@@ -1,0 +1,73 @@
+/**
+ * Browser capability detection for sync features
+ */
+
+export interface SyncCapabilities {
+  /** Supports File System Access API (persistent file handles) */
+  fileSystemAccess: boolean;
+  /** Supports saving files via picker */
+  showSaveFilePicker: boolean;
+  /** Supports opening files via picker */
+  showOpenFilePicker: boolean;
+  /** Supports Web Crypto API for encryption */
+  webCrypto: boolean;
+  /** Manual export/import always available */
+  manualSync: boolean;
+}
+
+/**
+ * Check if the File System Access API is available
+ */
+export function supportsFileSystemAccess(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    'showSaveFilePicker' in window &&
+    'showOpenFilePicker' in window
+  );
+}
+
+/**
+ * Check if Web Crypto API is available
+ */
+export function supportsWebCrypto(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.crypto !== 'undefined' &&
+    typeof window.crypto.subtle !== 'undefined'
+  );
+}
+
+/**
+ * Get all sync capabilities for the current browser
+ */
+export function getSyncCapabilities(): SyncCapabilities {
+  const hasFileSystemAccess = supportsFileSystemAccess();
+
+  return {
+    fileSystemAccess: hasFileSystemAccess,
+    showSaveFilePicker: hasFileSystemAccess,
+    showOpenFilePicker: hasFileSystemAccess,
+    webCrypto: supportsWebCrypto(),
+    manualSync: true, // Always available via Blob download/upload
+  };
+}
+
+/**
+ * Check if auto-sync is available (requires File System Access API)
+ */
+export function canAutoSync(): boolean {
+  return supportsFileSystemAccess();
+}
+
+/**
+ * Get a user-friendly message about sync capabilities
+ */
+export function getSyncCapabilityMessage(): string {
+  const capabilities = getSyncCapabilities();
+
+  if (capabilities.fileSystemAccess) {
+    return 'Full sync support available. You can configure automatic sync to a file.';
+  }
+
+  return 'Your browser supports manual export/import only. For automatic sync, use Chrome or Edge.';
+}

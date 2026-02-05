@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
@@ -27,6 +28,9 @@ function toggleTheme() {
 
     <!-- Right side - User actions -->
     <div class="flex items-center gap-4">
+      <!-- Sync status indicator -->
+      <SyncStatusIndicator />
+
       <!-- Theme toggle -->
       <button
         type="button"

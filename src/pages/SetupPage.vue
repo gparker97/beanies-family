@@ -3,14 +3,22 @@ import { ref, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useSyncStore } from '@/stores/syncStore';
+import { canAutoSync } from '@/services/sync/capabilities';
 import { BaseButton, BaseInput, BaseSelect, BaseCard } from '@/components/ui';
+import PasswordModal from '@/components/common/PasswordModal.vue';
 import { CURRENCIES, DEFAULT_CURRENCY } from '@/constants/currencies';
 
 const router = useRouter();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
+const syncStore = useSyncStore();
 
 const isSubmitting = ref(false);
+const isLoadingFile = ref(false);
+const loadFileError = ref<string | null>(null);
+const showDecryptModal = ref(false);
+const decryptError = ref<string | null>(null);
 const step = ref(1);
 
 const form = reactive({
@@ -98,6 +106,72 @@ async function completeSetup() {
     isSubmitting.value = false;
   }
 }
+
+async function loadExistingData() {
+  if (isLoadingFile.value) return;
+
+  isLoadingFile.value = true;
+  loadFileError.value = null;
+
+  try {
+    const result = await syncStore.loadFromNewFile();
+
+    if (result.needsPassword) {
+      // File is encrypted, show password modal
+      isLoadingFile.value = false;
+      showDecryptModal.value = true;
+      return;
+    }
+
+    if (result.success) {
+      // Data loaded successfully - set current member if we have one
+      if (familyStore.members.length > 0) {
+        const owner = familyStore.members.find(m => m.role === 'owner') ?? familyStore.members[0];
+        if (owner) {
+          familyStore.setCurrentMember(owner.id);
+        }
+      }
+      // Navigate to dashboard
+      router.replace('/dashboard');
+    } else if (syncStore.error) {
+      loadFileError.value = syncStore.error;
+    }
+  } catch (error) {
+    console.error('Failed to load existing data:', error);
+    loadFileError.value = 'Failed to load file. Please try again.';
+  } finally {
+    isLoadingFile.value = false;
+  }
+}
+
+async function handleDecryptFile(password: string) {
+  isLoadingFile.value = true;
+  decryptError.value = null;
+
+  const result = await syncStore.decryptPendingFile(password);
+
+  if (result.success) {
+    showDecryptModal.value = false;
+    // Data loaded successfully - set current member if we have one
+    if (familyStore.members.length > 0) {
+      const owner = familyStore.members.find(m => m.role === 'owner') ?? familyStore.members[0];
+      if (owner) {
+        familyStore.setCurrentMember(owner.id);
+      }
+    }
+    // Navigate to dashboard
+    router.replace('/dashboard');
+  } else {
+    decryptError.value = result.error ?? 'Failed to decrypt file';
+    isLoadingFile.value = false;
+  }
+}
+
+function handleDecryptModalClose() {
+  showDecryptModal.value = false;
+  syncStore.clearPendingEncryptedFile();
+  decryptError.value = null;
+}
 </script>
 
 <template>
@@ -167,6 +241,27 @@ async function completeSetup() {
               Continue
             </BaseButton>
           </div>
+
+          <!-- Load existing data option -->
+          <div v-if="canAutoSync()" class="pt-4 border-t border-gray-200 dark:border-slate-700">
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center mb-3">
+              Have an existing data file?
+            </p>
+            <BaseButton
+              variant="secondary"
+              class="w-full"
+              :loading="isLoadingFile"
+              @click="loadExistingData"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Load Existing Data File
+            </BaseButton>
+            <p v-if="loadFileError" class="mt-2 text-sm text-red-600 dark:text-red-400 text-center">
+              {{ loadFileError }}
+            </p>
+          </div>
         </div>
 
         <!-- Step 2: Preferences -->
@@ -205,6 +300,40 @@ async function completeSetup() {
       <p class="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
         Your data is stored locally and never leaves your device unless you enable sync.
       </p>
+    </div>
+
+    <!-- Decrypt File Password Modal -->
+    <PasswordModal
+      :open="showDecryptModal"
+      title="Enter Password"
+      description="This file is encrypted. Enter your password to decrypt and load your data."
+      confirm-label="Decrypt & Load"
+      @close="handleDecryptModalClose"
+      @confirm="handleDecryptFile"
+    />
+
+    <!-- Decrypt error display -->
+    <div
+      v-if="decryptError"
+      class="fixed bottom-4 right-4 p-4 bg-red-50 dark:bg-red-900/90 border border-red-200 dark:border-red-800 rounded-lg shadow-lg max-w-sm"
+    >
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+          <p class="text-sm font-medium text-red-800 dark:text-red-200">Decryption Error</p>
+          <p class="text-sm text-red-600 dark:text-red-300 mt-1">{{ decryptError }}</p>
+        </div>
+        <button
+          class="text-red-400 hover:text-red-600 dark:hover:text-red-200"
+          @click="decryptError = null"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </template>
