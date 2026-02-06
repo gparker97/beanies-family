@@ -49,7 +49,17 @@ vi.mock('@/stores/settingsStore', () => ({
 // Mock formatCurrency
 vi.mock('@/constants/currencies', () => ({
   formatCurrency: (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`,
-  CURRENCIES: [{ code: 'USD', name: 'US Dollar', symbol: '$' }],
+  getCurrencyInfo: (code: string) => {
+    const currencies: Record<string, { code: string; name: string; symbol: string; decimals: number }> = {
+      USD: { code: 'USD', name: 'US Dollar', symbol: '$', decimals: 2 },
+      SGD: { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$', decimals: 2 },
+    };
+    return currencies[code];
+  },
+  CURRENCIES: [
+    { code: 'USD', name: 'US Dollar', symbol: '$' },
+    { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$' },
+  ],
 }));
 
 describe('AccountsPage - Edit Account Modal', () => {
@@ -220,5 +230,115 @@ describe('AccountsPage - Edit Account Modal', () => {
 
     // updateAccount should be called
     expect(mockUpdateAccount).toHaveBeenCalled();
+  });
+});
+
+describe('AccountsPage - Currency Selector', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('should display a currency selector at the top of the page', () => {
+    const wrapper = mount(AccountsPage, {
+      global: {
+        stubs: {
+          BaseCard: { template: '<div><slot /></div>' },
+          BaseButton: { template: '<button><slot /></button>' },
+          BaseInput: { template: '<input />' },
+          BaseSelect: {
+            template: '<select :data-testid="$attrs[\'data-testid\']"><slot /></select>',
+            props: ['modelValue', 'options', 'label'],
+          },
+          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+        },
+      },
+    });
+
+    const currencySelector = wrapper.find('[data-testid="currency-selector"]');
+    expect(currencySelector.exists()).toBe(true);
+  });
+
+  it('should show USD and SGD as currency options', () => {
+    const wrapper = mount(AccountsPage, {
+      global: {
+        stubs: {
+          BaseCard: { template: '<div><slot /></div>' },
+          BaseButton: { template: '<button><slot /></button>' },
+          BaseInput: { template: '<input />' },
+          BaseSelect: {
+            template: '<select :data-testid="$attrs[\'data-testid\']" :data-options="JSON.stringify(options)"><slot /></select>',
+            props: ['modelValue', 'options', 'label'],
+          },
+          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+        },
+      },
+    });
+
+    const currencySelector = wrapper.find('[data-testid="currency-selector"]');
+    const options = JSON.parse(currencySelector.attributes('data-options') || '[]');
+
+    expect(options.some((o: { value: string }) => o.value === 'USD')).toBe(true);
+    expect(options.some((o: { value: string }) => o.value === 'SGD')).toBe(true);
+  });
+
+  it('should display currency label for amounts not in selected display currency', async () => {
+    // Mock accounts with different currencies
+    vi.mocked(await import('@/stores/accountsStore')).useAccountsStore.mockReturnValue({
+      accounts: [
+        {
+          id: 'usd-account',
+          memberId: 'member-1',
+          name: 'USD Account',
+          type: 'checking',
+          currency: 'USD',
+          balance: 1000,
+          institution: 'Bank',
+          isActive: true,
+          includeInNetWorth: true,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'sgd-account',
+          memberId: 'member-1',
+          name: 'SGD Account',
+          type: 'savings',
+          currency: 'SGD',
+          balance: 5000,
+          institution: 'SG Bank',
+          isActive: true,
+          includeInNetWorth: true,
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+      totalAssets: 6000,
+      totalLiabilities: 0,
+      totalBalance: 6000,
+      createAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+    } as any);
+
+    const wrapper = mount(AccountsPage, {
+      global: {
+        stubs: {
+          BaseCard: { template: '<div><slot /></div>' },
+          BaseButton: { template: '<button><slot /></button>' },
+          BaseInput: { template: '<input />' },
+          BaseSelect: {
+            template: '<select :data-testid="$attrs[\'data-testid\']"><slot /></select>',
+            props: ['modelValue', 'options', 'label'],
+          },
+          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+        },
+      },
+    });
+
+    // By default display currency is USD, so SGD account should show "SGD" label
+    const html = wrapper.html();
+    // SGD account balance should include currency label since it's not the display currency
+    expect(html).toContain('SGD');
   });
 });

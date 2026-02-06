@@ -156,6 +156,8 @@ export interface Settings {
   id: 'app_settings';
   baseCurrency: CurrencyCode;
   exchangeRates: ExchangeRate[];
+  exchangeRateAutoUpdate: boolean;
+  exchangeRateLastFetch: ISODateString | null;
   theme: 'light' | 'dark' | 'system';
   syncEnabled: boolean;
   syncFilePath?: string; // Display name of sync file

@@ -4,8 +4,8 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
-import { formatCurrency, CURRENCIES } from '@/constants/currencies';
-import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
+import { formatCurrency, CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
+import type { Account, AccountType, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
 
 const accountsStore = useAccountsStore();
 const familyStore = useFamilyStore();
@@ -14,6 +14,13 @@ const settingsStore = useSettingsStore();
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const isSubmitting = ref(false);
+
+// Display currency selector - only USD and SGD for now
+const displayCurrency = ref<CurrencyCode>('USD');
+const displayCurrencyOptions = [
+  { value: 'USD', label: 'USD - US Dollar' },
+  { value: 'SGD', label: 'SGD - Singapore Dollar' },
+];
 
 // Editing state
 const editingAccountId = ref<string | null>(null);
@@ -65,8 +72,28 @@ const newAccount = ref<CreateAccountInput>({
 
 const accounts = computed(() => accountsStore.accounts);
 
+/**
+ * Format money with currency label if different from display currency.
+ * If the currency matches display currency, just show the symbol and amount.
+ * If different, show "SGD S$108,000" format.
+ */
 function formatMoney(amount: number, currency?: string): string {
-  return formatCurrency(amount, currency || settingsStore.baseCurrency);
+  const currencyCode = (currency || settingsStore.baseCurrency) as CurrencyCode;
+  const currencyInfo = getCurrencyInfo(currencyCode);
+
+  // Format the number with the currency's symbol
+  const formatted = formatCurrency(amount, currencyCode);
+
+  // If currency matches display currency, just return the formatted amount
+  if (currencyCode === displayCurrency.value) {
+    return formatted;
+  }
+
+  // Otherwise, prepend the currency code for clarity (e.g., "SGD S$108,000")
+  return `${currencyCode} ${currencyInfo?.symbol || ''}${amount.toLocaleString('en-US', {
+    minimumFractionDigits: currencyInfo?.decimals ?? 2,
+    maximumFractionDigits: currencyInfo?.decimals ?? 2,
+  })}`;
 }
 
 function getAccountTypeLabel(type: AccountType): string {
@@ -156,9 +183,18 @@ async function deleteAccount(id: string) {
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Accounts</h1>
         <p class="text-gray-500 dark:text-gray-400">Manage your bank accounts and credit cards</p>
       </div>
-      <BaseButton @click="openAddModal">
-        Add Account
-      </BaseButton>
+      <div class="flex items-center gap-4">
+        <BaseSelect
+          v-model="displayCurrency"
+          :options="displayCurrencyOptions"
+          label="Display Currency"
+          data-testid="currency-selector"
+          class="w-48"
+        />
+        <BaseButton @click="openAddModal">
+          Add Account
+        </BaseButton>
+      </div>
     </div>
 
     <!-- Summary -->
