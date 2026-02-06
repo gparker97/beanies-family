@@ -1,17 +1,37 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
+import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
+import type { CurrencyCode } from '@/types/models';
 
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 
 const currentMember = computed(() => familyStore.currentMember);
+const showCurrencyDropdown = ref(false);
+
+const currencyOptions = CURRENCIES.map((c) => ({
+  code: c.code,
+  label: `${c.code} - ${c.symbol}`,
+  fullLabel: `${c.code} - ${c.name}`,
+}));
+
+const currentCurrencyInfo = computed(() => getCurrencyInfo(settingsStore.displayCurrency));
+
+async function selectCurrency(code: CurrencyCode) {
+  await settingsStore.setDisplayCurrency(code);
+  showCurrencyDropdown.value = false;
+}
 
 function toggleTheme() {
   const newTheme = settingsStore.theme === 'dark' ? 'light' : 'dark';
   settingsStore.setTheme(newTheme);
+}
+
+function closeCurrencyDropdown() {
+  showCurrencyDropdown.value = false;
 }
 </script>
 
@@ -28,6 +48,41 @@ function toggleTheme() {
 
     <!-- Right side - User actions -->
     <div class="flex items-center gap-4">
+      <!-- Currency selector -->
+      <div class="relative">
+        <button
+          type="button"
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+          @click="showCurrencyDropdown = !showCurrencyDropdown"
+          @blur="closeCurrencyDropdown"
+        >
+          <span>{{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}</span>
+          <span class="text-gray-500 dark:text-gray-400">{{ settingsStore.displayCurrency }}</span>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        <!-- Dropdown menu -->
+        <div
+          v-if="showCurrencyDropdown"
+          class="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50 max-h-64 overflow-y-auto"
+        >
+          <button
+            v-for="option in currencyOptions"
+            :key="option.code"
+            type="button"
+            class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+            :class="option.code === settingsStore.displayCurrency
+              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+              : 'text-gray-700 dark:text-gray-300'"
+            @mousedown.prevent="selectCurrency(option.code)"
+          >
+            {{ option.fullLabel }}
+          </button>
+        </div>
+      </div>
+
       <!-- Sync status indicator -->
       <SyncStatusIndicator />
 

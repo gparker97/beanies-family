@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useAccountsStore } from './accountsStore';
-import type { Account, CreateAccountInput } from '@/types/models';
+import type { Account } from '@/types/models';
 
 // Mock the account repository
 vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
@@ -50,8 +50,8 @@ describe('accountsStore', () => {
 
       // Assert
       expect(result).not.toBeNull();
-      expect(result?.name).toBe('Updated Account Name');
-      expect(store.accounts[0].name).toBe('Updated Account Name');
+      expect(result!.name).toBe('Updated Account Name');
+      expect(store.accounts[0]!.name).toBe('Updated Account Name');
       expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { name: 'Updated Account Name' });
     });
 
@@ -69,8 +69,8 @@ describe('accountsStore', () => {
 
       // Assert
       expect(result).not.toBeNull();
-      expect(result?.balance).toBe(2500.50);
-      expect(store.accounts[0].balance).toBe(2500.50);
+      expect(result!.balance).toBe(2500.50);
+      expect(store.accounts[0]!.balance).toBe(2500.50);
     });
 
     it('should update account memberId (associate with different family member)', async () => {
@@ -87,8 +87,8 @@ describe('accountsStore', () => {
 
       // Assert
       expect(result).not.toBeNull();
-      expect(result?.memberId).toBe('member-2');
-      expect(store.accounts[0].memberId).toBe('member-2');
+      expect(result!.memberId).toBe('member-2');
+      expect(store.accounts[0]!.memberId).toBe('member-2');
     });
 
     it('should update multiple fields at once', async () => {

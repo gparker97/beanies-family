@@ -3,25 +3,27 @@ import { computed } from 'vue';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard } from '@/components/ui';
-import { formatCurrency } from '@/constants/currencies';
+import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { formatDateShort } from '@/utils/date';
 
 const recurringStore = useRecurringStore();
 const settingsStore = useSettingsStore();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 
 const monthlyIncome = computed(() =>
-  formatCurrency(recurringStore.totalMonthlyRecurringIncome, settingsStore.baseCurrency)
+  formatInDisplayCurrency(recurringStore.totalMonthlyRecurringIncome, settingsStore.baseCurrency)
 );
 
 const monthlyExpenses = computed(() =>
-  formatCurrency(recurringStore.totalMonthlyRecurringExpenses, settingsStore.baseCurrency)
+  formatInDisplayCurrency(recurringStore.totalMonthlyRecurringExpenses, settingsStore.baseCurrency)
 );
 
 const netRecurring = computed(() => recurringStore.netMonthlyRecurring);
 
 const netRecurringFormatted = computed(() =>
-  formatCurrency(Math.abs(netRecurring.value), settingsStore.baseCurrency)
+  formatInDisplayCurrency(Math.abs(netRecurring.value), settingsStore.baseCurrency)
 );
 
 // Get upcoming items sorted by next due date
@@ -114,12 +116,12 @@ const upcomingItems = computed(() => {
                 <span class="text-gray-400 dark:text-gray-500 text-xs">
                   {{ nextDate ? formatDateShort(nextDate.toISOString()) : '' }}
                 </span>
-                <span
-                  :class="item.type === 'income' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
-                  class="font-medium"
-                >
-                  {{ item.type === 'income' ? '+' : '-' }}{{ formatCurrency(item.amount, item.currency) }}
-                </span>
+                <CurrencyAmount
+                  :amount="item.amount"
+                  :currency="item.currency"
+                  :type="item.type === 'income' ? 'income' : 'expense'"
+                  size="sm"
+                />
               </div>
             </div>
           </div>

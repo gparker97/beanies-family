@@ -10,6 +10,7 @@ export function getDefaultSettings(): Settings {
   return {
     id: SETTINGS_ID,
     baseCurrency: DEFAULT_CURRENCY,
+    displayCurrency: DEFAULT_CURRENCY,
     exchangeRates: [],
     exchangeRateAutoUpdate: true,
     exchangeRateLastFetch: null,
@@ -47,6 +48,10 @@ export async function saveSettings(settings: Partial<Settings>): Promise<Setting
 
 export async function setBaseCurrency(currency: CurrencyCode): Promise<Settings> {
   return saveSettings({ baseCurrency: currency });
+}
+
+export async function setDisplayCurrency(currency: CurrencyCode): Promise<Settings> {
+  return saveSettings({ displayCurrency: currency });
 }
 
 export async function setTheme(theme: 'light' | 'dark' | 'system'): Promise<Settings> {

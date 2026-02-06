@@ -4,7 +4,7 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
-import { formatCurrency } from '@/constants/currencies';
+import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import type { CreateGoalInput, GoalType, GoalPriority } from '@/types/models';
 
 const goalsStore = useGoalsStore();
@@ -38,10 +38,6 @@ const newGoal = ref<CreateGoalInput>({
   priority: 'medium',
   isCompleted: false,
 });
-
-function formatMoney(amount: number): string {
-  return formatCurrency(amount, settingsStore.baseCurrency);
-}
 
 function openAddModal() {
   newGoal.value = {
@@ -140,7 +136,9 @@ async function deleteGoal(id: string) {
           <div class="flex items-center justify-between text-sm mb-2">
             <span class="text-gray-500 dark:text-gray-400">Progress</span>
             <span class="font-medium text-gray-900 dark:text-gray-100">
-              {{ formatMoney(goal.currentAmount) }} / {{ formatMoney(goal.targetAmount) }}
+              <CurrencyAmount :amount="goal.currentAmount" :currency="goal.currency" size="sm" />
+              <span class="mx-1">/</span>
+              <CurrencyAmount :amount="goal.targetAmount" :currency="goal.currency" size="sm" />
             </span>
           </div>
           <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">

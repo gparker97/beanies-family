@@ -6,7 +6,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
-import { formatCurrency } from '@/constants/currencies';
+import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, getCategoryById } from '@/constants/categories';
 import { formatDate, toISODateString } from '@/utils/date';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
@@ -16,6 +17,7 @@ const transactionsStore = useTransactionsStore();
 const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 
 // Tab state
 const activeTab = ref<'transactions' | 'recurring'>('transactions');
@@ -58,8 +60,9 @@ const newTransaction = ref<CreateTransactionInput>({
 const transactions = computed(() => transactionsStore.sortedTransactions);
 const recurringItems = computed(() => recurringStore.recurringItems);
 
-function formatMoney(amount: number): string {
-  return formatCurrency(amount, settingsStore.baseCurrency);
+// Format totals (which are in base currency) to display currency
+function formatTotal(amount: number): string {
+  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
 }
 
 function getAccountName(accountId: string): string {
@@ -212,13 +215,13 @@ function formatNextDate(item: RecurringItem): string {
         <BaseCard>
           <p class="text-sm text-gray-500 dark:text-gray-400">This Month Income</p>
           <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-            {{ formatMoney(transactionsStore.thisMonthIncome) }}
+            {{ formatTotal(transactionsStore.thisMonthIncome) }}
           </p>
         </BaseCard>
         <BaseCard>
           <p class="text-sm text-gray-500 dark:text-gray-400">This Month Expenses</p>
           <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-            {{ formatMoney(transactionsStore.thisMonthExpenses) }}
+            {{ formatTotal(transactionsStore.thisMonthExpenses) }}
           </p>
         </BaseCard>
         <BaseCard>
@@ -227,7 +230,7 @@ function formatNextDate(item: RecurringItem): string {
             class="text-2xl font-bold mt-1"
             :class="transactionsStore.thisMonthNetCashFlow >= 0 ? 'text-green-600' : 'text-red-600'"
           >
-            {{ formatMoney(transactionsStore.thisMonthNetCashFlow) }}
+            {{ formatTotal(transactionsStore.thisMonthNetCashFlow) }}
           </p>
         </BaseCard>
       </div>
@@ -305,12 +308,12 @@ function formatNextDate(item: RecurringItem): string {
               </div>
             </div>
             <div class="flex items-center gap-4">
-              <span
-                class="text-lg font-semibold"
-                :class="transaction.type === 'income' ? 'text-green-600' : 'text-red-600'"
-              >
-                {{ transaction.type === 'income' ? '+' : '-' }}{{ formatMoney(transaction.amount) }}
-              </span>
+              <CurrencyAmount
+                :amount="transaction.amount"
+                :currency="transaction.currency"
+                :type="transaction.type === 'income' ? 'income' : 'expense'"
+                size="lg"
+              />
               <button
                 class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
                 @click="deleteTransaction(transaction.id)"
@@ -332,13 +335,13 @@ function formatNextDate(item: RecurringItem): string {
         <BaseCard>
           <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Recurring Income</p>
           <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-            {{ formatMoney(recurringStore.totalMonthlyRecurringIncome) }}
+            {{ formatTotal(recurringStore.totalMonthlyRecurringIncome) }}
           </p>
         </BaseCard>
         <BaseCard>
           <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Recurring Expenses</p>
           <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-            {{ formatMoney(recurringStore.totalMonthlyRecurringExpenses) }}
+            {{ formatTotal(recurringStore.totalMonthlyRecurringExpenses) }}
           </p>
         </BaseCard>
         <BaseCard>
@@ -347,7 +350,7 @@ function formatNextDate(item: RecurringItem): string {
             class="text-2xl font-bold mt-1"
             :class="recurringStore.netMonthlyRecurring >= 0 ? 'text-green-600' : 'text-red-600'"
           >
-            {{ formatMoney(recurringStore.netMonthlyRecurring) }}
+            {{ formatTotal(recurringStore.netMonthlyRecurring) }}
           </p>
         </BaseCard>
       </div>
@@ -418,12 +421,12 @@ function formatNextDate(item: RecurringItem): string {
                 </div>
               </div>
               <div class="flex items-center gap-4">
-                <span
-                  class="text-lg font-semibold"
-                  :class="item.type === 'income' ? 'text-green-600' : 'text-red-600'"
-                >
-                  {{ item.type === 'income' ? '+' : '-' }}{{ formatMoney(item.amount) }}
-                </span>
+                <CurrencyAmount
+                  :amount="item.amount"
+                  :currency="item.currency"
+                  :type="item.type === 'income' ? 'income' : 'expense'"
+                  size="lg"
+                />
                 <div class="flex gap-1">
                   <button
                     class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"

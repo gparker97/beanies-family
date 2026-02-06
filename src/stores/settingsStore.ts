@@ -11,6 +11,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Getters
   const baseCurrency = computed(() => settings.value.baseCurrency);
+  const displayCurrency = computed(() => settings.value.displayCurrency ?? settings.value.baseCurrency);
   const theme = computed(() => settings.value.theme);
   const syncEnabled = computed(() => settings.value.syncEnabled);
   const aiProvider = computed(() => settings.value.aiProvider);
@@ -59,6 +60,18 @@ export const useSettingsStore = defineStore('settings', () => {
       settings.value = await settingsRepo.setBaseCurrency(currency);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update base currency';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function setDisplayCurrency(currency: CurrencyCode): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      settings.value = await settingsRepo.setDisplayCurrency(currency);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update display currency';
     } finally {
       isLoading.value = false;
     }
@@ -190,6 +203,7 @@ export const useSettingsStore = defineStore('settings', () => {
     error,
     // Getters
     baseCurrency,
+    displayCurrency,
     theme,
     syncEnabled,
     aiProvider,
@@ -199,6 +213,7 @@ export const useSettingsStore = defineStore('settings', () => {
     // Actions
     loadSettings,
     setBaseCurrency,
+    setDisplayCurrency,
     setTheme,
     setSyncEnabled,
     setAutoSyncEnabled,

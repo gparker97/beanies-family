@@ -2,13 +2,14 @@
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard } from '@/components/ui';
-import { formatCurrency } from '@/constants/currencies';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 
 const assetsStore = useAssetsStore();
 const settingsStore = useSettingsStore();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 
-function formatMoney(amount: number): string {
-  return formatCurrency(amount, settingsStore.baseCurrency);
+function formatTotal(amount: number): string {
+  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
 }
 </script>
 
@@ -25,13 +26,13 @@ function formatMoney(amount: number): string {
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">Total Asset Value</p>
         <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-          {{ formatMoney(assetsStore.totalAssetValue) }}
+          {{ formatTotal(assetsStore.totalAssetValue) }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">Total Purchase Value</p>
         <p class="text-2xl font-bold text-gray-600 dark:text-gray-400 mt-1">
-          {{ formatMoney(assetsStore.totalPurchaseValue) }}
+          {{ formatTotal(assetsStore.totalPurchaseValue) }}
         </p>
       </BaseCard>
       <BaseCard>
@@ -40,7 +41,7 @@ function formatMoney(amount: number): string {
           class="text-2xl font-bold mt-1"
           :class="assetsStore.totalAppreciation >= 0 ? 'text-green-600' : 'text-red-600'"
         >
-          {{ formatMoney(assetsStore.totalAppreciation) }}
+          {{ formatTotal(assetsStore.totalAppreciation) }}
         </p>
       </BaseCard>
     </div>

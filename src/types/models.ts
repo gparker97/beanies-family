@@ -155,6 +155,7 @@ export interface AIApiKeys {
 export interface Settings {
   id: 'app_settings';
   baseCurrency: CurrencyCode;
+  displayCurrency: CurrencyCode; // Currency for displaying all values (can differ from base)
   exchangeRates: ExchangeRate[];
   exchangeRateAutoUpdate: boolean;
   exchangeRateLastFetch: ISODateString | null;

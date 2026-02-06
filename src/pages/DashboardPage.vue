@@ -6,12 +6,14 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard } from '@/components/ui';
 import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
-import { formatCurrency } from '@/constants/currencies';
+import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 
 const accountsStore = useAccountsStore();
 const transactionsStore = useTransactionsStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 
 const netWorth = computed(() => accountsStore.totalBalance);
 const totalAssets = computed(() => accountsStore.totalAssets);
@@ -22,8 +24,9 @@ const netCashFlow = computed(() => transactionsStore.thisMonthNetCashFlow);
 const activeGoals = computed(() => goalsStore.activeGoals.slice(0, 3));
 const recentTransactions = computed(() => transactionsStore.recentTransactions);
 
-function formatMoney(amount: number): string {
-  return formatCurrency(amount, settingsStore.baseCurrency);
+// Format totals (which are in base currency) to display currency
+function formatTotal(amount: number): string {
+  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
 }
 </script>
 
@@ -37,7 +40,7 @@ function formatMoney(amount: number): string {
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Net Worth</p>
             <p class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">
-              {{ formatMoney(netWorth) }}
+              {{ formatTotal(netWorth) }}
             </p>
           </div>
           <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
@@ -48,10 +51,10 @@ function formatMoney(amount: number): string {
         </div>
         <div class="mt-4 flex gap-4 text-sm">
           <span class="text-green-600 dark:text-green-400">
-            Assets: {{ formatMoney(totalAssets) }}
+            Assets: {{ formatTotal(totalAssets) }}
           </span>
           <span class="text-red-600 dark:text-red-400">
-            Liabilities: {{ formatMoney(totalLiabilities) }}
+            Liabilities: {{ formatTotal(totalLiabilities) }}
           </span>
         </div>
       </BaseCard>
@@ -62,7 +65,7 @@ function formatMoney(amount: number): string {
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Income</p>
             <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-              {{ formatMoney(monthlyIncome) }}
+              {{ formatTotal(monthlyIncome) }}
             </p>
           </div>
           <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
@@ -79,7 +82,7 @@ function formatMoney(amount: number): string {
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Expenses</p>
             <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-              {{ formatMoney(monthlyExpenses) }}
+              {{ formatTotal(monthlyExpenses) }}
             </p>
           </div>
           <div class="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
@@ -99,7 +102,7 @@ function formatMoney(amount: number): string {
               class="text-2xl font-bold mt-1"
               :class="netCashFlow >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'"
             >
-              {{ formatMoney(netCashFlow) }}
+              {{ formatTotal(netCashFlow) }}
             </p>
           </div>
           <div
@@ -169,12 +172,12 @@ function formatMoney(amount: number): string {
                 </p>
               </div>
             </div>
-            <span
-              class="font-medium"
-              :class="transaction.type === 'income' ? 'text-green-600' : 'text-red-600'"
-            >
-              {{ transaction.type === 'income' ? '+' : '-' }}{{ formatMoney(transaction.amount) }}
-            </span>
+            <CurrencyAmount
+              :amount="transaction.amount"
+              :currency="transaction.currency"
+              :type="transaction.type === 'income' ? 'income' : 'expense'"
+              size="md"
+            />
           </div>
         </div>
       </BaseCard>
@@ -195,7 +198,9 @@ function formatMoney(amount: number): string {
                 {{ goal.name }}
               </span>
               <span class="text-sm text-gray-500 dark:text-gray-400">
-                {{ formatMoney(goal.currentAmount) }} / {{ formatMoney(goal.targetAmount) }}
+                <CurrencyAmount :amount="goal.currentAmount" :currency="goal.currency" size="sm" />
+                <span class="mx-1">/</span>
+                <CurrencyAmount :amount="goal.targetAmount" :currency="goal.currency" size="sm" />
               </span>
             </div>
             <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">

@@ -4,27 +4,23 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
-import { formatCurrency, CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
-import type { Account, AccountType, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
+import { CURRENCIES } from '@/constants/currencies';
+import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 const accountsStore = useAccountsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const isSubmitting = ref(false);
 
-// Display currency selector - only USD and SGD for now
-const displayCurrency = ref<CurrencyCode>('USD');
-const displayCurrencyOptions = [
-  { value: 'USD', label: 'USD - US Dollar' },
-  { value: 'SGD', label: 'SGD - Singapore Dollar' },
-];
-
 // Editing state
 const editingAccountId = ref<string | null>(null);
-const editingAccount = ref<UpdateAccountInput & { name: string; balance: number; memberId: string }>({
+const editingAccount = ref<UpdateAccountInput & { name: string; balance: number; memberId: string; type: AccountType; currency: string }>({
   name: '',
   balance: 0,
   memberId: '',
@@ -72,28 +68,9 @@ const newAccount = ref<CreateAccountInput>({
 
 const accounts = computed(() => accountsStore.accounts);
 
-/**
- * Format money with currency label if different from display currency.
- * If the currency matches display currency, just show the symbol and amount.
- * If different, show "SGD S$108,000" format.
- */
-function formatMoney(amount: number, currency?: string): string {
-  const currencyCode = (currency || settingsStore.baseCurrency) as CurrencyCode;
-  const currencyInfo = getCurrencyInfo(currencyCode);
-
-  // Format the number with the currency's symbol
-  const formatted = formatCurrency(amount, currencyCode);
-
-  // If currency matches display currency, just return the formatted amount
-  if (currencyCode === displayCurrency.value) {
-    return formatted;
-  }
-
-  // Otherwise, prepend the currency code for clarity (e.g., "SGD S$108,000")
-  return `${currencyCode} ${currencyInfo?.symbol || ''}${amount.toLocaleString('en-US', {
-    minimumFractionDigits: currencyInfo?.decimals ?? 2,
-    maximumFractionDigits: currencyInfo?.decimals ?? 2,
-  })}`;
+// Format totals (which are in base currency) to display currency
+function formatTotal(amount: number): string {
+  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
 }
 
 function getAccountTypeLabel(type: AccountType): string {
@@ -183,18 +160,9 @@ async function deleteAccount(id: string) {
         <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Accounts</h1>
         <p class="text-gray-500 dark:text-gray-400">Manage your bank accounts and credit cards</p>
       </div>
-      <div class="flex items-center gap-4">
-        <BaseSelect
-          v-model="displayCurrency"
-          :options="displayCurrencyOptions"
-          label="Display Currency"
-          data-testid="currency-selector"
-          class="w-48"
-        />
-        <BaseButton @click="openAddModal">
-          Add Account
-        </BaseButton>
-      </div>
+      <BaseButton @click="openAddModal">
+        Add Account
+      </BaseButton>
     </div>
 
     <!-- Summary -->
@@ -202,19 +170,19 @@ async function deleteAccount(id: string) {
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">Total Assets</p>
         <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-          {{ formatMoney(accountsStore.totalAssets) }}
+          {{ formatTotal(accountsStore.totalAssets) }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">Total Liabilities</p>
         <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-          {{ formatMoney(accountsStore.totalLiabilities) }}
+          {{ formatTotal(accountsStore.totalLiabilities) }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">Net Worth</p>
         <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-          {{ formatMoney(accountsStore.totalBalance) }}
+          {{ formatTotal(accountsStore.totalBalance) }}
         </p>
       </BaseCard>
     </div>
@@ -253,12 +221,12 @@ async function deleteAccount(id: string) {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span
-              class="text-lg font-semibold"
-              :class="account.type === 'credit_card' || account.type === 'loan' ? 'text-red-600' : 'text-green-600'"
-            >
-              {{ formatMoney(account.balance, account.currency) }}
-            </span>
+            <CurrencyAmount
+              :amount="account.balance"
+              :currency="account.currency"
+              :type="account.type === 'credit_card' || account.type === 'loan' ? 'expense' : 'income'"
+              size="lg"
+            />
             <!-- Edit button -->
             <button
               data-testid="edit-account-btn"
