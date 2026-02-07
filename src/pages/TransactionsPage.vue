@@ -8,8 +8,10 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import CategoryIcon from '@/components/common/CategoryIcon.vue';
+import AccountTypeIcon from '@/components/common/AccountTypeIcon.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, getCategoryById } from '@/constants/categories';
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
 import { CURRENCIES } from '@/constants/currencies';
 import { formatDate, toISODateString } from '@/utils/date';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
@@ -22,8 +24,8 @@ const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 
-// Tab state
-const activeTab = ref<'transactions' | 'recurring'>('transactions');
+// Tab state - recurring first by default
+const activeTab = ref<'transactions' | 'recurring'>('recurring');
 
 // Transaction modal state
 const showAddModal = ref(false);
@@ -47,13 +49,21 @@ const accountOptions = computed(() =>
 );
 
 const categoryOptions = computed(() => {
-  const categories = newTransaction.value.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return categories.map((c) => ({ value: c.id, label: c.name }));
+  const type = newTransaction.value.type === 'income' ? 'income' : 'expense';
+  const groups = getCategoriesGrouped(type);
+  return groups.map((g) => ({
+    label: g.name,
+    options: g.categories.map((c) => ({ value: c.id, label: c.name })),
+  }));
 });
 
 const editCategoryOptions = computed(() => {
-  const categories = editTransaction.value.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return categories.map((c) => ({ value: c.id, label: c.name }));
+  const type = editTransaction.value.type === 'income' ? 'income' : 'expense';
+  const groups = getCategoriesGrouped(type);
+  return groups.map((g) => ({
+    label: g.name,
+    options: g.categories.map((c) => ({ value: c.id, label: c.name })),
+  }));
 });
 
 // Currency options with display currency at the top
@@ -137,6 +147,11 @@ function getMemberColorByAccountId(accountId: string): string {
   if (!account) return '#6b7280';
   const member = familyStore.members.find((m) => m.id === account.memberId);
   return member?.color || '#6b7280';
+}
+
+function getAccountTypeByAccountId(accountId: string) {
+  const account = accountsStore.accounts.find((a) => a.id === accountId);
+  return account?.type || 'other';
 }
 
 // Transaction functions
@@ -275,34 +290,35 @@ function formatNextDate(item: RecurringItem): string {
 
     <!-- Tab Navigation -->
     <div class="border-b border-gray-200 dark:border-slate-700">
-      <nav class="-mb-px flex gap-4">
+      <nav class="-mb-px flex gap-2">
         <button
-          class="py-3 px-1 border-b-2 font-medium text-sm transition-colors"
-          :class="
-            activeTab === 'transactions'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-          "
-          @click="activeTab = 'transactions'"
-        >
-          Transactions
-        </button>
-        <button
-          class="py-3 px-1 border-b-2 font-medium text-sm transition-colors"
+          class="py-2.5 px-4 rounded-t-lg font-medium text-sm transition-all"
           :class="
             activeTab === 'recurring'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
+              : 'bg-gradient-to-r from-gray-100 to-gray-50 dark:from-slate-700 dark:to-slate-600 text-gray-600 dark:text-gray-300 hover:from-gray-200 hover:to-gray-100 dark:hover:from-slate-600 dark:hover:to-slate-500'
           "
           @click="activeTab = 'recurring'"
         >
-          Recurring
+          Recurring Transactions
           <span
             v-if="recurringItems.length > 0"
-            class="ml-2 px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-slate-700"
+            class="ml-2 px-2 py-0.5 text-xs rounded-full"
+            :class="activeTab === 'recurring' ? 'bg-white/20' : 'bg-gray-200 dark:bg-slate-500'"
           >
             {{ recurringItems.length }}
           </span>
+        </button>
+        <button
+          class="py-2.5 px-4 rounded-t-lg font-medium text-sm transition-all"
+          :class="
+            activeTab === 'transactions'
+              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
+              : 'bg-gradient-to-r from-gray-100 to-gray-50 dark:from-slate-700 dark:to-slate-600 text-gray-600 dark:text-gray-300 hover:from-gray-200 hover:to-gray-100 dark:hover:from-slate-600 dark:hover:to-slate-500'
+          "
+          @click="activeTab = 'transactions'"
+        >
+          One Time Transactions
         </button>
       </nav>
     </div>
@@ -419,24 +435,40 @@ function formatNextDate(item: RecurringItem): string {
                   />
                 </svg>
               </div>
-              <div>
+              <div class="space-y-0.5">
+                <!-- Transaction Name -->
                 <p class="font-medium text-gray-900 dark:text-gray-100">
                   {{ transaction.description }}
-                  <span
-                    v-if="transaction.recurringItemId"
-                    class="ml-2 text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
-                  >
-                    Recurring
-                  </span>
                 </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ getCategoryName(transaction.category) }} - {{ getAccountName(transaction.accountId) }} - {{ formatDate(transaction.date) }}
+                <!-- Category -->
+                <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <CategoryIcon :category-id="transaction.category" size="sm" />
+                  {{ getCategoryName(transaction.category) }}
                 </p>
-                <p class="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
+                <!-- Family Member -->
+                <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                   <svg class="w-3.5 h-3.5" :style="{ color: getMemberColorByAccountId(transaction.accountId) }" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                   </svg>
                   {{ getMemberNameByAccountId(transaction.accountId) }}
+                </p>
+                <!-- Account -->
+                <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <AccountTypeIcon :type="getAccountTypeByAccountId(transaction.accountId)" size="sm" />
+                  {{ getAccountName(transaction.accountId) }}
+                </p>
+                <!-- Date -->
+                <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                  <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {{ formatDate(transaction.date) }}
+                  <span
+                    v-if="transaction.recurringItemId"
+                    class="ml-1 text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
+                  >
+                    Recurring
+                  </span>
                 </p>
               </div>
             </div>
@@ -575,26 +607,39 @@ function formatNextDate(item: RecurringItem): string {
                     />
                   </svg>
                 </div>
-                <div>
+                <div class="space-y-0.5">
+                  <!-- Transaction Name -->
                   <p class="font-medium text-gray-900 dark:text-gray-100">
                     {{ item.description }}
                     <span
                       v-if="!item.isActive"
-                      class="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-500 rounded"
+                      class="ml-1 text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-500 rounded"
                     >
                       Paused
                     </span>
                   </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ getCategoryName(item.category) }} - {{ getAccountName(item.accountId) }}
+                  <!-- Category -->
+                  <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <CategoryIcon :category-id="item.category" size="sm" />
+                    {{ getCategoryName(item.category) }}
                   </p>
-                  <p class="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
+                  <!-- Family Member -->
+                  <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
                     <svg class="w-3.5 h-3.5" :style="{ color: getMemberColorByAccountId(item.accountId) }" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                     </svg>
                     {{ getMemberNameByAccountId(item.accountId) }}
                   </p>
-                  <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  <!-- Account -->
+                  <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <AccountTypeIcon :type="getAccountTypeByAccountId(item.accountId)" size="sm" />
+                    {{ getAccountName(item.accountId) }}
+                  </p>
+                  <!-- Recurring Schedule -->
+                  <p class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
                     {{ formatFrequency(item) }} - Next: {{ formatNextDate(item) }}
                   </p>
                 </div>
@@ -675,7 +720,7 @@ function formatNextDate(item: RecurringItem): string {
 
         <BaseSelect
           v-model="newTransaction.category"
-          :options="categoryOptions"
+          :grouped-options="categoryOptions"
           label="Category"
         />
 
@@ -742,7 +787,7 @@ function formatNextDate(item: RecurringItem): string {
 
         <BaseSelect
           v-model="editTransaction.category"
-          :options="editCategoryOptions"
+          :grouped-options="editCategoryOptions"
           label="Category"
         />
 

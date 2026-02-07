@@ -2,15 +2,19 @@
 import { computed, ref } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useTranslationStore } from '@/stores/translationStore';
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
-import type { CurrencyCode } from '@/types/models';
+import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
+import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
+const translationStore = useTranslationStore();
 
 const currentMember = computed(() => familyStore.currentMember);
 const showCurrencyDropdown = ref(false);
+const showLanguageDropdown = ref(false);
 
 const currencyOptions = DISPLAY_CURRENCIES.map((c) => ({
   code: c.code,
@@ -19,10 +23,17 @@ const currencyOptions = DISPLAY_CURRENCIES.map((c) => ({
 }));
 
 const currentCurrencyInfo = computed(() => getCurrencyInfo(settingsStore.displayCurrency));
+const currentLanguageInfo = computed(() => getLanguageInfo(settingsStore.language));
 
 async function selectCurrency(code: CurrencyCode) {
   await settingsStore.setDisplayCurrency(code);
   showCurrencyDropdown.value = false;
+}
+
+async function selectLanguage(code: LanguageCode) {
+  showLanguageDropdown.value = false;
+  await settingsStore.setLanguage(code);
+  await translationStore.loadTranslations(code);
 }
 
 function toggleTheme() {
@@ -32,6 +43,10 @@ function toggleTheme() {
 
 function closeCurrencyDropdown() {
   showCurrencyDropdown.value = false;
+}
+
+function closeLanguageDropdown() {
+  showLanguageDropdown.value = false;
 }
 </script>
 
@@ -79,6 +94,45 @@ function closeCurrencyDropdown() {
             @mousedown.prevent="selectCurrency(option.code)"
           >
             {{ option.fullLabel }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Language selector -->
+      <div class="relative">
+        <button
+          type="button"
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+          :class="{ 'opacity-75': translationStore.isLoading }"
+          @click="showLanguageDropdown = !showLanguageDropdown"
+          @blur="closeLanguageDropdown"
+        >
+          <span>{{ currentLanguageInfo?.flag || '🌐' }}</span>
+          <span class="text-gray-500 dark:text-gray-400">{{ settingsStore.language.toUpperCase() }}</span>
+          <svg v-if="!translationStore.isLoading" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+          <svg v-else class="w-4 h-4 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+
+        <!-- Dropdown menu -->
+        <div
+          v-if="showLanguageDropdown"
+          class="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50"
+        >
+          <button
+            v-for="lang in LANGUAGES"
+            :key="lang.code"
+            type="button"
+            class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+            :class="lang.code === settingsStore.language
+              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+              : 'text-gray-700 dark:text-gray-300'"
+            @mousedown.prevent="selectLanguage(lang.code)"
+          >
+            {{ lang.flag }} {{ lang.nativeName }}
           </button>
         </div>
       </div>

@@ -8,10 +8,11 @@ import type {
   Settings,
   SyncQueueItem,
   RecurringItem,
+  TranslationCacheEntry,
 } from '@/types/models';
 
 const DB_NAME = 'gp-family-finance';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface FinanceDB extends DBSchema {
   familyMembers: {
@@ -52,6 +53,11 @@ export interface FinanceDB extends DBSchema {
     key: string;
     value: SyncQueueItem;
     indexes: { 'by-synced': number; 'by-timestamp': string };
+  };
+  translations: {
+    key: string;
+    value: TranslationCacheEntry;
+    indexes: { 'by-language': string };
   };
 }
 
@@ -116,6 +122,12 @@ export async function getDatabase(): Promise<IDBPDatabase<FinanceDB>> {
         const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' });
         syncStore.createIndex('by-synced', 'synced', { unique: false });
         syncStore.createIndex('by-timestamp', 'timestamp', { unique: false });
+      }
+
+      // Translations cache store
+      if (!db.objectStoreNames.contains('translations')) {
+        const translationsStore = db.createObjectStore('translations', { keyPath: 'id' });
+        translationsStore.createIndex('by-language', 'language', { unique: false });
       }
     },
   });

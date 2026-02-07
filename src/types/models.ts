@@ -2,6 +2,7 @@
 export type UUID = string;
 export type ISODateString = string;
 export type CurrencyCode = string; // ISO 4217 codes (e.g., 'USD', 'EUR', 'GBP')
+export type LanguageCode = 'en' | 'zh'; // Supported UI languages
 
 // FamilyMember - Each family member has their own profile
 export interface FamilyMember {
@@ -160,6 +161,7 @@ export interface Settings {
   exchangeRateAutoUpdate: boolean;
   exchangeRateLastFetch: ISODateString | null;
   theme: 'light' | 'dark' | 'system';
+  language: LanguageCode;
   syncEnabled: boolean;
   syncFilePath?: string; // Display name of sync file
   autoSyncEnabled: boolean;
@@ -169,6 +171,15 @@ export interface Settings {
   aiApiKeys: AIApiKeys;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+// Translation cache entry for storing translations in IndexedDB
+export interface TranslationCacheEntry {
+  id: string; // Compound: `${key}:${language}`
+  key: string;
+  language: LanguageCode;
+  translation: string;
+  version: number;
 }
 
 // Sync queue item for tracking changes
@@ -201,6 +212,7 @@ export interface Category {
   icon: string;
   type: 'income' | 'expense' | 'both';
   color: string;
+  group?: string;
 }
 
 // Form types for creating/updating entities
