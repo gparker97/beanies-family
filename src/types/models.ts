@@ -95,10 +95,25 @@ export interface RecurringItem {
 export type AssetType =
   | 'real_estate'
   | 'vehicle'
-  | 'investment'
-  | 'crypto'
+  | 'boat'
+  | 'jewelry'
+  | 'electronics'
+  | 'equipment'
+  | 'art'
   | 'collectible'
   | 'other';
+
+// Loan details for assets with financing
+export interface AssetLoan {
+  hasLoan: boolean;
+  loanAmount?: number; // Original principal
+  outstandingBalance?: number; // Current amount owed
+  interestRate?: number; // Annual percentage
+  monthlyPayment?: number;
+  loanTermMonths?: number;
+  lender?: string;
+  loanStartDate?: ISODateString;
+}
 
 export interface Asset {
   id: UUID;
@@ -111,6 +126,7 @@ export interface Asset {
   currency: CurrencyCode;
   notes?: string;
   includeInNetWorth: boolean;
+  loan?: AssetLoan;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

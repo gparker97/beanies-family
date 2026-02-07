@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode, ExchangeRate } from '@/types/models';
 import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
 import { useSettingsStore } from './settingsStore';
+import { useAssetsStore } from './assetsStore';
 
 export const useAccountsStore = defineStore('accounts', () => {
   // State
@@ -73,8 +74,8 @@ export const useAccountsStore = defineStore('accounts', () => {
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 
-  // Total liabilities - converts each account to base currency first
-  const totalLiabilities = computed(() => {
+  // Account-based liabilities only (credit cards, loans)
+  const accountLiabilities = computed(() => {
     return accounts.value
       .filter(
         (a) =>
@@ -83,6 +84,19 @@ export const useAccountsStore = defineStore('accounts', () => {
           (a.type === 'credit_card' || a.type === 'loan')
       )
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
+  });
+
+  // Total liabilities including asset loans
+  const totalLiabilities = computed(() => {
+    const assetsStore = useAssetsStore();
+    return accountLiabilities.value + assetsStore.totalLoanValue;
+  });
+
+  // Combined net worth: accounts + assets - all liabilities
+  const combinedNetWorth = computed(() => {
+    const assetsStore = useAssetsStore();
+    // totalBalance already subtracts account liabilities, so add net asset value (assets - asset loans)
+    return totalBalance.value + assetsStore.netAssetValue;
   });
 
   // Actions
@@ -171,7 +185,9 @@ export const useAccountsStore = defineStore('accounts', () => {
     accountsByMember,
     totalBalance,
     totalAssets,
+    accountLiabilities,
     totalLiabilities,
+    combinedNetWorth,
     // Actions
     loadAccounts,
     createAccount,

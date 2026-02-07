@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Asset, CreateAssetInput, UpdateAssetInput } from '@/types/models';
+import type { Asset, CreateAssetInput, UpdateAssetInput, CurrencyCode, ExchangeRate } from '@/types/models';
 import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
+import { useSettingsStore } from './settingsStore';
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
@@ -9,18 +10,63 @@ export const useAssetsStore = defineStore('assets', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  // Helper to get exchange rate
+  function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
+    if (from === to) return 1;
+
+    // Direct rate
+    const direct = rates.find((r) => r.from === from && r.to === to);
+    if (direct) return direct.rate;
+
+    // Inverse rate
+    const inverse = rates.find((r) => r.from === to && r.to === from);
+    if (inverse) return 1 / inverse.rate;
+
+    return undefined;
+  }
+
+  // Helper to convert amount to base currency
+  function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): number {
+    const settingsStore = useSettingsStore();
+    const baseCurrency = settingsStore.baseCurrency;
+
+    if (fromCurrency === baseCurrency) return amount;
+
+    const rate = getRate(settingsStore.exchangeRates, fromCurrency, baseCurrency);
+    return rate !== undefined ? amount * rate : amount;
+  }
+
   // Getters
+  // Total value of all assets (included in net worth), converted to base currency
   const totalAssetValue = computed(() =>
     assets.value
       .filter((a) => a.includeInNetWorth)
-      .reduce((sum, a) => sum + a.currentValue, 0)
+      .reduce((sum, a) => sum + convertToBaseCurrency(a.currentValue, a.currency), 0)
   );
 
+  // Total purchase value of all assets, converted to base currency
   const totalPurchaseValue = computed(() =>
-    assets.value.reduce((sum, a) => sum + a.purchaseValue, 0)
+    assets.value.reduce((sum, a) => sum + convertToBaseCurrency(a.purchaseValue, a.currency), 0)
   );
 
-  const totalAppreciation = computed(() => totalAssetValue.value - totalPurchaseValue.value);
+  // Total outstanding loan balance for assets with loans (included in net worth)
+  const totalLoanValue = computed(() =>
+    assets.value
+      .filter((a) => a.includeInNetWorth && a.loan?.hasLoan && a.loan?.outstandingBalance)
+      .reduce((sum, a) => sum + convertToBaseCurrency(a.loan!.outstandingBalance!, a.currency), 0)
+  );
+
+  // Net asset value = total asset value - outstanding loans
+  const netAssetValue = computed(() => totalAssetValue.value - totalLoanValue.value);
+
+  // Total appreciation (current value - purchase value)
+  const totalAppreciation = computed(() => {
+    return assets.value.reduce((sum, a) => {
+      const currentConverted = convertToBaseCurrency(a.currentValue, a.currency);
+      const purchaseConverted = convertToBaseCurrency(a.purchaseValue, a.currency);
+      return sum + (currentConverted - purchaseConverted);
+    }, 0);
+  });
 
   const assetsByType = computed(() => {
     const grouped = new Map<string, Asset[]>();
@@ -123,6 +169,8 @@ export const useAssetsStore = defineStore('assets', () => {
     // Getters
     totalAssetValue,
     totalPurchaseValue,
+    totalLoanValue,
+    netAssetValue,
     totalAppreciation,
     assetsByType,
     assetsByMember,

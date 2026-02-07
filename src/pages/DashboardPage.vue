@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -10,13 +11,17 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 
 const accountsStore = useAccountsStore();
+const assetsStore = useAssetsStore();
 const transactionsStore = useTransactionsStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 
-const netWorth = computed(() => accountsStore.totalBalance);
-const totalAssets = computed(() => accountsStore.totalAssets);
+// Combined net worth: accounts + physical assets - all liabilities (including asset loans)
+const netWorth = computed(() => accountsStore.combinedNetWorth);
+// Total assets: accounts + physical assets
+const totalAssets = computed(() => accountsStore.totalAssets + assetsStore.totalAssetValue);
+// Total liabilities: account liabilities + asset loans
 const totalLiabilities = computed(() => accountsStore.totalLiabilities);
 const monthlyIncome = computed(() => transactionsStore.thisMonthIncome);
 const monthlyExpenses = computed(() => transactionsStore.thisMonthExpenses);
