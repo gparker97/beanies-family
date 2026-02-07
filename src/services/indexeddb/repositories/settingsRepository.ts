@@ -1,7 +1,8 @@
 import { getDatabase } from '../database';
-import type { Settings, ExchangeRate, AIProvider, CurrencyCode } from '@/types/models';
+import type { Settings, ExchangeRate, AIProvider, CurrencyCode, LanguageCode } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
+import { DEFAULT_LANGUAGE } from '@/constants/languages';
 
 const SETTINGS_ID = 'app_settings';
 
@@ -15,6 +16,7 @@ export function getDefaultSettings(): Settings {
     exchangeRateAutoUpdate: true,
     exchangeRateLastFetch: null,
     theme: 'system',
+    language: DEFAULT_LANGUAGE,
     syncEnabled: false,
     autoSyncEnabled: true,
     encryptionEnabled: false,
@@ -56,6 +58,10 @@ export async function setDisplayCurrency(currency: CurrencyCode): Promise<Settin
 
 export async function setTheme(theme: 'light' | 'dark' | 'system'): Promise<Settings> {
   return saveSettings({ theme });
+}
+
+export async function setLanguage(language: LanguageCode): Promise<Settings> {
+  return saveSettings({ language });
 }
 
 export async function setSyncEnabled(enabled: boolean): Promise<Settings> {

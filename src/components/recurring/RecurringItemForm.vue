@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue';
 import { BaseInput, BaseSelect, BaseButton } from '@/components/ui';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '@/constants/categories';
+import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, getCategoriesGrouped } from '@/constants/categories';
 import { CURRENCIES } from '@/constants/currencies';
 import { toISODateString } from '@/utils/date';
 import type { RecurringItem, CreateRecurringItemInput, RecurringFrequency } from '@/types/models';
@@ -60,11 +60,19 @@ const accountOptions = computed(() =>
   accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))
 );
 
-// Category options based on type
+// Category options based on type (grouped for dropdown)
 const categoryOptions = computed(() => {
-  const categories =
-    formData.value.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  return categories.map((c) => ({ value: c.id, label: c.name }));
+  const type = formData.value.type === 'income' ? 'income' : 'expense';
+  const groups = getCategoriesGrouped(type);
+  return groups.map((g) => ({
+    label: g.name,
+    options: g.categories.map((c) => ({ value: c.id, label: c.name })),
+  }));
+});
+
+// Flat list of categories for default selection
+const flatCategories = computed(() => {
+  return formData.value.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 });
 
 // Currency options
@@ -101,18 +109,18 @@ const monthOptions = [
 watch(
   () => formData.value.type,
   () => {
-    const firstCategory = categoryOptions.value[0];
+    const firstCategory = flatCategories.value[0];
     if (firstCategory) {
-      formData.value.category = firstCategory.value;
+      formData.value.category = firstCategory.id;
     }
   }
 );
 
 // Set default category on mount if not set
-if (!formData.value.category && categoryOptions.value.length > 0) {
-  const firstCategory = categoryOptions.value[0];
+if (!formData.value.category && flatCategories.value.length > 0) {
+  const firstCategory = flatCategories.value[0];
   if (firstCategory) {
-    formData.value.category = firstCategory.value;
+    formData.value.category = firstCategory.id;
   }
 }
 
@@ -179,7 +187,7 @@ function handleSubmit() {
 
     <BaseSelect
       v-model="formData.category"
-      :options="categoryOptions"
+      :grouped-options="categoryOptions"
       label="Category"
     />
 

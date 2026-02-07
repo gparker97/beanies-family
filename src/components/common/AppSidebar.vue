@@ -1,26 +1,38 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useTranslation } from '@/composables/useTranslation';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useTranslation();
 
-interface NavItem {
-  name: string;
+interface NavItemDef {
+  labelKey: UIStringKey;
   path: string;
   icon: string;
 }
 
-const navItems: NavItem[] = [
-  { name: 'Dashboard', path: '/dashboard', icon: 'home' },
-  { name: 'Accounts', path: '/accounts', icon: 'credit-card' },
-  { name: 'Transactions', path: '/transactions', icon: 'arrow-right-left' },
-  { name: 'Assets', path: '/assets', icon: 'building' },
-  { name: 'Goals', path: '/goals', icon: 'target' },
-  { name: 'Reports', path: '/reports', icon: 'chart-bar' },
-  { name: 'Forecast', path: '/forecast', icon: 'trending-up' },
-  { name: 'Family', path: '/family', icon: 'users' },
-  { name: 'Settings', path: '/settings', icon: 'cog' },
+const navItemDefs: NavItemDef[] = [
+  { labelKey: 'nav.dashboard', path: '/dashboard', icon: 'home' },
+  { labelKey: 'nav.accounts', path: '/accounts', icon: 'credit-card' },
+  { labelKey: 'nav.transactions', path: '/transactions', icon: 'arrow-right-left' },
+  { labelKey: 'nav.assets', path: '/assets', icon: 'building' },
+  { labelKey: 'nav.goals', path: '/goals', icon: 'target' },
+  { labelKey: 'nav.reports', path: '/reports', icon: 'chart-bar' },
+  { labelKey: 'nav.forecast', path: '/forecast', icon: 'trending-up' },
+  { labelKey: 'nav.family', path: '/family', icon: 'users' },
+  { labelKey: 'nav.settings', path: '/settings', icon: 'cog' },
 ];
+
+const navItems = computed(() =>
+  navItemDefs.map(item => ({
+    name: t(item.labelKey),
+    path: item.path,
+    icon: item.icon,
+  }))
+);
 
 function isActive(path: string): boolean {
   return route.path === path;
@@ -36,10 +48,10 @@ function navigateTo(path: string) {
     <!-- Logo -->
     <div class="px-6 py-5 border-b border-gray-200 dark:border-slate-700">
       <h1 class="text-xl font-bold text-blue-600 dark:text-blue-400">
-        GP Finance
+        {{ t('app.name') }}
       </h1>
       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        Family Financial Planner
+        {{ t('app.tagline') }}
       </p>
     </div>
 

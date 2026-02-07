@@ -9,6 +9,7 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useRecurringStore } from '@/stores/recurringStore';
+import { useTranslationStore } from '@/stores/translationStore';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import AppSidebar from '@/components/common/AppSidebar.vue';
@@ -24,6 +25,7 @@ const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
+const translationStore = useTranslationStore();
 
 const showLayout = computed(() => {
   // Don't show sidebar/header on setup page
@@ -37,6 +39,11 @@ onMounted(async () => {
   // Auto-update exchange rates if enabled (non-blocking)
   if (settingsStore.settings.exchangeRateAutoUpdate) {
     updateRatesIfStale().catch(console.error);
+  }
+
+  // Load translations if language is not English (non-blocking)
+  if (settingsStore.language !== 'en') {
+    translationStore.loadTranslations(settingsStore.language).catch(console.error);
   }
 
   // Initialize sync service (restores file handle if configured)

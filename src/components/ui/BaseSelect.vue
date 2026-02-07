@@ -6,9 +6,15 @@ interface Option {
   label: string;
 }
 
+interface OptionGroup {
+  label: string;
+  options: Option[];
+}
+
 interface Props {
   modelValue: string | number;
-  options: Option[];
+  options?: Option[];
+  groupedOptions?: OptionGroup[];
   label?: string;
   placeholder?: string;
   error?: string;
@@ -29,6 +35,8 @@ const emit = defineEmits<{
 }>();
 
 const selectId = computed(() => props.id || `select-${Math.random().toString(36).slice(2, 9)}`);
+
+const isGrouped = computed(() => props.groupedOptions && props.groupedOptions.length > 0);
 
 const selectClasses = computed(() => {
   const base =
@@ -70,13 +78,36 @@ function handleChange(event: Event) {
         @change="handleChange"
       >
         <option value="" disabled>{{ placeholder }}</option>
-        <option
-          v-for="option in options"
-          :key="option.value"
-          :value="option.value"
-        >
-          {{ option.label }}
-        </option>
+
+        <!-- Grouped options with optgroup -->
+        <template v-if="isGrouped">
+          <optgroup
+            v-for="group in groupedOptions"
+            :key="group.label"
+            :label="group.label"
+            class="font-semibold text-gray-900 dark:text-gray-100"
+          >
+            <option
+              v-for="option in group.options"
+              :key="option.value"
+              :value="option.value"
+              class="font-normal"
+            >
+              {{ option.label }}
+            </option>
+          </optgroup>
+        </template>
+
+        <!-- Flat options -->
+        <template v-else>
+          <option
+            v-for="option in options"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}
+          </option>
+        </template>
       </select>
 
       <!-- Dropdown arrow -->
