@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { Line, Bar } from 'vue-chartjs';
 import {
   Chart as ChartJS,
@@ -21,7 +21,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
-import { ALL_CATEGORIES, getCategoryById } from '@/constants/categories';
+import { ALL_CATEGORIES, getCategoryById, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '@/constants/categories';
 import { addMonths, getStartOfMonth, getEndOfMonth, toISODateString, isDateBetween } from '@/utils/date';
 import type { CurrencyCode, ExchangeRate, Transaction, RecurringItem, Account, Asset } from '@/types/models';
 
@@ -65,13 +65,16 @@ function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): numb
 
 // ============ FILTERS ============
 
-// Date range filter
+// Date range filter - extended to 20 years
 const dateRangeOptions = [
   { value: '3m', label: 'Next 3 Months' },
   { value: '6m', label: 'Next 6 Months' },
   { value: '1y', label: 'Next 1 Year' },
   { value: '2y', label: 'Next 2 Years' },
   { value: '5y', label: 'Next 5 Years' },
+  { value: '10y', label: 'Next 10 Years' },
+  { value: '15y', label: 'Next 15 Years' },
+  { value: '20y', label: 'Next 20 Years' },
 ];
 const selectedDateRange = ref('1y');
 
@@ -82,8 +85,10 @@ const familyMemberOptions = computed(() => [
 ]);
 const selectedMember = ref('all');
 
-// Income vs Expenses time range
+// Income vs Expenses time range - added current and previous month
 const incomeExpenseRangeOptions = [
+  { value: 'current', label: 'Current Month' },
+  { value: 'previous', label: 'Previous Month' },
   { value: '6m', label: 'Last 6 Months' },
   { value: '1y', label: 'Last 12 Months' },
   { value: '2y', label: 'Last 2 Years' },
@@ -151,25 +156,44 @@ function calculateCurrentNetWorth(): number {
   return accountBalance + assetValue;
 }
 
-// Calculate monthly recurring net (income - expenses)
-function calculateMonthlyRecurringNet(): number {
+// Calculate monthly recurring income and expenses separately
+function calculateMonthlyRecurring(): { income: number; expenses: number } {
   const items = getFilteredRecurringItems();
 
-  return items.reduce((sum, item) => {
+  let income = 0;
+  let expenses = 0;
+
+  for (const item of items) {
     let monthlyAmount = item.amount;
     if (item.frequency === 'daily') monthlyAmount = item.amount * 30;
     if (item.frequency === 'yearly') monthlyAmount = item.amount / 12;
 
     const converted = convertToBaseCurrency(monthlyAmount, item.currency);
-    return sum + (item.type === 'income' ? converted : -converted);
-  }, 0);
+    if (item.type === 'income') {
+      income += converted;
+    } else {
+      expenses += converted;
+    }
+  }
+
+  return { income, expenses };
 }
+
+// Store monthly breakdown for tooltips
+interface MonthlyBreakdown {
+  netWorth: number;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+}
+
+const netWorthBreakdownData = ref<MonthlyBreakdown[]>([]);
 
 // Generate net worth projection data
 const netWorthChartData = computed(() => {
   const now = new Date();
   const currentNetWorth = calculateCurrentNetWorth();
-  const monthlyNet = calculateMonthlyRecurringNet();
+  const { income: monthlyIncome, expenses: monthlyExpenses } = calculateMonthlyRecurring();
+  const monthlyNet = monthlyIncome - monthlyExpenses;
 
   // Determine number of months to project
   let months = 12;
@@ -179,16 +203,36 @@ const netWorthChartData = computed(() => {
     case '1y': months = 12; break;
     case '2y': months = 24; break;
     case '5y': months = 60; break;
+    case '10y': months = 120; break;
+    case '15y': months = 180; break;
+    case '20y': months = 240; break;
   }
 
   const labels: string[] = [];
   const data: number[] = [];
+  const breakdowns: MonthlyBreakdown[] = [];
 
-  for (let i = 0; i <= months; i++) {
+  // For longer periods, show fewer data points (yearly for 10y+)
+  const step = months > 60 ? 12 : months > 24 ? 3 : 1;
+
+  for (let i = 0; i <= months; i += step) {
     const date = addMonths(now, i);
-    labels.push(date.toLocaleDateString('en-US', { month: 'short', year: i === 0 || date.getMonth() === 0 ? 'numeric' : undefined }));
-    data.push(currentNetWorth + monthlyNet * i);
+    const showYear = i === 0 || date.getMonth() === 0 || step >= 12;
+    labels.push(date.toLocaleDateString('en-US', {
+      month: step >= 12 ? undefined : 'short',
+      year: showYear ? 'numeric' : undefined
+    }));
+
+    const netWorth = currentNetWorth + monthlyNet * i;
+    data.push(netWorth);
+    breakdowns.push({
+      netWorth,
+      monthlyIncome,
+      monthlyExpenses,
+    });
   }
+
+  netWorthBreakdownData.value = breakdowns;
 
   return {
     labels,
@@ -200,7 +244,7 @@ const netWorthChartData = computed(() => {
         backgroundColor: 'rgba(59, 130, 246, 0.1)',
         fill: true,
         tension: 0.3,
-        pointRadius: 4,
+        pointRadius: months > 60 ? 3 : 4,
         pointHoverRadius: 6,
       },
     ],
@@ -216,8 +260,24 @@ const netWorthChartOptions = computed(() => ({
     },
     tooltip: {
       callbacks: {
-        label: (context: { parsed: { y: number } }) => {
-          return formatInDisplayCurrency(context.parsed.y, settingsStore.baseCurrency);
+        title: (context: { label: string }[]) => {
+          return context[0]?.label || '';
+        },
+        label: (context: { dataIndex: number; parsed: { y: number } }) => {
+          const breakdown = netWorthBreakdownData.value[context.dataIndex];
+          if (!breakdown) {
+            return formatInDisplayCurrency(context.parsed.y, settingsStore.baseCurrency);
+          }
+          return `Net Worth: ${formatInDisplayCurrency(breakdown.netWorth, settingsStore.baseCurrency)}`;
+        },
+        afterLabel: (context: { dataIndex: number }) => {
+          const breakdown = netWorthBreakdownData.value[context.dataIndex];
+          if (!breakdown) return [];
+          return [
+            `Monthly Income: +${formatInDisplayCurrency(breakdown.monthlyIncome, settingsStore.baseCurrency)}`,
+            `Monthly Expenses: -${formatInDisplayCurrency(breakdown.monthlyExpenses, settingsStore.baseCurrency)}`,
+            `Monthly Net: ${formatInDisplayCurrency(breakdown.monthlyIncome - breakdown.monthlyExpenses, settingsStore.baseCurrency)}`,
+          ];
         },
       },
     },
@@ -249,71 +309,118 @@ const netWorthChartOptions = computed(() => ({
 
 // ============ INCOME VS EXPENSES CALCULATION ============
 
-// Get transactions for selected member
-function getFilteredTransactions(): Transaction[] {
+// Get transactions for selected member (without category filter for stacked view)
+function getFilteredTransactionsForChart(): Transaction[] {
   const memberAccountIds = new Set(
     selectedMember.value === 'all'
       ? accountsStore.accounts.map((a) => a.id)
       : accountsStore.accounts.filter((a) => a.memberId === selectedMember.value).map((a) => a.id)
   );
 
-  let transactions = transactionsStore.transactions.filter((t) =>
+  return transactionsStore.transactions.filter((t) =>
     memberAccountIds.has(t.accountId)
   );
-
-  // Filter by category if selected
-  if (selectedCategory.value !== 'all') {
-    transactions = transactions.filter((t) => t.category === selectedCategory.value);
-  }
-
-  return transactions;
 }
 
-// Generate income vs expenses chart data
+// Color palette for categories
+const incomeColors = [
+  'rgba(34, 197, 94, 0.85)',   // green
+  'rgba(20, 184, 166, 0.85)',  // teal
+  'rgba(6, 182, 212, 0.85)',   // cyan
+  'rgba(59, 130, 246, 0.85)',  // blue
+  'rgba(99, 102, 241, 0.85)',  // indigo
+  'rgba(139, 92, 246, 0.85)',  // violet
+  'rgba(168, 85, 247, 0.85)',  // purple
+  'rgba(236, 72, 153, 0.85)',  // pink
+];
+
+const expenseColors = [
+  'rgba(239, 68, 68, 0.85)',   // red
+  'rgba(249, 115, 22, 0.85)',  // orange
+  'rgba(234, 179, 8, 0.85)',   // yellow
+  'rgba(132, 204, 22, 0.85)',  // lime
+  'rgba(16, 185, 129, 0.85)',  // emerald
+  'rgba(8, 145, 178, 0.85)',   // cyan-dark
+  'rgba(79, 70, 229, 0.85)',   // indigo-dark
+  'rgba(219, 39, 119, 0.85)',  // pink-dark
+  'rgba(190, 18, 60, 0.85)',   // rose
+  'rgba(124, 58, 237, 0.85)',  // violet-dark
+];
+
+// Generate income vs expenses chart data with category breakdown
 const incomeExpenseChartData = computed(() => {
   const now = new Date();
 
   // Determine number of months to look back
   let months = 12;
+  let startOffset = 0;
   switch (selectedIncomeExpenseRange.value) {
+    case 'current':
+      months = 1;
+      startOffset = 0;
+      break;
+    case 'previous':
+      months = 1;
+      startOffset = 1;
+      break;
     case '6m': months = 6; break;
     case '1y': months = 12; break;
     case '2y': months = 24; break;
   }
 
-  const transactions = getFilteredTransactions();
+  const transactions = getFilteredTransactionsForChart();
   const recurringItems = getFilteredRecurringItems();
 
   const labels: string[] = [];
-  const incomeData: number[] = [];
-  const expenseData: number[] = [];
 
-  for (let i = months - 1; i >= 0; i--) {
+  // Track amounts by category for each month
+  // Structure: { categoryId: number[] } where array index is month index
+  const incomeByCategoryByMonth: Map<string, number[]> = new Map();
+  const expenseByCategoryByMonth: Map<string, number[]> = new Map();
+
+  for (let i = months - 1 + startOffset; i >= startOffset; i--) {
     const monthDate = addMonths(now, -i);
     const monthStart = toISODateString(getStartOfMonth(monthDate));
     const monthEnd = toISODateString(getEndOfMonth(monthDate));
+    const monthIndex = months - 1 - i + startOffset;
 
-    labels.push(monthDate.toLocaleDateString('en-US', { month: 'short', year: monthDate.getMonth() === 0 || i === months - 1 ? 'numeric' : undefined }));
+    if (months === 1) {
+      labels.push(monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+    } else {
+      labels.push(monthDate.toLocaleDateString('en-US', {
+        month: 'short',
+        year: monthDate.getMonth() === 0 || i === months - 1 + startOffset ? 'numeric' : undefined
+      }));
+    }
 
     // Get transactions for this month
     const monthTransactions = transactions.filter((t) => isDateBetween(t.date, monthStart, monthEnd));
 
-    // Calculate income from transactions
-    let monthIncome = monthTransactions
-      .filter((t) => t.type === 'income')
-      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0);
+    // Process transactions by category
+    for (const t of monthTransactions) {
+      // Apply category filter if selected
+      if (selectedCategory.value !== 'all' && t.category !== selectedCategory.value) continue;
 
-    // Calculate expenses from transactions
-    let monthExpense = monthTransactions
-      .filter((t) => t.type === 'expense')
-      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0);
+      const amount = convertToBaseCurrency(t.amount, t.currency);
+      const categoryMap = t.type === 'income' ? incomeByCategoryByMonth : expenseByCategoryByMonth;
+
+      if (!categoryMap.has(t.category)) {
+        categoryMap.set(t.category, new Array(months).fill(0));
+      }
+      categoryMap.get(t.category)![monthIndex] += amount;
+    }
 
     // Add recurring items contribution (if not already counted via recurringItemId)
-    const transactionRecurringIds = new Set(monthTransactions.filter((t) => t.recurringItemId).map((t) => t.recurringItemId));
+    const transactionRecurringIds = new Set(
+      monthTransactions.filter((t) => t.recurringItemId).map((t) => t.recurringItemId)
+    );
 
     for (const item of recurringItems) {
       // Skip if this recurring item was already processed as a transaction
       if (transactionRecurringIds.has(item.id)) continue;
+
+      // Apply category filter if selected
+      if (selectedCategory.value !== 'all' && item.category !== selectedCategory.value) continue;
 
       // Check if this recurring item would have an occurrence in this month
       const startDate = new Date(item.startDate);
@@ -327,42 +434,86 @@ const incomeExpenseChartData = computed(() => {
         if (item.frequency === 'yearly') amount /= 12;
 
         const converted = convertToBaseCurrency(amount, item.currency);
+        const categoryMap = item.type === 'income' ? incomeByCategoryByMonth : expenseByCategoryByMonth;
 
-        // Only add if category matches filter
-        if (selectedCategory.value === 'all' || item.category === selectedCategory.value) {
-          if (item.type === 'income') {
-            monthIncome += converted;
-          } else {
-            monthExpense += converted;
-          }
+        if (!categoryMap.has(item.category)) {
+          categoryMap.set(item.category, new Array(months).fill(0));
         }
+        categoryMap.get(item.category)![monthIndex] += converted;
       }
     }
+  }
 
-    incomeData.push(monthIncome);
-    expenseData.push(monthExpense);
+  // Create datasets for each category
+  const datasets: {
+    label: string;
+    data: number[];
+    backgroundColor: string;
+    borderColor: string;
+    borderWidth: number;
+    borderRadius: number;
+    stack: string;
+  }[] = [];
+
+  // Add income category datasets
+  let incomeColorIndex = 0;
+  for (const [categoryId, monthlyAmounts] of incomeByCategoryByMonth.entries()) {
+    const category = getCategoryById(categoryId);
+    const color = category?.color || incomeColors[incomeColorIndex % incomeColors.length];
+    datasets.push({
+      label: category?.name || categoryId,
+      data: monthlyAmounts,
+      backgroundColor: color,
+      borderColor: color,
+      borderWidth: 1,
+      borderRadius: 2,
+      stack: 'income',
+    });
+    incomeColorIndex++;
+  }
+
+  // Add expense category datasets
+  let expenseColorIndex = 0;
+  for (const [categoryId, monthlyAmounts] of expenseByCategoryByMonth.entries()) {
+    const category = getCategoryById(categoryId);
+    const color = category?.color || expenseColors[expenseColorIndex % expenseColors.length];
+    datasets.push({
+      label: category?.name || categoryId,
+      data: monthlyAmounts,
+      backgroundColor: color,
+      borderColor: color,
+      borderWidth: 1,
+      borderRadius: 2,
+      stack: 'expenses',
+    });
+    expenseColorIndex++;
+  }
+
+  // If no data, add empty datasets to maintain structure
+  if (datasets.length === 0) {
+    datasets.push({
+      label: 'Income',
+      data: new Array(months).fill(0),
+      backgroundColor: 'rgba(34, 197, 94, 0.8)',
+      borderColor: 'rgb(34, 197, 94)',
+      borderWidth: 1,
+      borderRadius: 4,
+      stack: 'income',
+    });
+    datasets.push({
+      label: 'Expenses',
+      data: new Array(months).fill(0),
+      backgroundColor: 'rgba(239, 68, 68, 0.8)',
+      borderColor: 'rgb(239, 68, 68)',
+      borderWidth: 1,
+      borderRadius: 4,
+      stack: 'expenses',
+    });
   }
 
   return {
     labels,
-    datasets: [
-      {
-        label: 'Income',
-        data: incomeData,
-        backgroundColor: 'rgba(34, 197, 94, 0.8)',
-        borderColor: 'rgb(34, 197, 94)',
-        borderWidth: 1,
-        borderRadius: 4,
-      },
-      {
-        label: 'Expenses',
-        data: expenseData,
-        backgroundColor: 'rgba(239, 68, 68, 0.8)',
-        borderColor: 'rgb(239, 68, 68)',
-        borderWidth: 1,
-        borderRadius: 4,
-      },
-    ],
+    datasets,
   };
 });
 
@@ -374,13 +525,41 @@ const incomeExpenseChartOptions = computed(() => ({
       position: 'top' as const,
       labels: {
         usePointStyle: true,
-        padding: 20,
+        padding: 15,
+        boxWidth: 12,
+        font: {
+          size: 11,
+        },
       },
     },
     tooltip: {
+      mode: 'index' as const,
+      intersect: false,
       callbacks: {
-        label: (context: { dataset: { label: string }; parsed: { y: number } }) => {
-          return `${context.dataset.label}: ${formatInDisplayCurrency(context.parsed.y, settingsStore.baseCurrency)}`;
+        label: (context: { dataset: { label: string; stack: string }; parsed: { y: number } }) => {
+          if (context.parsed.y === 0) return null;
+          const prefix = context.dataset.stack === 'income' ? '+' : '-';
+          return `${context.dataset.label}: ${prefix}${formatInDisplayCurrency(context.parsed.y, settingsStore.baseCurrency)}`;
+        },
+        footer: (tooltipItems: { dataset: { stack: string }; parsed: { y: number } }[]) => {
+          let totalIncome = 0;
+          let totalExpenses = 0;
+
+          for (const item of tooltipItems) {
+            if (item.dataset.stack === 'income') {
+              totalIncome += item.parsed.y;
+            } else {
+              totalExpenses += item.parsed.y;
+            }
+          }
+
+          const net = totalIncome - totalExpenses;
+          return [
+            '',
+            `Total Income: +${formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency)}`,
+            `Total Expenses: -${formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency)}`,
+            `Net: ${net >= 0 ? '+' : ''}${formatInDisplayCurrency(net, settingsStore.baseCurrency)}`,
+          ];
         },
       },
     },
@@ -388,6 +567,7 @@ const incomeExpenseChartOptions = computed(() => ({
   scales: {
     y: {
       beginAtZero: true,
+      stacked: true,
       ticks: {
         callback: (value: number | string) => {
           if (typeof value === 'number') {
@@ -403,6 +583,7 @@ const incomeExpenseChartOptions = computed(() => ({
       },
     },
     x: {
+      stacked: true,
       grid: {
         display: false,
       },
@@ -424,13 +605,17 @@ const netWorthChange = computed(() => {
 });
 
 const totalIncome = computed(() => {
-  const data = incomeExpenseChartData.value.datasets[0].data;
-  return data.reduce((sum, val) => sum + val, 0);
+  const datasets = incomeExpenseChartData.value.datasets.filter(d => d.stack === 'income');
+  return datasets.reduce((total, dataset) => {
+    return total + dataset.data.reduce((sum, val) => sum + val, 0);
+  }, 0);
 });
 
 const totalExpenses = computed(() => {
-  const data = incomeExpenseChartData.value.datasets[1].data;
-  return data.reduce((sum, val) => sum + val, 0);
+  const datasets = incomeExpenseChartData.value.datasets.filter(d => d.stack === 'expenses');
+  return datasets.reduce((total, dataset) => {
+    return total + dataset.data.reduce((sum, val) => sum + val, 0);
+  }, 0);
 });
 
 const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
@@ -505,7 +690,7 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Income vs Expenses</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Monthly breakdown of income and expenses</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Monthly breakdown of income and expenses by category</p>
           </div>
           <div class="flex gap-3">
             <div class="w-40">
@@ -546,7 +731,7 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       </div>
 
       <!-- Chart -->
-      <div class="h-80">
+      <div class="h-96">
         <Bar :data="incomeExpenseChartData" :options="incomeExpenseChartOptions" />
       </div>
     </BaseCard>
