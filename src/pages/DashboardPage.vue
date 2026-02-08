@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useRecurringStore } from '@/stores/recurringStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { BaseCard } from '@/components/ui';
@@ -14,6 +15,7 @@ import { useTranslation } from '@/composables/useTranslation';
 const accountsStore = useAccountsStore();
 const assetsStore = useAssetsStore();
 const transactionsStore = useTransactionsStore();
+const recurringStore = useRecurringStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
@@ -25,9 +27,22 @@ const netWorth = computed(() => accountsStore.combinedNetWorth);
 const totalAssets = computed(() => accountsStore.totalAssets + assetsStore.totalAssetValue);
 // Total liabilities: account liabilities + asset loans
 const totalLiabilities = computed(() => accountsStore.totalLiabilities);
-const monthlyIncome = computed(() => transactionsStore.thisMonthIncome);
-const monthlyExpenses = computed(() => transactionsStore.thisMonthExpenses);
-const netCashFlow = computed(() => transactionsStore.thisMonthNetCashFlow);
+
+// Monthly income: one-time transactions + expected recurring income
+// This combines actual one-time transactions with the expected monthly recurring amounts
+const monthlyIncome = computed(() =>
+  transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome
+);
+
+// Monthly expenses: one-time transactions + expected recurring expenses
+// This combines actual one-time transactions with the expected monthly recurring amounts
+const monthlyExpenses = computed(() =>
+  transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses
+);
+
+// Net cash flow: monthly income minus monthly expenses
+const netCashFlow = computed(() => monthlyIncome.value - monthlyExpenses.value);
+
 const activeGoals = computed(() => goalsStore.activeGoals.slice(0, 3));
 const recentTransactions = computed(() => transactionsStore.recentTransactions);
 
