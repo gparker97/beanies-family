@@ -61,19 +61,47 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return transactions.value.filter((t) => isDateBetween(t.date, start, end));
   });
 
-  // One-time income (excludes transactions generated from recurring items)
+  // Total monthly income (includes both one-time and recurring transactions)
   // Converts each transaction to base currency first
   const thisMonthIncome = computed(() =>
+    thisMonthTransactions.value
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // Total monthly expenses (includes both one-time and recurring transactions)
+  // Converts each transaction to base currency first
+  const thisMonthExpenses = computed(() =>
+    thisMonthTransactions.value
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // One-time income only (excludes transactions generated from recurring items)
+  const thisMonthOneTimeIncome = computed(() =>
     thisMonthTransactions.value
       .filter((t) => t.type === 'income' && !t.recurringItemId)
       .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
   );
 
-  // One-time expenses (excludes transactions generated from recurring items)
-  // Converts each transaction to base currency first
-  const thisMonthExpenses = computed(() =>
+  // One-time expenses only (excludes transactions generated from recurring items)
+  const thisMonthOneTimeExpenses = computed(() =>
     thisMonthTransactions.value
       .filter((t) => t.type === 'expense' && !t.recurringItemId)
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // Recurring income only (transactions generated from recurring items)
+  const thisMonthRecurringIncome = computed(() =>
+    thisMonthTransactions.value
+      .filter((t) => t.type === 'income' && t.recurringItemId)
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // Recurring expenses only (transactions generated from recurring items)
+  const thisMonthRecurringExpenses = computed(() =>
+    thisMonthTransactions.value
+      .filter((t) => t.type === 'expense' && t.recurringItemId)
       .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
   );
 
@@ -273,6 +301,10 @@ export const useTransactionsStore = defineStore('transactions', () => {
     thisMonthTransactions,
     thisMonthIncome,
     thisMonthExpenses,
+    thisMonthOneTimeIncome,
+    thisMonthOneTimeExpenses,
+    thisMonthRecurringIncome,
+    thisMonthRecurringExpenses,
     thisMonthNetCashFlow,
     expensesByCategory,
     // Actions
