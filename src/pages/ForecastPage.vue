@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { BaseCard } from '@/components/ui';
+import { useTranslation } from '@/composables/useTranslation';
+
+const { t } = useTranslation();
 </script>
 
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Forecast</h1>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('forecast.title') }}</h1>
       <p class="text-gray-500 dark:text-gray-400">Plan for the future with financial projections</p>
     </div>
 

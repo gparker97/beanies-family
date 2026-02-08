@@ -9,6 +9,7 @@ import { BaseCard } from '@/components/ui';
 import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useTranslation } from '@/composables/useTranslation';
 
 const accountsStore = useAccountsStore();
 const assetsStore = useAssetsStore();
@@ -16,6 +17,7 @@ const transactionsStore = useTransactionsStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { t } = useTranslation();
 
 // Combined net worth: accounts + physical assets - all liabilities (including asset loans)
 const netWorth = computed(() => accountsStore.combinedNetWorth);
@@ -43,7 +45,7 @@ function formatTotal(amount: number): string {
       <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-blue-100 text-sm font-medium">Net Worth</p>
+            <p class="text-blue-100 text-sm font-medium">{{ t('dashboard.netWorth') }}</p>
             <p class="text-2xl font-bold mt-1">
               {{ formatTotal(netWorth) }}
             </p>
@@ -56,10 +58,10 @@ function formatTotal(amount: number): string {
         </div>
         <div class="mt-4 flex gap-4 text-sm">
           <span class="text-green-200">
-            Assets: {{ formatTotal(totalAssets) }}
+            {{ t('dashboard.assets') }}: {{ formatTotal(totalAssets) }}
           </span>
           <span class="text-red-200">
-            Liabilities: {{ formatTotal(totalLiabilities) }}
+            {{ t('dashboard.liabilities') }}: {{ formatTotal(totalLiabilities) }}
           </span>
         </div>
       </div>
@@ -68,7 +70,7 @@ function formatTotal(amount: number): string {
       <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-green-100 text-sm font-medium">Monthly Income</p>
+            <p class="text-green-100 text-sm font-medium">{{ t('dashboard.monthlyIncome') }}</p>
             <p class="text-2xl font-bold mt-1">
               {{ formatTotal(monthlyIncome) }}
             </p>
@@ -85,7 +87,7 @@ function formatTotal(amount: number): string {
       <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-red-100 text-sm font-medium">Monthly Expenses</p>
+            <p class="text-red-100 text-sm font-medium">{{ t('dashboard.monthlyExpenses') }}</p>
             <p class="text-2xl font-bold mt-1">
               {{ formatTotal(monthlyExpenses) }}
             </p>
@@ -107,7 +109,7 @@ function formatTotal(amount: number): string {
       >
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium" :class="netCashFlow >= 0 ? 'text-purple-100' : 'text-orange-100'">Net Cash Flow</p>
+            <p class="text-sm font-medium" :class="netCashFlow >= 0 ? 'text-purple-100' : 'text-orange-100'">{{ t('dashboard.netCashFlow') }}</p>
             <p class="text-2xl font-bold mt-1">
               {{ formatTotal(netCashFlow) }}
             </p>
@@ -123,9 +125,9 @@ function formatTotal(amount: number): string {
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Recent Transactions -->
-      <BaseCard title="Recent Transactions">
+      <BaseCard :title="t('dashboard.recentTransactions')">
         <div v-if="recentTransactions.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
-          No transactions yet. Add your first transaction to get started.
+          {{ t('dashboard.noTransactions') }}
         </div>
         <div v-else class="space-y-3">
           <div
@@ -181,9 +183,9 @@ function formatTotal(amount: number): string {
       </BaseCard>
 
       <!-- Active Goals -->
-      <BaseCard title="Active Goals">
+      <BaseCard :title="t('dashboard.activeGoals')">
         <div v-if="activeGoals.length === 0" class="text-center py-8 text-gray-500 dark:text-gray-400">
-          No active goals. Set a financial goal to track your progress.
+          {{ t('dashboard.noGoals') }}
         </div>
         <div v-else class="space-y-4">
           <div
