@@ -8,12 +8,12 @@
  * to invalidate cached translations.
  */
 
-export const UI_STRINGS_VERSION = 4;
+export const UI_STRINGS_VERSION = 6;
 
 export const UI_STRINGS = {
   // App branding
-  'app.name': 'GP Finance',
-  'app.tagline': 'Family Financial Planner',
+  'app.name': 'GP Family Planner',
+  'app.tagline': 'Smart Financial Planning',
   'app.version': 'v1.0.0 - MVP',
 
   // Common labels
@@ -80,8 +80,12 @@ export const UI_STRINGS = {
   'dashboard.monthlyExpenses': 'Monthly Expenses',
   'dashboard.netCashFlow': 'Net Cash Flow',
   'dashboard.recentTransactions': 'Recent Transactions',
+  'dashboard.upcomingTransactions': 'Upcoming Transactions',
+  'dashboard.assetsSummary': 'Assets Summary',
   'dashboard.activeGoals': 'Active Goals',
   'dashboard.noTransactions': 'No transactions yet. Add your first transaction to get started.',
+  'dashboard.noUpcoming': 'No upcoming transactions in the next 30 days',
+  'dashboard.noAssets': 'No assets yet. Add assets to track your property and valuables.',
   'dashboard.noGoals': 'No active goals. Set a financial goal to track your progress.',
 
   // Recurring
@@ -264,7 +268,7 @@ export const UI_STRINGS = {
   'settings.clearDataConfirmation': 'Are you sure you want to delete all your data? This action cannot be undone.',
   'settings.yesDeleteEverything': 'Yes, Delete Everything',
   'settings.about': 'About',
-  'settings.appName': 'GP Family Financial Planner',
+  'settings.appName': 'GP Family Planner',
   'settings.version': 'Version 1.0.0 (MVP)',
   'settings.appDescription': 'A local-first, privacy-focused family finance application.',
   'settings.privacyNote': 'Your data is stored locally in your browser and never leaves your device unless you enable file sync.',

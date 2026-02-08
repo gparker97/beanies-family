@@ -45,14 +45,22 @@ function navigateTo(path: string) {
 
 <template>
   <aside class="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 min-h-screen flex flex-col">
-    <!-- Logo -->
-    <div class="px-6 py-5 border-b border-gray-200 dark:border-slate-700">
-      <h1 class="text-xl font-bold text-blue-600 dark:text-blue-400">
-        {{ t('app.name') }}
-      </h1>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        {{ t('app.tagline') }}
-      </p>
+    <!-- Logo & Branding -->
+    <div class="px-5 py-4 border-b border-gray-200 dark:border-slate-700">
+      <div class="flex items-center gap-3">
+        <!-- Logo -->
+        <img src="/logo.svg" alt="GP Family Planner" class="w-11 h-11 flex-shrink-0" />
+        <!-- Text -->
+        <div class="min-w-0">
+          <h1 class="text-lg font-bold leading-tight" style="font-family: 'Poppins', sans-serif;">
+            <span class="bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 bg-clip-text text-transparent">GP Family</span>
+            <span class="text-slate-700 dark:text-slate-200"> Planner</span>
+          </h1>
+          <p class="text-[10px] font-medium tracking-wide text-gray-400 dark:text-gray-500 uppercase mt-0.5" style="font-family: 'Poppins', sans-serif;">
+            Smart Financial Planning
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Navigation -->

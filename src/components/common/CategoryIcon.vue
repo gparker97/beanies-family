@@ -2,119 +2,132 @@
 import { computed } from 'vue';
 import { getCategoryById } from '@/constants/categories';
 
-const props = defineProps<{
-  categoryId: string;
+interface Props {
+  category: string;
   size?: 'sm' | 'md' | 'lg';
-}>();
+  showBackground?: boolean;
+}
 
-const category = computed(() => getCategoryById(props.categoryId));
+const props = withDefaults(defineProps<Props>(), {
+  size: 'md',
+  showBackground: true,
+});
+
+const categoryInfo = computed(() => getCategoryById(props.category));
 
 const sizeClasses = computed(() => {
   switch (props.size) {
-    case 'sm': return 'w-3.5 h-3.5';
-    case 'lg': return 'w-5 h-5';
-    default: return 'w-4 h-4';
+    case 'sm': return { container: 'w-8 h-8', icon: 'w-4 h-4' };
+    case 'lg': return { container: 'w-12 h-12', icon: 'w-6 h-6' };
+    default: return { container: 'w-10 h-10', icon: 'w-5 h-5' };
   }
 });
 
-// Map icon names to SVG paths
-const iconPaths: Record<string, string> = {
-  // Employment
-  'briefcase': 'M20 7h-4V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM10 5h4v2h-4V5z',
-  'code': 'M8 5l-5 7 5 7M16 5l5 7-5 7',
-
-  // Investments
-  'dollar-sign': 'M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6',
-  'trending-up': 'M23 6l-9.5 9.5-5-5L1 18',
-
-  // Other Income
-  'gift': 'M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 110-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 100-5C13 2 12 7 12 7z',
-  'plus-circle': 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v8M8 12h8',
-  'refresh': 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15',
-
-  // Property
-  'home': 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-
-  // Entertainment
-  'film': 'M19.82 2H4.18A2.18 2.18 0 002 4.18v15.64A2.18 2.18 0 004.18 22h15.64A2.18 2.18 0 0022 19.82V4.18A2.18 2.18 0 0019.82 2zM7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5',
-  'palette': 'M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.78-.13 2.61-.37l-1.26-3.78A4 4 0 1115 10.6l3.78 1.26c.25-.83.37-1.68.37-2.61C22 6.5 17.5 2 12 2zM12 14a2 2 0 110-4 2 2 0 010 4z',
-  'repeat': 'M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3',
-
-  // Family
-  'users': 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75',
-  'book': 'M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 016.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z',
-  'paw': 'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z',
-
-  // Financial
-  'credit-card': 'M1 5a2 2 0 012-2h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V5zM1 10h22',
-  'shield': 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
-  'file-text': 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8zM14 2v6h6M16 13H8M16 17H8M10 9H8',
-
-  // Food
-  'coffee': 'M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3',
-  'utensils': 'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 002-2V2M7 2v20M21 15V2v0a5 5 0 00-5 5v6c0 1.1.9 2 2 2h3zm0 0v7',
-  'shopping-cart': 'M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6M9 22a1 1 0 100-2 1 1 0 000 2zM20 22a1 1 0 100-2 1 1 0 000 2z',
-
-  // Housing
-  'tool': 'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z',
-  'zap': 'M13 2L3 14h9l-1 8 10-12h-9l1-8z',
-
-  // Other
-  'heart-handshake': 'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7 7-7zM12 5L9.04 7.96a2.5 2.5 0 000 3.54L12 14.5l2.96-2.96a2.5 2.5 0 000-3.54L12 5z',
-  'more-horizontal': 'M12 12m-1 0a1 1 0 102 0 1 1 0 10-2 0M19 12m-1 0a1 1 0 102 0 1 1 0 10-2 0M5 12m-1 0a1 1 0 102 0 1 1 0 10-2 0',
-
-  // Personal
-  'shirt': 'M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z',
-  'activity': 'M22 12h-4l-3 9L9 3l-3 9H2',
-  'heart': 'M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z',
-
-  // Transportation
-  'settings': 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z',
-  'car': 'M16 6h2l3 6v5h-2M5 13h14M6 17h2M16 17h2M7 6h7l3 6H4l3-6zM4 13v5a1 1 0 001 1h1',
-  'fuel': 'M3 22V5a2 2 0 012-2h8a2 2 0 012 2v17H3zM13 10h2a2 2 0 012 2v5M18 12h1a2 2 0 012 2v6M7 8h4M7 12h4',
-  'train': 'M4 11V5a2 2 0 012-2h12a2 2 0 012 2v6M4 11h16M4 11v5a2 2 0 002 2h12a2 2 0 002-2v-5M7.5 15.5h.01M16.5 15.5h.01M9 21l-2-3M15 21l2-3',
-
-  // Travel
-  'airplane': 'M21 16v-2l-8-5V3.5a1.5 1.5 0 00-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z',
-  'hotel': 'M18 2H6a2 2 0 00-2 2v16l8-4 8 4V4a2 2 0 00-2-2z',
-};
-
-// Icons that need stroke instead of fill
-const strokeIcons = new Set([
-  'code', 'dollar-sign', 'trending-up', 'gift', 'plus-circle', 'refresh', 'home',
-  'film', 'repeat', 'users', 'book', 'paw', 'credit-card', 'shield', 'file-text',
-  'coffee', 'utensils', 'shopping-cart', 'tool', 'zap', 'heart-handshake',
-  'shirt', 'activity', 'heart', 'settings', 'car', 'fuel', 'train', 'airplane', 'hotel'
-]);
+const iconColor = computed(() => categoryInfo.value?.color || '#6b7280');
 </script>
 
 <template>
-  <span
-    v-if="category"
-    class="inline-flex items-center justify-center rounded"
-    :class="sizeClasses"
-    :style="{ color: category.color }"
-    :title="category.name"
+  <div
+    :class="[
+      sizeClasses.container,
+      'rounded-lg flex items-center justify-center flex-shrink-0',
+      showBackground ? 'bg-opacity-15' : ''
+    ]"
+    :style="showBackground ? { backgroundColor: `${iconColor}20` } : {}"
   >
-    <svg
-      v-if="iconPaths[category.icon]"
-      :class="sizeClasses"
-      fill="none"
-      :stroke="strokeIcons.has(category.icon) ? 'currentColor' : 'none'"
-      :fill-opacity="strokeIcons.has(category.icon) ? '0' : '1'"
-      viewBox="0 0 24 24"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path
-        :d="iconPaths[category.icon]"
-        :fill="strokeIcons.has(category.icon) ? 'none' : 'currentColor'"
-      />
+    <!-- Salary/Briefcase -->
+    <svg v-if="categoryInfo?.icon === 'briefcase'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
     </svg>
-    <!-- Fallback for unknown icons -->
-    <svg v-else :class="sizeClasses" fill="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="12" r="3" />
+
+    <!-- Home -->
+    <svg v-else-if="categoryInfo?.icon === 'home'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
     </svg>
-  </span>
+
+    <!-- Shopping Cart / Groceries -->
+    <svg v-else-if="categoryInfo?.icon === 'shopping-cart'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+
+    <!-- Utensils / Dining -->
+    <svg v-else-if="categoryInfo?.icon === 'utensils'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+
+    <!-- Car -->
+    <svg v-else-if="categoryInfo?.icon === 'car'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 17h8M8 17a2 2 0 11-4 0 2 2 0 014 0zm8 0a2 2 0 104 0 2 2 0 00-4 0zM4 11l2-6h12l2 6M4 11h16M4 11v6h16v-6" />
+    </svg>
+
+    <!-- Credit Card -->
+    <svg v-else-if="categoryInfo?.icon === 'credit-card'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+    </svg>
+
+    <!-- Zap / Utilities -->
+    <svg v-else-if="categoryInfo?.icon === 'zap'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+
+    <!-- Heart / Health -->
+    <svg v-else-if="categoryInfo?.icon === 'heart' || categoryInfo?.icon === 'activity'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+    </svg>
+
+    <!-- Gift -->
+    <svg v-else-if="categoryInfo?.icon === 'gift'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+    </svg>
+
+    <!-- Film / Entertainment -->
+    <svg v-else-if="categoryInfo?.icon === 'film'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+    </svg>
+
+    <!-- Book / Education -->
+    <svg v-else-if="categoryInfo?.icon === 'book'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+    </svg>
+
+    <!-- Trending Up / Investments -->
+    <svg v-else-if="categoryInfo?.icon === 'trending-up'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+
+    <!-- Dollar Sign -->
+    <svg v-else-if="categoryInfo?.icon === 'dollar-sign'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+
+    <!-- Repeat / Subscriptions -->
+    <svg v-else-if="categoryInfo?.icon === 'repeat'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+
+    <!-- Shield / Insurance -->
+    <svg v-else-if="categoryInfo?.icon === 'shield'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+
+    <!-- Users -->
+    <svg v-else-if="categoryInfo?.icon === 'users'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+
+    <!-- Coffee -->
+    <svg v-else-if="categoryInfo?.icon === 'coffee'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+
+    <!-- Code / Freelance -->
+    <svg v-else-if="categoryInfo?.icon === 'code'" :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+    </svg>
+
+    <!-- Default circle icon -->
+    <svg v-else :class="sizeClasses.icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" :style="{ color: iconColor }">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  </div>
 </template>
