@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
@@ -7,9 +7,11 @@ import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import { CURRENCIES } from '@/constants/currencies';
 import { clearAllData } from '@/services/indexeddb/database';
+import { useTranslation } from '@/composables/useTranslation';
 
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+const { t } = useTranslation();
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
@@ -27,11 +29,11 @@ const currencyOptions = CURRENCIES.map((c) => ({
   label: `${c.code} - ${c.name}`,
 }));
 
-const themeOptions = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
-];
+const themeOptions = computed(() => [
+  { value: 'light', label: t('settings.theme.light') },
+  { value: 'dark', label: t('settings.theme.dark') },
+  { value: 'system', label: t('settings.theme.system') },
+]);
 
 onMounted(async () => {
   await syncStore.initialize();
@@ -178,26 +180,26 @@ function formatLastSync(timestamp: string | null): string {
 <template>
   <div class="space-y-6">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-      <p class="text-gray-500 dark:text-gray-400">Configure your app preferences</p>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('settings.title') }}</h1>
+      <p class="text-gray-500 dark:text-gray-400">{{ t('settings.subtitle') }}</p>
     </div>
 
     <!-- General Settings -->
-    <BaseCard title="General">
+    <BaseCard :title="t('settings.general')">
       <div class="space-y-6">
         <BaseSelect
           :model-value="settingsStore.baseCurrency"
           :options="currencyOptions"
-          label="Base Currency"
-          hint="Your primary currency for displaying totals and conversions"
+          :label="t('settings.baseCurrency')"
+          :hint="t('settings.baseCurrencyHint')"
           @update:model-value="updateCurrency"
         />
 
         <BaseSelect
           :model-value="settingsStore.theme"
           :options="themeOptions"
-          label="Theme"
-          hint="Choose your preferred color scheme"
+          :label="t('settings.theme')"
+          :hint="t('settings.themeHint')"
           @update:model-value="updateTheme"
         />
       </div>
@@ -207,7 +209,7 @@ function formatLastSync(timestamp: string | null): string {
     <ExchangeRateSettings />
 
     <!-- File Sync Settings -->
-    <BaseCard title="File Sync">
+    <BaseCard :title="t('settings.fileSync')">
       <!-- Modern browsers with File System Access API -->
       <div v-if="syncStore.supportsAutoSync">
         <!-- Not configured state -->
@@ -215,16 +217,16 @@ function formatLastSync(timestamp: string | null): string {
           <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
-          <p class="font-medium text-gray-900 dark:text-gray-100 mb-2">Sync to a File</p>
+          <p class="font-medium text-gray-900 dark:text-gray-100 mb-2">{{ t('settings.syncToFile') }}</p>
           <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Save your data to a JSON file. Place it in Google Drive, Dropbox, or any synced folder for cloud backup.
+            {{ t('settings.syncToFileDescription') }}
           </p>
           <div class="flex flex-col gap-3">
             <BaseButton @click="handleConfigureSync">
-              Create New Sync File
+              {{ t('settings.createNewSyncFile') }}
             </BaseButton>
             <BaseButton variant="secondary" @click="handleLoadFromFileClick">
-              Load from Existing File
+              {{ t('settings.loadFromExistingFile') }}
             </BaseButton>
           </div>
 
@@ -426,35 +428,35 @@ function formatLastSync(timestamp: string | null): string {
     </BaseCard>
 
     <!-- AI Settings -->
-    <BaseCard title="AI Insights">
+    <BaseCard :title="t('settings.aiInsights')">
       <div class="text-center py-8 text-gray-500 dark:text-gray-400">
         <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
         </svg>
-        <p class="font-medium">AI-Powered Insights</p>
-        <p class="mt-1 text-sm">Coming soon - Get personalized financial advice powered by AI</p>
+        <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
+        <p class="mt-1 text-sm">{{ t('settings.aiComingSoon') }}</p>
       </div>
     </BaseCard>
 
     <!-- Data Management -->
-    <BaseCard title="Data Management">
+    <BaseCard :title="t('settings.dataManagement')">
       <div class="space-y-4">
         <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">Export Data</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Download all your data as a JSON file</p>
+            <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('settings.exportData') }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.exportDataDescription') }}</p>
           </div>
           <BaseButton variant="ghost" size="sm" @click="handleManualExport">
-            Export
+            {{ t('action.export') }}
           </BaseButton>
         </div>
         <div class="flex items-center justify-between py-3">
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">Clear All Data</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Permanently delete all your data</p>
+            <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('settings.clearAllData') }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.clearAllDataDescription') }}</p>
           </div>
           <BaseButton variant="danger" size="sm" @click="showClearConfirm = true">
-            Clear Data
+            {{ t('settings.clearData') }}
           </BaseButton>
         </div>
       </div>
@@ -462,27 +464,27 @@ function formatLastSync(timestamp: string | null): string {
       <!-- Clear confirmation dialog -->
       <div v-if="showClearConfirm" class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
         <p class="text-sm text-red-800 dark:text-red-200 mb-3">
-          Are you sure you want to delete all your data? This action cannot be undone.
+          {{ t('settings.clearDataConfirmation') }}
         </p>
         <div class="flex gap-2">
           <BaseButton variant="danger" size="sm" @click="handleClearData">
-            Yes, Delete Everything
+            {{ t('settings.yesDeleteEverything') }}
           </BaseButton>
           <BaseButton variant="ghost" size="sm" @click="showClearConfirm = false">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
         </div>
       </div>
     </BaseCard>
 
     <!-- About -->
-    <BaseCard title="About">
+    <BaseCard :title="t('settings.about')">
       <div class="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-        <p><strong class="text-gray-900 dark:text-gray-100">GP Family Financial Planner</strong></p>
-        <p>Version 1.0.0 (MVP)</p>
-        <p>A local-first, privacy-focused family finance application.</p>
+        <p><strong class="text-gray-900 dark:text-gray-100">{{ t('settings.appName') }}</strong></p>
+        <p>{{ t('settings.version') }}</p>
+        <p>{{ t('settings.appDescription') }}</p>
         <p class="pt-2">
-          Your data is stored locally in your browser and never leaves your device unless you enable file sync.
+          {{ t('settings.privacyNote') }}
         </p>
       </div>
     </BaseCard>

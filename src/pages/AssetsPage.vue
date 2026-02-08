@@ -7,29 +7,31 @@ import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useTranslation } from '@/composables/useTranslation';
 import type { Asset, AssetType, CreateAssetInput, UpdateAssetInput, AssetLoan } from '@/types/models';
 
 const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { t } = useTranslation();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const isSubmitting = ref(false);
 
 // Asset type options
-const assetTypes: { value: AssetType; label: string }[] = [
-  { value: 'real_estate', label: 'Real Estate' },
-  { value: 'vehicle', label: 'Vehicle' },
-  { value: 'boat', label: 'Boat' },
-  { value: 'jewelry', label: 'Jewelry' },
-  { value: 'electronics', label: 'Electronics' },
-  { value: 'equipment', label: 'Equipment' },
-  { value: 'art', label: 'Art' },
-  { value: 'collectible', label: 'Collectible' },
-  { value: 'other', label: 'Other' },
-];
+const assetTypes = computed(() => [
+  { value: 'real_estate' as AssetType, label: t('assets.type.real_estate') },
+  { value: 'vehicle' as AssetType, label: t('assets.type.vehicle') },
+  { value: 'boat' as AssetType, label: t('assets.type.boat') },
+  { value: 'jewelry' as AssetType, label: t('assets.type.jewelry') },
+  { value: 'electronics' as AssetType, label: t('assets.type.electronics') },
+  { value: 'equipment' as AssetType, label: t('assets.type.equipment') },
+  { value: 'art' as AssetType, label: t('assets.type.art') },
+  { value: 'collectible' as AssetType, label: t('assets.type.collectible') },
+  { value: 'other' as AssetType, label: t('assets.type.other') },
+]);
 
 const currencyOptions = CURRENCIES.map((c) => ({
   value: c.code,
@@ -120,7 +122,7 @@ function formatTotal(amount: number): string {
 }
 
 function getAssetTypeLabel(type: AssetType): string {
-  return assetTypes.find((t) => t.value === type)?.label || type;
+  return assetTypes.value.find((t) => t.value === type)?.label || type;
 }
 
 function getMemberName(memberId: string): string {
@@ -258,14 +260,14 @@ function getAppreciationPercent(asset: Asset): number {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Assets</h1>
-        <p class="text-gray-500 dark:text-gray-400">Track your property, vehicles, and valuables</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('assets.title') }}</h1>
+        <p class="text-gray-500 dark:text-gray-400">{{ t('assets.subtitle') }}</p>
       </div>
       <BaseButton @click="openAddModal">
         <svg class="w-5 h-5 mr-1.5 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
-        Add Asset
+        {{ t('assets.addAsset') }}
       </BaseButton>
     </div>
 
@@ -275,7 +277,7 @@ function getAppreciationPercent(asset: Asset): number {
       <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-green-100 text-sm font-medium">Total Value</p>
+            <p class="text-green-100 text-sm font-medium">{{ t('common.totalValue') }}</p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.totalAssetValue) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -290,7 +292,7 @@ function getAppreciationPercent(asset: Asset): number {
       <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-red-100 text-sm font-medium">Asset Loans</p>
+            <p class="text-red-100 text-sm font-medium">{{ t('common.assetLoans') }}</p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.totalLoanValue) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -305,7 +307,7 @@ function getAppreciationPercent(asset: Asset): number {
       <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-blue-100 text-sm font-medium">Net Asset Value</p>
+            <p class="text-blue-100 text-sm font-medium">{{ t('common.netAssetValue') }}</p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.netAssetValue) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -326,7 +328,7 @@ function getAppreciationPercent(asset: Asset): number {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium" :class="assetsStore.totalAppreciation >= 0 ? 'text-teal-100' : 'text-orange-100'">
-              {{ assetsStore.totalAppreciation >= 0 ? 'Appreciation' : 'Depreciation' }}
+              {{ assetsStore.totalAppreciation >= 0 ? t('common.appreciation') : t('common.depreciation') }}
             </p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(Math.abs(assetsStore.totalAppreciation)) }}</p>
           </div>
@@ -349,13 +351,13 @@ function getAppreciationPercent(asset: Asset): number {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
         </svg>
       </div>
-      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">No assets yet</h3>
-      <p class="text-gray-500 dark:text-gray-400 mt-1 mb-4">Get started by adding your first asset</p>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ t('assets.noAssets') }}</h3>
+      <p class="text-gray-500 dark:text-gray-400 mt-1 mb-4">{{ t('assets.getStarted') }}</p>
       <BaseButton @click="openAddModal">
         <svg class="w-5 h-5 mr-1.5 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
-        Add Asset
+        {{ t('assets.addAsset') }}
       </BaseButton>
     </div>
 
@@ -468,7 +470,7 @@ function getAppreciationPercent(asset: Asset): number {
                 <div>
                   <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ asset.name }}</h3>
                   <p v-if="asset.purchaseDate" class="text-sm text-gray-500 dark:text-gray-400">
-                    Purchased {{ formatDate(asset.purchaseDate) }}
+                    {{ t('common.purchased') }} {{ formatDate(asset.purchaseDate) }}
                   </p>
                 </div>
               </div>
@@ -499,7 +501,7 @@ function getAppreciationPercent(asset: Asset): number {
             <!-- Value Display -->
             <div class="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Current Value</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{{ t('common.currentValue') }}</p>
                 <div class="text-xl font-bold">
                   <CurrencyAmount
                     :amount="asset.currentValue"
@@ -510,7 +512,7 @@ function getAppreciationPercent(asset: Asset): number {
                 </div>
               </div>
               <div>
-                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Purchase Value</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{{ t('common.purchaseValue') }}</p>
                 <div class="text-lg text-gray-600 dark:text-gray-400">
                   <CurrencyAmount
                     :amount="asset.purchaseValue"
@@ -552,7 +554,7 @@ function getAppreciationPercent(asset: Asset): number {
                 <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                <span class="text-sm font-medium text-red-700 dark:text-red-400">Loan Outstanding</span>
+                <span class="text-sm font-medium text-red-700 dark:text-red-400">{{ t('common.loanOutstanding') }}</span>
               </div>
               <div class="text-lg font-bold text-red-600 dark:text-red-400">
                 <CurrencyAmount
@@ -601,9 +603,9 @@ function getAppreciationPercent(asset: Asset): number {
                 <span
                   v-if="!asset.includeInNetWorth"
                   class="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                  title="Not included in net worth"
+                  :title="t('status.excluded')"
                 >
-                  Excluded
+                  {{ t('status.excluded') }}
                 </span>
               </div>
             </div>
@@ -615,7 +617,7 @@ function getAppreciationPercent(asset: Asset): number {
     <!-- Add Asset Modal -->
     <BaseModal
       :open="showAddModal"
-      title="Add Asset"
+      :title="t('assets.addAsset')"
       size="lg"
       @close="showAddModal = false"
     >
@@ -623,7 +625,7 @@ function getAppreciationPercent(asset: Asset): number {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <BaseInput
             v-model="newAsset.name"
-            label="Asset Name"
+            :label="t('assets.assetName')"
             placeholder="e.g., Family Home, Toyota Camry"
             required
           />
@@ -631,7 +633,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseSelect
             v-model="newAsset.type"
             :options="assetTypes"
-            label="Asset Type"
+            :label="t('assets.assetType')"
           />
         </div>
 
@@ -639,13 +641,13 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseSelect
             v-model="newAsset.memberId"
             :options="memberOptions"
-            label="Owner"
+            :label="t('form.owner')"
           />
 
           <BaseSelect
             v-model="newAsset.currency"
             :options="currencyOptions"
-            label="Currency"
+            :label="t('form.currency')"
           />
         </div>
 
@@ -653,7 +655,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseInput
             v-model="newAsset.purchaseValue"
             type="number"
-            label="Purchase Value"
+            :label="t('common.purchaseValue')"
             placeholder="0.00"
             step="0.01"
           />
@@ -661,7 +663,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseInput
             v-model="newAsset.currentValue"
             type="number"
-            label="Current Value"
+            :label="t('common.currentValue')"
             placeholder="0.00"
             step="0.01"
           />
@@ -670,12 +672,12 @@ function getAppreciationPercent(asset: Asset): number {
         <BaseInput
           v-model="newAsset.purchaseDate"
           type="date"
-          label="Purchase Date"
+          :label="t('assets.purchaseDate')"
         />
 
         <BaseInput
           v-model="newAsset.notes"
-          label="Notes"
+          :label="t('form.notes')"
           placeholder="Additional details about this asset..."
         />
 
@@ -688,21 +690,21 @@ function getAppreciationPercent(asset: Asset): number {
               class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600"
             />
             <div>
-              <span class="font-medium text-gray-900 dark:text-gray-100">This asset has a loan</span>
-              <p class="text-sm text-gray-500 dark:text-gray-400">Track mortgage, auto loan, or other financing</p>
+              <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('assets.hasLoan') }}</span>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('assets.hasLoanDesc') }}</p>
             </div>
           </label>
         </div>
 
         <!-- Loan Details (shown when hasLoan is true) -->
         <div v-if="newAsset.loan?.hasLoan" class="space-y-4 p-4 bg-gray-50 dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700">
-          <h4 class="font-medium text-gray-900 dark:text-gray-100">Loan Details</h4>
+          <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ t('assets.loanDetails') }}</h4>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput
               v-model="newAsset.loan.loanAmount"
               type="number"
-              label="Original Loan Amount"
+              :label="t('assets.originalLoanAmount')"
               placeholder="0.00"
               step="0.01"
             />
@@ -710,7 +712,7 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="newAsset.loan.outstandingBalance"
               type="number"
-              label="Outstanding Balance"
+              :label="t('assets.outstandingBalance')"
               placeholder="0.00"
               step="0.01"
             />
@@ -720,7 +722,7 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="newAsset.loan.interestRate"
               type="number"
-              label="Interest Rate (%)"
+              :label="t('assets.interestRate')"
               placeholder="5.0"
               step="0.01"
             />
@@ -728,7 +730,7 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="newAsset.loan.monthlyPayment"
               type="number"
-              label="Monthly Payment"
+              :label="t('assets.monthlyPayment')"
               placeholder="0.00"
               step="0.01"
             />
@@ -738,13 +740,13 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="newAsset.loan.loanTermMonths"
               type="number"
-              label="Loan Term (months)"
+              :label="t('assets.loanTerm')"
               placeholder="360"
             />
 
             <BaseInput
               v-model="newAsset.loan.lender"
-              label="Lender"
+              :label="t('assets.lender')"
               placeholder="e.g., Bank of America"
             />
           </div>
@@ -752,7 +754,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseInput
             v-model="newAsset.loan.loanStartDate"
             type="date"
-            label="Loan Start Date"
+            :label="t('assets.loanStartDate')"
           />
         </div>
 
@@ -763,7 +765,7 @@ function getAppreciationPercent(asset: Asset): number {
               type="checkbox"
               class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600"
             />
-            <span class="text-sm text-gray-700 dark:text-gray-300">Include in Net Worth</span>
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('form.includeInNetWorth') }}</span>
           </label>
         </div>
       </form>
@@ -771,10 +773,10 @@ function getAppreciationPercent(asset: Asset): number {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="showAddModal = false">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="createAsset">
-            Add Asset
+            {{ t('assets.addAsset') }}
           </BaseButton>
         </div>
       </template>
@@ -783,7 +785,7 @@ function getAppreciationPercent(asset: Asset): number {
     <!-- Edit Asset Modal -->
     <BaseModal
       :open="showEditModal"
-      title="Edit Asset"
+      :title="t('assets.editAsset')"
       size="lg"
       @close="closeEditModal"
     >
@@ -791,7 +793,7 @@ function getAppreciationPercent(asset: Asset): number {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <BaseInput
             v-model="editingAsset.name"
-            label="Asset Name"
+            :label="t('assets.assetName')"
             placeholder="e.g., Family Home, Toyota Camry"
             required
           />
@@ -799,7 +801,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseSelect
             v-model="editingAsset.type"
             :options="assetTypes"
-            label="Asset Type"
+            :label="t('assets.assetType')"
           />
         </div>
 
@@ -807,13 +809,13 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseSelect
             v-model="editingAsset.memberId"
             :options="memberOptions"
-            label="Owner"
+            :label="t('form.owner')"
           />
 
           <BaseSelect
             v-model="editingAsset.currency"
             :options="currencyOptions"
-            label="Currency"
+            :label="t('form.currency')"
           />
         </div>
 
@@ -821,7 +823,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseInput
             v-model="editingAsset.purchaseValue"
             type="number"
-            label="Purchase Value"
+            :label="t('common.purchaseValue')"
             placeholder="0.00"
             step="0.01"
           />
@@ -829,7 +831,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseInput
             v-model="editingAsset.currentValue"
             type="number"
-            label="Current Value"
+            :label="t('common.currentValue')"
             placeholder="0.00"
             step="0.01"
           />
@@ -838,12 +840,12 @@ function getAppreciationPercent(asset: Asset): number {
         <BaseInput
           v-model="editingAsset.purchaseDate"
           type="date"
-          label="Purchase Date"
+          :label="t('assets.purchaseDate')"
         />
 
         <BaseInput
           v-model="editingAsset.notes"
-          label="Notes"
+          :label="t('form.notes')"
           placeholder="Additional details about this asset..."
         />
 
@@ -856,21 +858,21 @@ function getAppreciationPercent(asset: Asset): number {
               class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600"
             />
             <div>
-              <span class="font-medium text-gray-900 dark:text-gray-100">This asset has a loan</span>
-              <p class="text-sm text-gray-500 dark:text-gray-400">Track mortgage, auto loan, or other financing</p>
+              <span class="font-medium text-gray-900 dark:text-gray-100">{{ t('assets.hasLoan') }}</span>
+              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('assets.hasLoanDesc') }}</p>
             </div>
           </label>
         </div>
 
         <!-- Loan Details (shown when hasLoan is true) -->
         <div v-if="editingAsset.loan?.hasLoan" class="space-y-4 p-4 bg-gray-50 dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700">
-          <h4 class="font-medium text-gray-900 dark:text-gray-100">Loan Details</h4>
+          <h4 class="font-medium text-gray-900 dark:text-gray-100">{{ t('assets.loanDetails') }}</h4>
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <BaseInput
               v-model="editingAsset.loan.loanAmount"
               type="number"
-              label="Original Loan Amount"
+              :label="t('assets.originalLoanAmount')"
               placeholder="0.00"
               step="0.01"
             />
@@ -878,7 +880,7 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="editingAsset.loan.outstandingBalance"
               type="number"
-              label="Outstanding Balance"
+              :label="t('assets.outstandingBalance')"
               placeholder="0.00"
               step="0.01"
             />
@@ -888,7 +890,7 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="editingAsset.loan.interestRate"
               type="number"
-              label="Interest Rate (%)"
+              :label="t('assets.interestRate')"
               placeholder="5.0"
               step="0.01"
             />
@@ -896,7 +898,7 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="editingAsset.loan.monthlyPayment"
               type="number"
-              label="Monthly Payment"
+              :label="t('assets.monthlyPayment')"
               placeholder="0.00"
               step="0.01"
             />
@@ -906,13 +908,13 @@ function getAppreciationPercent(asset: Asset): number {
             <BaseInput
               v-model="editingAsset.loan.loanTermMonths"
               type="number"
-              label="Loan Term (months)"
+              :label="t('assets.loanTerm')"
               placeholder="360"
             />
 
             <BaseInput
               v-model="editingAsset.loan.lender"
-              label="Lender"
+              :label="t('assets.lender')"
               placeholder="e.g., Bank of America"
             />
           </div>
@@ -920,7 +922,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseInput
             v-model="editingAsset.loan.loanStartDate"
             type="date"
-            label="Loan Start Date"
+            :label="t('assets.loanStartDate')"
           />
         </div>
 
@@ -931,7 +933,7 @@ function getAppreciationPercent(asset: Asset): number {
               type="checkbox"
               class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600"
             />
-            <span class="text-sm text-gray-700 dark:text-gray-300">Include in Net Worth</span>
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('form.includeInNetWorth') }}</span>
           </label>
         </div>
       </form>
@@ -939,10 +941,10 @@ function getAppreciationPercent(asset: Asset): number {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="closeEditModal">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="saveEdit">
-            Save Changes
+            {{ t('action.saveChanges') }}
           </BaseButton>
         </div>
       </template>

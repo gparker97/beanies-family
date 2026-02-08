@@ -5,6 +5,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useTranslation } from '@/composables/useTranslation';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
@@ -23,6 +24,7 @@ const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { t } = useTranslation();
 
 // Tab state - recurring first by default
 const activeTab = ref<'transactions' | 'recurring'>('recurring');
@@ -38,11 +40,11 @@ const showRecurringModal = ref(false);
 const editingRecurringItem = ref<RecurringItem | undefined>(undefined);
 const isSubmittingRecurring = ref(false);
 
-const transactionTypes: { value: TransactionType; label: string }[] = [
-  { value: 'expense', label: 'Expense' },
-  { value: 'income', label: 'Income' },
-  { value: 'transfer', label: 'Transfer' },
-];
+const transactionTypes = computed(() => [
+  { value: 'expense' as TransactionType, label: t('transactions.type.expense') },
+  { value: 'income' as TransactionType, label: t('transactions.type.income') },
+  { value: 'transfer' as TransactionType, label: t('transactions.type.transfer') },
+]);
 
 const accountOptions = computed(() =>
   accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))
@@ -275,15 +277,15 @@ function formatNextDate(item: RecurringItem): string {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Transactions</h1>
-        <p class="text-gray-500 dark:text-gray-400">Track your income and expenses</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('transactions.title') }}</h1>
+        <p class="text-gray-500 dark:text-gray-400">{{ t('transactions.subtitle') }}</p>
       </div>
       <div class="flex gap-2">
         <BaseButton v-if="activeTab === 'transactions'" @click="openAddModal">
-          Add Transaction
+          {{ t('transactions.addTransaction') }}
         </BaseButton>
         <BaseButton v-else @click="openAddRecurringModal">
-          Add Recurring
+          {{ t('transactions.addRecurring') }}
         </BaseButton>
       </div>
     </div>
@@ -300,7 +302,7 @@ function formatNextDate(item: RecurringItem): string {
           "
           @click="activeTab = 'recurring'"
         >
-          Recurring Transactions
+          {{ t('transactions.recurringTransactions') }}
           <span
             v-if="recurringItems.length > 0"
             class="ml-2 px-2 py-0.5 text-xs rounded-full"
@@ -318,7 +320,7 @@ function formatNextDate(item: RecurringItem): string {
           "
           @click="activeTab = 'transactions'"
         >
-          One Time Transactions
+          {{ t('transactions.oneTime') }}
         </button>
       </nav>
     </div>
@@ -331,7 +333,7 @@ function formatNextDate(item: RecurringItem): string {
         <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-green-100 text-sm font-medium">This Month Income</p>
+              <p class="text-green-100 text-sm font-medium">{{ t('transactions.thisMonthIncome') }}</p>
               <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.thisMonthIncome) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -346,7 +348,7 @@ function formatNextDate(item: RecurringItem): string {
         <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-red-100 text-sm font-medium">This Month Expenses</p>
+              <p class="text-red-100 text-sm font-medium">{{ t('transactions.thisMonthExpenses') }}</p>
               <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.thisMonthExpenses) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -366,7 +368,7 @@ function formatNextDate(item: RecurringItem): string {
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium" :class="transactionsStore.thisMonthNetCashFlow >= 0 ? 'text-blue-100' : 'text-orange-100'">Net Cash Flow</p>
+              <p class="text-sm font-medium" :class="transactionsStore.thisMonthNetCashFlow >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('transactions.netCashFlow') }}</p>
               <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.thisMonthNetCashFlow) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -379,10 +381,10 @@ function formatNextDate(item: RecurringItem): string {
       </div>
 
       <!-- Transactions List -->
-      <BaseCard title="All Transactions">
+      <BaseCard :title="t('transactions.allTransactions')">
         <div v-if="transactions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p>No transactions recorded yet.</p>
-          <p class="mt-2">Click "Add Transaction" to get started.</p>
+          <p>{{ t('transactions.noTransactions') }}</p>
+          <p class="mt-2">{{ t('transactions.getStarted') }}</p>
         </div>
         <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
           <div
@@ -467,7 +469,7 @@ function formatNextDate(item: RecurringItem): string {
                     v-if="transaction.recurringItemId"
                     class="ml-1 text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded"
                   >
-                    Recurring
+                    {{ t('status.recurring') }}
                   </span>
                 </p>
               </div>
@@ -513,7 +515,7 @@ function formatNextDate(item: RecurringItem): string {
         <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-green-100 text-sm font-medium">Monthly Recurring Income</p>
+              <p class="text-green-100 text-sm font-medium">{{ t('recurring.monthlyIncome') }}</p>
               <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.totalMonthlyRecurringIncome) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -528,7 +530,7 @@ function formatNextDate(item: RecurringItem): string {
         <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-red-100 text-sm font-medium">Monthly Recurring Expenses</p>
+              <p class="text-red-100 text-sm font-medium">{{ t('recurring.monthlyExpenses') }}</p>
               <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.totalMonthlyRecurringExpenses) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -548,7 +550,7 @@ function formatNextDate(item: RecurringItem): string {
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium" :class="recurringStore.netMonthlyRecurring >= 0 ? 'text-blue-100' : 'text-orange-100'">Net Monthly Recurring</p>
+              <p class="text-sm font-medium" :class="recurringStore.netMonthlyRecurring >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('recurring.netMonthly') }}</p>
               <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.netMonthlyRecurring) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -561,7 +563,7 @@ function formatNextDate(item: RecurringItem): string {
       </div>
 
       <!-- Recurring Items List -->
-      <BaseCard title="Recurring Items">
+      <BaseCard :title="t('recurring.items')">
         <div v-if="recurringItems.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
           <svg
             class="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600"
@@ -576,8 +578,8 @@ function formatNextDate(item: RecurringItem): string {
               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
             />
           </svg>
-          <p>No recurring items yet.</p>
-          <p class="mt-2">Click "Add Recurring" to set up automatic transactions.</p>
+          <p>{{ t('recurring.noItems') }}</p>
+          <p class="mt-2">{{ t('recurring.getStarted') }}</p>
         </div>
         <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
           <div
@@ -615,7 +617,7 @@ function formatNextDate(item: RecurringItem): string {
                       v-if="!item.isActive"
                       class="ml-1 text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-500 rounded"
                     >
-                      Paused
+                      {{ t('status.paused') }}
                     </span>
                   </p>
                   <!-- Category -->
@@ -654,7 +656,7 @@ function formatNextDate(item: RecurringItem): string {
                 <div class="flex gap-1">
                   <button
                     class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
-                    :title="item.isActive ? 'Pause' : 'Resume'"
+                    :title="item.isActive ? t('action.pause') : t('action.resume')"
                     @click="toggleRecurringActive(item.id)"
                   >
                     <svg v-if="item.isActive" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -694,26 +696,26 @@ function formatNextDate(item: RecurringItem): string {
     <!-- Add Transaction Modal -->
     <BaseModal
       :open="showAddModal"
-      title="Add Transaction"
+      :title="t('transactions.addTransaction')"
       @close="showAddModal = false"
     >
       <form class="space-y-4" @submit.prevent="createTransaction">
         <BaseSelect
           v-model="newTransaction.type"
           :options="transactionTypes"
-          label="Type"
+          :label="t('form.type')"
         />
 
         <BaseSelect
           v-model="newTransaction.accountId"
           :options="accountOptions"
-          label="Account"
-          placeholder="Select an account"
+          :label="t('form.account')"
+          :placeholder="t('form.selectAccount')"
         />
 
         <BaseInput
           v-model="newTransaction.description"
-          label="Description"
+          :label="t('form.description')"
           placeholder="e.g., Grocery shopping"
           required
         />
@@ -721,38 +723,38 @@ function formatNextDate(item: RecurringItem): string {
         <BaseSelect
           v-model="newTransaction.category"
           :grouped-options="categoryOptions"
-          label="Category"
+          :label="t('form.category')"
         />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseInput
             v-model="newTransaction.amount"
             type="number"
-            label="Amount"
+            :label="t('form.amount')"
             placeholder="0.00"
           />
 
           <BaseSelect
             v-model="newTransaction.currency"
             :options="currencyOptions"
-            label="Currency"
+            :label="t('form.currency')"
           />
         </div>
 
         <BaseInput
           v-model="newTransaction.date"
           type="date"
-          label="Date"
+          :label="t('form.date')"
         />
       </form>
 
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="showAddModal = false">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="createTransaction">
-            Add Transaction
+            {{ t('transactions.addTransaction') }}
           </BaseButton>
         </div>
       </template>
@@ -761,26 +763,26 @@ function formatNextDate(item: RecurringItem): string {
     <!-- Edit Transaction Modal -->
     <BaseModal
       :open="showEditModal"
-      title="Edit Transaction"
+      :title="t('transactions.editTransaction')"
       @close="closeEditModal"
     >
       <form class="space-y-4" @submit.prevent="updateTransaction">
         <BaseSelect
           v-model="editTransaction.type"
           :options="transactionTypes"
-          label="Type"
+          :label="t('form.type')"
         />
 
         <BaseSelect
           v-model="editTransaction.accountId"
           :options="accountOptions"
-          label="Account"
-          placeholder="Select an account"
+          :label="t('form.account')"
+          :placeholder="t('form.selectAccount')"
         />
 
         <BaseInput
           v-model="editTransaction.description"
-          label="Description"
+          :label="t('form.description')"
           placeholder="e.g., Grocery shopping"
           required
         />
@@ -788,38 +790,38 @@ function formatNextDate(item: RecurringItem): string {
         <BaseSelect
           v-model="editTransaction.category"
           :grouped-options="editCategoryOptions"
-          label="Category"
+          :label="t('form.category')"
         />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseInput
             v-model="editTransaction.amount"
             type="number"
-            label="Amount"
+            :label="t('form.amount')"
             placeholder="0.00"
           />
 
           <BaseSelect
             v-model="editTransaction.currency"
             :options="currencyOptions"
-            label="Currency"
+            :label="t('form.currency')"
           />
         </div>
 
         <BaseInput
           v-model="editTransaction.date"
           type="date"
-          label="Date"
+          :label="t('form.date')"
         />
       </form>
 
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="closeEditModal">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="updateTransaction">
-            Save Changes
+            {{ t('action.saveChanges') }}
           </BaseButton>
         </div>
       </template>
@@ -828,7 +830,7 @@ function formatNextDate(item: RecurringItem): string {
     <!-- Add/Edit Recurring Modal -->
     <BaseModal
       :open="showRecurringModal"
-      :title="editingRecurringItem ? 'Edit Recurring Item' : 'Add Recurring Item'"
+      :title="editingRecurringItem ? t('recurring.editItem') : t('recurring.addItem')"
       size="lg"
       @close="handleRecurringCancel"
     >

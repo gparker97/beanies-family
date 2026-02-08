@@ -2,9 +2,11 @@
 import { ref } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { BaseCard, BaseButton, BaseInput, BaseModal } from '@/components/ui';
+import { useTranslation } from '@/composables/useTranslation';
 import type { CreateFamilyMemberInput } from '@/types/models';
 
 const familyStore = useFamilyStore();
+const { t } = useTranslation();
 
 const showAddModal = ref(false);
 const isSubmitting = ref(false);
@@ -22,12 +24,13 @@ const newMember = ref<CreateFamilyMemberInput>({
 });
 
 function getRoleLabel(role: string): string {
-  const roles: Record<string, string> = {
-    owner: 'Owner',
-    admin: 'Admin',
-    member: 'Member',
+  const roleKeys: Record<string, string> = {
+    owner: 'family.role.owner',
+    admin: 'family.role.admin',
+    member: 'family.role.member',
   };
-  return roles[role] || role;
+  const key = roleKeys[role];
+  return key ? t(key as any) : role;
 }
 
 function openAddModal() {
@@ -69,11 +72,11 @@ async function deleteMember(id: string) {
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Family Members</h1>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('family.title') }}</h1>
         <p class="text-gray-500 dark:text-gray-400">Manage your family profiles</p>
       </div>
       <BaseButton @click="openAddModal">
-        Add Member
+        {{ t('family.addMember') }}
       </BaseButton>
     </div>
 
@@ -126,13 +129,13 @@ async function deleteMember(id: string) {
     <!-- Add Member Modal -->
     <BaseModal
       :open="showAddModal"
-      title="Add Family Member"
+      :title="t('family.addMember')"
       @close="showAddModal = false"
     >
       <form class="space-y-4" @submit.prevent="createMember">
         <BaseInput
           v-model="newMember.name"
-          label="Name"
+          :label="t('form.name')"
           placeholder="Enter name"
           required
         />
@@ -140,7 +143,7 @@ async function deleteMember(id: string) {
         <BaseInput
           v-model="newMember.email"
           type="email"
-          label="Email"
+          :label="t('form.email')"
           placeholder="Enter email"
           required
         />
@@ -166,10 +169,10 @@ async function deleteMember(id: string) {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="showAddModal = false">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="createMember">
-            Add Member
+            {{ t('family.addMember') }}
           </BaseButton>
         </div>
       </template>

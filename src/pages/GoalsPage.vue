@@ -3,10 +3,13 @@ import { ref, computed } from 'vue';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useTranslation } from '@/composables/useTranslation';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { CURRENCIES } from '@/constants/currencies';
 import type { Goal, CreateGoalInput, UpdateGoalInput, GoalType, GoalPriority } from '@/types/models';
+
+const { t } = useTranslation();
 
 const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();
@@ -17,19 +20,19 @@ const showEditModal = ref(false);
 const editingGoal = ref<Goal | null>(null);
 const isSubmitting = ref(false);
 
-const goalTypes: { value: GoalType; label: string }[] = [
-  { value: 'savings', label: 'Savings' },
-  { value: 'debt_payoff', label: 'Debt Payoff' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'purchase', label: 'Purchase' },
-];
+const goalTypes = computed(() => [
+  { value: 'savings' as GoalType, label: t('goals.type.savings') },
+  { value: 'debt_payoff' as GoalType, label: t('goals.type.debt_payoff') },
+  { value: 'investment' as GoalType, label: t('goals.type.investment') },
+  { value: 'purchase' as GoalType, label: t('goals.type.purchase') },
+]);
 
-const priorityOptions: { value: GoalPriority; label: string }[] = [
-  { value: 'low', label: 'Low' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'high', label: 'High' },
-  { value: 'critical', label: 'Critical' },
-];
+const priorityOptions = computed(() => [
+  { value: 'low' as GoalPriority, label: t('goals.priority.low') },
+  { value: 'medium' as GoalPriority, label: t('goals.priority.medium') },
+  { value: 'high' as GoalPriority, label: t('goals.priority.high') },
+  { value: 'critical' as GoalPriority, label: t('goals.priority.critical') },
+]);
 
 const currencyOptions = CURRENCIES.map((c) => ({
   value: c.code,
@@ -37,7 +40,7 @@ const currencyOptions = CURRENCIES.map((c) => ({
 }));
 
 const memberOptions = computed(() => [
-  { value: '', label: 'Family-wide goal' },
+  { value: '', label: t('goals.familyWide') },
   ...familyStore.members.map((m) => ({ value: m.id, label: m.name })),
 ]);
 
@@ -192,39 +195,39 @@ async function deleteGoal(id: string) {
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Goals</h1>
-        <p class="text-gray-500 dark:text-gray-400">Set and track your financial goals</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('goals.title') }}</h1>
+        <p class="text-gray-500 dark:text-gray-400">{{ t('goals.subtitle') }}</p>
       </div>
       <BaseButton @click="openAddModal">
-        Add Goal
+        {{ t('goals.addGoal') }}
       </BaseButton>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <BaseCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Active Goals</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.activeGoals') }}</p>
         <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
           {{ goalsStore.activeGoals.length }}
         </p>
       </BaseCard>
       <BaseCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Completed Goals</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.completedGoals') }}</p>
         <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
           {{ goalsStore.completedGoals.length }}
         </p>
       </BaseCard>
       <BaseCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Overdue Goals</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.overdueGoals') }}</p>
         <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
           {{ goalsStore.overdueGoals.length }}
         </p>
       </BaseCard>
     </div>
 
-    <BaseCard title="All Goals">
+    <BaseCard :title="t('goals.allGoals')">
       <div v-if="goalsStore.goals.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
-        <p>No goals set yet.</p>
-        <p class="mt-2">Click "Add Goal" to create your first financial goal.</p>
+        <p>{{ t('goals.noGoals') }}</p>
+        <p class="mt-2">{{ t('goals.getStarted') }}</p>
       </div>
       <div v-else class="space-y-4">
         <div
@@ -269,7 +272,7 @@ async function deleteGoal(id: string) {
             </div>
           </div>
           <div class="flex items-center justify-between text-sm mb-2">
-            <span class="text-gray-500 dark:text-gray-400">Progress</span>
+            <span class="text-gray-500 dark:text-gray-400">{{ t('goals.progress') }}</span>
             <span class="font-medium text-gray-900 dark:text-gray-100">
               <CurrencyAmount :amount="goal.currentAmount" :currency="goal.currency" size="sm" />
               <span class="mx-1">/</span>
@@ -290,13 +293,13 @@ async function deleteGoal(id: string) {
     <!-- Add Goal Modal -->
     <BaseModal
       :open="showAddModal"
-      title="Add Goal"
+      :title="t('goals.addGoal')"
       @close="showAddModal = false"
     >
       <form class="space-y-4" @submit.prevent="createGoal">
         <BaseInput
           v-model="newGoal.name"
-          label="Goal Name"
+          :label="t('goals.goalName')"
           placeholder="e.g., Emergency Fund"
           required
         />
@@ -304,57 +307,57 @@ async function deleteGoal(id: string) {
         <BaseSelect
           v-model="newGoal.type"
           :options="goalTypes"
-          label="Goal Type"
+          :label="t('goals.goalType')"
         />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseInput
             v-model="newGoal.targetAmount"
             type="number"
-            label="Target Amount"
+            :label="t('form.targetAmount')"
             placeholder="0.00"
           />
 
           <BaseSelect
             v-model="newGoal.currency"
             :options="currencyOptions"
-            label="Currency"
+            :label="t('form.currency')"
           />
         </div>
 
         <BaseInput
           v-model="newGoal.currentAmount"
           type="number"
-          label="Current Amount"
+          :label="t('form.currentAmount')"
           placeholder="0.00"
         />
 
         <BaseSelect
           v-model="newGoal.priority"
           :options="priorityOptions"
-          label="Priority"
+          :label="t('form.priority')"
         />
 
         <BaseSelect
           v-model="newGoal.memberId"
           :options="memberOptions"
-          label="Assign to"
+          :label="t('goals.assignTo')"
         />
 
         <BaseInput
           v-model="newGoal.deadline"
           type="date"
-          label="Deadline (Optional)"
+          :label="t('goals.deadlineOptional')"
         />
       </form>
 
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="showAddModal = false">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="createGoal">
-            Add Goal
+            {{ t('goals.addGoal') }}
           </BaseButton>
         </div>
       </template>
@@ -363,13 +366,13 @@ async function deleteGoal(id: string) {
     <!-- Edit Goal Modal -->
     <BaseModal
       :open="showEditModal"
-      title="Edit Goal"
+      :title="t('goals.editGoal')"
       @close="closeEditModal"
     >
       <form class="space-y-4" @submit.prevent="updateGoal">
         <BaseInput
           v-model="editGoal.name"
-          label="Goal Name"
+          :label="t('goals.goalName')"
           placeholder="e.g., Emergency Fund"
           required
         />
@@ -377,47 +380,47 @@ async function deleteGoal(id: string) {
         <BaseSelect
           v-model="editGoal.type"
           :options="goalTypes"
-          label="Goal Type"
+          :label="t('goals.goalType')"
         />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseInput
             v-model="editGoal.targetAmount"
             type="number"
-            label="Target Amount"
+            :label="t('form.targetAmount')"
             placeholder="0.00"
           />
 
           <BaseSelect
             v-model="editGoal.currency"
             :options="currencyOptions"
-            label="Currency"
+            :label="t('form.currency')"
           />
         </div>
 
         <BaseInput
           v-model="editGoal.currentAmount"
           type="number"
-          label="Current Amount"
+          :label="t('form.currentAmount')"
           placeholder="0.00"
         />
 
         <BaseSelect
           v-model="editGoal.priority"
           :options="priorityOptions"
-          label="Priority"
+          :label="t('form.priority')"
         />
 
         <BaseSelect
           v-model="editGoal.memberId"
           :options="memberOptions"
-          label="Assign to"
+          :label="t('goals.assignTo')"
         />
 
         <BaseInput
           v-model="editGoal.deadline"
           type="date"
-          label="Deadline (Optional)"
+          :label="t('goals.deadlineOptional')"
         />
 
         <div class="flex items-center gap-2">
@@ -428,7 +431,7 @@ async function deleteGoal(id: string) {
             class="rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
           />
           <label for="isCompleted" class="text-sm text-gray-700 dark:text-gray-300">
-            Mark as completed
+            {{ t('action.markCompleted') }}
           </label>
         </div>
       </form>
@@ -436,10 +439,10 @@ async function deleteGoal(id: string) {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="closeEditModal">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="updateGoal">
-            Save Changes
+            {{ t('action.saveChanges') }}
           </BaseButton>
         </div>
       </template>

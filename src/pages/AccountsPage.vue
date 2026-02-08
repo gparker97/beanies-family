@@ -7,12 +7,14 @@ import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import { CURRENCIES } from '@/constants/currencies';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useTranslation } from '@/composables/useTranslation';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 const accountsStore = useAccountsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { t } = useTranslation();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -31,16 +33,16 @@ const editingAccount = ref<UpdateAccountInput & { name: string; balance: number;
   includeInNetWorth: true,
 });
 
-const accountTypes: { value: AccountType; label: string }[] = [
-  { value: 'checking', label: 'Checking Account' },
-  { value: 'savings', label: 'Savings Account' },
-  { value: 'credit_card', label: 'Credit Card' },
-  { value: 'investment', label: 'Investment Account' },
-  { value: 'crypto', label: 'Cryptocurrency' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'loan', label: 'Loan' },
-  { value: 'other', label: 'Other' },
-];
+const accountTypes = computed(() => [
+  { value: 'checking' as AccountType, label: t('accounts.type.checking') },
+  { value: 'savings' as AccountType, label: t('accounts.type.savings') },
+  { value: 'credit_card' as AccountType, label: t('accounts.type.credit_card') },
+  { value: 'investment' as AccountType, label: t('accounts.type.investment') },
+  { value: 'crypto' as AccountType, label: t('accounts.type.crypto') },
+  { value: 'cash' as AccountType, label: t('accounts.type.cash') },
+  { value: 'loan' as AccountType, label: t('accounts.type.loan') },
+  { value: 'other' as AccountType, label: t('accounts.type.other') },
+]);
 
 const currencyOptions = CURRENCIES.map((c) => ({
   value: c.code,
@@ -95,7 +97,7 @@ function formatTotal(amount: number): string {
 }
 
 function getAccountTypeLabel(type: AccountType): string {
-  return accountTypes.find((t) => t.value === type)?.label || type;
+  return accountTypes.value.find((t) => t.value === type)?.label || type;
 }
 
 function getMemberName(memberId: string): string {
@@ -193,14 +195,14 @@ async function deleteAccount(id: string) {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Accounts</h1>
-        <p class="text-gray-500 dark:text-gray-400">Manage your bank accounts and credit cards</p>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('accounts.title') }}</h1>
+        <p class="text-gray-500 dark:text-gray-400">{{ t('accounts.subtitle') }}</p>
       </div>
       <BaseButton @click="openAddModal">
         <svg class="w-5 h-5 mr-1.5 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
-        Add Account
+        {{ t('accounts.addAccount') }}
       </BaseButton>
     </div>
 
@@ -210,7 +212,7 @@ async function deleteAccount(id: string) {
       <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-green-100 text-sm font-medium">Total Assets</p>
+            <p class="text-green-100 text-sm font-medium">{{ t('common.totalAssets') }}</p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.totalAssets) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -225,7 +227,7 @@ async function deleteAccount(id: string) {
       <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-red-100 text-sm font-medium">Total Liabilities</p>
+            <p class="text-red-100 text-sm font-medium">{{ t('common.totalLiabilities') }}</p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.totalLiabilities) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -240,7 +242,7 @@ async function deleteAccount(id: string) {
       <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-5 text-white shadow-lg">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-blue-100 text-sm font-medium">Net Worth</p>
+            <p class="text-blue-100 text-sm font-medium">{{ t('dashboard.netWorth') }}</p>
             <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.totalBalance) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
@@ -259,13 +261,13 @@ async function deleteAccount(id: string) {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
         </svg>
       </div>
-      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">No accounts yet</h3>
-      <p class="text-gray-500 dark:text-gray-400 mt-1 mb-4">Get started by adding your first account</p>
+      <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">{{ t('accounts.noAccounts') }}</h3>
+      <p class="text-gray-500 dark:text-gray-400 mt-1 mb-4">{{ t('accounts.getStarted') }}</p>
       <BaseButton @click="openAddModal">
         <svg class="w-5 h-5 mr-1.5 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
         </svg>
-        Add Account
+        {{ t('accounts.addAccount') }}
       </BaseButton>
     </div>
 
@@ -396,7 +398,7 @@ async function deleteAccount(id: string) {
 
             <!-- Balance Display -->
             <div class="mb-4">
-              <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Balance</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{{ t('form.balance') }}</p>
               <div class="text-2xl font-bold">
                 <CurrencyAmount
                   :amount="account.balance"
@@ -428,14 +430,14 @@ async function deleteAccount(id: string) {
                   v-if="!account.isActive"
                   class="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-slate-700 text-gray-500 dark:text-gray-400"
                 >
-                  Inactive
+                  {{ t('status.inactive') }}
                 </span>
                 <span
                   v-if="!account.includeInNetWorth"
                   class="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                  title="Not included in net worth"
+                  :title="t('status.excluded')"
                 >
-                  Excluded
+                  {{ t('status.excluded') }}
                 </span>
               </div>
             </div>
@@ -447,13 +449,13 @@ async function deleteAccount(id: string) {
     <!-- Add Account Modal -->
     <BaseModal
       :open="showAddModal"
-      title="Add Account"
+      :title="t('accounts.addAccount')"
       @close="showAddModal = false"
     >
       <form class="space-y-4" @submit.prevent="createAccount">
         <BaseInput
           v-model="newAccount.name"
-          label="Account Name"
+          :label="t('accounts.accountName')"
           placeholder="e.g., Main Checking"
           required
         />
@@ -461,31 +463,31 @@ async function deleteAccount(id: string) {
         <BaseSelect
           v-model="newAccount.type"
           :options="accountTypes"
-          label="Account Type"
+          :label="t('accounts.accountType')"
         />
 
         <BaseSelect
           v-model="newAccount.memberId"
           :options="memberOptions"
-          label="Owner"
+          :label="t('form.owner')"
         />
 
         <BaseInput
           v-model="newAccount.institution"
-          label="Institution"
+          :label="t('form.institution')"
           placeholder="e.g., Bank of America"
         />
 
         <BaseSelect
           v-model="newAccount.currency"
           :options="currencyOptions"
-          label="Currency"
+          :label="t('form.currency')"
         />
 
         <BaseInput
           v-model="newAccount.balance"
           type="number"
-          label="Current Balance"
+          :label="t('accounts.currentBalance')"
           placeholder="0.00"
         />
       </form>
@@ -493,10 +495,10 @@ async function deleteAccount(id: string) {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="showAddModal = false">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="createAccount">
-            Add Account
+            {{ t('accounts.addAccount') }}
           </BaseButton>
         </div>
       </template>
@@ -505,13 +507,13 @@ async function deleteAccount(id: string) {
     <!-- Edit Account Modal -->
     <BaseModal
       :open="showEditModal"
-      title="Edit Account"
+      :title="t('accounts.editAccount')"
       @close="closeEditModal"
     >
       <form class="space-y-4" @submit.prevent="saveEdit">
         <BaseInput
           v-model="editingAccount.name"
-          label="Account Name"
+          :label="t('accounts.accountName')"
           placeholder="e.g., Main Checking"
           required
         />
@@ -519,31 +521,31 @@ async function deleteAccount(id: string) {
         <BaseSelect
           v-model="editingAccount.type"
           :options="accountTypes"
-          label="Account Type"
+          :label="t('accounts.accountType')"
         />
 
         <BaseSelect
           v-model="editingAccount.memberId"
           :options="memberOptions"
-          label="Owner"
+          :label="t('form.owner')"
         />
 
         <BaseInput
           v-model="editingAccount.institution"
-          label="Institution"
+          :label="t('form.institution')"
           placeholder="e.g., Bank of America"
         />
 
         <BaseSelect
           v-model="editingAccount.currency"
           :options="currencyOptions"
-          label="Currency"
+          :label="t('form.currency')"
         />
 
         <BaseInput
           v-model="editingAccount.balance"
           type="number"
-          label="Current Balance"
+          :label="t('accounts.currentBalance')"
           placeholder="0.00"
           step="0.01"
         />
@@ -555,7 +557,7 @@ async function deleteAccount(id: string) {
               type="checkbox"
               class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600"
             />
-            <span class="text-sm text-gray-700 dark:text-gray-300">Active</span>
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('form.isActive') }}</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer">
             <input
@@ -563,7 +565,7 @@ async function deleteAccount(id: string) {
               type="checkbox"
               class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300 dark:border-slate-600"
             />
-            <span class="text-sm text-gray-700 dark:text-gray-300">Include in Net Worth</span>
+            <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('form.includeInNetWorth') }}</span>
           </label>
         </div>
       </form>
@@ -571,10 +573,10 @@ async function deleteAccount(id: string) {
       <template #footer>
         <div class="flex justify-end gap-3">
           <BaseButton variant="secondary" @click="closeEditModal">
-            Cancel
+            {{ t('action.cancel') }}
           </BaseButton>
           <BaseButton data-testid="save-edit-btn" :loading="isSubmitting" @click="saveEdit">
-            Save Changes
+            {{ t('action.saveChanges') }}
           </BaseButton>
         </div>
       </template>

@@ -23,7 +23,10 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { ALL_CATEGORIES, getCategoryById, INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '@/constants/categories';
 import { addMonths, getStartOfMonth, getEndOfMonth, toISODateString, isDateBetween } from '@/utils/date';
+import { useTranslation } from '@/composables/useTranslation';
 import type { CurrencyCode, ExchangeRate, Transaction, RecurringItem, Account, Asset } from '@/types/models';
+
+const { t } = useTranslation();
 
 // Register Chart.js components
 ChartJS.register(
@@ -625,8 +628,8 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
   <div class="space-y-6">
     <!-- Header -->
     <div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Reports</h1>
-      <p class="text-gray-500 dark:text-gray-400">Visualize your financial data with charts and reports</p>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('reports.title') }}</h1>
+      <p class="text-gray-500 dark:text-gray-400">{{ t('reports.subtitle') }}</p>
     </div>
 
     <!-- Global Family Member Filter -->
@@ -635,7 +638,7 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
         <BaseSelect
           v-model="selectedMember"
           :options="familyMemberOptions"
-          label="Family Member"
+          :label="t('reports.familyMember')"
         />
       </div>
     </div>
@@ -645,8 +648,8 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <template #header>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Net Worth Over Time</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Projected net worth based on current assets and recurring transactions</p>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ t('reports.netWorthOverTime') }}</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('reports.netWorthDescription') }}</p>
           </div>
           <div class="w-48">
             <BaseSelect
@@ -660,18 +663,18 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <!-- Summary Stats -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-4 text-white">
-          <p class="text-blue-100 text-sm">Current Net Worth</p>
+          <p class="text-blue-100 text-sm">{{ t('reports.currentNetWorth') }}</p>
           <p class="text-xl font-bold mt-1">{{ formatInDisplayCurrency(calculateCurrentNetWorth(), settingsStore.baseCurrency) }}</p>
         </div>
         <div class="bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl p-4 text-white">
-          <p class="text-purple-100 text-sm">Projected Net Worth</p>
+          <p class="text-purple-100 text-sm">{{ t('reports.projectedNetWorth') }}</p>
           <p class="text-xl font-bold mt-1">{{ formatInDisplayCurrency(totalProjectedNetWorth, settingsStore.baseCurrency) }}</p>
         </div>
         <div
           class="rounded-xl p-4 text-white"
           :class="netWorthChange >= 0 ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-red-500 to-rose-600'"
         >
-          <p :class="netWorthChange >= 0 ? 'text-green-100' : 'text-red-100'" class="text-sm">Projected Change</p>
+          <p :class="netWorthChange >= 0 ? 'text-green-100' : 'text-red-100'" class="text-sm">{{ t('reports.projectedChange') }}</p>
           <p class="text-xl font-bold mt-1">
             {{ netWorthChange >= 0 ? '+' : '' }}{{ formatInDisplayCurrency(netWorthChange, settingsStore.baseCurrency) }}
           </p>
@@ -689,8 +692,8 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <template #header>
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Income vs Expenses</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Monthly breakdown of income and expenses by category</p>
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ t('reports.incomeVsExpenses') }}</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('reports.incomeVsExpensesDescription') }}</p>
           </div>
           <div class="flex gap-3">
             <div class="w-40">
@@ -712,18 +715,18 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <!-- Summary Stats -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-4 text-white">
-          <p class="text-green-100 text-sm">Total Income</p>
+          <p class="text-green-100 text-sm">{{ t('reports.totalIncome') }}</p>
           <p class="text-xl font-bold mt-1">{{ formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency) }}</p>
         </div>
         <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-4 text-white">
-          <p class="text-red-100 text-sm">Total Expenses</p>
+          <p class="text-red-100 text-sm">{{ t('reports.totalExpenses') }}</p>
           <p class="text-xl font-bold mt-1">{{ formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency) }}</p>
         </div>
         <div
           class="rounded-xl p-4 text-white"
           :class="netCashFlow >= 0 ? 'bg-gradient-to-br from-blue-500 to-indigo-600' : 'bg-gradient-to-br from-orange-500 to-amber-600'"
         >
-          <p :class="netCashFlow >= 0 ? 'text-blue-100' : 'text-orange-100'" class="text-sm">Net Cash Flow</p>
+          <p :class="netCashFlow >= 0 ? 'text-blue-100' : 'text-orange-100'" class="text-sm">{{ t('reports.netCashFlow') }}</p>
           <p class="text-xl font-bold mt-1">
             {{ netCashFlow >= 0 ? '+' : '' }}{{ formatInDisplayCurrency(netCashFlow, settingsStore.baseCurrency) }}
           </p>
