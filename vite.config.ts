@@ -9,11 +9,11 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png'],
+      includeAssets: ['favicon.svg', 'logo.svg', 'icons/*.png'],
       manifest: {
-        name: 'GP Family Financial Planner',
-        short_name: 'GP Finance',
-        description: 'A local-first family financial planning application',
+        name: 'GP Family Planner',
+        short_name: 'GP Planner',
+        description: 'Smart financial planning for your family',
         theme_color: '#3b82f6',
         background_color: '#0f172a',
         display: 'standalone',
