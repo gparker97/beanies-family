@@ -22,29 +22,33 @@ const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { t } = useTranslation();
 
 // Combined net worth: accounts + physical assets - all liabilities (including asset loans)
-const netWorth = computed(() => accountsStore.combinedNetWorth);
+// Uses filtered data based on global member filter
+const netWorth = computed(() => accountsStore.filteredCombinedNetWorth);
 // Total assets: accounts + physical assets
-const totalAssets = computed(() => accountsStore.totalAssets + assetsStore.totalAssetValue);
+const totalAssets = computed(() => accountsStore.filteredTotalAssets + assetsStore.filteredTotalAssetValue);
 // Total liabilities: account liabilities + asset loans
-const totalLiabilities = computed(() => accountsStore.totalLiabilities);
+const totalLiabilities = computed(() => accountsStore.filteredTotalLiabilities);
 
 // Monthly income: one-time transactions + expected recurring income
 // This combines actual one-time transactions with the expected monthly recurring amounts
+// Uses filtered data based on global member filter
 const monthlyIncome = computed(() =>
-  transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome
+  transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome
 );
 
 // Monthly expenses: one-time transactions + expected recurring expenses
 // This combines actual one-time transactions with the expected monthly recurring amounts
+// Uses filtered data based on global member filter
 const monthlyExpenses = computed(() =>
-  transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses
+  transactionsStore.filteredThisMonthOneTimeExpenses + recurringStore.filteredTotalMonthlyRecurringExpenses
 );
 
 // Net cash flow: monthly income minus monthly expenses
 const netCashFlow = computed(() => monthlyIncome.value - monthlyExpenses.value);
 
-const activeGoals = computed(() => goalsStore.activeGoals.slice(0, 3));
-const recentTransactions = computed(() => transactionsStore.recentTransactions);
+// Uses filtered data based on global member filter
+const activeGoals = computed(() => goalsStore.filteredActiveGoals.slice(0, 3));
+const recentTransactions = computed(() => transactionsStore.filteredRecentTransactions);
 
 // Format totals (which are in base currency) to display currency
 function formatTotal(amount: number): string {

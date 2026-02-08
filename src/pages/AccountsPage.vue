@@ -68,7 +68,8 @@ const newAccount = ref<CreateAccountInput>({
   includeInNetWorth: true,
 });
 
-const accounts = computed(() => accountsStore.accounts);
+// Uses filtered data based on global member filter
+const accounts = computed(() => accountsStore.filteredAccounts);
 
 // Group accounts by type for organized display
 const accountsByType = computed(() => {
@@ -213,7 +214,7 @@ async function deleteAccount(id: string) {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-green-100 text-sm font-medium">{{ t('common.totalAssets') }}</p>
-            <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.totalAssets) }}</p>
+            <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.filteredTotalAssets) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +229,7 @@ async function deleteAccount(id: string) {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-red-100 text-sm font-medium">{{ t('common.totalLiabilities') }}</p>
-            <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.totalLiabilities) }}</p>
+            <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.filteredTotalLiabilities) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,7 +244,7 @@ async function deleteAccount(id: string) {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-blue-100 text-sm font-medium">{{ t('dashboard.netWorth') }}</p>
-            <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.totalBalance) }}</p>
+            <p class="text-2xl font-bold mt-1">{{ formatTotal(accountsStore.filteredTotalBalance) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

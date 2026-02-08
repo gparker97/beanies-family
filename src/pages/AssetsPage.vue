@@ -95,7 +95,8 @@ const editingAsset = ref<UpdateAssetInput & {
   loan: getDefaultLoan(),
 });
 
-const assets = computed(() => assetsStore.assets);
+// Uses filtered data based on global member filter
+const assets = computed(() => assetsStore.filteredAssets);
 
 // Group assets by type
 const assetsByType = computed(() => {
@@ -278,7 +279,7 @@ function getAppreciationPercent(asset: Asset): number {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-green-100 text-sm font-medium">{{ t('common.totalValue') }}</p>
-            <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.totalAssetValue) }}</p>
+            <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.filteredTotalAssetValue) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -293,7 +294,7 @@ function getAppreciationPercent(asset: Asset): number {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-red-100 text-sm font-medium">{{ t('common.assetLoans') }}</p>
-            <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.totalLoanValue) }}</p>
+            <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.filteredTotalLoanValue) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,7 +309,7 @@ function getAppreciationPercent(asset: Asset): number {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-blue-100 text-sm font-medium">{{ t('common.netAssetValue') }}</p>
-            <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.netAssetValue) }}</p>
+            <p class="text-2xl font-bold mt-1">{{ formatTotal(assetsStore.filteredNetAssetValue) }}</p>
           </div>
           <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

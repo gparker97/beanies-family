@@ -12,23 +12,24 @@ const recurringStore = useRecurringStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 
+// Uses filtered data based on global member filter
 const monthlyIncome = computed(() =>
-  formatInDisplayCurrency(recurringStore.totalMonthlyRecurringIncome, settingsStore.baseCurrency)
+  formatInDisplayCurrency(recurringStore.filteredTotalMonthlyRecurringIncome, settingsStore.baseCurrency)
 );
 
 const monthlyExpenses = computed(() =>
-  formatInDisplayCurrency(recurringStore.totalMonthlyRecurringExpenses, settingsStore.baseCurrency)
+  formatInDisplayCurrency(recurringStore.filteredTotalMonthlyRecurringExpenses, settingsStore.baseCurrency)
 );
 
-const netRecurring = computed(() => recurringStore.netMonthlyRecurring);
+const netRecurring = computed(() => recurringStore.filteredNetMonthlyRecurring);
 
 const netRecurringFormatted = computed(() =>
   formatInDisplayCurrency(Math.abs(netRecurring.value), settingsStore.baseCurrency)
 );
 
-// Get upcoming items sorted by next due date
+// Get upcoming items sorted by next due date (uses filtered data)
 const upcomingItems = computed(() => {
-  const itemsWithDates = recurringStore.activeItems
+  const itemsWithDates = recurringStore.filteredActiveItems
     .map((item) => ({
       item,
       nextDate: getNextDueDateForItem(item),
@@ -44,7 +45,7 @@ const upcomingItems = computed(() => {
   <BaseCard title="Recurring Summary">
     <div class="space-y-4">
       <!-- Empty state -->
-      <div v-if="recurringStore.recurringItems.length === 0" class="text-center py-4">
+      <div v-if="recurringStore.filteredRecurringItems.length === 0" class="text-center py-4">
         <svg
           class="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600"
           fill="none"

@@ -8,7 +8,7 @@
  * to invalidate cached translations.
  */
 
-export const UI_STRINGS_VERSION = 3;
+export const UI_STRINGS_VERSION = 4;
 
 export const UI_STRINGS = {
   // App branding
@@ -328,6 +328,10 @@ export const UI_STRINGS = {
   // Empty states
   'empty.noData': 'No data available',
   'empty.noResults': 'No results found',
+
+  // Filter
+  'filter.members': 'Members',
+  'filter.allMembers': 'All Members',
 
   // Date/Time
   'date.today': 'Today',

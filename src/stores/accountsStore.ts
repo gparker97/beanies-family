@@ -4,6 +4,7 @@ import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode, Exc
 import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
 import { useSettingsStore } from './settingsStore';
 import { useAssetsStore } from './assetsStore';
+import { useMemberFilterStore } from './memberFilterStore';
 
 export const useAccountsStore = defineStore('accounts', () => {
   // State
@@ -99,6 +100,69 @@ export const useAccountsStore = defineStore('accounts', () => {
     return totalBalance.value + assetsStore.netAssetValue;
   });
 
+  // ========== FILTERED GETTERS (by global member filter) ==========
+
+  // Accounts filtered by global member filter
+  const filteredAccounts = computed(() => {
+    const memberFilter = useMemberFilterStore();
+    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
+      return accounts.value;
+    }
+    return accounts.value.filter(a => memberFilter.isMemberSelected(a.memberId));
+  });
+
+  const filteredActiveAccounts = computed(() =>
+    filteredAccounts.value.filter(a => a.isActive)
+  );
+
+  // Filtered total balance (net worth from accounts only)
+  const filteredTotalBalance = computed(() => {
+    return filteredAccounts.value
+      .filter(a => a.isActive && a.includeInNetWorth)
+      .reduce((sum, account) => {
+        const convertedBalance = convertToBaseCurrency(account.balance, account.currency);
+        const multiplier = account.type === 'credit_card' || account.type === 'loan' ? -1 : 1;
+        return sum + convertedBalance * multiplier;
+      }, 0);
+  });
+
+  // Filtered total assets
+  const filteredTotalAssets = computed(() => {
+    return filteredAccounts.value
+      .filter(
+        a =>
+          a.isActive &&
+          a.includeInNetWorth &&
+          a.type !== 'credit_card' &&
+          a.type !== 'loan'
+      )
+      .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
+  });
+
+  // Filtered account liabilities
+  const filteredAccountLiabilities = computed(() => {
+    return filteredAccounts.value
+      .filter(
+        a =>
+          a.isActive &&
+          a.includeInNetWorth &&
+          (a.type === 'credit_card' || a.type === 'loan')
+      )
+      .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
+  });
+
+  // Filtered total liabilities including asset loans
+  const filteredTotalLiabilities = computed(() => {
+    const assetsStore = useAssetsStore();
+    return filteredAccountLiabilities.value + assetsStore.filteredTotalLoanValue;
+  });
+
+  // Filtered combined net worth: filtered accounts + filtered assets - filtered liabilities
+  const filteredCombinedNetWorth = computed(() => {
+    const assetsStore = useAssetsStore();
+    return filteredTotalBalance.value + assetsStore.filteredNetAssetValue;
+  });
+
   // Actions
   async function loadAccounts() {
     isLoading.value = true;
@@ -188,6 +252,14 @@ export const useAccountsStore = defineStore('accounts', () => {
     accountLiabilities,
     totalLiabilities,
     combinedNetWorth,
+    // Filtered getters (by global member filter)
+    filteredAccounts,
+    filteredActiveAccounts,
+    filteredTotalBalance,
+    filteredTotalAssets,
+    filteredAccountLiabilities,
+    filteredTotalLiabilities,
+    filteredCombinedNetWorth,
     // Actions
     loadAccounts,
     createAccount,

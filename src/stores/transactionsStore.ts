@@ -12,6 +12,7 @@ import * as transactionRepo from '@/services/indexeddb/repositories/transactionR
 import { getStartOfMonth, getEndOfMonth, toISODateString, isDateBetween } from '@/utils/date';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
 
 export const useTransactionsStore = defineStore('transactions', () => {
   // State
@@ -115,6 +116,56 @@ export const useTransactionsStore = defineStore('transactions', () => {
     }
     return categoryTotals;
   });
+
+  // ========== FILTERED GETTERS (by global member filter) ==========
+
+  // Helper to get account IDs for selected members
+  function getSelectedAccountIds(): Set<string> {
+    const memberFilter = useMemberFilterStore();
+    const accountsStore = useAccountsStore();
+    return memberFilter.getSelectedMemberAccountIds(accountsStore.accounts);
+  }
+
+  // Transactions filtered by global member filter (via account ownership)
+  const filteredTransactions = computed(() => {
+    const memberFilter = useMemberFilterStore();
+    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
+      return transactions.value;
+    }
+    const selectedAccountIds = getSelectedAccountIds();
+    return transactions.value.filter(t => selectedAccountIds.has(t.accountId));
+  });
+
+  const filteredSortedTransactions = computed(() =>
+    [...filteredTransactions.value].sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+  );
+
+  const filteredRecentTransactions = computed(() =>
+    filteredSortedTransactions.value.slice(0, 10)
+  );
+
+  const filteredThisMonthTransactions = computed(() => {
+    const now = new Date();
+    const start = toISODateString(getStartOfMonth(now));
+    const end = toISODateString(getEndOfMonth(now));
+    return filteredTransactions.value.filter(t => isDateBetween(t.date, start, end));
+  });
+
+  // Filtered one-time income for this month
+  const filteredThisMonthOneTimeIncome = computed(() =>
+    filteredThisMonthTransactions.value
+      .filter(t => t.type === 'income' && !t.recurringItemId)
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // Filtered one-time expenses for this month
+  const filteredThisMonthOneTimeExpenses = computed(() =>
+    filteredThisMonthTransactions.value
+      .filter(t => t.type === 'expense' && !t.recurringItemId)
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
 
   /**
    * Calculate the balance adjustment for an account based on transaction type.
@@ -307,6 +358,13 @@ export const useTransactionsStore = defineStore('transactions', () => {
     thisMonthRecurringExpenses,
     thisMonthNetCashFlow,
     expensesByCategory,
+    // Filtered getters (by global member filter)
+    filteredTransactions,
+    filteredSortedTransactions,
+    filteredRecentTransactions,
+    filteredThisMonthTransactions,
+    filteredThisMonthOneTimeIncome,
+    filteredThisMonthOneTimeExpenses,
     // Actions
     loadTransactions,
     createTransaction,

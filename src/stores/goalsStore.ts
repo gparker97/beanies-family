@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
 import * as goalRepo from '@/services/indexeddb/repositories/goalRepository';
+import { useMemberFilterStore } from './memberFilterStore';
 
 export const useGoalsStore = defineStore('goals', () => {
   // State
@@ -38,6 +39,30 @@ export const useGoalsStore = defineStore('goals', () => {
     }
     return grouped;
   });
+
+  // ========== FILTERED GETTERS (by global member filter) ==========
+
+  // Goals filtered by global member filter
+  // Family-wide goals (memberId is null/undefined) are always included
+  const filteredGoals = computed(() => {
+    const memberFilter = useMemberFilterStore();
+    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
+      return goals.value;
+    }
+    return goals.value.filter(g => {
+      // Family-wide goals always show
+      if (!g.memberId) return true;
+      return memberFilter.isMemberSelected(g.memberId);
+    });
+  });
+
+  const filteredActiveGoals = computed(() =>
+    filteredGoals.value.filter(g => !g.isCompleted)
+  );
+
+  const filteredCompletedGoals = computed(() =>
+    filteredGoals.value.filter(g => g.isCompleted)
+  );
 
   // Actions
   async function loadGoals() {
@@ -137,6 +162,10 @@ export const useGoalsStore = defineStore('goals', () => {
     overdueGoals,
     goalsByPriority,
     goalsByMember,
+    // Filtered getters (by global member filter)
+    filteredGoals,
+    filteredActiveGoals,
+    filteredCompletedGoals,
     // Actions
     loadGoals,
     createGoal,

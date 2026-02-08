@@ -4,6 +4,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
+import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
@@ -63,6 +64,9 @@ function closeLanguageDropdown() {
 
     <!-- Right side - User actions -->
     <div class="flex items-center gap-4">
+      <!-- Member Filter -->
+      <MemberFilterDropdown />
+
       <!-- Currency selector -->
       <div class="relative">
         <button

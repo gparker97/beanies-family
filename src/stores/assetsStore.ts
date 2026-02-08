@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import type { Asset, CreateAssetInput, UpdateAssetInput, CurrencyCode, ExchangeRate } from '@/types/models';
 import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
 import { useSettingsStore } from './settingsStore';
+import { useMemberFilterStore } from './memberFilterStore';
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
@@ -87,6 +88,36 @@ export const useAssetsStore = defineStore('assets', () => {
     }
     return grouped;
   });
+
+  // ========== FILTERED GETTERS (by global member filter) ==========
+
+  // Assets filtered by global member filter
+  const filteredAssets = computed(() => {
+    const memberFilter = useMemberFilterStore();
+    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
+      return assets.value;
+    }
+    return assets.value.filter(a => memberFilter.isMemberSelected(a.memberId));
+  });
+
+  // Filtered total asset value
+  const filteredTotalAssetValue = computed(() =>
+    filteredAssets.value
+      .filter(a => a.includeInNetWorth)
+      .reduce((sum, a) => sum + convertToBaseCurrency(a.currentValue, a.currency), 0)
+  );
+
+  // Filtered total loan value
+  const filteredTotalLoanValue = computed(() =>
+    filteredAssets.value
+      .filter(a => a.includeInNetWorth && a.loan?.hasLoan && a.loan?.outstandingBalance)
+      .reduce((sum, a) => sum + convertToBaseCurrency(a.loan!.outstandingBalance!, a.currency), 0)
+  );
+
+  // Filtered net asset value
+  const filteredNetAssetValue = computed(() =>
+    filteredTotalAssetValue.value - filteredTotalLoanValue.value
+  );
 
   // Actions
   async function loadAssets() {
@@ -174,6 +205,11 @@ export const useAssetsStore = defineStore('assets', () => {
     totalAppreciation,
     assetsByType,
     assetsByMember,
+    // Filtered getters (by global member filter)
+    filteredAssets,
+    filteredTotalAssetValue,
+    filteredTotalLoanValue,
+    filteredNetAssetValue,
     // Actions
     loadAssets,
     createAsset,

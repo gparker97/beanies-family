@@ -10,6 +10,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import AppSidebar from '@/components/common/AppSidebar.vue';
@@ -26,6 +27,7 @@ const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
+const memberFilterStore = useMemberFilterStore();
 
 const showLayout = computed(() => {
   // Don't show sidebar/header on setup page
@@ -59,6 +61,8 @@ onMounted(async () => {
         router.replace('/setup');
         return;
       }
+      // Initialize member filter with all members selected
+      memberFilterStore.initialize();
       // Process recurring items to generate due transactions
       const result = await processRecurringItems();
       if (result.processed > 0) {
@@ -82,6 +86,9 @@ onMounted(async () => {
 
   // Load remaining data if setup is complete
   if (familyStore.isSetupComplete) {
+    // Initialize member filter with all members selected
+    memberFilterStore.initialize();
+
     await Promise.all([
       accountsStore.loadAccounts(),
       transactionsStore.loadTransactions(),

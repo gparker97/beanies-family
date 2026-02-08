@@ -15,6 +15,19 @@ const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 
+// Computed for filtered goals sorted by priority
+const filteredGoalsByPriority = computed(() => {
+  const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 } as const;
+  return [...goalsStore.filteredActiveGoals].sort(
+    (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
+  );
+});
+
+// Computed for filtered overdue goals
+const filteredOverdueGoals = computed(() =>
+  goalsStore.filteredActiveGoals.filter(g => g.deadline && new Date(g.deadline) < new Date())
+);
+
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingGoal = ref<Goal | null>(null);
@@ -207,31 +220,31 @@ async function deleteGoal(id: string) {
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.activeGoals') }}</p>
         <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-          {{ goalsStore.activeGoals.length }}
+          {{ goalsStore.filteredActiveGoals.length }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.completedGoals') }}</p>
         <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
-          {{ goalsStore.completedGoals.length }}
+          {{ goalsStore.filteredCompletedGoals.length }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.overdueGoals') }}</p>
         <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
-          {{ goalsStore.overdueGoals.length }}
+          {{ filteredOverdueGoals.length }}
         </p>
       </BaseCard>
     </div>
 
     <BaseCard :title="t('goals.allGoals')">
-      <div v-if="goalsStore.goals.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
+      <div v-if="goalsStore.filteredGoals.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
         <p>{{ t('goals.noGoals') }}</p>
         <p class="mt-2">{{ t('goals.getStarted') }}</p>
       </div>
       <div v-else class="space-y-4">
         <div
-          v-for="goal in goalsStore.goalsByPriority"
+          v-for="goal in filteredGoalsByPriority"
           :key="goal.id"
           class="p-4 border border-gray-200 dark:border-slate-700 rounded-lg"
         >

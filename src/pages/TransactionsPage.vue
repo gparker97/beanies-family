@@ -119,8 +119,9 @@ const editTransaction = ref<EditTransactionForm>({
   isReconciled: false,
 });
 
-const transactions = computed(() => transactionsStore.sortedTransactions);
-const recurringItems = computed(() => recurringStore.recurringItems);
+// Uses filtered data based on global member filter
+const transactions = computed(() => transactionsStore.filteredSortedTransactions);
+const recurringItems = computed(() => recurringStore.filteredRecurringItems);
 
 // Format totals (which are in base currency) to display currency
 function formatTotal(amount: number): string {
@@ -334,7 +335,7 @@ function formatNextDate(item: RecurringItem): string {
           <div class="flex items-center justify-between">
             <div>
               <p class="text-green-100 text-sm font-medium">{{ t('transactions.thisMonthIncome') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.thisMonthIncome) }}</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -349,7 +350,7 @@ function formatNextDate(item: RecurringItem): string {
           <div class="flex items-center justify-between">
             <div>
               <p class="text-red-100 text-sm font-medium">{{ t('transactions.thisMonthExpenses') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.thisMonthExpenses) }}</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.filteredThisMonthOneTimeExpenses + recurringStore.filteredTotalMonthlyRecurringExpenses) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -362,14 +363,14 @@ function formatNextDate(item: RecurringItem): string {
         <!-- Net Cash Flow -->
         <div
           class="rounded-xl p-5 text-white shadow-lg"
-          :class="transactionsStore.thisMonthNetCashFlow >= 0
+          :class="(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome - transactionsStore.filteredThisMonthOneTimeExpenses - recurringStore.filteredTotalMonthlyRecurringExpenses) >= 0
             ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
             : 'bg-gradient-to-br from-orange-500 to-amber-600'"
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium" :class="transactionsStore.thisMonthNetCashFlow >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('transactions.netCashFlow') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.thisMonthNetCashFlow) }}</p>
+              <p class="text-sm font-medium" :class="(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome - transactionsStore.filteredThisMonthOneTimeExpenses - recurringStore.filteredTotalMonthlyRecurringExpenses) >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('transactions.netCashFlow') }}</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome - transactionsStore.filteredThisMonthOneTimeExpenses - recurringStore.filteredTotalMonthlyRecurringExpenses) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -516,7 +517,7 @@ function formatNextDate(item: RecurringItem): string {
           <div class="flex items-center justify-between">
             <div>
               <p class="text-green-100 text-sm font-medium">{{ t('recurring.monthlyIncome') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.totalMonthlyRecurringIncome) }}</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.filteredTotalMonthlyRecurringIncome) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -531,7 +532,7 @@ function formatNextDate(item: RecurringItem): string {
           <div class="flex items-center justify-between">
             <div>
               <p class="text-red-100 text-sm font-medium">{{ t('recurring.monthlyExpenses') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.totalMonthlyRecurringExpenses) }}</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.filteredTotalMonthlyRecurringExpenses) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,14 +545,14 @@ function formatNextDate(item: RecurringItem): string {
         <!-- Net Monthly Recurring -->
         <div
           class="rounded-xl p-5 text-white shadow-lg"
-          :class="recurringStore.netMonthlyRecurring >= 0
+          :class="recurringStore.filteredNetMonthlyRecurring >= 0
             ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
             : 'bg-gradient-to-br from-orange-500 to-amber-600'"
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium" :class="recurringStore.netMonthlyRecurring >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('recurring.netMonthly') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.netMonthlyRecurring) }}</p>
+              <p class="text-sm font-medium" :class="recurringStore.filteredNetMonthlyRecurring >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('recurring.netMonthly') }}</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(recurringStore.filteredNetMonthlyRecurring) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

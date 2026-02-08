@@ -9,6 +9,8 @@ import type {
 } from '@/types/models';
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import { useSettingsStore } from './settingsStore';
+import { useMemberFilterStore } from './memberFilterStore';
+import { useAccountsStore } from './accountsStore';
 
 export const useRecurringStore = defineStore('recurring', () => {
   // State
@@ -103,6 +105,65 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   const netMonthlyRecurring = computed(() =>
     totalMonthlyRecurringIncome.value - totalMonthlyRecurringExpenses.value
+  );
+
+  // ========== FILTERED GETTERS (by global member filter) ==========
+
+  // Helper to get account IDs for selected members
+  function getSelectedAccountIds(): Set<string> {
+    const memberFilter = useMemberFilterStore();
+    const accountsStore = useAccountsStore();
+    return memberFilter.getSelectedMemberAccountIds(accountsStore.accounts);
+  }
+
+  // Recurring items filtered by global member filter (via account ownership)
+  const filteredRecurringItems = computed(() => {
+    const memberFilter = useMemberFilterStore();
+    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
+      return recurringItems.value;
+    }
+    const selectedAccountIds = getSelectedAccountIds();
+    return recurringItems.value.filter(item => selectedAccountIds.has(item.accountId));
+  });
+
+  const filteredActiveItems = computed(() =>
+    filteredRecurringItems.value.filter(item => item.isActive)
+  );
+
+  const filteredActiveIncomeItems = computed(() =>
+    filteredActiveItems.value.filter(item => item.type === 'income')
+  );
+
+  const filteredActiveExpenseItems = computed(() =>
+    filteredActiveItems.value.filter(item => item.type === 'expense')
+  );
+
+  // Filtered total monthly recurring income
+  const filteredTotalMonthlyRecurringIncome = computed(() =>
+    filteredActiveIncomeItems.value.reduce(
+      (sum, item) => {
+        const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+        const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
+        return sum + convertedAmount;
+      },
+      0
+    )
+  );
+
+  // Filtered total monthly recurring expenses
+  const filteredTotalMonthlyRecurringExpenses = computed(() =>
+    filteredActiveExpenseItems.value.reduce(
+      (sum, item) => {
+        const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+        const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
+        return sum + convertedAmount;
+      },
+      0
+    )
+  );
+
+  const filteredNetMonthlyRecurring = computed(() =>
+    filteredTotalMonthlyRecurringIncome.value - filteredTotalMonthlyRecurringExpenses.value
   );
 
   const sortedByDescription = computed(() =>
@@ -211,6 +272,14 @@ export const useRecurringStore = defineStore('recurring', () => {
     totalMonthlyRecurringExpenses,
     netMonthlyRecurring,
     sortedByDescription,
+    // Filtered getters (by global member filter)
+    filteredRecurringItems,
+    filteredActiveItems,
+    filteredActiveIncomeItems,
+    filteredActiveExpenseItems,
+    filteredTotalMonthlyRecurringIncome,
+    filteredTotalMonthlyRecurringExpenses,
+    filteredNetMonthlyRecurring,
     // Actions
     loadRecurringItems,
     createRecurringItem,
