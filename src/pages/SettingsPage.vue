@@ -220,33 +220,32 @@ function formatLastSync(timestamp: string | null): string {
       <p class="text-gray-500 dark:text-gray-400">{{ t('settings.subtitle') }}</p>
     </div>
 
-    <!-- General Settings -->
-    <BaseCard :title="t('settings.general')">
-      <div class="space-y-6">
-        <BaseSelect
-          :model-value="settingsStore.baseCurrency"
-          :options="currencyOptions"
-          :label="t('settings.baseCurrency')"
-          :hint="t('settings.baseCurrencyHint')"
-          @update:model-value="updateCurrency"
-        />
+    <!-- First Row: General Settings and File Sync side by side on wide screens -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <!-- General Settings -->
+      <BaseCard :title="t('settings.general')">
+        <div class="space-y-6">
+          <BaseSelect
+            :model-value="settingsStore.baseCurrency"
+            :options="currencyOptions"
+            :label="t('settings.baseCurrency')"
+            :hint="t('settings.baseCurrencyHint')"
+            @update:model-value="updateCurrency"
+          />
 
-        <BaseSelect
-          :model-value="settingsStore.theme"
-          :options="themeOptions"
-          :label="t('settings.theme')"
-          :hint="t('settings.themeHint')"
-          @update:model-value="updateTheme"
-        />
-      </div>
-    </BaseCard>
+          <BaseSelect
+            :model-value="settingsStore.theme"
+            :options="themeOptions"
+            :label="t('settings.theme')"
+            :hint="t('settings.themeHint')"
+            @update:model-value="updateTheme"
+          />
+        </div>
+      </BaseCard>
 
-    <!-- Exchange Rate Settings -->
-    <ExchangeRateSettings />
-
-    <!-- File Sync Settings -->
-    <BaseCard :title="t('settings.fileSync')">
-      <!-- Modern browsers with File System Access API -->
+      <!-- File Sync Settings -->
+      <BaseCard :title="t('settings.fileSync')">
+        <!-- Modern browsers with File System Access API -->
       <div v-if="syncStore.supportsAutoSync">
         <!-- Not configured state -->
         <div v-if="!syncStore.isConfigured" class="text-center py-6">
@@ -492,19 +491,38 @@ function formatLastSync(timestamp: string | null): string {
         </div>
       </div>
     </BaseCard>
+    </div>
 
-    <!-- AI Settings -->
-    <BaseCard :title="t('settings.aiInsights')">
-      <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-        <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
-        <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
-        <p class="mt-1 text-sm">{{ t('settings.aiComingSoon') }}</p>
-      </div>
-    </BaseCard>
+    <!-- Second Row: AI Settings and About side by side on wide screens -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <!-- AI Settings -->
+      <BaseCard :title="t('settings.aiInsights')">
+        <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+          <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
+          <p class="mt-1 text-sm">{{ t('settings.aiComingSoon') }}</p>
+        </div>
+      </BaseCard>
 
-    <!-- Data Management -->
+      <!-- About -->
+      <BaseCard :title="t('settings.about')">
+        <div class="space-y-2 text-sm text-gray-500 dark:text-gray-400">
+          <p><strong class="text-gray-900 dark:text-gray-100">{{ t('settings.appName') }}</strong></p>
+          <p>{{ t('settings.version') }}</p>
+          <p>{{ t('settings.appDescription') }}</p>
+          <p class="pt-2">
+            {{ t('settings.privacyNote') }}
+          </p>
+        </div>
+      </BaseCard>
+    </div>
+
+    <!-- Exchange Rate Settings (full width, rarely changed) -->
+    <ExchangeRateSettings />
+
+    <!-- Data Management (full width) -->
     <BaseCard :title="t('settings.dataManagement')">
       <div class="space-y-4">
         <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
@@ -540,18 +558,6 @@ function formatLastSync(timestamp: string | null): string {
             {{ t('action.cancel') }}
           </BaseButton>
         </div>
-      </div>
-    </BaseCard>
-
-    <!-- About -->
-    <BaseCard :title="t('settings.about')">
-      <div class="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-        <p><strong class="text-gray-900 dark:text-gray-100">{{ t('settings.appName') }}</strong></p>
-        <p>{{ t('settings.version') }}</p>
-        <p>{{ t('settings.appDescription') }}</p>
-        <p class="pt-2">
-          {{ t('settings.privacyNote') }}
-        </p>
       </div>
     </BaseCard>
 
