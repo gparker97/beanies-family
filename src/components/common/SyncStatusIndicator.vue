@@ -24,8 +24,9 @@ const statusConfig = computed(() => {
       return {
         icon: 'warning',
         color: 'text-yellow-500',
-        title: 'Click to grant file permission',
-        animate: false,
+        title: 'Click to grant file permission and load latest data',
+        animate: true,
+        pulse: true,
       };
     case 'ready':
       return {
@@ -88,21 +89,24 @@ async function handleClick() {
     </svg>
 
     <!-- Warning icon (needs permission) -->
-    <svg
-      v-else-if="statusConfig.icon === 'warning'"
-      class="w-5 h-5"
-      :class="statusConfig.color"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="2"
-        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-      />
-    </svg>
+    <div v-else-if="statusConfig.icon === 'warning'" class="relative">
+      <!-- Pulsing background -->
+      <span class="absolute inset-0 rounded-full bg-yellow-400 opacity-30 animate-ping" />
+      <svg
+        class="w-5 h-5 relative"
+        :class="statusConfig.color"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+        />
+      </svg>
+    </div>
 
     <!-- Error icon -->
     <svg

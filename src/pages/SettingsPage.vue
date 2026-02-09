@@ -15,6 +15,8 @@ const { t } = useTranslation();
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
+const showSyncConflict = ref(false);
+const conflictInfo = ref<{ fileTimestamp: string | null; localTimestamp: string | null } | null>(null);
 const importError = ref<string | null>(null);
 const importSuccess = ref(false);
 
@@ -56,7 +58,41 @@ async function handleRequestPermission() {
 }
 
 async function handleSyncNow() {
+  // Check for conflicts first
+  const conflict = await syncStore.checkForConflicts();
+  if (conflict.hasConflict) {
+    conflictInfo.value = {
+      fileTimestamp: conflict.fileTimestamp,
+      localTimestamp: conflict.localTimestamp,
+    };
+    showSyncConflict.value = true;
+    return;
+  }
   await syncStore.syncNow();
+}
+
+async function handleForceSyncNow() {
+  showSyncConflict.value = false;
+  conflictInfo.value = null;
+  await syncStore.forceSyncNow();
+}
+
+async function handleLoadFromFileInstead() {
+  showSyncConflict.value = false;
+  conflictInfo.value = null;
+  const success = await syncStore.loadFromFile();
+  if (success) {
+    importSuccess.value = true;
+    setTimeout(() => {
+      importSuccess.value = false;
+    }, 3000);
+  }
+}
+
+function formatConflictTimestamp(timestamp: string | null): string {
+  if (!timestamp) return 'Unknown';
+  const date = new Date(timestamp);
+  return date.toLocaleString();
 }
 
 function handleLoadFromFileClick() {
@@ -334,8 +370,38 @@ function formatLastSync(timestamp: string | null): string {
               </BaseButton>
             </div>
 
+            <!-- Sync conflict dialog -->
+            <div v-if="showSyncConflict" class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <div class="flex items-start gap-3">
+                <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div class="flex-1">
+                  <p class="font-medium text-yellow-800 dark:text-yellow-200">Sync Conflict Detected</p>
+                  <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    The sync file has newer data than your local data. This can happen if changes were made on another device.
+                  </p>
+                  <div class="text-xs text-yellow-600 dark:text-yellow-400 mt-2 space-y-1">
+                    <p><strong>File last updated:</strong> {{ formatConflictTimestamp(conflictInfo?.fileTimestamp ?? null) }}</p>
+                    <p><strong>Local last sync:</strong> {{ formatConflictTimestamp(conflictInfo?.localTimestamp ?? null) }}</p>
+                  </div>
+                  <div class="flex gap-2 mt-3">
+                    <BaseButton variant="primary" size="sm" @click="handleLoadFromFileInstead">
+                      Load from File
+                    </BaseButton>
+                    <BaseButton variant="ghost" size="sm" @click="handleForceSyncNow">
+                      Overwrite File
+                    </BaseButton>
+                    <BaseButton variant="ghost" size="sm" @click="showSyncConflict = false">
+                      Cancel
+                    </BaseButton>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Error display -->
-            <div v-if="syncStore.error" class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+            <div v-if="syncStore.error && !showSyncConflict" class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
               <p class="text-sm text-red-600 dark:text-red-400">{{ syncStore.error }}</p>
             </div>
 

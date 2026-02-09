@@ -236,6 +236,44 @@ export async function save(password?: string): Promise<boolean> {
 }
 
 /**
+ * Get the timestamp from the sync file without fully loading/importing data
+ * Returns null if file doesn't exist or is empty/invalid
+ */
+export async function getFileTimestamp(): Promise<string | null> {
+  if (!currentFileHandle) {
+    return null;
+  }
+
+  try {
+    // Verify we have permission
+    const hasPermission = await verifyPermission(currentFileHandle, 'read');
+    if (!hasPermission) {
+      return null;
+    }
+
+    // Read file
+    const file = await currentFileHandle.getFile();
+    const text = await file.text();
+
+    // Handle empty file
+    if (!text.trim()) {
+      return null;
+    }
+
+    const data = JSON.parse(text);
+
+    // Return the exportedAt timestamp
+    if (data && typeof data.exportedAt === 'string') {
+      return data.exportedAt;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Load data from the sync file
  */
 export async function load(): Promise<SyncFileData | null> {

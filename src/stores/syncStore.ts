@@ -80,10 +80,23 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Request permission to access the sync file (must be called from user gesture)
+   * If permission is granted, automatically loads from file and sets up auto-sync
    */
   async function requestPermission(): Promise<boolean> {
     const granted = await syncService.requestPermission();
     needsPermission.value = !granted;
+
+    if (granted) {
+      // Permission granted - load from file to get latest data
+      const hasData = await syncService.loadAndImport();
+      if (hasData) {
+        lastSync.value = toISODateString(new Date());
+        await reloadAllStores();
+      }
+      // Set up auto-sync now that we have permission
+      setupAutoSync();
+    }
+
     return granted;
   }
 
@@ -107,10 +120,47 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Check if the sync file has newer data than our last sync
+   * Returns: { hasConflict, fileTimestamp, localTimestamp }
+   */
+  async function checkForConflicts(): Promise<{
+    hasConflict: boolean;
+    fileTimestamp: string | null;
+    localTimestamp: string | null;
+  }> {
+    const fileTimestamp = await syncService.getFileTimestamp();
+    const localTimestamp = lastSync.value;
+
+    // If no file timestamp, no conflict (file might be empty/new)
+    if (!fileTimestamp) {
+      return { hasConflict: false, fileTimestamp: null, localTimestamp };
+    }
+
+    // If no local sync, we should load from file, not save
+    if (!localTimestamp) {
+      return { hasConflict: true, fileTimestamp, localTimestamp: null };
+    }
+
+    // Compare timestamps - if file is newer, there's a conflict
+    const hasConflict = new Date(fileTimestamp) > new Date(localTimestamp);
+    return { hasConflict, fileTimestamp, localTimestamp };
+  }
+
+  /**
    * Sync now - save current data to file
    * Uses encryption if enabled and session password is set
+   * @param force - If true, skip conflict detection and force save
    */
-  async function syncNow(): Promise<boolean> {
+  async function syncNow(force = false): Promise<boolean> {
+    // Check for conflicts unless forced
+    if (!force) {
+      const { hasConflict } = await checkForConflicts();
+      if (hasConflict) {
+        error.value = 'File has newer data. Load from file first or force sync.';
+        return false;
+      }
+    }
+
     const password = isEncryptionEnabled.value ? sessionPassword.value ?? undefined : undefined;
     const success = await syncService.save(password);
     if (success) {
@@ -118,6 +168,13 @@ export const useSyncStore = defineStore('sync', () => {
       await saveSettings({ lastSyncTimestamp: lastSync.value });
     }
     return success;
+  }
+
+  /**
+   * Force sync - save current data to file, overwriting any newer data
+   */
+  async function forceSyncNow(): Promise<boolean> {
+    return syncNow(true);
   }
 
   /**
@@ -405,6 +462,8 @@ export const useSyncStore = defineStore('sync', () => {
     requestPermission,
     configureSyncFile,
     syncNow,
+    forceSyncNow,
+    checkForConflicts,
     loadFromFile,
     loadFromNewFile,
     decryptPendingFile,
