@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { LanguageCode } from '@/types/models';
-import { UI_STRINGS, UI_STRINGS_VERSION, getAllKeys, getSourceText } from '@/services/translation/uiStrings';
+import { UI_STRINGS, getAllKeys, getSourceText, getAllHashes } from '@/services/translation/uiStrings';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import * as translationApi from '@/services/translation/translationApi';
 import * as translationCache from '@/services/indexeddb/repositories/translationCacheRepository';
+import * as translationFiles from '@/services/translation/translationFiles';
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
@@ -13,6 +14,7 @@ export const useTranslationStore = defineStore('translation', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const loadProgress = ref(0); // 0-100
+  const translationFile = ref<translationFiles.TranslationFile | null>(null);
 
   // Getters
   const isEnglish = computed(() => currentLanguage.value === 'en');
@@ -20,12 +22,18 @@ export const useTranslationStore = defineStore('translation', () => {
 
   /**
    * Load translations for a language.
-   * Checks cache first, fetches from API for missing translations.
+   * Flow:
+   * 1. Load from JSON file (committed translations)
+   * 2. Check for missing/outdated translations (hash mismatch)
+   * 3. Check IndexedDB cache for missing translations
+   * 4. Fetch remaining from API
+   * 5. Save new translations to IndexedDB cache
    */
   async function loadTranslations(language: LanguageCode): Promise<void> {
     // English is the source language, no translation needed
     if (language === 'en') {
       translations.value.clear();
+      translationFile.value = null;
       currentLanguage.value = 'en';
       loadProgress.value = 100;
       return;
@@ -36,57 +44,105 @@ export const useTranslationStore = defineStore('translation', () => {
     loadProgress.value = 0;
 
     try {
-      // Step 1: Load from IndexedDB cache
-      const cached = await translationCache.getTranslationsForLanguage(
-        language,
-        UI_STRINGS_VERSION
-      );
-      const cachedMap = new Map(cached.map(c => [c.key, c.translation]));
-
-      // Step 2: Find missing keys
       const allKeys = getAllKeys();
-      const missingKeys = allKeys.filter(key => !cachedMap.has(key));
+      const hashMap = getAllHashes();
+      const translationsMap = new Map<string, string>();
+
+      // Step 1: Load from JSON file
+      const file = await translationFiles.loadTranslationFile(language);
+      translationFile.value = file;
+
+      if (file) {
+        // Load up-to-date translations from file
+        for (const key of allKeys) {
+          const hash = hashMap[key];
+          if (hash) {
+            const translation = translationFiles.getTranslation(file, key, hash);
+            if (translation) {
+              translationsMap.set(key, translation);
+            }
+          }
+        }
+      }
+
+      loadProgress.value = 20;
+
+      // Step 2: Find missing or outdated keys
+      const missingKeys = allKeys.filter(key => !translationsMap.has(key));
 
       if (missingKeys.length === 0) {
-        // All translations are cached
-        translations.value = cachedMap;
+        // All translations are loaded from file
+        translations.value = translationsMap;
         currentLanguage.value = language;
         loadProgress.value = 100;
         isLoading.value = false;
         return;
       }
 
-      // Step 3: Fetch missing translations from API
-      const missingTexts = missingKeys.map(key => getSourceText(key));
+      loadProgress.value = 40;
+
+      // Step 3: Check IndexedDB cache for missing translations
+      const cached = await translationCache.getTranslationsForLanguageByKeys(
+        language,
+        missingKeys
+      );
+
+      // Add cached translations that match current hash
+      for (const entry of cached) {
+        const currentHash = hashMap[entry.key as UIStringKey];
+        if (currentHash === entry.hash) {
+          translationsMap.set(entry.key, entry.translation);
+        }
+      }
+
+      // Step 4: Find keys still missing after cache check
+      const stillMissingKeys = missingKeys.filter(key => !translationsMap.has(key));
+
+      if (stillMissingKeys.length === 0) {
+        // All translations found in file + cache
+        translations.value = translationsMap;
+        currentLanguage.value = language;
+        loadProgress.value = 100;
+        isLoading.value = false;
+        return;
+      }
+
+      loadProgress.value = 60;
+
+      // Step 5: Fetch remaining translations from API
+      const missingTexts = stillMissingKeys.map(key => getSourceText(key));
 
       const translated = await translationApi.translateBatch(
         missingTexts,
         'en',
         language,
         (completed, total) => {
-          loadProgress.value = Math.round((completed / total) * 100);
+          const apiProgress = 60 + Math.round((completed / total) * 30);
+          loadProgress.value = apiProgress;
         }
       );
 
       // Build new translations array for caching
-      const newTranslations: { key: string; translation: string }[] = [];
-      for (let i = 0; i < missingKeys.length; i++) {
-        const key = missingKeys[i]!;
+      const newTranslations: Array<{ key: string; translation: string; hash: string }> = [];
+      for (let i = 0; i < stillMissingKeys.length; i++) {
+        const key = stillMissingKeys[i]!;
         const translation = translated[i] || getSourceText(key);
-        newTranslations.push({ key, translation });
-        cachedMap.set(key, translation);
+        const hash = hashMap[key] || '';
+        newTranslations.push({ key, translation, hash });
+        translationsMap.set(key, translation);
       }
 
-      // Step 4: Save new translations to IndexedDB
+      loadProgress.value = 90;
+
+      // Step 6: Save new translations to IndexedDB cache
       if (newTranslations.length > 0) {
-        await translationCache.saveTranslations(
+        await translationCache.saveTranslationsWithHash(
           newTranslations,
-          language,
-          UI_STRINGS_VERSION
+          language
         );
       }
 
-      translations.value = cachedMap;
+      translations.value = translationsMap;
       currentLanguage.value = language;
       loadProgress.value = 100;
     } catch (e) {
@@ -129,6 +185,51 @@ export const useTranslationStore = defineStore('translation', () => {
     currentLanguage.value = language;
   }
 
+  /**
+   * Export current IndexedDB cache to a translation file.
+   * This allows developers to save new translations to JSON files.
+   */
+  async function exportCacheToFile(): Promise<void> {
+    if (currentLanguage.value === 'en') {
+      console.warn('Cannot export cache for English (source language)');
+      return;
+    }
+
+    const language = currentLanguage.value;
+    const allKeys = getAllKeys();
+
+    // Get all cached translations for this language
+    const cached = await translationCache.getTranslationsForLanguageByKeys(
+      language,
+      allKeys
+    );
+
+    // Load existing file or create new
+    let file = await translationFiles.loadTranslationFile(language);
+    if (!file) {
+      const languageNames: Record<LanguageCode, string> = {
+        en: 'English',
+        zh: '中文 (简体)',
+      };
+      file = translationFiles.createEmptyTranslationFile(
+        language,
+        languageNames[language] || language
+      );
+    }
+
+    // Update file with cached translations
+    const updates = cached.map(entry => ({
+      key: entry.key,
+      translation: entry.translation,
+      hash: entry.hash,
+    }));
+
+    const updatedFile = translationFiles.updateTranslationFile(file, updates);
+
+    // Download as JSON
+    translationFiles.downloadTranslationFile(updatedFile, `${language}.json`);
+  }
+
   return {
     // State
     currentLanguage,
@@ -143,5 +244,6 @@ export const useTranslationStore = defineStore('translation', () => {
     t,
     clearCache,
     setLanguageSync,
+    exportCacheToFile,
   };
 });

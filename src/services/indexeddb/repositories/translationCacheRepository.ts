@@ -91,3 +91,55 @@ export async function getTranslationCount(language: LanguageCode): Promise<numbe
   const entries = await db.getAllFromIndex('translations', 'by-language', language);
   return entries.length;
 }
+
+/**
+ * Get cached translations for specific keys.
+ * Includes hash for validation.
+ */
+export async function getTranslationsForLanguageByKeys(
+  language: LanguageCode,
+  keys: string[]
+): Promise<Array<{ key: string; translation: string; hash: string }>> {
+  const db = await getDatabase();
+  const results: Array<{ key: string; translation: string; hash: string }> = [];
+
+  for (const key of keys) {
+    const entry = await db.get('translations', `${key}:${language}`);
+    if (entry) {
+      results.push({
+        key: entry.key,
+        translation: entry.translation,
+        hash: entry.hash || '',
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Save translations with hash for version tracking.
+ * Hash is used to detect when source strings have changed.
+ */
+export async function saveTranslationsWithHash(
+  translations: Array<{ key: string; translation: string; hash: string }>,
+  language: LanguageCode
+): Promise<void> {
+  const db = await getDatabase();
+  const tx = db.transaction('translations', 'readwrite');
+  const store = tx.objectStore('translations');
+
+  for (const { key, translation, hash } of translations) {
+    const entry: TranslationCacheEntry = {
+      id: `${key}:${language}`,
+      key,
+      language,
+      translation,
+      version: 0, // No longer using global version
+      hash,
+    };
+    await store.put(entry);
+  }
+
+  await tx.done;
+}

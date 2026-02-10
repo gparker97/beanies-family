@@ -195,7 +195,8 @@ export interface TranslationCacheEntry {
   key: string;
   language: LanguageCode;
   translation: string;
-  version: number;
+  version: number; // Legacy: no longer used, kept for backward compatibility
+  hash?: string; // Hash of source text, used to detect when translation is outdated
 }
 
 // Sync queue item for tracking changes
