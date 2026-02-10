@@ -4,11 +4,23 @@
  * All user-facing text in the application should be defined here.
  * This enables dynamic translation of the UI.
  *
- * Increment UI_STRINGS_VERSION when adding or modifying strings
- * to invalidate cached translations.
+ * Each string is automatically hashed. When a string changes, its hash changes,
+ * triggering re-translation of only that specific string.
  */
 
-export const UI_STRINGS_VERSION = 6;
+/**
+ * Simple hash function for string content.
+ * Used to detect when English strings have changed.
+ */
+function hashString(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
 
 export const UI_STRINGS = {
   // App branding
@@ -367,4 +379,36 @@ export function getAllKeys(): UIStringKey[] {
  */
 export function getAllStrings(): Record<UIStringKey, string> {
   return { ...UI_STRINGS };
+}
+
+/**
+ * Get the hash for a UI string key.
+ * Hash is computed from the English text content.
+ */
+export function getStringHash(key: UIStringKey): string {
+  return hashString(UI_STRINGS[key]);
+}
+
+/**
+ * Get all UI string hashes.
+ * Returns a map of key -> hash.
+ */
+export function getAllHashes(): Record<UIStringKey, string> {
+  const hashes: Partial<Record<UIStringKey, string>> = {};
+  for (const key of getAllKeys()) {
+    hashes[key] = getStringHash(key);
+  }
+  return hashes as Record<UIStringKey, string>;
+}
+
+/**
+ * Get UI strings with their hashes.
+ * Returns array of { key, text, hash } objects.
+ */
+export function getAllStringsWithHashes(): Array<{ key: UIStringKey; text: string; hash: string }> {
+  return getAllKeys().map(key => ({
+    key,
+    text: UI_STRINGS[key],
+    hash: getStringHash(key),
+  }));
 }

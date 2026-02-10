@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useTranslationStore } from '@/stores/translationStore';
 import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
@@ -11,6 +12,7 @@ import { useTranslation } from '@/composables/useTranslation';
 
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+const translationStore = useTranslationStore();
 const { t } = useTranslation();
 
 const showClearConfirm = ref(false);
@@ -198,6 +200,10 @@ async function handleManualImport() {
   } else {
     importError.value = result.error ?? 'Import failed';
   }
+}
+
+async function handleExportTranslations() {
+  await translationStore.exportCacheToFile();
 }
 
 async function handleClearData() {
@@ -532,6 +538,20 @@ function formatLastSync(timestamp: string | null): string {
           </div>
           <BaseButton variant="ghost" size="sm" @click="handleManualExport">
             {{ t('action.export') }}
+          </BaseButton>
+        </div>
+        <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
+          <div>
+            <p class="font-medium text-gray-900 dark:text-gray-100">Export Translation Cache</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Download cached translations as a JSON file to commit to the repository</p>
+          </div>
+          <BaseButton
+            variant="ghost"
+            size="sm"
+            :disabled="settingsStore.language === 'en'"
+            @click="handleExportTranslations"
+          >
+            Export Translations
           </BaseButton>
         </div>
         <div class="flex items-center justify-between py-3">

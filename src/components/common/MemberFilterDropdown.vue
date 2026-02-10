@@ -3,7 +3,7 @@ import { computed, watch } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useTranslation } from '@/composables/useTranslation';
-import BaseMultiSelect from '@/components/ui/BaseMultiSelect.vue';
+import BaseMultiSelect from '@/components/ui/BaseMultiSelect/index.vue';
 
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
