@@ -5,3 +5,5 @@ public
 *.log
 .vscode
 .claude
+playwright-report
+test-results

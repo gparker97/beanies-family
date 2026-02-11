@@ -50,6 +50,9 @@ export default [
       '*.config.js',
       '*.config.ts',
       'scripts/**',
+      'playwright-report/**',
+      'test-results/**',
+      '.github/**',
     ],
   },
 ];
