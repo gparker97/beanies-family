@@ -3,7 +3,1443 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-02-10",
-    "translationCount": 0
+    "translationCount": 287
   },
-  "translations": {}
+  "translations": {
+    "app.name": {
+      "translation": "全科医生家庭计划员",
+      "hash": "26sbf7",
+      "lastUpdated": "2026-02-10"
+    },
+    "app.tagline": {
+      "translation": "智能财务规划",
+      "hash": "hyfuaz",
+      "lastUpdated": "2026-02-10"
+    },
+    "app.version": {
+      "translation": "v1.0.0 - MVP",
+      "hash": "w23ll9",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.totalAssets": {
+      "translation": "资产总计",
+      "hash": "akms4h",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.totalLiabilities": {
+      "translation": "负债总计",
+      "hash": "47x9dd",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.totalValue": {
+      "translation": "总价值",
+      "hash": "970697",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.netAssetValue": {
+      "translation": "净资产价值",
+      "hash": "9vgobm",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.appreciation": {
+      "translation": "重视",
+      "hash": "b77j6j",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.depreciation": {
+      "translation": "折旧",
+      "hash": "ancq4z",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.assetLoans": {
+      "translation": "资产贷款",
+      "hash": "nklhjn",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.loanOutstanding": {
+      "translation": "未偿还贷款",
+      "hash": "2vlnqi",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.purchaseValue": {
+      "translation": "购买价格",
+      "hash": "f99g1a",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.currentValue": {
+      "translation": "当前值",
+      "hash": "pp78i2",
+      "lastUpdated": "2026-02-10"
+    },
+    "common.purchased": {
+      "translation": "已购买",
+      "hash": "3ihjkz",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.active": {
+      "translation": "状态",
+      "hash": "wchdly",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.inactive": {
+      "translation": "非活动的",
+      "hash": "1h67ij",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.excluded": {
+      "translation": "Excluded",
+      "hash": "y1p2i2",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.paused": {
+      "translation": "已暂停",
+      "hash": "vm13n6",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.recurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.completed": {
+      "translation": "已完成",
+      "hash": "9xualn",
+      "lastUpdated": "2026-02-10"
+    },
+    "status.overdue": {
+      "translation": "超期",
+      "hash": "9hd20w",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.dashboard": {
+      "translation": "仪表板",
+      "hash": "ft8p6c",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.accounts": {
+      "translation": "账户",
+      "hash": "y9wwze",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.transactions": {
+      "translation": "交易",
+      "hash": "z19kl1",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.assets": {
+      "translation": "资产",
+      "hash": "wl9d43",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.goals": {
+      "translation": "入球",
+      "hash": "152c9s",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.reports": {
+      "translation": "报告",
+      "hash": "pebm1t",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.forecast": {
+      "translation": "天氣預報",
+      "hash": "8sd9nf",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.family": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-02-10"
+    },
+    "nav.settings": {
+      "translation": "设置",
+      "hash": "osmo8z",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.add": {
+      "translation": "新增",
+      "hash": "1eo1",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.edit": {
+      "translation": "修改",
+      "hash": "1a6ui",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.delete": {
+      "translation": "删除",
+      "hash": "xskn2j",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.save": {
+      "translation": "保存",
+      "hash": "1j2ql",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.saveChanges": {
+      "translation": "保存修改",
+      "hash": "vrk2jk",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.cancel": {
+      "translation": "取消",
+      "hash": "x9d2fu",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.confirm": {
+      "translation": "確認",
+      "hash": "rrr0bk",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.close": {
+      "translation": "关闭",
+      "hash": "12tjh4",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.back": {
+      "translation": "后退",
+      "hash": "187if",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.next": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.submit": {
+      "translation": "提交",
+      "hash": "tw8loo",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.search": {
+      "translation": "搜索",
+      "hash": "u51um0",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.filter": {
+      "translation": "籂選",
+      "hash": "ysvd08",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.clear": {
+      "translation": "清楚",
+      "hash": "12tbn1",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.refresh": {
+      "translation": "刷新",
+      "hash": "pjrwp1",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.loading": {
+      "translation": "正在載入...",
+      "hash": "vb9ooe",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.pause": {
+      "translation": "暂停",
+      "hash": "19rys6",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.resume": {
+      "translation": "继续",
+      "hash": "ulrws3",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.markCompleted": {
+      "translation": "标记为已完成",
+      "hash": "1qdmmo",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.export": {
+      "translation": "导出",
+      "hash": "yk542c",
+      "lastUpdated": "2026-02-10"
+    },
+    "action.import": {
+      "translation": "进口",
+      "hash": "yqu6uz",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.netWorth": {
+      "translation": "净值",
+      "hash": "pp2nez",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.assets": {
+      "translation": "资产",
+      "hash": "wl9d43",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.liabilities": {
+      "translation": "负债",
+      "hash": "faqc39",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.monthlyIncome": {
+      "translation": "月收入",
+      "hash": "a1n3a4",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.monthlyExpenses": {
+      "translation": "每月费用",
+      "hash": "v3o7bi",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.netCashFlow": {
+      "translation": "净现金流量",
+      "hash": "o3cvtk",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.recentTransactions": {
+      "translation": "最近交易",
+      "hash": "8dpeyu",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.upcomingTransactions": {
+      "translation": "即将开始的交易",
+      "hash": "3vbvaf",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.assetsSummary": {
+      "translation": "资产摘要",
+      "hash": "514kxj",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.activeGoals": {
+      "translation": "有效目标",
+      "hash": "1gaxwm",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.noTransactions": {
+      "translation": "还没有交易。添加您的第一笔交易即可开始。",
+      "hash": "ihwppm",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.noUpcoming": {
+      "translation": "在接下来的30天内没有将至交易",
+      "hash": "fj1dbl",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.noAssets": {
+      "translation": "尚无资产。添加资产以跟踪您的财产和贵重物品。",
+      "hash": "8wexs8",
+      "lastUpdated": "2026-02-10"
+    },
+    "dashboard.noGoals": {
+      "translation": "没有有效目标。设置财务目标以跟踪您的进度。",
+      "hash": "61thkk",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.title": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.items": {
+      "translation": "<strong>重复项目</strong>",
+      "hash": "lib2ir",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.monthlyIncome": {
+      "translation": "每月经常性收入",
+      "hash": "3k8zvl",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.monthlyExpenses": {
+      "translation": "每月经常性支出",
+      "hash": "netzrl",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.netMonthly": {
+      "translation": "月储蓄",
+      "hash": "q4xj6u",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.noItems": {
+      "translation": "还没有定期项目。",
+      "hash": "pl9bh4",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.getStarted": {
+      "translation": "点击",
+      "hash": "xfbm48",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.addItem": {
+      "translation": "添加定期项目",
+      "hash": "5il5bp",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.editItem": {
+      "translation": "编辑定期项目",
+      "hash": "47nzos",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.deleteConfirm": {
+      "translation": "您确定要删除此定期项目吗？现有交易不会受到影响。",
+      "hash": "vaakvq",
+      "lastUpdated": "2026-02-10"
+    },
+    "recurring.next": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.title": {
+      "translation": "账户",
+      "hash": "y9wwze",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.subtitle": {
+      "translation": "管理您的银行账户和信用卡",
+      "hash": "3q5xsj",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.addAccount": {
+      "translation": "添加账户",
+      "hash": "he46su",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.editAccount": {
+      "translation": "编辑账户",
+      "hash": "kdqxnt",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.deleteAccount": {
+      "translation": "删除帐户",
+      "hash": "qffm48",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.noAccounts": {
+      "translation": "还没有账号",
+      "hash": "raxci5",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.getStarted": {
+      "translation": "添加您的第一个账号即可开始使用",
+      "hash": "kmav2n",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.totalBalance": {
+      "translation": "总余额",
+      "hash": "xflwao",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.accountName": {
+      "translation": "账户名",
+      "hash": "jsbizi",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.accountType": {
+      "translation": "Account Type",
+      "hash": "jsfurx",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.currentBalance": {
+      "translation": "本期还款总额",
+      "hash": "ugv4ln",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.checking": {
+      "translation": "往來戶口",
+      "hash": "7jgly1",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.savings": {
+      "translation": "储蓄账户",
+      "hash": "frhzsq",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.credit_card": {
+      "translation": "贷记卡",
+      "hash": "lkxejb",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.investment": {
+      "translation": "投资帐户",
+      "hash": "3vn28w",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.crypto": {
+      "translation": "加密货币",
+      "hash": "ffzk6q",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.cash": {
+      "translation": "货币资金",
+      "hash": "18uvn",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.loan": {
+      "translation": "借款",
+      "hash": "1evps",
+      "lastUpdated": "2026-02-10"
+    },
+    "accounts.type.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.title": {
+      "translation": "交易",
+      "hash": "z19kl1",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.subtitle": {
+      "translation": "追踪您的收入和支出",
+      "hash": "42703n",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.addTransaction": {
+      "translation": "添加交易",
+      "hash": "4dkmu7",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.editTransaction": {
+      "translation": "编辑交易",
+      "hash": "wwrcug",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.deleteTransaction": {
+      "translation": "删除交易",
+      "hash": "3sqzvb",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.noTransactions": {
+      "translation": "尚未记录任何交易。",
+      "hash": "gc5sy2",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.getStarted": {
+      "translation": "点击",
+      "hash": "xfbm48",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.allTransactions": {
+      "translation": "所有交易",
+      "hash": "fv70p8",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.thisMonthIncome": {
+      "translation": "本月收入",
+      "hash": "tckhn9",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.thisMonthExpenses": {
+      "translation": "本月费用",
+      "hash": "w8btlp",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.netCashFlow": {
+      "translation": "净现金流量",
+      "hash": "o3cvtk",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.oneTime": {
+      "translation": "一次性交易",
+      "hash": "em1nki",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.recurringTransactions": {
+      "translation": "日常交易",
+      "hash": "sd76k8",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.addRecurring": {
+      "translation": "添加到重复性",
+      "hash": "12b4u",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.type.income": {
+      "translation": "收入",
+      "hash": "yqip87",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.type.expense": {
+      "translation": "费用",
+      "hash": "5vj7lk",
+      "lastUpdated": "2026-02-10"
+    },
+    "transactions.type.transfer": {
+      "translation": "移交",
+      "hash": "m93b4b",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.title": {
+      "translation": "资产",
+      "hash": "wl9d43",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.subtitle": {
+      "translation": "追踪您的财产、车辆和贵重物品",
+      "hash": "to98jk",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.addAsset": {
+      "translation": "添加文件",
+      "hash": "88awdt",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.editAsset": {
+      "translation": "编辑资产",
+      "hash": "uwpz8m",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.deleteAsset": {
+      "translation": "删除文件",
+      "hash": "yrztmt",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.noAssets": {
+      "translation": "无资产",
+      "hash": "8fyuzu",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.getStarted": {
+      "translation": "通过添加您的第一个资产开始",
+      "hash": "jmqb5a",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.assetName": {
+      "translation": "资产名称",
+      "hash": "3tkmx1",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.assetType": {
+      "translation": "资产类型",
+      "hash": "3tgb4m",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.hasLoan": {
+      "translation": "此资产有贷款",
+      "hash": "che0bd",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.hasLoanDesc": {
+      "translation": "跟踪抵押贷款、汽车贷款或其他融资",
+      "hash": "q4orye",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.loanDetails": {
+      "translation": "借款资料",
+      "hash": "aq2pri",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.originalLoanAmount": {
+      "translation": "原贷款金额",
+      "hash": "vw6389",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.outstandingBalance": {
+      "translation": "未清余额",
+      "hash": "2sfpbe",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.interestRate": {
+      "translation": "利率(%)",
+      "hash": "g31neq",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.monthlyPayment": {
+      "translation": "每月付款",
+      "hash": "hujk99",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.loanTerm": {
+      "translation": "贷款期限（月）",
+      "hash": "m5ufzm",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.lender": {
+      "translation": "贷款金融机构",
+      "hash": "xg56v8",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.loanStartDate": {
+      "translation": "开始日期",
+      "hash": "109ds4",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.purchaseDate": {
+      "translation": "采购日期",
+      "hash": "9nzjir",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.real_estate": {
+      "translation": "房地产",
+      "hash": "c9pery",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.vehicle": {
+      "translation": "車輛",
+      "hash": "x6r0uk",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.boat": {
+      "translation": "轮船",
+      "hash": "18huo",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.jewelry": {
+      "translation": "首饰",
+      "hash": "nlq3a",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.electronics": {
+      "translation": "电子产品",
+      "hash": "ri5y95",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.equipment": {
+      "translation": "设",
+      "hash": "k360eq",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.art": {
+      "translation": "艺术",
+      "hash": "1f0j",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.investment": {
+      "translation": "投资",
+      "hash": "65s0zx",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.crypto": {
+      "translation": "加密货币",
+      "hash": "ffzk6q",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.collectible": {
+      "translation": "收藏",
+      "hash": "cscrs4",
+      "lastUpdated": "2026-02-10"
+    },
+    "assets.type.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.title": {
+      "translation": "入球",
+      "hash": "152c9s",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.subtitle": {
+      "translation": "设定并跟踪您的财务目标",
+      "hash": "ohq3so",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.addGoal": {
+      "translation": "添加目标",
+      "hash": "kcq4cu",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.editGoal": {
+      "translation": "编辑目标",
+      "hash": "1ap3e1",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.deleteGoal": {
+      "translation": "删除目标",
+      "hash": "81o0a0",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.noGoals": {
+      "translation": "尚无目标",
+      "hash": "g0niyr",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.getStarted": {
+      "translation": "点击",
+      "hash": "xfbm48",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.allGoals": {
+      "translation": "所有目标",
+      "hash": "164j7l",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.activeGoals": {
+      "translation": "有效目标",
+      "hash": "1gaxwm",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.completedGoals": {
+      "translation": "已完成目标",
+      "hash": "qmd9cl",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.overdueGoals": {
+      "translation": "逾期目标",
+      "hash": "c1yjgg",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.goalName": {
+      "translation": "目标名称",
+      "hash": "4pawlk",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.goalType": {
+      "translation": "目标类型",
+      "hash": "4p6kt5",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.assignTo": {
+      "translation": "分配给",
+      "hash": "efgkwk",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.familyWide": {
+      "translation": "全家目标",
+      "hash": "b91anr",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.deadlineOptional": {
+      "translation": "截止日期（可选）",
+      "hash": "rv1z9z",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.type.savings": {
+      "translation": "节省金额",
+      "hash": "ciwz1j",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.type.debt_payoff": {
+      "translation": "债务偿还",
+      "hash": "5bpn2k",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.type.investment": {
+      "translation": "投资",
+      "hash": "65s0zx",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.type.purchase": {
+      "translation": "物品购买",
+      "hash": "twf1gh",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.priority.label": {
+      "translation": "优先顺序",
+      "hash": "j9vvj0",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.priority.low": {
+      "translation": "低",
+      "hash": "1n3o",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.priority.medium": {
+      "translation": "中等",
+      "hash": "wz9u97",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.priority.high": {
+      "translation": "高",
+      "hash": "1c7gi",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.priority.critical": {
+      "translation": "危险",
+      "hash": "xcqxfj",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.progress": {
+      "translation": "进度",
+      "hash": "fhj16b",
+      "lastUpdated": "2026-02-10"
+    },
+    "goals.deadline": {
+      "translation": "截止日期",
+      "hash": "9ec6m0",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.title": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.addMember": {
+      "translation": "添加成员",
+      "hash": "nibw07",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.editMember": {
+      "translation": "编辑成员",
+      "hash": "tb66q8",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.deleteMember": {
+      "translation": "删除成员",
+      "hash": "76f901",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.noMembers": {
+      "translation": "还没有家庭成员。",
+      "hash": "js9obu",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.role.owner": {
+      "translation": "所有者",
+      "hash": "19m2dv",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.role.admin": {
+      "translation": "管理员",
+      "hash": "11ksof",
+      "lastUpdated": "2026-02-10"
+    },
+    "family.role.member": {
+      "translation": "成员",
+      "hash": "wz48xy",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.title": {
+      "translation": "报告",
+      "hash": "pebm1t",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.subtitle": {
+      "translation": "使用图表和报告可视化您的财务数据",
+      "hash": "yiw1sp",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.noData": {
+      "translation": "尚无可用于报告的数据。",
+      "hash": "y50orw",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.familyMember": {
+      "translation": "家属",
+      "hash": "xvx0ru",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.netWorthOverTime": {
+      "translation": "随时间推移的净值",
+      "hash": "uo2abo",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.netWorthDescription": {
+      "translation": "基于流动资产和经常性交易的预计净资产",
+      "hash": "bv7bpc",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.currentNetWorth": {
+      "translation": "当前净值",
+      "hash": "uibw8s",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.projectedNetWorth": {
+      "translation": "预计净值",
+      "hash": "ald8w3",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.projectedChange": {
+      "translation": "预计变动",
+      "hash": "o04x2g",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.incomeVsExpenses": {
+      "translation": "收入与支出",
+      "hash": "s1maah",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.incomeVsExpensesDescription": {
+      "translation": "按类别分列的每月收入和支出明细",
+      "hash": "5sjfat",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.totalIncome": {
+      "translation": "总收入",
+      "hash": "6vashn",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.totalExpenses": {
+      "translation": "总开支",
+      "hash": "t74e2x",
+      "lastUpdated": "2026-02-10"
+    },
+    "reports.netCashFlow": {
+      "translation": "净现金流量",
+      "hash": "o3cvtk",
+      "lastUpdated": "2026-02-10"
+    },
+    "forecast.title": {
+      "translation": "天氣預報",
+      "hash": "8sd9nf",
+      "lastUpdated": "2026-02-10"
+    },
+    "forecast.noData": {
+      "translation": "尚无可用于预测的数据。",
+      "hash": "uoinvg",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.title": {
+      "translation": "设置",
+      "hash": "osmo8z",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.subtitle": {
+      "translation": "配置您的应用首选项",
+      "hash": "wkwl2e",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.general": {
+      "translation": "一般税率",
+      "hash": "q7dfwo",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.baseCurrency": {
+      "translation": "基准货币",
+      "hash": "p41bi8",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.baseCurrencyHint": {
+      "translation": "显示总计和转换的主要货币",
+      "hash": "x660ag",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.displayCurrency": {
+      "translation": "显示币种",
+      "hash": "rxz6r3",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.theme": {
+      "translation": "主题",
+      "hash": "1c3a21",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.theme.light": {
+      "translation": "光照",
+      "hash": "17plo6",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.theme.dark": {
+      "translation": "深色",
+      "hash": "19hue",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.theme.system": {
+      "translation": "系统设置",
+      "hash": "ttqfg1",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.themeHint": {
+      "translation": "选择您的配色方案",
+      "hash": "z9e2qt",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.language": {
+      "translation": "语言",
+      "hash": "pm7a14",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.sync": {
+      "translation": "同步",
+      "hash": "1jkcb",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.fileSync": {
+      "translation": "文件同步",
+      "hash": "ae7q9r",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.syncToFile": {
+      "translation": "同步到文件",
+      "hash": "8pccmd",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.syncToFileDescription": {
+      "translation": "将数据保存到JSON文件。将其放在Google云端硬盘、Dropbox或任何同步文件夹中进行云备份。",
+      "hash": "ty6kzr",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.createNewSyncFile": {
+      "translation": "创建新文件",
+      "hash": "hbcpx9",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.loadFromExistingFile": {
+      "translation": "从现有文件加载",
+      "hash": "g6mca3",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.syncEnabled": {
+      "translation": "同步已启用",
+      "hash": "c8x8sc",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.autoSync": {
+      "translation": "自动同步",
+      "hash": "be4h3o",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.encryption": {
+      "translation": "加密方式",
+      "hash": "7y9wo3",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.exchangeRates": {
+      "translation": "汇率",
+      "hash": "m4rsye",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.aiInsights": {
+      "translation": "AI 见解",
+      "hash": "9yp983",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.aiPoweredInsights": {
+      "translation": "AI 驱动的见解",
+      "hash": "iwsdi4",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.aiComingSoon": {
+      "translation": "即将推出-获得由AI提供支持的个性化财务建议",
+      "hash": "hgkcof",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.dataManagement": {
+      "translation": "数据管理",
+      "hash": "6yx94p",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.exportData": {
+      "translation": "导出数据",
+      "hash": "81o38q",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.exportDataDescription": {
+      "translation": "将您的所有数据下载为JSON文件",
+      "hash": "oq5xnr",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.clearAllData": {
+      "translation": "清除所有数据",
+      "hash": "5bpc2s",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.clearAllDataDescription": {
+      "translation": "永久删除您的所有数据",
+      "hash": "4275ns",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.clearData": {
+      "translation": "清除数据",
+      "hash": "jv2eot",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.clearDataConfirmation": {
+      "translation": "确定删除此计划吗？此操作无法回退。",
+      "hash": "n9otrn",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.yesDeleteEverything": {
+      "translation": "删除所有内容",
+      "hash": "uoqhil",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.about": {
+      "translation": "软件简介",
+      "hash": "11jkh9",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.appName": {
+      "translation": "全科医生家庭计划员",
+      "hash": "26sbf7",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.version": {
+      "translation": "1.0.0版（ MVP ）",
+      "hash": "9fpvx3",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.appDescription": {
+      "translation": "本地优先、以隐私为中心的家庭金融应用程序。",
+      "hash": "lzikpd",
+      "lastUpdated": "2026-02-10"
+    },
+    "settings.privacyNote": {
+      "translation": "您的数据存储在本地浏览器中，除非您启用文件同步，否则永远不会离开您的设备。",
+      "hash": "v6855t",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.name": {
+      "translation": "姓名",
+      "hash": "1fvl7",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.email": {
+      "translation": "电子邮箱",
+      "hash": "13xh18",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.type": {
+      "translation": "<g id=\"Bold\"><g id=\"Bold\">课程</g>类型</g>",
+      "hash": "1k7dm",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.amount": {
+      "translation": "金额(元)",
+      "hash": "whwdbs",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.currency": {
+      "translation": "货币",
+      "hash": "al2er5",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.balance": {
+      "translation": "余量",
+      "hash": "lx5d4s",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.date": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.category": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.description": {
+      "translation": "描述",
+      "hash": "xqskk",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.account": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.selectAccount": {
+      "translation": "选择一个账号",
+      "hash": "yb3rum",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.fromAccount": {
+      "translation": "从底部",
+      "hash": "vgsdop",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.toAccount": {
+      "translation": "到账户",
+      "hash": "wh15dk",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.owner": {
+      "translation": "所有者",
+      "hash": "19m2dv",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.institution": {
+      "translation": "法法机构",
+      "hash": "sp2uzs",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.frequency": {
+      "translation": "频率",
+      "hash": "vzf4u4",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.frequency.daily": {
+      "translation": "每天发布一次",
+      "hash": "1366m1",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.frequency.weekly": {
+      "translation": "每週",
+      "hash": "s8sy1r",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.frequency.monthly": {
+      "translation": "每月",
+      "hash": "n1rd3n",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.frequency.yearly": {
+      "translation": "每年",
+      "hash": "ras40m",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.startDate": {
+      "translation": "开始日期",
+      "hash": "5yr20c",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.endDate": {
+      "translation": "课程结束日期：",
+      "hash": "smc9ar",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.targetAmount": {
+      "translation": "目标金额",
+      "hash": "sr3vlz",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.currentAmount": {
+      "translation": "当前数",
+      "hash": "5lp3xb",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.priority": {
+      "translation": "优先级",
+      "hash": "i7ebss",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.includeInNetWorth": {
+      "translation": "计入净值",
+      "hash": "r0qemw",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.isActive": {
+      "translation": "状态",
+      "hash": "wchdly",
+      "lastUpdated": "2026-02-10"
+    },
+    "form.required": {
+      "translation": "必需项",
+      "hash": "5fksht",
+      "lastUpdated": "2026-02-10"
+    },
+    "validation.required": {
+      "translation": "必須填寫這一欄位",
+      "hash": "16025",
+      "lastUpdated": "2026-02-10"
+    },
+    "validation.invalidEmail": {
+      "translation": "請輸入有效的電子郵件地址",
+      "hash": "jw84of",
+      "lastUpdated": "2026-02-10"
+    },
+    "validation.invalidAmount": {
+      "translation": "请输入有效金额",
+      "hash": "iwmghz",
+      "lastUpdated": "2026-02-10"
+    },
+    "validation.minLength": {
+      "translation": "必须至少为 [missing] 个字符",
+      "hash": "fvrjy",
+      "lastUpdated": "2026-02-10"
+    },
+    "confirm.delete": {
+      "translation": "是否确定要删除此项目？",
+      "hash": "onnbn9",
+      "lastUpdated": "2026-02-10"
+    },
+    "confirm.deleteAccount": {
+      "translation": "您确定要删除此帐户吗？所有关联交易也将被删除。",
+      "hash": "gvclsa",
+      "lastUpdated": "2026-02-10"
+    },
+    "confirm.deleteMember": {
+      "translation": "是否确定删除该会员？",
+      "hash": "oeybey",
+      "lastUpdated": "2026-02-10"
+    },
+    "confirm.unsavedChanges": {
+      "translation": "您尚未保存更改！您确定要离开吗？",
+      "hash": "qku1hs",
+      "lastUpdated": "2026-02-10"
+    },
+    "success.saved": {
+      "translation": "更改已成功保存",
+      "hash": "swyfur",
+      "lastUpdated": "2026-02-10"
+    },
+    "success.created": {
+      "translation": "创建成功.",
+      "hash": "8i756p",
+      "lastUpdated": "2026-02-10"
+    },
+    "success.deleted": {
+      "translation": "已成功删除",
+      "hash": "1o8t5e",
+      "lastUpdated": "2026-02-10"
+    },
+    "success.updated": {
+      "translation": "已成功更新",
+      "hash": "er5u5w",
+      "lastUpdated": "2026-02-10"
+    },
+    "error.generic": {
+      "translation": "出错了。请重试。",
+      "hash": "dp1w0g",
+      "lastUpdated": "2026-02-10"
+    },
+    "error.loadFailed": {
+      "translation": "加载数据失败",
+      "hash": "ox7cwy",
+      "lastUpdated": "2026-02-10"
+    },
+    "error.saveFailed": {
+      "translation": "保存更改失败",
+      "hash": "clehuq",
+      "lastUpdated": "2026-02-10"
+    },
+    "error.deleteFailed": {
+      "translation": "无法删除",
+      "hash": "ho7eul",
+      "lastUpdated": "2026-02-10"
+    },
+    "error.networkError": {
+      "translation": "网络错误。请检查您的连接。",
+      "hash": "z5puqx",
+      "lastUpdated": "2026-02-10"
+    },
+    "empty.noData": {
+      "translation": "无资料",
+      "hash": "yhldrm",
+      "lastUpdated": "2026-02-10"
+    },
+    "empty.noResults": {
+      "translation": "未找到结果",
+      "hash": "myz3kp",
+      "lastUpdated": "2026-02-10"
+    },
+    "filter.members": {
+      "translation": "成员",
+      "hash": "rt2xhj",
+      "lastUpdated": "2026-02-10"
+    },
+    "filter.allMembers": {
+      "translation": "所有成员",
+      "hash": "igaxm",
+      "lastUpdated": "2026-02-10"
+    },
+    "date.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-02-10"
+    },
+    "date.yesterday": {
+      "translation": "昨天",
+      "hash": "6bfbz6",
+      "lastUpdated": "2026-02-10"
+    },
+    "date.thisWeek": {
+      "translation": "本周",
+      "hash": "mwbbqu",
+      "lastUpdated": "2026-02-10"
+    },
+    "date.thisMonth": {
+      "translation": "本月",
+      "hash": "mosqq",
+      "lastUpdated": "2026-02-10"
+    },
+    "date.thisYear": {
+      "translation": "今年",
+      "hash": "mwclmn",
+      "lastUpdated": "2026-02-10"
+    }
+  }
 }
