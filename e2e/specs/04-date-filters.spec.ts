@@ -5,6 +5,7 @@ import { TestDataFactory } from '../fixtures/data';
 
 test.describe('Date Filtering', () => {
   test('should filter transactions by current month', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
@@ -40,6 +41,7 @@ test.describe('Date Filtering', () => {
   });
 
   test('should filter transactions by last month', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
@@ -75,6 +77,7 @@ test.describe('Date Filtering', () => {
   });
 
   test('should filter transactions by last 3 months', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 

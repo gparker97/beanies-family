@@ -6,6 +6,7 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 
 test.describe('Account Management', () => {
   test('should create account and update dashboard net worth', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
@@ -28,6 +29,7 @@ test.describe('Account Management', () => {
   });
 
   test('should create multiple accounts', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
