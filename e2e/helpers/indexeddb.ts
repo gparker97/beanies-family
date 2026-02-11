@@ -5,40 +5,50 @@ export class IndexedDBHelper {
   constructor(private page: Page) {}
 
   async clearAllData() {
-    // Clear all object stores instead of deleting the database
+    // Clear all object stores using native IndexedDB APIs
     // This works even when the database is open
     await this.page.evaluate(() => {
       return new Promise<void>((resolve) => {
-        (async () => {
-          try {
-            const { openDB } = await import('idb');
-            const db = await openDB('gp-family-finance', 3);
+        const request = indexedDB.open('gp-family-finance', 3);
 
-            // Clear all object stores
-            const stores = [
-              'familyMembers',
-              'accounts',
-              'transactions',
-              'assets',
-              'goals',
-              'recurringItems',
-              'settings',
-            ];
+        request.onsuccess = () => {
+          const db = request.result;
+          const stores = [
+            'familyMembers',
+            'accounts',
+            'transactions',
+            'assets',
+            'goals',
+            'recurringItems',
+            'settings',
+          ];
+
+          try {
             const tx = db.transaction(stores, 'readwrite');
 
-            for (const storeName of stores) {
-              await tx.objectStore(storeName).clear();
-            }
+            stores.forEach((storeName) => {
+              tx.objectStore(storeName).clear();
+            });
 
-            await tx.done;
+            tx.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+
+            tx.onerror = () => {
+              db.close();
+              resolve();
+            };
+          } catch {
             db.close();
             resolve();
-          } catch (error) {
-            // If database doesn't exist yet, that's fine
-            console.error('Clear failed (database may not exist yet):', error);
-            resolve();
           }
-        })();
+        };
+
+        request.onerror = () => {
+          // If database doesn't exist yet, that's fine
+          resolve();
+        };
       });
     });
     await this.page.waitForTimeout(500);
@@ -47,52 +57,70 @@ export class IndexedDBHelper {
   async seedData(data: Partial<ExportedData>) {
     await this.page.evaluate((testData) => {
       return new Promise<void>((resolve, reject) => {
-        (async () => {
+        const request = indexedDB.open('gp-family-finance', 3);
+
+        request.onsuccess = () => {
+          const db = request.result;
+
           try {
-            const { openDB } = await import('idb');
-            const db = await openDB('gp-family-finance', 3);
+            const storeNames = [];
+            if (testData.familyMembers) storeNames.push('familyMembers');
+            if (testData.accounts) storeNames.push('accounts');
+            if (testData.transactions) storeNames.push('transactions');
+            if (testData.assets) storeNames.push('assets');
+            if (testData.goals) storeNames.push('goals');
+            if (testData.recurringItems) storeNames.push('recurringItems');
+            if (testData.settings) storeNames.push('settings');
+
+            const tx = db.transaction(storeNames, 'readwrite');
 
             if (testData.familyMembers) {
-              for (const member of testData.familyMembers) {
-                await db.add('familyMembers', member);
-              }
+              const store = tx.objectStore('familyMembers');
+              testData.familyMembers.forEach((member) => store.add(member));
             }
             if (testData.accounts) {
-              for (const account of testData.accounts) {
-                await db.add('accounts', account);
-              }
+              const store = tx.objectStore('accounts');
+              testData.accounts.forEach((account) => store.add(account));
             }
             if (testData.transactions) {
-              for (const transaction of testData.transactions) {
-                await db.add('transactions', transaction);
-              }
+              const store = tx.objectStore('transactions');
+              testData.transactions.forEach((transaction) => store.add(transaction));
             }
             if (testData.assets) {
-              for (const asset of testData.assets) {
-                await db.add('assets', asset);
-              }
+              const store = tx.objectStore('assets');
+              testData.assets.forEach((asset) => store.add(asset));
             }
             if (testData.goals) {
-              for (const goal of testData.goals) {
-                await db.add('goals', goal);
-              }
+              const store = tx.objectStore('goals');
+              testData.goals.forEach((goal) => store.add(goal));
             }
             if (testData.recurringItems) {
-              for (const item of testData.recurringItems) {
-                await db.add('recurringItems', item);
-              }
+              const store = tx.objectStore('recurringItems');
+              testData.recurringItems.forEach((item) => store.add(item));
             }
             if (testData.settings) {
-              await db.put('settings', testData.settings);
+              const store = tx.objectStore('settings');
+              store.put(testData.settings);
             }
 
-            db.close();
-            resolve();
+            tx.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+
+            tx.onerror = () => {
+              db.close();
+              reject(tx.error);
+            };
           } catch (error) {
-            console.error('Seed data failed:', error);
+            db.close();
             reject(error);
           }
-        })();
+        };
+
+        request.onerror = () => {
+          reject(request.error);
+        };
       });
     }, data);
     await this.page.reload();
@@ -101,27 +129,95 @@ export class IndexedDBHelper {
   async exportData(): Promise<ExportedData> {
     return await this.page.evaluate(() => {
       return new Promise<ExportedData>((resolve, reject) => {
-        (async () => {
-          try {
-            const { openDB } = await import('idb');
-            const db = await openDB('gp-family-finance', 3);
+        const request = indexedDB.open('gp-family-finance', 3);
 
-            const data = {
-              familyMembers: await db.getAll('familyMembers'),
-              accounts: await db.getAll('accounts'),
-              transactions: await db.getAll('transactions'),
-              assets: await db.getAll('assets'),
-              goals: await db.getAll('goals'),
-              recurringItems: await db.getAll('recurringItems'),
-              settings: (await db.get('settings', 'app_settings')) || undefined,
+        request.onsuccess = () => {
+          const db = request.result;
+
+          try {
+            const tx = db.transaction(
+              [
+                'familyMembers',
+                'accounts',
+                'transactions',
+                'assets',
+                'goals',
+                'recurringItems',
+                'settings',
+              ],
+              'readonly'
+            );
+
+            const data: ExportedData = {
+              familyMembers: [],
+              accounts: [],
+              transactions: [],
+              assets: [],
+              goals: [],
+              recurringItems: [],
+              settings: undefined,
             };
-            db.close();
-            resolve(data);
+
+            const requests = [
+              tx.objectStore('familyMembers').getAll(),
+              tx.objectStore('accounts').getAll(),
+              tx.objectStore('transactions').getAll(),
+              tx.objectStore('assets').getAll(),
+              tx.objectStore('goals').getAll(),
+              tx.objectStore('recurringItems').getAll(),
+              tx.objectStore('settings').get('app_settings'),
+            ];
+
+            let completed = 0;
+            const total = requests.length;
+
+            requests.forEach((req, index) => {
+              req.onsuccess = () => {
+                switch (index) {
+                  case 0:
+                    data.familyMembers = req.result || [];
+                    break;
+                  case 1:
+                    data.accounts = req.result || [];
+                    break;
+                  case 2:
+                    data.transactions = req.result || [];
+                    break;
+                  case 3:
+                    data.assets = req.result || [];
+                    break;
+                  case 4:
+                    data.goals = req.result || [];
+                    break;
+                  case 5:
+                    data.recurringItems = req.result || [];
+                    break;
+                  case 6:
+                    data.settings = req.result || undefined;
+                    break;
+                }
+
+                completed++;
+                if (completed === total) {
+                  db.close();
+                  resolve(data);
+                }
+              };
+            });
+
+            tx.onerror = () => {
+              db.close();
+              reject(tx.error);
+            };
           } catch (error) {
-            console.error('Export failed:', error);
+            db.close();
             reject(error);
           }
-        })();
+        };
+
+        request.onerror = () => {
+          reject(request.error);
+        };
       });
     });
   }
