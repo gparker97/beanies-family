@@ -5,11 +5,40 @@ export class IndexedDBHelper {
   constructor(private page: Page) {}
 
   async clearAllData() {
+    // Clear all object stores instead of deleting the database
+    // This works even when the database is open
     await this.page.evaluate(() => {
       return new Promise<void>((resolve) => {
-        const request = indexedDB.deleteDatabase('gp-family-finance');
-        request.onsuccess = () => resolve();
-        request.onerror = () => resolve();
+        (async () => {
+          try {
+            const { openDB } = await import('idb');
+            const db = await openDB('gp-family-finance', 3);
+
+            // Clear all object stores
+            const stores = [
+              'familyMembers',
+              'accounts',
+              'transactions',
+              'assets',
+              'goals',
+              'recurringItems',
+              'settings',
+            ];
+            const tx = db.transaction(stores, 'readwrite');
+
+            for (const storeName of stores) {
+              await tx.objectStore(storeName).clear();
+            }
+
+            await tx.done;
+            db.close();
+            resolve();
+          } catch (error) {
+            // If database doesn't exist yet, that's fine
+            console.log('Clear failed (database may not exist yet):', error);
+            resolve();
+          }
+        })();
       });
     });
     await this.page.waitForTimeout(500);
