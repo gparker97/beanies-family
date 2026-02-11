@@ -5,8 +5,8 @@ import AccountsPage from './AccountsPage.vue';
 
 // Mock the stores
 vi.mock('@/stores/accountsStore', () => ({
-  useAccountsStore: vi.fn(() => ({
-    accounts: [
+  useAccountsStore: vi.fn(() => {
+    const mockAccounts = [
       {
         id: 'test-account-1',
         memberId: 'member-1',
@@ -20,14 +20,18 @@ vi.mock('@/stores/accountsStore', () => ({
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       },
-    ],
-    totalAssets: 1000,
-    totalLiabilities: 0,
-    totalBalance: 1000,
-    createAccount: vi.fn(),
-    updateAccount: vi.fn(),
-    deleteAccount: vi.fn(),
-  })),
+    ];
+    return {
+      accounts: mockAccounts,
+      filteredAccounts: mockAccounts,
+      totalAssets: 1000,
+      totalLiabilities: 0,
+      totalBalance: 1000,
+      createAccount: vi.fn(),
+      updateAccount: vi.fn(),
+      deleteAccount: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('@/stores/familyStore', () => ({
@@ -62,10 +66,10 @@ vi.mock('@/stores/settingsStore', () => ({
 
 vi.mock('@/composables/useCurrencyDisplay', () => ({
   useCurrencyDisplay: vi.fn(() => ({
-    formatInDisplayCurrency: (amount: number) => `$${amount.toFixed(2)}`,
+    formatInDisplayCurrency: (amount: number) => `$${(amount || 0).toFixed(2)}`,
     convertToDisplay: (amount: number, currency: string) => ({
-      displayAmount: amount,
-      originalAmount: amount,
+      displayAmount: amount || 0,
+      originalAmount: amount || 0,
       displayCurrency: 'USD',
       originalCurrency: currency,
       isConverted: false,
@@ -226,22 +230,24 @@ describe('AccountsPage - Edit Account Modal', () => {
       memberId: 'member-2',
     });
 
+    const mockAccounts = [
+      {
+        id: 'test-account-1',
+        memberId: 'member-1',
+        name: 'Test Checking',
+        type: 'checking',
+        currency: 'USD',
+        balance: 1000,
+        institution: 'Test Bank',
+        isActive: true,
+        includeInNetWorth: true,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      },
+    ];
     vi.mocked(await import('@/stores/accountsStore')).useAccountsStore.mockReturnValue({
-      accounts: [
-        {
-          id: 'test-account-1',
-          memberId: 'member-1',
-          name: 'Test Checking',
-          type: 'checking',
-          currency: 'USD',
-          balance: 1000,
-          institution: 'Test Bank',
-          isActive: true,
-          includeInNetWorth: true,
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
+      accounts: mockAccounts,
+      filteredAccounts: mockAccounts,
       totalAssets: 1000,
       totalLiabilities: 0,
       totalBalance: 1000,
