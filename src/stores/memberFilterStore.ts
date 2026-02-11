@@ -66,7 +66,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
 
     // Ensure at least one is selected
     if (selectedMemberIds.value.size === 0 && familyStore.members.length > 0) {
-      selectedMemberIds.value.add(familyStore.members[0].id);
+      selectedMemberIds.value.add(familyStore.members[0]!.id);
     }
 
     // Trigger reactivity

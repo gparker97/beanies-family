@@ -883,7 +883,7 @@ function getAppreciationPercent(asset: Asset): number {
                     :amount="asset.purchaseValue"
                     :currency="asset.currency"
                     type="neutral"
-                    size="base"
+                    size="md"
                   />
                 </div>
               </div>

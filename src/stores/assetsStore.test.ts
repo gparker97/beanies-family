@@ -553,8 +553,8 @@ describe('assetsStore', () => {
       const settingsStore = useSettingsStore();
       settingsStore.settings.baseCurrency = 'USD';
       settingsStore.settings.exchangeRates = [
-        { from: 'EUR', to: 'USD', rate: 1.1 },
-        { from: 'GBP', to: 'USD', rate: 1.25 },
+        { from: 'EUR', to: 'USD', rate: 1.1, updatedAt: '2024-01-01T00:00:00.000Z' },
+        { from: 'GBP', to: 'USD', rate: 1.25, updatedAt: '2024-01-01T00:00:00.000Z' },
       ];
     });
 
@@ -613,7 +613,7 @@ describe('assetsStore', () => {
     it('should use inverse rate when direct rate not available', () => {
       const settingsStore = useSettingsStore();
       settingsStore.settings.exchangeRates = [
-        { from: 'USD', to: 'EUR', rate: 0.9 }, // Inverse: EUR to USD = 1/0.9 ≈ 1.111
+        { from: 'USD', to: 'EUR', rate: 0.9, updatedAt: '2024-01-01T00:00:00.000Z' }, // Inverse: EUR to USD = 1/0.9 ≈ 1.111
       ];
 
       const store = useAssetsStore();

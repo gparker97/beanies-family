@@ -146,6 +146,7 @@ describe('TransactionsPage - Date Filter', () => {
     category: 'utilities',
     description: 'Monthly bill',
     frequency: 'monthly',
+    dayOfMonth: 1,
     startDate: '2024-01-01T00:00:00.000Z',
     isActive: true,
     createdAt: '2024-01-01T00:00:00.000Z',

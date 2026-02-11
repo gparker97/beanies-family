@@ -43,19 +43,6 @@ watch(
     }
   }
 );
-
-// Compact display for header
-const _displayText = computed(() => {
-  if (!memberFilterStore.isInitialized || familyStore.members.length === 0) {
-    return t('filter.members');
-  }
-  if (memberFilterStore.isAllSelected) {
-    return t('filter.allMembers');
-  }
-  const count = memberFilterStore.selectedCount;
-  const total = familyStore.members.length;
-  return `${count}/${total}`;
-});
 </script>
 
 <template>

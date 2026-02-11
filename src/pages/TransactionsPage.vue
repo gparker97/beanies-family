@@ -789,7 +789,7 @@ function applyCustomDateRange() {
                 </p>
                 <!-- Category -->
                 <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <CategoryIcon :category-id="transaction.category" size="sm" />
+                  <CategoryIcon :category="transaction.category" size="sm" />
                   {{ getCategoryName(transaction.category) }}
                 </p>
                 <!-- Family Member -->
@@ -1038,7 +1038,7 @@ function applyCustomDateRange() {
                   </p>
                   <!-- Category -->
                   <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <CategoryIcon :category-id="item.category" size="sm" />
+                    <CategoryIcon :category="item.category" size="sm" />
                     {{ getCategoryName(item.category) }}
                   </p>
                   <!-- Family Member -->

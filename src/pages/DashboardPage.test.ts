@@ -67,6 +67,7 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       category: 'utilities',
       description: 'Monthly bill',
       frequency: 'monthly',
+      dayOfMonth: 1,
       startDate: '2024-01-01',
       isActive: true,
       createdAt: '2024-01-01T00:00:00.000Z',
@@ -324,7 +325,6 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
 
   describe('Inactive recurring items', () => {
     it('should not include inactive recurring items in totals', () => {
-      const _transactionsStore = useTransactionsStore();
       const recurringStore = useRecurringStore();
 
       // Active recurring income
