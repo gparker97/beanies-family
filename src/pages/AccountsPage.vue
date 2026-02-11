@@ -517,6 +517,7 @@ async function deleteAccount(id: string) {
           <div
             v-for="account in group.accounts"
             :key="account.id"
+            data-testid="account-card"
             class="rounded-xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
             :class="{ 'opacity-60': !account.isActive }"
           >
