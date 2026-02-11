@@ -8,7 +8,9 @@ export class AccountsPage {
   }
 
   async addAccount(data: { name: string; type: string; balance: number; currency?: string }) {
-    await this.page.getByRole('button', { name: 'Add Account' }).click();
+    // Use .first() to always click the header button, avoiding strict mode violation
+    // when both header and empty state buttons are visible
+    await this.page.getByRole('button', { name: 'Add Account' }).first().click();
     await this.page.getByLabel('Account Name').fill(data.name);
     await this.page.getByLabel('Account Type').selectOption(data.type);
     await this.page.getByLabel('Balance').fill(data.balance.toString());
