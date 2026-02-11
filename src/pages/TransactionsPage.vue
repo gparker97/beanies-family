@@ -14,7 +14,7 @@ import AccountTypeIcon from '@/components/common/AccountTypeIcon.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
 import { CURRENCIES } from '@/constants/currencies';
-import { formatDate, toISODateString } from '@/utils/date';
+import { formatDate, toISODateString, getStartOfMonth, getEndOfMonth, getLastMonthRange, getLastNMonthsRange, toDateInputValue, isDateBetween } from '@/utils/date';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import type { Transaction, CreateTransactionInput, UpdateTransactionInput, TransactionType, RecurringItem, CreateRecurringItemInput } from '@/types/models';
 
@@ -28,6 +28,13 @@ const { t } = useTranslation();
 
 // Tab state - recurring first by default
 const activeTab = ref<'transactions' | 'recurring'>('recurring');
+
+// Date filter state
+type DateFilterType = 'current_month' | 'last_month' | 'last_3_months' | 'custom';
+const dateFilterType = ref<DateFilterType>('current_month');
+const customStartDate = ref<string>('');
+const customEndDate = ref<string>('');
+const showCustomDatePicker = ref(false);
 
 // Transaction modal state
 const showAddModal = ref(false);
@@ -119,9 +126,102 @@ const editTransaction = ref<EditTransactionForm>({
   isReconciled: false,
 });
 
-// Uses filtered data based on global member filter
-const transactions = computed(() => transactionsStore.filteredSortedTransactions);
+// Date range based on filter type
+const dateRange = computed(() => {
+  const now = new Date();
+  let start: Date;
+  let end: Date;
+
+  switch (dateFilterType.value) {
+    case 'current_month':
+      start = getStartOfMonth(now);
+      end = getEndOfMonth(now);
+      break;
+    case 'last_month': {
+      const range = getLastMonthRange();
+      start = range.start;
+      end = range.end;
+      break;
+    }
+    case 'last_3_months': {
+      const range = getLastNMonthsRange(3);
+      start = range.start;
+      end = range.end;
+      break;
+    }
+    case 'custom':
+      if (customStartDate.value && customEndDate.value) {
+        start = new Date(customStartDate.value);
+        end = new Date(customEndDate.value);
+        end.setHours(23, 59, 59, 999); // End of day
+      } else {
+        // Fallback to current month if custom dates not set
+        start = getStartOfMonth(now);
+        end = getEndOfMonth(now);
+      }
+      break;
+  }
+
+  return {
+    start: toISODateString(start),
+    end: toISODateString(end),
+  };
+});
+
+// Display label for active filter
+const dateFilterLabel = computed(() => {
+  switch (dateFilterType.value) {
+    case 'current_month':
+      return 'Current Month';
+    case 'last_month':
+      return 'Last Month';
+    case 'last_3_months':
+      return 'Last 3 Months';
+    case 'custom':
+      if (customStartDate.value && customEndDate.value) {
+        return `${customStartDate.value} to ${customEndDate.value}`;
+      }
+      return 'Custom Range';
+  }
+});
+
+// Uses filtered data based on global member filter AND date filter
+const transactions = computed(() => {
+  const filtered = transactionsStore.filteredSortedTransactions.filter((t) =>
+    isDateBetween(t.date, dateRange.value.start, dateRange.value.end)
+  );
+  return filtered;
+});
+
 const recurringItems = computed(() => recurringStore.filteredRecurringItems);
+
+// Helper to convert amount to base currency (same as store)
+function convertToBaseCurrency(amount: number, fromCurrency: string): number {
+  const baseCurrency = settingsStore.baseCurrency;
+  if (fromCurrency === baseCurrency) return amount;
+
+  const rates = settingsStore.exchangeRates;
+  const directRate = rates.find((r) => r.from === fromCurrency && r.to === baseCurrency);
+  if (directRate) return amount * directRate.rate;
+
+  const inverseRate = rates.find((r) => r.from === baseCurrency && r.to === fromCurrency);
+  if (inverseRate) return amount / inverseRate.rate;
+
+  return amount; // Fallback if no rate found
+}
+
+// Filtered transaction totals for date range (converted to base currency)
+const dateFilteredIncome = computed(() =>
+  transactions.value
+    .filter((t) => t.type === 'income' && !t.recurringItemId)
+    .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+);
+
+const dateFilteredExpenses = computed(() =>
+  transactions.value
+    .filter((t) => t.type === 'expense' && !t.recurringItemId)
+    .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+);
 
 // Format totals (which are in base currency) to display currency
 function formatTotal(amount: number): string {
@@ -271,6 +371,28 @@ function formatNextDate(item: RecurringItem): string {
   if (!nextDate) return 'N/A';
   return formatDate(nextDate.toISOString());
 }
+
+// Date filter functions
+function setDateFilter(type: DateFilterType) {
+  dateFilterType.value = type;
+  if (type === 'custom') {
+    showCustomDatePicker.value = true;
+    // Initialize custom dates to current month if not set
+    if (!customStartDate.value || !customEndDate.value) {
+      const now = new Date();
+      customStartDate.value = toDateInputValue(getStartOfMonth(now));
+      customEndDate.value = toDateInputValue(getEndOfMonth(now));
+    }
+  } else {
+    showCustomDatePicker.value = false;
+  }
+}
+
+function applyCustomDateRange() {
+  if (customStartDate.value && customEndDate.value) {
+    dateFilterType.value = 'custom';
+  }
+}
 </script>
 
 <template>
@@ -328,14 +450,105 @@ function formatNextDate(item: RecurringItem): string {
 
     <!-- Transactions Tab -->
     <template v-if="activeTab === 'transactions'">
+      <!-- Date Filter -->
+      <div class="flex justify-between items-center">
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+          Showing: <span class="font-medium text-gray-900 dark:text-gray-100">{{ dateFilterLabel }}</span>
+        </div>
+        <div class="relative">
+          <div class="flex gap-2 items-center">
+            <!-- Preset Filters -->
+            <button
+              class="px-3 py-1.5 text-sm rounded-lg transition-all"
+              :class="dateFilterType === 'current_month'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'"
+              @click="setDateFilter('current_month')"
+            >
+              Current Month
+            </button>
+            <button
+              class="px-3 py-1.5 text-sm rounded-lg transition-all"
+              :class="dateFilterType === 'last_month'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'"
+              @click="setDateFilter('last_month')"
+            >
+              Last Month
+            </button>
+            <button
+              class="px-3 py-1.5 text-sm rounded-lg transition-all"
+              :class="dateFilterType === 'last_3_months'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'"
+              @click="setDateFilter('last_3_months')"
+            >
+              Last 3 Months
+            </button>
+            <button
+              class="px-3 py-1.5 text-sm rounded-lg transition-all"
+              :class="dateFilterType === 'custom'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'"
+              @click="setDateFilter('custom')"
+            >
+              Custom Range
+            </button>
+          </div>
+
+          <!-- Custom Date Range Picker -->
+          <div
+            v-if="showCustomDatePicker"
+            class="absolute right-0 mt-2 p-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 z-10"
+          >
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Start Date
+                </label>
+                <input
+                  v-model="customStartDate"
+                  type="date"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  End Date
+                </label>
+                <input
+                  v-model="customEndDate"
+                  type="date"
+                  class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div class="flex gap-2">
+                <button
+                  class="flex-1 px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600"
+                  @click="showCustomDatePicker = false"
+                >
+                  Cancel
+                </button>
+                <button
+                  class="flex-1 px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                  @click="applyCustomDateRange(); showCustomDatePicker = false"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Summary Cards with Gradients -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- This Month Income -->
+        <!-- Period Income -->
         <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-green-100 text-sm font-medium">{{ t('transactions.thisMonthIncome') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome) }}</p>
+              <p class="text-green-100 text-sm font-medium">Income ({{ dateFilterLabel }})</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(dateFilteredIncome + (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringIncome : 0)) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -345,12 +558,12 @@ function formatNextDate(item: RecurringItem): string {
           </div>
         </div>
 
-        <!-- This Month Expenses -->
+        <!-- Period Expenses -->
         <div class="bg-gradient-to-br from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-red-100 text-sm font-medium">{{ t('transactions.thisMonthExpenses') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.filteredThisMonthOneTimeExpenses + recurringStore.filteredTotalMonthlyRecurringExpenses) }}</p>
+              <p class="text-red-100 text-sm font-medium">Expenses ({{ dateFilterLabel }})</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(dateFilteredExpenses + (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringExpenses : 0)) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -363,14 +576,14 @@ function formatNextDate(item: RecurringItem): string {
         <!-- Net Cash Flow -->
         <div
           class="rounded-xl p-5 text-white shadow-lg"
-          :class="(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome - transactionsStore.filteredThisMonthOneTimeExpenses - recurringStore.filteredTotalMonthlyRecurringExpenses) >= 0
+          :class="(dateFilteredIncome + (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringIncome : 0) - dateFilteredExpenses - (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringExpenses : 0)) >= 0
             ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
             : 'bg-gradient-to-br from-orange-500 to-amber-600'"
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium" :class="(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome - transactionsStore.filteredThisMonthOneTimeExpenses - recurringStore.filteredTotalMonthlyRecurringExpenses) >= 0 ? 'text-blue-100' : 'text-orange-100'">{{ t('transactions.netCashFlow') }}</p>
-              <p class="text-2xl font-bold mt-1">{{ formatTotal(transactionsStore.filteredThisMonthOneTimeIncome + recurringStore.filteredTotalMonthlyRecurringIncome - transactionsStore.filteredThisMonthOneTimeExpenses - recurringStore.filteredTotalMonthlyRecurringExpenses) }}</p>
+              <p class="text-sm font-medium" :class="(dateFilteredIncome + (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringIncome : 0) - dateFilteredExpenses - (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringExpenses : 0)) >= 0 ? 'text-blue-100' : 'text-orange-100'">Net ({{ dateFilterLabel }})</p>
+              <p class="text-2xl font-bold mt-1">{{ formatTotal(dateFilteredIncome + (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringIncome : 0) - dateFilteredExpenses - (dateFilterType === 'current_month' ? recurringStore.filteredTotalMonthlyRecurringExpenses : 0)) }}</p>
             </div>
             <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -384,8 +597,21 @@ function formatNextDate(item: RecurringItem): string {
       <!-- Transactions List -->
       <BaseCard :title="t('transactions.allTransactions')">
         <div v-if="transactions.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
-          <p>{{ t('transactions.noTransactions') }}</p>
-          <p class="mt-2">{{ t('transactions.getStarted') }}</p>
+          <svg
+            class="w-12 h-12 mx-auto mb-4 text-gray-300 dark:text-gray-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+          <p>No transactions found for {{ dateFilterLabel }}</p>
+          <p class="mt-2 text-sm">Try selecting a different date range or add a new transaction.</p>
         </div>
         <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
           <div
