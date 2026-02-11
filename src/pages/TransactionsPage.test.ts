@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import TransactionsPage from './TransactionsPage.vue';
-import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useRecurringStore } from '@/stores/recurringStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import type { Transaction, Account, FamilyMember, RecurringItem } from '@/types/models';
-import { toISODateString, getStartOfMonth, getEndOfMonth, addMonths } from '@/utils/date';
+import { toISODateString, addMonths } from '@/utils/date';
 
 // Mock repositories
 vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
@@ -71,8 +71,8 @@ vi.mock('@/composables/useTranslation', () => ({
 // Mock currency display composable
 vi.mock('@/composables/useCurrencyDisplay', () => ({
   useCurrencyDisplay: () => ({
-    formatInDisplayCurrency: (amount: number, currency: string) => `$${amount.toFixed(2)}`,
-    convertToDisplay: (amount: number, currency: string) => ({
+    formatInDisplayCurrency: (amount: number, _currency: string) => `$${amount.toFixed(2)}`,
+    convertToDisplay: (amount: number, _currency: string) => ({
       displayAmount: amount,
       displayCurrency: 'USD',
     }),
@@ -249,11 +249,13 @@ describe('TransactionsPage - Date Filter', () => {
       expect(wrapper.vm.dateFilterType).toBe('current_month');
 
       // Total income: 200 (one-time) + 5000 (recurring) = 5200
-      const totalIncome = wrapper.vm.dateFilteredIncome + recurringStore.filteredTotalMonthlyRecurringIncome;
+      const totalIncome =
+        wrapper.vm.dateFilteredIncome + recurringStore.filteredTotalMonthlyRecurringIncome;
       expect(totalIncome).toBe(5200);
 
       // Total expenses: 50 (one-time) + 2000 (recurring) = 2050
-      const totalExpenses = wrapper.vm.dateFilteredExpenses + recurringStore.filteredTotalMonthlyRecurringExpenses;
+      const totalExpenses =
+        wrapper.vm.dateFilteredExpenses + recurringStore.filteredTotalMonthlyRecurringExpenses;
       expect(totalExpenses).toBe(2050);
     });
 
@@ -263,7 +265,12 @@ describe('TransactionsPage - Date Filter', () => {
 
       transactionsStore.transactions.push(
         createTransaction(thisMonth, { id: 'txn-1', amount: 100, type: 'income' }), // One-time
-        createTransaction(thisMonth, { id: 'txn-2', amount: 5000, type: 'income', recurringItemId: 'r1' }) // Generated from recurring
+        createTransaction(thisMonth, {
+          id: 'txn-2',
+          amount: 5000,
+          type: 'income',
+          recurringItemId: 'r1',
+        }) // Generated from recurring
       );
 
       wrapper = mount(TransactionsPage);
@@ -359,7 +366,11 @@ describe('TransactionsPage - Date Filter', () => {
 
       const filteredTransactions = wrapper.vm.transactions;
       expect(filteredTransactions).toHaveLength(3);
-      expect(filteredTransactions.map((t: Transaction) => t.id)).toEqual(['txn-1', 'txn-2', 'txn-3']);
+      expect(filteredTransactions.map((t: Transaction) => t.id)).toEqual([
+        'txn-1',
+        'txn-2',
+        'txn-3',
+      ]);
     });
 
     it('should calculate correct totals for last 3 months', async () => {

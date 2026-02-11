@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
-import * as goalRepo from '@/services/indexeddb/repositories/goalRepository';
 import { useMemberFilterStore } from './memberFilterStore';
+import * as goalRepo from '@/services/indexeddb/repositories/goalRepository';
+import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
 
 export const useGoalsStore = defineStore('goals', () => {
   // State
@@ -49,20 +49,16 @@ export const useGoalsStore = defineStore('goals', () => {
     if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
       return goals.value;
     }
-    return goals.value.filter(g => {
+    return goals.value.filter((g) => {
       // Family-wide goals always show
       if (!g.memberId) return true;
       return memberFilter.isMemberSelected(g.memberId);
     });
   });
 
-  const filteredActiveGoals = computed(() =>
-    filteredGoals.value.filter(g => !g.isCompleted)
-  );
+  const filteredActiveGoals = computed(() => filteredGoals.value.filter((g) => !g.isCompleted));
 
-  const filteredCompletedGoals = computed(() =>
-    filteredGoals.value.filter(g => g.isCompleted)
-  );
+  const filteredCompletedGoals = computed(() => filteredGoals.value.filter((g) => g.isCompleted));
 
   // Actions
   async function loadGoals() {

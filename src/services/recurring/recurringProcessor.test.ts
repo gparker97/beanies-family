@@ -130,7 +130,10 @@ describe('recurringProcessor - Account Balance Sync', () => {
       updatedAt: '2024-01-15T00:00:00.000Z',
     });
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount, balance: 4000 });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+      ...mockAccount,
+      balance: 4000,
+    });
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
 
     // Act

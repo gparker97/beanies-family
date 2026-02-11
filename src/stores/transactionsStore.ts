@@ -1,5 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type {
   Transaction,
   CreateTransactionInput,
@@ -8,11 +12,7 @@ import type {
   CurrencyCode,
   ExchangeRate,
 } from '@/types/models';
-import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
 import { getStartOfMonth, getEndOfMonth, toISODateString, isDateBetween } from '@/utils/date';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useMemberFilterStore } from '@/stores/memberFilterStore';
 
 export const useTransactionsStore = defineStore('transactions', () => {
   // State
@@ -21,7 +21,11 @@ export const useTransactionsStore = defineStore('transactions', () => {
   const error = ref<string | null>(null);
 
   // Helper to get exchange rate
-  function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
+  function getRate(
+    rates: ExchangeRate[],
+    from: CurrencyCode,
+    to: CurrencyCode
+  ): number | undefined {
     if (from === to) return 1;
 
     // Direct rate
@@ -48,9 +52,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   // Getters
   const sortedTransactions = computed(() =>
-    [...transactions.value].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
+    [...transactions.value].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   );
 
   const recentTransactions = computed(() => sortedTransactions.value.slice(0, 10));
@@ -133,7 +135,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
       return transactions.value;
     }
     const selectedAccountIds = getSelectedAccountIds();
-    return transactions.value.filter(t => selectedAccountIds.has(t.accountId));
+    return transactions.value.filter((t) => selectedAccountIds.has(t.accountId));
   });
 
   const filteredSortedTransactions = computed(() =>
@@ -142,28 +144,26 @@ export const useTransactionsStore = defineStore('transactions', () => {
     )
   );
 
-  const filteredRecentTransactions = computed(() =>
-    filteredSortedTransactions.value.slice(0, 10)
-  );
+  const filteredRecentTransactions = computed(() => filteredSortedTransactions.value.slice(0, 10));
 
   const filteredThisMonthTransactions = computed(() => {
     const now = new Date();
     const start = toISODateString(getStartOfMonth(now));
     const end = toISODateString(getEndOfMonth(now));
-    return filteredTransactions.value.filter(t => isDateBetween(t.date, start, end));
+    return filteredTransactions.value.filter((t) => isDateBetween(t.date, start, end));
   });
 
   // Filtered one-time income for this month
   const filteredThisMonthOneTimeIncome = computed(() =>
     filteredThisMonthTransactions.value
-      .filter(t => t.type === 'income' && !t.recurringItemId)
+      .filter((t) => t.type === 'income' && !t.recurringItemId)
       .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
   );
 
   // Filtered one-time expenses for this month
   const filteredThisMonthOneTimeExpenses = computed(() =>
     filteredThisMonthTransactions.value
-      .filter(t => t.type === 'expense' && !t.recurringItemId)
+      .filter((t) => t.type === 'expense' && !t.recurringItemId)
       .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
   );
 
@@ -192,10 +192,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
   /**
    * Update account balance in both store and database.
    */
-  async function adjustAccountBalance(
-    accountId: string,
-    adjustment: number
-  ): Promise<void> {
+  async function adjustAccountBalance(accountId: string, adjustment: number): Promise<void> {
     const accountsStore = useAccountsStore();
     const account = accountsStore.getAccountById(accountId);
     if (account) {
@@ -263,12 +260,20 @@ export const useTransactionsStore = defineStore('transactions', () => {
         // If amount, type, or account changed, adjust balances
         if (original) {
           // Reverse the original transaction's effect
-          const originalAdjustment = calculateBalanceAdjustment(original.type, original.amount, true);
+          const originalAdjustment = calculateBalanceAdjustment(
+            original.type,
+            original.amount,
+            true
+          );
           await adjustAccountBalance(original.accountId, -originalAdjustment);
 
           // If it was a transfer, also reverse destination
           if (original.type === 'transfer' && original.toAccountId) {
-            const originalDestAdjustment = calculateBalanceAdjustment(original.type, original.amount, false);
+            const originalDestAdjustment = calculateBalanceAdjustment(
+              original.type,
+              original.amount,
+              false
+            );
             await adjustAccountBalance(original.toAccountId, -originalDestAdjustment);
           }
 
@@ -315,7 +320,11 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
           // For transfers, also reverse destination
           if (transaction.type === 'transfer' && transaction.toAccountId) {
-            const destAdjustment = calculateBalanceAdjustment(transaction.type, transaction.amount, false);
+            const destAdjustment = calculateBalanceAdjustment(
+              transaction.type,
+              transaction.amount,
+              false
+            );
             await adjustAccountBalance(transaction.toAccountId, -destAdjustment);
           }
         }

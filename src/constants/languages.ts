@@ -14,8 +14,8 @@ export const LANGUAGES: LanguageInfo[] = [
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
 
-export const SUPPORTED_LANGUAGE_CODES: LanguageCode[] = LANGUAGES.map(l => l.code);
+export const SUPPORTED_LANGUAGE_CODES: LanguageCode[] = LANGUAGES.map((l) => l.code);
 
 export function getLanguageInfo(code: LanguageCode): LanguageInfo | undefined {
-  return LANGUAGES.find(l => l.code === code);
+  return LANGUAGES.find((l) => l.code === code);
 }

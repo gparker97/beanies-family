@@ -5,11 +5,7 @@ import {
   clearFileHandle,
   verifyPermission,
 } from './fileHandleStore';
-import {
-  createSyncFileData,
-  validateSyncFileData,
-  importSyncFileData,
-} from './fileSync';
+import { createSyncFileData, validateSyncFileData, importSyncFileData } from './fileSync';
 import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
 import type { SyncFileData } from '@/types/models';
 

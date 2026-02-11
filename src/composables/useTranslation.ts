@@ -1,6 +1,6 @@
 import { computed } from 'vue';
-import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { useTranslationStore } from '@/stores/translationStore';
 
 /**
  * Composable for accessing translations in Vue components.

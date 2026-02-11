@@ -1,5 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { useAccountsStore } from './accountsStore';
+import { useMemberFilterStore } from './memberFilterStore';
+import { useSettingsStore } from './settingsStore';
+import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import type {
   RecurringItem,
   CreateRecurringItemInput,
@@ -7,10 +11,6 @@ import type {
   CurrencyCode,
   ExchangeRate,
 } from '@/types/models';
-import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
-import { useSettingsStore } from './settingsStore';
-import { useMemberFilterStore } from './memberFilterStore';
-import { useAccountsStore } from './accountsStore';
 
 export const useRecurringStore = defineStore('recurring', () => {
   // State
@@ -19,7 +19,11 @@ export const useRecurringStore = defineStore('recurring', () => {
   const error = ref<string | null>(null);
 
   // Helper to get exchange rate
-  function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
+  function getRate(
+    rates: ExchangeRate[],
+    from: CurrencyCode,
+    to: CurrencyCode
+  ): number | undefined {
     if (from === to) return 1;
 
     // Direct rate
@@ -45,13 +49,9 @@ export const useRecurringStore = defineStore('recurring', () => {
   }
 
   // Getters
-  const activeItems = computed(() =>
-    recurringItems.value.filter((item) => item.isActive)
-  );
+  const activeItems = computed(() => recurringItems.value.filter((item) => item.isActive));
 
-  const incomeItems = computed(() =>
-    recurringItems.value.filter((item) => item.type === 'income')
-  );
+  const incomeItems = computed(() => recurringItems.value.filter((item) => item.type === 'income'));
 
   const expenseItems = computed(() =>
     recurringItems.value.filter((item) => item.type === 'expense')
@@ -81,30 +81,24 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   // Total monthly recurring income - converts each item to base currency first
   const totalMonthlyRecurringIncome = computed(() =>
-    activeIncomeItems.value.reduce(
-      (sum, item) => {
-        const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
-        const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
-        return sum + convertedAmount;
-      },
-      0
-    )
+    activeIncomeItems.value.reduce((sum, item) => {
+      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
+      return sum + convertedAmount;
+    }, 0)
   );
 
   // Total monthly recurring expenses - converts each item to base currency first
   const totalMonthlyRecurringExpenses = computed(() =>
-    activeExpenseItems.value.reduce(
-      (sum, item) => {
-        const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
-        const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
-        return sum + convertedAmount;
-      },
-      0
-    )
+    activeExpenseItems.value.reduce((sum, item) => {
+      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
+      return sum + convertedAmount;
+    }, 0)
   );
 
-  const netMonthlyRecurring = computed(() =>
-    totalMonthlyRecurringIncome.value - totalMonthlyRecurringExpenses.value
+  const netMonthlyRecurring = computed(
+    () => totalMonthlyRecurringIncome.value - totalMonthlyRecurringExpenses.value
   );
 
   // ========== FILTERED GETTERS (by global member filter) ==========
@@ -123,53 +117,45 @@ export const useRecurringStore = defineStore('recurring', () => {
       return recurringItems.value;
     }
     const selectedAccountIds = getSelectedAccountIds();
-    return recurringItems.value.filter(item => selectedAccountIds.has(item.accountId));
+    return recurringItems.value.filter((item) => selectedAccountIds.has(item.accountId));
   });
 
   const filteredActiveItems = computed(() =>
-    filteredRecurringItems.value.filter(item => item.isActive)
+    filteredRecurringItems.value.filter((item) => item.isActive)
   );
 
   const filteredActiveIncomeItems = computed(() =>
-    filteredActiveItems.value.filter(item => item.type === 'income')
+    filteredActiveItems.value.filter((item) => item.type === 'income')
   );
 
   const filteredActiveExpenseItems = computed(() =>
-    filteredActiveItems.value.filter(item => item.type === 'expense')
+    filteredActiveItems.value.filter((item) => item.type === 'expense')
   );
 
   // Filtered total monthly recurring income
   const filteredTotalMonthlyRecurringIncome = computed(() =>
-    filteredActiveIncomeItems.value.reduce(
-      (sum, item) => {
-        const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
-        const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
-        return sum + convertedAmount;
-      },
-      0
-    )
+    filteredActiveIncomeItems.value.reduce((sum, item) => {
+      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
+      return sum + convertedAmount;
+    }, 0)
   );
 
   // Filtered total monthly recurring expenses
   const filteredTotalMonthlyRecurringExpenses = computed(() =>
-    filteredActiveExpenseItems.value.reduce(
-      (sum, item) => {
-        const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
-        const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
-        return sum + convertedAmount;
-      },
-      0
-    )
+    filteredActiveExpenseItems.value.reduce((sum, item) => {
+      const monthlyAmount = normalizeToMonthly(item.amount, item.frequency);
+      const convertedAmount = convertToBaseCurrency(monthlyAmount, item.currency);
+      return sum + convertedAmount;
+    }, 0)
   );
 
-  const filteredNetMonthlyRecurring = computed(() =>
-    filteredTotalMonthlyRecurringIncome.value - filteredTotalMonthlyRecurringExpenses.value
+  const filteredNetMonthlyRecurring = computed(
+    () => filteredTotalMonthlyRecurringIncome.value - filteredTotalMonthlyRecurringExpenses.value
   );
 
   const sortedByDescription = computed(() =>
-    [...recurringItems.value].sort((a, b) =>
-      a.description.localeCompare(b.description)
-    )
+    [...recurringItems.value].sort((a, b) => a.description.localeCompare(b.description))
   );
 
   // Actions

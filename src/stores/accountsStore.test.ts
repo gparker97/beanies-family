@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAccountsStore } from './accountsStore';
 import type { Account } from '@/types/models';
 
@@ -52,7 +52,9 @@ describe('accountsStore', () => {
       expect(result).not.toBeNull();
       expect(result!.name).toBe('Updated Account Name');
       expect(store.accounts[0]!.name).toBe('Updated Account Name');
-      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { name: 'Updated Account Name' });
+      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', {
+        name: 'Updated Account Name',
+      });
     });
 
     it('should update account balance', async () => {
@@ -61,16 +63,16 @@ describe('accountsStore', () => {
       // Setup
       store.accounts.push({ ...mockAccount });
 
-      const updatedAccount = { ...mockAccount, balance: 2500.50 };
+      const updatedAccount = { ...mockAccount, balance: 2500.5 };
       vi.mocked(accountRepo.updateAccount).mockResolvedValue(updatedAccount);
 
       // Act
-      const result = await store.updateAccount('test-account-1', { balance: 2500.50 });
+      const result = await store.updateAccount('test-account-1', { balance: 2500.5 });
 
       // Assert
       expect(result).not.toBeNull();
-      expect(result!.balance).toBe(2500.50);
-      expect(store.accounts[0]!.balance).toBe(2500.50);
+      expect(result!.balance).toBe(2500.5);
+      expect(store.accounts[0]!.balance).toBe(2500.5);
     });
 
     it('should update account memberId (associate with different family member)', async () => {
@@ -183,7 +185,7 @@ describe('accountsStore', () => {
       const result = store.getAccountsByMemberId('member-1');
 
       expect(result.length).toBe(2);
-      expect(result.every(a => a.memberId === 'member-1')).toBe(true);
+      expect(result.every((a) => a.memberId === 'member-1')).toBe(true);
     });
   });
 });

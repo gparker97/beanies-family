@@ -33,15 +33,15 @@ export const CURRENCIES: CurrencyInfo[] = [
 
 export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
 
-export const SUPPORTED_CURRENCY_CODES: CurrencyCode[] = CURRENCIES.map(c => c.code);
+export const SUPPORTED_CURRENCY_CODES: CurrencyCode[] = CURRENCIES.map((c) => c.code);
 
 // Display currencies for the header dropdown (limited set)
-export const DISPLAY_CURRENCIES: CurrencyInfo[] = CURRENCIES.filter(c =>
-  c.code === 'USD' || c.code === 'SGD'
+export const DISPLAY_CURRENCIES: CurrencyInfo[] = CURRENCIES.filter(
+  (c) => c.code === 'USD' || c.code === 'SGD'
 );
 
 export function getCurrencyInfo(code: CurrencyCode): CurrencyInfo | undefined {
-  return CURRENCIES.find(c => c.code === code);
+  return CURRENCIES.find((c) => c.code === code);
 }
 
 export function formatCurrency(

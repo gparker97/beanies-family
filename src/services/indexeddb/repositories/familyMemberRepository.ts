@@ -1,7 +1,11 @@
 import { getDatabase } from '../database';
-import type { FamilyMember, CreateFamilyMemberInput, UpdateFamilyMemberInput } from '@/types/models';
-import { generateUUID } from '@/utils/id';
+import type {
+  FamilyMember,
+  CreateFamilyMemberInput,
+  UpdateFamilyMemberInput,
+} from '@/types/models';
 import { toISODateString } from '@/utils/date';
+import { generateUUID } from '@/utils/id';
 
 export async function getAllFamilyMembers(): Promise<FamilyMember[]> {
   const db = await getDatabase();

@@ -32,7 +32,7 @@ export async function loadTranslationFile(language: LanguageCode): Promise<Trans
     if (!response.ok) {
       return null;
     }
-    const data = await response.json() as TranslationFile;
+    const data = (await response.json()) as TranslationFile;
     return data;
   } catch (error) {
     console.warn(`Failed to load translation file for ${language}:`, error);
@@ -89,7 +89,7 @@ export function getOutdatedKeys(
     return allKeys; // All keys are missing
   }
 
-  return allKeys.filter(key => {
+  return allKeys.filter((key) => {
     const currentHash = hashMap[key];
     if (!currentHash) {
       return false;
@@ -101,10 +101,7 @@ export function getOutdatedKeys(
 /**
  * Create a new translation entry.
  */
-export function createTranslationEntry(
-  translation: string,
-  hash: string
-): TranslationEntry {
+export function createTranslationEntry(translation: string, hash: string): TranslationEntry {
   return {
     translation,
     hash,

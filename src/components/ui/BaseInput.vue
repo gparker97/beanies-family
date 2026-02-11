@@ -35,7 +35,9 @@ const inputClasses = computed(() => {
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
     : 'border-gray-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-200 dark:focus:ring-blue-900';
 
-  const disabled = props.disabled ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-900' : '';
+  const disabled = props.disabled
+    ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-900'
+    : '';
 
   return [base, states, disabled];
 });

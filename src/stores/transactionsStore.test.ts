@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useTransactionsStore } from './transactionsStore';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAccountsStore } from './accountsStore';
+import { useTransactionsStore } from './transactionsStore';
 import type { Transaction, Account } from '@/types/models';
 
 // Mock the transaction repository
@@ -288,7 +288,9 @@ describe('transactionsStore - Account Balance Sync', () => {
         .mockResolvedValueOnce({ ...mockAccount, balance: 850 }); // Apply new
 
       // Act
-      const result = await transactionsStore.updateTransaction('test-transaction-1', { amount: 150 });
+      const result = await transactionsStore.updateTransaction('test-transaction-1', {
+        amount: 150,
+      });
 
       // Assert
       expect(result).not.toBeNull();
@@ -312,7 +314,9 @@ describe('transactionsStore - Account Balance Sync', () => {
         .mockResolvedValueOnce({ ...mockAccount, balance: 1100 }); // Apply new income
 
       // Act
-      const result = await transactionsStore.updateTransaction('test-transaction-1', { type: 'income' });
+      const result = await transactionsStore.updateTransaction('test-transaction-1', {
+        type: 'income',
+      });
 
       // Assert
       expect(result).not.toBeNull();
@@ -353,8 +357,18 @@ describe('transactionsStore - Summary Card Calculations', () => {
 
       // Add one-time income transactions
       store.transactions.push(
-        createThisMonthTransaction({ id: 'txn-1', type: 'income', amount: 500, description: 'Freelance' }),
-        createThisMonthTransaction({ id: 'txn-2', type: 'income', amount: 300, description: 'Side gig' })
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'income',
+          amount: 500,
+          description: 'Freelance',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'income',
+          amount: 300,
+          description: 'Side gig',
+        })
       );
 
       // Add recurring-generated income (should be included)
@@ -405,8 +419,18 @@ describe('transactionsStore - Summary Card Calculations', () => {
 
       // Add one-time expenses
       store.transactions.push(
-        createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 50, description: 'Coffee' }),
-        createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 100, description: 'Groceries' })
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'expense',
+          amount: 50,
+          description: 'Coffee',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'expense',
+          amount: 100,
+          description: 'Groceries',
+        })
       );
 
       // Add recurring-generated expense (should be included)
@@ -447,7 +471,12 @@ describe('transactionsStore - Summary Card Calculations', () => {
       store.transactions.push(
         createThisMonthTransaction({ id: 'txn-1', type: 'income', amount: 500 }),
         createThisMonthTransaction({ id: 'txn-2', type: 'income', amount: 300 }),
-        createThisMonthTransaction({ id: 'txn-3', type: 'income', amount: 5000, recurringItemId: 'r1' })
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'income',
+          amount: 5000,
+          recurringItemId: 'r1',
+        })
       );
 
       // Should only include one-time: 500 + 300 = 800
@@ -458,7 +487,12 @@ describe('transactionsStore - Summary Card Calculations', () => {
       const store = useTransactionsStore();
 
       store.transactions.push(
-        createThisMonthTransaction({ id: 'txn-1', type: 'income', amount: 5000, recurringItemId: 'r1' })
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'income',
+          amount: 5000,
+          recurringItemId: 'r1',
+        })
       );
 
       expect(store.thisMonthOneTimeIncome).toBe(0);
@@ -472,7 +506,12 @@ describe('transactionsStore - Summary Card Calculations', () => {
       store.transactions.push(
         createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 50 }),
         createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 100 }),
-        createThisMonthTransaction({ id: 'txn-3', type: 'expense', amount: 2000, recurringItemId: 'r1' })
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'expense',
+          amount: 2000,
+          recurringItemId: 'r1',
+        })
       );
 
       // Should only include one-time: 50 + 100 = 150
@@ -483,7 +522,12 @@ describe('transactionsStore - Summary Card Calculations', () => {
       const store = useTransactionsStore();
 
       store.transactions.push(
-        createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 2000, recurringItemId: 'r1' })
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'expense',
+          amount: 2000,
+          recurringItemId: 'r1',
+        })
       );
 
       expect(store.thisMonthOneTimeExpenses).toBe(0);
@@ -496,8 +540,18 @@ describe('transactionsStore - Summary Card Calculations', () => {
 
       store.transactions.push(
         createThisMonthTransaction({ id: 'txn-1', type: 'income', amount: 500 }),
-        createThisMonthTransaction({ id: 'txn-2', type: 'income', amount: 5000, recurringItemId: 'salary' }),
-        createThisMonthTransaction({ id: 'txn-3', type: 'income', amount: 1000, recurringItemId: 'rental' })
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'income',
+          amount: 5000,
+          recurringItemId: 'salary',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'income',
+          amount: 1000,
+          recurringItemId: 'rental',
+        })
       );
 
       // Should only include recurring: 5000 + 1000 = 6000
@@ -521,8 +575,18 @@ describe('transactionsStore - Summary Card Calculations', () => {
 
       store.transactions.push(
         createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 50 }),
-        createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 2000, recurringItemId: 'rent' }),
-        createThisMonthTransaction({ id: 'txn-3', type: 'expense', amount: 100, recurringItemId: 'netflix' })
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'expense',
+          amount: 2000,
+          recurringItemId: 'rent',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'expense',
+          amount: 100,
+          recurringItemId: 'netflix',
+        })
       );
 
       // Should only include recurring: 2000 + 100 = 2100
@@ -550,9 +614,19 @@ describe('transactionsStore - Summary Card Calculations', () => {
         // One-time expense
         createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 300 }),
         // Recurring income
-        createThisMonthTransaction({ id: 'txn-3', type: 'income', amount: 5000, recurringItemId: 'r1' }),
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'income',
+          amount: 5000,
+          recurringItemId: 'r1',
+        }),
         // Recurring expense
-        createThisMonthTransaction({ id: 'txn-4', type: 'expense', amount: 2000, recurringItemId: 'r2' })
+        createThisMonthTransaction({
+          id: 'txn-4',
+          type: 'expense',
+          amount: 2000,
+          recurringItemId: 'r2',
+        })
       );
 
       // Net = (1000 + 5000) - (300 + 2000) = 6000 - 2300 = 3700
@@ -578,10 +652,17 @@ describe('transactionsStore - Summary Card Calculations', () => {
       store.transactions.push(
         createThisMonthTransaction({ id: 'txn-1', type: 'income', amount: 500 }),
         createThisMonthTransaction({ id: 'txn-2', type: 'income', amount: 300 }),
-        createThisMonthTransaction({ id: 'txn-3', type: 'income', amount: 5000, recurringItemId: 'salary' })
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'income',
+          amount: 5000,
+          recurringItemId: 'salary',
+        })
       );
 
-      expect(store.thisMonthOneTimeIncome + store.thisMonthRecurringIncome).toBe(store.thisMonthIncome);
+      expect(store.thisMonthOneTimeIncome + store.thisMonthRecurringIncome).toBe(
+        store.thisMonthIncome
+      );
     });
 
     it('should have one-time + recurring equal to total for expenses', () => {
@@ -590,10 +671,17 @@ describe('transactionsStore - Summary Card Calculations', () => {
       store.transactions.push(
         createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 50 }),
         createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 100 }),
-        createThisMonthTransaction({ id: 'txn-3', type: 'expense', amount: 2000, recurringItemId: 'rent' })
+        createThisMonthTransaction({
+          id: 'txn-3',
+          type: 'expense',
+          amount: 2000,
+          recurringItemId: 'rent',
+        })
       );
 
-      expect(store.thisMonthOneTimeExpenses + store.thisMonthRecurringExpenses).toBe(store.thisMonthExpenses);
+      expect(store.thisMonthOneTimeExpenses + store.thisMonthRecurringExpenses).toBe(
+        store.thisMonthExpenses
+      );
     });
   });
 });
