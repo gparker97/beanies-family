@@ -30,3 +30,7 @@ dist-ssr
 
 # Claude Code
 .claude/
+
+# Playwright
+playwright-report
+test-results

@@ -1,7 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { FamilyMember, CreateFamilyMemberInput, UpdateFamilyMemberInput } from '@/types/models';
 import * as familyRepo from '@/services/indexeddb/repositories/familyMemberRepository';
+import type {
+  FamilyMember,
+  CreateFamilyMemberInput,
+  UpdateFamilyMemberInput,
+} from '@/types/models';
 
 export const useFamilyStore = defineStore('family', () => {
   // State
@@ -11,9 +15,7 @@ export const useFamilyStore = defineStore('family', () => {
   const error = ref<string | null>(null);
 
   // Getters
-  const currentMember = computed(() =>
-    members.value.find((m) => m.id === currentMemberId.value)
-  );
+  const currentMember = computed(() => members.value.find((m) => m.id === currentMemberId.value));
 
   const owner = computed(() => members.value.find((m) => m.role === 'owner'));
 

@@ -67,15 +67,9 @@ onUnmounted(() => {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div
-        v-if="open"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      >
+      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
         <!-- Backdrop -->
-        <div
-          class="absolute inset-0 bg-black/50"
-          @click="close"
-        />
+        <div class="absolute inset-0 bg-black/50" @click="close" />
 
         <!-- Modal content -->
         <Transition
@@ -88,13 +82,13 @@ onUnmounted(() => {
         >
           <div
             v-if="open"
-            class="relative w-full bg-white dark:bg-slate-800 rounded-xl shadow-xl"
+            class="relative w-full rounded-xl bg-white shadow-xl dark:bg-slate-800"
             :class="sizeClasses[size]"
           >
             <!-- Header -->
             <div
               v-if="title || $slots.header"
-              class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700"
+              class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700"
             >
               <slot name="header">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -105,15 +99,10 @@ onUnmounted(() => {
               <button
                 v-if="closable"
                 type="button"
-                class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                class="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
                 @click="close"
               >
-                <svg
-                  class="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
@@ -132,7 +121,7 @@ onUnmounted(() => {
             <!-- Footer -->
             <div
               v-if="$slots.footer"
-              class="px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 rounded-b-xl"
+              class="rounded-b-xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
             >
               <slot name="footer" />
             </div>

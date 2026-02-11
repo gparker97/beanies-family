@@ -1,8 +1,14 @@
 import { getDatabase } from '../database';
-import type { Settings, ExchangeRate, AIProvider, CurrencyCode, LanguageCode } from '@/types/models';
-import { toISODateString } from '@/utils/date';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
 import { DEFAULT_LANGUAGE } from '@/constants/languages';
+import type {
+  Settings,
+  ExchangeRate,
+  AIProvider,
+  CurrencyCode,
+  LanguageCode,
+} from '@/types/models';
+import { toISODateString } from '@/utils/date';
 
 const SETTINGS_ID = 'app_settings';
 
@@ -127,9 +133,7 @@ export async function addExchangeRate(rate: ExchangeRate): Promise<Settings> {
 
 export async function removeExchangeRate(from: CurrencyCode, to: CurrencyCode): Promise<Settings> {
   const settings = await getSettings();
-  const exchangeRates = settings.exchangeRates.filter(
-    (r) => !(r.from === from && r.to === to)
-  );
+  const exchangeRates = settings.exchangeRates.filter((r) => !(r.from === from && r.to === to));
   return saveSettings({ exchangeRates });
 }
 

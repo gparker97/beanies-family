@@ -1,0 +1,9 @@
+dist
+node_modules
+package-lock.json
+public
+*.log
+.vscode
+.claude
+playwright-report
+test-results

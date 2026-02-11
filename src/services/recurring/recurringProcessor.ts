@@ -1,7 +1,7 @@
-import type { RecurringItem, CreateTransactionInput } from '@/types/models';
+import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
+import type { RecurringItem, CreateTransactionInput } from '@/types/models';
 import { toISODateString, addDays, addMonths, addYears, getStartOfDay } from '@/utils/date';
 
 export interface ProcessResult {
@@ -178,10 +178,7 @@ function calculateBalanceAdjustment(
 /**
  * Create a transaction from a recurring item.
  */
-async function createTransactionFromRecurring(
-  item: RecurringItem,
-  date: Date
-): Promise<boolean> {
+async function createTransactionFromRecurring(item: RecurringItem, date: Date): Promise<boolean> {
   const input: CreateTransactionInput = {
     accountId: item.accountId,
     type: item.type,
@@ -252,7 +249,7 @@ export function previewUpcomingDates(item: RecurringItem, count: number = 5): Da
  */
 export function getNextDueDateForItem(item: RecurringItem): Date | null {
   const dates = previewUpcomingDates(item, 1);
-  return dates.length > 0 ? dates[0] ?? null : null;
+  return dates.length > 0 ? (dates[0] ?? null) : null;
 }
 
 /**
@@ -282,8 +279,18 @@ function getOrdinalSuffix(n: number): string {
 
 function getMonthName(month: number): string {
   const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return months[(month - 1) % 12] ?? 'Jan';
 }

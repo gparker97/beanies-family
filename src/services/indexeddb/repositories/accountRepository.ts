@@ -1,7 +1,7 @@
 import { getDatabase } from '../database';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
-import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
+import { generateUUID } from '@/utils/id';
 
 export async function getAllAccounts(): Promise<Account[]> {
   const db = await getDatabase();
@@ -76,14 +76,15 @@ export async function deleteAccount(id: string): Promise<boolean> {
   return true;
 }
 
-export async function updateAccountBalance(id: string, newBalance: number): Promise<Account | undefined> {
+export async function updateAccountBalance(
+  id: string,
+  newBalance: number
+): Promise<Account | undefined> {
   return updateAccount(id, { balance: newBalance });
 }
 
 export async function getTotalBalance(memberId?: string): Promise<number> {
-  const accounts = memberId
-    ? await getAccountsByMemberId(memberId)
-    : await getAllAccounts();
+  const accounts = memberId ? await getAccountsByMemberId(memberId) : await getAllAccounts();
 
   return accounts
     .filter((a) => a.isActive && a.includeInNetWorth)

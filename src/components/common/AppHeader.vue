@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
+import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
+import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
+import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslationStore } from '@/stores/translationStore';
-import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
-import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
-import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
-import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const familyStore = useFamilyStore();
@@ -52,7 +52,9 @@ function closeLanguageDropdown() {
 </script>
 
 <template>
-  <header class="h-16 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-6 flex items-center justify-between">
+  <header
+    class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6 dark:border-slate-700 dark:bg-slate-800"
+  >
     <!-- Left side - Page title or breadcrumb -->
     <div>
       <slot name="left">
@@ -71,30 +73,37 @@ function closeLanguageDropdown() {
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+          class="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
           @click="showCurrencyDropdown = !showCurrencyDropdown"
           @blur="closeCurrencyDropdown"
         >
           <span>{{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}</span>
           <span class="text-gray-500 dark:text-gray-400">{{ settingsStore.displayCurrency }}</span>
-          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
         </button>
 
         <!-- Dropdown menu -->
         <div
           v-if="showCurrencyDropdown"
-          class="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50 max-h-64 overflow-y-auto"
+          class="absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
             v-for="option in currencyOptions"
             :key="option.code"
             type="button"
-            class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-            :class="option.code === settingsStore.displayCurrency
-              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-              : 'text-gray-700 dark:text-gray-300'"
+            class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            :class="
+              option.code === settingsStore.displayCurrency
+                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                : 'text-gray-700 dark:text-gray-300'
+            "
             @mousedown.prevent="selectCurrency(option.code)"
           >
             {{ option.fullLabel }}
@@ -106,34 +115,60 @@ function closeLanguageDropdown() {
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg transition-colors"
+          class="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
           :class="{ 'opacity-75': translationStore.isLoading }"
           @click="showLanguageDropdown = !showLanguageDropdown"
           @blur="closeLanguageDropdown"
         >
           <span>{{ currentLanguageInfo?.flag || '🌐' }}</span>
-          <span class="text-gray-500 dark:text-gray-400">{{ settingsStore.language.toUpperCase() }}</span>
-          <svg v-if="!translationStore.isLoading" class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          <span class="text-gray-500 dark:text-gray-400">{{
+            settingsStore.language.toUpperCase()
+          }}</span>
+          <svg
+            v-if="!translationStore.isLoading"
+            class="h-4 w-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
-          <svg v-else class="w-4 h-4 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <svg
+            v-else
+            class="h-4 w-4 animate-spin text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
           </svg>
         </button>
 
         <!-- Dropdown menu -->
         <div
           v-if="showLanguageDropdown"
-          class="absolute right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-1 z-50"
+          class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
             v-for="lang in LANGUAGES"
             :key="lang.code"
             type="button"
-            class="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-            :class="lang.code === settingsStore.language
-              ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
-              : 'text-gray-700 dark:text-gray-300'"
+            class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            :class="
+              lang.code === settingsStore.language
+                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                : 'text-gray-700 dark:text-gray-300'
+            "
             @mousedown.prevent="selectLanguage(lang.code)"
           >
             {{ lang.flag }} {{ lang.nativeName }}
@@ -147,13 +182,13 @@ function closeLanguageDropdown() {
       <!-- Theme toggle -->
       <button
         type="button"
-        class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+        class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
         @click="toggleTheme"
       >
         <!-- Sun icon -->
         <svg
           v-if="settingsStore.theme === 'dark'"
-          class="w-5 h-5"
+          class="h-5 w-5"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -166,13 +201,7 @@ function closeLanguageDropdown() {
           />
         </svg>
         <!-- Moon icon -->
-        <svg
-          v-else
-          class="w-5 h-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+        <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -184,13 +213,10 @@ function closeLanguageDropdown() {
 
       <!-- Profile dropdown -->
       <div class="flex items-center gap-3">
-        <div
-          v-if="currentMember"
-          class="flex items-center gap-2"
-        >
+        <div v-if="currentMember" class="flex items-center gap-2">
           <!-- Avatar -->
           <div
-            class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
+            class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
             :style="{ backgroundColor: currentMember.color || '#3b82f6' }"
           >
             {{ currentMember.name.charAt(0).toUpperCase() }}

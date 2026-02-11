@@ -70,7 +70,7 @@ function resetForm() {
 
 <template>
   <BaseModal :open="open" :title="title" @close="handleClose">
-    <form @submit.prevent="handleSubmit" class="space-y-4">
+    <form class="space-y-4" @submit.prevent="handleSubmit">
       <p class="text-sm text-gray-600 dark:text-gray-400">
         {{ description }}
       </p>
@@ -85,13 +85,13 @@ function resetForm() {
         />
         <button
           type="button"
-          class="absolute right-3 top-8 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          class="absolute top-8 right-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           @click="showPassword = !showPassword"
         >
           <!-- Eye icon -->
           <svg
             v-if="!showPassword"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -110,13 +110,7 @@ function resetForm() {
             />
           </svg>
           <!-- Eye-off icon -->
-          <svg
-            v-else
-            class="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -135,22 +129,17 @@ function resetForm() {
           placeholder="Confirm password"
           autocomplete="new-password"
         />
-        <p
-          v-if="confirmPassword && !passwordsMatch"
-          class="mt-1 text-sm text-red-500"
-        >
+        <p v-if="confirmPassword && !passwordsMatch" class="mt-1 text-sm text-red-500">
           Passwords do not match
         </p>
       </div>
 
-      <div v-if="error" class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+      <div v-if="error" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
         <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
       </div>
 
       <div class="flex justify-end gap-3 pt-4">
-        <BaseButton variant="ghost" type="button" @click="handleClose">
-          Cancel
-        </BaseButton>
+        <BaseButton variant="ghost" type="button" @click="handleClose"> Cancel </BaseButton>
         <BaseButton type="submit" :disabled="!canSubmit">
           {{ confirmLabel }}
         </BaseButton>

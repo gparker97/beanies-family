@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { BaseInput, BaseSelect, BaseButton } from '@/components/ui';
+import {
+  INCOME_CATEGORIES,
+  EXPENSE_CATEGORIES,
+  getCategoriesGrouped,
+} from '@/constants/categories';
+import { CURRENCIES } from '@/constants/currencies';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, getCategoriesGrouped } from '@/constants/categories';
-import { CURRENCIES } from '@/constants/currencies';
-import { toISODateString } from '@/utils/date';
 import type { RecurringItem, CreateRecurringItemInput, RecurringFrequency } from '@/types/models';
+import { toISODateString } from '@/utils/date';
 
 interface Props {
   item?: RecurringItem;
@@ -148,12 +152,9 @@ function handleSubmit() {
     description: formData.value.description,
     frequency: formData.value.frequency,
     dayOfMonth: formData.value.dayOfMonth,
-    monthOfYear:
-      formData.value.frequency === 'yearly' ? formData.value.monthOfYear : undefined,
+    monthOfYear: formData.value.frequency === 'yearly' ? formData.value.monthOfYear : undefined,
     startDate: new Date(formData.value.startDate || new Date()).toISOString(),
-    endDate: formData.value.endDate
-      ? new Date(formData.value.endDate).toISOString()
-      : undefined,
+    endDate: formData.value.endDate ? new Date(formData.value.endDate).toISOString() : undefined,
     isActive: formData.value.isActive,
     lastProcessedDate: props.item?.lastProcessedDate,
   };
@@ -164,11 +165,7 @@ function handleSubmit() {
 
 <template>
   <form class="space-y-4" @submit.prevent="handleSubmit">
-    <BaseSelect
-      v-model="formData.type"
-      :options="typeOptions"
-      label="Type"
-    />
+    <BaseSelect v-model="formData.type" :options="typeOptions" label="Type" />
 
     <BaseSelect
       v-model="formData.accountId"
@@ -185,11 +182,7 @@ function handleSubmit() {
       required
     />
 
-    <BaseSelect
-      v-model="formData.category"
-      :grouped-options="categoryOptions"
-      label="Category"
-    />
+    <BaseSelect v-model="formData.category" :grouped-options="categoryOptions" label="Category" />
 
     <div class="grid grid-cols-2 gap-4">
       <BaseInput
@@ -200,18 +193,10 @@ function handleSubmit() {
         required
       />
 
-      <BaseSelect
-        v-model="formData.currency"
-        :options="currencyOptions"
-        label="Currency"
-      />
+      <BaseSelect v-model="formData.currency" :options="currencyOptions" label="Currency" />
     </div>
 
-    <BaseSelect
-      v-model="formData.frequency"
-      :options="frequencyOptions"
-      label="Frequency"
-    />
+    <BaseSelect v-model="formData.frequency" :options="frequencyOptions" label="Frequency" />
 
     <!-- Day of Month (for monthly/yearly) -->
     <BaseSelect
@@ -229,11 +214,7 @@ function handleSubmit() {
       label="Month"
     />
 
-    <BaseInput
-      v-model="formData.startDate"
-      type="date"
-      label="Start Date"
-    />
+    <BaseInput v-model="formData.startDate" type="date" label="Start Date" />
 
     <BaseInput
       v-model="formData.endDate"
@@ -243,9 +224,7 @@ function handleSubmit() {
     />
 
     <div class="flex justify-end gap-3 pt-4">
-      <BaseButton variant="secondary" type="button" @click="emit('cancel')">
-        Cancel
-      </BaseButton>
+      <BaseButton variant="secondary" type="button" @click="emit('cancel')"> Cancel </BaseButton>
       <BaseButton type="submit">
         {{ isEditMode ? 'Update' : 'Create' }}
       </BaseButton>

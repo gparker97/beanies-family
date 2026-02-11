@@ -43,7 +43,8 @@ export function validateSyncFileData(data: unknown): data is SyncFileData {
   // settings can be null or object
   if (innerData.settings !== null && typeof innerData.settings !== 'object') return false;
   // recurringItems is optional for backward compatibility with older sync files
-  if (innerData.recurringItems !== undefined && !Array.isArray(innerData.recurringItems)) return false;
+  if (innerData.recurringItems !== undefined && !Array.isArray(innerData.recurringItems))
+    return false;
 
   return true;
 }
@@ -78,7 +79,7 @@ export async function readFileAsJson(file: File): Promise<unknown> {
       try {
         const json = JSON.parse(reader.result as string);
         resolve(json);
-      } catch (e) {
+      } catch {
         reject(new Error('Invalid JSON file'));
       }
     };

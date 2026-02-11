@@ -46,7 +46,9 @@ const selectClasses = computed(() => {
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
     : 'border-gray-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-200 dark:focus:ring-blue-900';
 
-  const disabled = props.disabled ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-900' : '';
+  const disabled = props.disabled
+    ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-900'
+    : '';
 
   return [base, states, disabled];
 });
@@ -100,24 +102,15 @@ function handleChange(event: Event) {
 
         <!-- Flat options -->
         <template v-else>
-          <option
-            v-for="option in options"
-            :key="option.value"
-            :value="option.value"
-          >
+          <option v-for="option in options" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </template>
       </select>
 
       <!-- Dropdown arrow -->
-      <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-        <svg
-          class="w-4 h-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
+      <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"

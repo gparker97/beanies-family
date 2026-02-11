@@ -27,7 +27,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
 
   const selectedMembers = computed(() => {
     const familyStore = useFamilyStore();
-    return familyStore.members.filter(m => selectedMemberIds.value.has(m.id));
+    return familyStore.members.filter((m) => selectedMemberIds.value.has(m.id));
   });
 
   // Actions
@@ -38,7 +38,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function initialize() {
     const familyStore = useFamilyStore();
-    selectedMemberIds.value = new Set(familyStore.members.map(m => m.id));
+    selectedMemberIds.value = new Set(familyStore.members.map((m) => m.id));
     isInitialized.value = true;
   }
 
@@ -48,7 +48,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function syncWithMembers() {
     const familyStore = useFamilyStore();
-    const currentIds = new Set(familyStore.members.map(m => m.id));
+    const currentIds = new Set(familyStore.members.map((m) => m.id));
 
     // Remove selections for deleted members
     for (const id of selectedMemberIds.value) {
@@ -97,7 +97,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function selectAll() {
     const familyStore = useFamilyStore();
-    selectedMemberIds.value = new Set(familyStore.members.map(m => m.id));
+    selectedMemberIds.value = new Set(familyStore.members.map((m) => m.id));
   }
 
   /**
@@ -115,13 +115,9 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function getSelectedMemberAccountIds(accounts: { id: string; memberId: string }[]): Set<string> {
     if (!isInitialized.value || isAllSelected.value) {
-      return new Set(accounts.map(a => a.id));
+      return new Set(accounts.map((a) => a.id));
     }
-    return new Set(
-      accounts
-        .filter(a => isMemberSelected(a.memberId))
-        .map(a => a.id)
-    );
+    return new Set(accounts.filter((a) => isMemberSelected(a.memberId)).map((a) => a.id));
   }
 
   return {

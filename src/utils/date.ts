@@ -117,3 +117,39 @@ export function getRelativeTimeString(isoString: ISODateString, locale: string =
     return formatDate(isoString, locale);
   }
 }
+
+/**
+ * Get the start and end dates for the previous month
+ */
+export function getLastMonthRange(): { start: Date; end: Date } {
+  const now = new Date();
+  const lastMonth = addMonths(now, -1);
+  return {
+    start: getStartOfMonth(lastMonth),
+    end: getEndOfMonth(lastMonth),
+  };
+}
+
+/**
+ * Get the start and end dates for the last N months (including current month)
+ */
+export function getLastNMonthsRange(months: number): { start: Date; end: Date } {
+  const now = new Date();
+  const startDate = addMonths(getStartOfMonth(now), -(months - 1));
+  return {
+    start: startDate,
+    end: getEndOfMonth(now),
+  };
+}
+
+/**
+ * Format a date for HTML date input (YYYY-MM-DD)
+ */
+export function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const monthStr = month < 10 ? `0${month}` : `${month}`;
+  const dayStr = day < 10 ? `0${day}` : `${day}`;
+  return `${year}-${monthStr}-${dayStr}`;
+}

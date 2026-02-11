@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useRecurringStore } from './recurringStore';
 import type { RecurringItem } from '@/types/models';
 
@@ -40,8 +40,20 @@ describe('recurringStore - Monthly Summary Calculations', () => {
       const store = useRecurringStore();
 
       store.recurringItems.push(
-        createMockRecurringItem({ id: 'r1', type: 'income', amount: 5000, frequency: 'monthly', isActive: true }),
-        createMockRecurringItem({ id: 'r2', type: 'income', amount: 1000, frequency: 'monthly', isActive: true })
+        createMockRecurringItem({
+          id: 'r1',
+          type: 'income',
+          amount: 5000,
+          frequency: 'monthly',
+          isActive: true,
+        }),
+        createMockRecurringItem({
+          id: 'r2',
+          type: 'income',
+          amount: 1000,
+          frequency: 'monthly',
+          isActive: true,
+        })
       );
 
       expect(store.totalMonthlyRecurringIncome).toBe(6000);
@@ -52,7 +64,13 @@ describe('recurringStore - Monthly Summary Calculations', () => {
 
       // $12000 yearly = $1000 per month
       store.recurringItems.push(
-        createMockRecurringItem({ id: 'r1', type: 'income', amount: 12000, frequency: 'yearly', isActive: true })
+        createMockRecurringItem({
+          id: 'r1',
+          type: 'income',
+          amount: 12000,
+          frequency: 'yearly',
+          isActive: true,
+        })
       );
 
       expect(store.totalMonthlyRecurringIncome).toBe(1000);
@@ -63,7 +81,13 @@ describe('recurringStore - Monthly Summary Calculations', () => {
 
       // $10 daily * 30 = $300 per month
       store.recurringItems.push(
-        createMockRecurringItem({ id: 'r1', type: 'income', amount: 10, frequency: 'daily', isActive: true })
+        createMockRecurringItem({
+          id: 'r1',
+          type: 'income',
+          amount: 10,
+          frequency: 'daily',
+          isActive: true,
+        })
       );
 
       expect(store.totalMonthlyRecurringIncome).toBe(300);
@@ -97,8 +121,20 @@ describe('recurringStore - Monthly Summary Calculations', () => {
       const store = useRecurringStore();
 
       store.recurringItems.push(
-        createMockRecurringItem({ id: 'r1', type: 'expense', amount: 2000, frequency: 'monthly', isActive: true }),
-        createMockRecurringItem({ id: 'r2', type: 'expense', amount: 500, frequency: 'monthly', isActive: true })
+        createMockRecurringItem({
+          id: 'r1',
+          type: 'expense',
+          amount: 2000,
+          frequency: 'monthly',
+          isActive: true,
+        }),
+        createMockRecurringItem({
+          id: 'r2',
+          type: 'expense',
+          amount: 500,
+          frequency: 'monthly',
+          isActive: true,
+        })
       );
 
       expect(store.totalMonthlyRecurringExpenses).toBe(2500);
@@ -109,7 +145,13 @@ describe('recurringStore - Monthly Summary Calculations', () => {
 
       // $1200 yearly = $100 per month
       store.recurringItems.push(
-        createMockRecurringItem({ id: 'r1', type: 'expense', amount: 1200, frequency: 'yearly', isActive: true })
+        createMockRecurringItem({
+          id: 'r1',
+          type: 'expense',
+          amount: 1200,
+          frequency: 'yearly',
+          isActive: true,
+        })
       );
 
       expect(store.totalMonthlyRecurringExpenses).toBe(100);
@@ -157,11 +199,29 @@ describe('recurringStore - Monthly Summary Calculations', () => {
 
       store.recurringItems.push(
         // Monthly salary: $5000/month
-        createMockRecurringItem({ id: 'r1', type: 'income', amount: 5000, frequency: 'monthly', isActive: true }),
+        createMockRecurringItem({
+          id: 'r1',
+          type: 'income',
+          amount: 5000,
+          frequency: 'monthly',
+          isActive: true,
+        }),
         // Monthly rent: $2000/month
-        createMockRecurringItem({ id: 'r2', type: 'expense', amount: 2000, frequency: 'monthly', isActive: true }),
+        createMockRecurringItem({
+          id: 'r2',
+          type: 'expense',
+          amount: 2000,
+          frequency: 'monthly',
+          isActive: true,
+        }),
         // Yearly insurance: $1200/year = $100/month
-        createMockRecurringItem({ id: 'r3', type: 'expense', amount: 1200, frequency: 'yearly', isActive: true })
+        createMockRecurringItem({
+          id: 'r3',
+          type: 'expense',
+          amount: 1200,
+          frequency: 'yearly',
+          isActive: true,
+        })
       );
 
       // Income: 5000, Expenses: 2000 + 100 = 2100

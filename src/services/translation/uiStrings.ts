@@ -16,7 +16,7 @@ function hashString(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash).toString(36);
@@ -110,7 +110,8 @@ export const UI_STRINGS = {
   'recurring.getStarted': 'Click "Add Recurring" to set up automatic transactions.',
   'recurring.addItem': 'Add Recurring Item',
   'recurring.editItem': 'Edit Recurring Item',
-  'recurring.deleteConfirm': 'Are you sure you want to delete this recurring item? Existing transactions will not be affected.',
+  'recurring.deleteConfirm':
+    'Are you sure you want to delete this recurring item? Existing transactions will not be affected.',
   'recurring.next': 'Next',
 
   // Accounts
@@ -231,7 +232,8 @@ export const UI_STRINGS = {
   'reports.noData': 'No data available for reports yet.',
   'reports.familyMember': 'Family Member',
   'reports.netWorthOverTime': 'Net Worth Over Time',
-  'reports.netWorthDescription': 'Projected net worth based on current assets and recurring transactions',
+  'reports.netWorthDescription':
+    'Projected net worth based on current assets and recurring transactions',
   'reports.currentNetWorth': 'Current Net Worth',
   'reports.projectedNetWorth': 'Projected Net Worth',
   'reports.projectedChange': 'Projected Change',
@@ -261,7 +263,8 @@ export const UI_STRINGS = {
   'settings.sync': 'Sync',
   'settings.fileSync': 'File Sync',
   'settings.syncToFile': 'Sync to a File',
-  'settings.syncToFileDescription': 'Save your data to a JSON file. Place it in Google Drive, Dropbox, or any synced folder for cloud backup.',
+  'settings.syncToFileDescription':
+    'Save your data to a JSON file. Place it in Google Drive, Dropbox, or any synced folder for cloud backup.',
   'settings.createNewSyncFile': 'Create New Sync File',
   'settings.loadFromExistingFile': 'Load from Existing File',
   'settings.syncEnabled': 'Sync Enabled',
@@ -277,13 +280,15 @@ export const UI_STRINGS = {
   'settings.clearAllData': 'Clear All Data',
   'settings.clearAllDataDescription': 'Permanently delete all your data',
   'settings.clearData': 'Clear Data',
-  'settings.clearDataConfirmation': 'Are you sure you want to delete all your data? This action cannot be undone.',
+  'settings.clearDataConfirmation':
+    'Are you sure you want to delete all your data? This action cannot be undone.',
   'settings.yesDeleteEverything': 'Yes, Delete Everything',
   'settings.about': 'About',
   'settings.appName': 'GP Family Planner',
   'settings.version': 'Version 1.0.0 (MVP)',
   'settings.appDescription': 'A local-first, privacy-focused family finance application.',
-  'settings.privacyNote': 'Your data is stored locally in your browser and never leaves your device unless you enable file sync.',
+  'settings.privacyNote':
+    'Your data is stored locally in your browser and never leaves your device unless you enable file sync.',
 
   // Form labels
   'form.name': 'Name',
@@ -324,7 +329,8 @@ export const UI_STRINGS = {
 
   // Confirmation dialogs
   'confirm.delete': 'Are you sure you want to delete this item?',
-  'confirm.deleteAccount': 'Are you sure you want to delete this account? All associated transactions will also be deleted.',
+  'confirm.deleteAccount':
+    'Are you sure you want to delete this account? All associated transactions will also be deleted.',
   'confirm.deleteMember': 'Are you sure you want to delete this family member?',
   'confirm.unsavedChanges': 'You have unsaved changes. Are you sure you want to leave?',
 
@@ -406,7 +412,7 @@ export function getAllHashes(): Record<UIStringKey, string> {
  * Returns array of { key, text, hash } objects.
  */
 export function getAllStringsWithHashes(): Array<{ key: UIStringKey; text: string; hash: string }> {
-  return getAllKeys().map(key => ({
+  return getAllKeys().map((key) => ({
     key,
     text: UI_STRINGS[key],
     hash: getStringHash(key),

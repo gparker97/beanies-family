@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAssetsStore } from './assetsStore';
 import { useSettingsStore } from './settingsStore';
 import type { Asset, AssetLoan } from '@/types/models';
@@ -370,7 +370,9 @@ describe('assetsStore', () => {
       it('should return 0 when no change in value', () => {
         const store = useAssetsStore();
 
-        store.assets.push(createMockAsset({ id: 'asset-1', purchaseValue: 100000, currentValue: 100000 }));
+        store.assets.push(
+          createMockAsset({ id: 'asset-1', purchaseValue: 100000, currentValue: 100000 })
+        );
 
         expect(store.totalAppreciation).toBe(0);
       });
@@ -449,10 +451,7 @@ describe('assetsStore', () => {
       it('should return 0 when no assets have loans', () => {
         const store = useAssetsStore();
 
-        store.assets.push(
-          createMockAsset({ id: 'asset-1' }),
-          createMockAsset({ id: 'asset-2' })
-        );
+        store.assets.push(createMockAsset({ id: 'asset-1' }), createMockAsset({ id: 'asset-2' }));
 
         expect(store.totalLoanValue).toBe(0);
       });
@@ -782,9 +781,7 @@ describe('Edge Cases', () => {
   it('should handle zero-value assets', () => {
     const store = useAssetsStore();
 
-    store.assets.push(
-      createMockAsset({ id: 'asset-1', currentValue: 0, purchaseValue: 0 })
-    );
+    store.assets.push(createMockAsset({ id: 'asset-1', currentValue: 0, purchaseValue: 0 }));
 
     expect(store.totalAssetValue).toBe(0);
     expect(store.totalPurchaseValue).toBe(0);
@@ -832,7 +829,7 @@ describe('Edge Cases', () => {
       createMockAsset({
         id: 'asset-1',
         currentValue: 123456.78,
-        purchaseValue: 100000.50,
+        purchaseValue: 100000.5,
       }),
       createMockAsset({
         id: 'asset-2',

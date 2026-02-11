@@ -28,15 +28,15 @@ const LANGUAGES = {
   zh: {
     code: 'zh',
     name: '中文 (简体)',
-    myMemoryCode: 'zh-CN'
-  }
+    myMemoryCode: 'zh-CN',
+  },
 };
 
 /**
  * Sleep helper
  */
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -46,7 +46,7 @@ function hashString(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash).toString(36);
@@ -78,7 +78,7 @@ function parseUIStrings() {
     const text = regexMatch[2];
     strings[key] = {
       text,
-      hash: hashString(text)
+      hash: hashString(text),
     };
   }
 
@@ -95,7 +95,10 @@ function parseUIStrings() {
  * Load existing translation file
  */
 function loadTranslationFile(language) {
-  const filePath = path.join(__dirname, `../src/services/translation/translations/${language}.json`);
+  const filePath = path.join(
+    __dirname,
+    `../src/services/translation/translations/${language}.json`
+  );
 
   if (!fs.existsSync(filePath)) {
     return {
@@ -103,9 +106,9 @@ function loadTranslationFile(language) {
         language,
         languageName: LANGUAGES[language].name,
         lastUpdated: new Date().toISOString().split('T')[0],
-        translationCount: 0
+        translationCount: 0,
       },
-      translations: {}
+      translations: {},
     };
   }
 
@@ -116,7 +119,10 @@ function loadTranslationFile(language) {
  * Save translation file
  */
 function saveTranslationFile(language, data) {
-  const filePath = path.join(__dirname, `../src/services/translation/translations/${language}.json`);
+  const filePath = path.join(
+    __dirname,
+    `../src/services/translation/translations/${language}.json`
+  );
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
 
@@ -130,7 +136,7 @@ async function translate(text, targetLang) {
     const params = new URLSearchParams({
       q: text,
       langpair: `en|${langCode}`,
-      de: 'gpsp2001@gmail.com'
+      de: 'gpsp2001@gmail.com',
     });
 
     const response = await fetch(`${MYMEMORY_API_URL}?${params.toString()}`);
@@ -189,8 +195,8 @@ async function updateTranslations(language) {
     }
   }
 
-  console.log(`   Missing: ${toTranslate.filter(t => t.reason === 'missing').length}`);
-  console.log(`   Outdated: ${toTranslate.filter(t => t.reason === 'outdated').length}`);
+  console.log(`   Missing: ${toTranslate.filter((t) => t.reason === 'missing').length}`);
+  console.log(`   Outdated: ${toTranslate.filter((t) => t.reason === 'outdated').length}`);
   console.log(`   Total to translate: ${toTranslate.length}\n`);
 
   if (toTranslate.length === 0) {
@@ -208,7 +214,7 @@ async function updateTranslations(language) {
     translationFile.translations[key] = {
       translation,
       hash,
-      lastUpdated: new Date().toISOString().split('T')[0]
+      lastUpdated: new Date().toISOString().split('T')[0],
     };
 
     completed++;
@@ -263,7 +269,7 @@ async function main() {
 
 // Run if called directly
 // Always run when this script is executed
-main().catch(error => {
+main().catch((error) => {
   console.error('\n❌ Fatal error:', error.message);
   process.exit(1);
 });

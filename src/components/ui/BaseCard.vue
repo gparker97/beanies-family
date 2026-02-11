@@ -14,14 +14,14 @@ withDefaults(defineProps<Props>(), {
 
 <template>
   <div
-    class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700"
+    class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     :class="{
-      'hover:shadow-md transition-shadow cursor-pointer': hoverable,
+      'cursor-pointer transition-shadow hover:shadow-md': hoverable,
     }"
   >
     <div
       v-if="title || $slots.header"
-      class="px-6 py-4 border-b border-gray-200 dark:border-slate-700"
+      class="border-b border-gray-200 px-6 py-4 dark:border-slate-700"
     >
       <slot name="header">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -39,7 +39,7 @@ withDefaults(defineProps<Props>(), {
 
     <div
       v-if="$slots.footer"
-      class="px-6 py-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 rounded-b-xl"
+      class="rounded-b-xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
     >
       <slot name="footer" />
     </div>

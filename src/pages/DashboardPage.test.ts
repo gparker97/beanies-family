@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
-import { useTransactionsStore } from '@/stores/transactionsStore';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useRecurringStore } from '@/stores/recurringStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import type { Transaction, RecurringItem } from '@/types/models';
 
 // Mock the repositories
@@ -82,21 +82,37 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
 
       // Add one-time income transactions (no recurringItemId)
       transactionsStore.transactions.push(
-        createThisMonthTransaction({ id: 'txn-1', type: 'income', amount: 500, description: 'Freelance' }),
-        createThisMonthTransaction({ id: 'txn-2', type: 'income', amount: 300, description: 'Side gig' })
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'income',
+          amount: 500,
+          description: 'Freelance',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'income',
+          amount: 300,
+          description: 'Side gig',
+        })
       );
 
       // Add active recurring income items
       recurringStore.recurringItems.push(
         createRecurringItem({ id: 'r1', type: 'income', amount: 5000, description: 'Salary' }),
-        createRecurringItem({ id: 'r2', type: 'income', amount: 1000, description: 'Rental income' })
+        createRecurringItem({
+          id: 'r2',
+          type: 'income',
+          amount: 1000,
+          description: 'Rental income',
+        })
       );
 
       // Dashboard Monthly Income = One-time income + Recurring income
       // One-time: 500 + 300 = 800
       // Recurring: 5000 + 1000 = 6000
       // Total: 800 + 6000 = 6800
-      const monthlyIncome = transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
+      const monthlyIncome =
+        transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
       expect(monthlyIncome).toBe(6800);
     });
 
@@ -112,7 +128,12 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       // Add a transaction that was generated from a recurring item
       // This should NOT be counted in one-time, as the recurring store handles it
       transactionsStore.transactions.push(
-        createThisMonthTransaction({ id: 'txn-2', type: 'income', amount: 5000, recurringItemId: 'r1' })
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'income',
+          amount: 5000,
+          recurringItemId: 'r1',
+        })
       );
 
       // Add the recurring item
@@ -127,7 +148,8 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       expect(recurringStore.totalMonthlyRecurringIncome).toBe(5000);
 
       // Dashboard total = 500 + 5000 = 5500
-      const monthlyIncome = transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
+      const monthlyIncome =
+        transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
       expect(monthlyIncome).toBe(5500);
     });
 
@@ -144,7 +166,8 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       expect(transactionsStore.thisMonthOneTimeIncome).toBe(0);
       expect(recurringStore.totalMonthlyRecurringIncome).toBe(5000);
 
-      const monthlyIncome = transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
+      const monthlyIncome =
+        transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
       expect(monthlyIncome).toBe(5000);
     });
 
@@ -162,7 +185,8 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       expect(transactionsStore.thisMonthOneTimeIncome).toBe(500);
       expect(recurringStore.totalMonthlyRecurringIncome).toBe(0);
 
-      const monthlyIncome = transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
+      const monthlyIncome =
+        transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
       expect(monthlyIncome).toBe(500);
     });
   });
@@ -174,8 +198,18 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
 
       // Add one-time expense transactions
       transactionsStore.transactions.push(
-        createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 50, description: 'Coffee' }),
-        createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 150, description: 'Groceries' })
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'expense',
+          amount: 50,
+          description: 'Coffee',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'expense',
+          amount: 150,
+          description: 'Groceries',
+        })
       );
 
       // Add active recurring expense items
@@ -188,7 +222,8 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       // One-time: 50 + 150 = 200
       // Recurring: 2000 + 100 = 2100
       // Total: 200 + 2100 = 2300
-      const monthlyExpenses = transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
+      const monthlyExpenses =
+        transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
       expect(monthlyExpenses).toBe(2300);
     });
 
@@ -203,7 +238,12 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
 
       // Add a transaction that was generated from a recurring item
       transactionsStore.transactions.push(
-        createThisMonthTransaction({ id: 'txn-2', type: 'expense', amount: 2000, recurringItemId: 'r1' })
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'expense',
+          amount: 2000,
+          recurringItemId: 'r1',
+        })
       );
 
       // Add the recurring item
@@ -218,7 +258,8 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
       expect(recurringStore.totalMonthlyRecurringExpenses).toBe(2000);
 
       // Dashboard total = 50 + 2000 = 2050
-      const monthlyExpenses = transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
+      const monthlyExpenses =
+        transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
       expect(monthlyExpenses).toBe(2050);
     });
   });
@@ -240,8 +281,10 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
         createRecurringItem({ id: 'r2', type: 'expense', amount: 2000 })
       );
 
-      const monthlyIncome = transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
-      const monthlyExpenses = transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
+      const monthlyIncome =
+        transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
+      const monthlyExpenses =
+        transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
       const netCashFlow = monthlyIncome - monthlyExpenses;
 
       // Income: 500 + 5000 = 5500
@@ -266,8 +309,10 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
         createRecurringItem({ id: 'r2', type: 'expense', amount: 3000 })
       );
 
-      const monthlyIncome = transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
-      const monthlyExpenses = transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
+      const monthlyIncome =
+        transactionsStore.thisMonthOneTimeIncome + recurringStore.totalMonthlyRecurringIncome;
+      const monthlyExpenses =
+        transactionsStore.thisMonthOneTimeExpenses + recurringStore.totalMonthlyRecurringExpenses;
       const netCashFlow = monthlyIncome - monthlyExpenses;
 
       // Income: 100 + 1000 = 1100
@@ -279,7 +324,7 @@ describe('Dashboard Summary Cards - One-time + Recurring Integration', () => {
 
   describe('Inactive recurring items', () => {
     it('should not include inactive recurring items in totals', () => {
-      const transactionsStore = useTransactionsStore();
+      const _transactionsStore = useTransactionsStore();
       const recurringStore = useRecurringStore();
 
       // Active recurring income

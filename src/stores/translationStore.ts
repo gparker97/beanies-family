@@ -1,11 +1,16 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { LanguageCode } from '@/types/models';
-import { UI_STRINGS, getAllKeys, getSourceText, getAllHashes } from '@/services/translation/uiStrings';
-import type { UIStringKey } from '@/services/translation/uiStrings';
-import * as translationApi from '@/services/translation/translationApi';
 import * as translationCache from '@/services/indexeddb/repositories/translationCacheRepository';
+import * as translationApi from '@/services/translation/translationApi';
 import * as translationFiles from '@/services/translation/translationFiles';
+import {
+  UI_STRINGS,
+  getAllKeys,
+  getSourceText,
+  getAllHashes,
+} from '@/services/translation/uiStrings';
+import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { LanguageCode } from '@/types/models';
 
 export const useTranslationStore = defineStore('translation', () => {
   // State
@@ -68,7 +73,7 @@ export const useTranslationStore = defineStore('translation', () => {
       loadProgress.value = 20;
 
       // Step 2: Find missing or outdated keys
-      const missingKeys = allKeys.filter(key => !translationsMap.has(key));
+      const missingKeys = allKeys.filter((key) => !translationsMap.has(key));
 
       if (missingKeys.length === 0) {
         // All translations are loaded from file
@@ -82,10 +87,7 @@ export const useTranslationStore = defineStore('translation', () => {
       loadProgress.value = 40;
 
       // Step 3: Check IndexedDB cache for missing translations
-      const cached = await translationCache.getTranslationsForLanguageByKeys(
-        language,
-        missingKeys
-      );
+      const cached = await translationCache.getTranslationsForLanguageByKeys(language, missingKeys);
 
       // Add cached translations that match current hash
       for (const entry of cached) {
@@ -96,7 +98,7 @@ export const useTranslationStore = defineStore('translation', () => {
       }
 
       // Step 4: Find keys still missing after cache check
-      const stillMissingKeys = missingKeys.filter(key => !translationsMap.has(key));
+      const stillMissingKeys = missingKeys.filter((key) => !translationsMap.has(key));
 
       if (stillMissingKeys.length === 0) {
         // All translations found in file + cache
@@ -110,7 +112,7 @@ export const useTranslationStore = defineStore('translation', () => {
       loadProgress.value = 60;
 
       // Step 5: Fetch remaining translations from API
-      const missingTexts = stillMissingKeys.map(key => getSourceText(key));
+      const missingTexts = stillMissingKeys.map((key) => getSourceText(key));
 
       const translated = await translationApi.translateBatch(
         missingTexts,
@@ -136,10 +138,7 @@ export const useTranslationStore = defineStore('translation', () => {
 
       // Step 6: Save new translations to IndexedDB cache
       if (newTranslations.length > 0) {
-        await translationCache.saveTranslationsWithHash(
-          newTranslations,
-          language
-        );
+        await translationCache.saveTranslationsWithHash(newTranslations, language);
       }
 
       translations.value = translationsMap;
@@ -199,10 +198,7 @@ export const useTranslationStore = defineStore('translation', () => {
     const allKeys = getAllKeys();
 
     // Get all cached translations for this language
-    const cached = await translationCache.getTranslationsForLanguageByKeys(
-      language,
-      allKeys
-    );
+    const cached = await translationCache.getTranslationsForLanguageByKeys(language, allKeys);
 
     // Load existing file or create new
     let file = await translationFiles.loadTranslationFile(language);
@@ -218,7 +214,7 @@ export const useTranslationStore = defineStore('translation', () => {
     }
 
     // Update file with cached translations
-    const updates = cached.map(entry => ({
+    const updates = cached.map((entry) => ({
       key: entry.key,
       translation: entry.translation,
       hash: entry.hash,

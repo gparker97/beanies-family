@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import AccountsPage from './AccountsPage.vue';
 
 // Mock the stores
@@ -34,8 +34,20 @@ vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: vi.fn(() => ({
     currentMemberId: 'member-1',
     members: [
-      { id: 'member-1', name: 'John Doe', email: 'john@example.com', role: 'owner', color: '#3b82f6' },
-      { id: 'member-2', name: 'Jane Doe', email: 'jane@example.com', role: 'member', color: '#10b981' },
+      {
+        id: 'member-1',
+        name: 'John Doe',
+        email: 'john@example.com',
+        role: 'owner',
+        color: '#3b82f6',
+      },
+      {
+        id: 'member-2',
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        role: 'member',
+        color: '#10b981',
+      },
     ],
   })),
 }));
@@ -67,7 +79,10 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
 vi.mock('@/constants/currencies', () => ({
   formatCurrency: (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`,
   getCurrencyInfo: (code: string) => {
-    const currencies: Record<string, { code: string; name: string; symbol: string; decimals: number }> = {
+    const currencies: Record<
+      string,
+      { code: string; name: string; symbol: string; decimals: number }
+    > = {
       USD: { code: 'USD', name: 'US Dollar', symbol: '$', decimals: 2 },
       SGD: { code: 'SGD', name: 'Singapore Dollar', symbol: 'S$', decimals: 2 },
     };
@@ -93,7 +108,10 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseButton: { template: '<button><slot /></button>' },
           BaseInput: { template: '<input />' },
           BaseSelect: { template: '<select />' },
-          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+          BaseModal: {
+            template: '<div v-if="open"><slot /><slot name="footer" /></div>',
+            props: ['open', 'title'],
+          },
           CurrencyAmount: { template: '<span>$0.00</span>' },
         },
       },
@@ -112,7 +130,11 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
           BaseInput: { template: '<input />' },
           BaseSelect: { template: '<select />' },
-          BaseModal: { template: '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+          BaseModal: {
+            template:
+              '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
+            props: ['open', 'title'],
+          },
           CurrencyAmount: { template: '<span>$0.00</span>' },
         },
       },
@@ -142,7 +164,8 @@ describe('AccountsPage - Edit Account Modal', () => {
             props: ['modelValue', 'options', 'label'],
           },
           BaseModal: {
-            template: '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
+            template:
+              '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
             props: ['open', 'title'],
           },
           CurrencyAmount: { template: '<span>$0.00</span>' },
@@ -172,7 +195,8 @@ describe('AccountsPage - Edit Account Modal', () => {
             props: ['modelValue', 'options', 'label'],
           },
           BaseModal: {
-            template: '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
+            template:
+              '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
             props: ['open', 'title'],
           },
           CurrencyAmount: { template: '<span>$0.00</span>' },
@@ -187,8 +211,9 @@ describe('AccountsPage - Edit Account Modal', () => {
     // Find family member selector (should have label "Owner" or "Family Member")
     const selects = wrapper.findAll('select');
     const memberSelect = selects.find(
-      s => s.attributes('data-label')?.toLowerCase().includes('owner') ||
-           s.attributes('data-label')?.toLowerCase().includes('member')
+      (s) =>
+        s.attributes('data-label')?.toLowerCase().includes('owner') ||
+        s.attributes('data-label')?.toLowerCase().includes('member')
     );
     expect(memberSelect).toBeDefined();
   });
@@ -233,7 +258,8 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseInput: { template: '<input />' },
           BaseSelect: { template: '<select />' },
           BaseModal: {
-            template: '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
+            template:
+              '<div v-if="open" data-testid="edit-modal"><slot /><slot name="footer" /></div>',
             props: ['open', 'title'],
           },
           CurrencyAmount: { template: '<span>$0.00</span>' },
@@ -271,7 +297,10 @@ describe('AccountsPage - Currency Selector', () => {
             template: '<select :data-testid="$attrs[\'data-testid\']"><slot /></select>',
             props: ['modelValue', 'options', 'label'],
           },
-          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+          BaseModal: {
+            template: '<div v-if="open"><slot /><slot name="footer" /></div>',
+            props: ['open', 'title'],
+          },
           CurrencyAmount: { template: '<span>$0.00</span>' },
         },
       },
@@ -290,10 +319,14 @@ describe('AccountsPage - Currency Selector', () => {
           BaseButton: { template: '<button><slot /></button>' },
           BaseInput: { template: '<input />' },
           BaseSelect: {
-            template: '<select :data-testid="$attrs[\'data-testid\']" :data-options="JSON.stringify(options)"><slot /></select>',
+            template:
+              '<select :data-testid="$attrs[\'data-testid\']" :data-options="JSON.stringify(options)"><slot /></select>',
             props: ['modelValue', 'options', 'label'],
           },
-          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+          BaseModal: {
+            template: '<div v-if="open"><slot /><slot name="footer" /></div>',
+            props: ['open', 'title'],
+          },
           CurrencyAmount: { template: '<span>$0.00</span>' },
         },
       },
@@ -314,7 +347,10 @@ describe('AccountsPage - Currency Selector', () => {
             template: '<select :data-testid="$attrs[\'data-testid\']"><slot /></select>',
             props: ['modelValue', 'options', 'label'],
           },
-          BaseModal: { template: '<div v-if="open"><slot /><slot name="footer" /></div>', props: ['open', 'title'] },
+          BaseModal: {
+            template: '<div v-if="open"><slot /><slot name="footer" /></div>',
+            props: ['open', 'title'],
+          },
           CurrencyAmount: { template: '<span data-testid="currency-amount">$0.00</span>' },
         },
       },

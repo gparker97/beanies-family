@@ -24,14 +24,14 @@ interface MyMemoryResponse {
 // Map our language codes to MyMemory language codes
 function getMyMemoryLangCode(code: LanguageCode): string {
   const langMap: Record<LanguageCode, string> = {
-    'en': 'en',
-    'zh': 'zh-CN', // Simplified Chinese
+    en: 'en',
+    zh: 'zh-CN', // Simplified Chinese
   };
   return langMap[code] || code;
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

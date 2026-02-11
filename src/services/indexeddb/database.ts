@@ -145,7 +145,16 @@ export async function closeDatabase(): Promise<void> {
 export async function clearAllData(): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(
-    ['familyMembers', 'accounts', 'transactions', 'assets', 'goals', 'recurringItems', 'settings', 'syncQueue'],
+    [
+      'familyMembers',
+      'accounts',
+      'transactions',
+      'assets',
+      'goals',
+      'recurringItems',
+      'settings',
+      'syncQueue',
+    ],
     'readwrite'
   );
 
@@ -175,15 +184,16 @@ export interface ExportedData {
 export async function exportAllData(): Promise<ExportedData> {
   const db = await getDatabase();
 
-  const [familyMembers, accounts, transactions, assets, goals, recurringItems, settings] = await Promise.all([
-    db.getAll('familyMembers'),
-    db.getAll('accounts'),
-    db.getAll('transactions'),
-    db.getAll('assets'),
-    db.getAll('goals'),
-    db.getAll('recurringItems'),
-    db.get('settings', 'app_settings'),
-  ]);
+  const [familyMembers, accounts, transactions, assets, goals, recurringItems, settings] =
+    await Promise.all([
+      db.getAll('familyMembers'),
+      db.getAll('accounts'),
+      db.getAll('transactions'),
+      db.getAll('assets'),
+      db.getAll('goals'),
+      db.getAll('recurringItems'),
+      db.get('settings', 'app_settings'),
+    ]);
 
   return {
     familyMembers,

@@ -50,14 +50,14 @@ async function handleClick() {
 <template>
   <button
     v-if="syncStore.isConfigured && statusConfig"
-    class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+    class="rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
     :title="statusConfig.title"
     @click="handleClick"
   >
     <!-- Sync icon (rotating when syncing) -->
     <svg
       v-if="statusConfig.icon === 'sync'"
-      class="w-5 h-5"
+      class="h-5 w-5"
       :class="[statusConfig.color, { 'animate-spin': statusConfig.animate }]"
       fill="none"
       stroke="currentColor"
@@ -74,7 +74,7 @@ async function handleClick() {
     <!-- Check icon (synced) -->
     <svg
       v-else-if="statusConfig.icon === 'check'"
-      class="w-5 h-5"
+      class="h-5 w-5"
       :class="statusConfig.color"
       fill="none"
       stroke="currentColor"
@@ -91,9 +91,9 @@ async function handleClick() {
     <!-- Warning icon (needs permission) -->
     <div v-else-if="statusConfig.icon === 'warning'" class="relative">
       <!-- Pulsing background -->
-      <span class="absolute inset-0 rounded-full bg-yellow-400 opacity-30 animate-ping" />
+      <span class="absolute inset-0 animate-ping rounded-full bg-yellow-400 opacity-30" />
       <svg
-        class="w-5 h-5 relative"
+        class="relative h-5 w-5"
         :class="statusConfig.color"
         fill="none"
         stroke="currentColor"
@@ -111,7 +111,7 @@ async function handleClick() {
     <!-- Error icon -->
     <svg
       v-else-if="statusConfig.icon === 'error'"
-      class="w-5 h-5"
+      class="h-5 w-5"
       :class="statusConfig.color"
       fill="none"
       stroke="currentColor"

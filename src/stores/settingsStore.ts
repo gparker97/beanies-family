@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
-import type { Settings, CurrencyCode, AIProvider, ExchangeRate, LanguageCode } from '@/types/models';
 import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
+import type {
+  Settings,
+  CurrencyCode,
+  AIProvider,
+  ExchangeRate,
+  LanguageCode,
+} from '@/types/models';
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -11,7 +17,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Getters
   const baseCurrency = computed(() => settings.value.baseCurrency);
-  const displayCurrency = computed(() => settings.value.displayCurrency ?? settings.value.baseCurrency);
+  const displayCurrency = computed(
+    () => settings.value.displayCurrency ?? settings.value.baseCurrency
+  );
   const theme = computed(() => settings.value.theme);
   const language = computed(() => settings.value.language ?? 'en');
   const syncEnabled = computed(() => settings.value.syncEnabled);
@@ -138,10 +146,7 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function setAIApiKey(
-    provider: 'claude' | 'openai' | 'gemini',
-    key: string
-  ): Promise<void> {
+  async function setAIApiKey(provider: 'claude' | 'openai' | 'gemini', key: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
     try {
@@ -159,7 +164,8 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       settings.value = await settingsRepo.setExchangeRateAutoUpdate(enabled);
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update exchange rate auto-update setting';
+      error.value =
+        e instanceof Error ? e.message : 'Failed to update exchange rate auto-update setting';
     } finally {
       isLoading.value = false;
     }

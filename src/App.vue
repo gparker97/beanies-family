@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { useFamilyStore } from '@/stores/familyStore';
-import { useAccountsStore } from '@/stores/accountsStore';
-import { useTransactionsStore } from '@/stores/transactionsStore';
-import { useAssetsStore } from '@/stores/assetsStore';
-import { useGoalsStore } from '@/stores/goalsStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useSyncStore } from '@/stores/syncStore';
-import { useRecurringStore } from '@/stores/recurringStore';
-import { useTranslationStore } from '@/stores/translationStore';
-import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { processRecurringItems } from '@/services/recurring/recurringProcessor';
-import { updateRatesIfStale } from '@/services/exchangeRate';
-import AppSidebar from '@/components/common/AppSidebar.vue';
 import AppHeader from '@/components/common/AppHeader.vue';
+import AppSidebar from '@/components/common/AppSidebar.vue';
+import { updateRatesIfStale } from '@/services/exchangeRate';
+import { processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { useGoalsStore } from '@/stores/goalsStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useSyncStore } from '@/stores/syncStore';
+import { useTranslationStore } from '@/stores/translationStore';
 
 const route = useRoute();
 const router = useRouter();
@@ -117,14 +117,14 @@ onMounted(async () => {
     <div v-if="showLayout" class="flex">
       <AppSidebar />
 
-      <div class="flex-1 flex flex-col">
+      <div class="flex flex-1 flex-col">
         <AppHeader>
           <template #title>
             {{ route.meta.title }}
           </template>
         </AppHeader>
 
-        <main class="flex-1 p-6 overflow-auto">
+        <main class="flex-1 overflow-auto p-6">
           <router-view />
         </main>
       </div>

@@ -1,20 +1,20 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
-import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
-import * as syncService from '@/services/sync/syncService';
-import { exportToFile, importFromFile } from '@/services/sync/fileSync';
-import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
-import { toISODateString } from '@/utils/date';
-import type { SyncFileData } from '@/types/models';
 
 // Import other stores for auto-sync watching
-import { useFamilyStore } from './familyStore';
 import { useAccountsStore } from './accountsStore';
-import { useTransactionsStore } from './transactionsStore';
 import { useAssetsStore } from './assetsStore';
+import { useFamilyStore } from './familyStore';
 import { useGoalsStore } from './goalsStore';
-import { useSettingsStore } from './settingsStore';
 import { useRecurringStore } from './recurringStore';
+import { useSettingsStore } from './settingsStore';
+import { useTransactionsStore } from './transactionsStore';
+import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
+import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import { exportToFile, importFromFile } from '@/services/sync/fileSync';
+import * as syncService from '@/services/sync/syncService';
+import type { SyncFileData } from '@/types/models';
+import { toISODateString } from '@/utils/date';
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -161,7 +161,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
     }
 
-    const password = isEncryptionEnabled.value ? sessionPassword.value ?? undefined : undefined;
+    const password = isEncryptionEnabled.value ? (sessionPassword.value ?? undefined) : undefined;
     const success = await syncService.save(password);
     if (success) {
       lastSync.value = toISODateString(new Date());
@@ -227,7 +227,9 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Decrypt and load the pending encrypted file
    */
-  async function decryptPendingFile(password: string): Promise<{ success: boolean; error?: string }> {
+  async function decryptPendingFile(
+    password: string
+  ): Promise<{ success: boolean; error?: string }> {
     if (!pendingEncryptedFile.value) {
       return { success: false, error: 'No pending encrypted file' };
     }

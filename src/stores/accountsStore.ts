@@ -1,10 +1,16 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode, ExchangeRate } from '@/types/models';
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
-import { useSettingsStore } from './settingsStore';
 import { useAssetsStore } from './assetsStore';
 import { useMemberFilterStore } from './memberFilterStore';
+import { useSettingsStore } from './settingsStore';
+import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
+import type {
+  Account,
+  CreateAccountInput,
+  UpdateAccountInput,
+  CurrencyCode,
+  ExchangeRate,
+} from '@/types/models';
 
 export const useAccountsStore = defineStore('accounts', () => {
   // State
@@ -13,7 +19,11 @@ export const useAccountsStore = defineStore('accounts', () => {
   const error = ref<string | null>(null);
 
   // Helper to get exchange rate
-  function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
+  function getRate(
+    rates: ExchangeRate[],
+    from: CurrencyCode,
+    to: CurrencyCode
+  ): number | undefined {
     if (from === to) return 1;
 
     // Direct rate
@@ -66,11 +76,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const totalAssets = computed(() => {
     return accounts.value
       .filter(
-        (a) =>
-          a.isActive &&
-          a.includeInNetWorth &&
-          a.type !== 'credit_card' &&
-          a.type !== 'loan'
+        (a) => a.isActive && a.includeInNetWorth && a.type !== 'credit_card' && a.type !== 'loan'
       )
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
@@ -79,10 +85,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const accountLiabilities = computed(() => {
     return accounts.value
       .filter(
-        (a) =>
-          a.isActive &&
-          a.includeInNetWorth &&
-          (a.type === 'credit_card' || a.type === 'loan')
+        (a) => a.isActive && a.includeInNetWorth && (a.type === 'credit_card' || a.type === 'loan')
       )
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
@@ -108,17 +111,15 @@ export const useAccountsStore = defineStore('accounts', () => {
     if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
       return accounts.value;
     }
-    return accounts.value.filter(a => memberFilter.isMemberSelected(a.memberId));
+    return accounts.value.filter((a) => memberFilter.isMemberSelected(a.memberId));
   });
 
-  const filteredActiveAccounts = computed(() =>
-    filteredAccounts.value.filter(a => a.isActive)
-  );
+  const filteredActiveAccounts = computed(() => filteredAccounts.value.filter((a) => a.isActive));
 
   // Filtered total balance (net worth from accounts only)
   const filteredTotalBalance = computed(() => {
     return filteredAccounts.value
-      .filter(a => a.isActive && a.includeInNetWorth)
+      .filter((a) => a.isActive && a.includeInNetWorth)
       .reduce((sum, account) => {
         const convertedBalance = convertToBaseCurrency(account.balance, account.currency);
         const multiplier = account.type === 'credit_card' || account.type === 'loan' ? -1 : 1;
@@ -130,11 +131,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const filteredTotalAssets = computed(() => {
     return filteredAccounts.value
       .filter(
-        a =>
-          a.isActive &&
-          a.includeInNetWorth &&
-          a.type !== 'credit_card' &&
-          a.type !== 'loan'
+        (a) => a.isActive && a.includeInNetWorth && a.type !== 'credit_card' && a.type !== 'loan'
       )
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
@@ -143,10 +140,7 @@ export const useAccountsStore = defineStore('accounts', () => {
   const filteredAccountLiabilities = computed(() => {
     return filteredAccounts.value
       .filter(
-        a =>
-          a.isActive &&
-          a.includeInNetWorth &&
-          (a.type === 'credit_card' || a.type === 'loan')
+        (a) => a.isActive && a.includeInNetWorth && (a.type === 'credit_card' || a.type === 'loan')
       )
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
@@ -191,10 +185,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     }
   }
 
-  async function updateAccount(
-    id: string,
-    input: UpdateAccountInput
-  ): Promise<Account | null> {
+  async function updateAccount(id: string, input: UpdateAccountInput): Promise<Account | null> {
     isLoading.value = true;
     error.value = null;
     try {
