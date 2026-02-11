@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { useGoalsStore } from '@/stores/goalsStore';
-import { useFamilyStore } from '@/stores/familyStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { useTranslation } from '@/composables/useTranslation';
-import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
-import type { Goal, CreateGoalInput, UpdateGoalInput, GoalType, GoalPriority } from '@/types/models';
+import { useFamilyStore } from '@/stores/familyStore';
+import { useGoalsStore } from '@/stores/goalsStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import type {
+  Goal,
+  CreateGoalInput,
+  UpdateGoalInput,
+  GoalType,
+  GoalPriority,
+} from '@/types/models';
 
 const { t } = useTranslation();
 
@@ -25,7 +31,7 @@ const filteredGoalsByPriority = computed(() => {
 
 // Computed for filtered overdue goals
 const filteredOverdueGoals = computed(() =>
-  goalsStore.filteredActiveGoals.filter(g => g.deadline && new Date(g.deadline) < new Date())
+  goalsStore.filteredActiveGoals.filter((g) => g.deadline && new Date(g.deadline) < new Date())
 );
 
 const showAddModal = ref(false);
@@ -216,29 +222,32 @@ async function deleteGoal(id: string) {
       </BaseButton>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.activeGoals') }}</p>
-        <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+        <p class="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
           {{ goalsStore.filteredActiveGoals.length }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.completedGoals') }}</p>
-        <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+        <p class="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
           {{ goalsStore.filteredCompletedGoals.length }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.overdueGoals') }}</p>
-        <p class="text-2xl font-bold text-red-600 dark:text-red-400 mt-1">
+        <p class="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
           {{ filteredOverdueGoals.length }}
         </p>
       </BaseCard>
     </div>
 
     <BaseCard :title="t('goals.allGoals')">
-      <div v-if="goalsStore.filteredGoals.length === 0" class="text-center py-12 text-gray-500 dark:text-gray-400">
+      <div
+        v-if="goalsStore.filteredGoals.length === 0"
+        class="py-12 text-center text-gray-500 dark:text-gray-400"
+      >
         <p>{{ t('goals.noGoals') }}</p>
         <p class="mt-2">{{ t('goals.getStarted') }}</p>
       </div>
@@ -246,18 +255,18 @@ async function deleteGoal(id: string) {
         <div
           v-for="goal in filteredGoalsByPriority"
           :key="goal.id"
-          class="p-4 border border-gray-200 dark:border-slate-700 rounded-lg"
+          class="rounded-lg border border-gray-200 p-4 dark:border-slate-700"
         >
-          <div class="flex items-center justify-between mb-2">
+          <div class="mb-2 flex items-center justify-between">
             <div>
               <h3 class="font-medium text-gray-900 dark:text-gray-100">{{ goal.name }}</h3>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ goalTypes.find(t => t.value === goal.type)?.label }} -
-                {{ priorityOptions.find(p => p.value === goal.priority)?.label }} priority
+                {{ goalTypes.find((t) => t.value === goal.type)?.label }} -
+                {{ priorityOptions.find((p) => p.value === goal.priority)?.label }} priority
               </p>
-              <p class="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-0.5">
+              <p class="mt-0.5 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                 <span
-                  class="w-2.5 h-2.5 rounded-full inline-block"
+                  class="inline-block h-2.5 w-2.5 rounded-full"
                   :style="{ backgroundColor: getMemberColor(goal.memberId) }"
                 />
                 {{ getMemberName(goal.memberId) }}
@@ -265,26 +274,36 @@ async function deleteGoal(id: string) {
             </div>
             <div class="flex gap-1">
               <button
-                class="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
+                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
                 title="Edit"
                 @click="openEditModal(goal)"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
                 </svg>
               </button>
               <button
-                class="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
+                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
                 title="Delete"
                 @click="deleteGoal(goal.id)"
               >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
                 </svg>
               </button>
             </div>
           </div>
-          <div class="flex items-center justify-between text-sm mb-2">
+          <div class="mb-2 flex items-center justify-between text-sm">
             <span class="text-gray-500 dark:text-gray-400">{{ t('goals.progress') }}</span>
             <span class="font-medium text-gray-900 dark:text-gray-100">
               <CurrencyAmount :amount="goal.currentAmount" :currency="goal.currency" size="sm" />
@@ -292,7 +311,7 @@ async function deleteGoal(id: string) {
               <CurrencyAmount :amount="goal.targetAmount" :currency="goal.currency" size="sm" />
             </span>
           </div>
-          <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-slate-700">
             <div
               class="h-2 rounded-full transition-all"
               :class="goal.isCompleted ? 'bg-green-600' : 'bg-blue-600'"
@@ -304,11 +323,7 @@ async function deleteGoal(id: string) {
     </BaseCard>
 
     <!-- Add Goal Modal -->
-    <BaseModal
-      :open="showAddModal"
-      :title="t('goals.addGoal')"
-      @close="showAddModal = false"
-    >
+    <BaseModal :open="showAddModal" :title="t('goals.addGoal')" @close="showAddModal = false">
       <form class="space-y-4" @submit.prevent="createGoal">
         <BaseInput
           v-model="newGoal.name"
@@ -317,11 +332,7 @@ async function deleteGoal(id: string) {
           required
         />
 
-        <BaseSelect
-          v-model="newGoal.type"
-          :options="goalTypes"
-          :label="t('goals.goalType')"
-        />
+        <BaseSelect v-model="newGoal.type" :options="goalTypes" :label="t('goals.goalType')" />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseInput
@@ -357,11 +368,7 @@ async function deleteGoal(id: string) {
           :label="t('goals.assignTo')"
         />
 
-        <BaseInput
-          v-model="newGoal.deadline"
-          type="date"
-          :label="t('goals.deadlineOptional')"
-        />
+        <BaseInput v-model="newGoal.deadline" type="date" :label="t('goals.deadlineOptional')" />
       </form>
 
       <template #footer>
@@ -377,11 +384,7 @@ async function deleteGoal(id: string) {
     </BaseModal>
 
     <!-- Edit Goal Modal -->
-    <BaseModal
-      :open="showEditModal"
-      :title="t('goals.editGoal')"
-      @close="closeEditModal"
-    >
+    <BaseModal :open="showEditModal" :title="t('goals.editGoal')" @close="closeEditModal">
       <form class="space-y-4" @submit.prevent="updateGoal">
         <BaseInput
           v-model="editGoal.name"
@@ -390,11 +393,7 @@ async function deleteGoal(id: string) {
           required
         />
 
-        <BaseSelect
-          v-model="editGoal.type"
-          :options="goalTypes"
-          :label="t('goals.goalType')"
-        />
+        <BaseSelect v-model="editGoal.type" :options="goalTypes" :label="t('goals.goalType')" />
 
         <div class="grid grid-cols-2 gap-4">
           <BaseInput
@@ -430,18 +429,14 @@ async function deleteGoal(id: string) {
           :label="t('goals.assignTo')"
         />
 
-        <BaseInput
-          v-model="editGoal.deadline"
-          type="date"
-          :label="t('goals.deadlineOptional')"
-        />
+        <BaseInput v-model="editGoal.deadline" type="date" :label="t('goals.deadlineOptional')" />
 
         <div class="flex items-center gap-2">
           <input
             id="isCompleted"
             v-model="editGoal.isCompleted"
             type="checkbox"
-            class="rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
           />
           <label for="isCompleted" class="text-sm text-gray-700 dark:text-gray-300">
             {{ t('action.markCompleted') }}

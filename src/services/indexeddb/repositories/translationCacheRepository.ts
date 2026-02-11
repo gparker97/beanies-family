@@ -13,7 +13,7 @@ export async function getTranslationsForLanguage(
   const all = await db.getAllFromIndex('translations', 'by-language', language);
 
   // Only return entries matching current version
-  return all.filter(entry => entry.version === version);
+  return all.filter((entry) => entry.version === version);
 }
 
 /**

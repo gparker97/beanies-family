@@ -27,7 +27,7 @@ const navItemDefs: NavItemDef[] = [
 ];
 
 const navItems = computed(() =>
-  navItemDefs.map(item => ({
+  navItemDefs.map((item) => ({
     name: t(item.labelKey),
     path: item.path,
     icon: item.icon,
@@ -44,19 +44,27 @@ function navigateTo(path: string) {
 </script>
 
 <template>
-  <aside class="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 min-h-screen flex flex-col">
+  <aside
+    class="flex min-h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+  >
     <!-- Logo & Branding -->
-    <div class="px-5 py-4 border-b border-gray-200 dark:border-slate-700">
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
       <div class="flex items-center gap-3">
         <!-- Logo -->
-        <img src="/logo.svg" alt="GP Family Planner" class="w-11 h-11 flex-shrink-0" />
+        <img src="/logo.svg" alt="GP Family Planner" class="h-11 w-11 flex-shrink-0" />
         <!-- Text -->
         <div class="min-w-0">
-          <h1 class="text-lg font-bold leading-tight" style="font-family: 'Poppins', sans-serif;">
-            <span class="bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 bg-clip-text text-transparent">GP Family</span>
+          <h1 class="text-lg leading-tight font-bold" style="font-family: Poppins, sans-serif">
+            <span
+              class="bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 bg-clip-text text-transparent"
+              >GP Family</span
+            >
             <span class="text-slate-700 dark:text-slate-200"> Planner</span>
           </h1>
-          <p class="text-[10px] font-medium tracking-wide text-gray-400 dark:text-gray-500 uppercase mt-0.5" style="font-family: 'Poppins', sans-serif;">
+          <p
+            class="mt-0.5 text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500"
+            style="font-family: Poppins, sans-serif"
+          >
             Smart Financial Planning
           </p>
         </div>
@@ -64,25 +72,23 @@ function navigateTo(path: string) {
     </div>
 
     <!-- Navigation -->
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
       <button
         v-for="item in navItems"
         :key="item.path"
-        class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors"
+        class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
         :class="
           isActive(item.path)
-            ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+            ? 'bg-blue-50 font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+            : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
         "
         @click="navigateTo(item.path)"
       >
         <!-- Icon placeholder - using simple shapes -->
-        <span
-          class="w-5 h-5 flex items-center justify-center text-current opacity-70"
-        >
+        <span class="flex h-5 w-5 items-center justify-center text-current opacity-70">
           <svg
             v-if="item.icon === 'home'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -96,7 +102,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'credit-card'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -110,7 +116,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'arrow-right-left'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -124,7 +130,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'building'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -138,7 +144,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'target'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -152,7 +158,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'chart-bar'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -166,7 +172,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'trending-up'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -180,7 +186,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'users'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -194,7 +200,7 @@ function navigateTo(path: string) {
           </svg>
           <svg
             v-else-if="item.icon === 'cog'"
-            class="w-5 h-5"
+            class="h-5 w-5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -219,10 +225,8 @@ function navigateTo(path: string) {
     </nav>
 
     <!-- Version info -->
-    <div class="px-6 py-3 border-t border-gray-200 dark:border-slate-700">
-      <p class="text-xs text-gray-400 dark:text-gray-500">
-        v1.0.0 - MVP
-      </p>
+    <div class="border-t border-gray-200 px-6 py-3 dark:border-slate-700">
+      <p class="text-xs text-gray-400 dark:text-gray-500">v1.0.0 - MVP</p>
     </div>
   </aside>
 </template>

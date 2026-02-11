@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import PasswordModal from '@/components/common/PasswordModal.vue';
+import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
+import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
+import { useTranslation } from '@/composables/useTranslation';
+import { CURRENCIES } from '@/constants/currencies';
+import { clearAllData } from '@/services/indexeddb/database';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
-import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
-import PasswordModal from '@/components/common/PasswordModal.vue';
-import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
-import { CURRENCIES } from '@/constants/currencies';
-import { clearAllData } from '@/services/indexeddb/database';
-import { useTranslation } from '@/composables/useTranslation';
 
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
@@ -18,7 +18,9 @@ const { t } = useTranslation();
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
 const showSyncConflict = ref(false);
-const conflictInfo = ref<{ fileTimestamp: string | null; localTimestamp: string | null } | null>(null);
+const conflictInfo = ref<{ fileTimestamp: string | null; localTimestamp: string | null } | null>(
+  null
+);
 const importError = ref<string | null>(null);
 const importSuccess = ref(false);
 
@@ -227,7 +229,7 @@ function formatLastSync(timestamp: string | null): string {
     </div>
 
     <!-- First Row: General Settings and File Sync side by side on wide screens -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <!-- General Settings -->
       <BaseCard :title="t('settings.general')">
         <div class="space-y-6">
@@ -252,108 +254,45 @@ function formatLastSync(timestamp: string | null): string {
       <!-- File Sync Settings -->
       <BaseCard :title="t('settings.fileSync')">
         <!-- Modern browsers with File System Access API -->
-      <div v-if="syncStore.supportsAutoSync">
-        <!-- Not configured state -->
-        <div v-if="!syncStore.isConfigured" class="text-center py-6">
-          <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <p class="font-medium text-gray-900 dark:text-gray-100 mb-2">{{ t('settings.syncToFile') }}</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            {{ t('settings.syncToFileDescription') }}
-          </p>
-          <div class="flex flex-col gap-3">
-            <BaseButton @click="handleConfigureSync">
-              {{ t('settings.createNewSyncFile') }}
-            </BaseButton>
-            <BaseButton variant="secondary" @click="handleLoadFromFileClick">
-              {{ t('settings.loadFromExistingFile') }}
-            </BaseButton>
-          </div>
-
-          <!-- Load file confirmation dialog (when not configured) -->
-          <div v-if="showLoadFileConfirm" class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-left">
-            <p class="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
-              This will replace all local data with the contents of the selected file and set it as your sync file. Continue?
+        <div v-if="syncStore.supportsAutoSync">
+          <!-- Not configured state -->
+          <div v-if="!syncStore.isConfigured" class="py-6 text-center">
+            <svg
+              class="mx-auto mb-4 h-12 w-12 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
+            <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.syncToFile') }}
             </p>
-            <div class="flex gap-2">
-              <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
-                Yes, Load File
-              </BaseButton>
-              <BaseButton variant="ghost" size="sm" @click="showLoadFileConfirm = false">
-                Cancel
-              </BaseButton>
-            </div>
-          </div>
-        </div>
-
-        <!-- Configured state -->
-        <div v-else class="space-y-4">
-          <!-- Needs permission state -->
-          <div v-if="syncStore.needsPermission" class="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-            <p class="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
-              Click to grant permission to access your sync file.
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.syncToFileDescription') }}
             </p>
-            <BaseButton variant="primary" @click="handleRequestPermission">
-              Grant Permission
-            </BaseButton>
-          </div>
-
-          <!-- Ready state -->
-          <div v-else>
-            <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
-              <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">Sync File</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">{{ syncStore.fileName }}</p>
-              </div>
-              <div class="flex items-center gap-2">
-                <span
-                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  :class="{
-                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400': syncStore.syncStatus === 'ready',
-                    'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400': syncStore.syncStatus === 'syncing',
-                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400': syncStore.syncStatus === 'error',
-                  }"
-                >
-                  {{ syncStore.syncStatus === 'syncing' ? 'Syncing...' : syncStore.syncStatus === 'error' ? 'Error' : 'Connected' }}
-                </span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
-              <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">Last Sync</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">{{ formatLastSync(syncStore.lastSync) }}</p>
-              </div>
-              <BaseButton
-                variant="secondary"
-                size="sm"
-                :loading="syncStore.isSyncing"
-                @click="handleSyncNow"
-              >
-                Sync Now
+            <div class="flex flex-col gap-3">
+              <BaseButton @click="handleConfigureSync">
+                {{ t('settings.createNewSyncFile') }}
+              </BaseButton>
+              <BaseButton variant="secondary" @click="handleLoadFromFileClick">
+                {{ t('settings.loadFromExistingFile') }}
               </BaseButton>
             </div>
 
-            <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
-              <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">Load from File</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Load data from a different file</p>
-              </div>
-              <BaseButton
-                variant="secondary"
-                size="sm"
-                :loading="syncStore.isSyncing"
-                @click="handleLoadFromFileClick"
-              >
-                Browse...
-              </BaseButton>
-            </div>
-
-            <!-- Load file confirmation dialog -->
-            <div v-if="showLoadFileConfirm" class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-              <p class="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
-                This will replace all local data with the contents of the selected file and switch your sync connection to that file. Continue?
+            <!-- Load file confirmation dialog (when not configured) -->
+            <div
+              v-if="showLoadFileConfirm"
+              class="mt-4 rounded-lg bg-yellow-50 p-4 text-left dark:bg-yellow-900/20"
+            >
+              <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
+                This will replace all local data with the contents of the selected file and set it
+                as your sync file. Continue?
               </p>
               <div class="flex gap-2">
                 <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
@@ -364,148 +303,317 @@ function formatLastSync(timestamp: string | null): string {
                 </BaseButton>
               </div>
             </div>
+          </div>
 
-            <div class="flex items-center justify-between py-3">
-              <div>
-                <p class="font-medium text-gray-900 dark:text-gray-100">Disconnect</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Stop syncing to this file</p>
-              </div>
-              <BaseButton variant="ghost" size="sm" @click="handleDisconnect">
-                Disconnect
+          <!-- Configured state -->
+          <div v-else class="space-y-4">
+            <!-- Needs permission state -->
+            <div
+              v-if="syncStore.needsPermission"
+              class="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
+            >
+              <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
+                Click to grant permission to access your sync file.
+              </p>
+              <BaseButton variant="primary" @click="handleRequestPermission">
+                Grant Permission
               </BaseButton>
             </div>
 
-            <!-- Sync conflict dialog -->
-            <div v-if="showSyncConflict" class="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-              <div class="flex items-start gap-3">
-                <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div class="flex-1">
-                  <p class="font-medium text-yellow-800 dark:text-yellow-200">Sync Conflict Detected</p>
-                  <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                    The sync file has newer data than your local data. This can happen if changes were made on another device.
+            <!-- Ready state -->
+            <div v-else>
+              <div
+                class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              >
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">Sync File</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ syncStore.fileName }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span
+                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                    :class="{
+                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400':
+                        syncStore.syncStatus === 'ready',
+                      'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400':
+                        syncStore.syncStatus === 'syncing',
+                      'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400':
+                        syncStore.syncStatus === 'error',
+                    }"
+                  >
+                    {{
+                      syncStore.syncStatus === 'syncing'
+                        ? 'Syncing...'
+                        : syncStore.syncStatus === 'error'
+                          ? 'Error'
+                          : 'Connected'
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              >
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">Last Sync</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ formatLastSync(syncStore.lastSync) }}
                   </p>
-                  <div class="text-xs text-yellow-600 dark:text-yellow-400 mt-2 space-y-1">
-                    <p><strong>File last updated:</strong> {{ formatConflictTimestamp(conflictInfo?.fileTimestamp ?? null) }}</p>
-                    <p><strong>Local last sync:</strong> {{ formatConflictTimestamp(conflictInfo?.localTimestamp ?? null) }}</p>
-                  </div>
-                  <div class="flex gap-2 mt-3">
-                    <BaseButton variant="primary" size="sm" @click="handleLoadFromFileInstead">
-                      Load from File
-                    </BaseButton>
-                    <BaseButton variant="ghost" size="sm" @click="handleForceSyncNow">
-                      Overwrite File
-                    </BaseButton>
-                    <BaseButton variant="ghost" size="sm" @click="showSyncConflict = false">
-                      Cancel
-                    </BaseButton>
+                </div>
+                <BaseButton
+                  variant="secondary"
+                  size="sm"
+                  :loading="syncStore.isSyncing"
+                  @click="handleSyncNow"
+                >
+                  Sync Now
+                </BaseButton>
+              </div>
+
+              <div
+                class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              >
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">Load from File</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Load data from a different file
+                  </p>
+                </div>
+                <BaseButton
+                  variant="secondary"
+                  size="sm"
+                  :loading="syncStore.isSyncing"
+                  @click="handleLoadFromFileClick"
+                >
+                  Browse...
+                </BaseButton>
+              </div>
+
+              <!-- Load file confirmation dialog -->
+              <div
+                v-if="showLoadFileConfirm"
+                class="mt-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
+              >
+                <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
+                  This will replace all local data with the contents of the selected file and switch
+                  your sync connection to that file. Continue?
+                </p>
+                <div class="flex gap-2">
+                  <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
+                    Yes, Load File
+                  </BaseButton>
+                  <BaseButton variant="ghost" size="sm" @click="showLoadFileConfirm = false">
+                    Cancel
+                  </BaseButton>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-3">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">Disconnect</p>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Stop syncing to this file</p>
+                </div>
+                <BaseButton variant="ghost" size="sm" @click="handleDisconnect">
+                  Disconnect
+                </BaseButton>
+              </div>
+
+              <!-- Sync conflict dialog -->
+              <div
+                v-if="showSyncConflict"
+                class="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-900/20"
+              >
+                <div class="flex items-start gap-3">
+                  <svg
+                    class="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                    />
+                  </svg>
+                  <div class="flex-1">
+                    <p class="font-medium text-yellow-800 dark:text-yellow-200">
+                      Sync Conflict Detected
+                    </p>
+                    <p class="mt-1 text-sm text-yellow-700 dark:text-yellow-300">
+                      The sync file has newer data than your local data. This can happen if changes
+                      were made on another device.
+                    </p>
+                    <div class="mt-2 space-y-1 text-xs text-yellow-600 dark:text-yellow-400">
+                      <p>
+                        <strong>File last updated:</strong>
+                        {{ formatConflictTimestamp(conflictInfo?.fileTimestamp ?? null) }}
+                      </p>
+                      <p>
+                        <strong>Local last sync:</strong>
+                        {{ formatConflictTimestamp(conflictInfo?.localTimestamp ?? null) }}
+                      </p>
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                      <BaseButton variant="primary" size="sm" @click="handleLoadFromFileInstead">
+                        Load from File
+                      </BaseButton>
+                      <BaseButton variant="ghost" size="sm" @click="handleForceSyncNow">
+                        Overwrite File
+                      </BaseButton>
+                      <BaseButton variant="ghost" size="sm" @click="showSyncConflict = false">
+                        Cancel
+                      </BaseButton>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- Error display -->
-            <div v-if="syncStore.error && !showSyncConflict" class="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <p class="text-sm text-red-600 dark:text-red-400">{{ syncStore.error }}</p>
-            </div>
+              <!-- Error display -->
+              <div
+                v-if="syncStore.error && !showSyncConflict"
+                class="mt-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20"
+              >
+                <p class="text-sm text-red-600 dark:text-red-400">{{ syncStore.error }}</p>
+              </div>
 
-            <!-- Success message -->
-            <div v-if="importSuccess" class="mt-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-              <p class="text-sm text-green-600 dark:text-green-400">Data loaded successfully!</p>
-            </div>
+              <!-- Success message -->
+              <div
+                v-if="importSuccess"
+                class="mt-4 rounded-lg bg-green-50 p-3 dark:bg-green-900/20"
+              >
+                <p class="text-sm text-green-600 dark:text-green-400">Data loaded successfully!</p>
+              </div>
 
-            <!-- Auto-sync toggle -->
-            <div class="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="settingsStore.settings.autoSyncEnabled"
-                  class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  @change="settingsStore.setAutoSyncEnabled(!settingsStore.settings.autoSyncEnabled)"
-                />
-                <div>
-                  <p class="font-medium text-gray-900 dark:text-gray-100">Auto-sync</p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">Automatically save changes to the sync file</p>
-                </div>
-              </label>
-            </div>
+              <!-- Auto-sync toggle -->
+              <div class="mt-4 border-t border-gray-200 pt-4 dark:border-slate-700">
+                <label class="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    :checked="settingsStore.settings.autoSyncEnabled"
+                    class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                    @change="
+                      settingsStore.setAutoSyncEnabled(!settingsStore.settings.autoSyncEnabled)
+                    "
+                  />
+                  <div>
+                    <p class="font-medium text-gray-900 dark:text-gray-100">Auto-sync</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      Automatically save changes to the sync file
+                    </p>
+                  </div>
+                </label>
+              </div>
 
-            <!-- Encryption toggle -->
-            <div class="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-              <label class="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="syncStore.isEncryptionEnabled"
-                  :disabled="isProcessingEncryption"
-                  class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                  @change="handleEncryptionToggle"
-                />
-                <div>
-                  <p class="font-medium text-gray-900 dark:text-gray-100">
-                    Encrypt sync file
-                    <span v-if="syncStore.isEncryptionEnabled" class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                      <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Encrypted
-                    </span>
-                  </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">Protect your data with password encryption</p>
-                </div>
-              </label>
-              <p v-if="!syncStore.hasSessionPassword && syncStore.isEncryptionEnabled" class="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
-                Note: You'll need to enter your password when you return to sync changes.
+              <!-- Encryption toggle -->
+              <div class="mt-4 border-t border-gray-200 pt-4 dark:border-slate-700">
+                <label class="flex cursor-pointer items-center gap-3">
+                  <input
+                    type="checkbox"
+                    :checked="syncStore.isEncryptionEnabled"
+                    :disabled="isProcessingEncryption"
+                    class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                    @change="handleEncryptionToggle"
+                  />
+                  <div>
+                    <p class="font-medium text-gray-900 dark:text-gray-100">
+                      Encrypt sync file
+                      <span
+                        v-if="syncStore.isEncryptionEnabled"
+                        class="ml-2 inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      >
+                        <svg
+                          class="mr-1 h-3 w-3"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                          />
+                        </svg>
+                        Encrypted
+                      </span>
+                    </p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                      Protect your data with password encryption
+                    </p>
+                  </div>
+                </label>
+                <p
+                  v-if="!syncStore.hasSessionPassword && syncStore.isEncryptionEnabled"
+                  class="mt-2 text-sm text-yellow-600 dark:text-yellow-400"
+                >
+                  Note: You'll need to enter your password when you return to sync changes.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fallback for older browsers -->
+        <div v-else class="space-y-4">
+          <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Your browser doesn't support automatic file sync. Use manual export/import instead.
+          </p>
+          <div
+            class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+          >
+            <div>
+              <p class="font-medium text-gray-900 dark:text-gray-100">Export Data</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                Download your data as a JSON file
               </p>
             </div>
+            <BaseButton variant="secondary" size="sm" @click="handleManualExport">
+              Export
+            </BaseButton>
+          </div>
+          <div class="flex items-center justify-between py-3">
+            <div>
+              <p class="font-medium text-gray-900 dark:text-gray-100">Import Data</p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">Load data from a JSON file</p>
+            </div>
+            <BaseButton variant="secondary" size="sm" @click="handleManualImport">
+              Import
+            </BaseButton>
+          </div>
+
+          <!-- Import error -->
+          <div v-if="importError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+            <p class="text-sm text-red-600 dark:text-red-400">{{ importError }}</p>
+          </div>
+
+          <!-- Import success -->
+          <div v-if="importSuccess" class="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
+            <p class="text-sm text-green-600 dark:text-green-400">Data imported successfully!</p>
           </div>
         </div>
-      </div>
-
-      <!-- Fallback for older browsers -->
-      <div v-else class="space-y-4">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Your browser doesn't support automatic file sync. Use manual export/import instead.
-        </p>
-        <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
-          <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">Export Data</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Download your data as a JSON file</p>
-          </div>
-          <BaseButton variant="secondary" size="sm" @click="handleManualExport">
-            Export
-          </BaseButton>
-        </div>
-        <div class="flex items-center justify-between py-3">
-          <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">Import Data</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Load data from a JSON file</p>
-          </div>
-          <BaseButton variant="secondary" size="sm" @click="handleManualImport">
-            Import
-          </BaseButton>
-        </div>
-
-        <!-- Import error -->
-        <div v-if="importError" class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-          <p class="text-sm text-red-600 dark:text-red-400">{{ importError }}</p>
-        </div>
-
-        <!-- Import success -->
-        <div v-if="importSuccess" class="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-          <p class="text-sm text-green-600 dark:text-green-400">Data imported successfully!</p>
-        </div>
-      </div>
-    </BaseCard>
+      </BaseCard>
     </div>
 
     <!-- Second Row: AI Settings and About side by side on wide screens -->
-    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <!-- AI Settings -->
       <BaseCard :title="t('settings.aiInsights')">
-        <div class="text-center py-8 text-gray-500 dark:text-gray-400">
-          <svg class="w-12 h-12 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        <div class="py-8 text-center text-gray-500 dark:text-gray-400">
+          <svg
+            class="mx-auto mb-4 h-12 w-12 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+            />
           </svg>
           <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
           <p class="mt-1 text-sm">{{ t('settings.aiComingSoon') }}</p>
@@ -515,7 +623,9 @@ function formatLastSync(timestamp: string | null): string {
       <!-- About -->
       <BaseCard :title="t('settings.about')">
         <div class="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-          <p><strong class="text-gray-900 dark:text-gray-100">{{ t('settings.appName') }}</strong></p>
+          <p>
+            <strong class="text-gray-900 dark:text-gray-100">{{ t('settings.appName') }}</strong>
+          </p>
           <p>{{ t('settings.version') }}</p>
           <p>{{ t('settings.appDescription') }}</p>
           <p class="pt-2">
@@ -531,19 +641,29 @@ function formatLastSync(timestamp: string | null): string {
     <!-- Data Management (full width) -->
     <BaseCard :title="t('settings.dataManagement')">
       <div class="space-y-4">
-        <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
+        <div
+          class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+        >
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('settings.exportData') }}</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.exportDataDescription') }}</p>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.exportData') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.exportDataDescription') }}
+            </p>
           </div>
           <BaseButton variant="ghost" size="sm" @click="handleManualExport">
             {{ t('action.export') }}
           </BaseButton>
         </div>
-        <div class="flex items-center justify-between py-3 border-b border-gray-200 dark:border-slate-700">
+        <div
+          class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+        >
           <div>
             <p class="font-medium text-gray-900 dark:text-gray-100">Export Translation Cache</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Download cached translations as a JSON file to commit to the repository</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              Download cached translations as a JSON file to commit to the repository
+            </p>
           </div>
           <BaseButton
             variant="ghost"
@@ -556,8 +676,12 @@ function formatLastSync(timestamp: string | null): string {
         </div>
         <div class="flex items-center justify-between py-3">
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('settings.clearAllData') }}</p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('settings.clearAllDataDescription') }}</p>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.clearAllData') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.clearAllDataDescription') }}
+            </p>
           </div>
           <BaseButton variant="danger" size="sm" @click="showClearConfirm = true">
             {{ t('settings.clearData') }}
@@ -566,8 +690,8 @@ function formatLastSync(timestamp: string | null): string {
       </div>
 
       <!-- Clear confirmation dialog -->
-      <div v-if="showClearConfirm" class="mt-4 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-        <p class="text-sm text-red-800 dark:text-red-200 mb-3">
+      <div v-if="showClearConfirm" class="mt-4 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+        <p class="mb-3 text-sm text-red-800 dark:text-red-200">
           {{ t('settings.clearDataConfirmation') }}
         </p>
         <div class="flex gap-2">
@@ -605,22 +729,37 @@ function formatLastSync(timestamp: string | null): string {
     <!-- Encryption error toast -->
     <div
       v-if="encryptionError"
-      class="fixed bottom-4 right-4 p-4 bg-red-50 dark:bg-red-900/90 border border-red-200 dark:border-red-800 rounded-lg shadow-lg max-w-sm"
+      class="fixed right-4 bottom-4 max-w-sm rounded-lg border border-red-200 bg-red-50 p-4 shadow-lg dark:border-red-800 dark:bg-red-900/90"
     >
       <div class="flex items-start gap-3">
-        <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          class="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
         <div>
           <p class="text-sm font-medium text-red-800 dark:text-red-200">Encryption Error</p>
-          <p class="text-sm text-red-600 dark:text-red-300 mt-1">{{ encryptionError }}</p>
+          <p class="mt-1 text-sm text-red-600 dark:text-red-300">{{ encryptionError }}</p>
         </div>
         <button
           class="text-red-400 hover:text-red-600 dark:hover:text-red-200"
           @click="encryptionError = null"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>

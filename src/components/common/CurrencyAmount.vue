@@ -3,22 +3,25 @@ import { computed } from 'vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import type { CurrencyCode } from '@/types/models';
 
-const props = withDefaults(defineProps<{
-  /** The amount to display */
-  amount: number;
-  /** The original currency of the amount */
-  currency: CurrencyCode;
-  /** Show as positive/negative with color (for income/expense) */
-  type?: 'income' | 'expense' | 'neutral';
-  /** Size variant */
-  size?: 'sm' | 'md' | 'lg' | 'xl';
-  /** Show the original currency even when not converted */
-  alwaysShowOriginal?: boolean;
-}>(), {
-  type: 'neutral',
-  size: 'md',
-  alwaysShowOriginal: false,
-});
+const props = withDefaults(
+  defineProps<{
+    /** The amount to display */
+    amount: number;
+    /** The original currency of the amount */
+    currency: CurrencyCode;
+    /** Show as positive/negative with color (for income/expense) */
+    type?: 'income' | 'expense' | 'neutral';
+    /** Size variant */
+    size?: 'sm' | 'md' | 'lg' | 'xl';
+    /** Show the original currency even when not converted */
+    alwaysShowOriginal?: boolean;
+  }>(),
+  {
+    type: 'neutral',
+    size: 'md',
+    alwaysShowOriginal: false,
+  }
+);
 
 const { convertToDisplay } = useCurrencyDisplay();
 
@@ -66,9 +69,17 @@ const prefix = computed(() => {
   <span class="inline-flex flex-col">
     <!-- Primary amount (display currency) -->
     <span :class="primaryClasses">
-      <span v-if="converted.conversionFailed" class="text-yellow-500 mr-1" title="Exchange rate not available">
-        <svg class="w-3 h-3 inline-block" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+      <span
+        v-if="converted.conversionFailed"
+        class="mr-1 text-yellow-500"
+        title="Exchange rate not available"
+      >
+        <svg class="inline-block h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+          <path
+            fill-rule="evenodd"
+            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+            clip-rule="evenodd"
+          />
         </svg>
       </span>
       {{ prefix }}{{ converted.displayFormatted }}

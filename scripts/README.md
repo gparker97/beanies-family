@@ -35,6 +35,7 @@ npm run translate zh
 The script updates: `src/services/translation/translations/{language}.json`
 
 Example output:
+
 ```
 🌐 Updating translations for: 中文 (简体) (zh)
 
@@ -78,17 +79,19 @@ const LANGUAGES = {
   zh: {
     code: 'zh',
     name: '中文 (简体)',
-    myMemoryCode: 'zh-CN'
+    myMemoryCode: 'zh-CN',
   },
-  es: {  // Add new language
+  es: {
+    // Add new language
     code: 'es',
     name: 'Español',
-    myMemoryCode: 'es'
-  }
+    myMemoryCode: 'es',
+  },
 };
 ```
 
 Then add a corresponding npm script in `package.json`:
+
 ```json
 "translate:es": "node scripts/updateTranslations.mjs es"
 ```
@@ -96,6 +99,7 @@ Then add a corresponding npm script in `package.json`:
 ### API Information
 
 Uses [MyMemory Translation API](https://mymemory.translated.net/):
+
 - Free tier: 50,000 characters/day
 - Rate limit: ~1 request per 250ms (respectful)
 - No API key required (but included for higher limits)
@@ -103,13 +107,16 @@ Uses [MyMemory Translation API](https://mymemory.translated.net/):
 ### Troubleshooting
 
 **Translation quality issues?**
+
 - Manually edit the JSON file to fix translations
 - The hash will remain the same, so your fix won't be overwritten
 
 **API rate limit errors?**
+
 - Increase `REQUEST_DELAY_MS` in the script
 - Wait a few minutes and try again
 
 **Script fails to parse uiStrings.ts?**
+
 - Ensure the `UI_STRINGS` object format hasn't changed
 - Check for syntax errors in uiStrings.ts

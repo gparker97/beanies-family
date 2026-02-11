@@ -1,7 +1,7 @@
 import { getDatabase } from '../database';
 import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
-import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
+import { generateUUID } from '@/utils/id';
 
 export async function getAllGoals(): Promise<Goal[]> {
   const db = await getDatabase();
@@ -43,10 +43,7 @@ export async function createGoal(input: CreateGoalInput): Promise<Goal> {
   return goal;
 }
 
-export async function updateGoal(
-  id: string,
-  input: UpdateGoalInput
-): Promise<Goal | undefined> {
+export async function updateGoal(id: string, input: UpdateGoalInput): Promise<Goal | undefined> {
   const db = await getDatabase();
   const existing = await db.get('goals', id);
 
@@ -76,7 +73,10 @@ export async function deleteGoal(id: string): Promise<boolean> {
   return true;
 }
 
-export async function updateGoalProgress(id: string, currentAmount: number): Promise<Goal | undefined> {
+export async function updateGoalProgress(
+  id: string,
+  currentAmount: number
+): Promise<Goal | undefined> {
   const goal = await getGoalById(id);
   if (!goal) return undefined;
 

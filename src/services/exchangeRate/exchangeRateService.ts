@@ -1,10 +1,11 @@
-import type { CurrencyCode, ExchangeRate } from '@/types/models';
 import { SUPPORTED_CURRENCY_CODES } from '@/constants/currencies';
-import { toISODateString } from '@/utils/date';
 import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
+import type { CurrencyCode, ExchangeRate } from '@/types/models';
+import { toISODateString } from '@/utils/date';
 
 // API URLs
-const PRIMARY_API_URL = 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies';
+const PRIMARY_API_URL =
+  'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies';
 const FALLBACK_API_URL = 'https://latest.currency-api.pages.dev/v1/currencies';
 
 // Staleness threshold: 24 hours

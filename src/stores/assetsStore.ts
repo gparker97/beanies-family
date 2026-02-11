@@ -1,9 +1,15 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Asset, CreateAssetInput, UpdateAssetInput, CurrencyCode, ExchangeRate } from '@/types/models';
-import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
-import { useSettingsStore } from './settingsStore';
 import { useMemberFilterStore } from './memberFilterStore';
+import { useSettingsStore } from './settingsStore';
+import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
+import type {
+  Asset,
+  CreateAssetInput,
+  UpdateAssetInput,
+  CurrencyCode,
+  ExchangeRate,
+} from '@/types/models';
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
@@ -12,7 +18,11 @@ export const useAssetsStore = defineStore('assets', () => {
   const error = ref<string | null>(null);
 
   // Helper to get exchange rate
-  function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
+  function getRate(
+    rates: ExchangeRate[],
+    from: CurrencyCode,
+    to: CurrencyCode
+  ): number | undefined {
     if (from === to) return 1;
 
     // Direct rate
@@ -97,26 +107,26 @@ export const useAssetsStore = defineStore('assets', () => {
     if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
       return assets.value;
     }
-    return assets.value.filter(a => memberFilter.isMemberSelected(a.memberId));
+    return assets.value.filter((a) => memberFilter.isMemberSelected(a.memberId));
   });
 
   // Filtered total asset value
   const filteredTotalAssetValue = computed(() =>
     filteredAssets.value
-      .filter(a => a.includeInNetWorth)
+      .filter((a) => a.includeInNetWorth)
       .reduce((sum, a) => sum + convertToBaseCurrency(a.currentValue, a.currency), 0)
   );
 
   // Filtered total loan value
   const filteredTotalLoanValue = computed(() =>
     filteredAssets.value
-      .filter(a => a.includeInNetWorth && a.loan?.hasLoan && a.loan?.outstandingBalance)
+      .filter((a) => a.includeInNetWorth && a.loan?.hasLoan && a.loan?.outstandingBalance)
       .reduce((sum, a) => sum + convertToBaseCurrency(a.loan!.outstandingBalance!, a.currency), 0)
   );
 
   // Filtered net asset value
-  const filteredNetAssetValue = computed(() =>
-    filteredTotalAssetValue.value - filteredTotalLoanValue.value
+  const filteredNetAssetValue = computed(
+    () => filteredTotalAssetValue.value - filteredTotalLoanValue.value
   );
 
   // Actions

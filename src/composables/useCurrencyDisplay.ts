@@ -1,6 +1,6 @@
 import { computed } from 'vue';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type { CurrencyCode, ExchangeRate } from '@/types/models';
 
 /**
@@ -19,7 +19,7 @@ function formatCurrencyWithCode(amount: number, currencyCode: CurrencyCode): str
 
   // Use $ for dollar-based currencies (USD, SGD, etc.), otherwise use the symbol
   const isDollarBased = currencyCode.endsWith('D') || currencyCode === 'USD';
-  const symbol = isDollarBased ? '$' : (info?.symbol || '');
+  const symbol = isDollarBased ? '$' : info?.symbol || '';
 
   return `${currencyCode} ${symbol}${formattedNumber}`;
 }
@@ -46,11 +46,7 @@ export interface ConvertedAmount {
 /**
  * Get exchange rate from the rates array
  */
-function getRate(
-  rates: ExchangeRate[],
-  from: CurrencyCode,
-  to: CurrencyCode
-): number | undefined {
+function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
   if (from === to) return 1;
 
   // Direct rate
@@ -102,10 +98,7 @@ export function useCurrencyDisplay() {
   /**
    * Convert an amount from its original currency to the display currency
    */
-  function convertToDisplay(
-    amount: number,
-    originalCurrency: CurrencyCode
-  ): ConvertedAmount {
+  function convertToDisplay(amount: number, originalCurrency: CurrencyCode): ConvertedAmount {
     const targetCurrency = displayCurrency.value;
     const isConverted = originalCurrency !== targetCurrency;
 

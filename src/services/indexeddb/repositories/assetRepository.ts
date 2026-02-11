@@ -1,7 +1,7 @@
 import { getDatabase } from '../database';
 import type { Asset, AssetType, CreateAssetInput, UpdateAssetInput } from '@/types/models';
-import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
+import { generateUUID } from '@/utils/id';
 
 export async function getAllAssets(): Promise<Asset[]> {
   const db = await getDatabase();
@@ -38,10 +38,7 @@ export async function createAsset(input: CreateAssetInput): Promise<Asset> {
   return asset;
 }
 
-export async function updateAsset(
-  id: string,
-  input: UpdateAssetInput
-): Promise<Asset | undefined> {
+export async function updateAsset(id: string, input: UpdateAssetInput): Promise<Asset | undefined> {
   const db = await getDatabase();
   const existing = await db.get('assets', id);
 
@@ -72,9 +69,7 @@ export async function deleteAsset(id: string): Promise<boolean> {
 }
 
 export async function getTotalAssetValue(memberId?: string): Promise<number> {
-  const assets = memberId
-    ? await getAssetsByMemberId(memberId)
-    : await getAllAssets();
+  const assets = memberId ? await getAssetsByMemberId(memberId) : await getAllAssets();
 
   return assets
     .filter((a) => a.includeInNetWorth)

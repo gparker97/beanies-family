@@ -201,7 +201,14 @@ export interface TranslationCacheEntry {
 
 // Sync queue item for tracking changes
 export type SyncOperation = 'create' | 'update' | 'delete';
-export type EntityType = 'familyMember' | 'account' | 'transaction' | 'asset' | 'goal' | 'recurringItem' | 'settings';
+export type EntityType =
+  | 'familyMember'
+  | 'account'
+  | 'transaction'
+  | 'asset'
+  | 'goal'
+  | 'recurringItem'
+  | 'settings';
 
 export interface SyncQueueItem {
   id: UUID;
@@ -249,7 +256,9 @@ export type CreateGoalInput = Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateGoalInput = Partial<Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>>;
 
 export type CreateRecurringItemInput = Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>;
-export type UpdateRecurringItemInput = Partial<Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>>;
+export type UpdateRecurringItemInput = Partial<
+  Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>
+>;
 
 // Sync file format
 export const SYNC_FILE_VERSION = '1.0';

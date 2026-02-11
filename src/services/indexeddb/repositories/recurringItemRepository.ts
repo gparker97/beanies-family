@@ -5,8 +5,8 @@ import type {
   UpdateRecurringItemInput,
   ISODateString,
 } from '@/types/models';
-import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
+import { generateUUID } from '@/utils/id';
 
 export async function getAllRecurringItems(): Promise<RecurringItem[]> {
   const db = await getDatabase();
@@ -23,7 +23,9 @@ export async function getRecurringItemsByAccountId(accountId: string): Promise<R
   return db.getAllFromIndex('recurringItems', 'by-accountId', accountId);
 }
 
-export async function getRecurringItemsByType(type: 'income' | 'expense'): Promise<RecurringItem[]> {
+export async function getRecurringItemsByType(
+  type: 'income' | 'expense'
+): Promise<RecurringItem[]> {
   const db = await getDatabase();
   return db.getAllFromIndex('recurringItems', 'by-type', type);
 }

@@ -1,11 +1,11 @@
 import { ref, computed } from 'vue';
-import { useSettingsStore } from '@/stores/settingsStore';
 import {
   updateRatesIfStale,
   forceUpdateRates,
   areRatesStale,
   formatLastUpdate,
 } from '@/services/exchangeRate';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 export function useExchangeRates() {
   const settingsStore = useSettingsStore();

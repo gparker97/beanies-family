@@ -82,6 +82,7 @@ gp-family-finance-planner/
 ## Data Models
 
 ### FamilyMember
+
 - `id`: UUID
 - `name`: string
 - `email`: string (unique)
@@ -90,6 +91,7 @@ gp-family-finance-planner/
 - Timestamps: createdAt, updatedAt
 
 ### Account
+
 - `id`: UUID
 - `memberId`: UUID (FK to FamilyMember)
 - `name`: string
@@ -102,6 +104,7 @@ gp-family-finance-planner/
 - Timestamps: createdAt, updatedAt
 
 ### Transaction
+
 - `id`: UUID
 - `accountId`: UUID (FK to Account)
 - `toAccountId`: UUID (optional, for transfers)
@@ -116,6 +119,7 @@ gp-family-finance-planner/
 - Timestamps: createdAt, updatedAt
 
 ### Asset
+
 - `id`: UUID
 - `memberId`: UUID (FK to FamilyMember)
 - `type`: 'real_estate' | 'vehicle' | 'investment' | 'crypto' | 'collectible' | 'other'
@@ -127,6 +131,7 @@ gp-family-finance-planner/
 - Timestamps: createdAt, updatedAt
 
 ### Goal
+
 - `id`: UUID
 - `memberId`: UUID (optional, null = family-wide)
 - `name`: string
@@ -140,6 +145,7 @@ gp-family-finance-planner/
 - Timestamps: createdAt, updatedAt
 
 ### Settings
+
 - `id`: 'app_settings' (singleton)
 - `baseCurrency`: CurrencyCode
 - `exchangeRates`: ExchangeRate[]
@@ -191,6 +197,7 @@ npm run lint
 ## Current Status (MVP - Phase 1)
 
 Implemented:
+
 - [x] Project scaffold with Vite + Vue 3 + TypeScript
 - [x] IndexedDB service with repositories
 - [x] Pinia stores for all entities
@@ -206,6 +213,7 @@ Implemented:
 - [x] Dark mode support
 
 Pending (Future Phases):
+
 - [ ] Google Drive encrypted sync
 - [ ] PWA offline support
 - [ ] Charts and reports

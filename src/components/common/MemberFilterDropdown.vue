@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
+import BaseMultiSelect from '@/components/ui/BaseMultiSelect/index.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { useTranslation } from '@/composables/useTranslation';
-import BaseMultiSelect from '@/components/ui/BaseMultiSelect/index.vue';
 
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
@@ -27,7 +27,7 @@ const selectedIds = computed({
 
 // Build options from family members
 const memberOptions = computed(() =>
-  familyStore.members.map(member => ({
+  familyStore.members.map((member) => ({
     value: member.id,
     label: member.name,
     color: member.color || '#3b82f6',
@@ -45,7 +45,7 @@ watch(
 );
 
 // Compact display for header
-const displayText = computed(() => {
+const _displayText = computed(() => {
   if (!memberFilterStore.isInitialized || familyStore.members.length === 0) {
     return t('filter.members');
   }
