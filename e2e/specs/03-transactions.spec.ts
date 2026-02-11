@@ -6,6 +6,7 @@ import { TestDataFactory } from '../fixtures/data';
 
 test.describe('Transaction Management', () => {
   test('should create transaction and update dashboard', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
@@ -34,6 +35,7 @@ test.describe('Transaction Management', () => {
   });
 
   test('should create expense and update dashboard', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 

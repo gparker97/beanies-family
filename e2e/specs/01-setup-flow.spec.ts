@@ -4,11 +4,11 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 
 test.describe('Setup Flow', () => {
   test('should complete fresh setup successfully', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
     const setupPage = new SetupPage(page);
-    await page.goto('/');
     await expect(page).toHaveURL('/setup');
 
     await setupPage.completeSetup('John Doe', 'john@example.com', 'USD');
@@ -21,6 +21,7 @@ test.describe('Setup Flow', () => {
   });
 
   test('should validate required fields', async ({ page }) => {
+    await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
 
