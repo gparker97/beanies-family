@@ -36,8 +36,8 @@ test.describe('Date Filtering', () => {
     await transactionsPage.goto();
     await transactionsPage.selectDateFilter('current_month');
 
-    await expect(page.getByText('Current Month')).toBeVisible();
-    await expect(page.getByText('Last Month')).not.toBeVisible();
+    await expect(page.getByTestId('transaction-item').getByText('Current Month')).toBeVisible();
+    await expect(page.getByTestId('transaction-item').getByText('Last Month')).not.toBeVisible();
   });
 
   test('should filter transactions by last month', async ({ page }) => {
@@ -72,8 +72,8 @@ test.describe('Date Filtering', () => {
     await transactionsPage.goto();
     await transactionsPage.selectDateFilter('last_month');
 
-    await expect(page.getByText('Last Month')).toBeVisible();
-    await expect(page.getByText('Current Month')).not.toBeVisible();
+    await expect(page.getByTestId('transaction-item').getByText('Last Month')).toBeVisible();
+    await expect(page.getByTestId('transaction-item').getByText('Current Month')).not.toBeVisible();
   });
 
   test('should filter transactions by last 3 months', async ({ page }) => {
@@ -108,7 +108,7 @@ test.describe('Date Filtering', () => {
     await transactionsPage.goto();
     await transactionsPage.selectDateFilter('last_3_months');
 
-    await expect(page.getByText('Within Range')).toBeVisible();
-    await expect(page.getByText('Outside Range')).not.toBeVisible();
+    await expect(page.getByTestId('transaction-item').getByText('Within Range')).toBeVisible();
+    await expect(page.getByTestId('transaction-item').getByText('Outside Range')).not.toBeVisible();
   });
 });
