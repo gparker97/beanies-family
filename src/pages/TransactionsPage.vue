@@ -731,6 +731,7 @@ function applyCustomDateRange() {
           <div
             v-for="transaction in transactions"
             :key="transaction.id"
+            data-testid="transaction-item"
             class="flex items-center justify-between py-4"
           >
             <div class="flex items-center gap-4">
