@@ -8,6 +8,9 @@ export class TransactionsPage {
   }
 
   async selectDateFilter(filter: 'current_month' | 'last_month' | 'last_3_months') {
+    // Switch to transactions tab if not already there (date filters only visible on transactions tab)
+    await this.page.getByRole('button', { name: 'One Time Transactions' }).click();
+
     const filterButtons = {
       current_month: 'Current Month',
       last_month: 'Last Month',
@@ -23,6 +26,8 @@ export class TransactionsPage {
     amount: number;
     category?: string;
   }) {
+    // Switch to transactions tab if not already there (default is recurring tab)
+    await this.page.getByRole('button', { name: 'One Time Transactions' }).click();
     await this.page.getByRole('button', { name: 'Add Transaction' }).click();
     await this.page.getByLabel('Type').selectOption(data.type);
     await this.page.getByLabel('Account').selectOption(data.account);
