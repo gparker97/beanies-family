@@ -1,5 +1,14 @@
 # GP Family Financial Planner
 
+> **IMPORTANT — Read before starting any work:**
+> Always read `docs/STATUS.md` before beginning or continuing work on this project. It contains the latest project status, what is in progress, and recent decisions. Update it when completing significant work or making architectural decisions.
+>
+> **Key project documents in `docs/`:**
+>
+> - `docs/STATUS.md` — Current project status and progress
+> - `docs/ARCHITECTURE.md` — System architecture, data flow, and key patterns
+> - `docs/adr/` — Architectural Decision Records (ADRs) for all major design decisions
+
 ## Project Overview
 
 A local-first, PWA-enabled family financial planning application. The app allows families to track accounts, transactions, assets, and financial goals with multi-currency support and optional encrypted cloud sync to Google Drive.
