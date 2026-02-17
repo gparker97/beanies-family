@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseCard } from '@/components/ui';
 import { CURRENCIES, DEFAULT_CURRENCY } from '@/constants/currencies';
 import { canAutoSync } from '@/services/sync/capabilities';
+import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+
+// Authenticated users already have an email from their account — no need to ask again
+const hasAuthEmail = computed(
+  () => authStore.isAuthenticated && !authStore.isLocalOnlyMode && !!authStore.currentUser?.email
+);
 
 const isSubmitting = ref(false);
 const isLoadingFile = ref(false);
@@ -57,14 +64,17 @@ function validateStep1(): boolean {
     return false;
   }
 
-  if (!form.email.trim()) {
-    errors.email = 'Email is required';
-    return false;
-  }
+  // Email validation only needed for local-only users (authenticated users have email from auth)
+  if (!hasAuthEmail.value) {
+    if (!form.email.trim()) {
+      errors.email = 'Email is required';
+      return false;
+    }
 
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = 'Please enter a valid email address';
-    return false;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errors.email = 'Please enter a valid email address';
+      return false;
+    }
   }
 
   return true;
@@ -90,9 +100,10 @@ async function completeSetup() {
   try {
     // Create the owner profile
     const randomColor = colors[Math.floor(Math.random() * colors.length)] ?? '#3b82f6';
+    const email = hasAuthEmail.value ? authStore.currentUser!.email : form.email.trim();
     const member = await familyStore.createMember({
       name: form.name.trim(),
-      email: form.email.trim(),
+      email,
       role: 'owner',
       color: randomColor,
     });
@@ -226,6 +237,7 @@ function handleDecryptModalClose() {
           />
 
           <BaseInput
+            v-if="!hasAuthEmail"
             v-model="form.email"
             type="email"
             label="Email Address"

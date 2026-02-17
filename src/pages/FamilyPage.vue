@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { BaseCard, BaseButton, BaseInput, BaseModal } from '@/components/ui';
+import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
+import CreateMemberAccountModal from '@/components/family/CreateMemberAccountModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import type { CreateFamilyMemberInput } from '@/types/models';
 
 const familyStore = useFamilyStore();
+const familyContextStore = useFamilyContextStore();
+const authStore = useAuthStore();
 const { t } = useTranslation();
 
 const showAddModal = ref(false);
+const showCreateAccountModal = ref(false);
 const isSubmitting = ref(false);
+const isEditingFamilyName = ref(false);
+const editFamilyName = ref('');
+const createAccountMemberName = ref('');
+const createAccountMemberEmail = ref('');
 
 const colors: string[] = [
   '#3b82f6',
@@ -28,16 +39,6 @@ const newMember = ref<CreateFamilyMemberInput>({
   role: 'member',
   color: colors[0] ?? '#3b82f6',
 });
-
-function getRoleLabel(role: string): string {
-  const roleKeys: Record<string, string> = {
-    owner: 'family.role.owner',
-    admin: 'family.role.admin',
-    member: 'family.role.member',
-  };
-  const key = roleKeys[role];
-  return key ? t(key as any) : role;
-}
 
 function openAddModal() {
   const randomColor = colors[Math.floor(Math.random() * colors.length)] ?? '#3b82f6';
@@ -72,13 +73,96 @@ async function deleteMember(id: string) {
     await familyStore.deleteMember(id);
   }
 }
+
+async function handleRoleChange(memberId: string, newRole: 'admin' | 'member') {
+  await familyStore.updateMemberRole(memberId, newRole);
+}
+
+function startEditFamilyName() {
+  editFamilyName.value = familyContextStore.activeFamilyName ?? '';
+  isEditingFamilyName.value = true;
+}
+
+async function saveFamilyName() {
+  if (!editFamilyName.value.trim()) return;
+  await familyContextStore.updateFamilyName(editFamilyName.value.trim());
+  isEditingFamilyName.value = false;
+}
+
+function cancelEditFamilyName() {
+  isEditingFamilyName.value = false;
+}
+
+function openCreateAccountModal(memberName: string, memberEmail: string) {
+  createAccountMemberName.value = memberName;
+  createAccountMemberEmail.value = memberEmail;
+  showCreateAccountModal.value = true;
+}
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- Family Name Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('family.title') }}</h1>
+        <div class="flex items-center gap-2">
+          <h1
+            v-if="!isEditingFamilyName"
+            class="text-2xl font-bold text-gray-900 dark:text-gray-100"
+          >
+            {{ familyContextStore.activeFamilyName || t('family.title') }}
+          </h1>
+          <div v-else class="flex items-center gap-2">
+            <input
+              v-model="editFamilyName"
+              type="text"
+              class="rounded-lg border border-gray-300 px-3 py-1.5 text-xl font-bold text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+              @keyup.enter="saveFamilyName"
+              @keyup.escape="cancelEditFamilyName"
+            />
+            <button
+              class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+              @click="saveFamilyName"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            </button>
+            <button
+              class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+              @click="cancelEditFamilyName"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <button
+            v-if="!isEditingFamilyName && familyContextStore.activeFamilyName"
+            class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+            title="Edit family name"
+            @click="startEditFamilyName"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+              />
+            </svg>
+          </button>
+        </div>
         <p class="text-gray-500 dark:text-gray-400">Manage your family profiles</p>
       </div>
       <BaseButton @click="openAddModal">
@@ -100,23 +184,23 @@ async function deleteMember(id: string) {
               <h3 class="truncate font-medium text-gray-900 dark:text-gray-100">
                 {{ member.name }}
               </h3>
-              <span
-                class="rounded-full px-2 py-0.5 text-xs"
-                :class="{
-                  'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400':
-                    member.role === 'owner',
-                  'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400':
-                    member.role === 'admin',
-                  'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300':
-                    member.role === 'member',
-                }"
-              >
-                {{ getRoleLabel(member.role) }}
-              </span>
+              <MemberRoleManager
+                :current-role="member.role"
+                :member-id="member.id"
+                @change="handleRoleChange(member.id, $event)"
+              />
             </div>
             <p class="truncate text-sm text-gray-500 dark:text-gray-400">
               {{ member.email }}
             </p>
+            <!-- Create Login button for members without auth -->
+            <button
+              v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
+              class="mt-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              @click="openCreateAccountModal(member.name, member.email)"
+            >
+              Create Login
+            </button>
           </div>
           <button
             v-if="member.role !== 'owner'"
@@ -187,5 +271,14 @@ async function deleteMember(id: string) {
         </div>
       </template>
     </BaseModal>
+
+    <!-- Create Member Account Modal -->
+    <CreateMemberAccountModal
+      :open="showCreateAccountModal"
+      :member-name="createAccountMemberName"
+      :member-email="createAccountMemberEmail"
+      @close="showCreateAccountModal = false"
+      @create="showCreateAccountModal = false"
+    />
   </div>
 </template>

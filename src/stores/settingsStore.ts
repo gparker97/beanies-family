@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
+import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type {
   Settings,
+  GlobalSettings,
   CurrencyCode,
   AIProvider,
   ExchangeRate,
@@ -12,6 +14,7 @@ import type {
 export const useSettingsStore = defineStore('settings', () => {
   // State
   const settings = ref<Settings>(settingsRepo.getDefaultSettings());
+  const globalSettings = ref<GlobalSettings>(globalSettingsRepo.getDefaultGlobalSettings());
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
@@ -20,13 +23,14 @@ export const useSettingsStore = defineStore('settings', () => {
   const displayCurrency = computed(
     () => settings.value.displayCurrency ?? settings.value.baseCurrency
   );
-  const theme = computed(() => settings.value.theme);
-  const language = computed(() => settings.value.language ?? 'en');
+  // Theme and language are global (device-level) settings
+  const theme = computed(() => globalSettings.value.theme);
+  const language = computed(() => globalSettings.value.language ?? 'en');
   const syncEnabled = computed(() => settings.value.syncEnabled);
   const aiProvider = computed(() => settings.value.aiProvider);
-  const exchangeRates = computed(() => settings.value.exchangeRates);
-  const exchangeRateAutoUpdate = computed(() => settings.value.exchangeRateAutoUpdate);
-  const exchangeRateLastFetch = computed(() => settings.value.exchangeRateLastFetch);
+  const exchangeRates = computed(() => globalSettings.value.exchangeRates);
+  const exchangeRateAutoUpdate = computed(() => globalSettings.value.exchangeRateAutoUpdate);
+  const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
 
   // Apply theme to document
   watch(
@@ -50,11 +54,28 @@ export const useSettingsStore = defineStore('settings', () => {
   );
 
   // Actions
+
+  /**
+   * Load global settings from registry DB (works before family is active).
+   */
+  async function loadGlobalSettings() {
+    try {
+      globalSettings.value = await globalSettingsRepo.getGlobalSettings();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to load global settings';
+    }
+  }
+
+  /**
+   * Load per-family settings from the active family DB.
+   */
   async function loadSettings() {
     isLoading.value = true;
     error.value = null;
     try {
       settings.value = await settingsRepo.getSettings();
+      // Also sync theme/language from per-family settings to global if they differ
+      // This maintains backward compatibility
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load settings';
     } finally {
@@ -90,6 +111,9 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      // Save to global settings (device-level)
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ theme: newTheme });
+      // Also save to per-family settings for backward compatibility
       settings.value = await settingsRepo.setTheme(newTheme);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update theme';
@@ -102,6 +126,9 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      // Save to global settings (device-level)
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ language: lang });
+      // Also save to per-family settings for backward compatibility
       settings.value = await settingsRepo.setLanguage(lang);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update language';
@@ -162,6 +189,11 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      // Save to global settings (exchange rates are device-level)
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+        exchangeRateAutoUpdate: enabled,
+      });
+      // Also save to per-family settings for backward compatibility
       settings.value = await settingsRepo.setExchangeRateAutoUpdate(enabled);
     } catch (e) {
       error.value =
@@ -175,6 +207,9 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      // Save to global settings (exchange rates are device-level)
+      globalSettings.value = await globalSettingsRepo.updateGlobalExchangeRates(rates);
+      // Also save to per-family settings for backward compatibility
       settings.value = await settingsRepo.updateExchangeRates(rates);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update exchange rates';
@@ -188,6 +223,8 @@ export const useSettingsStore = defineStore('settings', () => {
     error.value = null;
     try {
       settings.value = await settingsRepo.addExchangeRate(rate);
+      // Sync to global settings
+      globalSettings.value = await globalSettingsRepo.updateGlobalExchangeRates([rate]);
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to add exchange rate';
     } finally {
@@ -218,6 +255,7 @@ export const useSettingsStore = defineStore('settings', () => {
   return {
     // State
     settings,
+    globalSettings,
     isLoading,
     error,
     // Getters
@@ -231,6 +269,7 @@ export const useSettingsStore = defineStore('settings', () => {
     exchangeRateAutoUpdate,
     exchangeRateLastFetch,
     // Actions
+    loadGlobalSettings,
     loadSettings,
     setBaseCurrency,
     setDisplayCurrency,

@@ -98,6 +98,17 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  async function updateMemberRole(
+    id: string,
+    role: 'admin' | 'member'
+  ): Promise<FamilyMember | null> {
+    const member = members.value.find((m) => m.id === id);
+    if (!member || member.role === 'owner') {
+      return null;
+    }
+    return updateMember(id, { role });
+  }
+
   function setCurrentMember(id: string) {
     if (members.value.some((m) => m.id === id)) {
       currentMemberId.value = id;
@@ -120,6 +131,7 @@ export const useFamilyStore = defineStore('family', () => {
     createMember,
     updateMember,
     deleteMember,
+    updateMemberRole,
     setCurrentMember,
   };
 });

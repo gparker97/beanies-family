@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
+import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
+const router = useRouter();
+const authStore = useAuthStore();
 const familyStore = useFamilyStore();
+const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const translationStore = useTranslationStore();
 
 const currentMember = computed(() => familyStore.currentMember);
 const showCurrencyDropdown = ref(false);
 const showLanguageDropdown = ref(false);
+const showProfileDropdown = ref(false);
 
 const currencyOptions = DISPLAY_CURRENCIES.map((c) => ({
   code: c.code,
@@ -48,6 +55,16 @@ function closeCurrencyDropdown() {
 
 function closeLanguageDropdown() {
   showLanguageDropdown.value = false;
+}
+
+function closeProfileDropdown() {
+  showProfileDropdown.value = false;
+}
+
+async function handleSignOut() {
+  showProfileDropdown.value = false;
+  await authStore.signOut();
+  router.replace('/login');
 }
 </script>
 
@@ -211,19 +228,73 @@ function closeLanguageDropdown() {
         </svg>
       </button>
 
+      <!-- Offline badge -->
+      <span
+        v-if="authStore.isOfflineSession"
+        class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+      >
+        Offline
+      </span>
+
       <!-- Profile dropdown -->
-      <div class="flex items-center gap-3">
-        <div v-if="currentMember" class="flex items-center gap-2">
+      <div class="relative">
+        <button
+          v-if="currentMember || authStore.isAuthenticated"
+          class="flex items-center gap-2"
+          @click="showProfileDropdown = !showProfileDropdown"
+          @blur="closeProfileDropdown"
+        >
           <!-- Avatar -->
           <div
             class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-            :style="{ backgroundColor: currentMember.color || '#3b82f6' }"
+            :style="{ backgroundColor: currentMember?.color || '#3b82f6' }"
           >
-            {{ currentMember.name.charAt(0).toUpperCase() }}
+            {{
+              currentMember
+                ? currentMember.name.charAt(0).toUpperCase()
+                : authStore.currentUser?.email?.charAt(0)?.toUpperCase() || 'U'
+            }}
           </div>
           <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ currentMember.name }}
+            {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
           </span>
+          <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        <!-- Profile dropdown menu -->
+        <div
+          v-if="showProfileDropdown"
+          class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+        >
+          <div class="border-b border-gray-200 px-4 py-2 dark:border-slate-700">
+            <p class="text-sm font-medium text-gray-900 dark:text-white">
+              {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
+            </p>
+            <p
+              v-if="familyContextStore.activeFamilyName"
+              class="text-xs text-gray-500 dark:text-gray-400"
+            >
+              {{ familyContextStore.activeFamilyName }}
+            </p>
+            <p v-if="authStore.currentUser?.email" class="text-xs text-gray-500 dark:text-gray-400">
+              {{ authStore.currentUser.email }}
+            </p>
+          </div>
+          <button
+            v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
+            type="button"
+            class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
+            @mousedown.prevent="handleSignOut"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
     </div>

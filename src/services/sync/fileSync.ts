@@ -1,4 +1,9 @@
-import { exportAllData, importAllData, type ExportedData } from '@/services/indexeddb/database';
+import {
+  exportAllData,
+  importAllData,
+  getActiveFamilyId,
+  type ExportedData,
+} from '@/services/indexeddb/database';
 import type { SyncFileData } from '@/types/models';
 import { SYNC_FILE_VERSION } from '@/types/models';
 import { toISODateString } from '@/utils/date';
@@ -8,12 +13,20 @@ import { toISODateString } from '@/utils/date';
  */
 export async function createSyncFileData(encrypted = false): Promise<SyncFileData> {
   const data = await exportAllData();
-  return {
+  const syncData: SyncFileData = {
     version: SYNC_FILE_VERSION,
     exportedAt: toISODateString(new Date()),
     encrypted,
     data,
   };
+
+  // v2.0: include family identity
+  const familyId = getActiveFamilyId();
+  if (familyId) {
+    syncData.familyId = familyId;
+  }
+
+  return syncData;
 }
 
 /**

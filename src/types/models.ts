@@ -4,6 +4,48 @@ export type ISODateString = string;
 export type CurrencyCode = string; // ISO 4217 codes (e.g., 'USD', 'EUR', 'GBP')
 export type LanguageCode = 'en' | 'zh'; // Supported UI languages
 
+// Family - Top-level tenant entity (one per family)
+export interface Family {
+  id: UUID;
+  name: string;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+// UserFamilyMapping - Maps authenticated users to families
+export interface UserFamilyMapping {
+  id: UUID;
+  email: string;
+  familyId: UUID;
+  familyRole: 'owner' | 'admin' | 'member';
+  memberId: UUID; // FK to FamilyMember in per-family DB
+  isLocalOnly: boolean; // true = no Cognito account
+  lastActiveAt: ISODateString;
+}
+
+// CachedAuthSession - Offline-capable auth session
+export interface CachedAuthSession {
+  userId: string;
+  email: string;
+  idToken: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: ISODateString;
+  familyId: UUID;
+  cachedAt: ISODateString;
+}
+
+// GlobalSettings - Device-level settings (stored in registry DB, not per-family)
+export interface GlobalSettings {
+  id: 'global_settings';
+  theme: 'light' | 'dark' | 'system';
+  language: LanguageCode;
+  lastActiveFamilyId: UUID | null;
+  exchangeRates: ExchangeRate[];
+  exchangeRateAutoUpdate: boolean;
+  exchangeRateLastFetch: ISODateString | null;
+}
+
 // FamilyMember - Each family member has their own profile
 export interface FamilyMember {
   id: UUID;
@@ -261,12 +303,14 @@ export type UpdateRecurringItemInput = Partial<
 >;
 
 // Sync file format
-export const SYNC_FILE_VERSION = '1.0';
+export const SYNC_FILE_VERSION = '2.0';
 
 export interface SyncFileData {
   version: string;
   exportedAt: ISODateString;
   encrypted: boolean;
+  familyId?: UUID; // v2.0: identifies which family this data belongs to
+  familyName?: string; // v2.0: human-readable family name
   data: {
     familyMembers: FamilyMember[];
     accounts: Account[];

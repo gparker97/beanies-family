@@ -1,9 +1,10 @@
 import { openDB, type IDBPDatabase } from 'idb';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 
 const HANDLE_DB_NAME = 'gp-finance-file-handles';
 const HANDLE_DB_VERSION = 1;
 const HANDLE_STORE = 'handles';
-const SYNC_FILE_KEY = 'syncFile';
+const LEGACY_SYNC_FILE_KEY = 'syncFile';
 
 interface HandleDB {
   handles: {
@@ -31,23 +32,52 @@ async function getHandleDatabase(): Promise<IDBPDatabase<HandleDB>> {
 }
 
 /**
+ * Get the storage key for the current family's sync file handle.
+ * Falls back to legacy key if no family is active.
+ */
+function getSyncFileKey(): string {
+  const familyId = getActiveFamilyId();
+  return familyId ? `syncFile-${familyId}` : LEGACY_SYNC_FILE_KEY;
+}
+
+/**
  * Store a file handle for later retrieval
  */
 export async function storeFileHandle(handle: FileSystemFileHandle): Promise<void> {
   const db = await getHandleDatabase();
-  await db.put(HANDLE_STORE, handle, SYNC_FILE_KEY);
+  await db.put(HANDLE_STORE, handle, getSyncFileKey());
 }
 
 /**
- * Retrieve the stored file handle
+ * Retrieve the stored file handle for the current family.
+ * Only returns a handle stored under the family-specific key.
  */
 export async function getFileHandle(): Promise<FileSystemFileHandle | null> {
   try {
     const db = await getHandleDatabase();
-    const handle = await db.get(HANDLE_STORE, SYNC_FILE_KEY);
+    const key = getSyncFileKey();
+    const handle = await db.get(HANDLE_STORE, key);
+    console.log('[fileHandleStore] getFileHandle key:', key, 'found:', !!handle);
     return handle ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Migrate the legacy sync file handle to a specific family.
+ * Called during legacy DB migration only.
+ */
+export async function migrateLegacyFileHandle(familyId: string): Promise<void> {
+  try {
+    const db = await getHandleDatabase();
+    const legacyHandle = await db.get(HANDLE_STORE, LEGACY_SYNC_FILE_KEY);
+    if (legacyHandle) {
+      await db.put(HANDLE_STORE, legacyHandle, `syncFile-${familyId}`);
+      await db.delete(HANDLE_STORE, LEGACY_SYNC_FILE_KEY);
+    }
+  } catch {
+    // Non-critical — sync can be reconfigured manually
   }
 }
 
@@ -56,7 +86,7 @@ export async function getFileHandle(): Promise<FileSystemFileHandle | null> {
  */
 export async function clearFileHandle(): Promise<void> {
   const db = await getHandleDatabase();
-  await db.delete(HANDLE_STORE, SYNC_FILE_KEY);
+  await db.delete(HANDLE_STORE, getSyncFileKey());
 }
 
 /**

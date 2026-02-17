@@ -5,9 +5,11 @@ import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { needsLegacyMigration, runLegacyMigration } from '@/services/migration/legacyMigration';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -15,10 +17,12 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useAuthStore } from '@/stores/authStore';
 
 const route = useRoute();
 const router = useRouter();
 const familyStore = useFamilyStore();
+const familyContextStore = useFamilyContextStore();
 const accountsStore = useAccountsStore();
 const transactionsStore = useTransactionsStore();
 const assetsStore = useAssetsStore();
@@ -28,48 +32,50 @@ const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
+const authStore = useAuthStore();
 
 const showLayout = computed(() => {
-  // Don't show sidebar/header on setup page
-  return route.name !== 'Setup' && route.name !== 'NotFound';
+  // Don't show sidebar/header on setup, login, magic link callback, or 404 pages
+  return (
+    route.name !== 'Setup' &&
+    route.name !== 'NotFound' &&
+    route.name !== 'Login' &&
+    route.name !== 'MagicLinkCallback'
+  );
 });
 
-onMounted(async () => {
-  // Load settings first
+/**
+ * Load all family data from the active per-family database.
+ */
+async function loadFamilyData() {
+  const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
+  console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
+
+  // Load per-family settings
   await settingsStore.loadSettings();
-
-  // Auto-update exchange rates if enabled (non-blocking)
-  if (settingsStore.settings.exchangeRateAutoUpdate) {
-    updateRatesIfStale().catch(console.error);
-  }
-
-  // Load translations if language is not English (non-blocking)
-  if (settingsStore.language !== 'en') {
-    translationStore.loadTranslations(settingsStore.language).catch(console.error);
-  }
 
   // Initialize sync service (restores file handle if configured)
   await syncStore.initialize();
+  console.log(
+    '[loadFamilyData] sync configured:',
+    syncStore.isConfigured,
+    'needsPermission:',
+    syncStore.needsPermission
+  );
 
   // If sync is configured and we have permission, load from file (file always wins)
   if (syncStore.isConfigured && !syncStore.needsPermission) {
     const hasData = await syncStore.loadFromFile();
     if (hasData) {
-      // Data was loaded from file, stores are already refreshed
-      // Check if setup is needed
       if (!familyStore.isSetupComplete && route.name !== 'Setup') {
         router.replace('/setup');
         return;
       }
-      // Initialize member filter with all members selected
       memberFilterStore.initialize();
-      // Process recurring items to generate due transactions
       const result = await processRecurringItems();
       if (result.processed > 0) {
-        // Reload transactions to include newly generated ones
         await transactionsStore.loadTransactions();
       }
-      // Setup auto-sync for future changes
       syncStore.setupAutoSync();
       return;
     }
@@ -78,15 +84,12 @@ onMounted(async () => {
   // No sync data or sync not configured - load from local IndexedDB
   await familyStore.loadMembers();
 
-  // Check if setup is needed
   if (!familyStore.isSetupComplete && route.name !== 'Setup') {
     router.replace('/setup');
     return;
   }
 
-  // Load remaining data if setup is complete
   if (familyStore.isSetupComplete) {
-    // Initialize member filter with all members selected
     memberFilterStore.initialize();
 
     await Promise.all([
@@ -97,17 +100,115 @@ onMounted(async () => {
       recurringStore.loadRecurringItems(),
     ]);
 
-    // Process recurring items to generate due transactions
     const result = await processRecurringItems();
     if (result.processed > 0) {
-      // Reload transactions to include newly generated ones
       await transactionsStore.loadTransactions();
     }
 
-    // Setup auto-sync for future changes
     if (syncStore.isConfigured) {
       syncStore.setupAutoSync();
     }
+  }
+}
+
+onMounted(async () => {
+  // Step 1: Load global settings (theme, language) — works before any family is active
+  await settingsStore.loadGlobalSettings();
+
+  // Load translations if language is not English (non-blocking)
+  if (settingsStore.language !== 'en') {
+    translationStore.loadTranslations(settingsStore.language).catch(console.error);
+  }
+
+  // Step 2: Initialize auth
+  await authStore.initializeAuth();
+
+  // If auth is required and user is not authenticated, redirect to login
+  if (authStore.needsAuth) {
+    if (route.name !== 'Login' && route.name !== 'MagicLinkCallback') {
+      router.replace('/login');
+    }
+    return;
+  }
+
+  // Step 3: Run legacy migration if needed (old single-DB → per-family DB)
+  if (await needsLegacyMigration()) {
+    await runLegacyMigration();
+  }
+
+  // Step 4: Resolve active family
+  // If auth resolved a specific family, use it authoritatively (don't let
+  // familyContextStore.initialize() override it with lastActiveFamilyId)
+  const authFamilyId = authStore.currentUser?.familyId;
+
+  // DEBUG: trace family resolution
+  console.log('[App] Auth user:', JSON.stringify(authStore.currentUser));
+  console.log('[App] Auth familyId:', authFamilyId, 'type:', typeof authFamilyId);
+
+  if (authFamilyId) {
+    // Auth resolved a family — switch to it and load families list
+    const { closeDatabase } = await import('@/services/indexeddb/database');
+    await closeDatabase();
+    const switched = await familyContextStore.switchFamily(authFamilyId);
+    await familyContextStore.reload();
+    console.log(
+      '[App] switchFamily result:',
+      switched,
+      'active:',
+      familyContextStore.activeFamilyId
+    );
+
+    if (!switched) {
+      // Family not in registry on this device — create with the auth-resolved ID
+      // (NOT a random new ID, which would lose the association with the Cognito user)
+      console.warn(`Auth family ${authFamilyId} not found in registry, creating with auth ID`);
+      const family = await familyContextStore.createFamilyWithId(authFamilyId, 'My Family');
+      if (!family) {
+        console.error('Failed to create family');
+        return;
+      }
+    }
+  } else if (!authStore.isLocalOnlyMode && authStore.isAuthenticated) {
+    // Authenticated but familyId could not be resolved from any source.
+    // DO NOT fall back to initialize() — that loads lastActiveFamilyId which
+    // could belong to a DIFFERENT user, causing cross-family data leakage.
+    console.warn('[App] Authenticated user but no familyId resolved — creating new family');
+    const family = await familyContextStore.createFamily('My Family');
+    if (!family) {
+      console.error('Failed to create family for authenticated user');
+      return;
+    }
+  } else {
+    // Local-only mode (no auth configured) — safe to use lastActiveFamilyId
+    console.log('[App] Local-only mode, using initialize() fallback');
+    const activeFamily = await familyContextStore.initialize();
+    console.log('[App] initialize() returned:', activeFamily?.id, activeFamily?.name);
+
+    if (!activeFamily) {
+      // No family exists yet — first-time user or fresh device
+      const family = await familyContextStore.createFamily('My Family');
+      if (!family) {
+        console.error('Failed to create default family');
+        return;
+      }
+    }
+  }
+
+  // Step 5: Load family data from the active per-family DB
+  // Close any previously opened DB to ensure we open the correct family's DB
+  const { closeDatabase: closeDb, getActiveFamilyId: getActiveId } =
+    await import('@/services/indexeddb/database');
+  await closeDb();
+  console.log('[App] Before loadFamilyData, activeFamily:', getActiveId());
+  await loadFamilyData();
+  console.log(
+    '[App] After loadFamilyData, members:',
+    familyStore.members.map((m) => m.name)
+  );
+
+  // Auto-update exchange rates if enabled (non-blocking, requires active family)
+  if (settingsStore.exchangeRateAutoUpdate) {
+    updateRatesIfStale().catch(console.error);
   }
 });
 </script>

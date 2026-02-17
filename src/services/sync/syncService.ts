@@ -7,6 +7,7 @@ import {
 } from './fileHandleStore';
 import { createSyncFileData, validateSyncFileData, importSyncFileData } from './fileSync';
 import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 import type { SyncFileData } from '@/types/models';
 
 // Result type for openAndLoadFile that can indicate encrypted file needs password
@@ -30,8 +31,9 @@ export interface SyncServiceState {
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 2000;
 
-// Current file handle (in-memory for session)
+// Current file handle (in-memory for session) and the family it belongs to
 let currentFileHandle: FileSystemFileHandle | null = null;
+let currentFileHandleFamilyId: string | null = null;
 
 // Callbacks for state changes
 type StateCallback = (state: SyncServiceState) => void;
@@ -73,10 +75,47 @@ export function getState(): SyncServiceState {
 }
 
 /**
- * Initialize the sync service - try to restore file handle from storage
+ * Reset the sync service state.
+ * Must be called before re-initializing for a different family to prevent
+ * stale file handles or auto-sync state from the previous family carrying over.
+ */
+export function reset(): void {
+  cancelPendingSave();
+  currentFileHandle = null;
+  currentFileHandleFamilyId = null;
+  sessionPassword = null;
+  updateState({
+    isInitialized: false,
+    isConfigured: false,
+    fileName: null,
+    isSyncing: false,
+    lastError: null,
+  });
+}
+
+/**
+ * Initialize the sync service - try to restore file handle from storage.
+ * Resets previous state first to prevent cross-family data leakage.
+ * Requires an active family to be set (prevents loading a legacy/wrong family's handle).
  */
 export async function initialize(): Promise<boolean> {
+  // Always reset previous state — prevents stale handles from a previous
+  // family's session from being reused (critical for multi-family isolation)
+  reset();
+
   if (!supportsFileSystemAccess()) {
+    updateState({
+      isInitialized: true,
+      isConfigured: false,
+      lastError: null,
+    });
+    return false;
+  }
+
+  // Guard: don't initialize sync without an active family
+  // (prevents getSyncFileKey from falling back to legacy key)
+  if (!getActiveFamilyId()) {
+    console.warn('[syncService] No active family — skipping sync initialization');
     updateState({
       isInitialized: true,
       isConfigured: false,
@@ -89,6 +128,7 @@ export async function initialize(): Promise<boolean> {
     const handle = await getFileHandle();
     if (handle) {
       currentFileHandle = handle;
+      currentFileHandleFamilyId = getActiveFamilyId();
       updateState({
         isInitialized: true,
         isConfigured: true,
@@ -158,6 +198,7 @@ export async function selectSyncFile(): Promise<boolean> {
     // Store handle for persistence
     await storeFileHandle(handle);
     currentFileHandle = handle;
+    currentFileHandleFamilyId = getActiveFamilyId();
 
     updateState({
       isConfigured: true,
@@ -183,6 +224,17 @@ export async function selectSyncFile(): Promise<boolean> {
 export async function save(password?: string): Promise<boolean> {
   if (!currentFileHandle) {
     updateState({ lastError: 'No file configured' });
+    return false;
+  }
+
+  // Guard: ensure the file handle belongs to the currently active family.
+  // This prevents auto-sync from writing to a different family's sync file
+  // after a family switch within the same SPA session.
+  const activeFamilyId = getActiveFamilyId();
+  if (currentFileHandleFamilyId && activeFamilyId && currentFileHandleFamilyId !== activeFamilyId) {
+    console.warn(
+      `[syncService] save() blocked: handle belongs to family ${currentFileHandleFamilyId} but active family is ${activeFamilyId}`
+    );
     return false;
   }
 
@@ -319,7 +371,9 @@ export async function load(): Promise<SyncFileData | null> {
 }
 
 /**
- * Load data from sync file and import into database
+ * Load data from sync file and import into database.
+ * Checks that the sync file's familyId matches the active family to prevent
+ * cross-family data leakage (e.g., loading one family's sync file into another's DB).
  */
 export async function loadAndImport(): Promise<boolean> {
   const syncData = await load();
@@ -330,6 +384,19 @@ export async function loadAndImport(): Promise<boolean> {
 
   if (syncData.encrypted) {
     updateState({ lastError: 'Encrypted file - password required' });
+    return false;
+  }
+
+  // Guard: if sync file has a familyId (v2.0+), it must match the active family
+  const activeFamilyId = getActiveFamilyId();
+  if (syncData.familyId && activeFamilyId && syncData.familyId !== activeFamilyId) {
+    console.warn(
+      `[syncService] Sync file familyId (${syncData.familyId}) does not match active family (${activeFamilyId}). Skipping import.`
+    );
+    updateState({
+      lastError: 'Sync file belongs to a different family',
+      isConfigured: false,
+    });
     return false;
   }
 
@@ -390,6 +457,7 @@ export async function disconnect(): Promise<void> {
   cancelPendingSave();
   await clearFileHandle();
   currentFileHandle = null;
+  currentFileHandleFamilyId = null;
   updateState({
     isConfigured: false,
     fileName: null,
@@ -494,12 +562,26 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
 
     const syncData = data as SyncFileData;
 
+    // Guard: if sync file has a familyId (v2.0+), it must match the active family
+    const activeFamilyId = getActiveFamilyId();
+    if (syncData.familyId && activeFamilyId && syncData.familyId !== activeFamilyId) {
+      console.warn(
+        `[syncService] openAndLoadFile: sync file familyId (${syncData.familyId}) does not match active family (${activeFamilyId}). Skipping import.`
+      );
+      updateState({
+        isSyncing: false,
+        lastError: 'Sync file belongs to a different family',
+      });
+      return { success: false };
+    }
+
     // Import the data
     await importSyncFileData(syncData);
 
     // Store handle for persistence and set as sync target
     await storeFileHandle(handle);
     currentFileHandle = handle;
+    currentFileHandleFamilyId = activeFamilyId;
 
     updateState({
       isConfigured: true,
@@ -553,12 +635,26 @@ export async function decryptAndImport(
       return { success: false, error: 'Invalid data structure after decryption' };
     }
 
+    // Guard: if sync file has a familyId (v2.0+), it must match the active family
+    const activeFamilyId = getActiveFamilyId();
+    if (syncData.familyId && activeFamilyId && syncData.familyId !== activeFamilyId) {
+      console.warn(
+        `[syncService] decryptAndImport: sync file familyId (${syncData.familyId}) does not match active family (${activeFamilyId}). Skipping import.`
+      );
+      updateState({
+        isSyncing: false,
+        lastError: 'Sync file belongs to a different family',
+      });
+      return { success: false, error: 'Sync file belongs to a different family' };
+    }
+
     // Import the data
     await importSyncFileData(syncData);
 
     // Store handle for persistence and set as sync target
     await storeFileHandle(fileHandle);
     currentFileHandle = fileHandle;
+    currentFileHandleFamilyId = activeFamilyId;
 
     updateState({
       isConfigured: true,

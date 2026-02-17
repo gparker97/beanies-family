@@ -11,7 +11,8 @@ import type {
   TranslationCacheEntry,
 } from '@/types/models';
 
-const DB_NAME = 'gp-family-finance';
+const LEGACY_DB_NAME = 'gp-family-finance';
+const DB_NAME_PREFIX = 'gp-family-finance-';
 const DB_VERSION = 3;
 
 export interface FinanceDB extends DBSchema {
@@ -61,14 +62,11 @@ export interface FinanceDB extends DBSchema {
   };
 }
 
+let currentFamilyId: string | null = null;
 let dbInstance: IDBPDatabase<FinanceDB> | null = null;
 
-export async function getDatabase(): Promise<IDBPDatabase<FinanceDB>> {
-  if (dbInstance) {
-    return dbInstance;
-  }
-
-  dbInstance = await openDB<FinanceDB>(DB_NAME, DB_VERSION, {
+function createFinanceDB(dbName: string): Promise<IDBPDatabase<FinanceDB>> {
+  return openDB<FinanceDB>(dbName, DB_VERSION, {
     upgrade(db) {
       // FamilyMembers store
       if (!db.objectStoreNames.contains('familyMembers')) {
@@ -131,8 +129,71 @@ export async function getDatabase(): Promise<IDBPDatabase<FinanceDB>> {
       }
     },
   });
+}
 
+/**
+ * Set the active family, closing any currently open DB connection.
+ * Must be called before any data operations.
+ */
+export async function setActiveFamily(familyId: string): Promise<void> {
+  if (currentFamilyId === familyId && dbInstance) {
+    return; // Already active
+  }
+
+  // Close current DB if open
+  if (dbInstance) {
+    dbInstance.close();
+    dbInstance = null;
+  }
+
+  currentFamilyId = familyId;
+}
+
+/**
+ * Get the current active family ID.
+ */
+export function getActiveFamilyId(): string | null {
+  return currentFamilyId;
+}
+
+/**
+ * Get the family-scoped database name for a given family ID.
+ */
+export function getFamilyDatabaseName(familyId: string): string {
+  return `${DB_NAME_PREFIX}${familyId}`;
+}
+
+/**
+ * Get the database for the currently active family.
+ * Throws if no family is active.
+ */
+export async function getDatabase(): Promise<IDBPDatabase<FinanceDB>> {
+  if (!currentFamilyId) {
+    throw new Error('No active family set. Call setActiveFamily() first.');
+  }
+
+  if (dbInstance) {
+    return dbInstance;
+  }
+
+  const dbName = getFamilyDatabaseName(currentFamilyId);
+  dbInstance = await createFinanceDB(dbName);
   return dbInstance;
+}
+
+/**
+ * Open the legacy database (pre-migration `gp-family-finance`).
+ * Used only during migration.
+ */
+export async function getLegacyDatabase(): Promise<IDBPDatabase<FinanceDB>> {
+  return createFinanceDB(LEGACY_DB_NAME);
+}
+
+/**
+ * Get the legacy database name.
+ */
+export function getLegacyDatabaseName(): string {
+  return LEGACY_DB_NAME;
 }
 
 export async function closeDatabase(): Promise<void> {

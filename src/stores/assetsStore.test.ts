@@ -77,7 +77,7 @@ describe('assetsStore', () => {
     // Setup settings store with default base currency
     const settingsStore = useSettingsStore();
     settingsStore.settings.baseCurrency = 'USD';
-    settingsStore.settings.exchangeRates = [];
+    settingsStore.globalSettings.exchangeRates = [];
   });
 
   describe('CRUD Operations', () => {
@@ -552,7 +552,7 @@ describe('assetsStore', () => {
     beforeEach(() => {
       const settingsStore = useSettingsStore();
       settingsStore.settings.baseCurrency = 'USD';
-      settingsStore.settings.exchangeRates = [
+      settingsStore.globalSettings.exchangeRates = [
         { from: 'EUR', to: 'USD', rate: 1.1, updatedAt: '2024-01-01T00:00:00.000Z' },
         { from: 'GBP', to: 'USD', rate: 1.25, updatedAt: '2024-01-01T00:00:00.000Z' },
       ];
@@ -612,7 +612,7 @@ describe('assetsStore', () => {
 
     it('should use inverse rate when direct rate not available', () => {
       const settingsStore = useSettingsStore();
-      settingsStore.settings.exchangeRates = [
+      settingsStore.globalSettings.exchangeRates = [
         { from: 'USD', to: 'EUR', rate: 0.9, updatedAt: '2024-01-01T00:00:00.000Z' }, // Inverse: EUR to USD = 1/0.9 ≈ 1.111
       ];
 
@@ -634,7 +634,7 @@ describe('assetsStore Integration with accountsStore', () => {
     // Setup settings store with default base currency
     const settingsStore = useSettingsStore();
     settingsStore.settings.baseCurrency = 'USD';
-    settingsStore.settings.exchangeRates = [];
+    settingsStore.globalSettings.exchangeRates = [];
   });
 
   // Import accountsStore after pinia is set up
@@ -731,7 +731,7 @@ describe('Asset Types', () => {
 
     const settingsStore = useSettingsStore();
     settingsStore.settings.baseCurrency = 'USD';
-    settingsStore.settings.exchangeRates = [];
+    settingsStore.globalSettings.exchangeRates = [];
   });
 
   it('should support all defined asset types', () => {
@@ -775,7 +775,7 @@ describe('Edge Cases', () => {
 
     const settingsStore = useSettingsStore();
     settingsStore.settings.baseCurrency = 'USD';
-    settingsStore.settings.exchangeRates = [];
+    settingsStore.globalSettings.exchangeRates = [];
   });
 
   it('should handle zero-value assets', () => {

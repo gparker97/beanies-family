@@ -4,132 +4,185 @@ import type { ExportedData } from '@/services/indexeddb/database';
 export class IndexedDBHelper {
   constructor(private page: Page) {}
 
-  async clearAllData() {
-    // Clear all object stores using native IndexedDB APIs
-    // This works even when the database is open
-    await this.page.evaluate(() => {
-      return new Promise<void>((resolve) => {
-        const request = indexedDB.open('gp-family-finance', 3);
+  /**
+   * Find the active per-family database name by reading the registry.
+   * Falls back to looking for any gp-family-finance-* database.
+   */
+  private async getActiveFamilyDbName(): Promise<string | null> {
+    return await this.page.evaluate(async () => {
+      // Try reading the registry DB to find lastActiveFamilyId
+      try {
+        const registryDb = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('gp-finance-registry', 1);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
 
-        request.onsuccess = () => {
-          const db = request.result;
-          const stores = [
-            'familyMembers',
-            'accounts',
-            'transactions',
-            'assets',
-            'goals',
-            'recurringItems',
-            'settings',
-          ];
-
-          try {
-            const tx = db.transaction(stores, 'readwrite');
-
-            stores.forEach((storeName) => {
-              tx.objectStore(storeName).clear();
-            });
-
-            tx.oncomplete = () => {
-              db.close();
-              resolve();
-            };
-
-            tx.onerror = () => {
-              db.close();
-              resolve();
-            };
-          } catch {
-            db.close();
-            resolve();
+        const tx = registryDb.transaction('globalSettings', 'readonly');
+        const store = tx.objectStore('globalSettings');
+        const settings = await new Promise<{ lastActiveFamilyId?: string } | undefined>(
+          (resolve) => {
+            const req = store.get('global_settings');
+            req.onsuccess = () => resolve(req.result as { lastActiveFamilyId?: string });
+            req.onerror = () => resolve(undefined);
           }
-        };
+        );
+        registryDb.close();
 
-        request.onerror = () => {
-          // If database doesn't exist yet, that's fine
-          resolve();
-        };
-      });
+        if (settings?.lastActiveFamilyId) {
+          return `gp-family-finance-${settings.lastActiveFamilyId}`;
+        }
+      } catch {
+        // Registry doesn't exist yet
+      }
+
+      // Fallback: find any gp-family-finance-* database
+      if ('databases' in indexedDB) {
+        const dbs = await indexedDB.databases();
+        const familyDb = dbs.find((db) => db.name?.startsWith('gp-family-finance-'));
+        if (familyDb?.name) {
+          return familyDb.name;
+        }
+      }
+
+      return null;
+    });
+  }
+
+  async clearAllData() {
+    // Delete all known databases to ensure clean state
+    await this.page.evaluate(async () => {
+      // Use databases() API to find all databases to delete
+      if ('databases' in indexedDB) {
+        const dbs = await indexedDB.databases();
+        const deletePromises = dbs
+          .filter(
+            (db) =>
+              db.name?.startsWith('gp-family-finance') ||
+              db.name === 'gp-finance-registry' ||
+              db.name === 'gp-finance-file-handles'
+          )
+          .map(
+            (db) =>
+              new Promise<void>((resolve) => {
+                if (!db.name) {
+                  resolve();
+                  return;
+                }
+                const request = indexedDB.deleteDatabase(db.name);
+                request.onsuccess = () => resolve();
+                request.onerror = () => resolve();
+                request.onblocked = () => resolve();
+              })
+          );
+        await Promise.all(deletePromises);
+      } else {
+        // Fallback: try known names
+        const knownNames = ['gp-family-finance', 'gp-finance-registry', 'gp-finance-file-handles'];
+        await Promise.all(
+          knownNames.map(
+            (name) =>
+              new Promise<void>((resolve) => {
+                const request = indexedDB.deleteDatabase(name);
+                request.onsuccess = () => resolve();
+                request.onerror = () => resolve();
+                request.onblocked = () => resolve();
+              })
+          )
+        );
+      }
     });
     await this.page.waitForTimeout(500);
   }
 
   async seedData(data: Partial<ExportedData>) {
-    await this.page.evaluate((testData) => {
-      return new Promise<void>((resolve, reject) => {
-        const request = indexedDB.open('gp-family-finance', 3);
+    // Find the active per-family database name
+    const dbName = await this.getActiveFamilyDbName();
 
-        request.onsuccess = () => {
-          const db = request.result;
+    await this.page.evaluate(
+      ({ testData, familyDbName }) => {
+        return new Promise<void>((resolve, reject) => {
+          // Use the per-family DB name, or fall back to legacy name for migration
+          const targetDb = familyDbName || 'gp-family-finance';
+          const request = indexedDB.open(targetDb, 3);
 
-          try {
-            const storeNames = [];
-            if (testData.familyMembers) storeNames.push('familyMembers');
-            if (testData.accounts) storeNames.push('accounts');
-            if (testData.transactions) storeNames.push('transactions');
-            if (testData.assets) storeNames.push('assets');
-            if (testData.goals) storeNames.push('goals');
-            if (testData.recurringItems) storeNames.push('recurringItems');
-            if (testData.settings) storeNames.push('settings');
+          request.onsuccess = () => {
+            const db = request.result;
 
-            const tx = db.transaction(storeNames, 'readwrite');
+            try {
+              const storeNames: string[] = [];
+              if (testData.familyMembers) storeNames.push('familyMembers');
+              if (testData.accounts) storeNames.push('accounts');
+              if (testData.transactions) storeNames.push('transactions');
+              if (testData.assets) storeNames.push('assets');
+              if (testData.goals) storeNames.push('goals');
+              if (testData.recurringItems) storeNames.push('recurringItems');
+              if (testData.settings) storeNames.push('settings');
 
-            if (testData.familyMembers) {
-              const store = tx.objectStore('familyMembers');
-              testData.familyMembers.forEach((member) => store.add(member));
-            }
-            if (testData.accounts) {
-              const store = tx.objectStore('accounts');
-              testData.accounts.forEach((account) => store.add(account));
-            }
-            if (testData.transactions) {
-              const store = tx.objectStore('transactions');
-              testData.transactions.forEach((transaction) => store.add(transaction));
-            }
-            if (testData.assets) {
-              const store = tx.objectStore('assets');
-              testData.assets.forEach((asset) => store.add(asset));
-            }
-            if (testData.goals) {
-              const store = tx.objectStore('goals');
-              testData.goals.forEach((goal) => store.add(goal));
-            }
-            if (testData.recurringItems) {
-              const store = tx.objectStore('recurringItems');
-              testData.recurringItems.forEach((item) => store.add(item));
-            }
-            if (testData.settings) {
-              const store = tx.objectStore('settings');
-              store.put(testData.settings);
-            }
+              const tx = db.transaction(storeNames, 'readwrite');
 
-            tx.oncomplete = () => {
+              if (testData.familyMembers) {
+                const store = tx.objectStore('familyMembers');
+                testData.familyMembers.forEach((member: unknown) => store.add(member));
+              }
+              if (testData.accounts) {
+                const store = tx.objectStore('accounts');
+                testData.accounts.forEach((account: unknown) => store.add(account));
+              }
+              if (testData.transactions) {
+                const store = tx.objectStore('transactions');
+                testData.transactions.forEach((transaction: unknown) => store.add(transaction));
+              }
+              if (testData.assets) {
+                const store = tx.objectStore('assets');
+                testData.assets.forEach((asset: unknown) => store.add(asset));
+              }
+              if (testData.goals) {
+                const store = tx.objectStore('goals');
+                testData.goals.forEach((goal: unknown) => store.add(goal));
+              }
+              if (testData.recurringItems) {
+                const store = tx.objectStore('recurringItems');
+                testData.recurringItems.forEach((item: unknown) => store.add(item));
+              }
+              if (testData.settings) {
+                const store = tx.objectStore('settings');
+                store.put(testData.settings);
+              }
+
+              tx.oncomplete = () => {
+                db.close();
+                resolve();
+              };
+
+              tx.onerror = () => {
+                db.close();
+                reject(tx.error);
+              };
+            } catch (error) {
               db.close();
-              resolve();
-            };
+              reject(error);
+            }
+          };
 
-            tx.onerror = () => {
-              db.close();
-              reject(tx.error);
-            };
-          } catch (error) {
-            db.close();
-            reject(error);
-          }
-        };
-
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }, data);
+          request.onerror = () => {
+            reject(request.error);
+          };
+        });
+      },
+      { testData: data, familyDbName: dbName }
+    );
     await this.page.reload();
   }
 
   async exportData(): Promise<ExportedData> {
-    return await this.page.evaluate(() => {
+    // Find the active per-family database name
+    const dbName = await this.getActiveFamilyDbName();
+
+    return await this.page.evaluate((familyDbName) => {
       return new Promise<ExportedData>((resolve, reject) => {
-        const request = indexedDB.open('gp-family-finance', 3);
+        const targetDb = familyDbName || 'gp-family-finance';
+        const request = indexedDB.open(targetDb, 3);
 
         request.onsuccess = () => {
           const db = request.result;
@@ -219,6 +272,6 @@ export class IndexedDBHelper {
           reject(request.error);
         };
       });
-    });
+    }, dbName);
   }
 }

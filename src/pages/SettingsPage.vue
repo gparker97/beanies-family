@@ -2,14 +2,17 @@
 import { ref, computed, onMounted } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
+import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { clearAllData } from '@/services/indexeddb/database';
+import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 
+const authStore = useAuthStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
@@ -633,6 +636,12 @@ function formatLastSync(timestamp: string | null): string {
           </p>
         </div>
       </BaseCard>
+    </div>
+
+    <!-- Security Settings (only shown when auth is configured) -->
+    <div v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode">
+      <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Security</h2>
+      <PasskeySettings />
     </div>
 
     <!-- Exchange Rate Settings (full width, rarely changed) -->
