@@ -256,10 +256,10 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-slate-900">
-    <div v-if="showLayout" class="flex">
+    <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <AppSidebar />
 
-      <div class="flex flex-1 flex-col">
+      <div class="flex min-w-0 flex-1 flex-col">
         <AppHeader>
           <template #title>
             {{ route.meta.title }}
