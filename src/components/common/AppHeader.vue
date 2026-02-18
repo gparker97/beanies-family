@@ -5,10 +5,17 @@ import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
+import { useGoalsStore } from '@/stores/goalsStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useSyncStore } from '@/stores/syncStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -63,6 +70,18 @@ function closeProfileDropdown() {
 
 async function handleSignOut() {
   showProfileDropdown.value = false;
+
+  // Reset all data stores before sign-out clears auth state
+  useSyncStore().resetState();
+  useFamilyStore().resetState();
+  useAccountsStore().resetState();
+  useTransactionsStore().resetState();
+  useAssetsStore().resetState();
+  useGoalsStore().resetState();
+  useRecurringStore().resetState();
+  useSettingsStore().resetState();
+  useMemberFilterStore().resetState();
+
   await authStore.signOut();
   router.replace('/login');
 }

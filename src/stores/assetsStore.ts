@@ -202,6 +202,12 @@ export const useAssetsStore = defineStore('assets', () => {
     return assets.value.filter((a) => a.memberId === memberId);
   }
 
+  function resetState() {
+    assets.value = [];
+    isLoading.value = false;
+    error.value = null;
+  }
+
   return {
     // State
     assets,
@@ -227,5 +233,6 @@ export const useAssetsStore = defineStore('assets', () => {
     deleteAsset,
     getAssetById,
     getAssetsByMemberId,
+    resetState,
   };
 });

@@ -113,6 +113,11 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    * Get account IDs for currently selected members.
    * Useful for filtering transactions and recurring items.
    */
+  function resetState() {
+    selectedMemberIds.value = new Set();
+    isInitialized.value = false;
+  }
+
   function getSelectedMemberAccountIds(accounts: { id: string; memberId: string }[]): Set<string> {
     if (!isInitialized.value || isAllSelected.value) {
       return new Set(accounts.map((a) => a.id));
@@ -135,5 +140,6 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
     selectAll,
     isMemberSelected,
     getSelectedMemberAccountIds,
+    resetState,
   };
 });

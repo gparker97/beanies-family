@@ -243,6 +243,12 @@ export const useRecurringStore = defineStore('recurring', () => {
     return recurringItems.value.filter((item) => item.accountId === accountId);
   }
 
+  function resetState() {
+    recurringItems.value = [];
+    isLoading.value = false;
+    error.value = null;
+  }
+
   return {
     // State
     recurringItems,
@@ -274,5 +280,6 @@ export const useRecurringStore = defineStore('recurring', () => {
     toggleActive,
     getRecurringItemById,
     getItemsByAccountId,
+    resetState,
   };
 });

@@ -244,6 +244,12 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  function resetState() {
+    settings.value = settingsRepo.getDefaultSettings();
+    isLoading.value = false;
+    error.value = null;
+  }
+
   async function convertAmount(
     amount: number,
     from: CurrencyCode,
@@ -284,5 +290,6 @@ export const useSettingsStore = defineStore('settings', () => {
     addExchangeRate,
     removeExchangeRate,
     convertAmount,
+    resetState,
   };
 });

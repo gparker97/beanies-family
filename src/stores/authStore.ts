@@ -8,6 +8,7 @@ import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
+import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 
 export interface AuthUser {
   userId: string;
@@ -310,15 +311,30 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Sign out and clear session.
+   * Sign out: reset all data stores and delete the per-family IndexedDB cache.
+   * File handle is preserved so next login auto-reconnects to the data file.
    */
   async function signOut(): Promise<void> {
+    // Capture familyId before clearing auth state
+    const familyId = currentUser.value?.familyId;
+
+    // Sign out from Cognito
     cognitoService.signOut();
 
     if (currentUser.value?.userId) {
       await tokenManager.clearCachedSession(currentUser.value.userId);
     }
 
+    // Delete the per-family IndexedDB cache (ephemeral — data lives in the file)
+    if (familyId) {
+      try {
+        await deleteFamilyDatabase(familyId);
+      } catch (e) {
+        console.warn('Failed to delete family database on sign-out:', e);
+      }
+    }
+
+    // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
     isOfflineSession.value = false;

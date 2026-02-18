@@ -350,6 +350,12 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return transactions.value.filter((t) => isDateBetween(t.date, start, end));
   }
 
+  function resetState() {
+    transactions.value = [];
+    isLoading.value = false;
+    error.value = null;
+  }
+
   return {
     // State
     transactions,
@@ -382,5 +388,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
     getTransactionById,
     getTransactionsByAccountId,
     getTransactionsByDateRange,
+    resetState,
   };
 });

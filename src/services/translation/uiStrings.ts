@@ -288,7 +288,7 @@ export const UI_STRINGS = {
   'settings.version': 'Version 1.0.0 (MVP)',
   'settings.appDescription': 'A local-first, privacy-focused family finance application.',
   'settings.privacyNote':
-    'Your data is stored locally in your browser and never leaves your device unless you enable file sync.',
+    'Your data is encrypted and saved to a file you control. Nothing is stored on our servers — your financial data never leaves your device.',
 
   // Form labels
   'form.name': 'Name',

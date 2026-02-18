@@ -404,12 +404,11 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Setup auto-sync watchers for all data stores
+   * Setup auto-sync watchers for all data stores.
+   * Auto-sync is always on when file is configured + has permission.
    */
   function setupAutoSync(): void {
     if (!supportsAutoSync.value) return;
-
-    const settingsStore = useSettingsStore();
 
     // Watch for changes in all data stores
     watch(
@@ -422,17 +421,29 @@ export const useSyncStore = defineStore('sync', () => {
         useRecurringStore().recurringItems,
       ],
       () => {
-        // Only auto-sync if configured and enabled
-        if (
-          isConfigured.value &&
-          !needsPermission.value &&
-          settingsStore.settings.autoSyncEnabled
-        ) {
+        // Auto-save whenever file is configured and accessible
+        if (isConfigured.value && !needsPermission.value) {
           syncService.triggerDebouncedSave();
         }
       },
       { deep: true }
     );
+  }
+
+  /**
+   * Reset all sync state (used on sign-out)
+   */
+  function resetState() {
+    syncService.reset();
+    isInitialized.value = false;
+    isConfigured.value = false;
+    fileName.value = null;
+    isSyncing.value = false;
+    error.value = null;
+    lastSync.value = null;
+    needsPermission.value = false;
+    sessionPassword.value = null;
+    pendingEncryptedFile.value = null;
   }
 
   /**
@@ -479,6 +490,7 @@ export const useSyncStore = defineStore('sync', () => {
     manualImport,
     reloadAllStores,
     setupAutoSync,
+    resetState,
     clearError,
   };
 });

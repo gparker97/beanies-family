@@ -146,6 +146,12 @@ export const useGoalsStore = defineStore('goals', () => {
     return Math.min(100, (goal.currentAmount / goal.targetAmount) * 100);
   }
 
+  function resetState() {
+    goals.value = [];
+    isLoading.value = false;
+    error.value = null;
+  }
+
   return {
     // State
     goals,
@@ -171,5 +177,6 @@ export const useGoalsStore = defineStore('goals', () => {
     getGoalById,
     getGoalsByMemberId,
     getGoalProgress,
+    resetState,
   };
 });

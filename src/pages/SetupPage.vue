@@ -21,10 +21,14 @@ const hasAuthEmail = computed(
   () => authStore.isAuthenticated && !authStore.isLocalOnlyMode && !!authStore.currentUser?.email
 );
 
+const supportsFileSystemAccess = computed(() => canAutoSync());
+
 const isSubmitting = ref(false);
 const isLoadingFile = ref(false);
+const isCreatingFile = ref(false);
 const loadFileError = ref<string | null>(null);
 const showDecryptModal = ref(false);
+const showEncryptModal = ref(false);
 const decryptError = ref<string | null>(null);
 const step = ref(1);
 
@@ -83,6 +87,8 @@ function validateStep1(): boolean {
 function nextStep() {
   if (step.value === 1 && validateStep1()) {
     step.value = 2;
+  } else if (step.value === 2) {
+    step.value = 3;
   }
 }
 
@@ -92,8 +98,12 @@ function prevStep() {
   }
 }
 
-async function completeSetup() {
-  if (isSubmitting.value) return;
+/**
+ * Create the owner profile and save currency settings (Steps 1-2).
+ * Called before step 3 (file creation) to ensure data exists to save.
+ */
+async function createProfileAndSettings(): Promise<boolean> {
+  if (isSubmitting.value) return false;
 
   isSubmitting.value = true;
 
@@ -115,13 +125,78 @@ async function completeSetup() {
     // Set base currency
     await settingsStore.setBaseCurrency(form.baseCurrency);
 
-    // Navigate to dashboard
-    router.replace('/dashboard');
+    return true;
   } catch (error) {
     console.error('Setup failed:', error);
+    return false;
   } finally {
     isSubmitting.value = false;
   }
+}
+
+/**
+ * Create a new family data file. Opens file picker, then prompts for encryption password.
+ */
+async function handleCreateNewFile() {
+  if (isCreatingFile.value) return;
+
+  // Ensure profile and settings are saved first
+  const profileReady = familyStore.isSetupComplete || (await createProfileAndSettings());
+  if (!profileReady) return;
+
+  isCreatingFile.value = true;
+  loadFileError.value = null;
+
+  try {
+    const success = await syncStore.configureSyncFile();
+    if (success) {
+      // File created — now prompt for encryption password
+      showEncryptModal.value = true;
+    }
+  } catch (error) {
+    console.error('Failed to create file:', error);
+    loadFileError.value = 'Failed to create file. Please try again.';
+  } finally {
+    isCreatingFile.value = false;
+  }
+}
+
+/**
+ * After encryption password is set, navigate to dashboard.
+ */
+async function handleSetEncryptionPassword(password: string) {
+  const success = await syncStore.enableEncryption(password);
+  showEncryptModal.value = false;
+  if (success) {
+    syncStore.setupAutoSync();
+    router.replace('/dashboard');
+  } else {
+    loadFileError.value = 'Failed to encrypt file. You can configure encryption later in Settings.';
+    // Still navigate — file was created, just not encrypted
+    syncStore.setupAutoSync();
+    router.replace('/dashboard');
+  }
+}
+
+/**
+ * Skip encryption (user chose not to set a password) and go to dashboard.
+ */
+function handleSkipEncryption() {
+  showEncryptModal.value = false;
+  syncStore.setupAutoSync();
+  router.replace('/dashboard');
+}
+
+/**
+ * For browsers without File System Access API: complete setup without file.
+ */
+async function handleDownloadFallback() {
+  const profileReady = familyStore.isSetupComplete || (await createProfileAndSettings());
+  if (!profileReady) return;
+
+  // Manual export as download
+  await syncStore.manualExport();
+  router.replace('/dashboard');
 }
 
 async function loadExistingData() {
@@ -148,6 +223,7 @@ async function loadExistingData() {
           familyStore.setCurrentMember(owner.id);
         }
       }
+      syncStore.setupAutoSync();
       // Navigate to dashboard
       router.replace('/dashboard');
     } else if (syncStore.error) {
@@ -176,6 +252,7 @@ async function handleDecryptFile(password: string) {
         familyStore.setCurrentMember(owner.id);
       }
     }
+    syncStore.setupAutoSync();
     // Navigate to dashboard
     router.replace('/dashboard');
   } else {
@@ -203,7 +280,7 @@ function handleDecryptModalClose() {
       </div>
 
       <BaseCard>
-        <!-- Step indicator -->
+        <!-- Step indicator (3 steps) -->
         <div class="mb-8 flex items-center justify-center">
           <div class="flex items-center">
             <div
@@ -212,12 +289,19 @@ function handleDecryptModalClose() {
             >
               1
             </div>
-            <div class="mx-2 h-1 w-16" :class="step >= 2 ? 'bg-blue-600' : 'bg-gray-200'" />
+            <div class="mx-2 h-1 w-12" :class="step >= 2 ? 'bg-blue-600' : 'bg-gray-200'" />
             <div
               class="flex h-8 w-8 items-center justify-center rounded-full font-medium"
               :class="step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'"
             >
               2
+            </div>
+            <div class="mx-2 h-1 w-12" :class="step >= 3 ? 'bg-blue-600' : 'bg-gray-200'" />
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-full font-medium"
+              :class="step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'"
+            >
+              3
             </div>
           </div>
         </div>
@@ -251,7 +335,7 @@ function handleDecryptModalClose() {
           </div>
 
           <!-- Load existing data option -->
-          <div v-if="canAutoSync()" class="border-t border-gray-200 pt-4 dark:border-slate-700">
+          <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
             <p class="mb-3 text-center text-sm text-gray-500 dark:text-gray-400">
               Have an existing data file?
             </p>
@@ -269,7 +353,7 @@ function handleDecryptModalClose() {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                 />
               </svg>
-              Load Existing Data File
+              Load Existing Family Data File
             </BaseButton>
             <p v-if="loadFileError" class="mt-2 text-center text-sm text-red-600 dark:text-red-400">
               {{ loadFileError }}
@@ -292,20 +376,153 @@ function handleDecryptModalClose() {
 
           <div class="flex gap-3 pt-4">
             <BaseButton variant="secondary" class="flex-1" @click="prevStep"> Back </BaseButton>
-            <BaseButton class="flex-1" :loading="isSubmitting" @click="completeSetup">
-              Get Started
+            <BaseButton class="flex-1" @click="nextStep"> Continue </BaseButton>
+          </div>
+        </div>
+
+        <!-- Step 3: Secure Your Data -->
+        <div v-if="step === 3" class="space-y-4">
+          <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
+            Secure Your Data
+          </h2>
+
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Your data is encrypted and saved to a file you control. No data is stored on our
+            servers. You can place this file in Google Drive, Dropbox, or any synced folder for
+            cloud backup.
+          </p>
+
+          <!-- Security feature list -->
+          <div class="space-y-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+            <div class="flex items-start gap-3">
+              <svg
+                class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+              <p class="text-sm text-blue-800 dark:text-blue-200">
+                Encrypted with a password only you know
+              </p>
+            </div>
+            <div class="flex items-start gap-3">
+              <svg
+                class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+              <p class="text-sm text-blue-800 dark:text-blue-200">
+                Saved automatically as you make changes
+              </p>
+            </div>
+            <div class="flex items-start gap-3">
+              <svg
+                class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                />
+              </svg>
+              <p class="text-sm text-blue-800 dark:text-blue-200">
+                You control where the file is stored
+              </p>
+            </div>
+          </div>
+
+          <!-- File System Access API available -->
+          <div v-if="supportsFileSystemAccess" class="flex flex-col gap-3 pt-2">
+            <BaseButton class="w-full" :loading="isCreatingFile" @click="handleCreateNewFile">
+              <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                />
+              </svg>
+              Create New Family Data File
             </BaseButton>
+            <BaseButton
+              variant="secondary"
+              class="w-full"
+              :loading="isLoadingFile"
+              @click="loadExistingData"
+            >
+              <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
+              </svg>
+              Load Existing Family Data File
+            </BaseButton>
+          </div>
+
+          <!-- Fallback for browsers without File System Access API -->
+          <div v-else class="pt-2">
+            <div
+              class="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
+            >
+              <p class="text-sm text-amber-800 dark:text-amber-200">
+                For automatic saving, use Chrome or Edge. You can still download your data manually.
+              </p>
+            </div>
+            <BaseButton class="w-full" :loading="isSubmitting" @click="handleDownloadFallback">
+              Download Your Data
+            </BaseButton>
+          </div>
+
+          <p v-if="loadFileError" class="text-center text-sm text-red-600 dark:text-red-400">
+            {{ loadFileError }}
+          </p>
+
+          <div class="pt-2">
+            <BaseButton variant="secondary" class="w-full" @click="prevStep"> Back </BaseButton>
           </div>
         </div>
       </BaseCard>
 
       <!-- Footer -->
       <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        Your data is stored locally and never leaves your device unless you enable sync.
+        Your data is encrypted and stored in a file you control — not on our servers.
       </p>
     </div>
 
-    <!-- Decrypt File Password Modal -->
+    <!-- Encrypt File Password Modal (for new file creation) -->
+    <PasswordModal
+      :open="showEncryptModal"
+      title="Set Encryption Password"
+      description="Choose a strong password to protect your data file. You'll need this password each time you open the app."
+      confirm-label="Set Password & Continue"
+      :require-confirmation="true"
+      @close="handleSkipEncryption"
+      @confirm="handleSetEncryptionPassword"
+    />
+
+    <!-- Decrypt File Password Modal (for loading existing file) -->
     <PasswordModal
       :open="showDecryptModal"
       title="Enter Password"

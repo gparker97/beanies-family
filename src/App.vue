@@ -45,13 +45,18 @@ const showLayout = computed(() => {
 });
 
 /**
- * Load all family data from the active per-family database.
+ * Load all family data. The data file is the source of truth.
+ *
+ * Priority:
+ * 1. File handle exists + permission → load from file
+ * 2. File handle exists + needs permission → fallback to IndexedDB cache with warning
+ * 3. No file handle → redirect to setup (which now requires file creation)
  */
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
 
-  // Load per-family settings
+  // Load per-family settings (needed for encryption state, etc.)
   await settingsStore.loadSettings();
 
   // Initialize sync service (restores file handle if configured)
@@ -63,7 +68,7 @@ async function loadFamilyData() {
     syncStore.needsPermission
   );
 
-  // If sync is configured and we have permission, load from file (file always wins)
+  // Path 1: File configured + we have permission → load from file (source of truth)
   if (syncStore.isConfigured && !syncStore.needsPermission) {
     const hasData = await syncStore.loadFromFile();
     if (hasData) {
@@ -76,12 +81,52 @@ async function loadFamilyData() {
       if (result.processed > 0) {
         await transactionsStore.loadTransactions();
       }
+      // Auto-sync is always on when file is configured + has permission
       syncStore.setupAutoSync();
       return;
     }
   }
 
-  // No sync data or sync not configured - load from local IndexedDB
+  // Path 2: File configured but needs permission → IndexedDB cache as read-only fallback
+  if (syncStore.isConfigured && syncStore.needsPermission) {
+    console.log('[loadFamilyData] File needs permission — using IndexedDB cache as fallback');
+    await loadFromIndexedDBCache();
+    return;
+  }
+
+  // Path 3: No file configured → check if data exists in IndexedDB (existing/migrated user)
+  await familyStore.loadMembers();
+
+  if (!familyStore.isSetupComplete && route.name !== 'Setup') {
+    // No data and no file — redirect to setup (which now requires file creation)
+    router.replace('/setup');
+    return;
+  }
+
+  // Existing user with IndexedDB data but no file configured — load normally
+  // They'll be prompted to configure a file in setup step 3 or settings
+  if (familyStore.isSetupComplete) {
+    memberFilterStore.initialize();
+
+    await Promise.all([
+      accountsStore.loadAccounts(),
+      transactionsStore.loadTransactions(),
+      assetsStore.loadAssets(),
+      goalsStore.loadGoals(),
+      recurringStore.loadRecurringItems(),
+    ]);
+
+    const result = await processRecurringItems();
+    if (result.processed > 0) {
+      await transactionsStore.loadTransactions();
+    }
+  }
+}
+
+/**
+ * Fallback: load from IndexedDB cache when file permission is not yet granted.
+ */
+async function loadFromIndexedDBCache() {
   await familyStore.loadMembers();
 
   if (!familyStore.isSetupComplete && route.name !== 'Setup') {
@@ -103,10 +148,6 @@ async function loadFamilyData() {
     const result = await processRecurringItems();
     if (result.processed > 0) {
       await transactionsStore.loadTransactions();
-    }
-
-    if (syncStore.isConfigured) {
-      syncStore.setupAutoSync();
     }
   }
 }

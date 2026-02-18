@@ -203,6 +203,34 @@ export async function closeDatabase(): Promise<void> {
   }
 }
 
+/**
+ * Delete a family's IndexedDB database entirely.
+ * Closes any open connection first, then deletes the database.
+ * Used on sign-out to treat IndexedDB as an ephemeral cache.
+ */
+export async function deleteFamilyDatabase(familyId: string): Promise<void> {
+  // Close current connection if it belongs to this family
+  if (currentFamilyId === familyId && dbInstance) {
+    dbInstance.close();
+    dbInstance = null;
+  }
+
+  const dbName = getFamilyDatabaseName(familyId);
+  await new Promise<void>((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(dbName);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+    request.onblocked = () => {
+      console.warn(`Database ${dbName} delete blocked — closing and retrying`);
+      resolve(); // Don't block sign-out if DB is held by another tab
+    };
+  });
+
+  if (currentFamilyId === familyId) {
+    currentFamilyId = null;
+  }
+}
+
 export async function clearAllData(): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(

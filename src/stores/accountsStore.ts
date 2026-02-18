@@ -230,6 +230,12 @@ export const useAccountsStore = defineStore('accounts', () => {
     return accounts.value.filter((a) => a.memberId === memberId);
   }
 
+  function resetState() {
+    accounts.value = [];
+    isLoading.value = false;
+    error.value = null;
+  }
+
   return {
     // State
     accounts,
@@ -258,5 +264,6 @@ export const useAccountsStore = defineStore('accounts', () => {
     deleteAccount,
     getAccountById,
     getAccountsByMemberId,
+    resetState,
   };
 });

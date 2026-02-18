@@ -188,12 +188,20 @@ npm run lint
 
 ## Key Implementation Details
 
-1. **Local-First Architecture**: All data stored in IndexedDB using the `idb` library
+1. **File-First Architecture**: Encrypted local file is the source of truth. IndexedDB is a temporary cache deleted on sign-out
 2. **Multi-Currency**: Amounts stored with original currency, converted on-demand for display
 3. **Family Profiles**: Each member has their own accounts/transactions, with shared family goals
 4. **PWA Ready**: Service worker and manifest configured for offline support
-5. **Privacy-Focused**: Data never leaves device unless user enables Google Drive sync
+5. **Privacy-Focused**: Data encrypted by default in a user-controlled file. No data stored on servers. IndexedDB cache deleted on sign-out
 6. **Theme Support**: Light/dark mode with system preference detection
+
+## Terminology Guide
+
+- **"Data File"** or **"Family Data File"** — not "sync file"
+- **"Family Data Options"** — not "File Sync" (in Settings)
+- **"My Family's Data"** — not "Sync File" (in Settings configured state)
+- **"Last Saved"** — not "Last Sync"
+- **"Saving..."** — not "Syncing..."
 
 ## Code Conventions
 

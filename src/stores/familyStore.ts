@@ -115,6 +115,13 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  function resetState() {
+    members.value = [];
+    currentMemberId.value = null;
+    isLoading.value = false;
+    error.value = null;
+  }
+
   return {
     // State
     members,
@@ -133,5 +140,6 @@ export const useFamilyStore = defineStore('family', () => {
     deleteMember,
     updateMemberRole,
     setCurrentMember,
+    resetState,
   };
 });

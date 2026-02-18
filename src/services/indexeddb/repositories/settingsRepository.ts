@@ -25,7 +25,7 @@ export function getDefaultSettings(): Settings {
     language: DEFAULT_LANGUAGE,
     syncEnabled: false,
     autoSyncEnabled: true,
-    encryptionEnabled: false,
+    encryptionEnabled: true,
     aiProvider: 'none',
     aiApiKeys: {},
     createdAt: now,

@@ -10,14 +10,14 @@ const statusConfig = computed(() => {
       return {
         icon: 'sync',
         color: 'text-blue-500',
-        title: 'Syncing...',
+        title: 'Saving...',
         animate: true,
       };
     case 'error':
       return {
         icon: 'error',
         color: 'text-red-500',
-        title: `Sync error: ${syncStore.error}`,
+        title: `Save error: ${syncStore.error}`,
         animate: false,
       };
     case 'needs-permission':
@@ -32,7 +32,7 @@ const statusConfig = computed(() => {
       return {
         icon: 'check',
         color: 'text-green-500',
-        title: `Synced to ${syncStore.fileName}`,
+        title: `Data saved to ${syncStore.fileName}`,
         animate: false,
       };
     default:
