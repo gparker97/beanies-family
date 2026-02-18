@@ -3,6 +3,7 @@ import { ref, computed, toRaw } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -20,6 +21,7 @@ const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
 
 const showAddModal = ref(false);
@@ -137,7 +139,7 @@ const assetsByType = computed(() => {
 });
 
 function formatTotal(amount: number): string {
-  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
+  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
 }
 
 function getAssetTypeLabel(type: AssetType): string {
@@ -927,7 +929,7 @@ function getAppreciationPercent(asset: Asset): number {
                   type="neutral"
                   size="sm"
                 />
-                <span>({{ getAppreciationPercent(asset).toFixed(1) }}%)</span>
+                <span v-if="isUnlocked">({{ getAppreciationPercent(asset).toFixed(1) }}%)</span>
               </div>
             </div>
 
@@ -972,7 +974,9 @@ function getAppreciationPercent(asset: Asset): number {
                   type="neutral"
                   size="sm"
                 />/month
-                <span v-if="asset.loan.interestRate"> @ {{ asset.loan.interestRate }}%</span>
+                <span v-if="asset.loan.interestRate">
+                  @ {{ formatMasked(asset.loan.interestRate + '%') }}</span
+                >
               </div>
               <div v-if="asset.loan.lender" class="mt-1 text-xs text-red-500 dark:text-red-500">
                 {{ asset.loan.lender }}

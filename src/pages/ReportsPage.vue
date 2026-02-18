@@ -21,6 +21,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { ALL_CATEGORIES, getCategoryById } from '@/constants/categories';
 import {
   addMonths,
@@ -61,6 +62,7 @@ const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { isUnlocked, formatMasked } = usePrivacyMode();
 
 // Helper to get exchange rate
 function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number {
@@ -721,13 +723,21 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
         <div class="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white">
           <p class="text-sm text-blue-100">{{ t('reports.currentNetWorth') }}</p>
           <p class="mt-1 text-xl font-bold">
-            {{ formatInDisplayCurrency(calculateCurrentNetWorth(), settingsStore.baseCurrency) }}
+            {{
+              formatMasked(
+                formatInDisplayCurrency(calculateCurrentNetWorth(), settingsStore.baseCurrency)
+              )
+            }}
           </p>
         </div>
         <div class="rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 p-4 text-white">
           <p class="text-sm text-purple-100">{{ t('reports.projectedNetWorth') }}</p>
           <p class="mt-1 text-xl font-bold">
-            {{ formatInDisplayCurrency(totalProjectedNetWorth, settingsStore.baseCurrency) }}
+            {{
+              formatMasked(
+                formatInDisplayCurrency(totalProjectedNetWorth, settingsStore.baseCurrency)
+              )
+            }}
           </p>
         </div>
         <div
@@ -742,14 +752,18 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
             {{ t('reports.projectedChange') }}
           </p>
           <p class="mt-1 text-xl font-bold">
-            {{ netWorthChange >= 0 ? '+' : ''
-            }}{{ formatInDisplayCurrency(netWorthChange, settingsStore.baseCurrency) }}
+            {{
+              formatMasked(
+                (netWorthChange >= 0 ? '+' : '') +
+                  formatInDisplayCurrency(netWorthChange, settingsStore.baseCurrency)
+              )
+            }}
           </p>
         </div>
       </div>
 
       <!-- Chart -->
-      <div class="h-80">
+      <div class="h-80 transition-all duration-300" :class="{ 'blur-md': !isUnlocked }">
         <Line :data="netWorthChartData" :options="netWorthChartOptions" />
       </div>
     </BaseCard>
@@ -785,13 +799,13 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
         <div class="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-4 text-white">
           <p class="text-sm text-green-100">{{ t('reports.totalIncome') }}</p>
           <p class="mt-1 text-xl font-bold">
-            {{ formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency) }}
+            {{ formatMasked(formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency)) }}
           </p>
         </div>
         <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-4 text-white">
           <p class="text-sm text-red-100">{{ t('reports.totalExpenses') }}</p>
           <p class="mt-1 text-xl font-bold">
-            {{ formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency) }}
+            {{ formatMasked(formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency)) }}
           </p>
         </div>
         <div
@@ -806,14 +820,18 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
             {{ t('reports.netCashFlow') }}
           </p>
           <p class="mt-1 text-xl font-bold">
-            {{ netCashFlow >= 0 ? '+' : ''
-            }}{{ formatInDisplayCurrency(netCashFlow, settingsStore.baseCurrency) }}
+            {{
+              formatMasked(
+                (netCashFlow >= 0 ? '+' : '') +
+                  formatInDisplayCurrency(netCashFlow, settingsStore.baseCurrency)
+              )
+            }}
           </p>
         </div>
       </div>
 
       <!-- Chart -->
-      <div class="h-96">
+      <div class="h-96 transition-all duration-300" :class="{ 'blur-md': !isUnlocked }">
         <Bar :data="incomeExpenseChartData" :options="incomeExpenseChartOptions" />
       </div>
     </BaseCard>

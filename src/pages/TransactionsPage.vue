@@ -6,6 +6,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { EXPENSE_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
 import { CURRENCIES } from '@/constants/currencies';
@@ -40,6 +41,7 @@ const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
 
 // Tab state - recurring first by default
@@ -241,9 +243,9 @@ const dateFilteredExpenses = computed(() =>
     .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
 );
 
-// Format totals (which are in base currency) to display currency
+// Format totals (which are in base currency) to display currency, masked when privacy mode is on
 function formatTotal(amount: number): string {
-  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
+  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
 }
 
 function getAccountName(accountId: string): string {

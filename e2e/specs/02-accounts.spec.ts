@@ -29,6 +29,8 @@ test.describe('Account Management', () => {
 
     const dashboardPage = new DashboardPage(page);
     await dashboardPage.goto();
+    // Unlock privacy mode to reveal masked financial figures
+    await dashboardPage.unlockPrivacyMode();
 
     // Use auto-waiting assertion (data loads asynchronously)
     await expect(dashboardPage.netWorthValue).toContainText('5,000');

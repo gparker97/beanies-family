@@ -239,6 +239,16 @@ Pending (Future Phases):
 - [ ] Data import/export
 - [ ] Recurring transactions
 
+## Issue Implementation Workflow
+
+When asked to implement a GitHub issue/ticket:
+
+1. **Assign** the issue to the person who requested the work
+2. **Move to in progress**: Add a comment noting implementation is starting, with a brief summary of the approach
+3. **Implement** the feature/fix
+4. **Mark ready for testing**: Once complete, add a comment that implementation is done and ready for testing, with a summary of changes made
+5. **Ask questions** before starting if requirements are unclear
+
 ## Notes for AI Assistants
 
 - This is a Phase 1 MVP - prioritize core functionality

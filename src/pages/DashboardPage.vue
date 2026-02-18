@@ -5,6 +5,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
 import { BaseCard } from '@/components/ui';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -23,6 +24,7 @@ const recurringStore = useRecurringStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { isUnlocked, formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
 
 // Combined net worth: accounts + physical assets - all liabilities (including asset loans)
@@ -128,9 +130,9 @@ const assetTypeColors: Record<AssetType, string> = {
   other: '#64748b',
 };
 
-// Format totals (which are in base currency) to display currency
+// Format totals (which are in base currency) to display currency, masked when privacy mode is on
 function formatTotal(amount: number): string {
-  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
+  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
 }
 
 function formatDate(dateString: string): string {
@@ -412,7 +414,7 @@ function getDaysUntil(date: Date): string {
                   t('common.purchaseValue')
                 }}</span>
                 <span class="text-xs text-gray-600 dark:text-gray-300">
-                  {{ formatInDisplayCurrency(asset.purchaseValue, asset.currency) }}
+                  {{ formatMasked(formatInDisplayCurrency(asset.purchaseValue, asset.currency)) }}
                 </span>
               </div>
               <!-- Appreciation/Depreciation -->
@@ -430,9 +432,13 @@ function getDaysUntil(date: Date): string {
                       : 'text-red-600 dark:text-red-400'
                   "
                 >
-                  {{ asset.appreciation >= 0 ? '+' : ''
-                  }}{{ formatInDisplayCurrency(asset.appreciation, asset.currency) }}
-                  <span class="text-[10px] opacity-75"
+                  {{
+                    formatMasked(
+                      (asset.appreciation >= 0 ? '+' : '') +
+                        formatInDisplayCurrency(asset.appreciation, asset.currency)
+                    )
+                  }}
+                  <span v-if="isUnlocked" class="text-[10px] opacity-75"
                     >({{ asset.appreciationPercent.toFixed(1) }}%)</span
                   >
                 </span>
@@ -446,7 +452,11 @@ function getDaysUntil(date: Date): string {
                   t('common.loanOutstanding')
                 }}</span>
                 <span class="text-xs font-medium text-red-600 dark:text-red-400">
-                  -{{ formatInDisplayCurrency(asset.loan.outstandingBalance, asset.currency) }}
+                  {{
+                    formatMasked(
+                      '-' + formatInDisplayCurrency(asset.loan.outstandingBalance, asset.currency)
+                    )
+                  }}
                 </span>
               </div>
             </div>
@@ -469,10 +479,13 @@ function getDaysUntil(date: Date): string {
                 {{ goal.name }}
               </span>
               <span class="text-sm text-gray-500 dark:text-gray-400">
-                {{ Math.round((goal.currentAmount / goal.targetAmount) * 100) }}%
+                {{ formatMasked(Math.round((goal.currentAmount / goal.targetAmount) * 100) + '%') }}
               </span>
             </div>
-            <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-slate-700">
+            <div
+              class="h-2 w-full rounded-full bg-gray-200 transition-all dark:bg-slate-700"
+              :class="{ 'blur-sm': !isUnlocked }"
+            >
               <div
                 class="h-2 rounded-full bg-blue-600 transition-all"
                 :style="{

@@ -7,6 +7,11 @@ export class DashboardPage {
     await this.page.goto('/dashboard');
   }
 
+  /** Click the privacy mode unlock button to reveal masked financial figures */
+  async unlockPrivacyMode() {
+    await this.page.getByRole('button', { name: 'Show financial figures' }).click();
+  }
+
   /** Returns the locator for the Net Worth value (use with expect().toContainText() for auto-waiting) */
   get netWorthValue() {
     return this.page.locator('text=Net Worth').locator('..').locator('.text-2xl');
