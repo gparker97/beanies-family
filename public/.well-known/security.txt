@@ -1,0 +1,14 @@
+Contact: mailto:security@yourdomain.com
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://yourdomain.com/.well-known/security.txt
+Policy: https://github.com/gparker97/gp-family-finance-planner/blob/main/SECURITY.md
+Acknowledgments: https://github.com/gparker97/gp-family-finance-planner/blob/main/SECURITY.md#recognition
+
+# GP Family Finance Planner Security Contact
+#
+# If you discover a security vulnerability, please report it privately to:
+# security@yourdomain.com
+#
+# For more information, see our security policy:
+# https://github.com/gparker97/gp-family-finance-planner/blob/main/SECURITY.md
