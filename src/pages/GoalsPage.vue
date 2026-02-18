@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -15,6 +16,7 @@ import type {
   GoalPriority,
 } from '@/types/models';
 
+const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
 
 const goalsStore = useGoalsStore();
@@ -311,7 +313,10 @@ async function deleteGoal(id: string) {
               <CurrencyAmount :amount="goal.targetAmount" :currency="goal.currency" size="sm" />
             </span>
           </div>
-          <div class="h-2 w-full rounded-full bg-gray-200 dark:bg-slate-700">
+          <div
+            class="h-2 w-full rounded-full bg-gray-200 transition-all dark:bg-slate-700"
+            :class="{ 'blur-sm': !isUnlocked }"
+          >
             <div
               class="h-2 rounded-full transition-all"
               :class="goal.isCompleted ? 'bg-green-600' : 'bg-blue-600'"

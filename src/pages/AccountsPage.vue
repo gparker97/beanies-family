@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -14,6 +15,7 @@ const accountsStore = useAccountsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
 
 const showAddModal = ref(false);
@@ -109,9 +111,9 @@ const accountsByType = computed(() => {
     }));
 });
 
-// Format totals (which are in base currency) to display currency
+// Format totals (which are in base currency) to display currency, masked when privacy mode is on
 function formatTotal(amount: number): string {
-  return formatInDisplayCurrency(amount, settingsStore.baseCurrency);
+  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
 }
 
 function getAccountTypeLabel(type: AccountType): string {

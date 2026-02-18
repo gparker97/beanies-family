@@ -36,6 +36,8 @@ test.describe('Transaction Management', () => {
 
     const dashboardPage = new DashboardPage(page);
     await dashboardPage.goto();
+    // Unlock privacy mode to reveal masked financial figures
+    await dashboardPage.unlockPrivacyMode();
 
     // Use auto-waiting assertion (data loads asynchronously)
     await expect(dashboardPage.monthlyIncomeValue).toContainText('5,000');
@@ -73,6 +75,8 @@ test.describe('Transaction Management', () => {
 
     const dashboardPage = new DashboardPage(page);
     await dashboardPage.goto();
+    // Unlock privacy mode to reveal masked financial figures
+    await dashboardPage.unlockPrivacyMode();
 
     // Use auto-waiting assertion (data loads asynchronously)
     await expect(dashboardPage.monthlyExpensesValue).toContainText('150');

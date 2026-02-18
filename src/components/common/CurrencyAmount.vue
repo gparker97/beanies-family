@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import type { CurrencyCode } from '@/types/models';
 
 const props = withDefaults(
@@ -24,6 +25,7 @@ const props = withDefaults(
 );
 
 const { convertToDisplay } = useCurrencyDisplay();
+const { isUnlocked, MASK } = usePrivacyMode();
 
 const converted = computed(() => convertToDisplay(props.amount, props.currency));
 
@@ -66,27 +68,32 @@ const prefix = computed(() => {
 </script>
 
 <template>
-  <span class="inline-flex flex-col">
-    <!-- Primary amount (display currency) -->
-    <span :class="primaryClasses">
-      <span
-        v-if="converted.conversionFailed"
-        class="mr-1 text-yellow-500"
-        title="Exchange rate not available"
-      >
-        <svg class="inline-block h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-          <path
-            fill-rule="evenodd"
-            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-            clip-rule="evenodd"
-          />
-        </svg>
+  <span class="inline-flex flex-col transition-opacity duration-200">
+    <!-- Masked state -->
+    <span v-if="!isUnlocked" :class="primaryClasses">{{ MASK }}</span>
+    <!-- Unlocked state -->
+    <template v-else>
+      <!-- Primary amount (display currency) -->
+      <span :class="primaryClasses">
+        <span
+          v-if="converted.conversionFailed"
+          class="mr-1 text-yellow-500"
+          title="Exchange rate not available"
+        >
+          <svg class="inline-block h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fill-rule="evenodd"
+              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </span>
+        {{ prefix }}{{ converted.displayFormatted }}
       </span>
-      {{ prefix }}{{ converted.displayFormatted }}
-    </span>
-    <!-- Secondary amount (original currency) -->
-    <span v-if="showSecondary" :class="secondaryClasses">
-      {{ converted.originalFormatted }}
-    </span>
+      <!-- Secondary amount (original currency) -->
+      <span v-if="showSecondary" :class="secondaryClasses">
+        {{ converted.originalFormatted }}
+      </span>
+    </template>
   </span>
 </template>

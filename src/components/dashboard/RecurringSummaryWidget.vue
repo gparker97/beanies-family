@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseCard } from '@/components/ui';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -11,6 +12,7 @@ import { formatDateShort } from '@/utils/date';
 const recurringStore = useRecurringStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { formatMasked } = usePrivacyMode();
 
 // Uses filtered data based on global member filter
 const monthlyIncome = computed(() =>
@@ -74,13 +76,13 @@ const upcomingItems = computed(() => {
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Income</p>
             <p class="text-lg font-semibold text-green-600 dark:text-green-400">
-              +{{ monthlyIncome }}
+              {{ formatMasked('+' + monthlyIncome) }}
             </p>
           </div>
           <div>
             <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Expenses</p>
             <p class="text-lg font-semibold text-red-600 dark:text-red-400">
-              -{{ monthlyExpenses }}
+              {{ formatMasked('-' + monthlyExpenses) }}
             </p>
           </div>
         </div>
@@ -96,7 +98,7 @@ const upcomingItems = computed(() => {
                 : 'text-red-600 dark:text-red-400'
             "
           >
-            {{ netRecurring >= 0 ? '+' : '-' }}{{ netRecurringFormatted }}
+            {{ formatMasked((netRecurring >= 0 ? '+' : '-') + netRecurringFormatted) }}
           </p>
         </div>
 
