@@ -12,7 +12,7 @@
 > **Brand:**
 >
 > - `docs/brand/beanies-cig.html` — Corporate Identity Guidelines (colors, typography, logo rules, voice)
-> - `~/.claude/skills/beanies-theme.md` — Brand theme skill (use for all UI copy, component design, and image generation)
+> - `.claude/skills/beanies-theme.md` — Brand theme skill (use for all UI copy, component design, and image generation)
 
 ## Project Overview
 
@@ -29,7 +29,7 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **Voice:** Simple, friendly, comforting, secure, familiar. Say "counting beans..." not "Loading..."
 - **Golden rule:** The beanies hold hands and are never separated; never rotate the arrow.
 - **Full guidelines:** `docs/brand/beanies-cig.html`
-- **Theme skill:** `~/.claude/skills/beanies-theme.md` — consult for all UI copy and component design
+- **Theme skill:** `.claude/skills/beanies-theme.md` — consult for all UI copy and component design
 
 ## Technology Stack
 
