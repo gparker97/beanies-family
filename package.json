@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
+    "build": "npm run security:audit && vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
@@ -26,6 +26,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "type-check": "vue-tsc --noEmit",
+    "security:check": "npm run security:audit && npm run security:lint",
+    "security:audit": "npm audit --audit-level=moderate",
+    "security:audit:fix": "npm audit fix",
+    "security:lint": "eslint . --ext .vue,.js,.ts,.tsx --config eslint.security.config.js",
+    "security:full": "npm run security:audit && npm run security:lint && npm run type-check",
     "prepare": "husky"
   },
   "dependencies": {
@@ -40,6 +45,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
+    "@microsoft/eslint-plugin-sdl": "^1.1.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^24.10.1",
@@ -50,7 +56,9 @@
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-no-secrets": "^2.2.2",
     "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-vue": "^9.33.0",
     "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.5.0",
