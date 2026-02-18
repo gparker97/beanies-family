@@ -2,11 +2,13 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
+import { useSyncStore } from '@/stores/syncStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+const syncStore = useSyncStore();
 
 interface NavItemDef {
   labelKey: UIStringKey;
@@ -45,7 +47,7 @@ function navigateTo(path: string) {
 
 <template>
   <aside
-    class="flex min-h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+    class="flex h-full w-64 flex-shrink-0 flex-col border-r border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-800"
   >
     <!-- Logo & Branding -->
     <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
@@ -224,9 +226,69 @@ function navigateTo(path: string) {
       </button>
     </nav>
 
-    <!-- Version info -->
-    <div class="border-t border-gray-200 px-6 py-3 dark:border-slate-700">
-      <p class="text-xs text-gray-400 dark:text-gray-500">v1.0.0 - MVP</p>
+    <!-- Data status & version -->
+    <div class="border-t border-gray-200 px-4 py-3 dark:border-slate-700">
+      <!-- Encryption status -->
+      <div
+        v-if="syncStore.isConfigured"
+        class="mb-2 flex items-center gap-2"
+        :title="
+          syncStore.isEncryptionEnabled
+            ? 'Your data file is encrypted with AES-256-GCM'
+            : 'Your data file is not encrypted — enable encryption in Settings'
+        "
+      >
+        <!-- Locked icon (encrypted) -->
+        <svg
+          v-if="syncStore.isEncryptionEnabled"
+          class="h-4 w-4 flex-shrink-0 text-emerald-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+          />
+        </svg>
+        <!-- Unlocked icon (not encrypted) -->
+        <svg
+          v-else
+          class="h-4 w-4 flex-shrink-0 text-amber-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+          />
+        </svg>
+        <span
+          class="truncate text-xs"
+          :class="
+            syncStore.isEncryptionEnabled
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-amber-600 dark:text-amber-400'
+          "
+        >
+          {{ syncStore.isEncryptionEnabled ? 'Data encrypted' : 'Not encrypted' }}
+        </span>
+      </div>
+      <!-- File name -->
+      <p
+        v-if="syncStore.isConfigured && syncStore.fileName"
+        class="mb-1 truncate text-[10px] text-gray-400 dark:text-gray-500"
+        :title="syncStore.fileName"
+      >
+        {{ syncStore.fileName }}
+      </p>
+      <!-- Version -->
+      <p class="text-[10px] text-gray-400 dark:text-gray-500">v1.0.0 - MVP</p>
     </div>
   </aside>
 </template>
