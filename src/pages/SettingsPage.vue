@@ -386,7 +386,7 @@ function formatLastSync(timestamp: string | null): string {
                     :checked="syncStore.isEncryptionEnabled"
                     :disabled="isProcessingEncryption"
                     class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
-                    @change="handleEncryptionToggle"
+                    @click.prevent="handleEncryptionToggle"
                   />
                   <div>
                     <p class="font-medium text-gray-900 dark:text-gray-100">
