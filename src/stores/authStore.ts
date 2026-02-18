@@ -4,6 +4,10 @@ import { isCognitoConfigured } from '@/config/cognito';
 import * as cognitoService from '@/services/auth/cognitoService';
 import * as tokenManager from '@/services/auth/tokenManager';
 import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
+import {
+  getGlobalSettings,
+  saveGlobalSettings,
+} from '@/services/indexeddb/repositories/globalSettingsRepository';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import { useFamilyContextStore } from './familyContextStore';
@@ -45,6 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       if (!isCognitoConfigured()) {
         // No Cognito configured — run in local-only mode
+        isLocalOnlyMode.value = true;
+        isAuthenticated.value = true;
+        isInitialized.value = true;
+        return;
+      }
+
+      // Check if user previously chose local-only mode (persisted across page reloads)
+      const globalSettings = await getGlobalSettings();
+      if (globalSettings.isLocalOnlyMode) {
         isLocalOnlyMode.value = true;
         isAuthenticated.value = true;
         isInitialized.value = true;
@@ -334,6 +347,13 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
+    // Clear local-only mode flag from persistent storage
+    try {
+      await saveGlobalSettings({ isLocalOnlyMode: false });
+    } catch {
+      // Registry may already be cleared
+    }
+
     // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
@@ -343,11 +363,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Continue without authentication (local-only mode).
-   * Preserves the current setup flow for users who don't want accounts.
+   * Persists the choice so it survives page reloads.
    */
-  function continueWithoutAuth(): void {
+  async function continueWithoutAuth(): Promise<void> {
     isLocalOnlyMode.value = true;
     isAuthenticated.value = true;
+    await saveGlobalSettings({ isLocalOnlyMode: true });
   }
 
   return {

@@ -6,10 +6,17 @@ import { TestDataFactory } from '../fixtures/data';
 
 test.describe('Transaction Management', () => {
   test('should create transaction and update dashboard', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
+    // Seed test data into the family DB (created by app during initialization)
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id, { name: 'Checking' });
     await dbHelper.seedData({
@@ -30,15 +37,22 @@ test.describe('Transaction Management', () => {
     const dashboardPage = new DashboardPage(page);
     await dashboardPage.goto();
 
-    const income = await dashboardPage.getMonthlyIncome();
-    expect(income).toContain('5,000');
+    // Use auto-waiting assertion (data loads asynchronously)
+    await expect(dashboardPage.monthlyIncomeValue).toContainText('5,000');
   });
 
   test('should create expense and update dashboard', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
+    // Seed test data into the family DB (created by app during initialization)
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id, { name: 'Checking' });
     await dbHelper.seedData({
@@ -60,7 +74,7 @@ test.describe('Transaction Management', () => {
     const dashboardPage = new DashboardPage(page);
     await dashboardPage.goto();
 
-    const expenses = await dashboardPage.getMonthlyExpenses();
-    expect(expenses).toContain('150');
+    // Use auto-waiting assertion (data loads asynchronously)
+    await expect(dashboardPage.monthlyExpensesValue).toContainText('150');
   });
 });

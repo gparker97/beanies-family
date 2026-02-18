@@ -7,23 +7,40 @@ export class DashboardPage {
     await this.page.goto('/dashboard');
   }
 
+  /** Returns the locator for the Net Worth value (use with expect().toContainText() for auto-waiting) */
+  get netWorthValue() {
+    return this.page.locator('text=Net Worth').locator('..').locator('.text-2xl');
+  }
+
+  /** Returns the locator for the Monthly Income value */
+  get monthlyIncomeValue() {
+    return this.page.locator('text=Monthly Income').locator('..').locator('.text-2xl');
+  }
+
+  /** Returns the locator for the Monthly Expenses value */
+  get monthlyExpensesValue() {
+    return this.page.locator('text=Monthly Expenses').locator('..').locator('.text-2xl');
+  }
+
+  /** Returns the locator for the Net Cash Flow value */
+  get netCashFlowValue() {
+    return this.page.locator('text=Net Cash Flow').locator('..').locator('.text-2xl');
+  }
+
+  // Legacy methods (read text immediately without waiting for specific values)
   async getNetWorth(): Promise<string> {
-    const card = this.page.locator('text=Net Worth').locator('..');
-    return (await card.locator('.text-2xl').textContent()) || '';
+    return (await this.netWorthValue.textContent()) || '';
   }
 
   async getMonthlyIncome(): Promise<string> {
-    const card = this.page.locator('text=Monthly Income').locator('..');
-    return (await card.locator('.text-2xl').textContent()) || '';
+    return (await this.monthlyIncomeValue.textContent()) || '';
   }
 
   async getMonthlyExpenses(): Promise<string> {
-    const card = this.page.locator('text=Monthly Expenses').locator('..');
-    return (await card.locator('.text-2xl').textContent()) || '';
+    return (await this.monthlyExpensesValue.textContent()) || '';
   }
 
   async getNetCashFlow(): Promise<string> {
-    const card = this.page.locator('text=Net Cash Flow').locator('..');
-    return (await card.locator('.text-2xl').textContent()) || '';
+    return (await this.netCashFlowValue.textContent()) || '';
   }
 }

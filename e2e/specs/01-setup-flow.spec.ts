@@ -4,9 +4,15 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 
 test.describe('Setup Flow', () => {
   test('should complete fresh setup successfully', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const setupPage = new SetupPage(page);
     await expect(page).toHaveURL('/setup');
@@ -21,12 +27,17 @@ test.describe('Setup Flow', () => {
   });
 
   test('should validate required fields', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const setupPage = new SetupPage(page);
-    await setupPage.goto();
 
     // Try to continue without filling form
     await setupPage.continueButton.click();

@@ -15,21 +15,44 @@ export class SetupPage {
   get continueButton() {
     return this.page.getByRole('button', { name: 'Continue' });
   }
-  get getStartedButton() {
-    return this.page.getByRole('button', { name: 'Get Started' });
+  get backButton() {
+    return this.page.getByRole('button', { name: 'Back' });
+  }
+  get downloadButton() {
+    return this.page.getByRole('button', { name: 'Download Your Data' });
   }
 
   async goto() {
     await this.page.goto('/setup');
   }
 
+  /**
+   * Complete the 3-step setup wizard.
+   * Step 1: Profile (name + email)
+   * Step 2: Currency
+   * Step 3: Secure Your Data — uses "Download Your Data" fallback
+   *
+   * Disables File System Access API so the download fallback button appears
+   * (the API exists in headless Chromium but file pickers can't open).
+   */
   async completeSetup(name = 'John Doe', email = 'john@example.com', currency = 'USD') {
+    // Disable File System Access API so the "Download Your Data" fallback appears
+    // (headless Chromium has the API but file picker dialogs can't open)
+    await this.page.addInitScript(() => {
+      delete (window as any).showSaveFilePicker;
+      delete (window as any).showOpenFilePicker;
+    });
+
     await this.goto();
+    // Step 1: Profile
     await this.nameInput.fill(name);
     await this.emailInput.fill(email);
     await this.continueButton.click();
+    // Step 2: Currency
     await this.currencySelect.selectOption(currency);
-    await this.getStartedButton.click();
+    await this.continueButton.click();
+    // Step 3: Secure Your Data — use download fallback
+    await this.downloadButton.click();
     await this.page.waitForURL('/dashboard');
   }
 }

@@ -5,9 +5,15 @@ import { TestDataFactory } from '../fixtures/data';
 
 test.describe('Date Filtering', () => {
   test('should filter transactions by current month', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id);
@@ -16,6 +22,7 @@ test.describe('Date Filtering', () => {
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 15);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
 
+    // Seed test data into the family DB (created by app during initialization)
     await dbHelper.seedData({
       familyMembers: [member],
       accounts: [account],
@@ -41,9 +48,15 @@ test.describe('Date Filtering', () => {
   });
 
   test('should filter transactions by last month', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id);
@@ -52,6 +65,7 @@ test.describe('Date Filtering', () => {
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 15);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 15);
 
+    // Seed test data into the family DB (created by app during initialization)
     await dbHelper.seedData({
       familyMembers: [member],
       accounts: [account],
@@ -77,9 +91,15 @@ test.describe('Date Filtering', () => {
   });
 
   test('should filter transactions by last 3 months', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id);
@@ -88,6 +108,7 @@ test.describe('Date Filtering', () => {
     const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 15);
     const fourMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 4, 15);
 
+    // Seed test data into the family DB (created by app during initialization)
     await dbHelper.seedData({
       familyMembers: [member],
       accounts: [account],

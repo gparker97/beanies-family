@@ -44,6 +44,7 @@ export interface GlobalSettings {
   exchangeRates: ExchangeRate[];
   exchangeRateAutoUpdate: boolean;
   exchangeRateLastFetch: ISODateString | null;
+  isLocalOnlyMode?: boolean;
 }
 
 // FamilyMember - Each family member has their own profile

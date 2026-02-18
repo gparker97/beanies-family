@@ -129,8 +129,8 @@ function handlePasskeySignIn() {
     'This will be available once the backend is deployed.';
 }
 
-function handleContinueWithoutAuth() {
-  authStore.continueWithoutAuth();
+async function handleContinueWithoutAuth() {
+  await authStore.continueWithoutAuth();
   window.location.href = '/dashboard';
 }
 </script>

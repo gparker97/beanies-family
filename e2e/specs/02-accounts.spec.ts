@@ -6,9 +6,15 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 
 test.describe('Account Management', () => {
   test('should create account and update dashboard net worth', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const setupPage = new SetupPage(page);
     await setupPage.completeSetup();
@@ -24,14 +30,20 @@ test.describe('Account Management', () => {
     const dashboardPage = new DashboardPage(page);
     await dashboardPage.goto();
 
-    const netWorth = await dashboardPage.getNetWorth();
-    expect(netWorth).toContain('5,000');
+    // Use auto-waiting assertion (data loads asynchronously)
+    await expect(dashboardPage.netWorthValue).toContainText('5,000');
   });
 
   test('should create multiple accounts', async ({ page }) => {
+    // Navigate first so we have a page context for IndexedDB operations
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
+    // Reload after clearing so the app re-initializes with empty state
+    await page.goto('/');
+    // Bypass login (Cognito is configured but we test without an account)
+    await page.getByRole('button', { name: 'Continue without an account' }).click();
+    await page.waitForURL('/setup');
 
     const setupPage = new SetupPage(page);
     await setupPage.completeSetup();
@@ -51,7 +63,7 @@ test.describe('Account Management', () => {
       balance: 10000,
     });
 
-    const accountCount = await accountsPage.getAccountCount();
-    expect(accountCount).toBe(2);
+    // Use auto-waiting assertion (account list updates asynchronously)
+    await expect(page.locator('[data-testid="account-card"]')).toHaveCount(2);
   });
 });
