@@ -52,7 +52,10 @@ export class SetupPage {
     await this.currencySelect.selectOption(currency);
     await this.continueButton.click();
     // Step 3: Secure Your Data — use download fallback
-    await this.downloadButton.click();
+    // manualExport() triggers a file download before navigating to /dashboard.
+    // Capture the download event to prevent Playwright from treating it as a
+    // failed navigation (throws "Download is starting" in Firefox/WebKit).
+    await Promise.all([this.page.waitForEvent('download'), this.downloadButton.click()]);
     await this.page.waitForURL('/dashboard');
   }
 }
