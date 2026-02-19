@@ -9,7 +9,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'logo.svg', 'icons/*.png'],
+      includeAssets: ['brand/*.png', 'icons/*.png'],
       manifest: {
         name: 'beanies.family',
         short_name: 'beanies',
