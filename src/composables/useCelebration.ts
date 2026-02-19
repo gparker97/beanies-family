@@ -33,7 +33,7 @@ const configs: Record<
     asset: '/brand/beanies-celebrating-line.png',
   },
   'first-account': {
-    type: 'toast',
+    type: 'modal',
     message: 'Your first bean is planted!',
     asset: '/brand/beanies-celebrating-circle.png',
   },

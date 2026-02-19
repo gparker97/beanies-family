@@ -67,7 +67,7 @@ function navigateTo(path: string) {
           <p
             class="mt-0.5 text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500"
           >
-            Every bean counts
+            every bean counts
           </p>
         </div>
       </div>
