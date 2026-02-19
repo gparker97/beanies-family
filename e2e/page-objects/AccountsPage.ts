@@ -18,6 +18,14 @@ export class AccountsPage {
       await this.page.getByLabel('Currency').selectOption(data.currency);
     }
     await this.page.getByRole('button', { name: 'Add Account' }).last().click();
+    // Dismiss any celebration modal that may appear (e.g. 'first-account' trigger)
+    const letsGoButton = this.page.getByRole('button', { name: "Let's go!" });
+    try {
+      await letsGoButton.waitFor({ state: 'visible', timeout: 2000 });
+      await letsGoButton.click();
+    } catch {
+      // No celebration modal appeared — that's fine
+    }
     await expect(this.page.getByRole('dialog')).not.toBeVisible();
   }
 
