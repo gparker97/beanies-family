@@ -142,7 +142,7 @@ async function handleContinueWithoutAuth() {
         <img
           src="/brand/beanies_celebrating_line_transparent_600x600.png"
           alt="beanies celebrating"
-          class="mx-auto mb-1 w-full max-w-sm"
+          class="mx-auto w-full max-w-sm"
         />
         <h1 class="font-outfit text-5xl font-bold">
           <span class="text-secondary-500 dark:text-gray-100">beanies</span
