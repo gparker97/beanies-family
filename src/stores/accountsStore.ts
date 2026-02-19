@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { celebrate } from '@/composables/useCelebration';
 import { useAssetsStore } from './assetsStore';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useSettingsStore } from './settingsStore';
@@ -176,6 +177,9 @@ export const useAccountsStore = defineStore('accounts', () => {
     try {
       const account = await accountRepo.createAccount(input);
       accounts.value.push(account);
+      if (accounts.value.length === 1) {
+        celebrate('first-account');
+      }
       return account;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to create account';

@@ -95,7 +95,7 @@ function goToLogin() {
     <BaseCard class="w-full max-w-md text-center">
       <div v-if="status === 'verifying'" class="py-8">
         <div
-          class="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600"
+          class="border-sky-silk-100 border-t-primary-500 mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4"
         ></div>
         <p class="text-gray-600 dark:text-gray-400">Verifying your magic link...</p>
       </div>
@@ -120,7 +120,7 @@ function goToLogin() {
       <div v-if="status === 'error'" class="py-8">
         <p class="mb-4 text-red-600 dark:text-red-400">{{ errorMessage }}</p>
         <button
-          class="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-sm"
           @click="goToLogin"
         >
           Back to login

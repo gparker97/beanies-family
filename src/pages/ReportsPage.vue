@@ -720,8 +720,10 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
 
       <!-- Summary Stats -->
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-4 text-white">
-          <p class="text-sm text-blue-100">{{ t('reports.currentNetWorth') }}</p>
+        <div
+          class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-4 text-white"
+        >
+          <p class="text-sm text-white/80">{{ t('reports.currentNetWorth') }}</p>
           <p class="mt-1 text-xl font-bold">
             {{
               formatMasked(
@@ -812,11 +814,11 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
           class="rounded-xl p-4 text-white"
           :class="
             netCashFlow >= 0
-              ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+              ? 'from-secondary-500 to-secondary-700 bg-gradient-to-br'
               : 'bg-gradient-to-br from-orange-500 to-amber-600'
           "
         >
-          <p :class="netCashFlow >= 0 ? 'text-blue-100' : 'text-orange-100'" class="text-sm">
+          <p :class="netCashFlow >= 0 ? 'text-white/80' : 'text-orange-100'" class="text-sm">
             {{ t('reports.netCashFlow') }}
           </p>
           <p class="mt-1 text-xl font-bold">

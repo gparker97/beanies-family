@@ -1,4 +1,4 @@
-# GP Family Financial Planner
+# beanies.family
 
 > **IMPORTANT — Read before starting any work:**
 > Always read `docs/STATUS.md` before beginning or continuing work on this project. It contains the latest project status, what is in progress, and recent decisions. Update it when completing significant work or making architectural decisions.
@@ -8,10 +8,28 @@
 > - `docs/STATUS.md` — Current project status and progress
 > - `docs/ARCHITECTURE.md` — System architecture, data flow, and key patterns
 > - `docs/adr/` — Architectural Decision Records (ADRs) for all major design decisions
+>
+> **Brand:**
+>
+> - `docs/brand/beanies-cig.html` — Corporate Identity Guidelines (colors, typography, logo rules, voice)
+> - `.claude/skills/beanies-theme.md` — Brand theme skill (use for all UI copy, component design, and image generation)
 
 ## Project Overview
 
-A local-first, PWA-enabled family financial planning application. The app allows families to track accounts, transactions, assets, and financial goals with multi-currency support and optional encrypted cloud sync to Google Drive.
+beanies.family is the focal point of your family. It is a local-first, PWA-enabled family and financial planning and application. The main features include family financial planning, activity tracking, and family collaboration. The app allows families to track accounts, transactions, assets, and financial goals with multi-currency support and optional encrypted cloud sync to Google Drive. Additional features include keeping track of family activities, milestones, collaboration, and other things to help families learn, manage, and grow their beans together.
+
+## Brand Identity
+
+- **App name:** `beanies.family` — always lowercase with `.family`. Never "Beanies", "beanies", or "GP Family Planner".
+- **Tagline:** _Every bean counts_ (sentence case, no period)
+- **Primary font:** Outfit (headings, values) + Inter (body, data)
+- **Primary color:** Heritage Orange `#F15D22` (actions, CTAs, growth)
+- **Foundation color:** Deep Slate `#2C3E50` (text, security, dark bg)
+- **Accent colors:** Sky Silk `#AED6F1` (calm, backgrounds), Terracotta `#E67E22` (children, milestones)
+- **Voice:** Simple, friendly, comforting, secure, familiar. Say "counting beans..." not "Loading..."
+- **Golden rule:** The beanies hold hands and are never separated; never rotate the arrow.
+- **Full guidelines:** `docs/brand/beanies-cig.html`
+- **Theme skill:** `.claude/skills/beanies-theme.md` — consult for all UI copy and component design
 
 ## Technology Stack
 
@@ -197,11 +215,16 @@ npm run lint
 
 ## Terminology Guide
 
-- **"Data File"** or **"Family Data File"** — not "sync file"
-- **"Family Data Options"** — not "File Sync" (in Settings)
-- **"My Family's Data"** — not "Sync File" (in Settings configured state)
-- **"Last Saved"** — not "Last Sync"
-- **"Saving..."** — not "Syncing..."
+| Correct             | Incorrect                                                              |
+| ------------------- | ---------------------------------------------------------------------- |
+| `beanies.family`    | Beanies, beanies, Beanies Family, GP Family Planner, GP Family Finance |
+| _Every bean counts_ | Every Bean Counts, every bean counts.                                  |
+| Family Data File    | Sync File                                                              |
+| Family Data Options | File Sync (in Settings)                                                |
+| My Family's Data    | Sync File (in Settings configured state)                               |
+| Last Saved          | Last Sync                                                              |
+| Saving...           | Syncing...                                                             |
+| counting beans...   | Loading...                                                             |
 
 ## Code Conventions
 

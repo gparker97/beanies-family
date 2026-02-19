@@ -16,7 +16,7 @@ export interface PasskeyInfo {
   label: string;
 }
 
-const RP_NAME = 'GP Family Finance';
+const RP_NAME = 'beanies.family';
 
 /**
  * Check if WebAuthn is supported in the current browser.

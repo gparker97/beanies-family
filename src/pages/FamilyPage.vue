@@ -116,7 +116,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
             <input
               v-model="editFamilyName"
               type="text"
-              class="rounded-lg border border-gray-300 px-3 py-1.5 text-xl font-bold text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+              class="focus:border-primary-500 focus:ring-primary-500 rounded-lg border border-gray-300 px-3 py-1.5 text-xl font-bold text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
               @keyup.enter="saveFamilyName"
               @keyup.escape="cancelEditFamilyName"
             />
@@ -196,7 +196,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
             <!-- Create Login button for members without auth -->
             <button
               v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
-              class="mt-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 mt-1 text-xs"
               @click="openCreateAccountModal(member.name, member.email)"
             >
               Create Login
