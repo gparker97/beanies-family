@@ -54,7 +54,7 @@ function navigateTo(path: string) {
       <div class="flex items-center gap-3">
         <!-- Logo -->
         <img
-          src="/brand/beanies-logo-transparent.png"
+          src="/brand/beanies_logo_transparent_44x44.png"
           alt="beanies.family"
           class="h-11 w-11 flex-shrink-0"
         />

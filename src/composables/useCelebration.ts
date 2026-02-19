@@ -30,32 +30,32 @@ const configs: Record<
   'setup-complete': {
     type: 'modal',
     message: 'Setup complete — ready to start counting your beanies!',
-    asset: '/brand/beanies-celebrating-line.png',
+    asset: '/brand/beanies_celebrating_line_transparent_600x600.png',
   },
   'first-account': {
     type: 'modal',
     message: 'Your first bean is planted!',
-    asset: '/brand/beanies-celebrating-circle.png',
+    asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
   'first-transaction': {
     type: 'toast',
     message: 'Every beanie counts!',
-    asset: '/brand/beanies-celebrating-circle.png',
+    asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
   'goal-reached': {
     type: 'modal',
     message: 'Goal complete! The beanies are proud!',
-    asset: '/brand/beanies-celebrating-line.png',
+    asset: '/brand/beanies_celebrating_line_transparent_600x600.png',
   },
   'first-save': {
     type: 'toast',
     message: 'Your beanies are safe and encrypted!',
-    asset: '/brand/beanies-celebrating-circle.png',
+    asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
   'debt-free': {
     type: 'modal',
     message: 'Debt-free! The beanies are celebrating!',
-    asset: '/brand/beanies-celebrating-line.png',
+    asset: '/brand/beanies_celebrating_line_transparent_600x600.png',
   },
 };
 

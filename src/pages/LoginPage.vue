@@ -140,7 +140,7 @@ async function handleContinueWithoutAuth() {
     <div class="w-full max-w-md">
       <div class="mb-8 text-center">
         <img
-          src="/brand/beanies-celebrating-line.png"
+          src="/brand/beanies_celebrating_line_transparent_600x600.png"
           alt="beanies celebrating"
           class="mx-auto mb-4 h-28 w-auto"
         />

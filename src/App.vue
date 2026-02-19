@@ -278,7 +278,7 @@ onMounted(async () => {
         class="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-[#FDFBF9] dark:bg-[#1a252f]"
       >
         <img
-          src="/brand/beanies-spinner-no-text-transparent.png"
+          src="/brand/beanies_spinner_transparent_192x192.png"
           alt="Loading"
           class="h-24 w-24 animate-spin"
           style="animation-duration: 1.8s"
