@@ -139,10 +139,15 @@ async function handleContinueWithoutAuth() {
   <div class="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-slate-900">
     <div class="w-full max-w-md">
       <div class="mb-8 text-center">
+        <img
+          src="/brand/beanies-celebrating-line.png"
+          alt="beanies celebrating"
+          class="mx-auto mb-4 h-28 w-auto"
+        />
         <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
           beanies.family
         </h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">Every bean counts</p>
+        <p class="mt-2 text-gray-600 dark:text-gray-400">every bean counts</p>
 
         <!-- Security benefits -->
         <div class="mt-6 space-y-3 text-left">
