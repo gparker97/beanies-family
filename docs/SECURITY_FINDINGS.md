@@ -4,7 +4,7 @@
 
 This document tracks security findings from automated scans and their resolution status.
 
-**Last Scan:** 2026-02-13
+**Last Scan:** 2026-02-19
 **Total Issues:** 38 warnings, 0 critical errors
 
 ## Current Findings
@@ -47,47 +47,27 @@ These are false positives because:
 ### 2. innerHTML Usage (1 instance)
 
 **Severity:** Medium
-**Status:** Review Required
+**Status:** ✅ Resolved (2026-02-19)
 **Plugin:** @microsoft/eslint-plugin-sdl
 
-**Location:** `src/services/translation/translationApi.ts:92`
+**Location:** `src/services/translation/translationApi.ts`
 
-```typescript
-element.innerHTML = translatedText; // Potential XSS risk
-```
-
-**Analysis:**
-This is used for translation purposes where `translatedText` comes from the AI translation API.
-
-**Risk:**
-If the translation API is compromised or returns malicious content, it could lead to XSS.
-
-**Recommended Fix:**
-
-```typescript
-// Option 1: Use textContent instead of innerHTML
-element.textContent = translatedText;
-
-// Option 2: Sanitize before setting innerHTML
-import DOMPurify from 'dompurify';
-element.innerHTML = DOMPurify.sanitize(translatedText);
-```
-
-**Action:** Review and fix before production deployment
+**Resolution:**
+Replaced the DOM-based `decodeHtmlEntities` function (which used `textarea.innerHTML`) with a pure regex-based function that maps a fixed set of HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&apos;`, `&nbsp;`). This eliminates the XSS surface entirely without requiring a third-party sanitizer, since MyMemory API only returns this limited set of standard entities.
 
 ---
 
 ## Dependency Vulnerabilities
 
-**Status:** ✅ No vulnerabilities found
-**Last Check:** 2026-02-13
+**Status:** ⚠️ 26 transitive dev-dependency vulnerabilities (accepted risk)
+**Last Check:** 2026-02-19
 
 ```bash
 npm audit --audit-level=moderate
-# found 0 vulnerabilities
+# 26 vulnerabilities (all in transitive dev dependencies)
 ```
 
-All dependencies are up to date with no known security vulnerabilities.
+All 26 vulnerabilities are in transitive dev dependencies (e.g., `minimatch` in eslint plugins, `ejs` in `workbox-build`) that cannot be directly fixed by this project. No production dependencies are affected. The dedicated `dependency-audit` CI job reports these findings with `continue-on-error: true`. `npm audit` remains available as a standalone script (`npm run security:audit`) but no longer blocks the `build` or `security:full` scripts.
 
 ## Secrets Detection
 
@@ -136,10 +116,6 @@ No hardcoded API keys, passwords, or tokens found in the codebase.
    - Needs customization for production CDN sources
    - Ready to uncomment and test
 
-2. **Code Fixes**
-   - Review innerHTML usage in translationApi.ts
-   - Consider adding DOMPurify for sanitization
-
 ### 📋 Planned
 
 1. **Additional Security Measures**
@@ -160,7 +136,7 @@ No hardcoded API keys, passwords, or tokens found in the codebase.
 
 1. ✅ Enable security scanning in CI/CD pipeline
 2. ✅ Configure Dependabot for automatic updates
-3. ⚠️ Review and fix innerHTML usage
+3. ✅ Review and fix innerHTML usage (resolved 2026-02-19)
 4. 📋 Enable Content Security Policy for production
 5. 📋 Set up security monitoring/alerting
 
@@ -216,8 +192,9 @@ The majority of security warnings (38/38) are false positives related to dynamic
 | Finding           | Severity | Status   | Assigned To | Due Date |
 | ----------------- | -------- | -------- | ----------- | -------- |
 | Object Injection  | Low      | Accepted | N/A         | N/A      |
-| innerHTML Usage   | Medium   | Open     | Developer   | TBD      |
+| innerHTML Usage   | Medium   | Resolved | N/A         | Done     |
 | CSP Configuration | Medium   | Planned  | Developer   | TBD      |
+| Dep Vulns (26)    | Low      | Accepted | N/A         | N/A      |
 
 ## Review Schedule
 

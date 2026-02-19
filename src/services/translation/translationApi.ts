@@ -85,12 +85,20 @@ export async function translate(
 }
 
 /**
- * Decode HTML entities that MyMemory sometimes returns
+ * Decode HTML entities that MyMemory sometimes returns.
+ * Uses an explicit map instead of DOM innerHTML to avoid XSS surface.
  */
 function decodeHtmlEntities(text: string): string {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
+  const entities: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': '\u00A0',
+  };
+  return text.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/g, (match) => entities[match] ?? match);
 }
 
 /**

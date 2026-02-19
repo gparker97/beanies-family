@@ -22,7 +22,7 @@ npm run security:audit:fix
 
 **When it runs:**
 
-- Every production build (`npm run build`)
+- On demand (`npm run security:audit`)
 - Pull requests (via GitHub Actions)
 - Daily scheduled scans (2 AM UTC)
 

@@ -88,7 +88,7 @@ jobs:
 
       - name: Scan for secrets in code
         run: |
-          npx eslint . --ext .vue,.js,.ts,.tsx --no-eslintrc --config eslint.security.config.js --rule 'no-secrets/no-secrets: error'
+          npx eslint . --config eslint.security.config.js --rule 'no-secrets/no-secrets: error'
         continue-on-error: false
 
   codeql-analysis:
