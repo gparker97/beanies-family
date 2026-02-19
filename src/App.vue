@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
+import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { needsLegacyMigration, runLegacyMigration } from '@/services/migration/legacyMigration';
@@ -33,6 +34,8 @@ const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
 const authStore = useAuthStore();
+
+const isInitializing = ref(true);
 
 const showLayout = computed(() => {
   // Don't show sidebar/header on setup, login, magic link callback, or 404 pages
@@ -251,11 +254,39 @@ onMounted(async () => {
   if (settingsStore.exchangeRateAutoUpdate) {
     updateRatesIfStale().catch(console.error);
   }
+
+  isInitializing.value = false;
 });
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-slate-900">
+    <!-- Loading overlay with pod spinner -->
+    <Transition
+      enter-active-class="transition-opacity duration-200"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-300"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isInitializing"
+        class="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-[#FDFBF9] dark:bg-[#1a252f]"
+      >
+        <img
+          src="/brand/beanies-spinner-no-text-transparent.png"
+          alt="Loading"
+          class="h-24 w-24 animate-spin"
+          style="animation-duration: 1.8s"
+        />
+        <p class="mt-4 text-sm text-gray-400 dark:text-gray-500">counting beans...</p>
+      </div>
+    </Transition>
+
+    <!-- Celebration toasts and modals -->
+    <CelebrationOverlay />
+
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <AppSidebar />
 

@@ -297,7 +297,7 @@ function formatLastSync(timestamp: string | null): string {
                     :class="{
                       'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400':
                         syncStore.syncStatus === 'ready',
-                      'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400':
+                      'bg-sky-silk-100 text-secondary-500 dark:bg-primary-900/30 dark:text-primary-400':
                         syncStore.syncStatus === 'syncing',
                       'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400':
                         syncStore.syncStatus === 'error',
@@ -385,7 +385,7 @@ function formatLastSync(timestamp: string | null): string {
                     type="checkbox"
                     :checked="syncStore.isEncryptionEnabled"
                     :disabled="isProcessingEncryption"
-                    class="h-4 w-4 rounded text-blue-600 focus:ring-blue-500"
+                    class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded"
                     @click.prevent="handleEncryptionToggle"
                   />
                   <div>

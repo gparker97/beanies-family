@@ -111,7 +111,7 @@ async function handleSignOut() {
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
+          class="flex items-center gap-1 rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
           @click="showCurrencyDropdown = !showCurrencyDropdown"
           @blur="closeCurrencyDropdown"
         >
@@ -130,7 +130,7 @@ async function handleSignOut() {
         <!-- Dropdown menu -->
         <div
           v-if="showCurrencyDropdown"
-          class="absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
             v-for="option in currencyOptions"
@@ -139,7 +139,7 @@ async function handleSignOut() {
             class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
             :class="
               option.code === settingsStore.displayCurrency
-                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
                 : 'text-gray-700 dark:text-gray-300'
             "
             @mousedown.prevent="selectCurrency(option.code)"
@@ -153,7 +153,7 @@ async function handleSignOut() {
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
+          class="flex items-center gap-1 rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
           :class="{ 'opacity-75': translationStore.isLoading }"
           @click="showLanguageDropdown = !showLanguageDropdown"
           @blur="closeLanguageDropdown"
@@ -195,7 +195,7 @@ async function handleSignOut() {
         <!-- Dropdown menu -->
         <div
           v-if="showLanguageDropdown"
-          class="absolute right-0 z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
             v-for="lang in LANGUAGES"
@@ -204,7 +204,7 @@ async function handleSignOut() {
             class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
             :class="
               lang.code === settingsStore.language
-                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
                 : 'text-gray-700 dark:text-gray-300'
             "
             @mousedown.prevent="selectLanguage(lang.code)"
@@ -220,11 +220,11 @@ async function handleSignOut() {
       <!-- Privacy mode toggle -->
       <button
         type="button"
-        class="rounded-lg p-2 transition-colors"
+        class="rounded-xl p-2 transition-colors"
         :class="
           isUnlocked
             ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200'
-            : 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-slate-700'
+            : 'text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-slate-700'
         "
         :aria-label="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         :title="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
@@ -259,7 +259,7 @@ async function handleSignOut() {
       <!-- Theme toggle -->
       <button
         type="button"
-        class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
+        class="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
         @click="toggleTheme"
       >
         <!-- Sun icon -->
@@ -331,7 +331,7 @@ async function handleSignOut() {
         <!-- Profile dropdown menu -->
         <div
           v-if="showProfileDropdown"
-          class="absolute right-0 z-50 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <div class="border-b border-gray-200 px-4 py-2 dark:border-slate-700">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
