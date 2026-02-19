@@ -3,6 +3,7 @@ import { TransactionsPage } from '../page-objects/TransactionsPage';
 import { DashboardPage } from '../page-objects/DashboardPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { TestDataFactory } from '../fixtures/data';
+import { bypassLoginIfNeeded } from '../helpers/auth';
 
 test.describe('Transaction Management', () => {
   test('should create transaction and update dashboard', async ({ page }) => {
@@ -12,9 +13,7 @@ test.describe('Transaction Management', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     // Seed test data into the family DB (created by app during initialization)
     const member = TestDataFactory.createFamilyMember();
@@ -50,9 +49,7 @@ test.describe('Transaction Management', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     // Seed test data into the family DB (created by app during initialization)
     const member = TestDataFactory.createFamilyMember();

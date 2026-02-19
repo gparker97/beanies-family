@@ -1,36 +1,74 @@
 @import url('tailwindcss');
 
-/* Custom CSS variables for theming */
+/* ─── Brand colour theme (Tailwind 4 @theme) ──────────────────────────────
+   Defines semantic utility classes: bg-primary-500, text-secondary, etc.
+   Heritage Orange  #F15D22  — primary actions, CTAs, growth
+   Deep Slate       #2C3E50  — foundation, text, security
+   Sky Silk         #AED6F1  — calm, backgrounds, shadows
+   Terracotta       #E67E22  — warmth, children, milestones
+──────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Heritage Orange scale */
+  --color-primary-50: #fef3ee;
+  --color-primary-100: #fde6d4;
+  --color-primary-200: #fbc9a8;
+  --color-primary-400: #f48347;
+  --color-primary-500: #f15d22;
+  --color-primary-600: #d14d1a;
+  --color-primary-700: #b33e15;
+
+  /* Deep Slate scale */
+  --color-secondary-50: #edf0f3;
+  --color-secondary-100: #d2dae2;
+  --color-secondary-400: #5d7a8a;
+  --color-secondary-500: #2c3e50;
+  --color-secondary-600: #243442;
+  --color-secondary-700: #1a252f;
+
+  /* Sky Silk */
+  --color-sky-silk-50: #f0f7fd;
+  --color-sky-silk-100: #daeef9;
+  --color-sky-silk-300: #aed6f1;
+
+  /* Terracotta */
+  --color-terracotta-400: #e67e22;
+  --color-terracotta-500: #ca6f1e;
+
+  /* Fonts */
+  --font-outfit: 'Outfit', sans-serif;
+  --font-inter: 'Inter', system-ui, sans-serif;
+}
+
+/* ─── CSS custom properties (used in non-Tailwind contexts) ─────────────── */
 :root {
-  --color-primary: #3b82f6;
-  --color-primary-dark: #2563eb;
-  --color-secondary: #64748b;
+  --color-primary: #f15d22;
+  --color-primary-dark: #d14d1a;
+  --color-secondary: #2c3e50;
   --color-success: #22c55e;
-  --color-warning: #f59e0b;
+  --color-warning: #e67e22;
   --color-danger: #ef4444;
-  --color-background: #fff;
-  --color-surface: #f8fafc;
-  --color-text: #1e293b;
+  --color-background: #fdfbf9;
+  --color-surface: #f5f1ed;
+  --color-text: #2c3e50;
   --color-text-muted: #64748b;
   --color-border: #e2e8f0;
 }
 
 /* Dark mode variables */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0f172a;
-    --color-surface: #1e293b;
-    --color-text: #f1f5f9;
-    --color-text-muted: #94a3b8;
-    --color-border: #334155;
-  }
+.dark {
+  --color-background: #1a252f;
+  --color-surface: #34495e;
+  --color-text: #ecf0f1;
+  --color-text-muted: #bdc3c7;
+  --color-border: #4a6274;
 }
 
-/* Base styles */
+/* ─── Base styles ───────────────────────────────────────────────────────── */
 body {
   background-color: var(--color-background);
   color: var(--color-text);
   font-family:
+    Inter,
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
@@ -39,6 +77,13 @@ body {
     sans-serif;
   margin: 0;
   min-height: 100vh;
+}
+
+/* Outfit for headings and financial values */
+h1,
+h2,
+h3 {
+  font-family: Outfit, sans-serif;
 }
 
 #app {

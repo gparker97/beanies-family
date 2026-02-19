@@ -164,9 +164,9 @@ function getAssetTypeConfig(type: AssetType): {
 } {
   const configs: Record<AssetType, { bgColor: string; iconColor: string; darkBgColor: string }> = {
     real_estate: {
-      bgColor: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      darkBgColor: 'dark:bg-blue-900/30',
+      bgColor: 'bg-sky-silk-100',
+      iconColor: 'text-primary-600',
+      darkBgColor: 'dark:bg-primary-900/30',
     },
     vehicle: {
       bgColor: 'bg-purple-100',
@@ -195,9 +195,9 @@ function getAssetTypeConfig(type: AssetType): {
     },
     art: { bgColor: 'bg-pink-100', iconColor: 'text-pink-600', darkBgColor: 'dark:bg-pink-900/30' },
     collectible: {
-      bgColor: 'bg-indigo-100',
-      iconColor: 'text-indigo-600',
-      darkBgColor: 'dark:bg-indigo-900/30',
+      bgColor: 'bg-sky-silk-100',
+      iconColor: 'text-secondary-400',
+      darkBgColor: 'dark:bg-secondary-400/30',
     },
     other: { bgColor: 'bg-gray-100', iconColor: 'text-gray-600', darkBgColor: 'dark:bg-gray-700' },
   };
@@ -379,11 +379,11 @@ function getAppreciationPercent(asset: Asset): number {
 
       <!-- Net Asset Value -->
       <div
-        class="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-white shadow-lg"
+        class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-5 text-white shadow-lg"
       >
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-blue-100">{{ t('common.netAssetValue') }}</p>
+            <p class="text-sm font-medium text-white/80">{{ t('common.netAssetValue') }}</p>
             <p class="mt-1 text-2xl font-bold">
               {{ formatTotal(assetsStore.filteredNetAssetValue) }}
             </p>
@@ -831,7 +831,7 @@ function getAppreciationPercent(asset: Asset): number {
               <!-- Action Menu -->
               <div class="flex gap-1">
                 <button
-                  class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                  class="hover:text-primary-600 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
                   title="Edit asset"
                   @click="openEditModal(asset)"
                 >
@@ -1097,7 +1097,7 @@ function getAppreciationPercent(asset: Asset): number {
             <input
               v-model="newAsset.loan!.hasLoan"
               type="checkbox"
-              class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="text-primary-600 focus:ring-primary-500 h-5 w-5 rounded border-gray-300 dark:border-slate-600"
             />
             <div>
               <span class="font-medium text-gray-900 dark:text-gray-100">{{
@@ -1180,7 +1180,7 @@ function getAppreciationPercent(asset: Asset): number {
             <input
               v-model="newAsset.includeInNetWorth"
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
             />
             <span class="text-sm text-gray-700 dark:text-gray-300">{{
               t('form.includeInNetWorth')
@@ -1274,7 +1274,7 @@ function getAppreciationPercent(asset: Asset): number {
             <input
               v-model="editingAsset.loan!.hasLoan"
               type="checkbox"
-              class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="text-primary-600 focus:ring-primary-500 h-5 w-5 rounded border-gray-300 dark:border-slate-600"
             />
             <div>
               <span class="font-medium text-gray-900 dark:text-gray-100">{{
@@ -1357,7 +1357,7 @@ function getAppreciationPercent(asset: Asset): number {
             <input
               v-model="editingAsset.includeInNetWorth"
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
             />
             <span class="text-sm text-gray-700 dark:text-gray-300">{{
               t('form.includeInNetWorth')

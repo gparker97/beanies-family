@@ -34,7 +34,7 @@ const { t } = useTranslation();
         <ul class="mx-auto mt-4 max-w-md space-y-2 text-left">
           <li class="flex items-center gap-2">
             <svg
-              class="h-5 w-5 text-blue-500"
+              class="text-primary-500 h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -50,7 +50,7 @@ const { t } = useTranslation();
           </li>
           <li class="flex items-center gap-2">
             <svg
-              class="h-5 w-5 text-blue-500"
+              class="text-primary-500 h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -66,7 +66,7 @@ const { t } = useTranslation();
           </li>
           <li class="flex items-center gap-2">
             <svg
-              class="h-5 w-5 text-blue-500"
+              class="text-primary-500 h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -82,7 +82,7 @@ const { t } = useTranslation();
           </li>
           <li class="flex items-center gap-2">
             <svg
-              class="h-5 w-5 text-blue-500"
+              class="text-primary-500 h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"

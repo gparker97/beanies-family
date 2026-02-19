@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-18
-> **Updated by:** Claude (File-first architecture)
+> **Last updated:** 2026-02-19
+> **Updated by:** Claude (beanies.family rebranding — Issue #22)
 
 ## Current Phase
 
@@ -111,6 +111,25 @@
 - Login page: three security benefit bullet points (encrypted file, no server storage, cloud backup via folder)
 - ADR-011: file-first architecture decision record
 
+### beanies.family Rebranding (Issue #22)
+
+- Renamed app from "GP Family Planner" to `beanies.family` across all UI, metadata, and configuration
+- Updated `index.html` title and Google Fonts (Outfit + Inter replacing Poppins)
+- Updated `vite.config.ts` PWA manifest: name, short_name, description, theme_color, background_color
+- Updated `package.json` name, `router/index.ts` title, `passkeyService.ts` RP_NAME, `uiStrings.ts` app name/tagline
+- Rewrote `src/style.css` with Tailwind 4 `@theme` brand colour scales (Heritage Orange, Deep Slate, Sky Silk, Terracotta)
+- Replaced `public/favicon.svg` with beanies-branded SVG
+- Updated all UI components to squircle shape language (`rounded-2xl`/`rounded-3xl`/`rounded-xl`)
+- Replaced all blue/indigo colours with brand primaries (`primary-500` Heritage Orange, `secondary-500` Deep Slate)
+- Updated AppSidebar: beanies logo, brand wordmark, Outfit font, primary active states
+- Updated AppHeader: primary colours for active states and privacy toggle
+- Updated all 12 page files: brand colours, brand name, brand backgrounds
+- Added `CelebrationOverlay.vue` component with toast (4s auto-dismiss) and modal modes
+- Added `useCelebration` composable with six celebration triggers wired to key app events:
+  - Setup complete, first file save, first account, first transaction, goal reached, debt paid off
+- Added pod spinner loading overlay in `App.vue` ("counting beans..." copy)
+- Added project-local skill `.claude/skills/beanies-theme.md`
+
 ### Recent Fixes
 
 - **Multi-family isolation hardening** — Fixed cross-family data leakage when authenticated user's familyId could not be resolved:
@@ -177,3 +196,4 @@ _(None currently tracked)_
 | 2026-02-18 | File-first architecture: encrypted file as source of truth | Security value proposition, user data control, IndexedDB is ephemeral   |
 | 2026-02-18 | Encryption enabled by default for new data files           | Secure by default, users can opt out with explicit warning              |
 | 2026-02-18 | Auto-sync always on (no toggle)                            | Simplifies UX, data file always stays current                           |
+| 2026-02-19 | Rebranded to beanies.family (Issue #22)                    | Heritage Orange + Deep Slate palette, Outfit + Inter fonts, squircles   |

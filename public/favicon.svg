@@ -1,29 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <defs>
-    <linearGradient id="barGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" style="stop-color:#3b82f6"/>
-      <stop offset="100%" style="stop-color:#06b6d4"/>
-    </linearGradient>
-    <linearGradient id="moneyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#22c55e"/>
-      <stop offset="100%" style="stop-color:#16a34a"/>
-    </linearGradient>
-    <linearGradient id="arrowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" style="stop-color:#f97316"/>
-      <stop offset="100%" style="stop-color:#fbbf24"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Simplified bar chart -->
-  <rect x="14" y="14" width="4" height="10" rx="1" fill="url(#barGrad)" opacity="0.7"/>
-  <rect x="19" y="10" width="4" height="14" rx="1" fill="url(#barGrad)" opacity="0.85"/>
-  <rect x="24" y="5" width="4" height="19" rx="1" fill="url(#barGrad)"/>
-
-  <!-- Simplified money -->
-  <rect x="3" y="16" width="14" height="9" rx="1.5" fill="url(#moneyGrad)" transform="rotate(-5 10 20)"/>
-  <text x="10" y="23" font-family="Arial" font-size="6" font-weight="bold" fill="#166534" text-anchor="middle">$</text>
-
-  <!-- Simplified arrow -->
-  <path d="M4 27 Q12 29, 18 24 Q24 19, 28 13" stroke="url(#arrowGrad)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <path d="M26 10 L29 13 L25 16" stroke="url(#arrowGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Background circle - Deep Slate -->
+  <circle cx="32" cy="32" r="32" fill="#2C3E50"/>
+  <!-- Parent bean (Sky Silk / blue) -->
+  <ellipse cx="22" cy="34" rx="10" ry="13" fill="#AED6F1" rx="10"/>
+  <!-- Child bean (Heritage Orange) -->
+  <ellipse cx="40" cy="36" rx="8" ry="11" fill="#F15D22"/>
+  <!-- Hands joined - small connecting circle -->
+  <circle cx="31" cy="38" r="3" fill="#FDFBF9"/>
+  <!-- Upward arrow (momentum) -->
+  <polyline points="32,8 38,18 35,18 35,26 29,26 29,18 26,18" fill="#F15D22"/>
 </svg>

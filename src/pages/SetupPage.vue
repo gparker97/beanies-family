@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { celebrate } from '@/composables/useCelebration';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseCard } from '@/components/ui';
 import { CURRENCIES, DEFAULT_CURRENCY } from '@/constants/currencies';
@@ -168,11 +169,13 @@ async function handleSetEncryptionPassword(password: string) {
   const success = await syncStore.enableEncryption(password);
   showEncryptModal.value = false;
   if (success) {
+    celebrate('first-save');
     syncStore.setupAutoSync();
     router.replace('/dashboard');
   } else {
     loadFileError.value = 'Failed to encrypt file. You can configure encryption later in Settings.';
     // Still navigate — file was created, just not encrypted
+    celebrate('setup-complete');
     syncStore.setupAutoSync();
     router.replace('/dashboard');
   }
@@ -183,6 +186,7 @@ async function handleSetEncryptionPassword(password: string) {
  */
 function handleSkipEncryption() {
   showEncryptModal.value = false;
+  celebrate('setup-complete');
   syncStore.setupAutoSync();
   router.replace('/dashboard');
 }
@@ -196,6 +200,7 @@ async function handleDownloadFallback() {
 
   // Manual export as download
   await syncStore.manualExport();
+  celebrate('setup-complete');
   router.replace('/dashboard');
 }
 
@@ -270,12 +275,14 @@ function handleDecryptModalClose() {
 
 <template>
   <div
-    class="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4 dark:from-slate-900 dark:to-slate-800"
+    class="from-sky-silk-50 to-sky-silk-100 flex min-h-screen items-center justify-center bg-gradient-to-br p-4 dark:from-slate-900 dark:to-slate-800"
   >
     <div class="w-full max-w-md">
       <!-- Logo -->
       <div class="mb-8 text-center">
-        <h1 class="text-3xl font-bold text-blue-600 dark:text-blue-400">GP Family Finance</h1>
+        <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
+          beanies.family
+        </h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">Let's get you set up</p>
       </div>
 
@@ -285,21 +292,21 @@ function handleDecryptModalClose() {
           <div class="flex items-center">
             <div
               class="flex h-8 w-8 items-center justify-center rounded-full font-medium"
-              :class="step >= 1 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'"
+              :class="step >= 1 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'"
             >
               1
             </div>
-            <div class="mx-2 h-1 w-12" :class="step >= 2 ? 'bg-blue-600' : 'bg-gray-200'" />
+            <div class="mx-2 h-1 w-12" :class="step >= 2 ? 'bg-primary-500' : 'bg-gray-200'" />
             <div
               class="flex h-8 w-8 items-center justify-center rounded-full font-medium"
-              :class="step >= 2 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'"
+              :class="step >= 2 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'"
             >
               2
             </div>
-            <div class="mx-2 h-1 w-12" :class="step >= 3 ? 'bg-blue-600' : 'bg-gray-200'" />
+            <div class="mx-2 h-1 w-12" :class="step >= 3 ? 'bg-primary-500' : 'bg-gray-200'" />
             <div
               class="flex h-8 w-8 items-center justify-center rounded-full font-medium"
-              :class="step >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'"
+              :class="step >= 3 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'"
             >
               3
             </div>
@@ -393,10 +400,10 @@ function handleDecryptModalClose() {
           </p>
 
           <!-- Security feature list -->
-          <div class="space-y-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-900/20">
+          <div class="bg-sky-silk-50 dark:bg-secondary-700/30 space-y-3 rounded-lg p-4">
             <div class="flex items-start gap-3">
               <svg
-                class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+                class="text-primary-500 mt-0.5 h-5 w-5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -408,13 +415,13 @@ function handleDecryptModalClose() {
                   d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                 />
               </svg>
-              <p class="text-sm text-blue-800 dark:text-blue-200">
+              <p class="text-secondary-500 dark:text-sky-silk-300 text-sm">
                 Encrypted with a password only you know
               </p>
             </div>
             <div class="flex items-start gap-3">
               <svg
-                class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+                class="text-primary-500 mt-0.5 h-5 w-5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -426,13 +433,13 @@ function handleDecryptModalClose() {
                   d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                 />
               </svg>
-              <p class="text-sm text-blue-800 dark:text-blue-200">
+              <p class="text-secondary-500 dark:text-sky-silk-300 text-sm">
                 Saved automatically as you make changes
               </p>
             </div>
             <div class="flex items-start gap-3">
               <svg
-                class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+                class="text-primary-500 mt-0.5 h-5 w-5 flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -444,7 +451,7 @@ function handleDecryptModalClose() {
                   d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
                 />
               </svg>
-              <p class="text-sm text-blue-800 dark:text-blue-200">
+              <p class="text-secondary-500 dark:text-sky-silk-300 text-sm">
                 You control where the file is stored
               </p>
             </div>

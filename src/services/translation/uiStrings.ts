@@ -24,8 +24,8 @@ function hashString(str: string): string {
 
 export const UI_STRINGS = {
   // App branding
-  'app.name': 'GP Family Planner',
-  'app.tagline': 'Smart Financial Planning',
+  'app.name': 'beanies.family',
+  'app.tagline': 'Every bean counts',
   'app.version': 'v1.0.0 - MVP',
 
   // Common labels
@@ -284,7 +284,7 @@ export const UI_STRINGS = {
     'Are you sure you want to delete all your data? This action cannot be undone.',
   'settings.yesDeleteEverything': 'Yes, Delete Everything',
   'settings.about': 'About',
-  'settings.appName': 'GP Family Planner',
+  'settings.appName': 'beanies.family',
   'settings.version': 'Version 1.0.0 (MVP)',
   'settings.appDescription': 'A local-first, privacy-focused family finance application.',
   'settings.privacyNote':

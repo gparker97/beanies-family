@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { celebrate } from '@/composables/useCelebration';
 import { useMemberFilterStore } from './memberFilterStore';
 import * as goalRepo from '@/services/indexeddb/repositories/goalRepository';
 import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
@@ -129,8 +130,15 @@ export const useGoalsStore = defineStore('goals', () => {
     const goal = goals.value.find((g) => g.id === id);
     if (!goal) return null;
 
+    const wasCompleted = goal.isCompleted;
     const isCompleted = currentAmount >= goal.targetAmount;
-    return updateGoal(id, { currentAmount, isCompleted });
+    const result = await updateGoal(id, { currentAmount, isCompleted });
+
+    if (isCompleted && !wasCompleted) {
+      celebrate(goal.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
+    }
+
+    return result;
   }
 
   function getGoalById(id: string): Goal | undefined {

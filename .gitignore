@@ -28,7 +28,7 @@ dist-ssr
 *.sln
 *.sw?
 
-# Claude Code
+# Claude Code (ignore local settings, but track shared skills)
 .claude/*
 !.claude/skills/
 

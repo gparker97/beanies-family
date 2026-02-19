@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { celebrate } from '@/composables/useCelebration';
 import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
@@ -219,7 +220,11 @@ export const useTransactionsStore = defineStore('transactions', () => {
     error.value = null;
     try {
       const transaction = await transactionRepo.createTransaction(input);
+      const isFirst = transactions.value.length === 0;
       transactions.value.push(transaction);
+      if (isFirst) {
+        celebrate('first-transaction');
+      }
 
       // Update account balance
       const adjustment = calculateBalanceAdjustment(input.type, input.amount, true);

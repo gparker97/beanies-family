@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { TransactionsPage } from '../page-objects/TransactionsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { TestDataFactory } from '../fixtures/data';
+import { bypassLoginIfNeeded } from '../helpers/auth';
 
 test.describe('Date Filtering', () => {
   test('should filter transactions by current month', async ({ page }) => {
@@ -11,9 +12,7 @@ test.describe('Date Filtering', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id);
@@ -54,9 +53,7 @@ test.describe('Date Filtering', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id);
@@ -97,9 +94,7 @@ test.describe('Date Filtering', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const member = TestDataFactory.createFamilyMember();
     const account = TestDataFactory.createAccount(member.id);

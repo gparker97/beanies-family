@@ -3,6 +3,7 @@ import { SetupPage } from '../page-objects/SetupPage';
 import { DashboardPage } from '../page-objects/DashboardPage';
 import { AccountsPage } from '../page-objects/AccountsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
+import { bypassLoginIfNeeded } from '../helpers/auth';
 
 test.describe('Account Management', () => {
   test('should create account and update dashboard net worth', async ({ page }) => {
@@ -12,9 +13,7 @@ test.describe('Account Management', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const setupPage = new SetupPage(page);
     await setupPage.completeSetup();
@@ -43,9 +42,7 @@ test.describe('Account Management', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const setupPage = new SetupPage(page);
     await setupPage.completeSetup();
