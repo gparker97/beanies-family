@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { SetupPage } from '../page-objects/SetupPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
+import { bypassLoginIfNeeded } from '../helpers/auth';
 
 test.describe('Setup Flow', () => {
   test('should complete fresh setup successfully', async ({ page }) => {
@@ -10,9 +11,7 @@ test.describe('Setup Flow', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const setupPage = new SetupPage(page);
     await expect(page).toHaveURL('/setup');
@@ -33,9 +32,7 @@ test.describe('Setup Flow', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    // Bypass login (Cognito is configured but we test without an account)
-    await page.getByRole('button', { name: 'Continue without an account' }).click();
-    await page.waitForURL('/setup');
+    await bypassLoginIfNeeded(page);
 
     const setupPage = new SetupPage(page);
 

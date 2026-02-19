@@ -157,11 +157,11 @@ function getDaysUntil(date: Date): string {
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <!-- Net Worth -->
       <div
-        class="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-white shadow-lg"
+        class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-5 text-white shadow-lg"
       >
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-blue-100">{{ t('dashboard.netWorth') }}</p>
+            <p class="text-sm font-medium text-white/80">{{ t('dashboard.netWorth') }}</p>
             <p class="mt-1 text-2xl font-bold">
               {{ formatTotal(netWorth) }}
             </p>
@@ -487,7 +487,7 @@ function getDaysUntil(date: Date): string {
               :class="{ 'blur-sm': !isUnlocked }"
             >
               <div
-                class="h-2 rounded-full bg-blue-600 transition-all"
+                class="bg-primary-500 h-2 rounded-full transition-all"
                 :style="{
                   width: `${Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)}%`,
                 }"

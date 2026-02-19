@@ -446,7 +446,7 @@ function applyCustomDateRange() {
           class="rounded-t-lg px-4 py-2.5 text-sm font-medium transition-all"
           :class="
             activeTab === 'recurring'
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
+              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-md'
               : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-600 hover:from-gray-200 hover:to-gray-100 dark:from-slate-700 dark:to-slate-600 dark:text-gray-300 dark:hover:from-slate-600 dark:hover:to-slate-500'
           "
           @click="activeTab = 'recurring'"
@@ -464,7 +464,7 @@ function applyCustomDateRange() {
           class="rounded-t-lg px-4 py-2.5 text-sm font-medium transition-all"
           :class="
             activeTab === 'transactions'
-              ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md'
+              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-md'
               : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-600 hover:from-gray-200 hover:to-gray-100 dark:from-slate-700 dark:to-slate-600 dark:text-gray-300 dark:hover:from-slate-600 dark:hover:to-slate-500'
           "
           @click="activeTab = 'transactions'"
@@ -489,7 +489,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'current_month'
-                  ? 'bg-blue-500 text-white shadow-md'
+                  ? 'bg-primary-500 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('current_month')"
@@ -500,7 +500,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'last_month'
-                  ? 'bg-blue-500 text-white shadow-md'
+                  ? 'bg-primary-500 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('last_month')"
@@ -511,7 +511,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'last_3_months'
-                  ? 'bg-blue-500 text-white shadow-md'
+                  ? 'bg-primary-500 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('last_3_months')"
@@ -522,7 +522,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'custom'
-                  ? 'bg-blue-500 text-white shadow-md'
+                  ? 'bg-primary-500 text-white shadow-md'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('custom')"
@@ -565,7 +565,7 @@ function applyCustomDateRange() {
                   Cancel
                 </button>
                 <button
-                  class="flex-1 rounded-lg bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600"
+                  class="bg-primary-500 hover:bg-primary-600 flex-1 rounded-lg px-3 py-1.5 text-sm text-white"
                   @click="
                     applyCustomDateRange();
                     showCustomDatePicker = false;
@@ -654,7 +654,7 @@ function applyCustomDateRange() {
                 ? recurringStore.filteredTotalMonthlyRecurringExpenses
                 : 0) >=
             0
-              ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+              ? 'from-secondary-500 to-secondary-700 bg-gradient-to-br'
               : 'bg-gradient-to-br from-orange-500 to-amber-600'
           "
         >
@@ -672,7 +672,7 @@ function applyCustomDateRange() {
                       ? recurringStore.filteredTotalMonthlyRecurringExpenses
                       : 0) >=
                   0
-                    ? 'text-blue-100'
+                    ? 'text-white/80'
                     : 'text-orange-100'
                 "
               >
@@ -835,7 +835,7 @@ function applyCustomDateRange() {
                   {{ formatDate(transaction.date) }}
                   <span
                     v-if="transaction.recurringItemId"
-                    class="ml-1 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                    class="bg-sky-silk-100 text-secondary-500 dark:bg-primary-900/30 dark:text-primary-400 ml-1 rounded px-1.5 py-0.5 text-xs"
                   >
                     {{ t('status.recurring') }}
                   </span>
@@ -851,7 +851,7 @@ function applyCustomDateRange() {
               />
               <div class="flex gap-1">
                 <button
-                  class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                  class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
                   title="Edit"
                   @click="openEditModal(transaction)"
                 >
@@ -940,7 +940,7 @@ function applyCustomDateRange() {
           class="rounded-xl p-5 text-white shadow-lg"
           :class="
             recurringStore.filteredNetMonthlyRecurring >= 0
-              ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+              ? 'from-secondary-500 to-secondary-700 bg-gradient-to-br'
               : 'bg-gradient-to-br from-orange-500 to-amber-600'
           "
         >
@@ -950,7 +950,7 @@ function applyCustomDateRange() {
                 class="text-sm font-medium"
                 :class="
                   recurringStore.filteredNetMonthlyRecurring >= 0
-                    ? 'text-blue-100'
+                    ? 'text-white/80'
                     : 'text-orange-100'
                 "
               >
@@ -1091,7 +1091,7 @@ function applyCustomDateRange() {
                 />
                 <div class="flex gap-1">
                   <button
-                    class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                    class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
                     :title="item.isActive ? t('action.pause') : t('action.resume')"
                     @click="toggleRecurringActive(item.id)"
                   >
@@ -1131,7 +1131,7 @@ function applyCustomDateRange() {
                     </svg>
                   </button>
                   <button
-                    class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                    class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
                     title="Edit"
                     @click="openEditRecurringModal(item)"
                   >

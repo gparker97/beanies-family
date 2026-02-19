@@ -11,11 +11,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'logo.svg', 'icons/*.png'],
       manifest: {
-        name: 'GP Family Planner',
-        short_name: 'GP Planner',
-        description: 'Smart financial planning for your family',
-        theme_color: '#3b82f6',
-        background_color: '#0f172a',
+        name: 'beanies.family',
+        short_name: 'beanies',
+        description: 'Every bean counts — family planning made simple',
+        theme_color: '#2C3E50',
+        background_color: '#2C3E50',
         display: 'standalone',
         icons: [
           {

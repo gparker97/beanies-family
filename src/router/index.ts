@@ -93,7 +93,7 @@ const router = createRouter({
 // Update document title on route change
 router.afterEach((to) => {
   const title = to.meta.title as string | undefined;
-  document.title = title ? `${title} | GP Family Finance` : 'GP Family Finance';
+  document.title = title ? `${title} | beanies.family` : 'beanies.family';
 });
 
 export default router;
