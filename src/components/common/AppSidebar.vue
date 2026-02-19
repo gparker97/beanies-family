@@ -228,19 +228,20 @@ function navigateTo(path: string) {
 
     <!-- Data status & version -->
     <div class="border-t border-gray-200 px-4 py-3 dark:border-slate-700">
-      <!-- Encryption status -->
+      <!-- Encryption / file status — always visible -->
       <div
-        v-if="syncStore.isConfigured"
         class="mb-2 flex items-center gap-2"
         :title="
-          syncStore.isEncryptionEnabled
-            ? 'Your data file is encrypted with AES-256-GCM'
-            : 'Your data file is not encrypted — enable encryption in Settings'
+          !syncStore.isConfigured
+            ? 'No data file configured — data stored in browser only'
+            : syncStore.isEncryptionEnabled
+              ? 'Your data file is encrypted with AES-256-GCM'
+              : 'Your data file is not encrypted — enable encryption in Settings'
         "
       >
         <!-- Locked icon (encrypted) -->
         <svg
-          v-if="syncStore.isEncryptionEnabled"
+          v-if="syncStore.isConfigured && syncStore.isEncryptionEnabled"
           class="h-4 w-4 flex-shrink-0 text-emerald-500"
           fill="none"
           stroke="currentColor"
@@ -253,9 +254,9 @@ function navigateTo(path: string) {
             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
           />
         </svg>
-        <!-- Unlocked icon (not encrypted) -->
+        <!-- Unlocked icon (file configured, not encrypted) -->
         <svg
-          v-else
+          v-else-if="syncStore.isConfigured"
           class="h-4 w-4 flex-shrink-0 text-amber-500"
           fill="none"
           stroke="currentColor"
@@ -268,15 +269,38 @@ function navigateTo(path: string) {
             d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
           />
         </svg>
+        <!-- No file icon -->
+        <svg
+          v-else
+          class="h-4 w-4 flex-shrink-0 text-gray-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
         <span
           class="truncate text-xs"
           :class="
-            syncStore.isEncryptionEnabled
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-amber-600 dark:text-amber-400'
+            !syncStore.isConfigured
+              ? 'text-gray-400 dark:text-gray-500'
+              : syncStore.isEncryptionEnabled
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-amber-600 dark:text-amber-400'
           "
         >
-          {{ syncStore.isEncryptionEnabled ? 'Data encrypted' : 'Not encrypted' }}
+          {{
+            !syncStore.isConfigured
+              ? 'No data file'
+              : syncStore.isEncryptionEnabled
+                ? 'Data encrypted'
+                : 'Not encrypted'
+          }}
         </span>
       </div>
       <!-- File name -->
