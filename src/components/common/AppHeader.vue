@@ -72,6 +72,7 @@ function closeProfileDropdown() {
 
 async function handleSignOut() {
   showProfileDropdown.value = false;
+  const wasLocalOnly = authStore.isLocalOnlyMode;
 
   // Reset all data stores before sign-out clears auth state
   useSyncStore().resetState();
@@ -85,7 +86,8 @@ async function handleSignOut() {
   useMemberFilterStore().resetState();
 
   await authStore.signOut();
-  router.replace('/login');
+  // Local-only users go back to setup; Cognito users go to login
+  router.replace(wasLocalOnly ? '/setup' : '/login');
 }
 </script>
 
@@ -348,12 +350,12 @@ async function handleSignOut() {
             </p>
           </div>
           <button
-            v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
+            v-if="authStore.isAuthenticated"
             type="button"
             class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
             @mousedown.prevent="handleSignOut"
           >
-            Sign Out
+            {{ authStore.isLocalOnlyMode ? 'Sign Out & Reset' : 'Sign Out' }}
           </button>
         </div>
       </div>
