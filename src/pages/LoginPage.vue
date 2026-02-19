@@ -139,16 +139,16 @@ async function handleContinueWithoutAuth() {
   <div class="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-slate-900">
     <div class="w-full max-w-md">
       <div class="mb-8 text-center">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">GP Family Finance</h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">
-          Smart financial planning for your family
-        </p>
+        <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
+          beanies.family
+        </h1>
+        <p class="mt-2 text-gray-600 dark:text-gray-400">Every bean counts</p>
 
         <!-- Security benefits -->
         <div class="mt-6 space-y-3 text-left">
           <div class="flex items-start gap-3">
             <svg
-              class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+              class="text-primary-500 mt-0.5 h-5 w-5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -166,7 +166,7 @@ async function handleContinueWithoutAuth() {
           </div>
           <div class="flex items-start gap-3">
             <svg
-              class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+              class="text-primary-500 mt-0.5 h-5 w-5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -184,7 +184,7 @@ async function handleContinueWithoutAuth() {
           </div>
           <div class="flex items-start gap-3">
             <svg
-              class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500"
+              class="text-primary-500 mt-0.5 h-5 w-5 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -210,7 +210,7 @@ async function handleContinueWithoutAuth() {
             :class="[
               'flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-colors',
               activeTab === 'signin'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
             ]"
             @click="
@@ -226,7 +226,7 @@ async function handleContinueWithoutAuth() {
             :class="[
               'flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-colors',
               activeTab === 'signup'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300',
             ]"
             @click="
@@ -259,7 +259,7 @@ async function handleContinueWithoutAuth() {
           <!-- Magic link sent confirmation -->
           <div v-if="magicLinkSent" class="py-6 text-center">
             <svg
-              class="mx-auto mb-4 h-12 w-12 text-blue-500"
+              class="text-primary-500 mx-auto mb-4 h-12 w-12"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -277,7 +277,7 @@ async function handleContinueWithoutAuth() {
               >. Click the link to sign in.
             </p>
             <button
-              class="mt-4 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 mt-4 text-sm"
               @click="
                 magicLinkSent = false;
                 showMagicLink = false;
@@ -339,7 +339,7 @@ async function handleContinueWithoutAuth() {
             <div class="mt-4 space-y-2">
               <button
                 type="button"
-                class="w-full text-center text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 w-full text-center text-sm"
                 @click="
                   showMagicLink = true;
                   formError = null;

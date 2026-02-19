@@ -82,7 +82,7 @@ onUnmounted(() => {
         >
           <div
             v-if="open"
-            class="relative w-full rounded-xl bg-white shadow-xl dark:bg-slate-800"
+            class="relative w-full rounded-3xl bg-white shadow-xl dark:bg-slate-800"
             :class="sizeClasses[size]"
           >
             <!-- Header -->
@@ -99,7 +99,7 @@ onUnmounted(() => {
               <button
                 v-if="closable"
                 type="button"
-                class="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+                class="rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
                 @click="close"
               >
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -121,7 +121,7 @@ onUnmounted(() => {
             <!-- Footer -->
             <div
               v-if="$slots.footer"
-              class="rounded-b-xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
+              class="rounded-b-3xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
             >
               <slot name="footer" />
             </div>

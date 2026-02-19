@@ -227,7 +227,7 @@ async function deleteGoal(id: string) {
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.activeGoals') }}</p>
-        <p class="mt-1 text-2xl font-bold text-blue-600 dark:text-blue-400">
+        <p class="text-primary-600 dark:text-primary-400 mt-1 text-2xl font-bold">
           {{ goalsStore.filteredActiveGoals.length }}
         </p>
       </BaseCard>
@@ -276,7 +276,7 @@ async function deleteGoal(id: string) {
             </div>
             <div class="flex gap-1">
               <button
-                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
                 title="Edit"
                 @click="openEditModal(goal)"
               >
@@ -319,7 +319,7 @@ async function deleteGoal(id: string) {
           >
             <div
               class="h-2 rounded-full transition-all"
-              :class="goal.isCompleted ? 'bg-green-600' : 'bg-blue-600'"
+              :class="goal.isCompleted ? 'bg-green-600' : 'bg-primary-500'"
               :style="{ width: `${goalsStore.getGoalProgress(goal)}%` }"
             />
           </div>
@@ -441,7 +441,7 @@ async function deleteGoal(id: string) {
             id="isCompleted"
             v-model="editGoal.isCompleted"
             type="checkbox"
-            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+            class="text-primary-600 focus:ring-primary-500 rounded border-gray-300 dark:border-slate-600"
           />
           <label for="isCompleted" class="text-sm text-gray-700 dark:text-gray-300">
             {{ t('action.markCompleted') }}

@@ -53,21 +53,21 @@ function navigateTo(path: string) {
     <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
       <div class="flex items-center gap-3">
         <!-- Logo -->
-        <img src="/logo.svg" alt="GP Family Planner" class="h-11 w-11 flex-shrink-0" />
+        <img
+          src="/brand/beanies-logo-transparent.png"
+          alt="beanies.family"
+          class="h-11 w-11 flex-shrink-0"
+        />
         <!-- Text -->
         <div class="min-w-0">
-          <h1 class="text-lg leading-tight font-bold" style="font-family: Poppins, sans-serif">
-            <span
-              class="bg-gradient-to-r from-blue-600 via-cyan-500 to-teal-500 bg-clip-text text-transparent"
-              >GP Family</span
-            >
-            <span class="text-slate-700 dark:text-slate-200"> Planner</span>
+          <h1 class="font-outfit text-lg leading-tight font-bold">
+            <span class="text-secondary-500 dark:text-gray-100">beanies</span
+            ><span class="text-primary-500">.family</span>
           </h1>
           <p
             class="mt-0.5 text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500"
-            style="font-family: Poppins, sans-serif"
           >
-            Smart Financial Planning
+            Every bean counts
           </p>
         </div>
       </div>
@@ -78,10 +78,10 @@ function navigateTo(path: string) {
       <button
         v-for="item in navItems"
         :key="item.path"
-        class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors"
+        class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
         :class="
           isActive(item.path)
-            ? 'bg-blue-50 font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+            ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 font-medium'
             : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
         "
         @click="navigateTo(item.path)"

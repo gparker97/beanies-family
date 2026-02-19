@@ -139,9 +139,9 @@ function getAccountTypeConfig(type: AccountType): {
   const configs: Record<AccountType, { bgColor: string; iconColor: string; darkBgColor: string }> =
     {
       checking: {
-        bgColor: 'bg-blue-100',
-        iconColor: 'text-blue-600',
-        darkBgColor: 'dark:bg-blue-900/30',
+        bgColor: 'bg-sky-silk-100',
+        iconColor: 'text-primary-600',
+        darkBgColor: 'dark:bg-primary-900/30',
       },
       savings: {
         bgColor: 'bg-green-100',
@@ -316,11 +316,11 @@ async function deleteAccount(id: string) {
 
       <!-- Net Worth -->
       <div
-        class="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-5 text-white shadow-lg"
+        class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-5 text-white shadow-lg"
       >
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-blue-100">{{ t('dashboard.netWorth') }}</p>
+            <p class="text-sm font-medium text-white/80">{{ t('dashboard.netWorth') }}</p>
             <p class="mt-1 text-2xl font-bold">
               {{ formatTotal(accountsStore.filteredTotalBalance) }}
             </p>
@@ -667,7 +667,7 @@ async function deleteAccount(id: string) {
               <div class="flex gap-1">
                 <button
                   data-testid="edit-account-btn"
-                  class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                  class="hover:text-primary-600 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
                   title="Edit account"
                   @click="openEditModal(account)"
                 >
@@ -861,7 +861,7 @@ async function deleteAccount(id: string) {
             <input
               v-model="editingAccount.isActive"
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
             />
             <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('form.isActive') }}</span>
           </label>
@@ -869,7 +869,7 @@ async function deleteAccount(id: string) {
             <input
               v-model="editingAccount.includeInNetWorth"
               type="checkbox"
-              class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-slate-600"
+              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
             />
             <span class="text-sm text-gray-700 dark:text-gray-300">{{
               t('form.includeInNetWorth')

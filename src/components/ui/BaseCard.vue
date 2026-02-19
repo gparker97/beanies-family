@@ -14,7 +14,7 @@ withDefaults(defineProps<Props>(), {
 
 <template>
   <div
-    class="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
+    class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     :class="{
       'cursor-pointer transition-shadow hover:shadow-md': hoverable,
     }"
@@ -39,7 +39,7 @@ withDefaults(defineProps<Props>(), {
 
     <div
       v-if="$slots.footer"
-      class="rounded-b-xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
+      class="rounded-b-2xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
     >
       <slot name="footer" />
     </div>

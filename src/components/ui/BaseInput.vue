@@ -29,11 +29,11 @@ const inputId = computed(() => props.id || `input-${Math.random().toString(36).s
 
 const inputClasses = computed(() => {
   const base =
-    'block w-full rounded-lg border px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-colors';
+    'block w-full rounded-xl border px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 transition-colors';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
-    : 'border-gray-300 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-200 dark:focus:ring-blue-900';
+    : 'border-gray-300 dark:border-slate-600 focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700';
 
   const disabled = props.disabled
     ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-slate-900'
