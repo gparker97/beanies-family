@@ -2,7 +2,6 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
-import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
@@ -214,13 +213,10 @@ async function handleSignOut() {
         </div>
       </div>
 
-      <!-- Sync status indicator -->
-      <SyncStatusIndicator />
-
       <!-- Privacy mode toggle -->
       <button
         type="button"
-        class="rounded-xl p-2 transition-colors"
+        class="rounded-xl transition-colors"
         :class="
           isUnlocked
             ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200'
@@ -230,30 +226,20 @@ async function handleSignOut() {
         :title="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         @click="togglePrivacy"
       >
-        <!-- Unlocked icon -->
-        <svg
+        <!-- Open eyes (figures visible) -->
+        <img
           v-if="isUnlocked"
-          class="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-          />
-        </svg>
-        <!-- Locked icon -->
-        <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
+          src="/brand/beanies_open_eyes_transparent_512x512.png"
+          alt="Financial figures visible"
+          class="h-10 w-10"
+        />
+        <!-- Covering eyes (figures hidden) -->
+        <img
+          v-else
+          src="/brand/beanies_covering_eyes_transparent_512x512.png"
+          alt="Financial figures hidden"
+          class="h-10 w-10"
+        />
       </button>
 
       <!-- Theme toggle -->

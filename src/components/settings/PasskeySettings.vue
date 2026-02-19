@@ -60,22 +60,26 @@ function formatDate(dateStr: string): string {
             : 'text-amber-600 dark:text-amber-400'
         "
       >
-        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          v-if="platformAvailable"
+          class="h-4 w-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path
-            v-if="platformAvailable"
             stroke-linecap="round"
             stroke-linejoin="round"
             stroke-width="2"
             d="M5 13l4 4L19 7"
           />
-          <path
-            v-else
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
         </svg>
+        <img
+          v-else
+          src="/brand/beanies_impact_bullet_transparent_192x192.png"
+          alt=""
+          class="h-4 w-4 flex-shrink-0"
+        />
         {{
           platformAvailable
             ? 'Biometric authenticator available'

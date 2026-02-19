@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -50,23 +51,21 @@ function navigateTo(path: string) {
     class="flex h-full w-64 flex-shrink-0 flex-col border-r border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-800"
   >
     <!-- Logo & Branding -->
-    <div class="border-b border-gray-200 px-5 py-4 dark:border-slate-700">
+    <div class="border-b border-gray-200 py-1 pr-5 dark:border-slate-700">
       <div class="flex items-center gap-3">
         <!-- Logo -->
         <img
-          src="/brand/beanies_logo_transparent_44x44.png"
+          src="/brand/beanies_logo_transparent_150x150.png"
           alt="beanies.family"
-          class="h-11 w-11 flex-shrink-0"
+          class="h-24 w-24 flex-shrink-0"
         />
         <!-- Text -->
-        <div class="min-w-0">
-          <h1 class="font-outfit text-lg leading-tight font-bold">
+        <div class="-ml-5 min-w-0">
+          <h1 class="font-outfit text-xl leading-tight font-bold">
             <span class="text-secondary-500 dark:text-gray-100">beanies</span
             ><span class="text-primary-500">.family</span>
           </h1>
-          <p
-            class="mt-0.5 text-[10px] font-medium tracking-wide text-gray-400 uppercase dark:text-gray-500"
-          >
+          <p class="mt-0.5 text-xs font-medium tracking-wide text-gray-400 dark:text-gray-500">
             every bean counts
           </p>
         </div>
@@ -228,6 +227,18 @@ function navigateTo(path: string) {
 
     <!-- Data status & version -->
     <div class="border-t border-gray-200 px-4 py-3 dark:border-slate-700">
+      <!-- File name -->
+      <div v-if="syncStore.isConfigured && syncStore.fileName" class="mb-1 flex items-center gap-2">
+        <div class="flex w-5 flex-shrink-0 justify-center">
+          <SyncStatusIndicator />
+        </div>
+        <p
+          class="truncate text-[10px] text-gray-400 dark:text-gray-500"
+          :title="syncStore.fileName"
+        >
+          {{ syncStore.fileName }}
+        </p>
+      </div>
       <!-- Encryption / file status — always visible -->
       <div
         class="mb-2 flex items-center gap-2"
@@ -239,51 +250,53 @@ function navigateTo(path: string) {
               : 'Your data file is not encrypted — enable encryption in Settings'
         "
       >
-        <!-- Locked icon (encrypted) -->
-        <svg
-          v-if="syncStore.isConfigured && syncStore.isEncryptionEnabled"
-          class="h-4 w-4 flex-shrink-0 text-emerald-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
-        <!-- Unlocked icon (file configured, not encrypted) -->
-        <svg
-          v-else-if="syncStore.isConfigured"
-          class="h-4 w-4 flex-shrink-0 text-amber-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-          />
-        </svg>
-        <!-- No file icon -->
-        <svg
-          v-else
-          class="h-4 w-4 flex-shrink-0 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
+        <div class="flex w-5 flex-shrink-0 justify-center">
+          <!-- Locked icon (encrypted) -->
+          <svg
+            v-if="syncStore.isConfigured && syncStore.isEncryptionEnabled"
+            class="h-4 w-4 text-emerald-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+          <!-- Unlocked icon (file configured, not encrypted) -->
+          <svg
+            v-else-if="syncStore.isConfigured"
+            class="h-4 w-4 text-amber-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+            />
+          </svg>
+          <!-- No file icon -->
+          <svg
+            v-else
+            class="h-4 w-4 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+        </div>
         <span
           class="truncate text-xs"
           :class="
@@ -303,14 +316,6 @@ function navigateTo(path: string) {
           }}
         </span>
       </div>
-      <!-- File name -->
-      <p
-        v-if="syncStore.isConfigured && syncStore.fileName"
-        class="mb-1 truncate text-[10px] text-gray-400 dark:text-gray-500"
-        :title="syncStore.fileName"
-      >
-        {{ syncStore.fileName }}
-      </p>
       <!-- Version -->
       <p class="text-[10px] text-gray-400 dark:text-gray-500">v1.0.0 - MVP</p>
     </div>
