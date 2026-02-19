@@ -347,7 +347,16 @@ async function handleSignOut() {
               {{ authStore.currentUser.email }}
             </p>
           </div>
-          <!-- Sign out (only available when Cognito auth is configured) -->
+          <!-- Sign out — always available when authenticated -->
+          <button
+            v-if="authStore.isAuthenticated && !authStore.isAuthConfigured"
+            type="button"
+            class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
+            @mousedown.prevent="handleSignOut"
+          >
+            Sign Out
+          </button>
+          <!-- Sign out (Cognito configured, logged in with account) -->
           <button
             v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
             type="button"
