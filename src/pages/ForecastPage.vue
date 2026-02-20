@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { BaseCard } from '@/components/ui';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
@@ -7,93 +9,38 @@ const { t } = useTranslation();
 
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('forecast.title') }}</h1>
-      <p class="text-gray-500 dark:text-gray-400">Plan for the future with financial projections</p>
-    </div>
+    <PageHeader
+      icon="trending-up"
+      :title="t('forecast.title')"
+      subtitle="Plan for the future with financial projections"
+    />
 
     <BaseCard title="Financial Forecasting">
       <div class="py-12 text-center text-gray-500 dark:text-gray-400">
-        <svg
-          class="mx-auto mb-4 h-16 w-16 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-          />
-        </svg>
+        <BeanieIcon
+          name="trending-up"
+          size="xl"
+          class="animate-beanie-float mx-auto mb-4 h-16 w-16 text-gray-400"
+        />
         <p class="text-lg font-medium">Forecasting Coming Soon</p>
         <p class="mt-2">
           Cash flow projections and scenario planning will be available in a future update.
         </p>
         <ul class="mx-auto mt-4 max-w-md space-y-2 text-left">
           <li class="flex items-center gap-2">
-            <svg
-              class="text-primary-500 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <BeanieIcon name="check-circle" size="md" class="text-primary-500" />
             Recurring transaction projections
           </li>
           <li class="flex items-center gap-2">
-            <svg
-              class="text-primary-500 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <BeanieIcon name="check-circle" size="md" class="text-primary-500" />
             Cash flow forecast (3/6/12 months)
           </li>
           <li class="flex items-center gap-2">
-            <svg
-              class="text-primary-500 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <BeanieIcon name="check-circle" size="md" class="text-primary-500" />
             Goal achievement projections
           </li>
           <li class="flex items-center gap-2">
-            <svg
-              class="text-primary-500 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+            <BeanieIcon name="check-circle" size="md" class="text-primary-500" />
             "What if" scenario simulation
           </li>
         </ul>

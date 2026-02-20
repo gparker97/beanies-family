@@ -63,6 +63,164 @@
   --color-border: #4a6274;
 }
 
+/* ─── Micro-animation keyframes ────────────────────────────────────────── */
+@keyframes beanie-bounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(4px);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-2px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes beanie-wobble {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(-8deg);
+  }
+
+  75% {
+    transform: rotate(8deg);
+  }
+
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes beanie-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 6px rgb(241 93 34 / 40%));
+  }
+}
+
+@keyframes beanie-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes beanie-rotate-in {
+  0% {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.8);
+  }
+
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes beanie-blink {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(0.85);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes beanie-spring-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.02);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@utility animate-beanie-bounce {
+  animation: beanie-bounce 0.4s ease-out both;
+}
+
+@utility animate-beanie-wobble {
+  animation: beanie-wobble 0.3s ease-in-out both;
+}
+
+@utility animate-beanie-glow {
+  animation: beanie-glow 2s infinite;
+}
+
+@utility animate-beanie-float {
+  animation: beanie-float 3s ease-in-out infinite;
+}
+
+@utility animate-beanie-rotate-in {
+  animation: beanie-rotate-in 0.3s ease-out both;
+}
+
+@utility animate-beanie-blink {
+  animation: beanie-blink 0.35s ease-in-out both;
+}
+
+@utility animate-beanie-spring-in {
+  animation: beanie-spring-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@utility beanie-lift {
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.beanie-lift:hover {
+  box-shadow: 0 4px 12px rgb(0 0 0 / 10%);
+  transform: translateY(-2px);
+}
+
+/* Reduced motion: disable all beanie animations */
+@media (prefers-reduced-motion: reduce) {
+  .animate-beanie-bounce,
+  .animate-beanie-wobble,
+  .animate-beanie-glow,
+  .animate-beanie-float,
+  .animate-beanie-rotate-in,
+  .animate-beanie-blink,
+  .animate-beanie-spring-in {
+    animation: none !important;
+  }
+
+  .beanie-lift:hover {
+    transform: none;
+  }
+}
+
 /* ─── Base styles ───────────────────────────────────────────────────────── */
 body {
   background-color: var(--color-background);
