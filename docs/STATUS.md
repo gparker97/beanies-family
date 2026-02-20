@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-19
-> **Updated by:** Claude (beanie brand asset icons — covering eyes, open eyes, impact bullet)
+> **Last updated:** 2026-02-20
+> **Updated by:** Claude (Issue #44 — BeanieIcon component + centralized icon system)
 
 ## Current Phase
 
@@ -49,6 +49,17 @@
 - `beanies_open_eyes_transparent_512x512.png` — replaces all open-padlock SVG icons (privacy mode off, data visible, data unencrypted)
 - `beanies_impact_bullet_transparent_192x192.png` — replaces warning/alert/exclamation SVG icons and all feature bullet point icons (SyncStatusIndicator warning, PasskeySettings alert, LoginPage security bullets, SetupPage security bullets)
 - Theme skill (`.claude/skills/beanies-theme.md`) updated with icon usage guide
+
+### Centralized Icon System (Issue #44)
+
+- **`src/constants/icons.ts`** — Central registry of ~72 beanie-styled SVG icon definitions with `BeanieIconDef` type. Organized into: NAV (9), ACTION (8), SUMMARY (5), UTILITY (10), STATUS (4), CATEGORY (28), ACCOUNT_TYPE (8), ASSET_TYPE (9). Helper functions: `getIconDef()`, `getAccountTypeIcon()`, `getAssetTypeIcon()`
+- **`src/components/ui/BeanieIcon.vue`** — Universal icon component enforcing brand style (stroke-width 1.75, round linecap/linejoin). Props: `name`, `size` (xs/sm/md/lg/xl), `strokeWidth`. Falls back to three-dot circle for unknown icons
+- **`src/components/common/PageHeader.vue`** — Shared page header with 40px rounded-xl icon container + title + subtitle + action slot
+- **15 files migrated** — All inline SVGs replaced with BeanieIcon in: AppSidebar, AppHeader, BaseModal, CategoryIcon, AccountTypeIcon, DashboardPage, AccountsPage, TransactionsPage, AssetsPage, GoalsPage, ReportsPage, ForecastPage, FamilyPage, SettingsPage
+- CategoryIcon.vue reduced from ~365 lines to ~45 lines (19-branch v-if chain → single BeanieIcon)
+- AccountsPage reduced from 893 to ~591 lines; AssetsPage collapsed 2x 9-branch asset type icon chains
+- Zero inline `<svg>` elements remaining in all migrated files
+- Issue #40 broken into 7 sub-issues (#44–#50) for remaining UI overhaul work
 
 ### Multi-Family Architecture (Stage 1)
 
@@ -157,6 +168,7 @@
 ## In Progress
 
 - **Multi-Family with AWS Cognito Auth** — All 6 stages implemented (client-side); awaiting AWS infrastructure deployment for magic link + passkey backend
+- **Beanie-Themed UI Overhaul (Issue #40)** — Icons phase complete (#44). Remaining sub-issues: micro-animations (#45), sound effects (#46), empty state illustrations (#47), 404 page (#48), loading states (#49), forecast page redesign (#50)
 
 ## Up Next (Phase 1 Remaining)
 
@@ -204,3 +216,4 @@ _(None currently tracked)_
 | 2026-02-18 | Encryption enabled by default for new data files           | Secure by default, users can opt out with explicit warning              |
 | 2026-02-18 | Auto-sync always on (no toggle)                            | Simplifies UX, data file always stays current                           |
 | 2026-02-19 | Rebranded to beanies.family (Issue #22)                    | Heritage Orange + Deep Slate palette, Outfit + Inter fonts, squircles   |
+| 2026-02-20 | Centralized icon system (Issue #44)                        | Single source of truth for ~72 icons, brand-enforced stroke style       |
