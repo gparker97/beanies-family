@@ -27,6 +27,8 @@ import type { Family, FamilyMember } from '@/types/models';
 function makeMember(overrides: Partial<FamilyMember> & { id: string; name: string }): FamilyMember {
   return {
     email: `${overrides.name.toLowerCase().replace(/\s/g, '.')}@test.com`,
+    gender: 'other',
+    ageGroup: 'adult',
     role: 'owner',
     color: '#3b82f6',
     createdAt: '2024-01-01',

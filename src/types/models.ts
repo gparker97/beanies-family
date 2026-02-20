@@ -49,12 +49,26 @@ export interface GlobalSettings {
   soundEnabled?: boolean;
 }
 
+// Family member gender and age group for avatar selection
+export type Gender = 'male' | 'female' | 'other';
+export type AgeGroup = 'adult' | 'child';
+
+// Date of birth (month and day required, year optional)
+export interface DateOfBirth {
+  month: number; // 1-12
+  day: number; // 1-31
+  year?: number;
+}
+
 // FamilyMember - Each family member has their own profile
 export interface FamilyMember {
   id: UUID;
   name: string;
   email: string;
   avatar?: string;
+  gender: Gender;
+  ageGroup: AgeGroup;
+  dateOfBirth?: DateOfBirth;
   role: 'owner' | 'admin' | 'member';
   color: string; // UI differentiation
   createdAt: ISODateString;

@@ -115,6 +115,8 @@ async function createProfileAndSettings(): Promise<boolean> {
     const member = await familyStore.createMember({
       name: form.name.trim(),
       email,
+      gender: 'male',
+      ageGroup: 'adult',
       role: 'owner',
       color: randomColor,
     });

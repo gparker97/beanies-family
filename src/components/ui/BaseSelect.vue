@@ -40,7 +40,7 @@ const isGrouped = computed(() => props.groupedOptions && props.groupedOptions.le
 
 const selectClasses = computed(() => {
   const base =
-    'block w-full rounded-xl border px-3 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 transition-colors appearance-none cursor-pointer';
+    'block w-full rounded-xl border pl-3 pr-8 py-2 text-gray-900 dark:text-gray-100 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 transition-colors appearance-none cursor-pointer';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'

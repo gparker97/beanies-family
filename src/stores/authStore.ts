@@ -281,6 +281,8 @@ export const useAuthStore = defineStore('auth', () => {
       const member = await familyStore.createMember({
         name: params.memberName,
         email: params.email,
+        gender: 'male',
+        ageGroup: 'adult',
         role: 'owner',
         color: '#3b82f6',
       });
