@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
@@ -18,6 +20,13 @@ import type {
 
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+
+const progressMounted = ref(false);
+onMounted(() => {
+  nextTick(() => {
+    progressMounted.value = true;
+  });
+});
 
 const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();
@@ -214,15 +223,12 @@ async function deleteGoal(id: string) {
 
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('goals.title') }}</h1>
-        <p class="text-gray-500 dark:text-gray-400">{{ t('goals.subtitle') }}</p>
-      </div>
+    <PageHeader icon="target" :title="t('goals.title')" :subtitle="t('goals.subtitle')">
       <BaseButton @click="openAddModal">
+        <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('goals.addGoal') }}
       </BaseButton>
-    </div>
+    </PageHeader>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <BaseCard>
@@ -250,6 +256,10 @@ async function deleteGoal(id: string) {
         v-if="goalsStore.filteredGoals.length === 0"
         class="py-12 text-center text-gray-500 dark:text-gray-400"
       >
+        <BeanieIcon
+          name="target"
+          class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
+        />
         <p>{{ t('goals.noGoals') }}</p>
         <p class="mt-2">{{ t('goals.getStarted') }}</p>
       </div>
@@ -280,28 +290,14 @@ async function deleteGoal(id: string) {
                 title="Edit"
                 @click="openEditModal(goal)"
               >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
-                </svg>
+                <BeanieIcon name="edit" size="md" />
               </button>
               <button
                 class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
                 title="Delete"
                 @click="deleteGoal(goal.id)"
               >
-                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
-                </svg>
+                <BeanieIcon name="trash" size="md" />
               </button>
             </div>
           </div>
@@ -318,9 +314,9 @@ async function deleteGoal(id: string) {
             :class="{ 'blur-sm': !isUnlocked }"
           >
             <div
-              class="h-2 rounded-full transition-all"
+              class="h-2 rounded-full transition-all duration-700 ease-out"
               :class="goal.isCompleted ? 'bg-green-600' : 'bg-primary-500'"
-              :style="{ width: `${goalsStore.getGoalProgress(goal)}%` }"
+              :style="{ width: progressMounted ? `${goalsStore.getGoalProgress(goal)}%` : '0%' }"
             />
           </div>
         </div>
