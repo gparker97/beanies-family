@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-20
-> **Updated by:** Claude (Issue #55 — Completed goals section)
+> **Updated by:** Claude (Issue #42 — Financial institution dropdown)
 
 ## Current Phase
 
@@ -27,7 +27,7 @@
 
 ### UI Components
 
-- Base component library: BaseButton, BaseCard, BaseInput, BaseModal, BaseSelect
+- Base component library: BaseButton, BaseCard, BaseCombobox, BaseInput, BaseModal, BaseSelect
 - AppHeader, AppSidebar layout components
 
 ### Pages / Features
@@ -223,8 +223,22 @@
 - Renamed "All Goals" card to "Active Goals" for clarity
 - 3 new translation keys with beanie mode overrides (`goals.reopenGoal`, `goals.noCompletedGoals`, `goals.completedOn`)
 
+### Financial Institution Dropdown (Issue #42)
+
+- **`BaseCombobox.vue`** — Reusable searchable single-select dropdown with "Other" support, custom text input, clear button, backward compatibility for free-text values
+- **`src/constants/institutions.ts`** — 22 predefined global banks (BoA, HSBC, DBS, JPMorgan Chase, etc.) with name/shortName
+- **`src/constants/countries.ts`** — 249 ISO 3166-1 countries for optional country selector
+- **`useInstitutionOptions`** composable merges predefined + user-saved custom institutions into sorted dropdown options
+- Replaced plain text institution input on AccountsPage (add + edit modals) with institution combobox + country combobox
+- Replaced plain text lender input on AssetsPage loan section (add + edit modals) with institution combobox + country combobox
+- Custom institutions only persisted when form is saved (not on typing); deletable from dropdown with X button
+- Deleting a custom institution clears it from all linked accounts and asset loans
+- `institutionCountry` added to Account, `lenderCountry` added to AssetLoan, `customInstitutions` added to Settings
+- 7 new translation keys with beanie mode overrides
+
 ## Up Next (Phase 1 Remaining)
 
+- [x] Financial institution dropdown (Issue #42)
 - [ ] Switchable UI themes (Issue #41)
 - [ ] Data validation and error handling improvements
 - [ ] Responsive design polish
@@ -274,3 +288,4 @@ _(None currently tracked)_
 | 2026-02-20 | Web Audio API for sound effects (Issue #46)                | Zero bundle size, no audio files, sub-ms latency, browser-native        |
 | 2026-02-20 | Beanie UI overhaul complete (Issue #40)                    | All 13 sections done: icons, animations, sounds, empty states, 404, etc |
 | 2026-02-20 | Collapsible completed goals section (Issue #55)            | Disclosure pattern over tabs — completed goals are secondary archive    |
+| 2026-02-20 | Financial institution dropdown (Issue #42)                 | Searchable combobox with custom entry persistence, deferred save        |
