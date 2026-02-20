@@ -48,7 +48,7 @@
     "@microsoft/eslint-plugin-sdl": "^1.1.0",
     "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.1.18",
-    "@types/node": "^24.10.1",
+    "@types/node": "^25.3.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.8.1",
