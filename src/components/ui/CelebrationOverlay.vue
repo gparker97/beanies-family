@@ -56,9 +56,7 @@ const { toasts, activeModal, dismissModal } = useCelebration();
       style="pointer-events: none"
     >
       <TransitionGroup
-        enter-active-class="transition-all duration-400"
-        enter-from-class="opacity-0 translate-y-4 scale-95"
-        enter-to-class="opacity-100 translate-y-0 scale-100"
+        enter-active-class="animate-beanie-spring-in"
         leave-active-class="transition-all duration-300"
         leave-from-class="opacity-100 translate-y-0 scale-100"
         leave-to-class="opacity-0 translate-y-4 scale-95"

@@ -32,6 +32,8 @@ const currentMember = computed(() => familyStore.currentMember);
 const showCurrencyDropdown = ref(false);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
+const privacyAnimating = ref(false);
+const themeAnimating = ref(false);
 
 const currencyOptions = DISPLAY_CURRENCIES.map((c) => ({
   code: c.code,
@@ -53,7 +55,13 @@ async function selectLanguage(code: LanguageCode) {
   await translationStore.loadTranslations(code);
 }
 
-function toggleTheme() {
+function handlePrivacyToggle() {
+  privacyAnimating.value = true;
+  togglePrivacy();
+}
+
+function handleThemeToggle() {
+  themeAnimating.value = true;
   const newTheme = settingsStore.theme === 'dark' ? 'light' : 'dark';
   settingsStore.setTheme(newTheme);
 }
@@ -197,7 +205,7 @@ async function handleSignOut() {
         "
         :aria-label="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         :title="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
-        @click="togglePrivacy"
+        @click="handlePrivacyToggle"
       >
         <!-- Open eyes (figures visible) -->
         <img
@@ -205,6 +213,8 @@ async function handleSignOut() {
           src="/brand/beanies_open_eyes_transparent_512x512.png"
           alt="Financial figures visible"
           class="h-10 w-10"
+          :class="{ 'animate-beanie-blink': privacyAnimating }"
+          @animationend="privacyAnimating = false"
         />
         <!-- Covering eyes (figures hidden) -->
         <img
@@ -212,6 +222,8 @@ async function handleSignOut() {
           src="/brand/beanies_covering_eyes_transparent_512x512.png"
           alt="Financial figures hidden"
           class="h-10 w-10"
+          :class="{ 'animate-beanie-blink': privacyAnimating }"
+          @animationend="privacyAnimating = false"
         />
       </button>
 
@@ -219,10 +231,22 @@ async function handleSignOut() {
       <button
         type="button"
         class="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
-        @click="toggleTheme"
+        @click="handleThemeToggle"
       >
-        <BeanieIcon v-if="settingsStore.theme === 'dark'" name="sun" size="md" />
-        <BeanieIcon v-else name="moon" size="md" />
+        <BeanieIcon
+          v-if="settingsStore.theme === 'dark'"
+          name="sun"
+          size="md"
+          :class="{ 'animate-beanie-rotate-in': themeAnimating }"
+          @animationend="themeAnimating = false"
+        />
+        <BeanieIcon
+          v-else
+          name="moon"
+          size="md"
+          :class="{ 'animate-beanie-rotate-in': themeAnimating }"
+          @animationend="themeAnimating = false"
+        />
       </button>
 
       <!-- Offline badge -->

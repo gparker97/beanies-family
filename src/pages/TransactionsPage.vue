@@ -694,7 +694,7 @@ function applyCustomDateRange() {
         >
           <BeanieIcon
             name="calendar"
-            class="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
+            class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
             :stroke-width="1.5"
           />
           <p>No transactions found for {{ dateFilterLabel }}</p>
@@ -875,7 +875,7 @@ function applyCustomDateRange() {
         >
           <BeanieIcon
             name="repeat"
-            class="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
+            class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
             :stroke-width="1.5"
           />
           <p>{{ t('recurring.noItems') }}</p>

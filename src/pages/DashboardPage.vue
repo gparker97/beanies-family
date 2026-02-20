@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, nextTick } from 'vue';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { BaseCard } from '@/components/ui';
+import { useCountUp } from '@/composables/useCountUp';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
@@ -57,6 +58,20 @@ const monthlyExpenses = computed(
 
 // Net cash flow: monthly income minus monthly expenses
 const netCashFlow = computed(() => monthlyIncome.value - monthlyExpenses.value);
+
+// Count-up animations for summary cards
+const { displayValue: displayNetWorth } = useCountUp(netWorth, 100);
+const { displayValue: displayMonthlyIncome } = useCountUp(monthlyIncome, 200);
+const { displayValue: displayMonthlyExpenses } = useCountUp(monthlyExpenses, 300);
+const { displayValue: displayNetCashFlow } = useCountUp(netCashFlow, 400);
+
+// Progress bar fill animation
+const progressMounted = ref(false);
+onMounted(() => {
+  nextTick(() => {
+    progressMounted.value = true;
+  });
+});
 
 // Uses filtered data based on global member filter
 const activeGoals = computed(() => goalsStore.filteredActiveGoals.slice(0, 3));
@@ -140,7 +155,7 @@ function getDaysUntil(date: Date): string {
           <div>
             <p class="text-sm font-medium text-white/80">{{ t('dashboard.netWorth') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(netWorth) }}
+              {{ formatTotal(displayNetWorth) }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -165,7 +180,7 @@ function getDaysUntil(date: Date): string {
           <div>
             <p class="text-sm font-medium text-green-100">{{ t('dashboard.monthlyIncome') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(monthlyIncome) }}
+              {{ formatTotal(displayMonthlyIncome) }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -180,7 +195,7 @@ function getDaysUntil(date: Date): string {
           <div>
             <p class="text-sm font-medium text-red-100">{{ t('dashboard.monthlyExpenses') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(monthlyExpenses) }}
+              {{ formatTotal(displayMonthlyExpenses) }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -207,7 +222,7 @@ function getDaysUntil(date: Date): string {
               {{ t('dashboard.netCashFlow') }}
             </p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(netCashFlow) }}
+              {{ formatTotal(displayNetCashFlow) }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -427,9 +442,11 @@ function getDaysUntil(date: Date): string {
               :class="{ 'blur-sm': !isUnlocked }"
             >
               <div
-                class="bg-primary-500 h-2 rounded-full transition-all"
+                class="bg-primary-500 h-2 rounded-full transition-all duration-700 ease-out"
                 :style="{
-                  width: `${Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)}%`,
+                  width: progressMounted
+                    ? `${Math.min(100, (goal.currentAmount / goal.targetAmount) * 100)}%`
+                    : '0%',
                 }"
               />
             </div>

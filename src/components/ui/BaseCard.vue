@@ -16,7 +16,7 @@ withDefaults(defineProps<Props>(), {
   <div
     class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800"
     :class="{
-      'cursor-pointer transition-shadow hover:shadow-md': hoverable,
+      'beanie-lift cursor-pointer': hoverable,
     }"
   >
     <div

@@ -17,7 +17,11 @@ const { t } = useTranslation();
 
     <BaseCard title="Financial Forecasting">
       <div class="py-12 text-center text-gray-500 dark:text-gray-400">
-        <BeanieIcon name="trending-up" size="xl" class="mx-auto mb-4 h-16 w-16 text-gray-400" />
+        <BeanieIcon
+          name="trending-up"
+          size="xl"
+          class="animate-beanie-float mx-auto mb-4 h-16 w-16 text-gray-400"
+        />
         <p class="text-lg font-medium">Forecasting Coming Soon</p>
         <p class="mt-2">
           Cash flow projections and scenario planning will be available in a future update.

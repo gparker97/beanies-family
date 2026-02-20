@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
@@ -20,6 +20,13 @@ import type {
 
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+
+const progressMounted = ref(false);
+onMounted(() => {
+  nextTick(() => {
+    progressMounted.value = true;
+  });
+});
 
 const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();
@@ -249,6 +256,10 @@ async function deleteGoal(id: string) {
         v-if="goalsStore.filteredGoals.length === 0"
         class="py-12 text-center text-gray-500 dark:text-gray-400"
       >
+        <BeanieIcon
+          name="target"
+          class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
+        />
         <p>{{ t('goals.noGoals') }}</p>
         <p class="mt-2">{{ t('goals.getStarted') }}</p>
       </div>
@@ -303,9 +314,9 @@ async function deleteGoal(id: string) {
             :class="{ 'blur-sm': !isUnlocked }"
           >
             <div
-              class="h-2 rounded-full transition-all"
+              class="h-2 rounded-full transition-all duration-700 ease-out"
               :class="goal.isCompleted ? 'bg-green-600' : 'bg-primary-500'"
-              :style="{ width: `${goalsStore.getGoalProgress(goal)}%` }"
+              :style="{ width: progressMounted ? `${goalsStore.getGoalProgress(goal)}%` : '0%' }"
             />
           </div>
         </div>
