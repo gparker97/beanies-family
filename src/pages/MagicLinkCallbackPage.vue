@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { isCognitoConfigured } from '@/config/cognito';
 import * as cognitoService from '@/services/auth/cognitoService';
 import * as tokenManager from '@/services/auth/tokenManager';
@@ -94,9 +95,7 @@ function goToLogin() {
   <div class="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-slate-900">
     <BaseCard class="w-full max-w-md text-center">
       <div v-if="status === 'verifying'" class="py-8">
-        <div
-          class="border-sky-silk-100 border-t-primary-500 mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4"
-        ></div>
+        <BeanieSpinner size="md" class="mx-auto mb-4" />
         <p class="text-gray-600 dark:text-gray-400">Verifying your magic link...</p>
       </div>
 

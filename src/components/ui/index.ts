@@ -1,4 +1,5 @@
 export { default as BeanieIcon } from './BeanieIcon.vue';
+export { default as BeanieSpinner } from './BeanieSpinner.vue';
 export { default as BaseButton } from './BaseButton.vue';
 export { default as CelebrationOverlay } from './CelebrationOverlay.vue';
 export { default as BaseCard } from './BaseCard.vue';
