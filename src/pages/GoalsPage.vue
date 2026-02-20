@@ -12,6 +12,7 @@ import { CURRENCIES } from '@/constants/currencies';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { formatDate } from '@/utils/date';
 import type {
   Goal,
   CreateGoalInput,
@@ -223,6 +224,26 @@ async function deleteGoal(id: string) {
     playWhoosh();
   }
 }
+
+// Completed goals section
+const showCompletedGoals = ref(false);
+
+const filteredCompletedGoalsSorted = computed(() =>
+  [...goalsStore.filteredCompletedGoals].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  )
+);
+
+async function reopenGoal(id: string) {
+  await goalsStore.updateGoal(id, { isCompleted: false });
+}
+
+async function deleteCompletedGoal(id: string) {
+  if (confirm('Are you sure you want to delete this completed goal?')) {
+    await goalsStore.deleteGoal(id);
+    playWhoosh();
+  }
+}
 </script>
 
 <template>
@@ -255,7 +276,7 @@ async function deleteGoal(id: string) {
       </BaseCard>
     </div>
 
-    <BaseCard :title="t('goals.allGoals')">
+    <BaseCard :title="t('goals.activeGoals')">
       <div
         v-if="goalsStore.filteredActiveGoals.length === 0"
         class="py-12 text-center text-gray-500 dark:text-gray-400"
@@ -323,6 +344,84 @@ async function deleteGoal(id: string) {
         </div>
       </div>
     </BaseCard>
+
+    <!-- Completed Goals Section -->
+    <div v-if="goalsStore.filteredCompletedGoals.length > 0">
+      <button
+        class="flex w-full items-center gap-2 rounded-lg px-4 py-3 text-left text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-800"
+        @click="showCompletedGoals = !showCompletedGoals"
+      >
+        <BeanieIcon name="check-circle" size="md" class="text-green-500" />
+        <span class="font-medium">{{ t('goals.completedGoals') }}</span>
+        <span
+          class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400"
+        >
+          {{ goalsStore.filteredCompletedGoals.length }}
+        </span>
+        <BeanieIcon
+          :name="showCompletedGoals ? 'chevron-up' : 'chevron-down'"
+          size="md"
+          class="ml-auto"
+        />
+      </button>
+
+      <div v-if="showCompletedGoals" class="mt-2 space-y-3">
+        <div
+          v-for="goal in filteredCompletedGoalsSorted"
+          :key="goal.id"
+          class="rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/50"
+        >
+          <div class="mb-2 flex items-center justify-between">
+            <div>
+              <h3 class="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300">
+                <BeanieIcon name="check-circle" size="md" class="text-green-500" />
+                {{ goal.name }}
+              </h3>
+              <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                {{ goalTypes.find((t) => t.value === goal.type)?.label }}
+              </p>
+              <div class="mt-1 flex items-center gap-3 text-xs text-gray-400 dark:text-gray-500">
+                <span class="flex items-center gap-1">
+                  <span
+                    class="inline-block h-2.5 w-2.5 rounded-full"
+                    :style="{ backgroundColor: getMemberColor(goal.memberId) }"
+                  />
+                  {{ getMemberName(goal.memberId) }}
+                </span>
+                <span> {{ t('goals.completedOn') }}: {{ formatDate(goal.updatedAt) }} </span>
+              </div>
+            </div>
+            <div class="flex gap-1">
+              <button
+                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-green-600 dark:hover:bg-slate-700"
+                :title="t('goals.reopenGoal')"
+                @click="reopenGoal(goal.id)"
+              >
+                <BeanieIcon name="refresh" size="md" />
+              </button>
+              <button
+                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
+                :title="t('goals.deleteGoal')"
+                @click="deleteCompletedGoal(goal.id)"
+              >
+                <BeanieIcon name="trash" size="md" />
+              </button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500 dark:text-gray-400">{{ t('goals.progress') }}</span>
+            <span
+              class="font-medium text-gray-700 dark:text-gray-300"
+              :class="{ 'blur-sm': !isUnlocked }"
+            >
+              <CurrencyAmount :amount="goal.currentAmount" :currency="goal.currency" size="sm" />
+              <span class="mx-1">/</span>
+              <CurrencyAmount :amount="goal.targetAmount" :currency="goal.currency" size="sm" />
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Add Goal Modal -->
     <BaseModal :open="showAddModal" :title="t('goals.addGoal')" @close="showAddModal = false">
