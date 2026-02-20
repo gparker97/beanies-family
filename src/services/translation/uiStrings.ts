@@ -273,6 +273,9 @@ const STRING_DEFS = {
   'goals.priority.critical': { en: 'Critical' },
   'goals.progress': { en: 'Progress', beanie: 'Growth' },
   'goals.deadline': { en: 'Deadline' },
+  'goals.reopenGoal': { en: 'Reopen Goal', beanie: 'Replant This Bean!' },
+  'goals.noCompletedGoals': { en: 'No completed goals yet.', beanie: 'No beans harvested yet.' },
+  'goals.completedOn': { en: 'Completed', beanie: 'Harvested' },
 
   // Family
   'family.title': { en: 'Family', beanie: 'The Pod' },
