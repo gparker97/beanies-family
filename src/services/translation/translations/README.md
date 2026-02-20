@@ -34,6 +34,7 @@ Each language has its own JSON file (e.g., `zh.json`, `es.json`).
 - **meta.translationCount**: Number of translations
 
 For each translation:
+
 - **translation**: The translated text
 - **hash**: Hash of the source English text (auto-computed)
 - **lastUpdated**: When this translation was last updated
