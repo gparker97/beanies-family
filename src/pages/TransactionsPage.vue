@@ -3,8 +3,10 @@ import { ref, computed } from 'vue';
 import AccountTypeIcon from '@/components/common/AccountTypeIcon.vue';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
@@ -422,13 +424,11 @@ function applyCustomDateRange() {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-          {{ t('transactions.title') }}
-        </h1>
-        <p class="text-gray-500 dark:text-gray-400">{{ t('transactions.subtitle') }}</p>
-      </div>
+    <PageHeader
+      icon="arrow-right-left"
+      :title="t('transactions.title')"
+      :subtitle="t('transactions.subtitle')"
+    >
       <div class="flex gap-2">
         <BaseButton v-if="activeTab === 'transactions'" @click="openAddModal">
           {{ t('transactions.addTransaction') }}
@@ -437,7 +437,7 @@ function applyCustomDateRange() {
           {{ t('transactions.addRecurring') }}
         </BaseButton>
       </div>
-    </div>
+    </PageHeader>
 
     <!-- Tab Navigation -->
     <div class="border-b border-gray-200 dark:border-slate-700">
@@ -600,14 +600,7 @@ function applyCustomDateRange() {
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M7 11l5-5m0 0l5 5m-5-5v12"
-                />
-              </svg>
+              <BeanieIcon name="arrow-up" size="lg" />
             </div>
           </div>
         </div>
@@ -629,14 +622,7 @@ function applyCustomDateRange() {
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 13l-5 5m0 0l-5-5m5 5V6"
-                />
-              </svg>
+              <BeanieIcon name="arrow-down" size="lg" />
             </div>
           </div>
         </div>
@@ -694,14 +680,7 @@ function applyCustomDateRange() {
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
+              <BeanieIcon name="bar-chart" size="lg" />
             </div>
           </div>
         </div>
@@ -713,19 +692,11 @@ function applyCustomDateRange() {
           v-if="transactions.length === 0"
           class="py-12 text-center text-gray-500 dark:text-gray-400"
         >
-          <svg
-            class="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
+          <BeanieIcon
+            name="calendar"
+            class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
+            :stroke-width="1.5"
+          />
           <p>No transactions found for {{ dateFilterLabel }}</p>
           <p class="mt-2 text-sm">Try selecting a different date range or add a new transaction.</p>
         </div>
@@ -746,44 +717,18 @@ function applyCustomDateRange() {
                 "
               >
                 <!-- Recurring indicator -->
-                <svg
+                <BeanieIcon
                   v-if="transaction.recurringItemId"
-                  class="h-5 w-5"
+                  name="repeat"
+                  size="md"
                   :class="transaction.type === 'income' ? 'text-green-600' : 'text-red-600'"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
-                </svg>
-                <svg
+                />
+                <BeanieIcon
                   v-else
-                  class="h-5 w-5"
+                  :name="transaction.type === 'income' ? 'arrow-up' : 'arrow-down'"
+                  size="md"
                   :class="transaction.type === 'income' ? 'text-green-600' : 'text-red-600'"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    v-if="transaction.type === 'income'"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M7 11l5-5m0 0l5 5m-5-5v12"
-                  />
-                  <path
-                    v-else
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M17 13l-5 5m0 0l-5-5m5 5V6"
-                  />
-                </svg>
+                />
               </div>
               <div class="space-y-0.5">
                 <!-- Transaction Name -->
@@ -797,16 +742,11 @@ function applyCustomDateRange() {
                 </p>
                 <!-- Family Member -->
                 <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <svg
-                    class="h-3.5 w-3.5"
+                  <BeanieIcon
+                    name="user-filled"
+                    size="xs"
                     :style="{ color: getMemberColorByAccountId(transaction.accountId) }"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                    />
-                  </svg>
+                  />
                   {{ getMemberNameByAccountId(transaction.accountId) }}
                 </p>
                 <!-- Account -->
@@ -819,19 +759,7 @@ function applyCustomDateRange() {
                 </p>
                 <!-- Date -->
                 <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <svg
-                    class="h-3.5 w-3.5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
+                  <BeanieIcon name="calendar" size="xs" class="text-gray-400" />
                   {{ formatDate(transaction.date) }}
                   <span
                     v-if="transaction.recurringItemId"
@@ -855,28 +783,14 @@ function applyCustomDateRange() {
                   title="Edit"
                   @click="openEditModal(transaction)"
                 >
-                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
+                  <BeanieIcon name="edit" size="md" />
                 </button>
                 <button
                   class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
                   title="Delete"
                   @click="deleteTransaction(transaction.id)"
                 >
-                  <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
+                  <BeanieIcon name="trash" size="md" />
                 </button>
               </div>
             </div>
@@ -901,14 +815,7 @@ function applyCustomDateRange() {
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
+              <BeanieIcon name="repeat" size="lg" />
             </div>
           </div>
         </div>
@@ -923,14 +830,7 @@ function applyCustomDateRange() {
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
+              <BeanieIcon name="repeat" size="lg" />
             </div>
           </div>
         </div>
@@ -961,14 +861,7 @@ function applyCustomDateRange() {
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
+              <BeanieIcon name="bar-chart" size="lg" />
             </div>
           </div>
         </div>
@@ -980,19 +873,11 @@ function applyCustomDateRange() {
           v-if="recurringItems.length === 0"
           class="py-12 text-center text-gray-500 dark:text-gray-400"
         >
-          <svg
-            class="mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+          <BeanieIcon
+            name="repeat"
+            class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
+            :stroke-width="1.5"
+          />
           <p>{{ t('recurring.noItems') }}</p>
           <p class="mt-2">{{ t('recurring.getStarted') }}</p>
         </div>
@@ -1013,20 +898,11 @@ function applyCustomDateRange() {
                       : 'bg-red-100 dark:bg-red-900/30'
                   "
                 >
-                  <svg
-                    class="h-5 w-5"
+                  <BeanieIcon
+                    name="repeat"
+                    size="md"
                     :class="item.type === 'income' ? 'text-green-600' : 'text-red-600'"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    />
-                  </svg>
+                  />
                 </div>
                 <div class="space-y-0.5">
                   <!-- Transaction Name -->
@@ -1046,16 +922,11 @@ function applyCustomDateRange() {
                   </p>
                   <!-- Family Member -->
                   <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <svg
-                      class="h-3.5 w-3.5"
+                    <BeanieIcon
+                      name="user-filled"
+                      size="xs"
                       :style="{ color: getMemberColorByAccountId(item.accountId) }"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                      />
-                    </svg>
+                    />
                     {{ getMemberNameByAccountId(item.accountId) }}
                   </p>
                   <!-- Account -->
@@ -1065,19 +936,7 @@ function applyCustomDateRange() {
                   </p>
                   <!-- Recurring Schedule -->
                   <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <svg
-                      class="h-3.5 w-3.5 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
+                    <BeanieIcon name="calendar" size="xs" class="text-gray-400" />
                     {{ formatFrequency(item) }} - Next: {{ formatNextDate(item) }}
                   </p>
                 </div>
@@ -1095,68 +954,22 @@ function applyCustomDateRange() {
                     :title="item.isActive ? t('action.pause') : t('action.resume')"
                     @click="toggleRecurringActive(item.id)"
                   >
-                    <svg
-                      v-if="item.isActive"
-                      class="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    <svg
-                      v-else
-                      class="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
-                      />
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
+                    <BeanieIcon v-if="item.isActive" name="pause-circle" size="md" />
+                    <BeanieIcon v-else name="play-circle" size="md" />
                   </button>
                   <button
                     class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
                     title="Edit"
                     @click="openEditRecurringModal(item)"
                   >
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                      />
-                    </svg>
+                    <BeanieIcon name="edit" size="md" />
                   </button>
                   <button
                     class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
                     title="Delete"
                     @click="deleteRecurringItem(item.id)"
                   >
-                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                      />
-                    </svg>
+                    <BeanieIcon name="trash" size="md" />
                   </button>
                 </div>
               </div>
