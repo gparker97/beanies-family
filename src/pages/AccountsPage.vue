@@ -2,14 +2,17 @@
 import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
-import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
+import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
+import { COUNTRIES } from '@/constants/countries';
 import { CURRENCIES } from '@/constants/currencies';
+import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -22,6 +25,8 @@ const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
+const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
+const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -44,6 +49,7 @@ const editingAccount = ref<
   type: 'checking',
   currency: 'USD',
   institution: '',
+  institutionCountry: '',
   isActive: true,
   includeInNetWorth: true,
 });
@@ -79,6 +85,7 @@ const newAccount = ref<CreateAccountInput>({
   currency: settingsStore.baseCurrency,
   balance: 0,
   institution: '',
+  institutionCountry: '',
   isActive: true,
   includeInNetWorth: true,
 });
@@ -191,6 +198,7 @@ function openAddModal() {
     currency: settingsStore.baseCurrency,
     balance: 0,
     institution: '',
+    institutionCountry: '',
     isActive: true,
     includeInNetWorth: true,
   };
@@ -206,6 +214,7 @@ function openEditModal(account: Account) {
     type: account.type,
     currency: account.currency,
     institution: account.institution || '',
+    institutionCountry: account.institutionCountry || '',
     isActive: account.isActive,
     includeInNetWorth: account.includeInNetWorth,
   };
@@ -217,12 +226,26 @@ function closeEditModal() {
   editingAccountId.value = null;
 }
 
+async function persistCustomInstitutionIfNeeded(name: string | undefined) {
+  if (!name?.trim()) return;
+  const isKnown =
+    INSTITUTIONS.some((i) => i.name === name) || settingsStore.customInstitutions.includes(name);
+  if (!isKnown) {
+    await settingsStore.addCustomInstitution(name.trim());
+  }
+}
+
+async function handleRemoveCustomInstitution(name: string) {
+  await removeCustomInstitution(name);
+}
+
 async function createAccount() {
   if (!newAccount.value.name.trim()) return;
 
   isSubmitting.value = true;
   try {
     await accountsStore.createAccount(newAccount.value);
+    await persistCustomInstitutionIfNeeded(newAccount.value.institution);
     showAddModal.value = false;
   } finally {
     isSubmitting.value = false;
@@ -235,6 +258,7 @@ async function saveEdit() {
   isSubmitting.value = true;
   try {
     await accountsStore.updateAccount(editingAccountId.value, editingAccount.value);
+    await persistCustomInstitutionIfNeeded(editingAccount.value.institution);
     closeEditModal();
   } finally {
     isSubmitting.value = false;
@@ -377,7 +401,10 @@ async function deleteAccount(id: string) {
                 <div>
                   <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ account.name }}</h3>
                   <p v-if="account.institution" class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ account.institution }}
+                    {{ account.institution
+                    }}<span v-if="account.institutionCountry">
+                      &middot; {{ account.institutionCountry }}</span
+                    >
                   </p>
                 </div>
               </div>
@@ -459,7 +486,12 @@ async function deleteAccount(id: string) {
     </div>
 
     <!-- Add Account Modal -->
-    <BaseModal :open="showAddModal" :title="t('accounts.addAccount')" @close="showAddModal = false">
+    <BaseModal
+      :open="showAddModal"
+      :title="t('accounts.addAccount')"
+      size="xl"
+      @close="showAddModal = false"
+    >
       <form class="space-y-4" @submit.prevent="createAccount">
         <BaseInput
           v-model="newAccount.name"
@@ -480,11 +512,26 @@ async function deleteAccount(id: string) {
           :label="t('form.owner')"
         />
 
-        <BaseInput
-          v-model="newAccount.institution"
-          :label="t('form.institution')"
-          placeholder="e.g., Bank of America"
-        />
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <BaseCombobox
+            v-model="newAccount.institution"
+            :options="institutionOptions"
+            :label="t('form.institution')"
+            :placeholder="t('form.searchInstitutions')"
+            :search-placeholder="t('form.searchInstitutions')"
+            :other-value="OTHER_INSTITUTION_VALUE"
+            :other-label="t('form.other')"
+            :other-placeholder="t('form.enterCustomName')"
+            @custom-removed="handleRemoveCustomInstitution"
+          />
+          <BaseCombobox
+            v-model="newAccount.institutionCountry"
+            :options="countryOptions"
+            :label="t('form.country')"
+            :placeholder="t('form.searchCountries')"
+            :search-placeholder="t('form.searchCountries')"
+          />
+        </div>
 
         <BaseSelect
           v-model="newAccount.currency"
@@ -513,7 +560,12 @@ async function deleteAccount(id: string) {
     </BaseModal>
 
     <!-- Edit Account Modal -->
-    <BaseModal :open="showEditModal" :title="t('accounts.editAccount')" @close="closeEditModal">
+    <BaseModal
+      :open="showEditModal"
+      :title="t('accounts.editAccount')"
+      size="xl"
+      @close="closeEditModal"
+    >
       <form class="space-y-4" @submit.prevent="saveEdit">
         <BaseInput
           v-model="editingAccount.name"
@@ -534,11 +586,26 @@ async function deleteAccount(id: string) {
           :label="t('form.owner')"
         />
 
-        <BaseInput
-          v-model="editingAccount.institution"
-          :label="t('form.institution')"
-          placeholder="e.g., Bank of America"
-        />
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <BaseCombobox
+            v-model="editingAccount.institution"
+            :options="institutionOptions"
+            :label="t('form.institution')"
+            :placeholder="t('form.searchInstitutions')"
+            :search-placeholder="t('form.searchInstitutions')"
+            :other-value="OTHER_INSTITUTION_VALUE"
+            :other-label="t('form.other')"
+            :other-placeholder="t('form.enterCustomName')"
+            @custom-removed="handleRemoveCustomInstitution"
+          />
+          <BaseCombobox
+            v-model="editingAccount.institutionCountry"
+            :options="countryOptions"
+            :label="t('form.country')"
+            :placeholder="t('form.searchCountries')"
+            :search-placeholder="t('form.searchCountries')"
+          />
+        </div>
 
         <BaseSelect
           v-model="editingAccount.currency"

@@ -4,6 +4,7 @@ export { default as BaseButton } from './BaseButton.vue';
 export { default as CelebrationOverlay } from './CelebrationOverlay.vue';
 export { default as EmptyStateIllustration } from './EmptyStateIllustration.vue';
 export { default as BaseCard } from './BaseCard.vue';
+export { default as BaseCombobox } from './BaseCombobox.vue';
 export { default as BaseInput } from './BaseInput.vue';
 export { default as BaseModal } from './BaseModal.vue';
 export { default as BaseMultiSelect } from './BaseMultiSelect/index.vue';

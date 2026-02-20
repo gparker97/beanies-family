@@ -61,6 +61,8 @@ vi.mock('@/stores/settingsStore', () => ({
     baseCurrency: 'USD',
     displayCurrency: 'USD',
     settings: { exchangeRates: [] },
+    customInstitutions: [],
+    addCustomInstitution: vi.fn(),
   })),
 }));
 
@@ -111,6 +113,19 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseCard: { template: '<div><slot /></div>' },
           BaseButton: { template: '<button><slot /></button>' },
           BaseInput: { template: '<input />' },
+          BaseCombobox: {
+            template: '<div />',
+            props: [
+              'modelValue',
+              'options',
+              'label',
+              'placeholder',
+              'searchPlaceholder',
+              'otherValue',
+              'otherLabel',
+              'otherPlaceholder',
+            ],
+          },
           BaseSelect: { template: '<select />' },
           BaseModal: {
             template: '<div v-if="open"><slot /><slot name="footer" /></div>',
@@ -133,6 +148,19 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseCard: { template: '<div><slot /></div>' },
           BaseButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
           BaseInput: { template: '<input />' },
+          BaseCombobox: {
+            template: '<div />',
+            props: [
+              'modelValue',
+              'options',
+              'label',
+              'placeholder',
+              'searchPlaceholder',
+              'otherValue',
+              'otherLabel',
+              'otherPlaceholder',
+            ],
+          },
           BaseSelect: { template: '<select />' },
           BaseModal: {
             template:
@@ -162,6 +190,19 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseInput: {
             template: '<input :value="modelValue" data-testid="input" />',
             props: ['modelValue', 'label'],
+          },
+          BaseCombobox: {
+            template: '<div />',
+            props: [
+              'modelValue',
+              'options',
+              'label',
+              'placeholder',
+              'searchPlaceholder',
+              'otherValue',
+              'otherLabel',
+              'otherPlaceholder',
+            ],
           },
           BaseSelect: {
             template: '<select :value="modelValue" data-testid="select" />',
@@ -194,6 +235,19 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseCard: { template: '<div><slot /></div>' },
           BaseButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
           BaseInput: { template: '<input />' },
+          BaseCombobox: {
+            template: '<div />',
+            props: [
+              'modelValue',
+              'options',
+              'label',
+              'placeholder',
+              'searchPlaceholder',
+              'otherValue',
+              'otherLabel',
+              'otherPlaceholder',
+            ],
+          },
           BaseSelect: {
             template: '<select :data-label="label" />',
             props: ['modelValue', 'options', 'label'],
@@ -262,6 +316,19 @@ describe('AccountsPage - Edit Account Modal', () => {
           BaseCard: { template: '<div><slot /></div>' },
           BaseButton: { template: '<button @click="$emit(\'click\')"><slot /></button>' },
           BaseInput: { template: '<input />' },
+          BaseCombobox: {
+            template: '<div />',
+            props: [
+              'modelValue',
+              'options',
+              'label',
+              'placeholder',
+              'searchPlaceholder',
+              'otherValue',
+              'otherLabel',
+              'otherPlaceholder',
+            ],
+          },
           BaseSelect: { template: '<select />' },
           BaseModal: {
             template:
