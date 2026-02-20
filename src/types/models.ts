@@ -46,6 +46,7 @@ export interface GlobalSettings {
   exchangeRateLastFetch: ISODateString | null;
   isLocalOnlyMode?: boolean;
   beanieMode?: boolean;
+  soundEnabled?: boolean;
 }
 
 // FamilyMember - Each family member has their own profile

@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { playChime, playFanfare } from '@/composables/useSounds';
 
 type CelebrationType = 'toast' | 'modal';
 
@@ -67,11 +68,13 @@ export function celebrate(trigger: CelebrationTrigger): void {
 
   if (config.type === 'toast') {
     toasts.value.push(celebration);
+    playChime();
     setTimeout(() => {
       toasts.value = toasts.value.filter((c) => c.id !== celebration.id);
     }, 4000);
   } else {
     activeModal.value = celebration;
+    playFanfare();
   }
 }
 

@@ -7,6 +7,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { getAssetTypeIcon } from '@/constants/icons';
@@ -27,6 +28,7 @@ const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { playWhoosh } = useSounds();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -298,6 +300,7 @@ async function saveEdit() {
 async function deleteAsset(id: string) {
   if (confirm('Are you sure you want to delete this asset?')) {
     await assetsStore.deleteAsset(id);
+    playWhoosh();
   }
 }
 

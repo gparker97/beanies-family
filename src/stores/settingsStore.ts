@@ -32,6 +32,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const exchangeRateAutoUpdate = computed(() => globalSettings.value.exchangeRateAutoUpdate);
   const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
   const beanieMode = computed(() => globalSettings.value.beanieMode ?? false);
+  const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
 
   // Apply theme to document
   watch(
@@ -216,6 +217,18 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setSoundEnabled(enabled: boolean): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ soundEnabled: enabled });
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update sound setting';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   async function updateExchangeRates(rates: ExchangeRate[]): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -288,6 +301,7 @@ export const useSettingsStore = defineStore('settings', () => {
     exchangeRateAutoUpdate,
     exchangeRateLastFetch,
     beanieMode,
+    soundEnabled,
     // Actions
     loadGlobalSettings,
     loadSettings,
@@ -300,6 +314,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setAIProvider,
     setAIApiKey,
     setBeanieMode,
+    setSoundEnabled,
     setExchangeRateAutoUpdate,
     updateExchangeRates,
     addExchangeRate,

@@ -64,10 +64,10 @@ const { toasts, activeModal, dismissModal } = useCelebration();
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-lg dark:bg-slate-800"
+          class="flex items-center gap-4 rounded-2xl bg-white px-5 py-4 shadow-lg dark:bg-slate-800"
           style="pointer-events: auto"
         >
-          <img :src="toast.asset" :alt="toast.message" class="h-10 w-10 object-contain" />
+          <img :src="toast.asset" :alt="toast.message" class="h-20 w-20 object-contain" />
           <p class="text-secondary-500 font-medium dark:text-gray-100">{{ toast.message }}</p>
         </div>
       </TransitionGroup>

@@ -350,6 +350,8 @@ const STRING_DEFS = {
     en: 'Replace standard labels with friendly beanie-themed language',
   },
   'settings.beanieModeDisabled': { en: 'Beanie Mode is only available in English' },
+  'settings.soundEffects': { en: 'Sound Effects' },
+  'settings.soundEffectsDescription': { en: 'Play fun sounds for actions and celebrations' },
   'settings.sync': { en: 'Sync' },
   'settings.fileSync': { en: 'File Sync' },
   'settings.syncToFile': { en: 'Sync to a File' },
