@@ -470,6 +470,7 @@ function getAppreciationPercent(asset: Asset): number {
           <div
             v-for="asset in group.assets"
             :key="asset.id"
+            data-testid="asset-card"
             class="rounded-xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
           >
             <!-- Card Header -->
@@ -500,6 +501,7 @@ function getAppreciationPercent(asset: Asset): number {
               <!-- Action Menu -->
               <div class="flex gap-1">
                 <button
+                  data-testid="edit-asset-btn"
                   class="hover:text-primary-600 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
                   title="Edit asset"
                   @click="openEditModal(asset)"
@@ -1016,7 +1018,7 @@ function getAppreciationPercent(asset: Asset): number {
           <BaseButton variant="secondary" @click="closeEditModal">
             {{ t('action.cancel') }}
           </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="saveEdit">
+          <BaseButton data-testid="save-edit-btn" :loading="isSubmitting" @click="saveEdit">
             {{ t('action.saveChanges') }}
           </BaseButton>
         </div>

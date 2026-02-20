@@ -1,4 +1,4 @@
-import type { FamilyMember, Account, Transaction, Settings } from '@/types/models';
+import type { FamilyMember, Account, Transaction, Asset, Settings } from '@/types/models';
 
 export class TestDataFactory {
   static createFamilyMember(overrides?: Partial<FamilyMember>): FamilyMember {
@@ -44,6 +44,23 @@ export class TestDataFactory {
       date: now.split('T')[0],
       description: 'Test Expense',
       isReconciled: false,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    };
+  }
+
+  static createAsset(memberId: string, overrides?: Partial<Asset>): Asset {
+    const now = new Date().toISOString();
+    return {
+      id: `asset-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      memberId,
+      type: 'real_estate',
+      name: 'Test Property',
+      purchaseValue: 500000,
+      currentValue: 550000,
+      currency: 'USD',
+      includeInNetWorth: true,
       createdAt: now,
       updatedAt: now,
       ...overrides,
