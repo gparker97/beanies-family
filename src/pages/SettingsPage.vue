@@ -4,6 +4,8 @@ import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import PageHeader from '@/components/common/PageHeader.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { clearAllData } from '@/services/indexeddb/database';
@@ -182,10 +184,7 @@ function formatLastSync(timestamp: string | null): string {
 
 <template>
   <div class="space-y-6">
-    <div>
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ t('settings.title') }}</h1>
-      <p class="text-gray-500 dark:text-gray-400">{{ t('settings.subtitle') }}</p>
-    </div>
+    <PageHeader icon="cog" :title="t('settings.title')" :subtitle="t('settings.subtitle')" />
 
     <!-- First Row: General Settings and File Sync side by side on wide screens -->
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -486,19 +485,7 @@ function formatLastSync(timestamp: string | null): string {
       <!-- AI Settings -->
       <BaseCard :title="t('settings.aiInsights')">
         <div class="py-8 text-center text-gray-500 dark:text-gray-400">
-          <svg
-            class="mx-auto mb-4 h-12 w-12 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-            />
-          </svg>
+          <BeanieIcon name="light-bulb" size="xl" class="mx-auto mb-4 h-12 w-12 text-gray-400" />
           <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
           <p class="mt-1 text-sm">{{ t('settings.aiComingSoon') }}</p>
         </div>
@@ -622,19 +609,7 @@ function formatLastSync(timestamp: string | null): string {
       class="fixed right-4 bottom-4 max-w-sm rounded-lg border border-red-200 bg-red-50 p-4 shadow-lg dark:border-red-800 dark:bg-red-900/90"
     >
       <div class="flex items-start gap-3">
-        <svg
-          class="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
+        <BeanieIcon name="exclamation-circle" size="md" class="mt-0.5 flex-shrink-0 text-red-500" />
         <div>
           <p class="text-sm font-medium text-red-800 dark:text-red-200">Encryption Error</p>
           <p class="mt-1 text-sm text-red-600 dark:text-red-300">{{ encryptionError }}</p>
@@ -643,14 +618,7 @@ function formatLastSync(timestamp: string | null): string {
           class="text-red-400 hover:text-red-600 dark:hover:text-red-200"
           @click="encryptionError = null"
         >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <BeanieIcon name="close" size="sm" />
         </button>
       </div>
     </div>
