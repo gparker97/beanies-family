@@ -1,4 +1,5 @@
 import js from '@eslint/js';
+import globals from 'globals';
 import pluginVue from 'eslint-plugin-vue';
 import * as parserVue from 'vue-eslint-parser';
 import configPrettier from 'eslint-config-prettier';
@@ -19,6 +20,9 @@ export default [
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
+      globals: {
+        ...globals.browser,
+      },
       parser: parserVue,
       parserOptions: {
         parser: tseslint.parser,
