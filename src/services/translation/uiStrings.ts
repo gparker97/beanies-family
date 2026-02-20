@@ -347,6 +347,12 @@ export const UI_STRINGS = {
   'error.deleteFailed': 'Failed to delete',
   'error.networkError': 'Network error. Please check your connection.',
 
+  // Not Found (404)
+  'notFound.heading': 'Oops! This bean got lost...',
+  'notFound.description':
+    "The page you're looking for has wandered off. Let's get you back to your beans.",
+  'notFound.goHome': 'Back to Dashboard',
+
   // Empty states
   'empty.noData': 'No data available',
   'empty.noResults': 'No results found',
