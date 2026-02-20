@@ -410,7 +410,10 @@ function getAppreciationPercent(asset: Asset): number {
       <div
         class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800"
       >
-        <BeanieIcon name="building" class="h-10 w-10 text-gray-400 dark:text-gray-500" />
+        <BeanieIcon
+          name="building"
+          class="animate-beanie-float h-10 w-10 text-gray-400 dark:text-gray-500"
+        />
       </div>
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
         {{ t('assets.noAssets') }}

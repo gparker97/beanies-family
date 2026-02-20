@@ -5,7 +5,7 @@
     "at-rule-no-unknown": [
       true,
       {
-        "ignoreAtRules": ["tailwind", "apply", "layer", "variants", "screen", "theme"]
+        "ignoreAtRules": ["tailwind", "apply", "layer", "variants", "screen", "theme", "utility"]
       }
     ],
     "function-no-unknown": [true, { "ignoreFunctions": ["theme"] }],

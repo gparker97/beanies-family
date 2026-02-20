@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 
 interface Props {
@@ -11,6 +12,11 @@ interface Props {
 }
 
 defineProps<Props>();
+
+const showBounce = ref(false);
+onMounted(() => {
+  showBounce.value = true;
+});
 </script>
 
 <template>
@@ -18,6 +24,8 @@ defineProps<Props>();
     <div class="flex items-center gap-3">
       <div
         class="bg-primary-50 dark:bg-primary-900/30 flex h-10 w-10 items-center justify-center rounded-xl"
+        :class="{ 'animate-beanie-bounce': showBounce }"
+        @animationend="showBounce = false"
       >
         <BeanieIcon :name="icon" size="lg" class="text-primary-500" />
       </div>
