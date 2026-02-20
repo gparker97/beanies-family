@@ -3,6 +3,7 @@ import { onMounted, computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
@@ -277,13 +278,7 @@ onMounted(async () => {
         v-if="isInitializing"
         class="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-[#FDFBF9] dark:bg-[#1a252f]"
       >
-        <img
-          src="/brand/beanies_spinner_transparent_192x192.png"
-          alt="Loading"
-          class="h-24 w-24 animate-spin"
-          style="animation-duration: 1.8s"
-        />
-        <p class="mt-4 text-sm text-gray-400 dark:text-gray-500">counting beans...</p>
+        <BeanieSpinner size="xl" label />
       </div>
     </Transition>
 
