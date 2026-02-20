@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import SyncStatusIndicator from '@/components/common/SyncStatusIndicator.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -37,6 +37,8 @@ const navItems = computed(() =>
     icon: item.icon,
   }))
 );
+
+const hoveredPath = ref('');
 
 function isActive(path: string): boolean {
   return route.path === path;
@@ -85,8 +87,20 @@ function navigateTo(path: string) {
             : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
         "
         @click="navigateTo(item.path)"
+        @mouseenter="hoveredPath = item.path"
+        @mouseleave="hoveredPath = ''"
       >
-        <BeanieIcon :name="item.icon" size="md" class="opacity-70" />
+        <BeanieIcon
+          :name="item.icon"
+          size="md"
+          :class="
+            isActive(item.path)
+              ? 'animate-beanie-glow'
+              : hoveredPath === item.path
+                ? 'animate-beanie-wobble'
+                : 'opacity-70'
+          "
+        />
 
         <span>{{ item.name }}</span>
       </button>

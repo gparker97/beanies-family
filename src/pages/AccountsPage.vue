@@ -314,7 +314,7 @@ async function deleteAccount(id: string) {
       >
         <BeanieIcon
           name="credit-card"
-          class="h-10 w-10 text-gray-400 dark:text-gray-500"
+          class="animate-beanie-float h-10 w-10 text-gray-400 dark:text-gray-500"
           :stroke-width="1.5"
         />
       </div>
