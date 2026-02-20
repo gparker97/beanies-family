@@ -26,8 +26,9 @@ test.describe('Beanie Avatars', () => {
 
   test('family page member cards show BeanieAvatar', async ({ page }) => {
     await page.goto('/family');
-    // The owner member card should show a beanie avatar
-    const avatars = page.locator('[data-testid="beanie-avatar"]');
+    // Scope to main content area (exclude header filter avatar)
+    const mainContent = page.locator('main');
+    const avatars = mainContent.locator('[data-testid="beanie-avatar"]');
     await expect(avatars.first()).toBeVisible();
     // Owner created in setup defaults to adult-male
     await expect(avatars.first()).toHaveAttribute('data-variant', 'adult-male');
