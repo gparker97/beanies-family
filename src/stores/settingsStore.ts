@@ -31,6 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const exchangeRates = computed(() => globalSettings.value.exchangeRates);
   const exchangeRateAutoUpdate = computed(() => globalSettings.value.exchangeRateAutoUpdate);
   const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
+  const beanieMode = computed(() => globalSettings.value.beanieMode ?? false);
 
   // Apply theme to document
   watch(
@@ -203,6 +204,18 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setBeanieMode(enabled: boolean): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({ beanieMode: enabled });
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update beanie mode';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   async function updateExchangeRates(rates: ExchangeRate[]): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -274,6 +287,7 @@ export const useSettingsStore = defineStore('settings', () => {
     exchangeRates,
     exchangeRateAutoUpdate,
     exchangeRateLastFetch,
+    beanieMode,
     // Actions
     loadGlobalSettings,
     loadSettings,
@@ -285,6 +299,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setAutoSyncEnabled,
     setAIProvider,
     setAIApiKey,
+    setBeanieMode,
     setExchangeRateAutoUpdate,
     updateExchangeRates,
     addExchangeRate,
