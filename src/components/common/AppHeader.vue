@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
@@ -116,14 +117,7 @@ async function handleSignOut() {
         >
           <span>{{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}</span>
           <span class="text-gray-500 dark:text-gray-400">{{ settingsStore.displayCurrency }}</span>
-          <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
+          <BeanieIcon name="chevron-down" size="sm" class="text-gray-400" />
         </button>
 
         <!-- Dropdown menu -->
@@ -161,34 +155,13 @@ async function handleSignOut() {
           <span class="text-gray-500 dark:text-gray-400">{{
             settingsStore.language.toUpperCase()
           }}</span>
-          <svg
+          <BeanieIcon
             v-if="!translationStore.isLoading"
-            class="h-4 w-4 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-          <svg
-            v-else
-            class="h-4 w-4 animate-spin text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+            name="chevron-down"
+            size="sm"
+            class="text-gray-400"
+          />
+          <BeanieIcon v-else name="refresh" size="sm" class="animate-spin text-gray-400" />
         </button>
 
         <!-- Dropdown menu -->
@@ -248,30 +221,8 @@ async function handleSignOut() {
         class="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
         @click="toggleTheme"
       >
-        <!-- Sun icon -->
-        <svg
-          v-if="settingsStore.theme === 'dark'"
-          class="h-5 w-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-          />
-        </svg>
-        <!-- Moon icon -->
-        <svg v-else class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-          />
-        </svg>
+        <BeanieIcon v-if="settingsStore.theme === 'dark'" name="sun" size="md" />
+        <BeanieIcon v-else name="moon" size="md" />
       </button>
 
       <!-- Offline badge -->
@@ -304,14 +255,7 @@ async function handleSignOut() {
           <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
           </span>
-          <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
+          <BeanieIcon name="chevron-down" size="sm" class="text-gray-400" />
         </button>
 
         <!-- Profile dropdown menu -->
