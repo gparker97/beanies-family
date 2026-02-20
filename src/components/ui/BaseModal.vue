@@ -83,13 +83,13 @@ onUnmounted(() => {
         >
           <div
             v-if="open"
-            class="relative w-full rounded-3xl bg-white shadow-xl dark:bg-slate-800"
+            class="relative flex max-h-[calc(100vh-2rem)] w-full flex-col rounded-3xl bg-white shadow-xl dark:bg-slate-800"
             :class="sizeClasses[size]"
           >
             <!-- Header -->
             <div
               v-if="title || $slots.header"
-              class="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700"
+              class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700"
             >
               <slot name="header">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -108,14 +108,14 @@ onUnmounted(() => {
             </div>
 
             <!-- Body -->
-            <div class="p-6">
+            <div class="flex-1 overflow-y-auto p-6">
               <slot />
             </div>
 
             <!-- Footer -->
             <div
               v-if="$slots.footer"
-              class="rounded-b-3xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
+              class="shrink-0 rounded-b-3xl border-t border-gray-200 bg-gray-50 px-6 py-4 dark:border-slate-700 dark:bg-slate-900"
             >
               <slot name="footer" />
             </div>

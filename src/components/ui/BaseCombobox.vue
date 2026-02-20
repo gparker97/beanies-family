@@ -200,6 +200,7 @@ function clearSelection() {
     <!-- Trigger button -->
     <button
       type="button"
+      data-testid="combobox-trigger"
       class="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors focus:ring-2 focus:outline-none"
       :class="[
         error
@@ -230,6 +231,7 @@ function clearSelection() {
         <button
           v-if="hasSelection && !disabled"
           type="button"
+          data-testid="combobox-clear"
           class="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
           @click.stop="clearSelection"
         >
@@ -266,6 +268,7 @@ function clearSelection() {
       ref="customInputRef"
       v-model="customText"
       type="text"
+      data-testid="combobox-custom-input"
       class="focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-gray-900 transition-colors focus:ring-2 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
       :placeholder="otherPlaceholder"
       @blur="handleCustomBlur"
@@ -275,6 +278,7 @@ function clearSelection() {
     <!-- Dropdown -->
     <div
       v-if="isOpen"
+      data-testid="combobox-dropdown"
       class="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
     >
       <!-- Search input -->
@@ -285,6 +289,7 @@ function clearSelection() {
           ref="searchInputRef"
           v-model="searchQuery"
           type="text"
+          data-testid="combobox-search"
           class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100"
           :placeholder="searchPlaceholder"
           @keydown.stop
@@ -297,6 +302,7 @@ function clearSelection() {
           v-for="option in filteredOptions"
           :key="option.value"
           type="button"
+          :data-testid="`combobox-option-${option.value}`"
           class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
           :class="
             option.value === modelValue && !isOtherMode
@@ -314,6 +320,7 @@ function clearSelection() {
             </span>
             <button
               type="button"
+              :data-testid="`combobox-remove-${option.value}`"
               class="rounded p-0.5 text-gray-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
               title="Remove custom institution"
               @click.stop="removeCustomOption(option)"
@@ -357,6 +364,7 @@ function clearSelection() {
         <button
           v-if="otherValue"
           type="button"
+          data-testid="combobox-other"
           class="flex w-full items-center gap-2 border-t border-gray-100 px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:border-slate-700 dark:hover:bg-slate-700"
           :class="
             isOtherMode
