@@ -7,6 +7,7 @@ import PageHeader from '@/components/common/PageHeader.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
@@ -692,11 +693,7 @@ function applyCustomDateRange() {
           v-if="transactions.length === 0"
           class="py-12 text-center text-gray-500 dark:text-gray-400"
         >
-          <BeanieIcon
-            name="calendar"
-            class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
-            :stroke-width="1.5"
-          />
+          <EmptyStateIllustration variant="transactions" class="mb-4" />
           <p>No transactions found for {{ dateFilterLabel }}</p>
           <p class="mt-2 text-sm">Try selecting a different date range or add a new transaction.</p>
         </div>
@@ -873,11 +870,7 @@ function applyCustomDateRange() {
           v-if="recurringItems.length === 0"
           class="py-12 text-center text-gray-500 dark:text-gray-400"
         >
-          <BeanieIcon
-            name="repeat"
-            class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
-            :stroke-width="1.5"
-          />
+          <EmptyStateIllustration variant="recurring" class="mb-4" />
           <p>{{ t('recurring.noItems') }}</p>
           <p class="mt-2">{{ t('recurring.getStarted') }}</p>
         </div>

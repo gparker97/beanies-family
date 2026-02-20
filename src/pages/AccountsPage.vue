@@ -4,6 +4,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
@@ -309,15 +310,7 @@ async function deleteAccount(id: string) {
 
     <!-- Empty State -->
     <div v-if="accounts.length === 0" class="py-16 text-center">
-      <div
-        class="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-slate-800"
-      >
-        <BeanieIcon
-          name="credit-card"
-          class="animate-beanie-float h-10 w-10 text-gray-400 dark:text-gray-500"
-          :stroke-width="1.5"
-        />
-      </div>
+      <EmptyStateIllustration variant="accounts" class="mb-6" />
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">
         {{ t('accounts.noAccounts') }}
       </h3>
