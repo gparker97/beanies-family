@@ -512,8 +512,8 @@ export const UI_STRINGS = Object.fromEntries(
  */
 export const BEANIE_STRINGS = Object.fromEntries(
   Object.entries(STRING_DEFS)
-    .filter(([, v]) => v.beanie !== undefined)
-    .map(([k, v]) => [k, v.beanie])
+    .filter(([, v]) => 'beanie' in v)
+    .map(([k, v]) => [k, (v as { en: string; beanie: string }).beanie])
 ) as Partial<typeof UI_STRINGS>;
 
 export type UIStringKey = keyof typeof STRING_DEFS;
