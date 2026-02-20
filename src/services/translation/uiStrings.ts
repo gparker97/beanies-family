@@ -246,6 +246,13 @@ export const UI_STRINGS = {
   // Forecast
   'forecast.title': 'Forecast',
   'forecast.noData': 'No data available for forecasting yet.',
+  'forecast.comingSoon': 'Coming soon to your bean patch',
+  'forecast.comingSoonDescription':
+    "We're growing something special. Financial forecasting will help you see where your beans are headed.",
+  'forecast.feature.projections': 'Recurring transaction projections',
+  'forecast.feature.cashFlow': 'Cash flow forecast (3, 6, and 12 months)',
+  'forecast.feature.goals': 'Goal achievement projections',
+  'forecast.feature.scenarios': '"What if" scenario simulation',
 
   // Settings
   'settings.title': 'Settings',
