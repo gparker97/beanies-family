@@ -5,6 +5,7 @@ import * as translationApi from '@/services/translation/translationApi';
 import * as translationFiles from '@/services/translation/translationFiles';
 import {
   UI_STRINGS,
+  BEANIE_STRINGS,
   getAllKeys,
   getSourceText,
   getAllHashes,
@@ -20,6 +21,7 @@ export const useTranslationStore = defineStore('translation', () => {
   const error = ref<string | null>(null);
   const loadProgress = ref(0); // 0-100
   const translationFile = ref<translationFiles.TranslationFile | null>(null);
+  const beanieMode = ref(false);
 
   // Getters
   const isEnglish = computed(() => currentLanguage.value === 'en');
@@ -158,12 +160,27 @@ export const useTranslationStore = defineStore('translation', () => {
   /**
    * Get the translated text for a UI string key.
    * Returns English text if translation not available.
+   *
+   * IMPORTANT: The translation pipeline always uses UI_STRINGS (plain English)
+   * as the source text. BEANIE_STRINGS are never translated and are only shown
+   * as a cosmetic overlay when language is English and beanie mode is enabled.
    */
   function t(key: UIStringKey): string {
     if (currentLanguage.value === 'en') {
+      if (beanieMode.value && BEANIE_STRINGS[key]) {
+        return BEANIE_STRINGS[key]!;
+      }
       return UI_STRINGS[key];
     }
     return translations.value.get(key) || UI_STRINGS[key];
+  }
+
+  /**
+   * Set beanie mode on or off.
+   * Only affects display when language is English.
+   */
+  function setBeanieMode(enabled: boolean): void {
+    beanieMode.value = enabled;
   }
 
   /**
@@ -232,12 +249,14 @@ export const useTranslationStore = defineStore('translation', () => {
     isLoading,
     error,
     loadProgress,
+    beanieMode,
     // Getters
     isEnglish,
     translationCount,
     // Actions
     loadTranslations,
     t,
+    setBeanieMode,
     clearCache,
     setLanguageSync,
     exportCacheToFile,

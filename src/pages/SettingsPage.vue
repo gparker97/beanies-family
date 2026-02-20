@@ -47,6 +47,11 @@ onMounted(async () => {
   await syncStore.initialize();
 });
 
+async function handleBeanieToggle(event: Event) {
+  const target = event.target as HTMLInputElement;
+  await settingsStore.setBeanieMode(target.checked);
+}
+
 async function updateCurrency(value: string | number) {
   await settingsStore.setBaseCurrency(value as string);
 }
@@ -206,6 +211,35 @@ function formatLastSync(timestamp: string | null): string {
             :hint="t('settings.themeHint')"
             @update:model-value="updateTheme"
           />
+
+          <!-- Beanie Mode -->
+          <div
+            class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+            :class="{ 'opacity-50': !translationStore.isEnglish }"
+          >
+            <div>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ t('settings.beanieMode') }}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {{ t('settings.beanieModeDescription') }}
+              </p>
+              <p
+                v-if="!translationStore.isEnglish"
+                class="mt-1 text-xs text-amber-600 dark:text-amber-400"
+              >
+                {{ t('settings.beanieModeDisabled') }}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              data-testid="beanie-mode-toggle"
+              :checked="settingsStore.beanieMode"
+              :disabled="!translationStore.isEnglish"
+              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
+              @change="handleBeanieToggle"
+            />
+          </div>
         </div>
       </BaseCard>
 

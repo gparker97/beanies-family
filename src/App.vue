@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue';
+import { onMounted, computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
@@ -160,6 +160,13 @@ onMounted(async () => {
   try {
     // Step 1: Load global settings (theme, language) — works before any family is active
     await settingsStore.loadGlobalSettings();
+
+    // Sync beanie mode from settings to translation store
+    watch(
+      () => settingsStore.beanieMode,
+      (val) => translationStore.setBeanieMode(val),
+      { immediate: true }
+    );
 
     // Load translations if language is not English (non-blocking)
     if (settingsStore.language !== 'en') {
