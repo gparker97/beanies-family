@@ -6,6 +6,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import type { Gender, AgeGroup } from '@/types/models';
 
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
@@ -103,8 +104,13 @@ watch(
 
       <template #option="{ option }">
         <BeanieAvatar
-          :variant="getMemberAvatarVariant({ gender: option.gender, ageGroup: option.ageGroup })"
-          :color="option.color"
+          :variant="
+            getMemberAvatarVariant({
+              gender: option.gender as Gender | undefined,
+              ageGroup: option.ageGroup as AgeGroup | undefined,
+            })
+          "
+          :color="option.color as string"
           size="xs"
         />
         <span class="truncate text-sm text-gray-700 dark:text-gray-300">
