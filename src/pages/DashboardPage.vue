@@ -4,6 +4,7 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { BaseCard } from '@/components/ui';
 import { useCountUp } from '@/composables/useCountUp';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
@@ -240,7 +241,8 @@ function getDaysUntil(date: Date): string {
           v-if="recentTransactions.length === 0"
           class="py-8 text-center text-gray-500 dark:text-gray-400"
         >
-          {{ t('dashboard.noTransactions') }}
+          <EmptyStateIllustration variant="transactions" class="mb-4" />
+          <p class="text-sm">{{ t('dashboard.noTransactions') }}</p>
         </div>
         <div v-else class="space-y-2">
           <div
@@ -276,7 +278,8 @@ function getDaysUntil(date: Date): string {
           v-if="upcomingTransactions.length === 0"
           class="py-8 text-center text-gray-500 dark:text-gray-400"
         >
-          {{ t('dashboard.noUpcoming') }}
+          <EmptyStateIllustration variant="recurring" class="mb-4" />
+          <p class="text-sm">{{ t('dashboard.noUpcoming') }}</p>
         </div>
         <div v-else class="space-y-2">
           <div
@@ -325,7 +328,8 @@ function getDaysUntil(date: Date): string {
           v-if="assetsSummary.length === 0"
           class="py-8 text-center text-gray-500 dark:text-gray-400"
         >
-          {{ t('dashboard.noAssets') }}
+          <EmptyStateIllustration variant="assets" class="mb-4" />
+          <p class="text-sm">{{ t('dashboard.noAssets') }}</p>
         </div>
         <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div
@@ -425,7 +429,8 @@ function getDaysUntil(date: Date): string {
           v-if="activeGoals.length === 0"
           class="py-8 text-center text-gray-500 dark:text-gray-400"
         >
-          {{ t('dashboard.noGoals') }}
+          <EmptyStateIllustration variant="goals" class="mb-4" />
+          <p class="text-sm">{{ t('dashboard.noGoals') }}</p>
         </div>
         <div v-else class="space-y-4">
           <div v-for="goal in activeGoals" :key="goal.id" class="space-y-2">
