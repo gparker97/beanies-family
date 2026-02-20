@@ -31,6 +31,9 @@ test.describe('Sound Effects', () => {
     await toggle.uncheck();
     await expect(toggle).not.toBeChecked();
 
+    // Wait for IndexedDB write to complete before reloading
+    await page.waitForTimeout(500);
+
     // Reload and verify persistence
     await page.reload();
     await expect(page.getByTestId('sound-toggle')).not.toBeChecked();

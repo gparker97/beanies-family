@@ -34,6 +34,9 @@ test.describe('Beanie Mode', () => {
     await toggle.check();
     await expect(toggle).toBeChecked();
 
+    // Wait for IndexedDB write to complete
+    await page.waitForTimeout(500);
+
     // Go to dashboard and verify beanie strings
     await page.goto('/dashboard');
     await expect(page.getByText('Your Bean Count')).toBeVisible();
@@ -45,6 +48,9 @@ test.describe('Beanie Mode', () => {
     const toggle = page.getByTestId('beanie-mode-toggle');
     await toggle.check();
 
+    // Wait for IndexedDB write to complete
+    await page.waitForTimeout(500);
+
     // Verify beanie string on dashboard
     await page.goto('/dashboard');
     await expect(page.getByText('Your Bean Count')).toBeVisible();
@@ -53,6 +59,9 @@ test.describe('Beanie Mode', () => {
     await page.goto('/settings');
     const toggleAgain = page.getByTestId('beanie-mode-toggle');
     await toggleAgain.uncheck();
+
+    // Wait for IndexedDB write to complete
+    await page.waitForTimeout(500);
 
     // Verify plain English restored
     await page.goto('/dashboard');
