@@ -28,6 +28,7 @@ export function getDefaultSettings(): Settings {
     encryptionEnabled: true,
     aiProvider: 'none',
     aiApiKeys: {},
+    customInstitutions: [],
     createdAt: now,
     updatedAt: now,
   };
@@ -154,6 +155,21 @@ export async function getExchangeRate(
   if (inverse) return 1 / inverse.rate;
 
   return undefined;
+}
+
+export async function addCustomInstitution(name: string): Promise<Settings> {
+  const settings = await getSettings();
+  const existing = settings.customInstitutions ?? [];
+  if (existing.includes(name)) return settings;
+  const updated = [...existing, name].sort((a, b) => a.localeCompare(b));
+  return saveSettings({ customInstitutions: updated });
+}
+
+export async function removeCustomInstitution(name: string): Promise<Settings> {
+  const settings = await getSettings();
+  const existing = settings.customInstitutions ?? [];
+  const updated = existing.filter((n) => n !== name);
+  return saveSettings({ customInstitutions: updated });
 }
 
 export async function convertAmount(

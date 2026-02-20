@@ -33,6 +33,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
   const beanieMode = computed(() => globalSettings.value.beanieMode ?? false);
   const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
+  const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
 
   // Apply theme to document
   watch(
@@ -229,6 +230,30 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function addCustomInstitution(name: string): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      settings.value = await settingsRepo.addCustomInstitution(name);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to add custom institution';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  async function removeCustomInstitution(name: string): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      settings.value = await settingsRepo.removeCustomInstitution(name);
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to remove custom institution';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   async function updateExchangeRates(rates: ExchangeRate[]): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -302,6 +327,7 @@ export const useSettingsStore = defineStore('settings', () => {
     exchangeRateLastFetch,
     beanieMode,
     soundEnabled,
+    customInstitutions,
     // Actions
     loadGlobalSettings,
     loadSettings,
@@ -315,6 +341,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setAIApiKey,
     setBeanieMode,
     setSoundEnabled,
+    addCustomInstitution,
+    removeCustomInstitution,
     setExchangeRateAutoUpdate,
     updateExchangeRates,
     addExchangeRate,

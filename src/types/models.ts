@@ -80,6 +80,7 @@ export interface Account {
   currency: CurrencyCode;
   balance: number;
   institution?: string;
+  institutionCountry?: string;
   isActive: boolean;
   includeInNetWorth: boolean;
   createdAt: ISODateString;
@@ -157,6 +158,7 @@ export interface AssetLoan {
   monthlyPayment?: number;
   loanTermMonths?: number;
   lender?: string;
+  lenderCountry?: string;
   loanStartDate?: ISODateString;
 }
 
@@ -230,6 +232,7 @@ export interface Settings {
   lastSyncTimestamp?: ISODateString;
   aiProvider: AIProvider;
   aiApiKeys: AIApiKeys;
+  customInstitutions?: string[];
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

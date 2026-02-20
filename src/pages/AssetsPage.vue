@@ -2,14 +2,17 @@
 import { ref, computed, toRaw } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
-import { BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
+import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
+import { COUNTRIES } from '@/constants/countries';
 import { CURRENCIES } from '@/constants/currencies';
+import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getAssetTypeIcon } from '@/constants/icons';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -29,6 +32,8 @@ const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
+const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
+const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -69,6 +74,7 @@ function getDefaultLoan(): AssetLoan {
     monthlyPayment: undefined,
     loanTermMonths: undefined,
     lender: undefined,
+    lenderCountry: undefined,
     loanStartDate: undefined,
   };
 }
@@ -253,6 +259,19 @@ function closeEditModal() {
   editingAssetId.value = null;
 }
 
+async function persistCustomInstitutionIfNeeded(name: string | undefined) {
+  if (!name?.trim()) return;
+  const isKnown =
+    INSTITUTIONS.some((i) => i.name === name) || settingsStore.customInstitutions.includes(name);
+  if (!isKnown) {
+    await settingsStore.addCustomInstitution(name.trim());
+  }
+}
+
+async function handleRemoveCustomInstitution(name: string) {
+  await removeCustomInstitution(name);
+}
+
 async function createAsset() {
   if (!newAsset.value.name.trim()) return;
 
@@ -269,6 +288,7 @@ async function createAsset() {
       assetData.loan = { hasLoan: false };
     }
     await assetsStore.createAsset(assetData);
+    await persistCustomInstitutionIfNeeded(rawData.loan?.lender);
     showAddModal.value = false;
   } finally {
     isSubmitting.value = false;
@@ -291,6 +311,7 @@ async function saveEdit() {
       assetData.loan = { hasLoan: false };
     }
     await assetsStore.updateAsset(editingAssetId.value, assetData);
+    await persistCustomInstitutionIfNeeded(rawData.loan?.lender);
     closeEditModal();
   } finally {
     isSubmitting.value = false;
@@ -464,7 +485,7 @@ function getAppreciationPercent(asset: Asset): number {
                 >
                   <BeanieIcon
                     :name="`asset-${asset.type}`"
-                    size="lg"
+                    size="xl"
                     :style="{ color: getAssetTypeIcon(asset.type)?.color }"
                   />
                 </div>
@@ -506,7 +527,7 @@ function getAppreciationPercent(asset: Asset): number {
                     :amount="asset.currentValue"
                     :currency="asset.currency"
                     type="income"
-                    size="lg"
+                    size="xl"
                   />
                 </div>
               </div>
@@ -563,7 +584,7 @@ function getAppreciationPercent(asset: Asset): number {
                   :amount="asset.loan.outstandingBalance"
                   :currency="asset.currency"
                   type="expense"
-                  size="lg"
+                  size="xl"
                 />
               </div>
               <div
@@ -581,7 +602,10 @@ function getAppreciationPercent(asset: Asset): number {
                 >
               </div>
               <div v-if="asset.loan.lender" class="mt-1 text-xs text-red-500 dark:text-red-500">
-                {{ asset.loan.lender }}
+                {{ asset.loan.lender
+                }}<span v-if="asset.loan.lenderCountry">
+                  &middot; {{ asset.loan.lenderCountry }}</span
+                >
               </div>
             </div>
 
@@ -627,7 +651,7 @@ function getAppreciationPercent(asset: Asset): number {
     <BaseModal
       :open="showAddModal"
       :title="t('assets.addAsset')"
-      size="lg"
+      size="xl"
       @close="showAddModal = false"
     >
       <form class="space-y-4" @submit.prevent="createAsset">
@@ -748,18 +772,31 @@ function getAppreciationPercent(asset: Asset): number {
             />
           </div>
 
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseInput
-              v-model="newAsset.loan.loanTermMonths"
-              type="number"
-              :label="t('assets.loanTerm')"
-              placeholder="360"
-            />
+          <BaseInput
+            v-model="newAsset.loan.loanTermMonths"
+            type="number"
+            :label="t('assets.loanTerm')"
+            placeholder="360"
+          />
 
-            <BaseInput
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BaseCombobox
               v-model="newAsset.loan.lender"
+              :options="institutionOptions"
               :label="t('assets.lender')"
-              placeholder="e.g., Bank of America"
+              :placeholder="t('form.searchInstitutions')"
+              :search-placeholder="t('form.searchInstitutions')"
+              :other-value="OTHER_INSTITUTION_VALUE"
+              :other-label="t('form.other')"
+              :other-placeholder="t('form.enterCustomName')"
+              @custom-removed="handleRemoveCustomInstitution"
+            />
+            <BaseCombobox
+              v-model="newAsset.loan.lenderCountry"
+              :options="countryOptions"
+              :label="t('form.country')"
+              :placeholder="t('form.searchCountries')"
+              :search-placeholder="t('form.searchCountries')"
             />
           </div>
 
@@ -800,7 +837,7 @@ function getAppreciationPercent(asset: Asset): number {
     <BaseModal
       :open="showEditModal"
       :title="t('assets.editAsset')"
-      size="lg"
+      size="xl"
       @close="closeEditModal"
     >
       <form class="space-y-4" @submit.prevent="saveEdit">
@@ -925,18 +962,31 @@ function getAppreciationPercent(asset: Asset): number {
             />
           </div>
 
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseInput
-              v-model="editingAsset.loan.loanTermMonths"
-              type="number"
-              :label="t('assets.loanTerm')"
-              placeholder="360"
-            />
+          <BaseInput
+            v-model="editingAsset.loan.loanTermMonths"
+            type="number"
+            :label="t('assets.loanTerm')"
+            placeholder="360"
+          />
 
-            <BaseInput
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BaseCombobox
               v-model="editingAsset.loan.lender"
+              :options="institutionOptions"
               :label="t('assets.lender')"
-              placeholder="e.g., Bank of America"
+              :placeholder="t('form.searchInstitutions')"
+              :search-placeholder="t('form.searchInstitutions')"
+              :other-value="OTHER_INSTITUTION_VALUE"
+              :other-label="t('form.other')"
+              :other-placeholder="t('form.enterCustomName')"
+              @custom-removed="handleRemoveCustomInstitution"
+            />
+            <BaseCombobox
+              v-model="editingAsset.loan.lenderCountry"
+              :options="countryOptions"
+              :label="t('form.country')"
+              :placeholder="t('form.searchCountries')"
+              :search-placeholder="t('form.searchCountries')"
             />
           </div>
 
