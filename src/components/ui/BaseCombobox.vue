@@ -8,7 +8,7 @@ export interface ComboboxOption {
 }
 
 interface Props {
-  modelValue: string;
+  modelValue: string | undefined;
   options: ComboboxOption[];
   label?: string;
   placeholder?: string;
