@@ -10,6 +10,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { EXPENSE_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
 import { CURRENCIES } from '@/constants/currencies';
@@ -46,6 +47,7 @@ const familyStore = useFamilyStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
+const { playWhoosh } = useSounds();
 
 // Tab state - recurring first by default
 const activeTab = ref<'transactions' | 'recurring'>('recurring');
@@ -345,6 +347,7 @@ async function updateTransaction() {
 async function deleteTransaction(id: string) {
   if (confirm('Are you sure you want to delete this transaction?')) {
     await transactionsStore.deleteTransaction(id);
+    playWhoosh();
   }
 }
 
@@ -386,6 +389,7 @@ async function deleteRecurringItem(id: string) {
     )
   ) {
     await recurringStore.deleteRecurringItem(id);
+    playWhoosh();
   }
 }
 

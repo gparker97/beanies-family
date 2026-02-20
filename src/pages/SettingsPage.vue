@@ -52,6 +52,11 @@ async function handleBeanieToggle(event: Event) {
   await settingsStore.setBeanieMode(target.checked);
 }
 
+async function handleSoundToggle(event: Event) {
+  const target = event.target as HTMLInputElement;
+  await settingsStore.setSoundEnabled(target.checked);
+}
+
 async function updateCurrency(value: string | number) {
   await settingsStore.setBaseCurrency(value as string);
 }
@@ -238,6 +243,27 @@ function formatLastSync(timestamp: string | null): string {
               :disabled="!translationStore.isEnglish"
               class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
               @change="handleBeanieToggle"
+            />
+          </div>
+
+          <!-- Sound Effects -->
+          <div
+            class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+          >
+            <div>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ t('settings.soundEffects') }}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {{ t('settings.soundEffectsDescription') }}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              data-testid="sound-toggle"
+              :checked="settingsStore.soundEnabled"
+              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
+              @change="handleSoundToggle"
             />
           </div>
         </div>

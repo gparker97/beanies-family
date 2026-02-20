@@ -20,6 +20,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
+import { setSoundEnabled } from '@/composables/useSounds';
 
 const route = useRoute();
 const router = useRouter();
@@ -165,6 +166,13 @@ onMounted(async () => {
     watch(
       () => settingsStore.beanieMode,
       (val) => translationStore.setBeanieMode(val),
+      { immediate: true }
+    );
+
+    // Sync sound enabled from settings to useSounds composable
+    watch(
+      () => settingsStore.soundEnabled,
+      (val) => setSoundEnabled(val),
       { immediate: true }
     );
 
