@@ -7,19 +7,31 @@ import type {
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 
+/** Apply defaults for legacy records missing gender/ageGroup fields */
+function applyDefaults(member: FamilyMember): FamilyMember {
+  return {
+    ...member,
+    gender: member.gender ?? 'other',
+    ageGroup: member.ageGroup ?? 'adult',
+  };
+}
+
 export async function getAllFamilyMembers(): Promise<FamilyMember[]> {
   const db = await getDatabase();
-  return db.getAll('familyMembers');
+  const members = await db.getAll('familyMembers');
+  return members.map(applyDefaults);
 }
 
 export async function getFamilyMemberById(id: string): Promise<FamilyMember | undefined> {
   const db = await getDatabase();
-  return db.get('familyMembers', id);
+  const member = await db.get('familyMembers', id);
+  return member ? applyDefaults(member) : undefined;
 }
 
 export async function getFamilyMemberByEmail(email: string): Promise<FamilyMember | undefined> {
   const db = await getDatabase();
-  return db.getFromIndex('familyMembers', 'by-email', email);
+  const member = await db.getFromIndex('familyMembers', 'by-email', email);
+  return member ? applyDefaults(member) : undefined;
 }
 
 export async function createFamilyMember(input: CreateFamilyMemberInput): Promise<FamilyMember> {

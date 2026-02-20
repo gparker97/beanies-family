@@ -3,6 +3,8 @@ import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
@@ -269,16 +271,13 @@ async function handleSignOut() {
           @blur="closeProfileDropdown"
         >
           <!-- Avatar -->
-          <div
-            class="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium text-white"
-            :style="{ backgroundColor: currentMember?.color || '#3b82f6' }"
-          >
-            {{
-              currentMember
-                ? currentMember.name.charAt(0).toUpperCase()
-                : authStore.currentUser?.email?.charAt(0)?.toUpperCase() || 'U'
-            }}
-          </div>
+          <BeanieAvatar
+            :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
+            :color="currentMember?.color || '#3b82f6'"
+            size="sm"
+            :aria-label="currentMember?.name || 'Profile'"
+            data-testid="header-avatar"
+          />
           <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
           </span>

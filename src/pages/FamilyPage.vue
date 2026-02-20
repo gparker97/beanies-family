@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { BaseCard, BaseButton, BaseInput, BaseModal } from '@/components/ui';
+import { BaseCard, BaseButton, BaseInput, BaseModal, BaseSelect } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import CreateMemberAccountModal from '@/components/family/CreateMemberAccountModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import type { CreateFamilyMemberInput } from '@/types/models';
+import type {
+  CreateFamilyMemberInput,
+  FamilyMember,
+  UpdateFamilyMemberInput,
+  Gender,
+  AgeGroup,
+} from '@/types/models';
 
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
@@ -16,6 +24,8 @@ const authStore = useAuthStore();
 const { t } = useTranslation();
 
 const showAddModal = ref(false);
+const showEditModal = ref(false);
+const editingMemberId = ref<string | null>(null);
 const showCreateAccountModal = ref(false);
 const isSubmitting = ref(false);
 const isEditingFamilyName = ref(false);
@@ -34,21 +44,63 @@ const colors: string[] = [
   '#f97316',
 ];
 
+const genderOptions = [
+  { value: 'male', label: t('family.gender.male') },
+  { value: 'female', label: t('family.gender.female') },
+  { value: 'other', label: t('family.gender.other') },
+];
+
+const ageGroupOptions = [
+  { value: 'adult', label: t('family.ageGroup.adult') },
+  { value: 'child', label: t('family.ageGroup.child') },
+];
+
+const monthOptions = [
+  { value: '1', label: 'January' },
+  { value: '2', label: 'February' },
+  { value: '3', label: 'March' },
+  { value: '4', label: 'April' },
+  { value: '5', label: 'May' },
+  { value: '6', label: 'June' },
+  { value: '7', label: 'July' },
+  { value: '8', label: 'August' },
+  { value: '9', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+const dayOptions = Array.from({ length: 31 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
+
 const newMember = ref<CreateFamilyMemberInput>({
   name: '',
   email: '',
+  gender: 'male' as Gender,
+  ageGroup: 'adult' as AgeGroup,
   role: 'member',
   color: colors[0] ?? '#3b82f6',
 });
+
+const dobMonth = ref('1');
+const dobDay = ref('1');
+const dobYear = ref('');
 
 function openAddModal() {
   const randomColor = colors[Math.floor(Math.random() * colors.length)] ?? '#3b82f6';
   newMember.value = {
     name: '',
     email: '',
+    gender: 'male' as Gender,
+    ageGroup: 'adult' as AgeGroup,
     role: 'member',
     color: randomColor,
   };
+  dobMonth.value = '1';
+  dobDay.value = '1';
+  dobYear.value = '';
   showAddModal.value = true;
 }
 
@@ -57,8 +109,78 @@ async function createMember() {
 
   isSubmitting.value = true;
   try {
-    await familyStore.createMember(newMember.value);
+    const input = { ...newMember.value };
+    // Attach date of birth if month and day are filled
+    if (dobMonth.value && dobDay.value) {
+      input.dateOfBirth = {
+        month: parseInt(dobMonth.value, 10),
+        day: parseInt(dobDay.value, 10),
+        ...(dobYear.value ? { year: parseInt(dobYear.value, 10) } : {}),
+      };
+    }
+    await familyStore.createMember(input);
     showAddModal.value = false;
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+// Edit member state
+const editMember = ref({
+  name: '',
+  email: '',
+  gender: 'male' as Gender,
+  ageGroup: 'adult' as AgeGroup,
+  color: '#3b82f6',
+});
+const editDobMonth = ref('1');
+const editDobDay = ref('1');
+const editDobYear = ref('');
+
+function openEditModal(member: FamilyMember) {
+  editingMemberId.value = member.id;
+  editMember.value = {
+    name: member.name,
+    email: member.email,
+    gender: member.gender || 'other',
+    ageGroup: member.ageGroup || 'adult',
+    color: member.color,
+  };
+  editDobMonth.value = member.dateOfBirth?.month?.toString() ?? '1';
+  editDobDay.value = member.dateOfBirth?.day?.toString() ?? '1';
+  editDobYear.value = member.dateOfBirth?.year?.toString() ?? '';
+  showEditModal.value = true;
+}
+
+function closeEditModal() {
+  showEditModal.value = false;
+  editingMemberId.value = null;
+}
+
+async function saveEditMember() {
+  if (!editMember.value.name.trim() || !editMember.value.email.trim()) return;
+  if (!editingMemberId.value) return;
+
+  isSubmitting.value = true;
+  try {
+    const input: UpdateFamilyMemberInput = {
+      name: editMember.value.name,
+      email: editMember.value.email,
+      gender: editMember.value.gender,
+      ageGroup: editMember.value.ageGroup,
+      color: editMember.value.color,
+    };
+    if (editDobMonth.value && editDobDay.value) {
+      input.dateOfBirth = {
+        month: parseInt(editDobMonth.value, 10),
+        day: parseInt(editDobDay.value, 10),
+        ...(editDobYear.value ? { year: parseInt(editDobYear.value, 10) } : {}),
+      };
+    } else {
+      input.dateOfBirth = undefined;
+    }
+    await familyStore.updateMember(editingMemberId.value, input);
+    closeEditModal();
   } finally {
     isSubmitting.value = false;
   }
@@ -154,12 +276,12 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       <BaseCard v-for="member in familyStore.members" :key="member.id" :hoverable="true">
         <div class="flex items-start gap-4">
-          <div
-            class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full text-lg font-medium text-white"
-            :style="{ backgroundColor: member.color }"
-          >
-            {{ member.name.charAt(0).toUpperCase() }}
-          </div>
+          <BeanieAvatar
+            :variant="getMemberAvatarVariant(member)"
+            :color="member.color"
+            size="lg"
+            :aria-label="member.name"
+          />
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <h3 class="truncate font-medium text-gray-900 dark:text-gray-100">
@@ -183,13 +305,22 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
               Create Login
             </button>
           </div>
-          <button
-            v-if="member.role !== 'owner'"
-            class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-            @click="deleteMember(member.id)"
-          >
-            <BeanieIcon name="trash" size="md" />
-          </button>
+          <div class="flex flex-shrink-0 gap-1">
+            <button
+              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
+              :title="t('family.editMember')"
+              @click="openEditModal(member)"
+            >
+              <BeanieIcon name="edit" size="md" />
+            </button>
+            <button
+              v-if="member.role !== 'owner'"
+              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
+              @click="deleteMember(member.id)"
+            >
+              <BeanieIcon name="trash" size="md" />
+            </button>
+          </div>
         </div>
       </BaseCard>
     </div>
@@ -211,6 +342,59 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           placeholder="Enter email"
           required
         />
+
+        <div class="grid grid-cols-2 gap-3">
+          <BaseSelect
+            v-model="newMember.gender"
+            :options="genderOptions"
+            :label="t('family.gender')"
+            data-testid="gender-select"
+          />
+          <BaseSelect
+            v-model="newMember.ageGroup"
+            :options="ageGroupOptions"
+            :label="t('family.ageGroup')"
+            data-testid="age-group-select"
+          />
+        </div>
+
+        <!-- Date of Birth (optional) -->
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('family.dateOfBirth') }}
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <BaseSelect
+              v-model="dobMonth"
+              :options="monthOptions"
+              :label="t('family.dateOfBirth.month')"
+            />
+            <BaseSelect
+              v-model="dobDay"
+              :options="dayOptions"
+              :label="t('family.dateOfBirth.day')"
+            />
+            <BaseInput
+              v-model="dobYear"
+              type="number"
+              :label="t('family.dateOfBirth.year')"
+              placeholder="Year"
+            />
+          </div>
+        </div>
+
+        <!-- Avatar Preview -->
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('family.avatarPreview') }}
+          </span>
+          <BeanieAvatar
+            :variant="getMemberAvatarVariant(newMember)"
+            :color="newMember.color"
+            size="xl"
+            data-testid="avatar-preview"
+          />
+        </div>
 
         <div>
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -241,6 +425,110 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           </BaseButton>
           <BaseButton :loading="isSubmitting" @click="createMember">
             {{ t('family.addMember') }}
+          </BaseButton>
+        </div>
+      </template>
+    </BaseModal>
+
+    <!-- Edit Member Modal -->
+    <BaseModal :open="showEditModal" :title="t('family.editMember')" @close="closeEditModal">
+      <form class="space-y-4" @submit.prevent="saveEditMember">
+        <BaseInput
+          v-model="editMember.name"
+          :label="t('form.name')"
+          placeholder="Enter name"
+          required
+        />
+
+        <BaseInput
+          v-model="editMember.email"
+          type="email"
+          :label="t('form.email')"
+          placeholder="Enter email"
+          required
+        />
+
+        <div class="grid grid-cols-2 gap-3">
+          <BaseSelect
+            v-model="editMember.gender"
+            :options="genderOptions"
+            :label="t('family.gender')"
+            data-testid="edit-gender-select"
+          />
+          <BaseSelect
+            v-model="editMember.ageGroup"
+            :options="ageGroupOptions"
+            :label="t('family.ageGroup')"
+            data-testid="edit-age-group-select"
+          />
+        </div>
+
+        <!-- Date of Birth (optional) -->
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('family.dateOfBirth') }}
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <BaseSelect
+              v-model="editDobMonth"
+              :options="monthOptions"
+              :label="t('family.dateOfBirth.month')"
+            />
+            <BaseSelect
+              v-model="editDobDay"
+              :options="dayOptions"
+              :label="t('family.dateOfBirth.day')"
+            />
+            <BaseInput
+              v-model="editDobYear"
+              type="number"
+              :label="t('family.dateOfBirth.year')"
+              placeholder="Year"
+            />
+          </div>
+        </div>
+
+        <!-- Avatar Preview -->
+        <div class="flex items-center gap-3">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('family.avatarPreview') }}
+          </span>
+          <BeanieAvatar
+            :variant="getMemberAvatarVariant(editMember)"
+            :color="editMember.color"
+            size="xl"
+          />
+        </div>
+
+        <div>
+          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            Profile Color
+          </label>
+          <div class="flex gap-2">
+            <button
+              v-for="color in colors"
+              :key="color"
+              type="button"
+              class="h-8 w-8 rounded-full border-2 transition-all"
+              :class="
+                editMember.color === color
+                  ? 'scale-110 border-gray-900 dark:border-white'
+                  : 'border-transparent'
+              "
+              :style="{ backgroundColor: color }"
+              @click="editMember.color = color"
+            />
+          </div>
+        </div>
+      </form>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <BaseButton variant="secondary" @click="closeEditModal">
+            {{ t('action.cancel') }}
+          </BaseButton>
+          <BaseButton :loading="isSubmitting" @click="saveEditMember">
+            {{ t('action.saveChanges') }}
           </BaseButton>
         </div>
       </template>

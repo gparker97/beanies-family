@@ -16,6 +16,8 @@ interface Props {
   minSelection?: number;
   allSelectedLabel?: string;
   countLabel?: string;
+  /** Remove border, background and padding from trigger button */
+  borderless?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -23,6 +25,7 @@ const props = withDefaults(defineProps<Props>(), {
   minSelection: 1,
   allSelectedLabel: 'All Selected',
   countLabel: 'selected',
+  borderless: false,
 });
 
 const emit = defineEmits<{
@@ -114,7 +117,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="dropdownRef" class="relative min-w-[140px]">
+  <div ref="dropdownRef" :class="borderless ? 'relative' : 'relative min-w-[140px]'">
     <!-- Label -->
     <label v-if="label" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
       {{ label }}
@@ -123,24 +126,38 @@ onUnmounted(() => {
     <!-- Trigger button -->
     <button
       type="button"
-      class="flex w-full items-center justify-between rounded-lg border bg-white px-3 py-2 text-left transition-colors focus:ring-2 focus:outline-none dark:bg-slate-800"
+      class="flex items-center text-left transition-colors focus:outline-none"
       :class="[
-        disabled
-          ? 'cursor-not-allowed border-gray-300 bg-gray-50 opacity-50 dark:border-slate-600 dark:bg-slate-900'
-          : 'cursor-pointer border-gray-300 hover:border-gray-400 focus:border-blue-500 focus:ring-blue-200 dark:border-slate-600 dark:hover:border-slate-500 dark:focus:ring-blue-900',
+        borderless
+          ? 'cursor-pointer gap-1 rounded-xl py-1 hover:bg-gray-100 dark:hover:bg-slate-700'
+          : [
+              'w-full justify-between rounded-lg border bg-white px-3 py-2 focus:ring-2 dark:bg-slate-800',
+              disabled
+                ? 'cursor-not-allowed border-gray-300 bg-gray-50 opacity-50 dark:border-slate-600 dark:bg-slate-900'
+                : 'cursor-pointer border-gray-300 hover:border-gray-400 focus:border-blue-500 focus:ring-blue-200 dark:border-slate-600 dark:hover:border-slate-500 dark:focus:ring-blue-900',
+            ],
       ]"
       :disabled="disabled"
       @click="toggleDropdown"
     >
-      <span
-        class="truncate"
-        :class="modelValue.length === 0 ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'"
+      <slot
+        name="trigger"
+        :is-all-selected="isAllSelected"
+        :selected-count="modelValue.length"
+        :display-text="displayText"
+        :is-open="isOpen"
+        :selected-values="modelValue"
       >
-        {{ displayText }}
-      </span>
+        <span
+          class="truncate"
+          :class="modelValue.length === 0 ? 'text-gray-400' : 'text-gray-900 dark:text-gray-100'"
+        >
+          {{ displayText }}
+        </span>
+      </slot>
       <svg
-        class="ml-2 h-4 w-4 flex-shrink-0 text-gray-400 transition-transform"
-        :class="{ 'rotate-180': isOpen }"
+        class="h-4 w-4 flex-shrink-0 text-gray-400 transition-transform"
+        :class="[{ 'rotate-180': isOpen }, borderless ? '' : 'ml-2']"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -199,17 +216,20 @@ onUnmounted(() => {
           </svg>
         </div>
 
-        <!-- Color indicator (optional) -->
-        <div
-          v-if="option.color"
-          class="h-3 w-3 flex-shrink-0 rounded-full"
-          :style="{ backgroundColor: option.color }"
-        />
+        <!-- Option content (slottable) -->
+        <slot name="option" :option="option" :is-selected="isSelected(option.value)">
+          <!-- Color indicator (optional) -->
+          <div
+            v-if="option.color"
+            class="h-3 w-3 flex-shrink-0 rounded-full"
+            :style="{ backgroundColor: option.color }"
+          />
 
-        <!-- Label -->
-        <span class="truncate text-sm text-gray-700 dark:text-gray-300">
-          {{ option.label }}
-        </span>
+          <!-- Label -->
+          <span class="truncate text-sm text-gray-700 dark:text-gray-300">
+            {{ option.label }}
+          </span>
+        </slot>
       </div>
 
       <!-- Empty state -->

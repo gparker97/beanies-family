@@ -98,6 +98,8 @@ describe('TransactionsPage - Date Filter', () => {
     id: 'member-1',
     name: 'Test User',
     email: 'test@example.com',
+    gender: 'other',
+    ageGroup: 'adult',
     role: 'owner',
     color: '#3b82f6',
     createdAt: '2024-01-01T00:00:00.000Z',

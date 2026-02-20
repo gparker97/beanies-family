@@ -289,6 +289,18 @@ const STRING_DEFS = {
   'family.role.owner': { en: 'Owner', beanie: 'Head Bean' },
   'family.role.admin': { en: 'Admin', beanie: 'Big Bean' },
   'family.role.member': { en: 'Member', beanie: 'Beanie' },
+  'family.gender': { en: 'Gender' },
+  'family.gender.male': { en: 'Male', beanie: 'Boy Bean' },
+  'family.gender.female': { en: 'Female', beanie: 'Girl Bean' },
+  'family.gender.other': { en: 'Other' },
+  'family.ageGroup': { en: 'Age Group' },
+  'family.ageGroup.adult': { en: 'Adult', beanie: 'Big Bean' },
+  'family.ageGroup.child': { en: 'Child', beanie: 'Little Bean' },
+  'family.dateOfBirth': { en: 'Date of Birth', beanie: 'Bean Birthday' },
+  'family.dateOfBirth.month': { en: 'Month' },
+  'family.dateOfBirth.day': { en: 'Day' },
+  'family.dateOfBirth.year': { en: 'Year (optional)' },
+  'family.avatarPreview': { en: 'Avatar Preview', beanie: 'Your Beanie' },
 
   // Reports
   'reports.title': { en: 'Reports', beanie: 'Bean Reports' },
