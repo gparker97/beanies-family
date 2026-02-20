@@ -6,6 +6,7 @@ import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/compon
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -21,6 +22,7 @@ import type {
 
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { playWhoosh } = useSounds();
 
 const progressMounted = ref(false);
 onMounted(() => {
@@ -218,6 +220,7 @@ async function updateGoal() {
 async function deleteGoal(id: string) {
   if (confirm('Are you sure you want to delete this goal?')) {
     await goalsStore.deleteGoal(id);
+    playWhoosh();
   }
 }
 </script>
@@ -254,7 +257,7 @@ async function deleteGoal(id: string) {
 
     <BaseCard :title="t('goals.allGoals')">
       <div
-        v-if="goalsStore.filteredGoals.length === 0"
+        v-if="goalsStore.filteredActiveGoals.length === 0"
         class="py-12 text-center text-gray-500 dark:text-gray-400"
       >
         <EmptyStateIllustration variant="goals" class="mb-4" />

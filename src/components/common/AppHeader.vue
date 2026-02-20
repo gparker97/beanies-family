@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useSounds } from '@/composables/useSounds';
 import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -28,6 +29,7 @@ const settingsStore = useSettingsStore();
 const translationStore = useTranslationStore();
 
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
+const { playBlink } = useSounds();
 const currentMember = computed(() => familyStore.currentMember);
 const showCurrencyDropdown = ref(false);
 const showLanguageDropdown = ref(false);
@@ -58,6 +60,7 @@ async function selectLanguage(code: LanguageCode) {
 function handlePrivacyToggle() {
   privacyAnimating.value = true;
   togglePrivacy();
+  playBlink();
 }
 
 function handleThemeToggle() {

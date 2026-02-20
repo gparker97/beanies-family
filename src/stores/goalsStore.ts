@@ -93,11 +93,26 @@ export const useGoalsStore = defineStore('goals', () => {
     isLoading.value = true;
     error.value = null;
     try {
+      const existing = goals.value.find((g) => g.id === id);
+      const wasCompleted = existing?.isCompleted ?? false;
+
+      // Auto-complete if currentAmount meets targetAmount
+      if (existing && input.currentAmount !== undefined && !input.isCompleted) {
+        if (input.currentAmount >= existing.targetAmount) {
+          input = { ...input, isCompleted: true };
+        }
+      }
+
       const updated = await goalRepo.updateGoal(id, input);
       if (updated) {
         const index = goals.value.findIndex((g) => g.id === id);
         if (index !== -1) {
           goals.value[index] = updated;
+        }
+
+        // Fire celebration when goal transitions to completed
+        if (updated.isCompleted && !wasCompleted) {
+          celebrate(updated.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
         }
       }
       return updated ?? null;
@@ -127,18 +142,7 @@ export const useGoalsStore = defineStore('goals', () => {
   }
 
   async function updateProgress(id: string, currentAmount: number): Promise<Goal | null> {
-    const goal = goals.value.find((g) => g.id === id);
-    if (!goal) return null;
-
-    const wasCompleted = goal.isCompleted;
-    const isCompleted = currentAmount >= goal.targetAmount;
-    const result = await updateGoal(id, { currentAmount, isCompleted });
-
-    if (isCompleted && !wasCompleted) {
-      celebrate(goal.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
-    }
-
-    return result;
+    return updateGoal(id, { currentAmount });
   }
 
   function getGoalById(id: string): Goal | undefined {
