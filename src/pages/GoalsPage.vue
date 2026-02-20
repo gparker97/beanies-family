@@ -4,6 +4,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import PageHeader from '@/components/common/PageHeader.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
@@ -256,10 +257,7 @@ async function deleteGoal(id: string) {
         v-if="goalsStore.filteredGoals.length === 0"
         class="py-12 text-center text-gray-500 dark:text-gray-400"
       >
-        <BeanieIcon
-          name="target"
-          class="animate-beanie-float mx-auto mb-4 h-12 w-12 text-gray-300 dark:text-gray-600"
-        />
+        <EmptyStateIllustration variant="goals" class="mb-4" />
         <p>{{ t('goals.noGoals') }}</p>
         <p class="mt-2">{{ t('goals.getStarted') }}</p>
       </div>
