@@ -16,12 +16,16 @@ test.describe('Beanie Avatars', () => {
     await setupPage.completeSetup();
   });
 
-  test('header shows BeanieAvatar SVG instead of initial circle', async ({ page }) => {
+  test('header shows BeanieAvatar with PNG image', async ({ page }) => {
     await page.goto('/dashboard');
     const headerAvatar = page.getByTestId('header-avatar');
     await expect(headerAvatar).toBeVisible();
-    // It should be an SVG element
     await expect(headerAvatar).toHaveAttribute('data-variant');
+    // Should contain an img element with a brand PNG source
+    const img = headerAvatar.locator('img');
+    await expect(img).toBeVisible();
+    const src = await img.getAttribute('src');
+    expect(src).toMatch(/\/brand\/beanies_.*\.png$/);
   });
 
   test('family page member cards show BeanieAvatar', async ({ page }) => {
@@ -32,6 +36,9 @@ test.describe('Beanie Avatars', () => {
     await expect(avatars.first()).toBeVisible();
     // Owner created in setup defaults to adult-male
     await expect(avatars.first()).toHaveAttribute('data-variant', 'adult-male');
+    // Should render as an img
+    const img = avatars.first().locator('img');
+    await expect(img).toBeVisible();
   });
 
   test('add member with Female Child shows correct avatar', async ({ page }) => {
