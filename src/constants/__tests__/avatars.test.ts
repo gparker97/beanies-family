@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-  BEANIE_AVATARS,
-  getAvatarDef,
+  AVATAR_IMAGE_PATHS,
+  getAvatarImagePath,
   getAllAvatarVariants,
   type AvatarVariant,
 } from '@/constants/avatars';
 
-describe('BEANIE_AVATARS', () => {
+describe('AVATAR_IMAGE_PATHS', () => {
   it('has all 8 expected variants', () => {
     const variants = getAllAvatarVariants();
     expect(variants).toHaveLength(8);
@@ -20,63 +20,51 @@ describe('BEANIE_AVATARS', () => {
     expect(variants).toContain('family-filtered');
   });
 
-  const characterVariants: AvatarVariant[] = [
-    'adult-male',
-    'adult-female',
-    'adult-other',
-    'child-male',
-    'child-female',
-    'child-other',
-  ];
-
-  it.each(characterVariants)('%s has body, eyes, smile fields', (variant) => {
-    const def = BEANIE_AVATARS[variant];
-    expect(def.body).toBeTruthy();
-    expect(def.eyes.length).toBeGreaterThanOrEqual(2);
-    expect(def.smile).toBeTruthy();
-  });
-
-  it('child variants have beanie hat accessories', () => {
-    const childVariants: AvatarVariant[] = ['child-male', 'child-female', 'child-other'];
-    for (const variant of childVariants) {
-      const def = BEANIE_AVATARS[variant];
-      // All children should have at least 3 accessories (dome, brim, pom-pom)
-      expect(def.accessories.length).toBeGreaterThanOrEqual(3);
+  it('all variants map to PNG file paths', () => {
+    const variants = getAllAvatarVariants();
+    for (const variant of variants) {
+      const path = AVATAR_IMAGE_PATHS[variant];
+      expect(path).toBeTruthy();
+      expect(path).toMatch(/\.png$/);
+      expect(path).toMatch(/^\/brand\//);
     }
-  });
-
-  it('adult-other has no accessories', () => {
-    const def = BEANIE_AVATARS['adult-other'];
-    expect(def.accessories).toHaveLength(0);
-  });
-
-  it('adult-male has cap accessory', () => {
-    const def = BEANIE_AVATARS['adult-male'];
-    expect(def.accessories.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('adult-female has hair and bow accessories', () => {
-    const def = BEANIE_AVATARS['adult-female'];
-    // Hair dome (1) + hair strands (2) + bow triangles (2) + knot (1) = 6
-    expect(def.accessories.length).toBeGreaterThanOrEqual(6);
-  });
-
-  it('child-female has hair peeking from beanie and bow', () => {
-    const def = BEANIE_AVATARS['child-female'];
-    // Hair (2) + hat dome + brim + pom-pom + bow (2 petals + knot) = 8
-    expect(def.accessories.length).toBeGreaterThanOrEqual(8);
   });
 });
 
-describe('getAvatarDef', () => {
-  it('returns definition for valid variant', () => {
-    const def = getAvatarDef('adult-male');
-    expect(def).toBeDefined();
-    expect(def?.body).toBeTruthy();
+describe('getAvatarImagePath', () => {
+  it('returns correct path for adult-male', () => {
+    expect(getAvatarImagePath('adult-male')).toBe(
+      '/brand/beanies_father_icon_transparent_360x360.png'
+    );
   });
 
-  it('returns undefined for unknown variant', () => {
-    const def = getAvatarDef('unknown' as AvatarVariant);
-    expect(def).toBeUndefined();
+  it('returns correct path for adult-female', () => {
+    expect(getAvatarImagePath('adult-female')).toBe(
+      '/brand/beanies_mother_icon_transparent_350x350.png'
+    );
+  });
+
+  it('returns correct path for child-male', () => {
+    expect(getAvatarImagePath('child-male')).toBe(
+      '/brand/beanies_baby_boy_icon_transparent_300x300.png'
+    );
+  });
+
+  it('returns correct path for child-female', () => {
+    expect(getAvatarImagePath('child-female')).toBe(
+      '/brand/beanies_baby_girl_icon_transparent_300x300.png'
+    );
+  });
+
+  it('returns correct path for family-group', () => {
+    expect(getAvatarImagePath('family-group')).toBe(
+      '/brand/beanies_family_icon_transparent_384x384.png'
+    );
+  });
+
+  it('returns neutral path for unknown variant', () => {
+    expect(getAvatarImagePath('unknown' as AvatarVariant)).toBe(
+      '/brand/beanies_neutral_icon_transparent_350x350.png'
+    );
   });
 });
