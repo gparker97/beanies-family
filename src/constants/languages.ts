@@ -9,8 +9,20 @@ export interface LanguageInfo {
 }
 
 export const LANGUAGES: LanguageInfo[] = [
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
-  { code: 'zh', name: 'Chinese (Simplified)', nativeName: '简体中文', flag: '🇨🇳' },
+  {
+    code: 'en',
+    name: 'English',
+    nativeName: 'English',
+    flag: '🇺🇸',
+    flagIcon: '/brand/flags/us.svg',
+  },
+  {
+    code: 'zh',
+    name: 'Chinese (Simplified)',
+    nativeName: '简体中文',
+    flag: '🇨🇳',
+    flagIcon: '/brand/flags/cn.svg',
+  },
 ];
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'en';
