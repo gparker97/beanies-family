@@ -11,7 +11,7 @@
 >
 > **Brand:**
 >
-> - `docs/brand/beanies-cig.html` — Corporate Identity Guidelines (colors, typography, logo rules, voice)
+> - `docs/brand/beanies-cig-v2.html` — Corporate Identity Guidelines v2 (colors, typography, logo rules, voice, UI system, navigation, mobile)
 > - `.claude/skills/beanies-theme.md` — Brand theme skill (use for all UI copy, component design, and image generation)
 
 ## Project Overview
@@ -23,12 +23,13 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **App name:** `beanies.family` — always lowercase with `.family`. Never "Beanies", "beanies", or "GP Family Planner".
 - **Tagline:** _Every bean counts_ (sentence case, no period)
 - **Primary font:** Outfit (headings, values) + Inter (body, data)
-- **Primary color:** Heritage Orange `#F15D22` (actions, CTAs, growth)
-- **Foundation color:** Deep Slate `#2C3E50` (text, security, dark bg)
-- **Accent colors:** Sky Silk `#AED6F1` (calm, backgrounds), Terracotta `#E67E22` (children, milestones)
+- **Primary color:** Heritage Orange `#F15D22` (energy, actions, CTAs, alerts — never use Alert Red)
+- **Foundation color:** Deep Slate `#2C3E50` (anchor, trust, sidebar, headings, body text)
+- **Accent colors:** Sky Silk `#AED6F1` (calm, safety, backgrounds), Terracotta `#E67E22` (warmth, milestones, gradient partner)
+- **Background color:** Cloud White `#F8F9FA` (space, clarity, page backgrounds, cards)
 - **Voice:** Simple, friendly, comforting, secure, familiar. Say "counting beans..." not "Loading..."
 - **Golden rule:** The beanies hold hands and are never separated; never rotate the arrow.
-- **Full guidelines:** `docs/brand/beanies-cig.html`
+- **Full guidelines:** `docs/brand/beanies-cig-v2.html`
 - **Theme skill:** `.claude/skills/beanies-theme.md` — consult for all UI copy and component design
 
 ## Technology Stack
