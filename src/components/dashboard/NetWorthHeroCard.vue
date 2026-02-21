@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { getCurrencyInfo } from '@/constants/currencies';
 import type { CurrencyCode } from '@/types/models';
 import type { PeriodKey, NetWorthDataPoint } from '@/composables/useNetWorthHistory';
 
@@ -123,6 +124,16 @@ const chartDataConfig = computed(() => {
   };
 });
 
+// Format value as compact label (e.g. "$125k", "$1.2M")
+function formatCompactValue(value: number): string {
+  const info = getCurrencyInfo(props.currency);
+  const sym = info?.symbol || '';
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${sym}${(value / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${sym}${Math.round(value / 1_000)}k`;
+  return `${sym}${Math.round(value)}`;
+}
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -157,15 +168,42 @@ const chartOptions = computed(() => ({
   },
   scales: {
     x: {
-      display: false,
+      display: true,
       grid: { display: false },
+      border: { display: false },
+      ticks: {
+        color: 'rgba(255,255,255,0.2)',
+        font: { family: 'Outfit', size: 9, weight: '400' as const },
+        maxRotation: 0,
+        maxTicksLimit: 6,
+        callback: function (
+          this: { getLabelForValue: (v: number) => string },
+          _value: string | number,
+          index: number,
+          ticks: { value: number }[]
+        ) {
+          if (index === ticks.length - 1) return 'Today';
+          return this.getLabelForValue(index);
+        },
+      },
     },
     y: {
-      display: false,
+      display: true,
+      position: 'left' as const,
       grid: {
         display: true,
         color: 'rgba(255,255,255,0.04)',
         lineWidth: 1,
+      },
+      border: { display: false },
+      ticks: {
+        color: 'rgba(255,255,255,0.2)',
+        font: { family: 'Outfit', size: 10 },
+        maxTicksLimit: 3,
+        callback: function (_value: string | number) {
+          if (!isUnlocked.value) return '';
+          return formatCompactValue(Number(_value));
+        },
       },
     },
   },
@@ -281,7 +319,7 @@ const periodLabel = computed(() => {
     </div>
 
     <!-- Chart area -->
-    <div class="relative mt-5 h-20">
+    <div class="relative mt-5 h-28">
       <div v-if="!isUnlocked" class="flex h-full items-center justify-center">
         <span class="font-outfit text-[0.75rem] font-medium text-white/20"> Chart hidden </span>
       </div>
