@@ -14,7 +14,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
-import { useFamilyStore } from '@/stores/familyStore';
+
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -23,32 +23,12 @@ import { formatDateShort } from '@/utils/date';
 
 const router = useRouter();
 const accountsStore = useAccountsStore();
-const familyStore = useFamilyStore();
 const transactionsStore = useTransactionsStore();
 const recurringStore = useRecurringStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
-
-// ── Greeting ────────────────────────────────────────────────────────────────
-const ownerName = computed(() => familyStore.owner?.name || 'there');
-
-const greeting = computed(() => {
-  const hour = new Date().getHours();
-  if (hour < 12) return `Good morning, ${ownerName.value}`;
-  if (hour < 18) return `Good afternoon, ${ownerName.value}`;
-  return `Good evening, ${ownerName.value}`;
-});
-
-const todayFormatted = computed(() => {
-  return new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-});
 
 // ── Financial data ──────────────────────────────────────────────────────────
 // Combined net worth: accounts + physical assets - all liabilities
@@ -144,16 +124,6 @@ function getGoalIcon(type: string): string {
 
 <template>
   <div class="space-y-6">
-    <!-- ── Greeting Header ─────────────────────────────────────────────── -->
-    <div>
-      <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
-        {{ greeting }}
-      </h1>
-      <p class="text-secondary-500/40 mt-0.5 text-[0.8rem] dark:text-gray-500">
-        {{ todayFormatted }}
-      </p>
-    </div>
-
     <!-- ── Net Worth Hero Card ─────────────────────────────────────────── -->
     <NetWorthHeroCard
       :amount="netWorth"
