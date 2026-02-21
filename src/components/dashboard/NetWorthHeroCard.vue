@@ -147,9 +147,9 @@ const chartOptions = computed(() => ({
       cornerRadius: 10,
       displayColors: false,
       callbacks: {
-        label: (ctx: { parsed: { y: number } }) => {
+        label: (ctx: { parsed: { y: number | null } }) => {
           if (!isUnlocked.value) return MASK;
-          const val = ctx.parsed.y;
+          const val = ctx.parsed.y ?? 0;
           return convertToDisplay(val, props.currency).displayFormatted;
         },
       },
@@ -183,7 +183,9 @@ const chartDataWithDot = computed(() => {
 
   const values = props.historyData.map((d) => d.value);
   // Create array of nulls with only the last point set
-  const lastPointData = values.map((_, i) => (i === values.length - 1 ? values[i] : null));
+  const lastPointData: (number | null)[] = values.map((_, i) =>
+    i === values.length - 1 ? (values[i] ?? null) : null
+  );
 
   return {
     ...base,

@@ -108,7 +108,7 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
 
 function getGoalTint(index: number): 'orange' | 'silk' | 'slate' {
   const tints: ('orange' | 'silk' | 'slate')[] = ['orange', 'silk', 'slate'];
-  return tints[index % tints.length];
+  return tints[index % tints.length] ?? 'orange';
 }
 
 function getGoalIcon(type: string): string {
