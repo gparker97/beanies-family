@@ -28,6 +28,7 @@ export function getDefaultSettings(): Settings {
     encryptionEnabled: true,
     aiProvider: 'none',
     aiApiKeys: {},
+    preferredCurrencies: [],
     customInstitutions: [],
     createdAt: now,
     updatedAt: now,
@@ -155,6 +156,10 @@ export async function getExchangeRate(
   if (inverse) return 1 / inverse.rate;
 
   return undefined;
+}
+
+export async function setPreferredCurrencies(currencies: CurrencyCode[]): Promise<Settings> {
+  return saveSettings({ preferredCurrencies: currencies });
 }
 
 export async function addCustomInstitution(name: string): Promise<Settings> {

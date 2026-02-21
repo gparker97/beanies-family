@@ -7,7 +7,8 @@ import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 
 import { useTranslation } from '@/composables/useTranslation';
-import { CURRENCIES } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
+import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { clearAllData } from '@/services/indexeddb/database';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -32,10 +33,28 @@ const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
 const isProcessingEncryption = ref(false);
 
-const currencyOptions = CURRENCIES.map((c) => ({
-  value: c.code,
-  label: `${c.code} - ${c.name}`,
-}));
+const { currencyOptions } = useCurrencyOptions();
+
+// Available currencies for preferred picker (exclude already-preferred ones)
+const availableForPreferred = computed(() =>
+  CURRENCIES.filter((c) => !(settingsStore.preferredCurrencies || []).includes(c.code)).map(
+    (c) => ({
+      value: c.code,
+      label: `${c.code} - ${c.name}`,
+    })
+  )
+);
+
+function addPreferredCurrency(code: string | number) {
+  const current = settingsStore.preferredCurrencies || [];
+  if (current.length >= 4) return;
+  settingsStore.setPreferredCurrencies([...current, code as string]);
+}
+
+function removePreferredCurrency(code: string) {
+  const current = settingsStore.preferredCurrencies || [];
+  settingsStore.setPreferredCurrencies(current.filter((c) => c !== code));
+}
 
 const themeOptions = computed(() => [
   { value: 'light', label: t('settings.theme.light') },
@@ -206,6 +225,46 @@ function formatLastSync(timestamp: string | null): string {
             :hint="t('settings.baseCurrencyHint')"
             @update:model-value="updateCurrency"
           />
+
+          <!-- Preferred Currencies -->
+          <div>
+            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Preferred Currencies
+            </label>
+            <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+              Select up to 4 currencies to show in the header
+            </p>
+
+            <!-- Selected chips -->
+            <div
+              v-if="(settingsStore.preferredCurrencies || []).length > 0"
+              class="mb-2 flex flex-wrap gap-1.5"
+            >
+              <span
+                v-for="code in settingsStore.preferredCurrencies"
+                :key="code"
+                class="inline-flex items-center gap-1 rounded-full bg-[#F15D22]/10 px-2.5 py-1 text-xs font-medium text-[#F15D22]"
+              >
+                {{ getCurrencyInfo(code)?.symbol }} {{ code }}
+                <button
+                  type="button"
+                  class="ml-0.5 cursor-pointer text-[#F15D22]/60 hover:text-[#F15D22]"
+                  @click="removePreferredCurrency(code)"
+                >
+                  &times;
+                </button>
+              </span>
+            </div>
+
+            <!-- Add dropdown -->
+            <BaseSelect
+              v-if="(settingsStore.preferredCurrencies || []).length < 4"
+              model-value=""
+              :options="availableForPreferred"
+              placeholder="Add currency..."
+              @update:model-value="addPreferredCurrency"
+            />
+          </div>
 
           <BaseSelect
             :model-value="settingsStore.theme"

@@ -5,6 +5,7 @@ export interface LanguageInfo {
   name: string;
   nativeName: string;
   flag: string;
+  flagIcon?: string; // Reserved for future custom PNG flag icons
 }
 
 export const LANGUAGES: LanguageInfo[] = [

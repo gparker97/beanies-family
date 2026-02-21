@@ -8,7 +8,7 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
-import { CURRENCIES } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -68,10 +68,7 @@ const priorityOptions = computed(() => [
   { value: 'critical' as GoalPriority, label: t('goals.priority.critical') },
 ]);
 
-const currencyOptions = CURRENCIES.map((c) => ({
-  value: c.code,
-  label: `${c.code} - ${c.name}`,
-}));
+const { currencyOptions } = useCurrencyOptions();
 
 const memberOptions = computed(() => [
   { value: '', label: t('goals.familyWide') },
@@ -97,7 +94,7 @@ const newGoal = ref<NewGoalForm>({
   type: 'savings',
   targetAmount: 0,
   currentAmount: 0,
-  currency: settingsStore.baseCurrency,
+  currency: settingsStore.displayCurrency,
   deadline: '',
   priority: 'medium',
   isCompleted: false,
@@ -125,7 +122,7 @@ const editGoal = ref<EditGoalForm>({
   type: 'savings',
   targetAmount: 0,
   currentAmount: 0,
-  currency: settingsStore.baseCurrency,
+  currency: settingsStore.displayCurrency,
   deadline: '',
   priority: 'medium',
   isCompleted: false,
@@ -150,7 +147,7 @@ function openAddModal() {
     type: 'savings',
     targetAmount: 0,
     currentAmount: 0,
-    currency: settingsStore.baseCurrency,
+    currency: settingsStore.displayCurrency,
     deadline: '',
     priority: 'medium',
     isCompleted: false,

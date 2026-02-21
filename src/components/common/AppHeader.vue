@@ -7,7 +7,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
-import { DISPLAY_CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
+import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES, getLanguageInfo } from '@/constants/languages';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -56,19 +56,33 @@ const pageTitle = computed(() => (route.meta?.title as string) || '');
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
 const currentMember = computed(() => familyStore.currentMember);
-const showCurrencyDropdown = ref(false);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
+const showCurrencyDropdown = ref(false);
 const privacyAnimating = ref(false);
 
-const currencyOptions = DISPLAY_CURRENCIES.map((c) => ({
-  code: c.code,
-  label: `${c.code} - ${c.symbol}`,
-  fullLabel: `${c.code} - ${c.name}`,
-}));
+// ── Currency chips ───────────────────────────────────────────────────────
+const hasMultipleCurrencies = computed(() => settingsStore.effectiveDisplayCurrencies.length >= 2);
 
+const currencyChips = computed(() =>
+  settingsStore.effectiveDisplayCurrencies.map((code) => {
+    const info = getCurrencyInfo(code);
+    return {
+      code,
+      symbol: info?.symbol || code,
+      label: `${info?.symbol || ''} ${code}`.trim(),
+      active: code === settingsStore.displayCurrency,
+    };
+  })
+);
+
+// Fallback: single currency display for 0-1 preferred
 const currentCurrencyInfo = computed(() => getCurrencyInfo(settingsStore.displayCurrency));
 const currentLanguageInfo = computed(() => getLanguageInfo(settingsStore.language));
+
+async function selectCurrencyChip(code: CurrencyCode) {
+  await settingsStore.setDisplayCurrency(code);
+}
 
 async function selectCurrency(code: CurrencyCode) {
   await settingsStore.setDisplayCurrency(code);
@@ -138,49 +152,73 @@ async function handleSignOut() {
       </h1>
     </div>
 
-    <!-- Right side - Icon-only controls -->
+    <!-- Right side - v4 pill/squircle controls -->
     <div class="flex items-center gap-2">
       <!-- Member Filter -->
       <MemberFilterDropdown />
 
-      <!-- Currency selector (symbol only) -->
-      <div class="relative">
+      <!-- Currency selector -->
+      <!-- Multi-chip mode: 2+ effective currencies -->
+      <div
+        v-if="hasMultipleCurrencies"
+        class="flex items-center gap-0.5 rounded-[14px] bg-white px-1.5 py-1 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
+      >
+        <button
+          v-for="chip in currencyChips"
+          :key="chip.code"
+          type="button"
+          class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-all"
+          :class="
+            chip.active
+              ? 'bg-[#F15D22] text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
+              : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-500 dark:hover:text-gray-300'
+          "
+          @click="selectCurrencyChip(chip.code)"
+        >
+          {{ chip.label }}
+        </button>
+      </div>
+
+      <!-- Single-currency fallback mode: pill with chevron + dropdown -->
+      <div v-else class="relative">
         <button
           type="button"
-          class="flex h-10 w-10 items-center justify-center rounded-[14px] text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.08]"
+          class="font-outfit flex items-center gap-1.5 rounded-[14px] bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-300 dark:shadow-none"
           @click="showCurrencyDropdown = !showCurrencyDropdown"
           @blur="closeCurrencyDropdown"
         >
           {{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}
+          {{ settingsStore.displayCurrency }}
+          <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
         </button>
 
         <!-- Dropdown menu -->
         <div
           v-if="showCurrencyDropdown"
-          class="absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 max-h-64 w-48 overflow-y-auto rounded-2xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
-            v-for="option in currencyOptions"
-            :key="option.code"
+            v-for="chip in currencyChips"
+            :key="chip.code"
             type="button"
             class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
             :class="
-              option.code === settingsStore.displayCurrency
+              chip.active
                 ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
                 : 'text-gray-700 dark:text-gray-300'
             "
-            @mousedown.prevent="selectCurrency(option.code)"
+            @mousedown.prevent="selectCurrency(chip.code)"
           >
-            {{ option.fullLabel }}
+            {{ chip.label }}
           </button>
         </div>
       </div>
 
-      <!-- Language selector (flag only) -->
+      <!-- Language selector (flag in white-bg pill + chevron) -->
       <div class="relative">
         <button
           type="button"
-          class="flex h-10 w-10 items-center justify-center rounded-[14px] text-base transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08]"
+          class="flex items-center gap-1.5 rounded-[14px] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
           :class="{ 'opacity-75': translationStore.isLoading }"
           @click="showLanguageDropdown = !showLanguageDropdown"
           @blur="closeLanguageDropdown"
@@ -189,36 +227,47 @@ async function handleSignOut() {
             <BeanieIcon name="refresh" size="sm" class="animate-spin text-gray-400" />
           </template>
           <template v-else>
-            {{ currentLanguageInfo?.flag || '🌐' }}
+            <span class="text-[22px] leading-none">{{ currentLanguageInfo?.flag || '🌐' }}</span>
           </template>
+          <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
         </button>
 
-        <!-- Dropdown menu -->
+        <!-- Language dropdown -->
         <div
           v-if="showLanguageDropdown"
-          class="absolute right-0 z-50 mt-1 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 w-48 rounded-2xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
             v-for="lang in LANGUAGES"
             :key="lang.code"
             type="button"
-            class="w-full px-3 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
             :class="
               lang.code === settingsStore.language
-                ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
-                : 'text-gray-700 dark:text-gray-300'
+                ? 'bg-[#F15D22]/10 text-[#F15D22] dark:bg-[#F15D22]/20'
+                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
             "
             @mousedown.prevent="selectLanguage(lang.code)"
           >
-            {{ lang.flag }} {{ lang.nativeName }}
+            <span
+              class="flex h-7 w-7 items-center justify-center rounded-full text-base"
+              :class="
+                lang.code === settingsStore.language
+                  ? 'bg-[#F15D22]/10'
+                  : 'bg-gray-100 dark:bg-slate-700'
+              "
+            >
+              {{ lang.flag }}
+            </span>
+            <span class="font-medium">{{ lang.nativeName }}</span>
           </button>
         </div>
       </div>
 
-      <!-- Privacy mode toggle -->
+      <!-- Privacy mode toggle (white-bg squircle) -->
       <button
         type="button"
-        class="relative flex h-10 w-10 items-center justify-center rounded-[14px] transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08]"
+        class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
         :aria-label="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         :title="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         @click="handlePrivacyToggle"
@@ -248,10 +297,10 @@ async function handleSignOut() {
         />
       </button>
 
-      <!-- Notification bell -->
+      <!-- Notification bell (white-bg squircle) -->
       <button
         type="button"
-        class="relative flex h-10 w-10 items-center justify-center rounded-[14px] text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.08]"
+        class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white text-gray-500 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-400 dark:shadow-none"
         aria-label="Notifications"
         title="Notifications"
       >
@@ -289,7 +338,7 @@ async function handleSignOut() {
         <!-- Profile dropdown menu -->
         <div
           v-if="showProfileDropdown"
-          class="absolute right-0 z-50 mt-1 w-56 rounded-xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 w-56 rounded-2xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <div class="border-b border-gray-200 px-4 py-2 dark:border-slate-700">
             <p class="text-sm font-medium text-gray-900 dark:text-white">

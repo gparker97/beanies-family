@@ -6,7 +6,7 @@ import {
   EXPENSE_CATEGORIES,
   getCategoriesGrouped,
 } from '@/constants/categories';
-import { CURRENCIES } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { RecurringItem, CreateRecurringItemInput, RecurringFrequency } from '@/types/models';
@@ -33,7 +33,7 @@ const formData = ref({
   accountId: props.item?.accountId || '',
   type: (props.item?.type || 'expense') as 'income' | 'expense',
   amount: props.item?.amount?.toString() || '',
-  currency: props.item?.currency || settingsStore.baseCurrency,
+  currency: props.item?.currency || settingsStore.displayCurrency,
   category: props.item?.category || '',
   description: props.item?.description || '',
   frequency: (props.item?.frequency || 'monthly') as RecurringFrequency,
@@ -79,11 +79,7 @@ const flatCategories = computed(() => {
   return formData.value.type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 });
 
-// Currency options
-const currencyOptions = CURRENCIES.map((c) => ({
-  value: c.code,
-  label: `${c.code} - ${c.name}`,
-}));
+const { currencyOptions } = useCurrencyOptions();
 
 // Day of month options (1-28 to avoid month-end issues)
 const dayOfMonthOptions = computed(() =>
