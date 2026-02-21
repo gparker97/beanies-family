@@ -246,6 +246,7 @@ export interface Settings {
   lastSyncTimestamp?: ISODateString;
   aiProvider: AIProvider;
   aiApiKeys: AIApiKeys;
+  preferredCurrencies?: CurrencyCode[];
   customInstitutions?: string[];
   createdAt: ISODateString;
   updatedAt: ISODateString;

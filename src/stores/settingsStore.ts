@@ -33,6 +33,13 @@ export const useSettingsStore = defineStore('settings', () => {
   const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
   const beanieMode = computed(() => globalSettings.value.beanieMode ?? false);
   const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
+  const preferredCurrencies = computed(() => settings.value.preferredCurrencies ?? []);
+  const effectiveDisplayCurrencies = computed(() => {
+    const prefs = preferredCurrencies.value;
+    const base = baseCurrency.value;
+    const set = new Set([...prefs, base]);
+    return Array.from(set);
+  });
   const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
 
   // Apply theme to document
@@ -230,6 +237,24 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setPreferredCurrencies(currencies: CurrencyCode[]): Promise<void> {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      const limited = currencies.slice(0, 4);
+      settings.value = await settingsRepo.setPreferredCurrencies(limited);
+      // If current display currency is no longer in the effective list, fall back to base
+      const effective = new Set([...limited, settings.value.baseCurrency]);
+      if (!effective.has(settings.value.displayCurrency)) {
+        settings.value = await settingsRepo.setDisplayCurrency(settings.value.baseCurrency);
+      }
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update preferred currencies';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -327,6 +352,8 @@ export const useSettingsStore = defineStore('settings', () => {
     exchangeRateLastFetch,
     beanieMode,
     soundEnabled,
+    preferredCurrencies,
+    effectiveDisplayCurrencies,
     customInstitutions,
     // Actions
     loadGlobalSettings,
@@ -341,6 +368,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setAIApiKey,
     setBeanieMode,
     setSoundEnabled,
+    setPreferredCurrencies,
     addCustomInstitution,
     removeCustomInstitution,
     setExchangeRateAutoUpdate,

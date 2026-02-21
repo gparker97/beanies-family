@@ -4,7 +4,8 @@ import { useRouter } from 'vue-router';
 import { celebrate } from '@/composables/useCelebration';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseCard } from '@/components/ui';
-import { CURRENCIES, DEFAULT_CURRENCY } from '@/constants/currencies';
+import { DEFAULT_CURRENCY } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { canAutoSync } from '@/services/sync/capabilities';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -44,10 +45,7 @@ const errors = reactive({
   email: '',
 });
 
-const currencyOptions = CURRENCIES.map((c) => ({
-  value: c.code,
-  label: `${c.code} - ${c.name}`,
-}));
+const { currencyOptions } = useCurrencyOptions();
 
 const colors: string[] = [
   '#3b82f6',

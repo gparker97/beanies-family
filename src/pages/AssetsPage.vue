@@ -11,7 +11,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { COUNTRIES } from '@/constants/countries';
-import { CURRENCIES } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getAssetTypeIcon } from '@/constants/icons';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -52,10 +52,7 @@ const assetTypes = computed(() => [
   { value: 'other' as AssetType, label: t('assets.type.other') },
 ]);
 
-const currencyOptions = CURRENCIES.map((c) => ({
-  value: c.code,
-  label: `${c.code} - ${c.name}`,
-}));
+const { currencyOptions } = useCurrencyOptions();
 
 const memberOptions = computed(() =>
   familyStore.members.map((m) => ({
@@ -87,7 +84,7 @@ const newAsset = ref<CreateAssetInput>({
   purchaseValue: 0,
   currentValue: 0,
   purchaseDate: undefined,
-  currency: settingsStore.baseCurrency,
+  currency: settingsStore.displayCurrency,
   notes: '',
   includeInNetWorth: true,
   loan: getDefaultLoan(),
@@ -229,7 +226,7 @@ function openAddModal() {
     purchaseValue: 0,
     currentValue: 0,
     purchaseDate: undefined,
-    currency: settingsStore.baseCurrency,
+    currency: settingsStore.displayCurrency,
     notes: '',
     includeInNetWorth: true,
     loan: getDefaultLoan(),

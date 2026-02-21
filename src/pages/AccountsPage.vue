@@ -11,7 +11,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { COUNTRIES } from '@/constants/countries';
-import { CURRENCIES } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -65,10 +65,7 @@ const accountTypes = computed(() => [
   { value: 'other' as AccountType, label: t('accounts.type.other') },
 ]);
 
-const currencyOptions = CURRENCIES.map((c) => ({
-  value: c.code,
-  label: `${c.code} - ${c.name}`,
-}));
+const { currencyOptions } = useCurrencyOptions();
 
 // Family member options for the owner selector
 const memberOptions = computed(() =>
@@ -82,7 +79,7 @@ const newAccount = ref<CreateAccountInput>({
   memberId: familyStore.currentMemberId || '',
   name: '',
   type: 'checking',
-  currency: settingsStore.baseCurrency,
+  currency: settingsStore.displayCurrency,
   balance: 0,
   institution: '',
   institutionCountry: '',
@@ -195,7 +192,7 @@ function openAddModal() {
     memberId: familyStore.currentMemberId || '',
     name: '',
     type: 'checking',
-    currency: settingsStore.baseCurrency,
+    currency: settingsStore.displayCurrency,
     balance: 0,
     institution: '',
     institutionCountry: '',
