@@ -229,6 +229,12 @@ async function handleSignOut() {
           <template v-if="translationStore.isLoading">
             <BeanieIcon name="refresh" size="sm" class="animate-spin text-gray-400" />
           </template>
+          <img
+            v-else-if="currentLanguageInfo?.flagIcon"
+            :src="currentLanguageInfo.flagIcon"
+            :alt="currentLanguageInfo.name"
+            class="h-6 w-8 rounded-sm object-cover"
+          />
           <span v-else class="text-[26px] leading-none">
             {{ currentLanguageInfo?.flag || '🌐' }}
           </span>
@@ -253,14 +259,20 @@ async function handleSignOut() {
             @mousedown.prevent="selectLanguage(lang.code)"
           >
             <span
-              class="flex h-9 w-9 items-center justify-center rounded-[10px] text-2xl"
+              class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-[10px]"
               :class="
                 lang.code === settingsStore.language
                   ? 'bg-[#F15D22]/15 shadow-[0_2px_6px_rgba(241,93,34,0.15)]'
                   : 'bg-gray-100 dark:bg-slate-600'
               "
             >
-              {{ lang.flag }}
+              <img
+                v-if="lang.flagIcon"
+                :src="lang.flagIcon"
+                :alt="lang.name"
+                class="h-6 w-8 rounded-sm object-cover"
+              />
+              <span v-else class="text-2xl">{{ lang.flag }}</span>
             </span>
             <span
               class="text-sm font-medium"
