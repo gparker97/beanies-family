@@ -66,7 +66,7 @@ const encryptionTitle = computed(() => {
           <span class="text-white">beanies</span><span class="text-[#F15D22]">.family</span>
         </h1>
         <p
-          class="font-outfit mt-0.5 text-[0.7rem] font-light tracking-[0.06em] text-white/25 italic"
+          class="font-outfit mt-0.5 text-[0.75rem] font-light tracking-[0.06em] text-white/25 italic"
         >
           every bean counts.
         </p>
@@ -78,7 +78,7 @@ const encryptionTitle = computed(() => {
       <button
         v-for="item in primaryItems"
         :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[0.8rem] font-medium transition-all duration-150"
+        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
         :class="
           isActive(item.path)
             ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -97,7 +97,7 @@ const encryptionTitle = computed(() => {
       <button
         v-for="item in secondaryItems"
         :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[0.8rem] font-medium transition-all duration-150"
+        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
         :class="
           isActive(item.path)
             ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -115,10 +115,10 @@ const encryptionTitle = computed(() => {
       <div class="flex items-center gap-2.5">
         <BeanieAvatar :variant="ownerVariant" :color="ownerColor" size="md" />
         <div class="min-w-0">
-          <p class="font-outfit truncate text-[0.8rem] font-semibold text-white">
+          <p class="font-outfit truncate text-[1rem] font-semibold text-white">
             {{ familyStore.owner.name }}
           </p>
-          <p class="truncate text-[0.65rem] text-white/35">
+          <p class="truncate text-[0.85rem] text-white/35">
             {{ familyStore.owner.role === 'owner' ? 'Owner' : familyStore.owner.role }}
           </p>
         </div>
@@ -142,7 +142,7 @@ const encryptionTitle = computed(() => {
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
-        <p class="truncate text-[0.5rem] text-white/30" :title="syncStore.fileName">
+        <p class="truncate text-[0.6rem] text-white/30" :title="syncStore.fileName">
           {{ syncStore.fileName }}
         </p>
       </div>
@@ -191,7 +191,7 @@ const encryptionTitle = computed(() => {
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
         <span
-          class="text-[0.5rem]"
+          class="text-[0.6rem]"
           :class="
             !syncStore.isConfigured
               ? 'text-white/30'
@@ -211,7 +211,7 @@ const encryptionTitle = computed(() => {
       </div>
 
       <!-- Version -->
-      <p class="text-[0.5rem] text-white/20">v1.0.0 - MVP</p>
+      <p class="text-[0.6rem] text-white/20">v1.0.0 - MVP</p>
     </div>
   </aside>
 </template>
