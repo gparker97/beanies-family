@@ -214,11 +214,11 @@ async function handleSignOut() {
         </div>
       </div>
 
-      <!-- Language selector (flag in white-bg pill + chevron) -->
+      <!-- Language selector (emoji flag in white-bg pill + chevron) -->
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1.5 rounded-[14px] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+          class="flex items-center gap-1 rounded-[14px] bg-white px-2 py-1 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-all hover:shadow-[0_4px_12px_rgba(44,62,80,0.1)] dark:bg-slate-800 dark:shadow-none"
           :class="{ 'opacity-75': translationStore.isLoading }"
           @click="showLanguageDropdown = !showLanguageDropdown"
           @blur="closeLanguageDropdown"
@@ -226,40 +226,47 @@ async function handleSignOut() {
           <template v-if="translationStore.isLoading">
             <BeanieIcon name="refresh" size="sm" class="animate-spin text-gray-400" />
           </template>
-          <template v-else>
-            <span class="text-[22px] leading-none">{{ currentLanguageInfo?.flag || '🌐' }}</span>
-          </template>
+          <span v-else class="text-2xl leading-none">{{ currentLanguageInfo?.flag || '🌐' }}</span>
           <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
         </button>
 
         <!-- Language dropdown -->
         <div
           v-if="showLanguageDropdown"
-          class="absolute right-0 z-50 mt-1 w-48 rounded-2xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+          class="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1.5 shadow-lg dark:border-slate-700 dark:bg-slate-800"
         >
           <button
             v-for="lang in LANGUAGES"
             :key="lang.code"
             type="button"
-            class="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors"
+            class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all"
             :class="
               lang.code === settingsStore.language
-                ? 'bg-[#F15D22]/10 text-[#F15D22] dark:bg-[#F15D22]/20'
-                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
+                ? 'bg-[#F15D22]/10 dark:bg-[#F15D22]/20'
+                : 'hover:bg-gray-50 dark:hover:bg-slate-700'
             "
             @mousedown.prevent="selectLanguage(lang.code)"
           >
             <span
-              class="flex h-7 w-7 items-center justify-center rounded-full text-base"
+              class="flex h-9 w-9 items-center justify-center rounded-[10px] text-2xl"
               :class="
                 lang.code === settingsStore.language
-                  ? 'bg-[#F15D22]/10'
-                  : 'bg-gray-100 dark:bg-slate-700'
+                  ? 'bg-[#F15D22]/15 shadow-[0_2px_6px_rgba(241,93,34,0.15)]'
+                  : 'bg-gray-100 dark:bg-slate-600'
               "
             >
               {{ lang.flag }}
             </span>
-            <span class="font-medium">{{ lang.nativeName }}</span>
+            <span
+              class="text-sm font-medium"
+              :class="
+                lang.code === settingsStore.language
+                  ? 'text-[#F15D22]'
+                  : 'text-gray-500 dark:text-gray-400'
+              "
+            >
+              {{ lang.nativeName }}
+            </span>
           </button>
         </div>
       </div>
