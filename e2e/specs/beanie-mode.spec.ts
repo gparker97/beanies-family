@@ -26,7 +26,7 @@ test.describe('Beanie Mode', () => {
   test('enabling beanie mode updates visible strings immediately', async ({ page }) => {
     // Verify plain English is shown on dashboard first
     await page.goto('/dashboard');
-    await expect(page.getByText('Net Worth')).toBeVisible();
+    await expect(page.getByText('Family Net Worth')).toBeVisible();
 
     // Go to settings and enable beanie mode
     await page.goto('/settings');
@@ -39,7 +39,7 @@ test.describe('Beanie Mode', () => {
 
     // Go to dashboard and verify beanie strings
     await page.goto('/dashboard');
-    await expect(page.getByText('Your Bean Count')).toBeVisible();
+    await expect(page.getByText('Alllllll Your Beans')).toBeVisible();
   });
 
   test('disabling beanie mode reverts strings immediately', async ({ page }) => {
@@ -53,7 +53,7 @@ test.describe('Beanie Mode', () => {
 
     // Verify beanie string on dashboard
     await page.goto('/dashboard');
-    await expect(page.getByText('Your Bean Count')).toBeVisible();
+    await expect(page.getByText('Alllllll Your Beans')).toBeVisible();
 
     // Disable beanie mode
     await page.goto('/settings');
@@ -65,7 +65,7 @@ test.describe('Beanie Mode', () => {
 
     // Verify plain English restored
     await page.goto('/dashboard');
-    await expect(page.getByText('Net Worth')).toBeVisible();
+    await expect(page.getByText('Family Net Worth')).toBeVisible();
   });
 
   test('toggle is disabled when non-English language is active', async ({ page }) => {

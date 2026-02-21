@@ -52,6 +52,21 @@
   --color-text: #2c3e50;
   --color-text-muted: #64748b;
   --color-border: #e2e8f0;
+
+  /* ── v3 Nook UI design tokens ─────────────────────────────────────────── */
+  --sq: 24px;
+  --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+  --card-hover-shadow: 0 8px 32px rgb(44 62 80 / 10%);
+  --soft-shadow: 0 8px 40px rgb(44 62 80 / 8%);
+
+  /* Brand tint overlays */
+  --tint-orange-8: rgb(241 93 34 / 8%);
+  --tint-orange-15: rgb(241 93 34 / 15%);
+  --tint-silk-10: rgb(174 214 241 / 10%);
+  --tint-silk-20: rgb(174 214 241 / 20%);
+  --tint-slate-5: rgb(44 62 80 / 5%);
+  --tint-slate-10: rgb(44 62 80 / 10%);
+  --tint-success-10: rgb(39 174 96 / 10%);
 }
 
 /* Dark mode variables */
@@ -61,6 +76,16 @@
   --color-text: #ecf0f1;
   --color-text-muted: #bdc3c7;
   --color-border: #4a6274;
+  --card-shadow: 0 4px 20px rgb(0 0 0 / 20%);
+  --card-hover-shadow: 0 8px 32px rgb(0 0 0 / 30%);
+  --soft-shadow: 0 8px 40px rgb(0 0 0 / 25%);
+  --tint-orange-8: rgb(241 93 34 / 12%);
+  --tint-orange-15: rgb(241 93 34 / 20%);
+  --tint-silk-10: rgb(174 214 241 / 8%);
+  --tint-silk-20: rgb(174 214 241 / 15%);
+  --tint-slate-5: rgb(255 255 255 / 5%);
+  --tint-slate-10: rgb(255 255 255 / 10%);
+  --tint-success-10: rgb(39 174 96 / 15%);
 }
 
 /* ─── Micro-animation keyframes ────────────────────────────────────────── */

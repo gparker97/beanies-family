@@ -35,10 +35,10 @@ const STRING_DEFS = {
   'app.version': { en: 'v1.0.0 - MVP' },
 
   // Common labels
-  'common.totalAssets': { en: 'Total Assets', beanie: 'Total Beans' },
+  'common.totalAssets': { en: 'Total Assets', beanie: 'All Your Assets' },
   'common.totalLiabilities': { en: 'Total Liabilities', beanie: 'Beans Owed' },
-  'common.totalValue': { en: 'Total Value', beanie: 'Total Bean Value' },
-  'common.netAssetValue': { en: 'Net Asset Value', beanie: 'Net Bean Value' },
+  'common.totalValue': { en: 'Total Value', beanie: 'Total Value' },
+  'common.netAssetValue': { en: 'Net Asset Value', beanie: 'Net Asset Value' },
   'common.appreciation': { en: 'Appreciation', beanie: 'Bean Growth' },
   'common.depreciation': { en: 'Depreciation', beanie: 'Shrinking Beans' },
   'common.assetLoans': { en: 'Asset Loans' },
@@ -57,14 +57,14 @@ const STRING_DEFS = {
   'status.overdue': { en: 'Overdue' },
 
   // Navigation
-  'nav.dashboard': { en: 'Dashboard', beanie: 'Bean Counter' },
+  'nav.dashboard': { en: 'Dashboard', beanie: 'The Nook' },
   'nav.accounts': { en: 'Accounts' },
   'nav.transactions': { en: 'Transactions' },
   'nav.assets': { en: 'Assets' },
   'nav.goals': { en: 'Goals' },
   'nav.reports': { en: 'Reports' },
   'nav.forecast': { en: 'Forecast', beanie: 'Bean Forecast' },
-  'nav.family': { en: 'Family', beanie: 'The Pod' },
+  'nav.family': { en: 'Family Hub', beanie: 'Family Hub' },
   'nav.settings': { en: 'Settings' },
 
   // Common actions
@@ -91,7 +91,7 @@ const STRING_DEFS = {
   'action.import': { en: 'Import' },
 
   // Dashboard
-  'dashboard.netWorth': { en: 'Net Worth', beanie: 'Your Bean Count' },
+  'dashboard.netWorth': { en: 'Family Net Worth', beanie: 'Alllllll Your Beans' },
   'dashboard.assets': { en: 'Assets', beanie: 'Your Beans' },
   'dashboard.liabilities': { en: 'Liabilities', beanie: 'Beans Owed' },
   'dashboard.monthlyIncome': { en: 'Monthly Income', beanie: 'Beans Coming In' },
@@ -103,7 +103,7 @@ const STRING_DEFS = {
   'dashboard.activeGoals': { en: 'Active Goals', beanie: 'Growing Goals' },
   'dashboard.noTransactions': {
     en: 'No transactions yet. Add your first transaction to get started.',
-    beanie: 'No bean moves yet — add your first one to get growing!',
+    beanie: 'Nothing yet — add your first one to get growing!',
   },
   'dashboard.noUpcoming': {
     en: 'No upcoming transactions in the next 30 days',
