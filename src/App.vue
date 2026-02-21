@@ -304,11 +304,7 @@ onMounted(async () => {
       <AppSidebar />
 
       <div class="flex min-w-0 flex-1 flex-col">
-        <AppHeader>
-          <template #title>
-            {{ route.meta.title }}
-          </template>
-        </AppHeader>
+        <AppHeader />
 
         <main class="flex-1 overflow-auto p-6">
           <router-view />

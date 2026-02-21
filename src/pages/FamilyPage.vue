@@ -225,48 +225,44 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Family Name Header -->
+    <!-- Family name + actions -->
     <div class="flex items-center justify-between">
-      <div>
-        <div class="flex items-center gap-2">
-          <BeanieIcon name="users" size="lg" class="text-primary-500" />
-          <h1
-            v-if="!isEditingFamilyName"
-            class="text-2xl font-bold text-gray-900 dark:text-gray-100"
-          >
-            {{ familyContextStore.activeFamilyName || t('family.title') }}
-          </h1>
-          <div v-else class="flex items-center gap-2">
-            <input
-              v-model="editFamilyName"
-              type="text"
-              class="focus:border-primary-500 focus:ring-primary-500 rounded-lg border border-gray-300 px-3 py-1.5 text-xl font-bold text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
-              @keyup.enter="saveFamilyName"
-              @keyup.escape="cancelEditFamilyName"
-            />
-            <button
-              class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-              @click="saveFamilyName"
-            >
-              <BeanieIcon name="check" size="md" />
-            </button>
-            <button
-              class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-              @click="cancelEditFamilyName"
-            >
-              <BeanieIcon name="close" size="md" />
-            </button>
-          </div>
+      <div class="flex items-center gap-2">
+        <span
+          v-if="!isEditingFamilyName"
+          class="text-sm font-medium text-gray-600 dark:text-gray-400"
+        >
+          {{ familyContextStore.activeFamilyName || t('family.title') }}
+        </span>
+        <div v-else class="flex items-center gap-2">
+          <input
+            v-model="editFamilyName"
+            type="text"
+            class="focus:border-primary-500 focus:ring-primary-500 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+            @keyup.enter="saveFamilyName"
+            @keyup.escape="cancelEditFamilyName"
+          />
           <button
-            v-if="!isEditingFamilyName && familyContextStore.activeFamilyName"
-            class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
-            title="Edit family name"
-            @click="startEditFamilyName"
+            class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+            @click="saveFamilyName"
           >
-            <BeanieIcon name="edit" size="sm" />
+            <BeanieIcon name="check" size="md" />
+          </button>
+          <button
+            class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+            @click="cancelEditFamilyName"
+          >
+            <BeanieIcon name="close" size="md" />
           </button>
         </div>
-        <p class="text-gray-500 dark:text-gray-400">Manage your family profiles</p>
+        <button
+          v-if="!isEditingFamilyName && familyContextStore.activeFamilyName"
+          class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+          title="Edit family name"
+          @click="startEditFamilyName"
+        >
+          <BeanieIcon name="edit" size="sm" />
+        </button>
       </div>
       <BaseButton @click="openAddModal">
         {{ t('family.addMember') }}

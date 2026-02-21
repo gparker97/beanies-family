@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import AccountTypeIcon from '@/components/common/AccountTypeIcon.vue';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-import PageHeader from '@/components/common/PageHeader.vue';
+
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -428,21 +428,15 @@ function applyCustomDateRange() {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <PageHeader
-      icon="arrow-right-left"
-      :title="t('transactions.title')"
-      :subtitle="t('transactions.subtitle')"
-    >
-      <div class="flex gap-2">
-        <BaseButton v-if="activeTab === 'transactions'" @click="openAddModal">
-          {{ t('transactions.addTransaction') }}
-        </BaseButton>
-        <BaseButton v-else @click="openAddRecurringModal">
-          {{ t('transactions.addRecurring') }}
-        </BaseButton>
-      </div>
-    </PageHeader>
+    <!-- Action bar -->
+    <div class="flex justify-end gap-2">
+      <BaseButton v-if="activeTab === 'transactions'" @click="openAddModal">
+        {{ t('transactions.addTransaction') }}
+      </BaseButton>
+      <BaseButton v-else @click="openAddRecurringModal">
+        {{ t('transactions.addRecurring') }}
+      </BaseButton>
+    </div>
 
     <!-- Tab Navigation -->
     <div class="border-b border-gray-200 dark:border-slate-700">

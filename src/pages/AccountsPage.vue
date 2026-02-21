@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-import PageHeader from '@/components/common/PageHeader.vue';
+
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
@@ -275,13 +275,13 @@ async function deleteAccount(id: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <PageHeader icon="credit-card" :title="t('accounts.title')" :subtitle="t('accounts.subtitle')">
+    <!-- Action bar -->
+    <div class="flex justify-end">
       <BaseButton @click="openAddModal">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('accounts.addAccount') }}
       </BaseButton>
-    </PageHeader>
+    </div>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">

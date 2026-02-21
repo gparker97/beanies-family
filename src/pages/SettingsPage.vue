@@ -5,7 +5,7 @@ import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import PageHeader from '@/components/common/PageHeader.vue';
+
 import { useTranslation } from '@/composables/useTranslation';
 import { CURRENCIES } from '@/constants/currencies';
 import { clearAllData } from '@/services/indexeddb/database';
@@ -194,8 +194,6 @@ function formatLastSync(timestamp: string | null): string {
 
 <template>
   <div class="space-y-6">
-    <PageHeader icon="cog" :title="t('settings.title')" :subtitle="t('settings.subtitle')" />
-
     <!-- First Row: General Settings and File Sync side by side on wide screens -->
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
       <!-- General Settings -->

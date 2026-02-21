@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -23,12 +23,35 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
+const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const translationStore = useTranslationStore();
+
+// ── Page title / Dashboard greeting ──────────────────────────────────────
+const isDashboard = computed(() => route.name === 'Dashboard');
+const ownerName = computed(() => familyStore.owner?.name || 'there');
+
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  if (hour < 12) return `Good morning, ${ownerName.value}`;
+  if (hour < 18) return `Good afternoon, ${ownerName.value}`;
+  return `Good evening, ${ownerName.value}`;
+});
+
+const todayFormatted = computed(() => {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+});
+
+const pageTitle = computed(() => (route.meta?.title as string) || '');
 
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
@@ -37,7 +60,6 @@ const showCurrencyDropdown = ref(false);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
 const privacyAnimating = ref(false);
-const themeAnimating = ref(false);
 
 const currencyOptions = DISPLAY_CURRENCIES.map((c) => ({
   code: c.code,
@@ -63,12 +85,6 @@ function handlePrivacyToggle() {
   privacyAnimating.value = true;
   togglePrivacy();
   playBlink();
-}
-
-function handleThemeToggle() {
-  themeAnimating.value = true;
-  const newTheme = settingsStore.theme === 'dark' ? 'light' : 'dark';
-  settingsStore.setTheme(newTheme);
 }
 
 function closeCurrencyDropdown() {
@@ -103,34 +119,39 @@ async function handleSignOut() {
 </script>
 
 <template>
-  <header
-    class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6 dark:border-slate-700 dark:bg-slate-800"
-  >
-    <!-- Left side - Page title or breadcrumb -->
-    <div>
-      <slot name="left">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          <slot name="title" />
-        </h2>
-      </slot>
+  <header class="flex h-16 items-center justify-between bg-transparent px-6">
+    <!-- Left side - Page title or greeting -->
+    <div class="min-w-0">
+      <template v-if="isDashboard">
+        <h1 class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100">
+          {{ greeting }}
+        </h1>
+        <p class="text-secondary-500/40 text-xs dark:text-gray-500">
+          {{ todayFormatted }}
+        </p>
+      </template>
+      <h1
+        v-else
+        class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100"
+      >
+        {{ pageTitle }}
+      </h1>
     </div>
 
-    <!-- Right side - User actions -->
-    <div class="flex items-center gap-4">
+    <!-- Right side - Icon-only controls -->
+    <div class="flex items-center gap-2">
       <!-- Member Filter -->
       <MemberFilterDropdown />
 
-      <!-- Currency selector -->
+      <!-- Currency selector (symbol only) -->
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
+          class="flex h-10 w-10 items-center justify-center rounded-[14px] text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/[0.08]"
           @click="showCurrencyDropdown = !showCurrencyDropdown"
           @blur="closeCurrencyDropdown"
         >
-          <span>{{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}</span>
-          <span class="text-gray-500 dark:text-gray-400">{{ settingsStore.displayCurrency }}</span>
-          <BeanieIcon name="chevron-down" size="sm" class="text-gray-400" />
+          {{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}
         </button>
 
         <!-- Dropdown menu -->
@@ -155,26 +176,21 @@ async function handleSignOut() {
         </div>
       </div>
 
-      <!-- Language selector -->
+      <!-- Language selector (flag only) -->
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
+          class="flex h-10 w-10 items-center justify-center rounded-[14px] text-base transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08]"
           :class="{ 'opacity-75': translationStore.isLoading }"
           @click="showLanguageDropdown = !showLanguageDropdown"
           @blur="closeLanguageDropdown"
         >
-          <span>{{ currentLanguageInfo?.flag || '🌐' }}</span>
-          <span class="text-gray-500 dark:text-gray-400">{{
-            settingsStore.language.toUpperCase()
-          }}</span>
-          <BeanieIcon
-            v-if="!translationStore.isLoading"
-            name="chevron-down"
-            size="sm"
-            class="text-gray-400"
-          />
-          <BeanieIcon v-else name="refresh" size="sm" class="animate-spin text-gray-400" />
+          <template v-if="translationStore.isLoading">
+            <BeanieIcon name="refresh" size="sm" class="animate-spin text-gray-400" />
+          </template>
+          <template v-else>
+            {{ currentLanguageInfo?.flag || '🌐' }}
+          </template>
         </button>
 
         <!-- Dropdown menu -->
@@ -202,12 +218,7 @@ async function handleSignOut() {
       <!-- Privacy mode toggle -->
       <button
         type="button"
-        class="rounded-xl transition-colors"
-        :class="
-          isUnlocked
-            ? 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200'
-            : 'text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-slate-700'
-        "
+        class="relative flex h-10 w-10 items-center justify-center rounded-[14px] transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08]"
         :aria-label="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         :title="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
         @click="handlePrivacyToggle"
@@ -217,7 +228,7 @@ async function handleSignOut() {
           v-if="isUnlocked"
           src="/brand/beanies_open_eyes_transparent_512x512.png"
           alt="Financial figures visible"
-          class="h-10 w-10"
+          class="h-8 w-8"
           :class="{ 'animate-beanie-blink': privacyAnimating }"
           @animationend="privacyAnimating = false"
         />
@@ -226,32 +237,27 @@ async function handleSignOut() {
           v-else
           src="/brand/beanies_covering_eyes_transparent_512x512.png"
           alt="Financial figures hidden"
-          class="h-10 w-10"
+          class="h-8 w-8"
           :class="{ 'animate-beanie-blink': privacyAnimating }"
           @animationend="privacyAnimating = false"
         />
+        <!-- Green status dot when unlocked -->
+        <span
+          v-if="isUnlocked"
+          class="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full bg-[#27AE60]"
+        />
       </button>
 
-      <!-- Theme toggle -->
+      <!-- Notification bell -->
       <button
         type="button"
-        class="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
-        @click="handleThemeToggle"
+        class="relative flex h-10 w-10 items-center justify-center rounded-[14px] text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.08]"
+        aria-label="Notifications"
+        title="Notifications"
       >
-        <BeanieIcon
-          v-if="settingsStore.theme === 'dark'"
-          name="sun"
-          size="md"
-          :class="{ 'animate-beanie-rotate-in': themeAnimating }"
-          @animationend="themeAnimating = false"
-        />
-        <BeanieIcon
-          v-else
-          name="moon"
-          size="md"
-          :class="{ 'animate-beanie-rotate-in': themeAnimating }"
-          @animationend="themeAnimating = false"
-        />
+        <BeanieIcon name="bell" size="md" />
+        <!-- Heritage Orange notification dot -->
+        <span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F15D22]" />
       </button>
 
       <!-- Offline badge -->
@@ -262,15 +268,14 @@ async function handleSignOut() {
         Offline
       </span>
 
-      <!-- Profile dropdown -->
+      <!-- Profile dropdown (avatar + chevron only) -->
       <div class="relative">
         <button
           v-if="currentMember || authStore.isAuthenticated"
-          class="flex items-center gap-2"
+          class="flex items-center gap-1 rounded-[14px] py-1 pr-1 pl-1 transition-colors hover:bg-gray-100 dark:hover:bg-white/[0.08]"
           @click="showProfileDropdown = !showProfileDropdown"
           @blur="closeProfileDropdown"
         >
-          <!-- Avatar -->
           <BeanieAvatar
             :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
             :color="currentMember?.color || '#3b82f6'"
@@ -278,10 +283,7 @@ async function handleSignOut() {
             :aria-label="currentMember?.name || 'Profile'"
             data-testid="header-avatar"
           />
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
-          </span>
-          <BeanieIcon name="chevron-down" size="sm" class="text-gray-400" />
+          <BeanieIcon name="chevron-down" size="xs" class="text-gray-400" />
         </button>
 
         <!-- Profile dropdown menu -->
