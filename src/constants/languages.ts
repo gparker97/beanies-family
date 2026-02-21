@@ -5,7 +5,7 @@ export interface LanguageInfo {
   name: string;
   nativeName: string;
   flag: string;
-  flagIcon?: string; // Reserved for future custom PNG flag icons
+  flagIcon?: string; // Path to beanie flag illustration
 }
 
 export const LANGUAGES: LanguageInfo[] = [
