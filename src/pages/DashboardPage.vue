@@ -10,6 +10,7 @@ import NetWorthHeroCard from '@/components/dashboard/NetWorthHeroCard.vue';
 import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import { useNetWorthHistory } from '@/composables/useNetWorthHistory';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useTranslation } from '@/composables/useTranslation';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
@@ -29,6 +30,10 @@ const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+
+// ── Net worth history ───────────────────────────────────────────────────────
+const { selectedPeriod, chartData, periodComparison, incomeChange, expenseChange, cashFlowChange } =
+  useNetWorthHistory();
 
 // ── Financial data ──────────────────────────────────────────────────────────
 // Combined net worth: accounts + physical assets - all liabilities
@@ -129,6 +134,11 @@ function getGoalIcon(type: string): string {
       :amount="netWorth"
       :currency="settingsStore.baseCurrency"
       :label="t('dashboard.netWorth')"
+      :change-amount="periodComparison.changeAmount"
+      :change-percent="periodComparison.changePercent"
+      :selected-period="selectedPeriod"
+      :history-data="chartData"
+      @update:selected-period="selectedPeriod = $event"
     />
 
     <!-- ── Summary Stat Cards (3-column) ───────────────────────────────── -->
@@ -137,6 +147,7 @@ function getGoalIcon(type: string): string {
         :label="t('dashboard.monthlyIncome')"
         :amount="monthlyIncome"
         :currency="settingsStore.baseCurrency"
+        :change-amount="incomeChange"
         tint="green"
         test-id="stat-monthly-income"
       />
@@ -144,6 +155,7 @@ function getGoalIcon(type: string): string {
         :label="t('dashboard.monthlyExpenses')"
         :amount="monthlyExpenses"
         :currency="settingsStore.baseCurrency"
+        :change-amount="expenseChange"
         tint="orange"
         test-id="stat-monthly-expenses"
       />
@@ -151,6 +163,7 @@ function getGoalIcon(type: string): string {
         :label="t('dashboard.netCashFlow')"
         :amount="netCashFlow"
         :currency="settingsStore.baseCurrency"
+        :change-amount="cashFlowChange"
         tint="slate"
         :dark="true"
         test-id="stat-net-cash-flow"
