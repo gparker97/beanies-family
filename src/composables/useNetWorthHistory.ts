@@ -147,10 +147,10 @@ export function useNetWorthHistory() {
     for (const pointDate of datePoints) {
       // Reverse all transactions that happened after this date point
       while (txnIdx < transactions.length) {
-        const txnDate = getStartOfDay(new Date(transactions[txnIdx].date));
+        const txn = transactions[txnIdx]!;
+        const txnDate = getStartOfDay(new Date(txn.date));
         if (txnDate <= pointDate) break;
 
-        const txn = transactions[txnIdx];
         const converted = convertAmount(txn.amount, txn.currency, baseCurrency, rates);
 
         if (txn.type === 'income') {
@@ -180,8 +180,11 @@ export function useNetWorthHistory() {
     const data = chartData.value;
     if (data.length < 2) return { changeAmount: 0, changePercent: 0 };
 
-    const startValue = data[0].value;
-    const endValue = data[data.length - 1].value;
+    const first = data[0];
+    const last = data[data.length - 1];
+    if (!first || !last) return { changeAmount: 0, changePercent: 0 };
+    const startValue = first.value;
+    const endValue = last.value;
     const changeAmount = endValue - startValue;
     const changePercent = startValue !== 0 ? (changeAmount / Math.abs(startValue)) * 100 : 0;
 
