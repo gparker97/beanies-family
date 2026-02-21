@@ -12,24 +12,24 @@ export class DashboardPage {
     await this.page.getByRole('button', { name: 'Show financial figures' }).click();
   }
 
-  /** Returns the locator for the Net Worth value (use with expect().toContainText() for auto-waiting) */
+  /** Returns the locator for the Net Worth value (hero card) */
   get netWorthValue() {
-    return this.page.locator('text=Net Worth').locator('..').locator('.text-2xl');
+    return this.page.getByTestId('hero-amount');
   }
 
   /** Returns the locator for the Monthly Income value */
   get monthlyIncomeValue() {
-    return this.page.locator('text=Monthly Income').locator('..').locator('.text-2xl');
+    return this.page.getByTestId('stat-monthly-income').getByTestId('stat-amount');
   }
 
   /** Returns the locator for the Monthly Expenses value */
   get monthlyExpensesValue() {
-    return this.page.locator('text=Monthly Expenses').locator('..').locator('.text-2xl');
+    return this.page.getByTestId('stat-monthly-expenses').getByTestId('stat-amount');
   }
 
   /** Returns the locator for the Net Cash Flow value */
   get netCashFlowValue() {
-    return this.page.locator('text=Net Cash Flow').locator('..').locator('.text-2xl');
+    return this.page.getByTestId('stat-net-cash-flow').getByTestId('stat-amount');
   }
 
   // Legacy methods (read text immediately without waiting for specific values)
