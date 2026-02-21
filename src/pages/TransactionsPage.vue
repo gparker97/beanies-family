@@ -13,7 +13,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { EXPENSE_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
-import { CURRENCIES } from '@/constants/currencies';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -98,25 +98,13 @@ const editCategoryOptions = computed(() => {
   }));
 });
 
-// Currency options with display currency at the top
-const currencyOptions = computed(() => {
-  const displayCurrency = settingsStore.displayCurrency;
-  const sortedCurrencies = [...CURRENCIES].sort((a, b) => {
-    if (a.code === displayCurrency) return -1;
-    if (b.code === displayCurrency) return 1;
-    return 0;
-  });
-  return sortedCurrencies.map((c) => ({
-    value: c.code,
-    label: `${c.code} - ${c.name}`,
-  }));
-});
+const { currencyOptions } = useCurrencyOptions();
 
 const newTransaction = ref<CreateTransactionInput>({
   accountId: '',
   type: 'expense',
   amount: 0,
-  currency: settingsStore.baseCurrency,
+  currency: settingsStore.displayCurrency,
   category: '',
   date: toISODateString(new Date()),
   description: '',
@@ -142,7 +130,7 @@ const editTransaction = ref<EditTransactionForm>({
   accountId: '',
   type: 'expense',
   amount: 0,
-  currency: settingsStore.baseCurrency,
+  currency: settingsStore.displayCurrency,
   category: '',
   date: toISODateString(new Date()),
   description: '',
@@ -288,7 +276,7 @@ function openAddModal() {
     accountId: accountsStore.accounts[0]?.id || '',
     type: 'expense',
     amount: 0,
-    currency: settingsStore.baseCurrency,
+    currency: settingsStore.displayCurrency,
     category: EXPENSE_CATEGORIES[0]?.id || '',
     date: toISODateString(new Date()),
     description: '',
