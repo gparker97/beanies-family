@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { Line } from 'vue-chartjs';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+} from 'chart.js';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import type { CurrencyCode } from '@/types/models';
+import type { PeriodKey, NetWorthDataPoint } from '@/composables/useNetWorthHistory';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip);
 
 interface Props {
   /** Net worth amount */
@@ -15,13 +28,23 @@ interface Props {
   changePercent?: number;
   /** Label displayed above the amount */
   label?: string;
+  /** Selected time period */
+  selectedPeriod?: PeriodKey;
+  /** Chart data points */
+  historyData?: NetWorthDataPoint[];
 }
 
 const props = withDefaults(defineProps<Props>(), {
   changeAmount: 0,
   changePercent: 0,
   label: 'Family Net Worth',
+  selectedPeriod: '1M',
+  historyData: () => [],
 });
+
+const emit = defineEmits<{
+  'update:selectedPeriod': [period: PeriodKey];
+}>();
 
 const { isUnlocked, MASK } = usePrivacyMode();
 const { convertToDisplay } = useCurrencyDisplay();
@@ -39,13 +62,164 @@ const changeConverted = computed(() =>
 
 const isPositiveChange = computed(() => props.changeAmount >= 0);
 
-const periods = [
+const periods: { key: PeriodKey; label: string }[] = [
   { key: '1W', label: '1W' },
   { key: '1M', label: '1M' },
   { key: '3M', label: '3M' },
   { key: '1Y', label: '1Y' },
   { key: 'all', label: 'All' },
-] as const;
+];
+
+function selectPeriod(key: PeriodKey) {
+  emit('update:selectedPeriod', key);
+}
+
+// ── Chart configuration ─────────────────────────────────────────────────────
+
+const chartCanvasKey = ref(0);
+
+// Rerender chart when privacy mode changes
+watch(
+  () => isUnlocked.value,
+  () => {
+    chartCanvasKey.value++;
+  }
+);
+
+const chartDataConfig = computed(() => {
+  const data = props.historyData;
+  if (!isUnlocked.value || data.length === 0) {
+    return {
+      labels: [] as string[],
+      datasets: [],
+    };
+  }
+
+  return {
+    labels: data.map((d) => d.label),
+    datasets: [
+      {
+        data: data.map((d) => d.value),
+        borderColor: '#F15D22',
+        borderWidth: 2,
+        backgroundColor: (ctx: { chart: ChartJS }) => {
+          const chart = ctx.chart;
+          const { ctx: canvasCtx, chartArea } = chart;
+          if (!chartArea) return 'rgba(241,93,34,0)';
+          const gradient = canvasCtx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(241,93,34,0.3)');
+          gradient.addColorStop(1, 'rgba(241,93,34,0)');
+          return gradient;
+        },
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: '#F15D22',
+        pointHoverBorderColor: '#FFFFFF',
+        pointHoverBorderWidth: 2,
+      },
+    ],
+  };
+});
+
+const chartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: {
+    duration: 400,
+    easing: 'easeOutQuart' as const,
+  },
+  interaction: {
+    intersect: false,
+    mode: 'index' as const,
+  },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      enabled: isUnlocked.value,
+      backgroundColor: 'rgba(44,62,80,0.95)',
+      titleColor: 'rgba(255,255,255,0.6)',
+      bodyColor: '#FFFFFF',
+      titleFont: { family: 'Outfit', size: 11 },
+      bodyFont: { family: 'Outfit', size: 13, weight: 'bold' as const },
+      padding: { top: 8, bottom: 8, left: 12, right: 12 },
+      cornerRadius: 10,
+      displayColors: false,
+      callbacks: {
+        label: (ctx: { parsed: { y: number } }) => {
+          if (!isUnlocked.value) return MASK;
+          const val = ctx.parsed.y;
+          return convertToDisplay(val, props.currency).displayFormatted;
+        },
+      },
+    },
+  },
+  scales: {
+    x: {
+      display: false,
+      grid: { display: false },
+    },
+    y: {
+      display: false,
+      grid: {
+        display: true,
+        color: 'rgba(255,255,255,0.04)',
+        lineWidth: 1,
+      },
+    },
+  },
+  elements: {
+    line: {
+      capBezierPoints: true,
+    },
+  },
+}));
+
+// Show last data point as a glowing dot via a custom dataset
+const chartDataWithDot = computed(() => {
+  const base = chartDataConfig.value;
+  if (!isUnlocked.value || base.datasets.length === 0) return base;
+
+  const values = props.historyData.map((d) => d.value);
+  // Create array of nulls with only the last point set
+  const lastPointData = values.map((_, i) => (i === values.length - 1 ? values[i] : null));
+
+  return {
+    ...base,
+    datasets: [
+      ...base.datasets,
+      {
+        data: lastPointData,
+        borderColor: 'transparent',
+        backgroundColor: '#F15D22',
+        pointRadius: 5,
+        pointBorderColor: '#FFFFFF',
+        pointBorderWidth: 2,
+        pointHoverRadius: 6,
+        fill: false,
+        showLine: false,
+      },
+    ],
+  };
+});
+
+const periodLabel = computed(() => {
+  switch (props.selectedPeriod) {
+    case '1W':
+      return 'this week';
+    case '1M':
+      return 'this month';
+    case '3M':
+      return 'past 3 months';
+    case '1Y':
+      return 'this year';
+    case 'all':
+      return 'all time';
+    default:
+      return 'this month';
+  }
+});
 </script>
 
 <template>
@@ -77,7 +251,7 @@ const periods = [
         >
           <span>{{ isPositiveChange ? '↑' : '↓' }}</span>
           <span v-if="changePercent !== 0">
-            {{ isPositiveChange ? '+' : '' }}{{ changePercent.toFixed(1) }}% this month
+            {{ isPositiveChange ? '+' : '' }}{{ changePercent.toFixed(1) }}% {{ periodLabel }}
           </span>
           <span v-if="changeAmount !== 0" class="opacity-60">
             · {{ isPositiveChange ? '+' : '-' }}{{ changeConverted.displayFormatted }}
@@ -93,44 +267,32 @@ const periods = [
           type="button"
           class="font-outfit cursor-pointer rounded-[10px] px-3 py-1.5 text-[0.6rem] font-semibold transition-all"
           :class="
-            period.key === '1M'
+            period.key === selectedPeriod
               ? 'bg-primary-500/40 text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
               : 'text-white/35 hover:text-white/60'
           "
+          @click="selectPeriod(period.key)"
         >
           {{ period.label }}
         </button>
       </div>
     </div>
 
-    <!-- Sparkline area chart placeholder -->
+    <!-- Chart area -->
     <div class="relative mt-5 h-20">
-      <svg viewBox="0 0 600 80" preserveAspectRatio="none" class="h-full w-full">
-        <defs>
-          <linearGradient id="nw-chart-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="rgba(241,93,34,0.3)" />
-            <stop offset="100%" stop-color="rgba(241,93,34,0)" />
-          </linearGradient>
-        </defs>
-        <!-- Grid lines -->
-        <line x1="0" y1="20" x2="600" y2="20" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
-        <line x1="0" y1="40" x2="600" y2="40" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
-        <line x1="0" y1="60" x2="600" y2="60" stroke="rgba(255,255,255,0.04)" stroke-width="1" />
-        <!-- Line -->
-        <path
-          d="M0,60 Q60,55 120,48 T240,35 T360,28 T480,18 T600,8"
-          fill="none"
-          stroke="rgba(241,93,34,0.6)"
-          stroke-width="2"
-        />
-        <!-- Fill area -->
-        <path
-          d="M0,60 Q60,55 120,48 T240,35 T360,28 T480,18 T600,8 L600,80 L0,80 Z"
-          fill="url(#nw-chart-gradient)"
-        />
-        <!-- Current point -->
-        <circle cx="600" cy="8" r="4" fill="#F15D22" stroke="white" stroke-width="2" />
-      </svg>
+      <div v-if="!isUnlocked" class="flex h-full items-center justify-center">
+        <span class="font-outfit text-[0.75rem] font-medium text-white/20"> Chart hidden </span>
+      </div>
+      <div v-else-if="historyData.length === 0" class="flex h-full items-center justify-center">
+        <span class="font-outfit text-[0.75rem] font-medium text-white/20"> No data yet </span>
+      </div>
+      <Line
+        v-else
+        :key="chartCanvasKey"
+        :data="chartDataWithDot"
+        :options="chartOptions"
+        class="h-full w-full"
+      />
     </div>
   </div>
 </template>
