@@ -161,7 +161,7 @@ async function handleSignOut() {
       <!-- Multi-chip mode: 2+ effective currencies -->
       <div
         v-if="hasMultipleCurrencies"
-        class="flex items-center gap-0.5 rounded-[14px] bg-white px-1.5 py-1 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
+        class="flex h-10 items-center gap-0.5 rounded-[14px] bg-white px-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
       >
         <button
           v-for="chip in currencyChips"
@@ -175,7 +175,8 @@ async function handleSignOut() {
           "
           @click="selectCurrencyChip(chip.code)"
         >
-          {{ chip.label }}
+          <span class="text-[#27AE60]">{{ chip.symbol }}</span>
+          {{ chip.code }}
         </button>
       </div>
 
@@ -183,11 +184,13 @@ async function handleSignOut() {
       <div v-else class="relative">
         <button
           type="button"
-          class="font-outfit flex items-center gap-1.5 rounded-[14px] bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-300 dark:shadow-none"
+          class="font-outfit flex h-10 items-center gap-1.5 rounded-[14px] bg-white px-3 text-sm font-semibold text-gray-700 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-300 dark:shadow-none"
           @click="showCurrencyDropdown = !showCurrencyDropdown"
           @blur="closeCurrencyDropdown"
         >
-          {{ currentCurrencyInfo?.symbol || settingsStore.displayCurrency }}
+          <span class="text-[#27AE60]">{{
+            currentCurrencyInfo?.symbol || settingsStore.displayCurrency
+          }}</span>
           {{ settingsStore.displayCurrency }}
           <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
         </button>
@@ -218,7 +221,7 @@ async function handleSignOut() {
       <div class="relative">
         <button
           type="button"
-          class="flex items-center gap-1 rounded-[14px] bg-white px-2 py-1 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-all hover:shadow-[0_4px_12px_rgba(44,62,80,0.1)] dark:bg-slate-800 dark:shadow-none"
+          class="flex h-10 items-center gap-1 rounded-[14px] bg-white px-2 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-all hover:shadow-[0_4px_12px_rgba(44,62,80,0.1)] dark:bg-slate-800 dark:shadow-none"
           :class="{ 'opacity-75': translationStore.isLoading }"
           @click="showLanguageDropdown = !showLanguageDropdown"
           @blur="closeLanguageDropdown"
@@ -226,7 +229,9 @@ async function handleSignOut() {
           <template v-if="translationStore.isLoading">
             <BeanieIcon name="refresh" size="sm" class="animate-spin text-gray-400" />
           </template>
-          <span v-else class="text-2xl leading-none">{{ currentLanguageInfo?.flag || '🌐' }}</span>
+          <span v-else class="text-[26px] leading-none">
+            {{ currentLanguageInfo?.flag || '🌐' }}
+          </span>
           <span class="text-secondary-500/30 text-[0.5rem]">▼</span>
         </button>
 

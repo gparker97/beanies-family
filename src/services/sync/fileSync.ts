@@ -4,6 +4,7 @@ import {
   getActiveFamilyId,
   type ExportedData,
 } from '@/services/indexeddb/database';
+import { getSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import type { SyncFileData } from '@/types/models';
 import { SYNC_FILE_VERSION } from '@/types/models';
 import { toISODateString } from '@/utils/date';
@@ -109,6 +110,10 @@ export async function importSyncFileData(syncFile: SyncFileData): Promise<void> 
     throw new Error('Invalid sync file format');
   }
 
+  // Read local-only preferences before import overwrites them
+  const localSettings = await getSettings();
+  const localPreferredCurrencies = localSettings.preferredCurrencies;
+
   // Remove sync-related settings from imported data to preserve local sync config
   const importData: ExportedData = {
     ...syncFile.data,
@@ -118,6 +123,8 @@ export async function importSyncFileData(syncFile: SyncFileData): Promise<void> 
           // Preserve these fields from local settings (don't overwrite sync config)
           syncFilePath: undefined,
           lastSyncTimestamp: undefined,
+          // Preserve local-only UI preferences
+          preferredCurrencies: localPreferredCurrencies,
         }
       : null,
   };
