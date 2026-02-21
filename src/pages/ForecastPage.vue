@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { BaseCard } from '@/components/ui';
-import PageHeader from '@/components/common/PageHeader.vue';
+
 import { useTranslation } from '@/composables/useTranslation';
 import { useReducedMotion } from '@/composables/useReducedMotion';
 
@@ -17,12 +17,6 @@ const features = [
 
 <template>
   <div class="space-y-6">
-    <PageHeader
-      icon="trending-up"
-      :title="t('forecast.title')"
-      :subtitle="t('forecast.comingSoonDescription')"
-    />
-
     <BaseCard>
       <div class="py-10 text-center">
         <!-- Beanie with telescope illustration -->

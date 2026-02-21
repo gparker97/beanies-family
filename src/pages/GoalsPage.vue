@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-import PageHeader from '@/components/common/PageHeader.vue';
+
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
@@ -248,12 +248,13 @@ async function deleteCompletedGoal(id: string) {
 
 <template>
   <div class="space-y-6">
-    <PageHeader icon="target" :title="t('goals.title')" :subtitle="t('goals.subtitle')">
+    <!-- Action bar -->
+    <div class="flex justify-end">
       <BaseButton @click="openAddModal">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('goals.addGoal') }}
       </BaseButton>
-    </PageHeader>
+    </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
       <BaseCard>

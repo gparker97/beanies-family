@@ -14,7 +14,7 @@ import {
   Filler,
 } from 'chart.js';
 import { BaseCard, BaseSelect } from '@/components/ui';
-import PageHeader from '@/components/common/PageHeader.vue';
+
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -684,9 +684,6 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <PageHeader icon="chart-bar" :title="t('reports.title')" :subtitle="t('reports.subtitle')" />
-
     <!-- Global Family Member Filter -->
     <div class="flex flex-wrap gap-4">
       <div class="w-64">
