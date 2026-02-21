@@ -51,7 +51,7 @@ body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-fo
 .ds{border-radius:12px;overflow:hidden;background:var(--cloud-white);}
 
 /* PHONE */
-.pg{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;max-width:1200px;margin:0 auto;}
+.pg{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;max-width:1500px;margin:0 auto;}
 .pf{width:320px;background:var(--deep-slate);border-radius:44px;padding:16px;box-shadow:0 30px 80px rgba(44,62,80,0.3);}
 .pno{width:120px;height:28px;background:var(--deep-slate);border-radius:0 0 20px 20px;margin:-16px auto 0;position:relative;z-index:2;}
 .ps{border-radius:32px;overflow:hidden;background:var(--cloud-white);min-height:580px;position:relative;}
@@ -345,6 +345,17 @@ body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-fo
             <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);display:flex;align-items:center;justify-content:center;font-size:14px;">👨</div>
             <div><div class="nm">Greg</div><div class="rl">Parent Bean</div></div>
           </div>
+          <!-- Security indicators -->
+          <div style="margin-top:12px;padding:0 4px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;opacity:0.3;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span style="font-family:var(--fh);font-size:0.5rem;color:rgba(255,255,255,0.7);letter-spacing:0.02em;">bean_pod_greg.enc</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;opacity:0.3;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(110,231,183,0.9)" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span style="font-family:var(--fh);font-size:0.5rem;color:rgba(110,231,183,0.7);letter-spacing:0.02em;">AES-256 encrypted</span>
+            </div>
+          </div>
         </aside>
         <main class="dm">
           <div class="dtb">
@@ -571,6 +582,17 @@ body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-fo
           <div class="dni a"><span style="width:24px;text-align:center;">👨‍👩‍👦</span>Family Hub</div>
           <div class="dni"><span style="width:24px;text-align:center;">📄</span>Documents</div>
           <div class="dni"><span style="width:24px;text-align:center;">⚙️</span>Settings</div>
+          <!-- Security indicators -->
+          <div style="margin-top:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;opacity:0.3;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span style="font-family:var(--fh);font-size:0.5rem;color:rgba(255,255,255,0.7);letter-spacing:0.02em;">bean_pod_greg.enc</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;opacity:0.3;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(110,231,183,0.9)" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span style="font-family:var(--fh);font-size:0.5rem;color:rgba(110,231,183,0.7);letter-spacing:0.02em;">AES-256 encrypted</span>
+            </div>
+          </div>
         </aside>
         <main class="hm">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
@@ -612,27 +634,235 @@ body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-fo
   <div class="sh">
     <div class="sn">Proposal 04</div>
     <h2 class="st">Mobile — On-the-Go Beans</h2>
-    <p class="ss">Native mobile experience with bottom tab navigation, quick actions, and the same warm, secure feeling in your pocket.</p>
+    <p class="ss">Native mobile experience with bottom tab navigation, icon-based header controls, and a hamburger overlay menu revealing all desktop features.</p>
   </div>
   <div class="pg">
+    <!-- ─── Phone 1: Home (Updated) ─── -->
     <div>
       <div class="pf"><div class="pno"></div><div class="ps">
-        <div class="mhd"><div><div class="mgr">Hi, <span>Greg</span> 🫘</div><div class="msb2">Saturday, 21 Feb</div></div><div class="mava">👨</div></div>
-        <div class="mnw"><div class="mnwl">Family Net Worth</div><div class="mnwa">$124,580</div><div class="mnwc">↑ +3.2% this month</div></div>
-        <div class="mqa">
-          <div class="mqai"><div class="mqic" style="background:var(--or10);">➕</div><div class="mqal">Add</div></div>
-          <div class="mqai"><div class="mqic" style="background:var(--silk20);">💸</div><div class="mqal">Transfer</div></div>
-          <div class="mqai"><div class="mqic" style="background:var(--s05);">📊</div><div class="mqal">Reports</div></div>
+        <!-- Mobile header — clean: hamburger + greeting + notification only -->
+        <div style="padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <!-- Hamburger menu button -->
+            <div style="width:34px;height:34px;border-radius:11px;background:var(--s05);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;">
+              <div style="width:14px;height:2px;background:var(--deep-slate);border-radius:2px;opacity:0.5;"></div>
+              <div style="width:14px;height:2px;background:var(--deep-slate);border-radius:2px;opacity:0.5;"></div>
+              <div style="width:10px;height:2px;background:var(--heritage-orange);border-radius:2px;align-self:flex-start;margin-left:10px;"></div>
+            </div>
+            <div>
+              <div class="mgr" style="font-size:1.05rem;">Hi, <span>Greg</span> 🫘</div>
+              <div class="msb2" style="font-size:0.6rem;">Saturday, 21 Feb</div>
+            </div>
+          </div>
+          <!-- Notification bell only -->
+          <div style="width:34px;height:34px;border-radius:11px;background:white;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(44,62,80,0.07);cursor:pointer;position:relative;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="color:var(--deep-slate);opacity:0.45;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <div style="position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--heritage-orange);border-radius:50%;border:1.5px solid white;"></div>
+          </div>
         </div>
-        <div class="mstl">Recent</div>
-        <div class="mtx"><div class="mtxi" style="background:var(--or10);">🛒</div><div style="flex:1;"><div class="mtxn">FairPrice</div><div class="mtxc">Groceries · Today</div></div><div class="mtxa" style="color:var(--deep-slate);">−$68.40</div></div>
-        <div class="mtx"><div class="mtxi" style="background:var(--silk20);">🎹</div><div style="flex:1;"><div class="mtxn">Piano Lesson</div><div class="mtxc">Education · Yesterday</div></div><div class="mtxa" style="color:var(--deep-slate);">−$45.00</div></div>
-        <div class="mtx"><div class="mtxi" style="background:rgba(39,174,96,0.1);">💵</div><div style="flex:1;"><div class="mtxn">Salary</div><div class="mtxc">Income · 20 Feb</div></div><div class="mtxa" style="color:#27AE60;">+$5,200</div></div>
-        <div class="mtx"><div class="mtxi" style="background:var(--or10);">⛽</div><div style="flex:1;"><div class="mtxn">Shell Fuel</div><div class="mtxc">Transport · 19 Feb</div></div><div class="mtxa" style="color:var(--deep-slate);">−$52.10</div></div>
+
+        <!-- Net Worth Card with time period -->
+        <div class="mnw">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;">
+            <div>
+              <div class="mnwl">Family Net Worth</div>
+              <div class="mnwa">$124,580</div>
+              <div class="mnwc">↑ +3.2% this month</div>
+            </div>
+          </div>
+          <!-- Time period pills -->
+          <div style="display:flex;gap:3px;margin-top:12px;background:rgba(255,255,255,0.08);border-radius:10px;padding:2px;width:fit-content;">
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:rgba(255,255,255,0.3);padding:4px 8px;border-radius:8px;cursor:pointer;">1W</div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:white;padding:4px 8px;border-radius:8px;cursor:pointer;background:rgba(241,93,34,0.45);">1M</div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:rgba(255,255,255,0.3);padding:4px 8px;border-radius:8px;cursor:pointer;">3M</div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:rgba(255,255,255,0.3);padding:4px 8px;border-radius:8px;cursor:pointer;">1Y</div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:rgba(255,255,255,0.3);padding:4px 8px;border-radius:8px;cursor:pointer;">All</div>
+          </div>
+          <!-- Mini chart -->
+          <div style="margin-top:8px;height:40px;">
+            <svg viewBox="0 0 600 80" preserveAspectRatio="none" width="100%" height="100%">
+              <defs><linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(241,93,34,0.25)"/><stop offset="100%" stop-color="rgba(241,93,34,0)"/></linearGradient></defs>
+              <path d="M0,60 Q60,55 120,48 T240,35 T360,28 T480,18 T600,8" fill="none" stroke="rgba(241,93,34,0.5)" stroke-width="2"/>
+              <path d="M0,60 Q60,55 120,48 T240,35 T360,28 T480,18 T600,8 L600,80 L0,80 Z" fill="url(#cg2)"/>
+              <circle cx="600" cy="8" r="3" fill="var(--heritage-orange)" stroke="white" stroke-width="1.5"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- 3 Summary Cards -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 16px;margin-bottom:14px;">
+          <div style="background:white;border-radius:14px;padding:12px 10px;box-shadow:0 1px 6px rgba(44,62,80,0.04);text-align:center;">
+            <div style="width:28px;height:28px;border-radius:8px;background:rgba(39,174,96,0.1);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#27AE60" stroke-width="3" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:var(--deep-slate);opacity:0.4;text-transform:uppercase;letter-spacing:0.05em;">Income</div>
+            <div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;color:var(--deep-slate);">$7,400</div>
+          </div>
+          <div style="background:white;border-radius:14px;padding:12px 10px;box-shadow:0 1px 6px rgba(44,62,80,0.04);text-align:center;">
+            <div style="width:28px;height:28px;border-radius:8px;background:var(--or10);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--heritage-orange)" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+            </div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:var(--deep-slate);opacity:0.4;text-transform:uppercase;letter-spacing:0.05em;">Expenses</div>
+            <div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;color:var(--deep-slate);">$5,560</div>
+          </div>
+          <div style="background:linear-gradient(135deg,var(--deep-slate),#3D5368);border-radius:14px;padding:12px 10px;text-align:center;">
+            <div style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 6px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><path d="M12 2v20M2 12h20"/></svg>
+            </div>
+            <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;color:white;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em;">Cash Flow</div>
+            <div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;color:white;">+$1,840</div>
+          </div>
+        </div>
+
+        <!-- Upcoming Transactions -->
+        <div class="mstl">Upcoming</div>
+        <div class="mtx"><div class="mtxi" style="background:var(--or10);">🏠</div><div style="flex:1;"><div class="mtxn">Rent Payment</div><div class="mtxc">Tomorrow · auto-debit</div></div><div class="mtxa" style="color:var(--deep-slate);">−$1,800</div></div>
+        <div class="mtx"><div class="mtxi" style="background:var(--silk20);">🎹</div><div style="flex:1;"><div class="mtxn">Piano Lesson</div><div class="mtxc">Mon 23 Feb · Beanie</div></div><div class="mtxa" style="color:var(--deep-slate);">−$45.00</div></div>
+        <div class="mtx"><div class="mtxi" style="background:rgba(39,174,96,0.1);">📱</div><div style="flex:1;"><div class="mtxn">Mobile Plan</div><div class="mtxc">25 Feb · auto-debit</div></div><div class="mtxa" style="color:var(--deep-slate);">−$89.00</div></div>
+        <div class="mtx"><div class="mtxi" style="background:var(--or10);">🔒</div><div style="flex:1;"><div class="mtxn">AIA Insurance</div><div class="mtxc">28 Feb · auto-debit</div></div><div class="mtxa" style="color:var(--deep-slate);">−$245.00</div></div>
+
         <div class="mtb"><div class="mt a"><div class="mti">🏠</div><div class="mtl">Nook</div></div><div class="mt"><div class="mti">💰</div><div class="mtl">Accounts</div></div><div class="mt"><div class="mti">🎯</div><div class="mtl">Goals</div></div><div class="mt"><div class="mti">👨‍👩‍👦</div><div class="mtl">Pod</div></div></div>
       </div></div>
       <div class="pl">Home — The Nook</div>
     </div>
+
+    <!-- ─── Phone 2: Hamburger Menu Overlay ─── -->
+    <div>
+      <div class="pf"><div class="pno"></div><div class="ps" style="background:var(--deep-slate);">
+        <!-- Menu overlay header -->
+        <div style="padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:16px;">🫘</div>
+            <div>
+              <div style="font-family:var(--fh);font-weight:700;font-size:0.95rem;color:white;">beanies<span style="font-weight:400;opacity:0.4;">.family</span></div>
+            </div>
+          </div>
+          <!-- Close X button -->
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </div>
+        </div>
+
+        <!-- User profile card -->
+        <div style="margin:8px 16px 20px;background:rgba(255,255,255,0.06);border-radius:18px;padding:16px;display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);display:flex;align-items:center;justify-content:center;font-size:1.1rem;">👨</div>
+          <div style="flex:1;">
+            <div style="font-family:var(--fh);font-weight:700;font-size:0.85rem;color:white;">Greg</div>
+            <div style="font-size:0.6rem;color:rgba(255,255,255,0.35);">greg@beanies.family</div>
+          </div>
+          <div style="background:rgba(241,93,34,0.25);padding:3px 10px;border-radius:8px;font-family:var(--fh);font-size:0.5rem;font-weight:700;color:var(--heritage-orange);letter-spacing:0.08em;text-transform:uppercase;">Family</div>
+        </div>
+
+        <!-- Main nav items -->
+        <div style="padding:0 16px;">
+          <!-- Quick controls section — moved from header -->
+          <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:10px;padding:0 8px;">Controls</div>
+
+          <!-- Family member filter -->
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.04);margin-bottom:4px;cursor:pointer;">
+            <div style="display:flex;align-items:center;">
+              <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);display:flex;align-items:center;justify-content:center;font-size:10px;border:2px solid var(--deep-slate);">👨</div>
+              <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#F9D5C2,#F2A07B);display:flex;align-items:center;justify-content:center;font-size:10px;margin-left:-7px;border:2px solid var(--deep-slate);">👩</div>
+              <div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:10px;margin-left:-7px;border:2px solid var(--deep-slate);">👶</div>
+            </div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Viewing: All Beans</span>
+            <span style="margin-left:auto;font-size:0.5rem;color:rgba(255,255,255,0.2);">▼</span>
+          </div>
+
+          <!-- Privacy mode toggle -->
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.04);margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(39,174,96,0.15);display:flex;align-items:center;justify-content:center;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6EE7B7" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <div style="flex:1;">
+              <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Privacy Mode</span>
+              <div style="font-size:0.55rem;color:rgba(255,255,255,0.2);margin-top:1px;">Figures visible</div>
+            </div>
+            <div style="width:36px;height:20px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));border-radius:10px;position:relative;">
+              <div style="width:14px;height:14px;background:white;border-radius:50%;position:absolute;top:3px;right:3px;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+            </div>
+          </div>
+
+          <!-- Language + Currency row -->
+          <div style="display:flex;gap:6px;margin-bottom:4px;">
+            <div style="flex:1;display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.04);cursor:pointer;">
+              <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 40'%3E%3Crect width='60' height='20' fill='%23EF4135'/%3E%3Crect y='20' width='60' height='20' fill='%23F8F9FA'/%3E%3Ccircle cx='30' cy='20' r='6' fill='%23F8F9FA'/%3E%3Ccircle cx='32' cy='20' r='5' fill='%23EF4135'/%3E%3C/svg%3E" alt="SG" style="width:20px;height:14px;border-radius:2px;">
+              </div>
+              <div>
+                <span style="font-family:var(--fh);font-size:0.7rem;font-weight:500;color:rgba(255,255,255,0.5);">English</span>
+                <span style="font-size:0.45rem;color:rgba(255,255,255,0.2);margin-left:3px;">▼</span>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.04);cursor:pointer;">
+              <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">💲</div>
+              <div>
+                <span style="font-family:var(--fh);font-size:0.7rem;font-weight:600;color:rgba(255,255,255,0.5);">SGD</span>
+                <span style="font-size:0.45rem;color:rgba(255,255,255,0.2);margin-left:3px;">▼</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:1px;background:rgba(255,255,255,0.06);margin:12px 0;"></div>
+          <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:10px;padding:0 8px;">Main</div>
+
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:linear-gradient(135deg,rgba(241,93,34,0.2),rgba(230,126,34,0.08));margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(241,93,34,0.2);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🏠</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:600;color:white;">The Nook</span>
+            <div style="margin-left:auto;width:6px;height:6px;border-radius:50%;background:var(--heritage-orange);"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">💰</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Accounts</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">📊</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Budgets</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🎯</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Goals</span>
+            <div style="margin-left:auto;background:var(--heritage-orange);color:white;font-size:0.5rem;font-weight:700;padding:2px 7px;border-radius:8px;">3</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">📅</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Calendar</span>
+          </div>
+
+          <div style="height:1px;background:rgba(255,255,255,0.06);margin:12px 0;"></div>
+          <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:10px;padding:0 8px;">Family & More</div>
+
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">👨‍👩‍👦</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Family Hub</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">📄</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Documents</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;margin-bottom:4px;cursor:pointer;">
+            <div style="width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">⚙️</div>
+            <span style="font-family:var(--fh);font-size:0.8rem;font-weight:500;color:rgba(255,255,255,0.5);">Settings</span>
+          </div>
+        </div>
+
+        <!-- Bottom footer with security indicators -->
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:14px 20px 22px;background:linear-gradient(0deg,rgba(44,62,80,1) 70%,rgba(44,62,80,0));border-radius:0 0 32px 32px;">
+          <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:6px;opacity:0.25;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span style="font-family:var(--fh);font-size:0.45rem;color:rgba(255,255,255,0.7);letter-spacing:0.02em;">bean_pod_greg.enc</span>
+              <span style="color:rgba(255,255,255,0.15);font-size:0.4rem;">·</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(110,231,183,0.9)" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span style="font-family:var(--fh);font-size:0.45rem;color:rgba(110,231,183,0.7);letter-spacing:0.02em;">AES-256</span>
+            </div>
+          </div>
+        </div>
+      </div></div>
+      <div class="pl">Hamburger Menu — Overlay</div>
+    </div>
+
+    <!-- ─── Phone 3: Goals ─── -->
     <div>
       <div class="pf"><div class="pno"></div><div class="ps" style="background:linear-gradient(180deg,var(--cloud-white),#EDF6FC);">
         <div class="mhd"><div><div class="mgr">Goals 🎯</div><div class="msb2">3 active goals</div></div><div class="mava" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));font-size:0.8rem;">+</div></div>
@@ -644,6 +874,8 @@ body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-fo
       </div></div>
       <div class="pl">Goals — Growing</div>
     </div>
+
+    <!-- ─── Phone 4: Notifications ─── -->
     <div>
       <div class="pf"><div class="pno"></div><div class="ps">
         <div class="mhd"><div><div class="mgr">Notifications 🔔</div><div class="msb2">4 new updates</div></div><div style="font-size:0.7rem;color:var(--heritage-orange);font-weight:600;font-family:var(--fh);cursor:pointer;">Mark Read</div></div>
@@ -658,7 +890,7 @@ body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-fo
       <div class="pl">Notifications</div>
     </div>
   </div>
-  <div class="an" style="margin-top:40px;"><div class="anl"></div><div><div class="ant">Design Notes</div><div class="anx">Mobile uses a bottom tab bar with "Nook, Accounts, Goals, Pod" as the four pillars. Quick actions use icon buttons with Sky Silk and Heritage Orange tints. Completed goals celebrate with gradient cards. Notifications use Heritage Orange for celebrations — never Alert Red. Tone is always warm.</div></div></div>
+  <div class="an" style="margin-top:40px;"><div class="anl"></div><div><div class="ant">Design Notes</div><div class="anx">The mobile header is deliberately minimal: just a hamburger button (with the brand's signature short orange bottom line), the "Hi, Greg 🫘" greeting, and a single notification bell. All other controls — family member filter (stacked avatars with "Viewing: All Beans"), privacy mode toggle with on/off switch, language selector (flag image), and currency dropdown — live inside the hamburger overlay menu under a "Controls" section at the top, keeping them accessible but out of the way. The overlay now flows: Controls → Main navigation → Family &amp; More → tagline footer. The net worth card retains the time period selector and sparkline chart, followed by the 3 summary cards and Upcoming Transactions.</div></div></div>
 </section>
 
 <!-- ═══ 5: LANDING PAGE ═══ -->
