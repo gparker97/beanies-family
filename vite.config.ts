@@ -19,12 +19,12 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: 'icons/icon-192x192.png',
+            src: 'brand/beanies_logo_transparent_logo_only_192x192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: 'icons/icon-512x512.png',
+            src: 'brand/beanies_logo_transparent_logo_only_512x512.png',
             sizes: '512x512',
             type: 'image/png',
           },
