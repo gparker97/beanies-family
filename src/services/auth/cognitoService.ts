@@ -79,6 +79,50 @@ export function signUp(params: SignUpParams): Promise<ISignUpResult> {
 }
 
 /**
+ * Confirm a user's sign-up with a verification code.
+ */
+export function confirmSignUp(email: string, code: string): Promise<void> {
+  if (!isCognitoConfigured()) {
+    return Promise.reject(new Error('Cognito is not configured'));
+  }
+
+  const pool = getUserPool();
+  const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.confirmRegistration(code, true, (err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+/**
+ * Resend the confirmation code for an unverified user.
+ */
+export function resendConfirmationCode(email: string): Promise<void> {
+  if (!isCognitoConfigured()) {
+    return Promise.reject(new Error('Cognito is not configured'));
+  }
+
+  const pool = getUserPool();
+  const cognitoUser = new CognitoUser({ Username: email, Pool: pool });
+
+  return new Promise((resolve, reject) => {
+    cognitoUser.resendConfirmationCode((err) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+/**
  * Sign in with email and password.
  */
 export function signIn(email: string, password: string): Promise<AuthResult> {
