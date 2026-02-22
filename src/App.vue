@@ -63,6 +63,16 @@ const showLayout = computed(() => {
  * 2. File handle exists + needs permission → fallback to IndexedDB cache with warning
  * 3. No file handle → redirect to setup (which now requires file creation)
  */
+/** Redirect to setup if profile or onboarding is incomplete */
+function redirectToSetupIfNeeded(): boolean {
+  if (route.name === 'Setup') return false;
+  if (!familyStore.isSetupComplete || !settingsStore.onboardingCompleted) {
+    router.replace('/setup');
+    return true;
+  }
+  return false;
+}
+
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
@@ -83,10 +93,7 @@ async function loadFamilyData() {
   if (syncStore.isConfigured && !syncStore.needsPermission) {
     const hasData = await syncStore.loadFromFile();
     if (hasData) {
-      if (!familyStore.isSetupComplete && route.name !== 'Setup') {
-        router.replace('/setup');
-        return;
-      }
+      if (redirectToSetupIfNeeded()) return;
       memberFilterStore.initialize();
       const result = await processRecurringItems();
       if (result.processed > 0) {
@@ -108,11 +115,7 @@ async function loadFamilyData() {
   // Path 3: No file configured → check if data exists in IndexedDB (existing/migrated user)
   await familyStore.loadMembers();
 
-  if (!familyStore.isSetupComplete && route.name !== 'Setup') {
-    // No data and no file — redirect to setup (which now requires file creation)
-    router.replace('/setup');
-    return;
-  }
+  if (redirectToSetupIfNeeded()) return;
 
   // Existing user with IndexedDB data but no file configured — load normally
   // They'll be prompted to configure a file in setup step 3 or settings
@@ -140,10 +143,7 @@ async function loadFamilyData() {
 async function loadFromIndexedDBCache() {
   await familyStore.loadMembers();
 
-  if (!familyStore.isSetupComplete && route.name !== 'Setup') {
-    router.replace('/setup');
-    return;
-  }
+  if (redirectToSetupIfNeeded()) return;
 
   if (familyStore.isSetupComplete) {
     memberFilterStore.initialize();

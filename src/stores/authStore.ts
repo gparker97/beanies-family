@@ -12,6 +12,7 @@ import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
+import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 
 export interface AuthUser {
@@ -302,6 +303,10 @@ export const useAuthStore = defineStore('auth', () => {
           lastActiveAt: toISODateString(new Date()),
         });
       }
+
+      // Mark onboarding as not completed so new users see the setup wizard
+      const settingsStore = useSettingsStore();
+      await settingsStore.setOnboardingCompleted(false);
 
       // Sign up with Cognito
       const result = await cognitoService.signUp({
