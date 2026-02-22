@@ -5,8 +5,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
-import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useAnimatedCurrency } from '@/composables/useAnimatedCurrency';
 import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
@@ -22,8 +21,6 @@ import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } fro
 const accountsStore = useAccountsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
-const { formatInDisplayCurrency } = useCurrencyDisplay();
-const { formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
@@ -121,10 +118,22 @@ const accountsByType = computed(() => {
     }));
 });
 
-// Format totals (which are in base currency) to display currency, masked when privacy mode is on
-function formatTotal(amount: number): string {
-  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
-}
+// Animated summary card values
+const baseCurrency = computed(() => settingsStore.baseCurrency);
+const { formatted: animatedAssets } = useAnimatedCurrency(
+  computed(() => accountsStore.filteredTotalAssets),
+  baseCurrency
+);
+const { formatted: animatedLiabilities } = useAnimatedCurrency(
+  computed(() => accountsStore.filteredTotalLiabilities),
+  baseCurrency,
+  100
+);
+const { formatted: animatedNetWorth } = useAnimatedCurrency(
+  computed(() => accountsStore.filteredTotalBalance),
+  baseCurrency,
+  200
+);
 
 function getAccountTypeLabel(type: AccountType): string {
   return accountTypes.value.find((t) => t.value === type)?.label || type;
@@ -293,7 +302,7 @@ async function deleteAccount(id: string) {
           <div>
             <p class="text-sm font-medium text-green-100">{{ t('common.totalAssets') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(accountsStore.filteredTotalAssets) }}
+              {{ animatedAssets }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -308,7 +317,7 @@ async function deleteAccount(id: string) {
           <div>
             <p class="text-sm font-medium text-red-100">{{ t('common.totalLiabilities') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(accountsStore.filteredTotalLiabilities) }}
+              {{ animatedLiabilities }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -325,7 +334,7 @@ async function deleteAccount(id: string) {
           <div>
             <p class="text-sm font-medium text-white/80">{{ t('dashboard.netWorth') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(accountsStore.filteredTotalBalance) }}
+              {{ animatedNetWorth }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">

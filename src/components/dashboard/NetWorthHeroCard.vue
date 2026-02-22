@@ -10,8 +10,9 @@ import {
   Filler,
   Tooltip,
 } from 'chart.js';
+import { useCountUp } from '@/composables/useCountUp';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
-import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useTranslation } from '@/composables/useTranslation';
 import { getCurrencyInfo } from '@/constants/currencies';
 import type { CurrencyCode } from '@/types/models';
@@ -54,13 +55,24 @@ const { t } = useTranslation();
 
 const converted = computed(() => convertToDisplay(props.amount, props.currency));
 
+// Animate the hero net worth value — returns 0 when masked so
+// revealing numbers triggers a fresh count-up from zero
+const heroTarget = computed(() => (isUnlocked.value ? converted.value.displayAmount : 0));
+const { displayValue: animatedHero } = useCountUp(heroTarget, 0, 800);
 const formattedAmount = computed(() => {
   if (!isUnlocked.value) return MASK;
-  return converted.value.displayFormatted;
+  return formatCurrencyWithCode(animatedHero.value, converted.value.displayCurrency);
 });
 
 const changeConverted = computed(() =>
   convertToDisplay(Math.abs(props.changeAmount), props.currency)
+);
+
+// Animate the change amount
+const changeTarget = computed(() => (isUnlocked.value ? changeConverted.value.displayAmount : 0));
+const { displayValue: animatedChange } = useCountUp(changeTarget, 200);
+const formattedChange = computed(() =>
+  formatCurrencyWithCode(animatedChange.value, changeConverted.value.displayCurrency)
 );
 
 const isPositiveChange = computed(() => props.changeAmount >= 0);
@@ -296,7 +308,7 @@ const periodLabel = computed(() => {
             {{ isPositiveChange ? '+' : '' }}{{ changePercent.toFixed(1) }}% {{ periodLabel }}
           </span>
           <span v-if="changeAmount !== 0" class="opacity-60">
-            · {{ isPositiveChange ? '+' : '-' }}{{ changeConverted.displayFormatted }}
+            · {{ isPositiveChange ? '+' : '-' }}{{ formattedChange }}
           </span>
         </div>
       </div>
