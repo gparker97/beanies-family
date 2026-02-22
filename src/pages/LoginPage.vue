@@ -3,11 +3,13 @@ import { ref, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { isCognitoConfigured } from '@/config/cognito';
 import * as cognitoService from '@/services/auth/cognitoService';
 import { isWebAuthnSupported } from '@/services/auth/passkeyService';
 import { useAuthStore } from '@/stores/authStore';
 
+const { t } = useTranslation();
 const authStore = useAuthStore();
 
 const activeTab = ref<'signin' | 'signup'>('signin');
@@ -40,7 +42,7 @@ async function handleSignIn() {
   formError.value = null;
 
   if (!signInEmail.value || !signInPassword.value) {
-    formError.value = 'Please enter your email and password';
+    formError.value = t('auth.enterEmailPassword');
     return;
   }
 
@@ -58,17 +60,17 @@ async function handleSignUp() {
   formError.value = null;
 
   if (!signUpFamilyName.value || !signUpName.value || !signUpEmail.value || !signUpPassword.value) {
-    formError.value = 'Please fill in all fields';
+    formError.value = t('auth.fillAllFields');
     return;
   }
 
   if (signUpPassword.value !== signUpConfirmPassword.value) {
-    formError.value = 'Passwords do not match';
+    formError.value = t('auth.passwordsDoNotMatch');
     return;
   }
 
   if (signUpPassword.value.length < 8) {
-    formError.value = 'Password must be at least 8 characters';
+    formError.value = t('auth.passwordMinLength');
     return;
   }
 
@@ -80,10 +82,7 @@ async function handleSignUp() {
   });
 
   if (result.needsVerification) {
-    successMessage.value =
-      'Account created! We sent a verification link to ' +
-      signUpEmail.value +
-      '. Please click the link in the email to verify your account before signing in.';
+    successMessage.value = `${t('auth.accountCreated')} ${signUpEmail.value}. ${t('auth.verifyEmail')}`;
     activeTab.value = 'signin';
     signInEmail.value = signUpEmail.value;
     return;
@@ -105,7 +104,7 @@ async function handleMagicLink() {
   }
 
   if (!isCognitoConfigured()) {
-    formError.value = 'Authentication is not configured';
+    formError.value = t('auth.notConfigured');
     return;
   }
 
@@ -116,7 +115,7 @@ async function handleMagicLink() {
     } else if (result.error) {
       formError.value = result.error;
     } else {
-      formError.value = 'Unable to send magic link. Please try signing in with a password.';
+      formError.value = t('auth.magicLinkFailed');
     }
   } catch (err) {
     formError.value = err instanceof Error ? err.message : 'Failed to send magic link';
@@ -124,9 +123,7 @@ async function handleMagicLink() {
 }
 
 function handlePasskeySignIn() {
-  formError.value =
-    'Passkey sign-in requires server-side infrastructure (AWS Cognito WebAuthn challenge). ' +
-    'This will be available once the backend is deployed.';
+  formError.value = t('auth.passkeyNotAvailable');
 }
 
 async function handleContinueWithoutAuth() {
@@ -168,7 +165,7 @@ async function handleContinueWithoutAuth() {
               formError = null;
             "
           >
-            Sign In
+            {{ t('auth.signIn') }}
           </button>
           <button
             :class="[
@@ -184,7 +181,7 @@ async function handleContinueWithoutAuth() {
               formError = null;
             "
           >
-            Create Account
+            {{ t('auth.createAccount') }}
           </button>
         </div>
 
@@ -219,10 +216,10 @@ async function handleContinueWithoutAuth() {
                 d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
               />
             </svg>
-            <p class="font-medium text-gray-900 dark:text-gray-100">Check your email</p>
+            <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('auth.checkEmail') }}</p>
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              We sent a magic link to <strong>{{ magicLinkEmail }}</strong
-              >. Click the link to sign in.
+              {{ t('auth.magicLinkSentTo') }} <strong>{{ magicLinkEmail }}</strong
+              >. {{ t('auth.magicLinkAction') }}
             </p>
             <button
               class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 mt-4 text-sm"
@@ -231,7 +228,7 @@ async function handleContinueWithoutAuth() {
                 showMagicLink = false;
               "
             >
-              Back to sign in
+              {{ t('auth.backToSignIn') }}
             </button>
           </div>
 
@@ -248,7 +245,7 @@ async function handleContinueWithoutAuth() {
             </div>
 
             <BaseButton type="submit" class="mt-6 w-full" :disabled="authStore.isLoading">
-              {{ authStore.isLoading ? 'Sending...' : 'Send Magic Link' }}
+              {{ authStore.isLoading ? t('auth.sendingMagicLink') : t('auth.sendMagicLink') }}
             </BaseButton>
 
             <button
@@ -256,7 +253,7 @@ async function handleContinueWithoutAuth() {
               class="mt-3 w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               @click="showMagicLink = false"
             >
-              Sign in with password instead
+              {{ t('auth.signInPassword') }}
             </button>
           </form>
 
@@ -280,7 +277,7 @@ async function handleContinueWithoutAuth() {
             </div>
 
             <BaseButton type="submit" class="mt-6 w-full" :disabled="authStore.isLoading">
-              {{ authStore.isLoading ? 'Signing in...' : 'Sign In' }}
+              {{ authStore.isLoading ? t('auth.signingIn') : t('auth.signIn') }}
             </BaseButton>
 
             <!-- Alternative sign-in methods -->
@@ -293,7 +290,7 @@ async function handleContinueWithoutAuth() {
                   formError = null;
                 "
               >
-                Sign in with magic link
+                {{ t('auth.signInMagicLink') }}
               </button>
 
               <button
@@ -310,7 +307,7 @@ async function handleContinueWithoutAuth() {
                     d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
                   />
                 </svg>
-                Sign in with passkey
+                {{ t('auth.signInPasskey') }}
               </button>
             </div>
           </form>
@@ -321,11 +318,16 @@ async function handleContinueWithoutAuth() {
           <div class="space-y-4">
             <BaseInput
               v-model="signUpFamilyName"
-              label="Family Name"
-              placeholder="The Smith Family"
+              :label="t('auth.familyName')"
+              :placeholder="t('auth.familyNamePlaceholder')"
               required
             />
-            <BaseInput v-model="signUpName" label="Your Name" placeholder="John Smith" required />
+            <BaseInput
+              v-model="signUpName"
+              :label="t('setup.yourName')"
+              :placeholder="t('auth.yourNamePlaceholder')"
+              required
+            />
             <BaseInput
               v-model="signUpEmail"
               label="Email"
@@ -337,7 +339,7 @@ async function handleContinueWithoutAuth() {
               v-model="signUpPassword"
               label="Password"
               type="password"
-              placeholder="At least 8 characters"
+              :placeholder="t('auth.passwordPlaceholder')"
               required
             />
             <BaseInput
@@ -350,7 +352,7 @@ async function handleContinueWithoutAuth() {
           </div>
 
           <BaseButton type="submit" class="mt-6 w-full" :disabled="authStore.isLoading">
-            {{ authStore.isLoading ? 'Creating account...' : 'Create Account' }}
+            {{ authStore.isLoading ? t('auth.creatingAccount') : t('auth.createAccount') }}
           </BaseButton>
         </form>
 
@@ -360,7 +362,7 @@ async function handleContinueWithoutAuth() {
             class="w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             @click="handleContinueWithoutAuth"
           >
-            Continue without an account
+            {{ t('auth.continueWithoutAccount') }}
           </button>
         </div>
       </BaseCard>
@@ -374,7 +376,7 @@ async function handleContinueWithoutAuth() {
             class="mt-0.5 h-5 w-5 flex-shrink-0"
           />
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Your data is encrypted and stored in a file you control
+            {{ t('auth.securityEncrypted') }}
           </p>
         </div>
         <div class="flex items-start gap-3">
@@ -384,7 +386,7 @@ async function handleContinueWithoutAuth() {
             class="mt-0.5 h-5 w-5 flex-shrink-0"
           />
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            No data is stored on our servers — everything stays on your device
+            {{ t('auth.securityNoServers') }}
           </p>
         </div>
         <div class="flex items-start gap-3">
@@ -394,7 +396,7 @@ async function handleContinueWithoutAuth() {
             class="mt-0.5 h-5 w-5 flex-shrink-0"
           />
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Back up easily by saving your data file to Google Drive, Dropbox, or any cloud folder
+            {{ t('auth.securityBackup') }}
           </p>
         </div>
       </div>

@@ -6,6 +6,7 @@ import PasswordModal from '@/components/common/PasswordModal.vue';
 import { BaseButton, BaseInput, BaseSelect, BaseCard } from '@/components/ui';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
+import { useTranslation } from '@/composables/useTranslation';
 import { canAutoSync } from '@/services/sync/capabilities';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -17,6 +18,7 @@ const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
+const { t } = useTranslation();
 
 // Authenticated users already have an email from their account — no need to ask again
 const hasAuthEmail = computed(
@@ -63,19 +65,19 @@ function validateStep1(): boolean {
   errors.email = '';
 
   if (!form.name.trim()) {
-    errors.name = 'Name is required';
+    errors.name = t('setup.nameRequired');
     return false;
   }
 
   // Email validation only needed for local-only users (authenticated users have email from auth)
   if (!hasAuthEmail.value) {
     if (!form.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = t('setup.emailRequired');
       return false;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = t('setup.invalidEmail');
       return false;
     }
   }
@@ -156,7 +158,7 @@ async function handleCreateNewFile() {
     }
   } catch (error) {
     console.error('Failed to create file:', error);
-    loadFileError.value = 'Failed to create file. Please try again.';
+    loadFileError.value = t('setup.fileCreateFailed');
   } finally {
     isCreatingFile.value = false;
   }
@@ -173,7 +175,7 @@ async function handleSetEncryptionPassword(password: string) {
     syncStore.setupAutoSync();
     router.replace('/dashboard');
   } else {
-    loadFileError.value = 'Failed to encrypt file. You can configure encryption later in Settings.';
+    loadFileError.value = t('setup.encryptionFailed');
     // Still navigate — file was created, just not encrypted
     celebrate('setup-complete');
     syncStore.setupAutoSync();
@@ -283,7 +285,7 @@ function handleDecryptModalClose() {
         <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
           beanies.family
         </h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">Let's get you set up</p>
+        <p class="mt-2 text-gray-600 dark:text-gray-400">{{ t('setup.subtitle') }}</p>
       </div>
 
       <BaseCard>
@@ -316,13 +318,13 @@ function handleDecryptModalClose() {
         <!-- Step 1: Personal Info -->
         <div v-if="step === 1" class="space-y-4">
           <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Create Your Profile
+            {{ t('setup.createProfile') }}
           </h2>
 
           <BaseInput
             v-model="form.name"
-            label="Your Name"
-            placeholder="Enter your name"
+            :label="t('setup.yourName')"
+            :placeholder="t('setup.enterYourName')"
             :error="errors.name"
             required
           />
@@ -331,20 +333,20 @@ function handleDecryptModalClose() {
             v-if="!hasAuthEmail"
             v-model="form.email"
             type="email"
-            label="Email Address"
-            placeholder="Enter your email"
+            :label="t('setup.emailAddress')"
+            :placeholder="t('setup.enterYourEmail')"
             :error="errors.email"
             required
           />
 
           <div class="pt-4">
-            <BaseButton class="w-full" @click="nextStep"> Continue </BaseButton>
+            <BaseButton class="w-full" @click="nextStep"> {{ t('action.continue') }} </BaseButton>
           </div>
 
           <!-- Load existing data option -->
           <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
             <p class="mb-3 text-center text-sm text-gray-500 dark:text-gray-400">
-              Have an existing data file?
+              {{ t('setup.haveExistingFile') }}
             </p>
             <BaseButton
               variant="secondary"
@@ -360,7 +362,7 @@ function handleDecryptModalClose() {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                 />
               </svg>
-              Load Existing Family Data File
+              {{ t('setup.loadExistingFile') }}
             </BaseButton>
             <p v-if="loadFileError" class="mt-2 text-center text-sm text-red-600 dark:text-red-400">
               {{ loadFileError }}
@@ -371,32 +373,32 @@ function handleDecryptModalClose() {
         <!-- Step 2: Preferences -->
         <div v-if="step === 2" class="space-y-4">
           <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Set Your Preferences
+            {{ t('setup.setPreferences') }}
           </h2>
 
           <BaseSelect
             v-model="form.baseCurrency"
             :options="currencyOptions"
-            label="Base Currency"
-            hint="This will be your primary currency for displaying totals"
+            :label="t('settings.baseCurrency')"
+            :hint="t('setup.baseCurrencyHint')"
           />
 
           <div class="flex gap-3 pt-4">
-            <BaseButton variant="secondary" class="flex-1" @click="prevStep"> Back </BaseButton>
-            <BaseButton class="flex-1" @click="nextStep"> Continue </BaseButton>
+            <BaseButton variant="secondary" class="flex-1" @click="prevStep">
+              {{ t('action.back') }}
+            </BaseButton>
+            <BaseButton class="flex-1" @click="nextStep"> {{ t('action.continue') }} </BaseButton>
           </div>
         </div>
 
         <!-- Step 3: Secure Your Data -->
         <div v-if="step === 3" class="space-y-4">
           <h2 class="mb-4 text-xl font-semibold text-gray-900 dark:text-gray-100">
-            Secure Your Data
+            {{ t('setup.secureData') }}
           </h2>
 
           <p class="text-sm text-gray-600 dark:text-gray-400">
-            Your data is encrypted and saved to a file you control. No data is stored on our
-            servers. You can place this file in Google Drive, Dropbox, or any synced folder for
-            cloud backup.
+            {{ t('setup.securityDescription') }}
           </p>
 
           <!-- Security feature list -->
@@ -408,7 +410,7 @@ function handleDecryptModalClose() {
                 class="mt-0.5 h-5 w-5 flex-shrink-0"
               />
               <p class="text-secondary-500 dark:text-sky-silk-300 text-sm">
-                Encrypted with a password only you know
+                {{ t('setup.securityEncrypted') }}
               </p>
             </div>
             <div class="flex items-start gap-3">
@@ -418,7 +420,7 @@ function handleDecryptModalClose() {
                 class="mt-0.5 h-5 w-5 flex-shrink-0"
               />
               <p class="text-secondary-500 dark:text-sky-silk-300 text-sm">
-                Saved automatically as you make changes
+                {{ t('setup.securityAutoSaved') }}
               </p>
             </div>
             <div class="flex items-start gap-3">
@@ -428,7 +430,7 @@ function handleDecryptModalClose() {
                 class="mt-0.5 h-5 w-5 flex-shrink-0"
               />
               <p class="text-secondary-500 dark:text-sky-silk-300 text-sm">
-                You control where the file is stored
+                {{ t('setup.securityYouControl') }}
               </p>
             </div>
           </div>
@@ -444,7 +446,7 @@ function handleDecryptModalClose() {
                   d="M12 6v6m0 0v6m0-6h6m-6 0H6"
                 />
               </svg>
-              Create New Family Data File
+              {{ t('setup.createDataFile') }}
             </BaseButton>
             <BaseButton
               variant="secondary"
@@ -460,7 +462,7 @@ function handleDecryptModalClose() {
                   d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
                 />
               </svg>
-              Load Existing Family Data File
+              {{ t('setup.loadExistingFile') }}
             </BaseButton>
           </div>
 
@@ -470,11 +472,11 @@ function handleDecryptModalClose() {
               class="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
             >
               <p class="text-sm text-amber-800 dark:text-amber-200">
-                For automatic saving, use Chrome or Edge. You can still download your data manually.
+                {{ t('setup.browserWarning') }}
               </p>
             </div>
             <BaseButton class="w-full" :loading="isSubmitting" @click="handleDownloadFallback">
-              Download Your Data
+              {{ t('setup.downloadData') }}
             </BaseButton>
           </div>
 
@@ -483,23 +485,25 @@ function handleDecryptModalClose() {
           </p>
 
           <div class="pt-2">
-            <BaseButton variant="secondary" class="w-full" @click="prevStep"> Back </BaseButton>
+            <BaseButton variant="secondary" class="w-full" @click="prevStep">
+              {{ t('action.back') }}
+            </BaseButton>
           </div>
         </div>
       </BaseCard>
 
       <!-- Footer -->
       <p class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        Your data is encrypted and stored in a file you control — not on our servers.
+        {{ t('setup.footerNote') }}
       </p>
     </div>
 
     <!-- Encrypt File Password Modal (for new file creation) -->
     <PasswordModal
       :open="showEncryptModal"
-      title="Set Encryption Password"
-      description="Choose a strong password to protect your data file. You'll need this password each time you open the app."
-      confirm-label="Set Password & Continue"
+      :title="t('password.setPassword')"
+      :description="t('password.strongPasswordDescription')"
+      :confirm-label="t('password.setAndContinue')"
       :require-confirmation="true"
       @close="handleSkipEncryption"
       @confirm="handleSetEncryptionPassword"
@@ -508,9 +512,9 @@ function handleDecryptModalClose() {
     <!-- Decrypt File Password Modal (for loading existing file) -->
     <PasswordModal
       :open="showDecryptModal"
-      title="Enter Password"
-      description="This file is encrypted. Enter your password to decrypt and load your data."
-      confirm-label="Decrypt & Load"
+      :title="t('password.enterPassword')"
+      :description="t('password.encryptedFileDescription')"
+      :confirm-label="t('password.decryptAndLoad')"
       @close="handleDecryptModalClose"
       @confirm="handleDecryptFile"
     />
@@ -535,7 +539,9 @@ function handleDecryptModalClose() {
           />
         </svg>
         <div>
-          <p class="text-sm font-medium text-red-800 dark:text-red-200">Decryption Error</p>
+          <p class="text-sm font-medium text-red-800 dark:text-red-200">
+            {{ t('password.decryptionError') }}
+          </p>
           <p class="mt-1 text-sm text-red-600 dark:text-red-300">{{ decryptError }}</p>
         </div>
         <button

@@ -3,11 +3,13 @@ import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { isCognitoConfigured } from '@/config/cognito';
 import * as cognitoService from '@/services/auth/cognitoService';
 import * as tokenManager from '@/services/auth/tokenManager';
 import { useAuthStore } from '@/stores/authStore';
 
+const { t } = useTranslation();
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
@@ -20,13 +22,13 @@ onMounted(async () => {
 
   if (!code || !email) {
     status.value = 'error';
-    errorMessage.value = 'Invalid magic link. Please request a new one.';
+    errorMessage.value = t('auth.invalidMagicLink');
     return;
   }
 
   if (!isCognitoConfigured()) {
     status.value = 'error';
-    errorMessage.value = 'Authentication is not configured.';
+    errorMessage.value = t('auth.notConfigured');
     return;
   }
 
@@ -42,7 +44,7 @@ onMounted(async () => {
 
     if (initResult.challengeName !== 'CUSTOM_CHALLENGE' || !initResult.cognitoUser) {
       status.value = 'error';
-      errorMessage.value = initResult.error || 'Unexpected authentication state.';
+      errorMessage.value = initResult.error || t('auth.unexpectedState');
       return;
     }
 
@@ -56,7 +58,7 @@ onMounted(async () => {
       await handleSuccessfulAuth(challengeResult.session);
     } else {
       status.value = 'error';
-      errorMessage.value = challengeResult.error || 'Invalid or expired magic link code.';
+      errorMessage.value = challengeResult.error || t('auth.expiredMagicLink');
     }
   } catch (err) {
     status.value = 'error';
@@ -96,7 +98,7 @@ function goToLogin() {
     <BaseCard class="w-full max-w-md text-center">
       <div v-if="status === 'verifying'" class="py-8">
         <BeanieSpinner size="md" class="mx-auto mb-4" />
-        <p class="text-gray-600 dark:text-gray-400">Verifying your magic link...</p>
+        <p class="text-gray-600 dark:text-gray-400">{{ t('auth.verifyingMagicLink') }}</p>
       </div>
 
       <div v-if="status === 'success'" class="py-8">
@@ -113,7 +115,7 @@ function goToLogin() {
             d="M5 13l4 4L19 7"
           />
         </svg>
-        <p class="text-gray-600 dark:text-gray-400">Signed in successfully! Redirecting...</p>
+        <p class="text-gray-600 dark:text-gray-400">{{ t('auth.signedInRedirecting') }}</p>
       </div>
 
       <div v-if="status === 'error'" class="py-8">
@@ -122,7 +124,7 @@ function goToLogin() {
           class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 text-sm"
           @click="goToLogin"
         >
-          Back to login
+          {{ t('auth.backToLogin') }}
         </button>
       </div>
     </BaseCard>

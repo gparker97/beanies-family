@@ -85,38 +85,38 @@ function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): numb
 // ============ FILTERS ============
 
 // Date range filter - extended to 20 years
-const dateRangeOptions = [
-  { value: '3m', label: 'Next 3 Months' },
-  { value: '6m', label: 'Next 6 Months' },
-  { value: '1y', label: 'Next 1 Year' },
-  { value: '2y', label: 'Next 2 Years' },
-  { value: '5y', label: 'Next 5 Years' },
-  { value: '10y', label: 'Next 10 Years' },
-  { value: '15y', label: 'Next 15 Years' },
-  { value: '20y', label: 'Next 20 Years' },
-];
+const dateRangeOptions = computed(() => [
+  { value: '3m', label: t('reports.next3Months') },
+  { value: '6m', label: t('reports.next6Months') },
+  { value: '1y', label: t('reports.next1Year') },
+  { value: '2y', label: t('reports.next2Years') },
+  { value: '5y', label: t('reports.next5Years') },
+  { value: '10y', label: t('reports.next10Years') },
+  { value: '15y', label: t('reports.next15Years') },
+  { value: '20y', label: t('reports.next20Years') },
+]);
 const selectedDateRange = ref('1y');
 
 // Family member filter
 const familyMemberOptions = computed(() => [
-  { value: 'all', label: 'All Family Members' },
+  { value: 'all', label: t('reports.allFamilyMembers') },
   ...familyStore.members.map((m) => ({ value: m.id, label: m.name })),
 ]);
 const selectedMember = ref('all');
 
 // Income vs Expenses time range - added current and previous month
-const incomeExpenseRangeOptions = [
-  { value: 'current', label: 'Current Month' },
-  { value: 'previous', label: 'Previous Month' },
-  { value: '6m', label: 'Last 6 Months' },
-  { value: '1y', label: 'Last 12 Months' },
-  { value: '2y', label: 'Last 2 Years' },
-];
+const incomeExpenseRangeOptions = computed(() => [
+  { value: 'current', label: t('date.currentMonth') },
+  { value: 'previous', label: t('date.previousMonth') },
+  { value: '6m', label: t('date.last6Months') },
+  { value: '1y', label: t('date.last12Months') },
+  { value: '2y', label: t('date.last2Years') },
+]);
 const selectedIncomeExpenseRange = ref('1y');
 
 // Category filter for income/expenses
 const categoryOptions = computed(() => [
-  { value: 'all', label: 'All Categories' },
+  { value: 'all', label: t('reports.allCategories') },
   ...ALL_CATEGORIES.map((c) => ({ value: c.id, label: c.name })),
 ]);
 const selectedCategory = ref('all');
@@ -272,7 +272,7 @@ const netWorthProjection = computed(() => {
       labels,
       datasets: [
         {
-          label: 'Projected Net Worth',
+          label: t('reports.projectedNetWorth'),
           data,
           borderColor: 'rgb(59, 130, 246)',
           backgroundColor: 'rgba(59, 130, 246, 0.1)',

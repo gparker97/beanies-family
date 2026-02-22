@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { BaseModal, BaseButton, BaseInput } from '@/components/ui';
+import { useTranslation } from '@/composables/useTranslation';
 
 interface Props {
   open: boolean;
@@ -11,9 +12,9 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  title: 'Enter Password',
-  description: 'Enter your encryption password to continue.',
-  confirmLabel: 'Confirm',
+  title: undefined,
+  description: undefined,
+  confirmLabel: undefined,
   requireConfirmation: false,
 });
 
@@ -21,6 +22,14 @@ const emit = defineEmits<{
   close: [];
   confirm: [password: string];
 }>();
+
+const { t } = useTranslation();
+
+const resolvedTitle = computed(() => props.title ?? t('password.enterPassword'));
+const resolvedDescription = computed(
+  () => props.description ?? t('password.enterPasswordDescription')
+);
+const resolvedConfirmLabel = computed(() => props.confirmLabel ?? t('action.confirm'));
 
 const password = ref('');
 const confirmPassword = ref('');
@@ -42,12 +51,12 @@ function handleSubmit() {
   error.value = null;
 
   if (!password.value) {
-    error.value = 'Password is required';
+    error.value = t('password.required');
     return;
   }
 
   if (props.requireConfirmation && !passwordsMatch.value) {
-    error.value = 'Passwords do not match';
+    error.value = t('password.mismatch');
     return;
   }
 
@@ -69,18 +78,18 @@ function resetForm() {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="title" @close="handleClose">
+  <BaseModal :open="open" :title="resolvedTitle" @close="handleClose">
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <p class="text-sm text-gray-600 dark:text-gray-400">
-        {{ description }}
+        {{ resolvedDescription }}
       </p>
 
       <div class="relative">
         <BaseInput
           v-model="password"
           :type="showPassword ? 'text' : 'password'"
-          label="Password"
-          placeholder="Enter password"
+          :label="t('password.password')"
+          :placeholder="t('password.enterPasswordPlaceholder')"
           autocomplete="current-password"
         />
         <button
@@ -125,12 +134,12 @@ function resetForm() {
         <BaseInput
           v-model="confirmPassword"
           :type="showPassword ? 'text' : 'password'"
-          label="Confirm Password"
-          placeholder="Confirm password"
+          :label="t('password.confirmPassword')"
+          :placeholder="t('password.confirmPasswordPlaceholder')"
           autocomplete="new-password"
         />
         <p v-if="confirmPassword && !passwordsMatch" class="mt-1 text-sm text-red-500">
-          Passwords do not match
+          {{ t('password.mismatch') }}
         </p>
       </div>
 
@@ -139,9 +148,11 @@ function resetForm() {
       </div>
 
       <div class="flex justify-end gap-3 pt-4">
-        <BaseButton variant="ghost" type="button" @click="handleClose"> Cancel </BaseButton>
+        <BaseButton variant="ghost" type="button" @click="handleClose">
+          {{ t('action.cancel') }}
+        </BaseButton>
         <BaseButton type="submit" :disabled="!canSubmit">
-          {{ confirmLabel }}
+          {{ resolvedConfirmLabel }}
         </BaseButton>
       </div>
     </form>

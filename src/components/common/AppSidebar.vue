@@ -42,9 +42,9 @@ function navigateTo(path: string) {
 }
 
 const encryptionTitle = computed(() => {
-  if (!syncStore.isConfigured) return 'No data file configured';
-  if (syncStore.isEncryptionEnabled) return 'Data encrypted (AES-256-GCM)';
-  return 'Data file not encrypted';
+  if (!syncStore.isConfigured) return t('sidebar.noDataFileConfigured');
+  if (syncStore.isEncryptionEnabled) return t('sidebar.dataEncryptedFull');
+  return t('sidebar.dataFileNotEncrypted');
 });
 </script>
 
@@ -119,7 +119,9 @@ const encryptionTitle = computed(() => {
             {{ familyStore.owner.name }}
           </p>
           <p class="truncate text-[0.85rem] text-white/35">
-            {{ familyStore.owner.role === 'owner' ? 'Owner' : familyStore.owner.role }}
+            {{
+              familyStore.owner.role === 'owner' ? t('family.role.owner') : familyStore.owner.role
+            }}
           </p>
         </div>
       </div>
@@ -202,10 +204,10 @@ const encryptionTitle = computed(() => {
         >
           {{
             !syncStore.isConfigured
-              ? 'No data file'
+              ? t('sidebar.noDataFile')
               : syncStore.isEncryptionEnabled
-                ? 'Data encrypted'
-                : 'Not encrypted'
+                ? t('sidebar.dataEncrypted')
+                : t('sidebar.notEncrypted')
           }}
         </span>
       </div>
