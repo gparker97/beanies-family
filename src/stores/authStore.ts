@@ -307,6 +307,7 @@ export const useAuthStore = defineStore('auth', () => {
       const result = await cognitoService.signUp({
         email: params.email,
         password: params.password,
+        name: params.memberName,
         familyId: family.id,
         familyRole: 'owner',
       });
