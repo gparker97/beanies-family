@@ -88,15 +88,18 @@ function resetAllStores() {
 
 async function handleSignOut() {
   close();
-  resetAllStores();
+  // Sign out first — flushes pending saves while sync service still has the
+  // file handle and session password, preventing plaintext writes
   await authStore.signOut();
+  resetAllStores();
   router.replace('/login');
 }
 
 async function handleSignOutAndClearData() {
   close();
-  resetAllStores();
+  // Sign out first — flushes pending saves while session password is still available
   await authStore.signOutAndClearData();
+  resetAllStores();
   router.replace('/login');
 }
 
