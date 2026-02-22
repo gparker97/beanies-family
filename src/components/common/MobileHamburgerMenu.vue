@@ -9,10 +9,16 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES } from '@/constants/languages';
 import { NAV_ITEMS } from '@/constants/navigation';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
+import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -22,6 +28,7 @@ const emit = defineEmits<{ close: [] }>();
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 const settingsStore = useSettingsStore();
@@ -65,6 +72,32 @@ function navigateTo(path: string) {
 function handlePrivacyToggle() {
   togglePrivacy();
   playBlink();
+}
+
+function resetAllStores() {
+  useSyncStore().resetState();
+  useFamilyStore().resetState();
+  useAccountsStore().resetState();
+  useTransactionsStore().resetState();
+  useAssetsStore().resetState();
+  useGoalsStore().resetState();
+  useRecurringStore().resetState();
+  useSettingsStore().resetState();
+  useMemberFilterStore().resetState();
+}
+
+async function handleSignOut() {
+  close();
+  resetAllStores();
+  await authStore.signOut();
+  router.replace('/login');
+}
+
+async function handleSignOutAndClearData() {
+  close();
+  resetAllStores();
+  await authStore.signOutAndClearData();
+  router.replace('/login');
 }
 
 async function selectLanguage(code: LanguageCode) {
@@ -355,6 +388,28 @@ const encryptionLabel = computed(() => {
                   <polyline points="14 2 14 8 20 8" />
                 </svg>
                 <span class="truncate text-[0.6rem] text-white/30">{{ syncStore.fileName }}</span>
+              </div>
+
+              <!-- Sign out buttons (cloud users only) -->
+              <div
+                v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
+                class="space-y-1"
+              >
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-[0.8rem] text-red-400 transition-colors hover:bg-white/[0.05]"
+                  @click="handleSignOut"
+                >
+                  {{ t('auth.signOut') }}
+                </button>
+                <button
+                  v-if="settingsStore.isTrustedDevice"
+                  type="button"
+                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-[0.75rem] text-white/40 transition-colors hover:bg-white/[0.05]"
+                  @click="handleSignOutAndClearData"
+                >
+                  {{ t('auth.signOutClearData') }}
+                </button>
               </div>
 
               <!-- Version -->

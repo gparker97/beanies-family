@@ -8,6 +8,7 @@ import MobileHamburgerMenu from '@/components/common/MobileHamburgerMenu.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
@@ -44,6 +45,17 @@ const { isMobile, isDesktop } = useBreakpoint();
 
 const isInitializing = ref(true);
 const isMenuOpen = ref(false);
+const showTrustPrompt = ref(false);
+
+function handleTrustDevice() {
+  settingsStore.setTrustedDevice(true);
+  showTrustPrompt.value = false;
+}
+
+function handleDeclineTrust() {
+  settingsStore.setTrustedDevicePromptShown();
+  showTrustPrompt.value = false;
+}
 
 const showLayout = computed(() => {
   // Don't show sidebar/header on setup, login, magic link callback, or 404 pages
@@ -277,6 +289,15 @@ onMounted(async () => {
     if (settingsStore.exchangeRateAutoUpdate) {
       updateRatesIfStale().catch(console.error);
     }
+    // Show trust device prompt for cloud users who haven't been asked yet
+    if (
+      authStore.isAuthenticated &&
+      !authStore.isLocalOnlyMode &&
+      !settingsStore.trustedDevicePromptShown &&
+      familyStore.isSetupComplete
+    ) {
+      showTrustPrompt.value = true;
+    }
   } finally {
     // Always dismiss the loading overlay, even on early return or error
     isInitializing.value = false;
@@ -306,6 +327,11 @@ onMounted(async () => {
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />
     <ConfirmModal />
+    <TrustDeviceModal
+      :open="showTrustPrompt"
+      @trust="handleTrustDevice"
+      @decline="handleDeclineTrust"
+    />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <!-- Desktop sidebar -->

@@ -852,6 +852,22 @@ const STRING_DEFS = {
     en: 'Remove this passkey? You will no longer be able to sign in with it.',
   },
 
+  // Trusted device
+  'trust.title': { en: 'Trust this device?' },
+  'trust.description': {
+    en: 'Keep your data cached locally for instant access next time you sign in.',
+  },
+  'trust.trustButton': { en: 'Trust this device' },
+  'trust.notNow': { en: 'Not now' },
+  'trust.hint': {
+    en: 'You can change this in Settings. Use "Sign out & clear data" to remove cached data.',
+  },
+  'trust.settingsLabel': { en: 'Trusted device' },
+  'trust.settingsDesc': {
+    en: 'Keep data cached locally between sign-ins for faster access',
+  },
+  'auth.signOutClearData': { en: 'Sign out & clear data' },
+
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
   'mobile.pod': { en: 'Pod', beanie: 'Pod' },

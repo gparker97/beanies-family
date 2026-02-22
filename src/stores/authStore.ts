@@ -348,8 +348,9 @@ export const useAuthStore = defineStore('auth', () => {
       await tokenManager.clearCachedSession(currentUser.value.userId);
     }
 
-    // Delete the per-family IndexedDB cache (ephemeral — data lives in the file)
-    if (familyId) {
+    // Delete the per-family IndexedDB cache unless this is a trusted device
+    const settingsStore = useSettingsStore();
+    if (familyId && !settingsStore.isTrustedDevice) {
       try {
         await deleteFamilyDatabase(familyId);
       } catch (e) {
@@ -358,6 +359,46 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     // Clear local-only mode flag from persistent storage
+    try {
+      await saveGlobalSettings({ isLocalOnlyMode: false });
+    } catch {
+      // Registry may already be cleared
+    }
+
+    // Clear auth state
+    currentUser.value = null;
+    isAuthenticated.value = false;
+    isOfflineSession.value = false;
+    isLocalOnlyMode.value = false;
+  }
+
+  /**
+   * Sign out and always clear the per-family IndexedDB cache,
+   * regardless of trusted device status. Also resets the trust flag.
+   */
+  async function signOutAndClearData(): Promise<void> {
+    const familyId = currentUser.value?.familyId;
+
+    cognitoService.signOut();
+
+    if (currentUser.value?.userId) {
+      await tokenManager.clearCachedSession(currentUser.value.userId);
+    }
+
+    // Always delete regardless of trust setting
+    if (familyId) {
+      try {
+        await deleteFamilyDatabase(familyId);
+      } catch (e) {
+        console.warn('Failed to delete family database on sign-out:', e);
+      }
+    }
+
+    // Clear trust flag
+    const settingsStore = useSettingsStore();
+    await settingsStore.setTrustedDevice(false);
+
+    // Clear local-only mode flag
     try {
       await saveGlobalSettings({ isLocalOnlyMode: false });
     } catch {
@@ -399,6 +440,7 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signUp,
     signOut,
+    signOutAndClearData,
     continueWithoutAuth,
   };
 });
