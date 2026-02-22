@@ -260,12 +260,20 @@ export async function save(password?: string): Promise<boolean> {
       const encryptedData = await encryptSyncData(dataJson, password);
 
       // Create encrypted file format - store encrypted data as string in data field
-      const encryptedSyncData = {
+      // Preserve envelope fields (familyId, familyName) so the file can be identified
+      // without decryption (e.g., for family resolution on a new device)
+      const encryptedSyncData: Record<string, unknown> = {
         version: syncData.version,
         exportedAt: syncData.exportedAt,
         encrypted: true,
         data: encryptedData, // This is now a string (base64 encrypted)
       };
+      if (syncData.familyId) {
+        encryptedSyncData.familyId = syncData.familyId;
+      }
+      if (syncData.familyName) {
+        encryptedSyncData.familyName = syncData.familyName;
+      }
       fileContent = JSON.stringify(encryptedSyncData, null, 2);
     } else {
       fileContent = JSON.stringify(syncData, null, 2);
@@ -657,11 +665,14 @@ export async function decryptAndImport(
     const decryptedData = JSON.parse(decryptedJson);
 
     // Reconstruct the sync data with decrypted content
+    // Carry over envelope fields (familyId, familyName) from the outer wrapper
     const syncData: SyncFileData = {
       version: rawSyncData.version,
       exportedAt: rawSyncData.exportedAt,
       encrypted: false, // Mark as decrypted for import
       data: decryptedData,
+      familyId: rawSyncData.familyId,
+      familyName: rawSyncData.familyName,
     };
 
     // Validate the decrypted data structure
