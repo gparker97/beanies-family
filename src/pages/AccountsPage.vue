@@ -10,6 +10,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
+import { confirm as showConfirm } from '@/composables/useConfirm';
 import { COUNTRIES } from '@/constants/countries';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
@@ -263,7 +264,9 @@ async function saveEdit() {
 }
 
 async function deleteAccount(id: string) {
-  if (confirm('Are you sure you want to delete this account?')) {
+  if (
+    await showConfirm({ title: 'confirm.deleteAccountTitle', message: 'accounts.deleteConfirm' })
+  ) {
     await accountsStore.deleteAccount(id);
     playWhoosh();
   }

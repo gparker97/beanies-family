@@ -12,6 +12,7 @@ import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
+import { confirm as showConfirm } from '@/composables/useConfirm';
 import { EXPENSE_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
@@ -333,7 +334,12 @@ async function updateTransaction() {
 }
 
 async function deleteTransaction(id: string) {
-  if (confirm(t('transactions.deleteConfirm'))) {
+  if (
+    await showConfirm({
+      title: 'confirm.deleteTransactionTitle',
+      message: 'transactions.deleteConfirm',
+    })
+  ) {
     await transactionsStore.deleteTransaction(id);
     playWhoosh();
   }
@@ -371,7 +377,9 @@ function handleRecurringCancel() {
 }
 
 async function deleteRecurringItem(id: string) {
-  if (confirm(t('recurring.deleteConfirm'))) {
+  if (
+    await showConfirm({ title: 'confirm.deleteRecurringTitle', message: 'recurring.deleteConfirm' })
+  ) {
     await recurringStore.deleteRecurringItem(id);
     playWhoosh();
   }

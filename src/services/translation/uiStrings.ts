@@ -545,8 +545,8 @@ const STRING_DEFS = {
   // Dashboard (additional)
   'dashboard.savingsGoals': { en: 'Savings Goals', beanie: 'Bean Dreams' },
   'dashboard.seeAll': { en: 'See All →' },
-  'dashboard.yourBeans': { en: 'Your Beans', beanie: 'The Pod' },
-  'dashboard.addBean': { en: 'Add Bean', beanie: 'Add Beanie' },
+  'dashboard.yourBeans': { en: 'Your Family', beanie: 'The Pod' },
+  'dashboard.addBean': { en: 'Add Family Member', beanie: 'Add a Beanie' },
   'dashboard.healthy': { en: 'Healthy', beanie: 'Growing Strong' },
   'dashboard.savingsRate': { en: 'savings rate' },
   'dashboard.recurringSummary': { en: 'Recurring Summary', beanie: 'Regular Bean Summary' },
@@ -814,11 +814,43 @@ const STRING_DEFS = {
   'auth.expiredMagicLink': { en: 'Invalid or expired magic link code.' },
 
   // Common actions (additional)
+  'action.ok': { en: 'OK' },
   'action.continue': { en: 'Continue' },
   'action.apply': { en: 'Apply' },
   'action.download': { en: 'Download' },
   'action.load': { en: 'Load' },
   'action.seeAll': { en: 'See All' },
+
+  // Confirmation dialog titles
+  'confirm.deleteAccountTitle': { en: 'Delete Account', beanie: 'Remove Bean Jar' },
+  'confirm.deleteTransactionTitle': { en: 'Delete Transaction', beanie: 'Remove Bean Move' },
+  'confirm.deleteRecurringTitle': { en: 'Delete Recurring Item', beanie: 'Remove Regular Bean' },
+  'confirm.deleteAssetTitle': { en: 'Delete Asset', beanie: 'Remove Valuable Bean' },
+  'confirm.deleteGoalTitle': { en: 'Delete Goal', beanie: 'Remove Bean Dream' },
+  'confirm.deleteMemberTitle': { en: 'Remove Family Member', beanie: 'Remove Beanie' },
+  'confirm.removePasskeyTitle': { en: 'Remove Passkey' },
+  'confirm.cannotDeleteOwnerTitle': { en: 'Cannot Delete Owner' },
+
+  // Confirmation dialog messages
+  'accounts.deleteConfirm': {
+    en: 'Are you sure you want to delete this account?',
+    beanie: 'Remove this bean jar for good?',
+  },
+  'assets.deleteConfirm': {
+    en: 'Are you sure you want to delete this asset?',
+    beanie: 'Remove this valuable bean?',
+  },
+  'goals.deleteConfirm': {
+    en: 'Are you sure you want to delete this goal?',
+    beanie: 'Remove this bean dream for good?',
+  },
+  'goals.deleteCompletedConfirm': {
+    en: 'Are you sure you want to delete this completed goal?',
+    beanie: 'Remove this finished bean dream?',
+  },
+  'passkey.removeConfirm': {
+    en: 'Remove this passkey? You will no longer be able to sign in with it.',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**

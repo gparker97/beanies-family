@@ -8,6 +8,7 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
+import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
@@ -216,7 +217,7 @@ async function updateGoal() {
 }
 
 async function deleteGoal(id: string) {
-  if (confirm('Are you sure you want to delete this goal?')) {
+  if (await showConfirm({ title: 'confirm.deleteGoalTitle', message: 'goals.deleteConfirm' })) {
     await goalsStore.deleteGoal(id);
     playWhoosh();
   }
@@ -236,7 +237,9 @@ async function reopenGoal(id: string) {
 }
 
 async function deleteCompletedGoal(id: string) {
-  if (confirm('Are you sure you want to delete this completed goal?')) {
+  if (
+    await showConfirm({ title: 'confirm.deleteGoalTitle', message: 'goals.deleteCompletedConfirm' })
+  ) {
     await goalsStore.deleteGoal(id);
     playWhoosh();
   }

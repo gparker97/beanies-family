@@ -10,6 +10,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
+import { confirm as showConfirm } from '@/composables/useConfirm';
 import { COUNTRIES } from '@/constants/countries';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
@@ -316,7 +317,7 @@ async function saveEdit() {
 }
 
 async function deleteAsset(id: string) {
-  if (confirm('Are you sure you want to delete this asset?')) {
+  if (await showConfirm({ title: 'confirm.deleteAssetTitle', message: 'assets.deleteConfirm' })) {
     await assetsStore.deleteAsset(id);
     playWhoosh();
   }
