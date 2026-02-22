@@ -35,3 +35,7 @@ module "frontend" {
   }
 }
 
+module "registry" {
+  source = "./modules/registry"
+  table_name = "family_registry"
+}
