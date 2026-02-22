@@ -4,6 +4,7 @@ import {
   getActiveFamilyId,
   type ExportedData,
 } from '@/services/indexeddb/database';
+import { getFamilyById } from '@/services/familyContext';
 import { getSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import type { SyncFileData } from '@/types/models';
 import { SYNC_FILE_VERSION } from '@/types/models';
@@ -25,6 +26,10 @@ export async function createSyncFileData(encrypted = false): Promise<SyncFileDat
   const familyId = getActiveFamilyId();
   if (familyId) {
     syncData.familyId = familyId;
+    const family = await getFamilyById(familyId);
+    if (family) {
+      syncData.familyName = family.name;
+    }
   }
 
   return syncData;
@@ -44,6 +49,13 @@ export function validateSyncFileData(data: unknown): data is SyncFileData {
   if (typeof obj.version !== 'string') return false;
   if (typeof obj.exportedAt !== 'string') return false;
   if (typeof obj.encrypted !== 'boolean') return false;
+
+  // For encrypted files, the data field is a base64 string (not an object)
+  if (obj.encrypted === true) {
+    return typeof obj.data === 'string';
+  }
+
+  // For unencrypted files, validate the full data structure
   if (!obj.data || typeof obj.data !== 'object') return false;
 
   const innerData = obj.data as Record<string, unknown>;

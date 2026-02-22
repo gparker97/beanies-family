@@ -135,15 +135,17 @@ function resetAllStores() {
 
 async function handleSignOut() {
   showProfileDropdown.value = false;
-  resetAllStores();
+  // Sign out first — flushes pending saves while sync service still has the
+  // file handle, and reads isTrustedDevice before stores are reset
   await authStore.signOut();
+  resetAllStores();
   router.replace('/login');
 }
 
 async function handleSignOutAndClearData() {
   showProfileDropdown.value = false;
-  resetAllStores();
   await authStore.signOutAndClearData();
+  resetAllStores();
   router.replace('/login');
 }
 </script>
