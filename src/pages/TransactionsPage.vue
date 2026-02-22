@@ -8,8 +8,7 @@ import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
-import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useAnimatedCurrency } from '@/composables/useAnimatedCurrency';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -45,8 +44,6 @@ const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
-const { formatInDisplayCurrency } = useCurrencyDisplay();
-const { formatMasked } = usePrivacyMode();
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 
@@ -237,10 +234,49 @@ const dateFilteredExpenses = computed(() =>
     .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
 );
 
-// Format totals (which are in base currency) to display currency, masked when privacy mode is on
-function formatTotal(amount: number): string {
-  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
-}
+// Animated summary card values
+const baseCurrency = computed(() => settingsStore.baseCurrency);
+
+// Transaction tab cards
+const periodIncomeTotal = computed(
+  () =>
+    dateFilteredIncome.value +
+    (dateFilterType.value === 'current_month'
+      ? recurringStore.filteredTotalMonthlyRecurringIncome
+      : 0)
+);
+const periodExpensesTotal = computed(
+  () =>
+    dateFilteredExpenses.value +
+    (dateFilterType.value === 'current_month'
+      ? recurringStore.filteredTotalMonthlyRecurringExpenses
+      : 0)
+);
+const periodNetTotal = computed(() => periodIncomeTotal.value - periodExpensesTotal.value);
+
+const { formatted: animatedPeriodIncome } = useAnimatedCurrency(periodIncomeTotal, baseCurrency);
+const { formatted: animatedPeriodExpenses } = useAnimatedCurrency(
+  periodExpensesTotal,
+  baseCurrency,
+  100
+);
+const { formatted: animatedPeriodNet } = useAnimatedCurrency(periodNetTotal, baseCurrency, 200);
+
+// Recurring tab cards
+const { formatted: animatedRecurringIncome } = useAnimatedCurrency(
+  computed(() => recurringStore.filteredTotalMonthlyRecurringIncome),
+  baseCurrency
+);
+const { formatted: animatedRecurringExpenses } = useAnimatedCurrency(
+  computed(() => recurringStore.filteredTotalMonthlyRecurringExpenses),
+  baseCurrency,
+  100
+);
+const { formatted: animatedRecurringNet } = useAnimatedCurrency(
+  computed(() => recurringStore.filteredNetMonthlyRecurring),
+  baseCurrency,
+  200
+);
 
 function getAccountName(accountId: string): string {
   const account = accountsStore.accounts.find((a) => a.id === accountId);
@@ -582,14 +618,7 @@ function applyCustomDateRange() {
                 {{ t('transactions.income') }} ({{ dateFilterLabel }})
               </p>
               <p class="mt-1 text-2xl font-bold">
-                {{
-                  formatTotal(
-                    dateFilteredIncome +
-                      (dateFilterType === 'current_month'
-                        ? recurringStore.filteredTotalMonthlyRecurringIncome
-                        : 0)
-                  )
-                }}
+                {{ animatedPeriodIncome }}
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -606,14 +635,7 @@ function applyCustomDateRange() {
                 {{ t('transactions.expenses') }} ({{ dateFilterLabel }})
               </p>
               <p class="mt-1 text-2xl font-bold">
-                {{
-                  formatTotal(
-                    dateFilteredExpenses +
-                      (dateFilterType === 'current_month'
-                        ? recurringStore.filteredTotalMonthlyRecurringExpenses
-                        : 0)
-                  )
-                }}
+                {{ animatedPeriodExpenses }}
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -660,18 +682,7 @@ function applyCustomDateRange() {
                 {{ t('transactions.net') }} ({{ dateFilterLabel }})
               </p>
               <p class="mt-1 text-2xl font-bold">
-                {{
-                  formatTotal(
-                    dateFilteredIncome +
-                      (dateFilterType === 'current_month'
-                        ? recurringStore.filteredTotalMonthlyRecurringIncome
-                        : 0) -
-                      dateFilteredExpenses -
-                      (dateFilterType === 'current_month'
-                        ? recurringStore.filteredTotalMonthlyRecurringExpenses
-                        : 0)
-                  )
-                }}
+                {{ animatedPeriodNet }}
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -802,7 +813,7 @@ function applyCustomDateRange() {
             <div>
               <p class="text-sm font-medium text-green-100">{{ t('recurring.monthlyIncome') }}</p>
               <p class="mt-1 text-2xl font-bold">
-                {{ formatTotal(recurringStore.filteredTotalMonthlyRecurringIncome) }}
+                {{ animatedRecurringIncome }}
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -817,7 +828,7 @@ function applyCustomDateRange() {
             <div>
               <p class="text-sm font-medium text-red-100">{{ t('recurring.monthlyExpenses') }}</p>
               <p class="mt-1 text-2xl font-bold">
-                {{ formatTotal(recurringStore.filteredTotalMonthlyRecurringExpenses) }}
+                {{ animatedRecurringExpenses }}
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -848,7 +859,7 @@ function applyCustomDateRange() {
                 {{ t('recurring.netMonthly') }}
               </p>
               <p class="mt-1 text-2xl font-bold">
-                {{ formatTotal(recurringStore.filteredNetMonthlyRecurring) }}
+                {{ animatedRecurringNet }}
               </p>
             </div>
             <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">

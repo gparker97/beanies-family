@@ -5,7 +5,6 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
@@ -15,6 +14,7 @@ import { COUNTRIES } from '@/constants/countries';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getAssetTypeIcon } from '@/constants/icons';
+import { useAnimatedCurrency } from '@/composables/useAnimatedCurrency';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -29,12 +29,33 @@ import type {
 const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
-const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
+
+// Animated summary card values
+const baseCurrency = computed(() => settingsStore.baseCurrency);
+const { formatted: animatedAssetValue } = useAnimatedCurrency(
+  computed(() => assetsStore.filteredTotalAssetValue),
+  baseCurrency
+);
+const { formatted: animatedLoanValue } = useAnimatedCurrency(
+  computed(() => assetsStore.filteredTotalLoanValue),
+  baseCurrency,
+  100
+);
+const { formatted: animatedNetAssetValue } = useAnimatedCurrency(
+  computed(() => assetsStore.filteredNetAssetValue),
+  baseCurrency,
+  200
+);
+const { formatted: animatedAppreciation } = useAnimatedCurrency(
+  computed(() => Math.abs(assetsStore.totalAppreciation)),
+  baseCurrency,
+  300
+);
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -147,10 +168,6 @@ const assetsByType = computed(() => {
       assets: groups.get(type) || [],
     }));
 });
-
-function formatTotal(amount: number): string {
-  return formatMasked(formatInDisplayCurrency(amount, settingsStore.baseCurrency));
-}
 
 function getAssetTypeLabel(type: AssetType): string {
   return assetTypes.value.find((t) => t.value === type)?.label || type;
@@ -354,7 +371,7 @@ function getAppreciationPercent(asset: Asset): number {
           <div>
             <p class="text-sm font-medium text-green-100">{{ t('common.totalValue') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(assetsStore.filteredTotalAssetValue) }}
+              {{ animatedAssetValue }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -369,7 +386,7 @@ function getAppreciationPercent(asset: Asset): number {
           <div>
             <p class="text-sm font-medium text-red-100">{{ t('common.assetLoans') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(assetsStore.filteredTotalLoanValue) }}
+              {{ animatedLoanValue }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -386,7 +403,7 @@ function getAppreciationPercent(asset: Asset): number {
           <div>
             <p class="text-sm font-medium text-white/80">{{ t('common.netAssetValue') }}</p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(assetsStore.filteredNetAssetValue) }}
+              {{ animatedNetAssetValue }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
@@ -417,7 +434,7 @@ function getAppreciationPercent(asset: Asset): number {
               }}
             </p>
             <p class="mt-1 text-2xl font-bold">
-              {{ formatTotal(Math.abs(assetsStore.totalAppreciation)) }}
+              {{ animatedAppreciation }}
             </p>
           </div>
           <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue';
+import { useCountUp } from '@/composables/useCountUp';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
@@ -37,6 +38,23 @@ const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 
+// Animated stat card counts
+const { displayValue: animatedActiveCount } = useCountUp(
+  computed(() => goalsStore.filteredActiveGoals.length)
+);
+const { displayValue: animatedCompletedCount } = useCountUp(
+  computed(() => goalsStore.filteredCompletedGoals.length),
+  100
+);
+const { displayValue: animatedOverdueCount } = useCountUp(
+  computed(
+    () =>
+      goalsStore.filteredActiveGoals.filter((g) => g.deadline && new Date(g.deadline) < new Date())
+        .length
+  ),
+  200
+);
+
 // Computed for filtered goals sorted by priority
 const filteredGoalsByPriority = computed(() => {
   const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 } as const;
@@ -44,11 +62,6 @@ const filteredGoalsByPriority = computed(() => {
     (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]
   );
 });
-
-// Computed for filtered overdue goals
-const filteredOverdueGoals = computed(() =>
-  goalsStore.filteredActiveGoals.filter((g) => g.deadline && new Date(g.deadline) < new Date())
-);
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -260,19 +273,19 @@ async function deleteCompletedGoal(id: string) {
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.activeGoals') }}</p>
         <p class="text-primary-600 dark:text-primary-400 mt-1 text-2xl font-bold">
-          {{ goalsStore.filteredActiveGoals.length }}
+          {{ Math.round(animatedActiveCount) }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.completedGoals') }}</p>
         <p class="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
-          {{ goalsStore.filteredCompletedGoals.length }}
+          {{ Math.round(animatedCompletedCount) }}
         </p>
       </BaseCard>
       <BaseCard>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.overdueGoals') }}</p>
         <p class="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
-          {{ filteredOverdueGoals.length }}
+          {{ Math.round(animatedOverdueCount) }}
         </p>
       </BaseCard>
     </div>
