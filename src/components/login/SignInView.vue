@@ -19,6 +19,8 @@ const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const settingsStore = useSettingsStore();
 
+const SESSION_PASSWORD_KEY = 'beanies-file-password';
+
 const emit = defineEmits<{
   back: [];
   'signed-in': [destination: string];
@@ -43,6 +45,30 @@ const isCreatingPassword = computed(
   () => selectedMember.value && !selectedMember.value.passwordHash
 );
 
+/**
+ * Try to auto-decrypt using a cached sessionStorage password.
+ * Returns true if decryption succeeded, false otherwise.
+ */
+async function tryAutoDecrypt(): Promise<boolean> {
+  try {
+    const cached = sessionStorage.getItem(SESSION_PASSWORD_KEY);
+    if (!cached) return false;
+
+    const result = await syncStore.decryptPendingFile(cached);
+    if (result.success) {
+      needsDecryptPassword.value = false;
+      needsFileLoad.value = false;
+      return true;
+    }
+    // Cached password is wrong (file re-encrypted?) — clear it
+    sessionStorage.removeItem(SESSION_PASSWORD_KEY);
+    return false;
+  } catch {
+    sessionStorage.removeItem(SESSION_PASSWORD_KEY);
+    return false;
+  }
+}
+
 onMounted(async () => {
   // If no members loaded yet, we need to load the file first
   if (familyStore.members.length === 0) {
@@ -57,8 +83,10 @@ onMounted(async () => {
       try {
         const loadResult = await syncStore.loadFromFile();
         if (!loadResult.success && loadResult.needsPassword) {
-          // File is encrypted — show decrypt password form
-          needsDecryptPassword.value = true;
+          // File is encrypted — try cached password before showing form
+          if (!(await tryAutoDecrypt())) {
+            needsDecryptPassword.value = true;
+          }
         } else if (loadResult.success && !syncStore.isEncryptionEnabled) {
           fileUnencrypted.value = true;
         }
@@ -158,13 +186,17 @@ async function handleGrantPermission() {
           fileUnencrypted.value = true;
         }
       } else if (syncStore.hasPendingEncryptedFile) {
-        // File is encrypted — show decrypt form
-        needsDecryptPassword.value = true;
+        // File is encrypted — try cached password before showing form
+        if (!(await tryAutoDecrypt())) {
+          needsDecryptPassword.value = true;
+        }
       } else {
         // Try loading explicitly in case requestPermission didn't fully load
         const loadResult = await syncStore.loadFromFile();
         if (loadResult.needsPassword) {
-          needsDecryptPassword.value = true;
+          if (!(await tryAutoDecrypt())) {
+            needsDecryptPassword.value = true;
+          }
         } else if (familyStore.members.length === 0) {
           needsFileLoad.value = true;
         }
@@ -224,6 +256,8 @@ async function handleDecrypt() {
   try {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
+      // Cache password in sessionStorage so subsequent sign-ins auto-decrypt
+      sessionStorage.setItem(SESSION_PASSWORD_KEY, decryptPassword.value);
       needsDecryptPassword.value = false;
       needsFileLoad.value = false;
       decryptPassword.value = '';
@@ -318,6 +352,13 @@ async function handleDecrypt() {
           {{ t('password.decryptAndLoad') }}
         </BaseButton>
       </form>
+      <button
+        type="button"
+        class="w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        @click="handleSwitchFamily"
+      >
+        {{ t('auth.switchFamily') }}
+      </button>
     </div>
 
     <!-- No members at all -->
