@@ -898,6 +898,7 @@ const STRING_DEFS = {
     beanie: 'Open your bean file to get back in the pod',
   },
   'auth.openDataFile': { en: 'Open data file' },
+  'auth.switchFamily': { en: 'Switch to a different family' },
   'auth.noMembersWithPassword': {
     en: 'No members have set a password yet. Please complete onboarding first.',
   },
