@@ -55,9 +55,11 @@ export const useAuthStore = defineStore('auth', () => {
         return;
       }
 
-      // Check if user previously chose local-only mode (persisted across page reloads)
+      // Check if user previously chose local-only mode (persisted across page reloads).
+      // Only honored when running locally without Cognito — in production (Cognito configured),
+      // auth is always required and the "Continue without account" option is hidden.
       const globalSettings = await getGlobalSettings();
-      if (globalSettings.isLocalOnlyMode) {
+      if (globalSettings.isLocalOnlyMode && !isCognitoConfigured()) {
         isLocalOnlyMode.value = true;
         isAuthenticated.value = true;
         isInitialized.value = true;

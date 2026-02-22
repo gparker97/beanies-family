@@ -356,8 +356,11 @@ async function handleContinueWithoutAuth() {
           </BaseButton>
         </form>
 
-        <!-- Continue without account -->
-        <div class="mt-6 border-t border-gray-200 pt-4 dark:border-slate-700">
+        <!-- Continue without account (local dev only — hidden when Cognito is configured) -->
+        <div
+          v-if="!isCognitoConfigured()"
+          class="mt-6 border-t border-gray-200 pt-4 dark:border-slate-700"
+        >
           <button
             class="w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             @click="handleContinueWithoutAuth"
