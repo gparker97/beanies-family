@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
-import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { useCountUp } from '@/composables/useCountUp';
 import type { CurrencyCode } from '@/types/models';
 
 interface Props {
@@ -37,6 +38,13 @@ const { convertToDisplay } = useCurrencyDisplay();
 const converted = computed(() => convertToDisplay(props.amount, props.currency));
 const changeConverted = computed(() =>
   convertToDisplay(Math.abs(props.changeAmount), props.currency)
+);
+
+// Animate the display amount on change
+const displayAmountRef = computed(() => converted.value.displayAmount);
+const { displayValue: animatedAmount } = useCountUp(displayAmountRef);
+const animatedFormatted = computed(() =>
+  formatCurrencyWithCode(animatedAmount.value, converted.value.displayCurrency)
 );
 
 const isPositiveChange = computed(() => props.changeAmount >= 0);
@@ -135,7 +143,7 @@ const changeColor = computed(() => {
       class="font-outfit text-2xl font-extrabold"
       :class="dark ? '' : 'text-secondary-500 dark:text-gray-100'"
     >
-      {{ isUnlocked ? converted.displayFormatted : MASK }}
+      {{ isUnlocked ? animatedFormatted : MASK }}
     </div>
 
     <!-- Change indicator -->
