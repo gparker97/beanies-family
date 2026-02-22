@@ -13,17 +13,11 @@ const emit = defineEmits<{
   'select-member': [memberId: string];
 }>();
 
-function getRoleLabel(role: string): string {
-  switch (role) {
-    case 'owner':
-      return t('dashboard.roleParent');
-    case 'admin':
-      return t('dashboard.roleParent');
-    case 'member':
-      return t('dashboard.roleLittleBean');
-    default:
-      return role;
+function getRoleLabel(member: { role: string; ageGroup?: string }): string {
+  if (member.role === 'owner' || member.ageGroup === 'adult') {
+    return t('dashboard.roleParent');
   }
+  return t('dashboard.roleLittleBean');
 }
 </script>
 
@@ -63,7 +57,7 @@ function getRoleLabel(role: string): string {
           {{ member.name }}
         </div>
         <div class="text-secondary-500/35 text-[0.6rem] dark:text-gray-500">
-          {{ getRoleLabel(member.role) }}
+          {{ getRoleLabel(member) }}
         </div>
       </button>
 
