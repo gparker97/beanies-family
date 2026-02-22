@@ -7,12 +7,13 @@ import type {
 import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 
-/** Apply defaults for legacy records missing gender/ageGroup fields */
+/** Apply defaults for legacy records missing gender/ageGroup/requiresPassword fields */
 function applyDefaults(member: FamilyMember): FamilyMember {
   return {
     ...member,
     gender: member.gender ?? 'other',
     ageGroup: member.ageGroup ?? 'adult',
+    requiresPassword: member.requiresPassword ?? !member.passwordHash,
   };
 }
 

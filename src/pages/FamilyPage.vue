@@ -4,11 +4,9 @@ import { BaseCard, BaseButton, BaseInput, BaseModal, BaseSelect } from '@/compon
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
-import CreateMemberAccountModal from '@/components/family/CreateMemberAccountModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
-import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import type {
@@ -21,18 +19,54 @@ import type {
 
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
-const authStore = useAuthStore();
 const { t } = useTranslation();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingMemberId = ref<string | null>(null);
-const showCreateAccountModal = ref(false);
 const isSubmitting = ref(false);
 const isEditingFamilyName = ref(false);
 const editFamilyName = ref('');
-const createAccountMemberName = ref('');
-const createAccountMemberEmail = ref('');
+const showInviteModal = ref(false);
+const inviteCopiedCode = ref(false);
+const inviteCopiedLink = ref(false);
+
+const inviteRole = ref<'parent' | 'child'>('parent');
+const inviteCode = computed(() => familyContextStore.activeFamilyId ?? '');
+const inviteLink = computed(
+  () => `${window.location.origin}/join?code=${inviteCode.value}&role=${inviteRole.value}`
+);
+
+function openInviteModal() {
+  inviteRole.value = 'parent';
+  inviteCopiedCode.value = false;
+  inviteCopiedLink.value = false;
+  showInviteModal.value = true;
+}
+
+async function copyInviteCode() {
+  try {
+    await navigator.clipboard.writeText(inviteCode.value);
+    inviteCopiedCode.value = true;
+    setTimeout(() => {
+      inviteCopiedCode.value = false;
+    }, 2000);
+  } catch {
+    // fallback — select text for manual copy
+  }
+}
+
+async function copyInviteLink() {
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    inviteCopiedLink.value = true;
+    setTimeout(() => {
+      inviteCopiedLink.value = false;
+    }, 2000);
+  } catch {
+    // fallback
+  }
+}
 
 const colors: string[] = [
   '#3b82f6',
@@ -83,6 +117,7 @@ const newMember = ref<CreateFamilyMemberInput>({
   ageGroup: 'adult' as AgeGroup,
   role: 'member',
   color: colors[0] ?? '#3b82f6',
+  requiresPassword: true,
 });
 
 const dobMonth = ref('1');
@@ -98,6 +133,7 @@ function openAddModal() {
     ageGroup: 'adult' as AgeGroup,
     role: 'member',
     color: randomColor,
+    requiresPassword: true,
   };
   dobMonth.value = '1';
   dobDay.value = '1';
@@ -219,12 +255,6 @@ async function saveFamilyName() {
 function cancelEditFamilyName() {
   isEditingFamilyName.value = false;
 }
-
-function openCreateAccountModal(memberName: string, memberEmail: string) {
-  createAccountMemberName.value = memberName;
-  createAccountMemberEmail.value = memberEmail;
-  showCreateAccountModal.value = true;
-}
 </script>
 
 <template>
@@ -268,9 +298,18 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           <BeanieIcon name="edit" size="sm" />
         </button>
       </div>
-      <BaseButton @click="openAddModal">
-        {{ t('family.addMember') }}
-      </BaseButton>
+      <div class="flex gap-2">
+        <BaseButton
+          v-if="familyContextStore.activeFamilyId"
+          variant="secondary"
+          @click="openInviteModal"
+        >
+          {{ t('login.inviteTitle') }}
+        </BaseButton>
+        <BaseButton @click="openAddModal">
+          {{ t('family.addMember') }}
+        </BaseButton>
+      </div>
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -296,14 +335,6 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
             <p class="truncate text-sm text-gray-500 dark:text-gray-400">
               {{ member.email }}
             </p>
-            <!-- Create Login button for members without auth -->
-            <button
-              v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
-              class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 mt-1 text-xs"
-              @click="openCreateAccountModal(member.name, member.email)"
-            >
-              {{ t('family.createLogin') }}
-            </button>
           </div>
           <div class="flex flex-shrink-0 gap-1">
             <button
@@ -534,13 +565,92 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
       </template>
     </BaseModal>
 
-    <!-- Create Member Account Modal -->
-    <CreateMemberAccountModal
-      :open="showCreateAccountModal"
-      :member-name="createAccountMemberName"
-      :member-email="createAccountMemberEmail"
-      @close="showCreateAccountModal = false"
-      @create="showCreateAccountModal = false"
-    />
+    <!-- Invite Family Member Modal -->
+    <BaseModal
+      :open="showInviteModal"
+      :title="t('login.inviteTitle')"
+      @close="showInviteModal = false"
+    >
+      <div class="space-y-5">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          {{ t('login.inviteDesc') }}
+        </p>
+
+        <!-- Role Toggle -->
+        <div>
+          <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('login.inviteRoleLabel') }}
+          </label>
+          <div class="inline-flex rounded-lg border border-gray-200 dark:border-slate-600">
+            <button
+              type="button"
+              class="rounded-l-lg px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                inviteRole === 'parent'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700'
+              "
+              @click="inviteRole = 'parent'"
+            >
+              {{ t('login.inviteAsParent') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-r-lg px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                inviteRole === 'child'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700'
+              "
+              @click="inviteRole = 'child'"
+            >
+              {{ t('login.inviteAsChild') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Family Code -->
+        <div>
+          <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('login.inviteCode') }}
+          </label>
+          <div class="flex items-center gap-2">
+            <code
+              class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-sm text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+            >
+              {{ inviteCode }}
+            </code>
+            <BaseButton variant="secondary" @click="copyInviteCode">
+              {{ inviteCopiedCode ? t('login.copied') : t('login.copyCode') }}
+            </BaseButton>
+          </div>
+        </div>
+
+        <!-- Shareable Link -->
+        <div>
+          <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('login.inviteLink') }}
+          </label>
+          <div class="flex items-center gap-2">
+            <code
+              class="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+            >
+              {{ inviteLink }}
+            </code>
+            <BaseButton variant="secondary" @click="copyInviteLink">
+              {{ inviteCopiedLink ? t('login.copied') : t('login.copyLink') }}
+            </BaseButton>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end">
+          <BaseButton variant="secondary" @click="showInviteModal = false">
+            {{ t('action.close') }}
+          </BaseButton>
+        </div>
+      </template>
+    </BaseModal>
   </div>
 </template>

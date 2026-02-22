@@ -721,6 +721,13 @@ const STRING_DEFS = {
     en: 'This file is encrypted. Enter your password to decrypt and load your data.',
   },
 
+  // Setup — Joiner onboarding
+  'setup.joinerTitle': { en: 'Complete your profile', beanie: 'Set up your beanie' },
+  'setup.joinerSubtitle': { en: 'Tell us a bit about yourself' },
+  'setup.dateOfBirth': { en: 'Date of birth', beanie: 'Bean birthday' },
+  'setup.selectColor': { en: 'Pick your color' },
+  'setup.completeProfile': { en: 'Done' },
+
   // Setup
   'setup.subtitle': { en: "Let's get you set up" },
   'setup.createProfile': { en: 'Create Your Profile' },
@@ -780,6 +787,12 @@ const STRING_DEFS = {
   'auth.fillAllFields': { en: 'Please fill in all fields' },
   'auth.passwordsDoNotMatch': { en: 'Passwords do not match' },
   'auth.passwordMinLength': { en: 'Password must be at least 8 characters' },
+  'auth.needsPassword': { en: 'Set up' },
+  'auth.createPasswordPrompt': {
+    en: 'Create a password for your account. You will use this to sign in next time.',
+  },
+  'auth.createPasswordPlaceholder': { en: 'Choose a password (min 8 characters)' },
+  'auth.createAndSignIn': { en: 'Create Password & Sign In' },
   'auth.accountCreated': {
     en: 'Account created! We sent a verification link to',
   },
@@ -874,6 +887,56 @@ const STRING_DEFS = {
     en: 'Keep data cached locally (unecrypted) between sign-ins for faster access',
   },
   'auth.signOutClearData': { en: 'Sign out & clear data' },
+
+  // File-based auth
+  'auth.selectMember': { en: 'Select your profile' },
+  'auth.enterPassword': { en: 'Please enter your password' },
+  'auth.loadingFile': { en: 'counting beans...', beanie: 'counting beans...' },
+  'auth.loadFileFirst': {
+    en: 'Open your family data file to sign in',
+    beanie: 'Open your bean file to get back in the pod',
+  },
+  'auth.openDataFile': { en: 'Open data file' },
+  'auth.noMembersWithPassword': {
+    en: 'No members have set a password yet. Please complete onboarding first.',
+  },
+  'auth.fileLoadFailed': { en: 'Failed to load file. Please try again.' },
+  'auth.password': { en: 'Password' },
+  'auth.enterYourPassword': { en: 'Enter your password' },
+  'auth.signInFailed': { en: 'Sign in failed' },
+  'auth.signUpFailed': { en: 'Sign up failed' },
+  'auth.createPassword': { en: 'Create a password' },
+  'auth.confirmPassword': { en: 'Confirm password' },
+  'auth.confirmPasswordPlaceholder': { en: 'Re-enter your password' },
+
+  // Login redesign — Role selection / Invite
+  'login.inviteAsParent': { en: 'Parent', beanie: 'Big Bean' },
+  'login.inviteAsChild': { en: 'Child', beanie: 'Little Bean' },
+  'login.inviteRoleLabel': { en: 'Inviting as' },
+  'login.joiningAs': { en: 'Joining as' },
+
+  // Login redesign — Welcome Gate / Join Pod / Invite
+  'login.welcomeTitle': { en: 'Welcome to the family', beanie: 'Welcome to the pod' },
+  'login.welcomeSubtitle': { en: "Your family's finances, together", beanie: 'Every bean counts' },
+  'login.signIn': { en: 'Sign in' },
+  'login.createPod': { en: 'Create a new pod' },
+  'login.joinPod': { en: 'Join a pod' },
+  'login.createPodDesc': { en: 'Start a new family pod' },
+  'login.joinPodDesc': { en: "Join your family's existing pod" },
+  'login.backToWelcome': { en: 'Back' },
+  'login.familyCode': { en: 'Family code' },
+  'login.familyCodePlaceholder': { en: 'Enter the code from your family' },
+  'login.familyCodeHelp': { en: 'Ask your family admin for the invite code' },
+  'login.joiningPod': { en: 'Joining pod...' },
+  'login.inviteTitle': { en: 'Invite family member' },
+  'login.inviteDesc': {
+    en: 'Share this code with family members so they can join your pod',
+  },
+  'login.inviteCode': { en: 'Family code' },
+  'login.inviteLink': { en: 'Or share this link' },
+  'login.copied': { en: 'Copied!' },
+  'login.copyCode': { en: 'Copy code' },
+  'login.copyLink': { en: 'Copy link' },
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },

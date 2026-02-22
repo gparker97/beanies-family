@@ -31,6 +31,7 @@ function makeMember(overrides: Partial<FamilyMember> & { id: string; name: strin
     ageGroup: 'adult',
     role: 'owner',
     color: '#3b82f6',
+    requiresPassword: false,
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
     ...overrides,
@@ -476,7 +477,6 @@ describe('UserFamilyMapping Lookup', () => {
       familyId,
       familyRole: 'owner',
       memberId: 'member-1',
-      isLocalOnly: false,
       lastActiveAt: '2024-01-01',
     });
 

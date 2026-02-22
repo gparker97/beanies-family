@@ -69,6 +69,7 @@ describe('useMemberAvatar', () => {
       ageGroup: 'child',
       role: 'member',
       color: '#ef4444',
+      requiresPassword: false,
       createdAt: '',
       updatedAt: '',
     });

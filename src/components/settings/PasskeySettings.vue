@@ -26,7 +26,7 @@ onMounted(async () => {
 
 function handleRegister() {
   statusMessage.value =
-    'Passkey registration requires server-side infrastructure (AWS Cognito WebAuthn challenge). This will be available once the backend is deployed.';
+    'Passkey registration requires server-side infrastructure. This will be available in a future update.';
 }
 
 async function handleRemove(credentialId: string) {

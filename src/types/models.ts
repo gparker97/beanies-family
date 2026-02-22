@@ -12,27 +12,14 @@ export interface Family {
   updatedAt: ISODateString;
 }
 
-// UserFamilyMapping - Maps authenticated users to families
+// UserFamilyMapping - Maps users to families
 export interface UserFamilyMapping {
   id: UUID;
   email: string;
   familyId: UUID;
   familyRole: 'owner' | 'admin' | 'member';
   memberId: UUID; // FK to FamilyMember in per-family DB
-  isLocalOnly: boolean; // true = no Cognito account
   lastActiveAt: ISODateString;
-}
-
-// CachedAuthSession - Offline-capable auth session
-export interface CachedAuthSession {
-  userId: string;
-  email: string;
-  idToken: string;
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: ISODateString;
-  familyId: UUID;
-  cachedAt: ISODateString;
 }
 
 // GlobalSettings - Device-level settings (stored in registry DB, not per-family)
@@ -44,7 +31,6 @@ export interface GlobalSettings {
   exchangeRates: ExchangeRate[];
   exchangeRateAutoUpdate: boolean;
   exchangeRateLastFetch: ISODateString | null;
-  isLocalOnlyMode?: boolean;
   beanieMode?: boolean;
   soundEnabled?: boolean;
   isTrustedDevice?: boolean;
@@ -73,6 +59,8 @@ export interface FamilyMember {
   dateOfBirth?: DateOfBirth;
   role: 'owner' | 'admin' | 'member';
   color: string; // UI differentiation
+  passwordHash?: string; // PBKDF2 hash in "salt:hash" format
+  requiresPassword: boolean; // true when member needs to set a password
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

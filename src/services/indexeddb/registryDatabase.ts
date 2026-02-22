@@ -1,8 +1,8 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Family, UserFamilyMapping, CachedAuthSession, GlobalSettings } from '@/types/models';
+import type { Family, UserFamilyMapping, GlobalSettings } from '@/types/models';
 
 const REGISTRY_DB_NAME = 'gp-finance-registry';
-const REGISTRY_DB_VERSION = 1;
+const REGISTRY_DB_VERSION = 2;
 
 export interface RegistryDB extends DBSchema {
   families: {
@@ -14,13 +14,6 @@ export interface RegistryDB extends DBSchema {
     value: UserFamilyMapping;
     indexes: {
       'by-email': string;
-      'by-familyId': string;
-    };
-  };
-  cachedSessions: {
-    key: string;
-    value: CachedAuthSession;
-    indexes: {
       'by-familyId': string;
     };
   };
@@ -38,7 +31,7 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
   }
 
   registryInstance = await openDB<RegistryDB>(REGISTRY_DB_NAME, REGISTRY_DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains('families')) {
         db.createObjectStore('families', { keyPath: 'id' });
       }
@@ -49,9 +42,11 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
         mappingStore.createIndex('by-familyId', 'familyId', { unique: false });
       }
 
-      if (!db.objectStoreNames.contains('cachedSessions')) {
-        const sessionStore = db.createObjectStore('cachedSessions', { keyPath: 'userId' });
-        sessionStore.createIndex('by-familyId', 'familyId', { unique: false });
+      // v2: remove cachedSessions store (Cognito removed)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (oldVersion < 2 && (db as any).objectStoreNames.contains('cachedSessions')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (db as any).deleteObjectStore('cachedSessions');
       }
 
       if (!db.objectStoreNames.contains('globalSettings')) {

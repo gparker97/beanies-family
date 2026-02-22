@@ -94,7 +94,6 @@ export async function runLegacyMigration(): Promise<Family> {
       familyId,
       familyRole: 'owner',
       memberId: ownerMember.id,
-      isLocalOnly: true,
       lastActiveAt: now,
     });
   }

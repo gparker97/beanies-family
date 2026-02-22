@@ -4,7 +4,7 @@
 
 ## High-Level Architecture
 
-beanies.family is a **local-first, single-page application** (SPA) built with Vue 3. All data is stored client-side in IndexedDB with an encrypted local file as source of truth. Optional AWS Cognito authentication provides per-user data isolation.
+beanies.family is a **local-first, single-page application** (SPA) built with Vue 3. All data is stored client-side in IndexedDB with an encrypted local file as source of truth. File-based authentication uses PBKDF2 password hashes stored in the data file itself — no cloud auth dependencies.
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -28,8 +28,8 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 │                            └──────────────────┘  │
 └──────────────────────────────────────────────────┘
                       │
-          ┌───────────┼───────────┐
-          ▼           ▼           ▼
+          ┌───────────┼───────────┬───────────┐
+          ▼           ▼           ▼           ▼
     ┌──────────┐ ┌─────────┐ ┌──────────┐
     │ Local    │ │ Exchange │ │ MyMemory │
     │ .json    │ │ Rate API │ │ Translate│
@@ -69,6 +69,7 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 - **exchangeRate/**: Free currency API integration with fallback
 - **recurring/**: Recurring transaction processor (runs on app startup)
 - **translation/**: MyMemory API integration for i18n
+- **auth/**: PBKDF2 password hashing service (`passwordService.ts`) and passkey/WebAuthn support (`passkeyService.ts`)
 
 ### Composables (`src/composables/`)
 
@@ -125,7 +126,6 @@ A shared `gp-finance-registry` database stores cross-family metadata:
 | ------------------ | ------------------------------------------- |
 | families           | Family list (id, name, createdAt)           |
 | userFamilyMappings | Maps auth users to families                 |
-| cachedAuthSessions | Offline auth tokens (7-day grace period)    |
 | globalSettings     | Device-level prefs (theme, language, rates) |
 
 ### File Handle Database
@@ -187,13 +187,14 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Designed for reuse by future mobile bottom nav and hamburger menu (see v5 UI proposal)
 - Each item has: `labelKey` (i18n), `path` (route), `emoji` (icon), `section` (primary/secondary)
 
-### Authentication (Optional)
+### Authentication
 
-- AWS Cognito integration (disabled when env vars not set)
-- "Continue without account" mode preserves local-only behavior
-- Auth resolution chain: JWT claims → Cognito attributes → registry lookup → cached session
+- **File-based auth**: PBKDF2 password hashes stored directly in the family data file alongside `FamilyMember` records
+- **Two-layer security**: (1) AES-GCM file encryption password protects data at rest, (2) per-member PBKDF2 password proves identity within the family
+- **Member lifecycle**: Owner creates member → shares invite → member claims record and sets password during joiner onboarding
 - Per-family database isolation prevents cross-user data leakage
-- 7-day offline grace period for cached auth tokens
+- No cloud auth dependencies — the data file IS the auth database
+- See ADR-014 for the decision to move from Cognito to file-based auth
 
 ## Testing
 

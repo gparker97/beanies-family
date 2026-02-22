@@ -640,8 +640,8 @@ function formatLastSync(timestamp: string | null): string {
       </BaseCard>
     </div>
 
-    <!-- Security Settings (only shown when auth is configured) -->
-    <div v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode" class="space-y-4">
+    <!-- Security Settings -->
+    <div v-if="authStore.isAuthenticated" class="space-y-4">
       <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
         {{ t('settings.security') }}
       </h2>

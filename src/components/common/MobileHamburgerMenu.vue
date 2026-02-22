@@ -390,11 +390,8 @@ const encryptionLabel = computed(() => {
                 <span class="truncate text-[0.6rem] text-white/30">{{ syncStore.fileName }}</span>
               </div>
 
-              <!-- Sign out buttons (cloud users only) -->
-              <div
-                v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
-                class="space-y-1"
-              >
+              <!-- Sign out buttons -->
+              <div class="space-y-1">
                 <button
                   type="button"
                   class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-[0.8rem] text-red-400 transition-colors hover:bg-white/[0.05]"

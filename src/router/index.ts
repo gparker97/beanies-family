@@ -12,6 +12,13 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Login', requiresAuth: false },
   },
   {
+    path: '/join',
+    name: 'JoinFamily',
+    component: () => import('@/pages/LoginPage.vue'),
+    meta: { title: 'Join Family', requiresAuth: false },
+    props: { initialView: 'join' },
+  },
+  {
     path: '/setup',
     name: 'Setup',
     component: () => import('@/pages/SetupPage.vue'),
@@ -70,12 +77,6 @@ const routes: RouteRecordRaw[] = [
     name: 'Settings',
     component: () => import('@/pages/SettingsPage.vue'),
     meta: { title: 'Settings', requiresSetup: true, requiresAuth: true },
-  },
-  {
-    path: '/auth/magic',
-    name: 'MagicLinkCallback',
-    component: () => import('@/pages/MagicLinkCallbackPage.vue'),
-    meta: { title: 'Signing In...', requiresAuth: false },
   },
   {
     path: '/:pathMatch(.*)*',

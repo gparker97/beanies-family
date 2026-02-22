@@ -51,10 +51,6 @@ export default defineConfig({
       },
     }),
   ],
-  define: {
-    // amazon-cognito-identity-js uses Node.js `global` — alias to `globalThis` for the browser
-    global: 'globalThis',
-  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
