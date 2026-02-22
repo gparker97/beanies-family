@@ -234,11 +234,13 @@ async function handleLoadFile() {
     } else if (result.needsPassword) {
       // File is encrypted — show decrypt password form
       needsDecryptPassword.value = true;
+    } else if (syncStore.error) {
+      formError.value = syncStore.error;
     } else {
       formError.value = t('auth.fileLoadFailed');
     }
   } catch {
-    formError.value = t('auth.fileLoadFailed');
+    formError.value = syncStore.error || t('auth.fileLoadFailed');
   } finally {
     isLoadingFile.value = false;
   }

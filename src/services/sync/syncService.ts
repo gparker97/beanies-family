@@ -10,6 +10,7 @@ import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { SyncFileData } from '@/types/models';
+import { generateUUID } from '@/utils/id';
 
 // Result type for openAndLoadFile that can indicate encrypted file needs password
 export interface OpenFileResult {
@@ -599,23 +600,18 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
 
     const syncData = data as SyncFileData;
 
-    // Guard: if sync file has a familyId (v2.0+), it must match the active family
+    // User explicitly picked this file — adopt its family identity
     let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId && activeFamilyId && syncData.familyId !== activeFamilyId) {
-      console.warn(
-        `[syncService] openAndLoadFile: sync file familyId (${syncData.familyId}) does not match active family (${activeFamilyId}). Skipping import.`
-      );
-      updateState({
-        isSyncing: false,
-        lastError: 'Sync file belongs to a different family',
-      });
-      return { success: false };
-    }
-
-    // If no active family (e.g. sign-in flow), activate from file's familyId
-    if (!activeFamilyId && syncData.familyId) {
-      await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-      activeFamilyId = syncData.familyId;
+    if (syncData.familyId) {
+      if (syncData.familyId !== activeFamilyId) {
+        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
+        activeFamilyId = syncData.familyId;
+      }
+    } else if (!activeFamilyId) {
+      // v1 file with no familyId and no active family — create one
+      const newFamilyId = generateUUID();
+      await createFamilyWithId(newFamilyId, 'My Family');
+      activeFamilyId = newFamilyId;
     }
 
     // Import the data
@@ -681,23 +677,18 @@ export async function decryptAndImport(
       return { success: false, error: 'Invalid data structure after decryption' };
     }
 
-    // Guard: if sync file has a familyId (v2.0+), it must match the active family
+    // User explicitly provided password — adopt the file's family identity
     let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId && activeFamilyId && syncData.familyId !== activeFamilyId) {
-      console.warn(
-        `[syncService] decryptAndImport: sync file familyId (${syncData.familyId}) does not match active family (${activeFamilyId}). Skipping import.`
-      );
-      updateState({
-        isSyncing: false,
-        lastError: 'Sync file belongs to a different family',
-      });
-      return { success: false, error: 'Sync file belongs to a different family' };
-    }
-
-    // If no active family (e.g. sign-in flow), activate from file's familyId
-    if (!activeFamilyId && syncData.familyId) {
-      await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-      activeFamilyId = syncData.familyId;
+    if (syncData.familyId) {
+      if (syncData.familyId !== activeFamilyId) {
+        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
+        activeFamilyId = syncData.familyId;
+      }
+    } else if (!activeFamilyId) {
+      // Encrypted file with no familyId and no active family — create one
+      const newFamilyId = generateUUID();
+      await createFamilyWithId(newFamilyId, 'My Family');
+      activeFamilyId = newFamilyId;
     }
 
     // Import the data
