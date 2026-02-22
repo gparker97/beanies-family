@@ -32,6 +32,7 @@ const needsFileLoad = ref(false);
 const isLoadingFile = ref(false);
 const needsDecryptPassword = ref(false);
 const decryptPassword = ref('');
+const needsPermissionGrant = ref(false);
 
 // All selectable members (both with and without passwords)
 const allMembers = computed(() => familyStore.members);
@@ -45,14 +46,10 @@ onMounted(async () => {
   // If no members loaded yet, we need to load the file first
   if (familyStore.members.length === 0) {
     // Activate last active family so sync can find the stored file handle
-    if (!familyContextStore.activeFamilyId) {
-      await familyContextStore.initialize();
-    }
+    await familyContextStore.initialize();
 
-    // Try to initialize sync to check if file is configured
-    if (!syncStore.isConfigured) {
-      await syncStore.initialize();
-    }
+    // Always (re-)initialize sync to restore file handle and check permissions
+    await syncStore.initialize();
 
     if (syncStore.isConfigured && !syncStore.needsPermission) {
       isLoadingFile.value = true;
@@ -66,10 +63,18 @@ onMounted(async () => {
         // File load failed
       }
       isLoadingFile.value = false;
+    } else if (syncStore.isConfigured && syncStore.needsPermission) {
+      // File handle exists but browser revoked permission — need user gesture to re-grant
+      needsPermissionGrant.value = true;
     }
 
-    // If still no members, user needs to load a file manually
-    if (familyStore.members.length === 0 && !needsFileLoad.value) {
+    // If still no members and no other prompt showing, user needs to load a file manually
+    if (
+      familyStore.members.length === 0 &&
+      !needsFileLoad.value &&
+      !needsDecryptPassword.value &&
+      !needsPermissionGrant.value
+    ) {
       needsFileLoad.value = true;
     }
   }
@@ -133,6 +138,38 @@ async function handleSignIn() {
     emit('signed-in', destination);
   } else {
     formError.value = result.error ?? t('auth.signInFailed');
+  }
+}
+
+async function handleGrantPermission() {
+  isLoadingFile.value = true;
+  formError.value = null;
+
+  try {
+    const granted = await syncStore.requestPermission();
+    if (granted) {
+      needsPermissionGrant.value = false;
+      if (familyStore.members.length > 0) {
+        // Data loaded successfully
+      } else if (syncStore.hasPendingEncryptedFile) {
+        // File is encrypted — show decrypt form
+        needsDecryptPassword.value = true;
+      } else {
+        // Try loading explicitly in case requestPermission didn't fully load
+        const loadResult = await syncStore.loadFromFile();
+        if (loadResult.needsPassword) {
+          needsDecryptPassword.value = true;
+        } else if (familyStore.members.length === 0) {
+          needsFileLoad.value = true;
+        }
+      }
+    } else {
+      formError.value = t('auth.fileLoadFailed');
+    }
+  } catch {
+    formError.value = t('auth.fileLoadFailed');
+  } finally {
+    isLoadingFile.value = false;
   }
 }
 
@@ -224,6 +261,26 @@ async function handleDecrypt() {
     <!-- Loading file -->
     <div v-if="isLoadingFile" class="py-8 text-center">
       <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+    </div>
+
+    <!-- File handle exists but needs permission re-grant -->
+    <div v-else-if="needsPermissionGrant" class="space-y-4">
+      <p class="text-sm text-gray-600 dark:text-gray-400">
+        {{ t('auth.reconnectFile') }}
+      </p>
+      <BaseButton class="w-full" @click="handleGrantPermission">
+        {{ t('auth.reconnectButton') }}
+      </BaseButton>
+      <button
+        type="button"
+        class="w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        @click="
+          needsPermissionGrant = false;
+          needsFileLoad = true;
+        "
+      >
+        {{ t('auth.switchFamily') }}
+      </button>
     </div>
 
     <!-- Need to load file first -->

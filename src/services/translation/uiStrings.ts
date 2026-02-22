@@ -899,6 +899,10 @@ const STRING_DEFS = {
   },
   'auth.openDataFile': { en: 'Open data file' },
   'auth.switchFamily': { en: 'Switch to a different family' },
+  'auth.reconnectFile': {
+    en: 'Your data file was found but needs permission to access. Click below to reconnect.',
+  },
+  'auth.reconnectButton': { en: 'Reconnect to data file' },
   'auth.noMembersWithPassword': {
     en: 'No members have set a password yet. Please complete onboarding first.',
   },
