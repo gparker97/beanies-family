@@ -166,8 +166,8 @@ async function createProfileAndSettings(): Promise<boolean> {
 async function handleCreateNewFile() {
   if (isCreatingFile.value) return;
 
-  // Ensure profile and settings are saved first
-  const profileReady = familyStore.isSetupComplete || (await createProfileAndSettings());
+  // Always save profile and settings (even if owner was pre-created during cloud signup)
+  const profileReady = await createProfileAndSettings();
   if (!profileReady) return;
 
   isCreatingFile.value = true;
@@ -194,21 +194,29 @@ async function completeOnboarding() {
   await settingsStore.setOnboardingCompleted(true);
 }
 
+/**
+ * Navigate to dashboard — guaranteed to execute even if prior steps fail.
+ */
+function navigateToDashboard() {
+  syncStore.setupAutoSync();
+  router.replace('/dashboard');
+}
+
 async function handleSetEncryptionPassword(password: string) {
-  const success = await syncStore.enableEncryption(password);
   showEncryptModal.value = false;
+  // Complete onboarding FIRST — before enableEncryption() which reloads settings
   await completeOnboarding();
-  if (success) {
-    celebrate('first-save');
-    syncStore.setupAutoSync();
-    router.replace('/dashboard');
-  } else {
-    loadFileError.value = t('setup.encryptionFailed');
-    // Still navigate — file was created, just not encrypted
-    celebrate('setup-complete');
-    syncStore.setupAutoSync();
-    router.replace('/dashboard');
+  try {
+    const success = await syncStore.enableEncryption(password);
+    if (success) {
+      celebrate('first-save');
+    } else {
+      celebrate('setup-complete');
+    }
+  } catch (e) {
+    console.error('Encryption failed:', e);
   }
+  navigateToDashboard();
 }
 
 /**
@@ -218,15 +226,14 @@ async function handleSkipEncryption() {
   showEncryptModal.value = false;
   await completeOnboarding();
   celebrate('setup-complete');
-  syncStore.setupAutoSync();
-  router.replace('/dashboard');
+  navigateToDashboard();
 }
 
 /**
  * For browsers without File System Access API: complete setup without file.
  */
 async function handleDownloadFallback() {
-  const profileReady = familyStore.isSetupComplete || (await createProfileAndSettings());
+  const profileReady = await createProfileAndSettings();
   if (!profileReady) return;
 
   // Manual export as download
