@@ -40,8 +40,9 @@ const changeConverted = computed(() =>
   convertToDisplay(Math.abs(props.changeAmount), props.currency)
 );
 
-// Animate the display amount on change
-const displayAmountRef = computed(() => converted.value.displayAmount);
+// Animate the display amount on change — returns 0 when masked so
+// revealing numbers always triggers a fresh count-up from zero
+const displayAmountRef = computed(() => (isUnlocked.value ? converted.value.displayAmount : 0));
 const { displayValue: animatedAmount } = useCountUp(displayAmountRef);
 const animatedFormatted = computed(() =>
   formatCurrencyWithCode(animatedAmount.value, converted.value.displayCurrency)
