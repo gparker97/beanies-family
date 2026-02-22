@@ -52,6 +52,8 @@ export class IndexedDBHelper {
   async clearAllData() {
     // Delete all known databases to ensure clean state
     await this.page.evaluate(async () => {
+      // Clear E2E auto-auth flag so the next load shows the login page
+      sessionStorage.removeItem('e2e_auto_auth');
       // Use databases() API to find all databases to delete
       if ('databases' in indexedDB) {
         const dbs = await indexedDB.databases();

@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { SetupPage } from '../page-objects/SetupPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 
@@ -13,10 +12,6 @@ test.describe('Setup Flow', () => {
     await page.goto('/');
     await bypassLoginIfNeeded(page);
 
-    const setupPage = new SetupPage(page);
-    await expect(page).toHaveURL('/setup');
-
-    await setupPage.completeSetup('John Doe', 'john@example.com', 'USD');
     await expect(page).toHaveURL('/dashboard');
 
     const data = await dbHelper.exportData();
@@ -32,14 +27,28 @@ test.describe('Setup Flow', () => {
     await dbHelper.clearAllData();
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
-    await bypassLoginIfNeeded(page);
 
-    const setupPage = new SetupPage(page);
+    // Click "Create a new pod" on WelcomeGate
+    await page.getByRole('button', { name: 'Create a new pod' }).click();
 
-    // Try to continue without filling form
-    await setupPage.continueButton.click();
+    // Fill some fields but leave password empty to bypass native required
+    // validation on the first field and trigger the JS-level check
+    await page.getByLabel('Family Name').fill('Test');
+    await page.getByLabel('Your Name').fill('Test');
+    await page.getByLabel('Email').fill('test@example.com');
+    // Leave Password and Confirm password empty
 
-    // Should still be on setup page
-    await expect(page).toHaveURL('/setup');
+    // Remove required attribute so native validation doesn't block submit
+    await page.evaluate(() => {
+      document.querySelectorAll('input[required]').forEach((el) => {
+        el.removeAttribute('required');
+      });
+    });
+
+    await page.getByRole('button', { name: 'Next' }).click();
+
+    // Should still be on login page with custom JS validation error
+    await expect(page).toHaveURL('/login');
+    await expect(page.getByText('Please fill in all fields')).toBeVisible();
   });
 });

@@ -166,9 +166,9 @@ export const useAuthStore = defineStore('auth', () => {
         });
       }
 
-      // Mark onboarding as not completed so new users see the setup wizard
+      // Mark onboarding as completed — the create pod wizard handles everything
       const settingsStore = useSettingsStore();
-      await settingsStore.setOnboardingCompleted(false);
+      await settingsStore.setOnboardingCompleted(true);
 
       // Auto sign in
       currentUser.value = {
@@ -249,6 +249,23 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * E2E test helper: restore auth from sessionStorage (dev mode only).
+   * When the e2e_auto_auth flag is set, auto-authenticate so the app
+   * skips the login page and loads family data from IndexedDB cache.
+   */
+  function restoreE2EAuth(): boolean {
+    if (!import.meta.env.DEV) return false;
+    try {
+      if (sessionStorage.getItem('e2e_auto_auth') !== 'true') return false;
+      isAuthenticated.value = true;
+      isInitialized.value = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Sign out and always clear the per-family IndexedDB cache,
    * regardless of trusted device status. Also resets the trust flag.
    */
@@ -293,5 +310,6 @@ export const useAuthStore = defineStore('auth', () => {
     setPassword,
     signOut,
     signOutAndClearData,
+    restoreE2EAuth,
   };
 });

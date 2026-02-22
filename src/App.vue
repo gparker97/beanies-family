@@ -58,13 +58,8 @@ function handleDeclineTrust() {
 }
 
 const showLayout = computed(() => {
-  // Don't show sidebar/header on setup, login, or 404 pages
-  return (
-    route.name !== 'Setup' &&
-    route.name !== 'NotFound' &&
-    route.name !== 'Login' &&
-    route.name !== 'JoinFamily'
-  );
+  // Don't show sidebar/header on login or 404 pages
+  return route.name !== 'NotFound' && route.name !== 'Login' && route.name !== 'JoinFamily';
 });
 
 /**
@@ -73,17 +68,8 @@ const showLayout = computed(() => {
  * Priority:
  * 1. File handle exists + permission → load from file
  * 2. File handle exists + needs permission → fallback to IndexedDB cache with warning
- * 3. No file handle → redirect to setup (which now requires file creation)
+ * 3. No file handle → load from IndexedDB if available
  */
-/** Redirect to setup if profile or onboarding is incomplete */
-function redirectToSetupIfNeeded(): boolean {
-  if (route.name === 'Setup') return false;
-  if (!familyStore.isSetupComplete || !settingsStore.onboardingCompleted) {
-    router.replace('/setup');
-    return true;
-  }
-  return false;
-}
 
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
@@ -105,7 +91,6 @@ async function loadFamilyData() {
   if (syncStore.isConfigured && !syncStore.needsPermission) {
     const loadResult = await syncStore.loadFromFile();
     if (loadResult.success) {
-      if (redirectToSetupIfNeeded()) return;
       memberFilterStore.initialize();
       const result = await processRecurringItems();
       if (result.processed > 0) {
@@ -127,10 +112,7 @@ async function loadFamilyData() {
   // Path 3: No file configured → check if data exists in IndexedDB (existing/migrated user)
   await familyStore.loadMembers();
 
-  if (redirectToSetupIfNeeded()) return;
-
   // Existing user with IndexedDB data but no file configured — load normally
-  // They'll be prompted to configure a file in setup step 3 or settings
   if (familyStore.isSetupComplete) {
     memberFilterStore.initialize();
 
@@ -154,8 +136,6 @@ async function loadFamilyData() {
  */
 async function loadFromIndexedDBCache() {
   await familyStore.loadMembers();
-
-  if (redirectToSetupIfNeeded()) return;
 
   if (familyStore.isSetupComplete) {
     memberFilterStore.initialize();
@@ -204,10 +184,13 @@ onMounted(async () => {
 
     // If not authenticated, redirect to login (unless already on login page)
     if (authStore.needsAuth) {
-      if (route.name !== 'Login' && route.name !== 'JoinFamily') {
-        router.replace('/login');
+      // E2E auto-auth: restore from sessionStorage (dev mode only)
+      if (!authStore.restoreE2EAuth()) {
+        if (route.name !== 'Login' && route.name !== 'JoinFamily') {
+          router.replace('/login');
+        }
+        return;
       }
-      return;
     }
 
     // Step 3: Run legacy migration if needed (old single-DB → per-family DB)
@@ -256,10 +239,12 @@ onMounted(async () => {
     }
 
     // Show trust device prompt after first successful sign-in + data load
+    // (suppressed during E2E auto-auth to avoid blocking test interactions)
     if (
       authStore.isAuthenticated &&
       !settingsStore.trustedDevicePromptShown &&
-      familyStore.isSetupComplete
+      familyStore.isSetupComplete &&
+      sessionStorage.getItem('e2e_auto_auth') !== 'true'
     ) {
       showTrustPrompt.value = true;
     }

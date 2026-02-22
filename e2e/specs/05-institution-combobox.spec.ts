@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { SetupPage } from '../page-objects/SetupPage';
 import { AccountsPage } from '../page-objects/AccountsPage';
 import { AssetsPage } from '../page-objects/AssetsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
@@ -12,8 +11,6 @@ test.describe('Account Institution Combobox', () => {
     await dbHelper.clearAllData();
     await page.goto('/');
     await bypassLoginIfNeeded(page);
-    const setupPage = new SetupPage(page);
-    await setupPage.completeSetup();
   });
 
   test('should select a predefined institution from dropdown', async ({ page }) => {
@@ -150,8 +147,6 @@ test.describe('Asset Loan Lender Combobox', () => {
     await dbHelper.clearAllData();
     await page.goto('/');
     await bypassLoginIfNeeded(page);
-    const setupPage = new SetupPage(page);
-    await setupPage.completeSetup();
   });
 
   test('should select a predefined lender for asset loan', async ({ page }) => {
