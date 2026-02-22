@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useTranslation } from '@/composables/useTranslation';
 import { getCurrencyInfo } from '@/constants/currencies';
 import type { CurrencyCode } from '@/types/models';
 import type { PeriodKey, NetWorthDataPoint } from '@/composables/useNetWorthHistory';
@@ -49,6 +50,7 @@ const emit = defineEmits<{
 
 const { isUnlocked, MASK } = usePrivacyMode();
 const { convertToDisplay } = useCurrencyDisplay();
+const { t } = useTranslation();
 
 const converted = computed(() => convertToDisplay(props.amount, props.currency));
 
@@ -321,10 +323,14 @@ const periodLabel = computed(() => {
     <!-- Chart area -->
     <div class="relative mt-5 h-28">
       <div v-if="!isUnlocked" class="flex h-full items-center justify-center">
-        <span class="font-outfit text-[0.75rem] font-medium text-white/20"> Chart hidden </span>
+        <span class="font-outfit text-[0.75rem] font-medium text-white/20">
+          {{ t('dashboard.chartHidden') }}
+        </span>
       </div>
       <div v-else-if="historyData.length === 0" class="flex h-full items-center justify-center">
-        <span class="font-outfit text-[0.75rem] font-medium text-white/20"> No data yet </span>
+        <span class="font-outfit text-[0.75rem] font-medium text-white/20">
+          {{ t('dashboard.noDataYet') }}
+        </span>
       </div>
       <Line
         v-else

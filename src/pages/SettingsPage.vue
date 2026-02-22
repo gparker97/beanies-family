@@ -229,10 +229,10 @@ function formatLastSync(timestamp: string | null): string {
           <!-- Preferred Currencies -->
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Preferred Currencies
+              {{ t('settings.preferredCurrencies') }}
             </label>
             <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
-              Select up to 4 currencies to show in the header
+              {{ t('settings.preferredCurrenciesHint') }}
             </p>
 
             <!-- Selected chips -->
@@ -261,7 +261,7 @@ function formatLastSync(timestamp: string | null): string {
               v-if="(settingsStore.preferredCurrencies || []).length < 4"
               model-value=""
               :options="availableForPreferred"
-              placeholder="Add currency..."
+              :placeholder="t('settings.addCurrency')"
               @update:model-value="addPreferredCurrency"
             />
           </div>
@@ -327,9 +327,9 @@ function formatLastSync(timestamp: string | null): string {
       </BaseCard>
 
       <!-- Family Data Options -->
-      <BaseCard title="Family Data Options">
+      <BaseCard :title="t('settings.familyDataOptions')">
         <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Your family's financial data is encrypted and safely stored in a file you control.
+          {{ t('settings.familyDataDescription') }}
         </p>
 
         <!-- Modern browsers with File System Access API -->
@@ -342,15 +342,17 @@ function formatLastSync(timestamp: string | null): string {
               class="mx-auto mb-4 h-12 w-12"
             />
             <p class="mb-2 font-medium text-gray-900 dark:text-gray-100">
-              Save your data to a file
+              {{ t('settings.saveDataToFile') }}
             </p>
             <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-              Create an encrypted data file or load an existing one.
+              {{ t('settings.createOrLoadDataFile') }}
             </p>
             <div class="flex flex-col gap-3">
-              <BaseButton @click="handleConfigureSync"> Create New Family Data File </BaseButton>
+              <BaseButton @click="handleConfigureSync">
+                {{ t('settings.createNewDataFile') }}
+              </BaseButton>
               <BaseButton variant="secondary" @click="handleLoadFromFileClick">
-                Load Existing Family Data File
+                {{ t('settings.loadExistingDataFile') }}
               </BaseButton>
             </div>
 
@@ -360,15 +362,14 @@ function formatLastSync(timestamp: string | null): string {
               class="mt-4 rounded-lg bg-yellow-50 p-4 text-left dark:bg-yellow-900/20"
             >
               <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
-                This will replace all local data with the contents of the selected file and set it
-                as your data file. Continue?
+                {{ t('settings.loadFileConfirmation') }}
               </p>
               <div class="flex gap-2">
                 <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
-                  Yes, Load File
+                  {{ t('settings.yesLoadFile') }}
                 </BaseButton>
                 <BaseButton variant="ghost" size="sm" @click="showLoadFileConfirm = false">
-                  Cancel
+                  {{ t('action.cancel') }}
                 </BaseButton>
               </div>
             </div>
@@ -382,10 +383,10 @@ function formatLastSync(timestamp: string | null): string {
               class="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
             >
               <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
-                Click to grant permission to access your data file.
+                {{ t('settings.grantPermissionPrompt') }}
               </p>
               <BaseButton variant="primary" @click="handleRequestPermission">
-                Grant Permission
+                {{ t('settings.grantPermission') }}
               </BaseButton>
             </div>
 
@@ -396,7 +397,9 @@ function formatLastSync(timestamp: string | null): string {
                 class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
               >
                 <div>
-                  <p class="font-medium text-gray-900 dark:text-gray-100">My Family's Data</p>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">
+                    {{ t('settings.myFamilyData') }}
+                  </p>
                   <p class="text-sm text-gray-500 dark:text-gray-400">{{ syncStore.fileName }}</p>
                 </div>
                 <div class="flex items-center gap-2">
@@ -413,10 +416,10 @@ function formatLastSync(timestamp: string | null): string {
                   >
                     {{
                       syncStore.syncStatus === 'syncing'
-                        ? 'Saving...'
+                        ? t('settings.saving')
                         : syncStore.syncStatus === 'error'
-                          ? 'Error'
-                          : 'Saved'
+                          ? t('settings.error')
+                          : t('settings.saved')
                     }}
                   </span>
                 </div>
@@ -427,7 +430,9 @@ function formatLastSync(timestamp: string | null): string {
                 class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
               >
                 <div>
-                  <p class="font-medium text-gray-900 dark:text-gray-100">Last Saved</p>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">
+                    {{ t('settings.lastSaved') }}
+                  </p>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
                     {{ formatLastSync(syncStore.lastSync) }}
                   </p>
@@ -438,10 +443,10 @@ function formatLastSync(timestamp: string | null): string {
               <div class="flex items-center justify-between py-3">
                 <div>
                   <p class="font-medium text-gray-900 dark:text-gray-100">
-                    Load another Family Data File
+                    {{ t('settings.loadAnotherDataFile') }}
                   </p>
                   <p class="text-sm text-gray-500 dark:text-gray-400">
-                    Switch to a different data file
+                    {{ t('settings.switchDataFile') }}
                   </p>
                 </div>
                 <BaseButton
@@ -450,7 +455,7 @@ function formatLastSync(timestamp: string | null): string {
                   :loading="syncStore.isSyncing"
                   @click="handleLoadFromFileClick"
                 >
-                  Browse...
+                  {{ t('settings.browse') }}
                 </BaseButton>
               </div>
 
@@ -460,15 +465,14 @@ function formatLastSync(timestamp: string | null): string {
                 class="mt-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
               >
                 <p class="mb-3 text-sm text-yellow-800 dark:text-yellow-200">
-                  This will replace all local data with the contents of the selected file and switch
-                  to that file. Continue?
+                  {{ t('settings.switchFileConfirmation') }}
                 </p>
                 <div class="flex gap-2">
                   <BaseButton variant="primary" size="sm" @click="handleLoadFromFileConfirmed">
-                    Yes, Load File
+                    {{ t('settings.yesLoadFile') }}
                   </BaseButton>
                   <BaseButton variant="ghost" size="sm" @click="showLoadFileConfirm = false">
-                    Cancel
+                    {{ t('action.cancel') }}
                   </BaseButton>
                 </div>
               </div>
@@ -483,7 +487,9 @@ function formatLastSync(timestamp: string | null): string {
                 v-if="importSuccess"
                 class="mt-4 rounded-lg bg-green-50 p-3 dark:bg-green-900/20"
               >
-                <p class="text-sm text-green-600 dark:text-green-400">Data loaded successfully!</p>
+                <p class="text-sm text-green-600 dark:text-green-400">
+                  {{ t('settings.dataLoadedSuccess') }}
+                </p>
               </div>
 
               <!-- Encryption toggle -->
@@ -498,7 +504,7 @@ function formatLastSync(timestamp: string | null): string {
                   />
                   <div>
                     <p class="font-medium text-gray-900 dark:text-gray-100">
-                      Encrypt data file
+                      {{ t('settings.encryptDataFile') }}
                       <span
                         v-if="syncStore.isEncryptionEnabled"
                         class="ml-2 inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
@@ -508,11 +514,11 @@ function formatLastSync(timestamp: string | null): string {
                           alt=""
                           class="mr-1 h-3 w-3"
                         />
-                        Encrypted
+                        {{ t('settings.encrypted') }}
                       </span>
                     </p>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                      Protect your data with password encryption
+                      {{ t('settings.encryptionDescription') }}
                     </p>
                   </div>
                 </label>
@@ -523,8 +529,7 @@ function formatLastSync(timestamp: string | null): string {
                   class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20"
                 >
                   <p class="mb-3 text-sm text-red-800 dark:text-red-200">
-                    Disabling encryption means your financial data will be stored as clear text and
-                    could be read by anyone with access to the file. Are you sure?
+                    {{ t('settings.disableEncryptionWarning') }}
                   </p>
                   <div class="flex gap-2">
                     <BaseButton
@@ -532,14 +537,14 @@ function formatLastSync(timestamp: string | null): string {
                       size="sm"
                       @click="handleDisableEncryptionConfirmed"
                     >
-                      Yes, Disable Encryption
+                      {{ t('settings.yesDisableEncryption') }}
                     </BaseButton>
                     <BaseButton
                       variant="ghost"
                       size="sm"
                       @click="showDisableEncryptionConfirm = false"
                     >
-                      Cancel
+                      {{ t('action.cancel') }}
                     </BaseButton>
                   </div>
                 </div>
@@ -548,7 +553,7 @@ function formatLastSync(timestamp: string | null): string {
                   v-if="!syncStore.hasSessionPassword && syncStore.isEncryptionEnabled"
                   class="mt-2 text-sm text-yellow-600 dark:text-yellow-400"
                 >
-                  Note: You'll need to enter your password when you return to access your data.
+                  {{ t('settings.passwordNote') }}
                 </p>
               </div>
             </div>
@@ -558,29 +563,34 @@ function formatLastSync(timestamp: string | null): string {
         <!-- Fallback for older browsers -->
         <div v-else class="space-y-4">
           <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
-            Your browser doesn't support automatic file saving. Use manual export/import instead.
-            For automatic saving, use Chrome or Edge.
+            {{ t('settings.noAutoSyncWarning') }}
           </p>
           <div
             class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
           >
             <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">Download Your Data</p>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ t('settings.downloadYourData') }}
+              </p>
               <p class="text-sm text-gray-500 dark:text-gray-400">
-                Download your data as a JSON file
+                {{ t('settings.downloadDataDescription') }}
               </p>
             </div>
             <BaseButton variant="secondary" size="sm" @click="handleManualExport">
-              Download
+              {{ t('action.download') }}
             </BaseButton>
           </div>
           <div class="flex items-center justify-between py-3">
             <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">Load Data File</p>
-              <p class="text-sm text-gray-500 dark:text-gray-400">Load data from a JSON file</p>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ t('settings.loadDataFile') }}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {{ t('settings.loadDataFileDescription') }}
+              </p>
             </div>
             <BaseButton variant="secondary" size="sm" @click="handleManualImport">
-              Load
+              {{ t('action.load') }}
             </BaseButton>
           </div>
 
@@ -591,7 +601,9 @@ function formatLastSync(timestamp: string | null): string {
 
           <!-- Import success -->
           <div v-if="importSuccess" class="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
-            <p class="text-sm text-green-600 dark:text-green-400">Data loaded successfully!</p>
+            <p class="text-sm text-green-600 dark:text-green-400">
+              {{ t('settings.dataLoadedSuccess') }}
+            </p>
           </div>
         </div>
       </BaseCard>
@@ -625,7 +637,9 @@ function formatLastSync(timestamp: string | null): string {
 
     <!-- Security Settings (only shown when auth is configured) -->
     <div v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode">
-      <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">Security</h2>
+      <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+        {{ t('settings.security') }}
+      </h2>
       <PasskeySettings />
     </div>
 
@@ -654,9 +668,11 @@ function formatLastSync(timestamp: string | null): string {
           class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
         >
           <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">Export Translation Cache</p>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.exportTranslationCache') }}
+            </p>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-              Download cached translations as a JSON file to commit to the repository
+              {{ t('settings.exportTranslationCacheDescription') }}
             </p>
           </div>
           <BaseButton
@@ -665,7 +681,7 @@ function formatLastSync(timestamp: string | null): string {
             :disabled="settingsStore.language === 'en'"
             @click="handleExportTranslations"
           >
-            Export Translations
+            {{ t('settings.exportTranslations') }}
           </BaseButton>
         </div>
         <div class="flex items-center justify-between py-3">
@@ -702,9 +718,9 @@ function formatLastSync(timestamp: string | null): string {
     <!-- Enable Encryption Password Modal -->
     <PasswordModal
       :open="showEnableEncryptionModal"
-      title="Set Encryption Password"
-      description="Choose a strong password to encrypt your data file. You'll need this password each time you open the app."
-      confirm-label="Enable Encryption"
+      :title="t('password.setPassword')"
+      :description="t('password.setPasswordDescription')"
+      :confirm-label="t('password.enableEncryption')"
       :require-confirmation="true"
       @close="handleEnableEncryptionModalClose"
       @confirm="handleEnableEncryption"
@@ -713,9 +729,9 @@ function formatLastSync(timestamp: string | null): string {
     <!-- Decrypt File Password Modal -->
     <PasswordModal
       :open="showDecryptFileModal"
-      title="Enter Password"
-      description="This file is encrypted. Enter your password to decrypt and load the data."
-      confirm-label="Decrypt & Load"
+      :title="t('password.enterPassword')"
+      :description="t('password.enterPasswordDescription')"
+      :confirm-label="t('password.decryptAndLoad')"
       @close="handleDecryptModalClose"
       @confirm="handleDecryptFile"
     />
@@ -728,7 +744,9 @@ function formatLastSync(timestamp: string | null): string {
       <div class="flex items-start gap-3">
         <BeanieIcon name="exclamation-circle" size="md" class="mt-0.5 flex-shrink-0 text-red-500" />
         <div>
-          <p class="text-sm font-medium text-red-800 dark:text-red-200">Encryption Error</p>
+          <p class="text-sm font-medium text-red-800 dark:text-red-200">
+            {{ t('password.encryptionError') }}
+          </p>
           <p class="mt-1 text-sm text-red-600 dark:text-red-300">{{ encryptionError }}</p>
         </div>
         <button

@@ -183,18 +183,18 @@ const dateRange = computed(() => {
 const dateFilterLabel = computed(() => {
   switch (dateFilterType.value) {
     case 'current_month':
-      return 'Current Month';
+      return t('date.currentMonth');
     case 'last_month':
-      return 'Last Month';
+      return t('date.lastMonth');
     case 'last_3_months':
-      return 'Last 3 Months';
+      return t('date.last3Months');
     case 'custom':
       if (customStartDate.value && customEndDate.value) {
         return `${customStartDate.value} to ${customEndDate.value}`;
       }
-      return 'Custom Range';
+      return t('date.customRange');
     default:
-      return 'All Time';
+      return t('date.allTime');
   }
 });
 
@@ -333,7 +333,7 @@ async function updateTransaction() {
 }
 
 async function deleteTransaction(id: string) {
-  if (confirm('Are you sure you want to delete this transaction?')) {
+  if (confirm(t('transactions.deleteConfirm'))) {
     await transactionsStore.deleteTransaction(id);
     playWhoosh();
   }
@@ -371,11 +371,7 @@ function handleRecurringCancel() {
 }
 
 async function deleteRecurringItem(id: string) {
-  if (
-    confirm(
-      'Are you sure you want to delete this recurring item? Existing transactions will not be affected.'
-    )
-  ) {
+  if (confirm(t('recurring.deleteConfirm'))) {
     await recurringStore.deleteRecurringItem(id);
     playWhoosh();
   }
@@ -466,7 +462,7 @@ function applyCustomDateRange() {
       <!-- Date Filter -->
       <div class="flex items-center justify-between">
         <div class="text-sm text-gray-600 dark:text-gray-400">
-          Showing:
+          {{ t('transactions.showing') }}
           <span class="font-medium text-gray-900 dark:text-gray-100">{{ dateFilterLabel }}</span>
         </div>
         <div class="relative">
@@ -481,7 +477,7 @@ function applyCustomDateRange() {
               "
               @click="setDateFilter('current_month')"
             >
-              Current Month
+              {{ t('date.currentMonth') }}
             </button>
             <button
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
@@ -492,7 +488,7 @@ function applyCustomDateRange() {
               "
               @click="setDateFilter('last_month')"
             >
-              Last Month
+              {{ t('date.lastMonth') }}
             </button>
             <button
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
@@ -503,7 +499,7 @@ function applyCustomDateRange() {
               "
               @click="setDateFilter('last_3_months')"
             >
-              Last 3 Months
+              {{ t('date.last3Months') }}
             </button>
             <button
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
@@ -514,7 +510,7 @@ function applyCustomDateRange() {
               "
               @click="setDateFilter('custom')"
             >
-              Custom Range
+              {{ t('date.customRange') }}
             </button>
           </div>
 
@@ -526,7 +522,7 @@ function applyCustomDateRange() {
             <div class="space-y-3">
               <div>
                 <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  Start Date
+                  {{ t('form.startDate') }}
                 </label>
                 <input
                   v-model="customStartDate"
@@ -536,7 +532,7 @@ function applyCustomDateRange() {
               </div>
               <div>
                 <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  End Date
+                  {{ t('form.endDate') }}
                 </label>
                 <input
                   v-model="customEndDate"
@@ -549,7 +545,7 @@ function applyCustomDateRange() {
                   class="flex-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
                   @click="showCustomDatePicker = false"
                 >
-                  Cancel
+                  {{ t('action.cancel') }}
                 </button>
                 <button
                   class="bg-primary-500 hover:bg-primary-600 flex-1 rounded-lg px-3 py-1.5 text-sm text-white"
@@ -558,7 +554,7 @@ function applyCustomDateRange() {
                     showCustomDatePicker = false;
                   "
                 >
-                  Apply
+                  {{ t('action.apply') }}
                 </button>
               </div>
             </div>
@@ -574,7 +570,9 @@ function applyCustomDateRange() {
         >
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-green-100">Income ({{ dateFilterLabel }})</p>
+              <p class="text-sm font-medium text-green-100">
+                {{ t('transactions.income') }} ({{ dateFilterLabel }})
+              </p>
               <p class="mt-1 text-2xl font-bold">
                 {{
                   formatTotal(
@@ -596,7 +594,9 @@ function applyCustomDateRange() {
         <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-5 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-red-100">Expenses ({{ dateFilterLabel }})</p>
+              <p class="text-sm font-medium text-red-100">
+                {{ t('transactions.expenses') }} ({{ dateFilterLabel }})
+              </p>
               <p class="mt-1 text-2xl font-bold">
                 {{
                   formatTotal(
@@ -649,7 +649,7 @@ function applyCustomDateRange() {
                     : 'text-orange-100'
                 "
               >
-                Net ({{ dateFilterLabel }})
+                {{ t('transactions.net') }} ({{ dateFilterLabel }})
               </p>
               <p class="mt-1 text-2xl font-bold">
                 {{
@@ -680,8 +680,8 @@ function applyCustomDateRange() {
           class="py-12 text-center text-gray-500 dark:text-gray-400"
         >
           <EmptyStateIllustration variant="transactions" class="mb-4" />
-          <p>No transactions found for {{ dateFilterLabel }}</p>
-          <p class="mt-2 text-sm">Try selecting a different date range or add a new transaction.</p>
+          <p>{{ t('transactions.noTransactionsForPeriod') }}</p>
+          <p class="mt-2 text-sm">{{ t('transactions.tryDifferentRange') }}</p>
         </div>
         <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
           <div
@@ -763,14 +763,14 @@ function applyCustomDateRange() {
               <div class="flex gap-1">
                 <button
                   class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                  title="Edit"
+                  :title="t('action.edit')"
                   @click="openEditModal(transaction)"
                 >
                   <BeanieIcon name="edit" size="md" />
                 </button>
                 <button
                   class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                  title="Delete"
+                  :title="t('action.delete')"
                   @click="deleteTransaction(transaction.id)"
                 >
                   <BeanieIcon name="trash" size="md" />
@@ -938,14 +938,14 @@ function applyCustomDateRange() {
                   </button>
                   <button
                     class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                    title="Edit"
+                    :title="t('action.edit')"
                     @click="openEditRecurringModal(item)"
                   >
                     <BeanieIcon name="edit" size="md" />
                   </button>
                   <button
                     class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                    title="Delete"
+                    :title="t('action.delete')"
                     @click="deleteRecurringItem(item.id)"
                   >
                     <BeanieIcon name="trash" size="md" />
@@ -981,7 +981,7 @@ function applyCustomDateRange() {
         <BaseInput
           v-model="newTransaction.description"
           :label="t('form.description')"
-          placeholder="e.g., Grocery shopping"
+          :placeholder="t('transactions.descriptionPlaceholder')"
           required
         />
 
@@ -1044,7 +1044,7 @@ function applyCustomDateRange() {
         <BaseInput
           v-model="editTransaction.description"
           :label="t('form.description')"
-          placeholder="e.g., Grocery shopping"
+          :placeholder="t('transactions.descriptionPlaceholder')"
           required
         />
 

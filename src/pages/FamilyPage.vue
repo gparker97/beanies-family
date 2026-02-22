@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { BaseCard, BaseButton, BaseInput, BaseModal, BaseSelect } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -55,20 +55,20 @@ const ageGroupOptions = [
   { value: 'child', label: t('family.ageGroup.child') },
 ];
 
-const monthOptions = [
-  { value: '1', label: 'January' },
-  { value: '2', label: 'February' },
-  { value: '3', label: 'March' },
-  { value: '4', label: 'April' },
-  { value: '5', label: 'May' },
-  { value: '6', label: 'June' },
-  { value: '7', label: 'July' },
-  { value: '8', label: 'August' },
-  { value: '9', label: 'September' },
-  { value: '10', label: 'October' },
-  { value: '11', label: 'November' },
-  { value: '12', label: 'December' },
-];
+const monthOptions = computed(() => [
+  { value: '1', label: t('month.january') },
+  { value: '2', label: t('month.february') },
+  { value: '3', label: t('month.march') },
+  { value: '4', label: t('month.april') },
+  { value: '5', label: t('month.may') },
+  { value: '6', label: t('month.june') },
+  { value: '7', label: t('month.july') },
+  { value: '8', label: t('month.august') },
+  { value: '9', label: t('month.september') },
+  { value: '10', label: t('month.october') },
+  { value: '11', label: t('month.november') },
+  { value: '12', label: t('month.december') },
+]);
 
 const dayOptions = Array.from({ length: 31 }, (_, i) => ({
   value: String(i + 1),
@@ -189,10 +189,10 @@ async function saveEditMember() {
 async function deleteMember(id: string) {
   const member = familyStore.members.find((m) => m.id === id);
   if (member?.role === 'owner') {
-    alert('Cannot delete the owner account.');
+    alert(t('family.cannotDeleteOwner'));
     return;
   }
-  if (confirm('Are you sure you want to remove this family member?')) {
+  if (confirm(t('family.deleteConfirm'))) {
     await familyStore.deleteMember(id);
   }
 }
@@ -258,7 +258,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
         <button
           v-if="!isEditingFamilyName && familyContextStore.activeFamilyName"
           class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
-          title="Edit family name"
+          :title="t('family.editFamilyName')"
           @click="startEditFamilyName"
         >
           <BeanieIcon name="edit" size="sm" />
@@ -298,7 +298,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
               class="text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 mt-1 text-xs"
               @click="openCreateAccountModal(member.name, member.email)"
             >
-              Create Login
+              {{ t('family.createLogin') }}
             </button>
           </div>
           <div class="flex flex-shrink-0 gap-1">
@@ -327,7 +327,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
         <BaseInput
           v-model="newMember.name"
           :label="t('form.name')"
-          placeholder="Enter name"
+          :placeholder="t('family.enterName')"
           required
         />
 
@@ -335,7 +335,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           v-model="newMember.email"
           type="email"
           :label="t('form.email')"
-          placeholder="Enter email"
+          :placeholder="t('family.enterEmail')"
           required
         />
 
@@ -374,7 +374,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
               v-model="dobYear"
               type="number"
               :label="t('family.dateOfBirth.year')"
-              placeholder="Year"
+              :placeholder="t('family.year')"
             />
           </div>
         </div>
@@ -394,7 +394,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
 
         <div>
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Profile Color
+            {{ t('family.profileColor') }}
           </label>
           <div class="flex gap-2">
             <button
@@ -432,7 +432,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
         <BaseInput
           v-model="editMember.name"
           :label="t('form.name')"
-          placeholder="Enter name"
+          :placeholder="t('family.enterName')"
           required
         />
 
@@ -440,7 +440,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           v-model="editMember.email"
           type="email"
           :label="t('form.email')"
-          placeholder="Enter email"
+          :placeholder="t('family.enterEmail')"
           required
         />
 
@@ -479,7 +479,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
               v-model="editDobYear"
               type="number"
               :label="t('family.dateOfBirth.year')"
-              placeholder="Year"
+              :placeholder="t('family.year')"
             />
           </div>
         </div>
@@ -498,7 +498,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
 
         <div>
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Profile Color
+            {{ t('family.profileColor') }}
           </label>
           <div class="flex gap-2">
             <button

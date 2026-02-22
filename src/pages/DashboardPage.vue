@@ -170,9 +170,11 @@ function getGoalIcon(type: string): string {
       >
         <div v-if="isUnlocked && netCashFlow > 0" class="mt-1 flex items-center gap-1">
           <span class="font-outfit text-[0.65rem] font-semibold text-emerald-300">
-            Healthy 🌱
+            {{ t('dashboard.healthy') }} 🌱
           </span>
-          <span class="text-[0.6rem] opacity-35">{{ savingsRate }}% savings rate</span>
+          <span class="text-[0.6rem] opacity-35"
+            >{{ savingsRate }}% {{ t('dashboard.savingsRate') }}</span
+          >
         </div>
       </SummaryStatCard>
     </div>
@@ -188,13 +190,13 @@ function getGoalIcon(type: string): string {
           <div
             class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
           >
-            Savings Goals
+            {{ t('dashboard.savingsGoals') }}
           </div>
           <router-link
             to="/goals"
             class="text-primary-500 hover:text-primary-600 text-[0.75rem] font-medium"
           >
-            See All →
+            {{ t('dashboard.seeAll') }}
           </router-link>
         </div>
 
@@ -229,7 +231,7 @@ function getGoalIcon(type: string): string {
             to="/transactions"
             class="text-primary-500 hover:text-primary-600 text-[0.75rem] font-medium"
           >
-            See All →
+            {{ t('dashboard.seeAll') }}
           </router-link>
         </div>
 
@@ -266,7 +268,7 @@ function getGoalIcon(type: string): string {
             to="/transactions"
             class="text-primary-500 hover:text-primary-600 text-[0.75rem] font-medium"
           >
-            See All →
+            {{ t('dashboard.seeAll') }}
           </router-link>
         </div>
 

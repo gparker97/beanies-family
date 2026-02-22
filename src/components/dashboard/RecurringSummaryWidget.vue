@@ -4,6 +4,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseCard } from '@/components/ui';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useTranslation } from '@/composables/useTranslation';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -13,6 +14,7 @@ const recurringStore = useRecurringStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { formatMasked } = usePrivacyMode();
+const { t } = useTranslation();
 
 // Uses filtered data based on global member filter
 const monthlyIncome = computed(() =>
@@ -50,7 +52,7 @@ const upcomingItems = computed(() => {
 </script>
 
 <template>
-  <BaseCard title="Recurring Summary">
+  <BaseCard :title="t('dashboard.recurringSummary')">
     <div class="space-y-4">
       <!-- Empty state -->
       <div v-if="recurringStore.filteredRecurringItems.length === 0" class="py-4 text-center">
@@ -67,20 +69,26 @@ const upcomingItems = computed(() => {
             d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
           />
         </svg>
-        <p class="text-sm text-gray-500 dark:text-gray-400">No recurring items yet</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          {{ t('dashboard.noRecurringItems') }}
+        </p>
       </div>
 
       <!-- Monthly totals -->
       <div v-else>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Income</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('recurring.monthlyIncome') }}
+            </p>
             <p class="text-lg font-semibold text-green-600 dark:text-green-400">
               {{ formatMasked('+' + monthlyIncome) }}
             </p>
           </div>
           <div>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Monthly Expenses</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('recurring.monthlyExpenses') }}
+            </p>
             <p class="text-lg font-semibold text-red-600 dark:text-red-400">
               {{ formatMasked('-' + monthlyExpenses) }}
             </p>
@@ -89,7 +97,7 @@ const upcomingItems = computed(() => {
 
         <!-- Net -->
         <div class="border-t border-gray-100 pt-3 dark:border-slate-700">
-          <p class="text-sm text-gray-500 dark:text-gray-400">Net Recurring (Monthly)</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.netRecurring') }}</p>
           <p
             class="text-xl font-bold"
             :class="
@@ -107,7 +115,7 @@ const upcomingItems = computed(() => {
           v-if="upcomingItems.length > 0"
           class="border-t border-gray-100 pt-3 dark:border-slate-700"
         >
-          <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">Upcoming</p>
+          <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.upcoming') }}</p>
           <div class="space-y-2">
             <div
               v-for="{ item, nextDate } in upcomingItems"

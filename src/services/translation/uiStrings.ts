@@ -57,7 +57,7 @@ const STRING_DEFS = {
   'status.overdue': { en: 'Overdue' },
 
   // Navigation
-  'nav.dashboard': { en: 'Dashboard', beanie: 'The Nook' },
+  'nav.dashboard': { en: 'Dashboard', beanie: 'Your Nook' },
   'nav.accounts': { en: 'Accounts' },
   'nav.transactions': { en: 'Transactions' },
   'nav.assets': { en: 'Assets' },
@@ -516,6 +516,309 @@ const STRING_DEFS = {
   'date.thisWeek': { en: 'This Week' },
   'date.thisMonth': { en: 'This Month' },
   'date.thisYear': { en: 'This Year' },
+  'date.tomorrow': { en: 'Tomorrow' },
+  'date.days': { en: 'days' },
+  'date.currentMonth': { en: 'Current Month' },
+  'date.lastMonth': { en: 'Last Month' },
+  'date.last3Months': { en: 'Last 3 Months' },
+  'date.last6Months': { en: 'Last 6 Months' },
+  'date.last12Months': { en: 'Last 12 Months' },
+  'date.last2Years': { en: 'Last 2 Years' },
+  'date.customRange': { en: 'Custom Range' },
+  'date.allTime': { en: 'All Time' },
+  'date.previousMonth': { en: 'Previous Month' },
+
+  // Months
+  'month.january': { en: 'January' },
+  'month.february': { en: 'February' },
+  'month.march': { en: 'March' },
+  'month.april': { en: 'April' },
+  'month.may': { en: 'May' },
+  'month.june': { en: 'June' },
+  'month.july': { en: 'July' },
+  'month.august': { en: 'August' },
+  'month.september': { en: 'September' },
+  'month.october': { en: 'October' },
+  'month.november': { en: 'November' },
+  'month.december': { en: 'December' },
+
+  // Dashboard (additional)
+  'dashboard.savingsGoals': { en: 'Savings Goals', beanie: 'Bean Dreams' },
+  'dashboard.seeAll': { en: 'See All →' },
+  'dashboard.yourBeans': { en: 'Your Beans', beanie: 'The Pod' },
+  'dashboard.addBean': { en: 'Add Bean', beanie: 'Add Beanie' },
+  'dashboard.healthy': { en: 'Healthy', beanie: 'Growing Strong' },
+  'dashboard.savingsRate': { en: 'savings rate' },
+  'dashboard.recurringSummary': { en: 'Recurring Summary', beanie: 'Regular Bean Summary' },
+  'dashboard.netRecurring': { en: 'Net Recurring (Monthly)', beanie: 'Net Beans (Monthly)' },
+  'dashboard.upcoming': { en: 'Upcoming', beanie: 'Coming Up' },
+  'dashboard.noRecurringItems': { en: 'No recurring items yet', beanie: 'No regular beans yet' },
+  'dashboard.roleParent': { en: 'Parent', beanie: 'Big Bean' },
+  'dashboard.roleLittleBean': { en: 'Little Bean' },
+  'dashboard.chartHidden': { en: 'Chart hidden' },
+  'dashboard.noDataYet': { en: 'No data yet', beanie: 'No beans to chart yet' },
+
+  // Greeting
+  'greeting.morning': { en: 'Good morning,' },
+  'greeting.afternoon': { en: 'Good afternoon,' },
+  'greeting.evening': { en: 'Good evening,' },
+
+  // Header / Privacy
+  'header.hideFinancialFigures': {
+    en: 'Hide financial figures',
+    beanie: 'Cover the beans',
+  },
+  'header.showFinancialFigures': {
+    en: 'Show financial figures',
+    beanie: 'Show the beans',
+  },
+  'header.financialFiguresVisible': { en: 'Financial figures visible' },
+  'header.financialFiguresHidden': { en: 'Financial figures hidden' },
+  'header.notifications': { en: 'Notifications' },
+
+  // Sidebar
+  'sidebar.noDataFile': { en: 'No data file' },
+  'sidebar.dataEncrypted': { en: 'Data encrypted' },
+  'sidebar.notEncrypted': { en: 'Not encrypted' },
+  'sidebar.noDataFileConfigured': { en: 'No data file configured' },
+  'sidebar.dataEncryptedFull': { en: 'Data encrypted (AES-256-GCM)' },
+  'sidebar.dataFileNotEncrypted': { en: 'Data file not encrypted' },
+
+  // Transactions (additional)
+  'transactions.showing': { en: 'Showing:' },
+  'transactions.income': { en: 'Income', beanie: 'Beans In' },
+  'transactions.expenses': { en: 'Expenses', beanie: 'Beans Out' },
+  'transactions.net': { en: 'Net' },
+  'transactions.noTransactionsForPeriod': {
+    en: 'No transactions found for this period',
+    beanie: 'No bean moves found for this period',
+  },
+  'transactions.tryDifferentRange': {
+    en: 'Try selecting a different date range or add a new transaction.',
+    beanie: 'Try a different date range or add a new bean move.',
+  },
+  'transactions.deleteConfirm': {
+    en: 'Are you sure you want to delete this transaction?',
+    beanie: 'Remove this bean move for good?',
+  },
+  'transactions.descriptionPlaceholder': {
+    en: 'e.g., Grocery shopping',
+  },
+
+  // Reports (additional)
+  'reports.next3Months': { en: 'Next 3 Months' },
+  'reports.next6Months': { en: 'Next 6 Months' },
+  'reports.next1Year': { en: 'Next 1 Year' },
+  'reports.next2Years': { en: 'Next 2 Years' },
+  'reports.next5Years': { en: 'Next 5 Years' },
+  'reports.next10Years': { en: 'Next 10 Years' },
+  'reports.next15Years': { en: 'Next 15 Years' },
+  'reports.next20Years': { en: 'Next 20 Years' },
+  'reports.allFamilyMembers': { en: 'All Family Members' },
+  'reports.allCategories': { en: 'All Categories' },
+
+  // Family (additional)
+  'family.cannotDeleteOwner': { en: 'Cannot delete the owner account.' },
+  'family.deleteConfirm': {
+    en: 'Are you sure you want to remove this family member?',
+    beanie: 'Remove this beanie from the pod?',
+  },
+  'family.editFamilyName': { en: 'Edit family name' },
+  'family.createLogin': { en: 'Create Login' },
+  'family.enterName': { en: 'Enter name' },
+  'family.enterEmail': { en: 'Enter email' },
+  'family.profileColor': { en: 'Profile Color' },
+  'family.year': { en: 'Year' },
+
+  // Settings (additional)
+  'settings.preferredCurrencies': { en: 'Preferred Currencies' },
+  'settings.preferredCurrenciesHint': {
+    en: 'Select up to 4 currencies to show in the header',
+  },
+  'settings.addCurrency': { en: 'Add currency...' },
+  'settings.familyDataOptions': { en: 'Family Data Options' },
+  'settings.familyDataDescription': {
+    en: "Your family's financial data is encrypted and safely stored in a file you control.",
+    beanie: 'Your beans are safe — encrypted and stored in a file only you control.',
+  },
+  'settings.saveDataToFile': { en: 'Save your data to a file' },
+  'settings.createOrLoadDataFile': {
+    en: 'Create an encrypted data file or load an existing one.',
+  },
+  'settings.createNewDataFile': { en: 'Create New Family Data File' },
+  'settings.loadExistingDataFile': { en: 'Load Existing Family Data File' },
+  'settings.loadFileConfirmation': {
+    en: 'This will replace all local data with the contents of the selected file and set it as your data file. Continue?',
+  },
+  'settings.yesLoadFile': { en: 'Yes, Load File' },
+  'settings.grantPermissionPrompt': {
+    en: 'Click to grant permission to access your data file.',
+  },
+  'settings.grantPermission': { en: 'Grant Permission' },
+  'settings.myFamilyData': { en: "My Family's Data" },
+  'settings.saving': { en: 'Saving...', beanie: 'Saving beans...' },
+  'settings.error': { en: 'Error' },
+  'settings.saved': { en: 'Saved' },
+  'settings.lastSaved': { en: 'Last Saved' },
+  'settings.loadAnotherDataFile': { en: 'Load another Family Data File' },
+  'settings.switchDataFile': { en: 'Switch to a different data file' },
+  'settings.browse': { en: 'Browse...' },
+  'settings.switchFileConfirmation': {
+    en: 'This will replace all local data with the contents of the selected file and switch to that file. Continue?',
+  },
+  'settings.dataLoadedSuccess': { en: 'Data loaded successfully!' },
+  'settings.encryptDataFile': { en: 'Encrypt data file' },
+  'settings.encrypted': { en: 'Encrypted' },
+  'settings.encryptionDescription': {
+    en: 'Protect your data with password encryption',
+    beanie: 'Lock your beans with a password',
+  },
+  'settings.disableEncryptionWarning': {
+    en: 'Disabling encryption means your financial data will be stored as clear text and could be read by anyone with access to the file. Are you sure?',
+  },
+  'settings.yesDisableEncryption': { en: 'Yes, Disable Encryption' },
+  'settings.passwordNote': {
+    en: "Note: You'll need to enter your password when you return to access your data.",
+  },
+  'settings.noAutoSyncWarning': {
+    en: "Your browser doesn't support automatic file saving. Use manual export/import instead. For automatic saving, use Chrome or Edge.",
+  },
+  'settings.downloadYourData': { en: 'Download Your Data' },
+  'settings.downloadDataDescription': { en: 'Download your data as a JSON file' },
+  'settings.loadDataFile': { en: 'Load Data File' },
+  'settings.loadDataFileDescription': { en: 'Load data from a JSON file' },
+  'settings.security': { en: 'Security' },
+  'settings.exportTranslationCache': { en: 'Export Translation Cache' },
+  'settings.exportTranslationCacheDescription': {
+    en: 'Download cached translations as a JSON file to commit to the repository',
+  },
+  'settings.exportTranslations': { en: 'Export Translations' },
+
+  // Password modal
+  'password.setPassword': { en: 'Set Encryption Password' },
+  'password.setPasswordDescription': {
+    en: "Choose a strong password to encrypt your data file. You'll need this password each time you open the app.",
+  },
+  'password.enableEncryption': { en: 'Enable Encryption' },
+  'password.enterPassword': { en: 'Enter Password' },
+  'password.enterPasswordDescription': {
+    en: 'This file is encrypted. Enter your password to decrypt and load the data.',
+  },
+  'password.decryptAndLoad': { en: 'Decrypt & Load' },
+  'password.encryptionError': { en: 'Encryption Error' },
+  'password.password': { en: 'Password' },
+  'password.enterPasswordPlaceholder': { en: 'Enter password' },
+  'password.confirmPassword': { en: 'Confirm Password' },
+  'password.confirmPasswordPlaceholder': { en: 'Confirm password' },
+  'password.required': { en: 'Password is required' },
+  'password.mismatch': { en: 'Passwords do not match' },
+  'password.decryptionError': { en: 'Decryption Error' },
+  'password.setAndContinue': { en: 'Set Password & Continue' },
+  'password.strongPasswordDescription': {
+    en: "Choose a strong password to protect your data file. You'll need this password each time you open the app.",
+  },
+  'password.encryptedFileDescription': {
+    en: 'This file is encrypted. Enter your password to decrypt and load your data.',
+  },
+
+  // Setup
+  'setup.subtitle': { en: "Let's get you set up" },
+  'setup.createProfile': { en: 'Create Your Profile' },
+  'setup.yourName': { en: 'Your Name' },
+  'setup.enterYourName': { en: 'Enter your name' },
+  'setup.emailAddress': { en: 'Email Address' },
+  'setup.enterYourEmail': { en: 'Enter your email' },
+  'setup.haveExistingFile': { en: 'Have an existing data file?' },
+  'setup.setPreferences': { en: 'Set Your Preferences' },
+  'setup.baseCurrencyHint': {
+    en: 'This will be your primary currency for displaying totals',
+  },
+  'setup.secureData': { en: 'Secure Your Data' },
+  'setup.securityDescription': {
+    en: 'Your data is encrypted and saved to a file you control. No data is stored on our servers. You can place this file in Google Drive, Dropbox, or any synced folder for cloud backup.',
+  },
+  'setup.securityEncrypted': { en: 'Encrypted with a password only you know' },
+  'setup.securityAutoSaved': { en: 'Saved automatically as you make changes' },
+  'setup.securityYouControl': { en: 'You control where the file is stored' },
+  'setup.createDataFile': { en: 'Create New Family Data File' },
+  'setup.loadExistingFile': { en: 'Load Existing Family Data File' },
+  'setup.browserWarning': {
+    en: 'For automatic saving, use Chrome or Edge. You can still download your data manually.',
+  },
+  'setup.downloadData': { en: 'Download Your Data' },
+  'setup.footerNote': {
+    en: 'Your data is encrypted and stored in a file you control — not on our servers.',
+  },
+  'setup.nameRequired': { en: 'Name is required' },
+  'setup.emailRequired': { en: 'Email is required' },
+  'setup.invalidEmail': { en: 'Please enter a valid email address' },
+  'setup.fileCreateFailed': {
+    en: 'Failed to create file. Please try again.',
+  },
+  'setup.encryptionFailed': {
+    en: 'Failed to encrypt file. You can configure encryption later in Settings.',
+  },
+
+  // Auth / Login
+  'auth.signIn': { en: 'Sign In' },
+  'auth.signingIn': { en: 'Signing in...' },
+  'auth.createAccount': { en: 'Create Account' },
+  'auth.creatingAccount': { en: 'Creating account...' },
+  'auth.signOut': { en: 'Sign Out' },
+  'auth.signInWithAccount': { en: 'Sign In with Account' },
+  'auth.checkEmail': { en: 'Check your email' },
+  'auth.magicLinkSentTo': { en: 'We sent a magic link to' },
+  'auth.magicLinkAction': { en: 'Click the link to sign in.' },
+  'auth.backToSignIn': { en: 'Back to sign in' },
+  'auth.sendMagicLink': { en: 'Send Magic Link' },
+  'auth.sendingMagicLink': { en: 'Sending...' },
+  'auth.signInPassword': { en: 'Sign in with password instead' },
+  'auth.signInMagicLink': { en: 'Sign in with magic link' },
+  'auth.signInPasskey': { en: 'Sign in with passkey' },
+  'auth.continueWithoutAccount': { en: 'Continue without an account' },
+  'auth.enterEmailPassword': { en: 'Please enter your email and password' },
+  'auth.fillAllFields': { en: 'Please fill in all fields' },
+  'auth.passwordsDoNotMatch': { en: 'Passwords do not match' },
+  'auth.passwordMinLength': { en: 'Password must be at least 8 characters' },
+  'auth.accountCreated': {
+    en: 'Account created! We sent a verification link to',
+  },
+  'auth.verifyEmail': {
+    en: 'Please click the link in the email to verify your account before signing in.',
+  },
+  'auth.magicLinkFailed': {
+    en: 'Unable to send magic link. Please try signing in with a password.',
+  },
+  'auth.passkeyNotAvailable': {
+    en: 'Passkey sign-in requires server-side infrastructure. This will be available once the backend is deployed.',
+  },
+  'auth.notConfigured': { en: 'Authentication is not configured' },
+  'auth.securityEncrypted': {
+    en: 'Your data is encrypted and stored in a file you control',
+  },
+  'auth.securityNoServers': {
+    en: 'No data is stored on our servers — everything stays on your device',
+  },
+  'auth.securityBackup': {
+    en: 'Back up easily by saving your data file to Google Drive, Dropbox, or any cloud folder',
+  },
+  'auth.familyName': { en: 'Family Name' },
+  'auth.familyNamePlaceholder': { en: 'The Smith Family' },
+  'auth.yourNamePlaceholder': { en: 'John Smith' },
+  'auth.passwordPlaceholder': { en: 'At least 8 characters' },
+  'auth.verifyingMagicLink': { en: 'Verifying your magic link...' },
+  'auth.signedInRedirecting': { en: 'Signed in successfully! Redirecting...' },
+  'auth.backToLogin': { en: 'Back to login' },
+  'auth.invalidMagicLink': { en: 'Invalid magic link. Please request a new one.' },
+  'auth.unexpectedState': { en: 'Unexpected authentication state.' },
+  'auth.expiredMagicLink': { en: 'Invalid or expired magic link code.' },
+
+  // Common actions (additional)
+  'action.continue': { en: 'Continue' },
+  'action.apply': { en: 'Apply' },
+  'action.download': { en: 'Download' },
+  'action.load': { en: 'Load' },
+  'action.seeAll': { en: 'See All' },
 } satisfies Record<string, StringEntry>;
 
 /**

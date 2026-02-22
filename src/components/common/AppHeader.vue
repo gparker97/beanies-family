@@ -21,6 +21,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useTranslation } from '@/composables/useTranslation';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const route = useRoute();
@@ -30,6 +31,7 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
 const translationStore = useTranslationStore();
+const { t } = useTranslation();
 
 // ── Page title / Dashboard greeting ──────────────────────────────────────
 const isDashboard = computed(() => route.name === 'Dashboard');
@@ -37,9 +39,9 @@ const ownerName = computed(() => familyStore.owner?.name || 'there');
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
-  if (hour < 12) return `Good morning, ${ownerName.value}`;
-  if (hour < 18) return `Good afternoon, ${ownerName.value}`;
-  return `Good evening, ${ownerName.value}`;
+  if (hour < 12) return `${t('greeting.morning')} ${ownerName.value}`;
+  if (hour < 18) return `${t('greeting.afternoon')} ${ownerName.value}`;
+  return `${t('greeting.evening')} ${ownerName.value}`;
 });
 
 const todayFormatted = computed(() => {
@@ -292,15 +294,17 @@ async function handleSignOut() {
       <button
         type="button"
         class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
-        :aria-label="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
-        :title="isUnlocked ? 'Hide financial figures' : 'Show financial figures'"
+        :aria-label="
+          isUnlocked ? t('header.hideFinancialFigures') : t('header.showFinancialFigures')
+        "
+        :title="isUnlocked ? t('header.hideFinancialFigures') : t('header.showFinancialFigures')"
         @click="handlePrivacyToggle"
       >
         <!-- Open eyes (figures visible) -->
         <img
           v-if="isUnlocked"
           src="/brand/beanies_open_eyes_transparent_512x512.png"
-          alt="Financial figures visible"
+          :alt="t('header.financialFiguresVisible')"
           class="h-8 w-8"
           :class="{ 'animate-beanie-blink': privacyAnimating }"
           @animationend="privacyAnimating = false"
@@ -309,7 +313,7 @@ async function handleSignOut() {
         <img
           v-else
           src="/brand/beanies_covering_eyes_transparent_512x512.png"
-          alt="Financial figures hidden"
+          :alt="t('header.financialFiguresHidden')"
           class="h-8 w-8"
           :class="{ 'animate-beanie-blink': privacyAnimating }"
           @animationend="privacyAnimating = false"
@@ -325,8 +329,8 @@ async function handleSignOut() {
       <button
         type="button"
         class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white text-gray-500 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-400 dark:shadow-none"
-        aria-label="Notifications"
-        title="Notifications"
+        :aria-label="t('header.notifications')"
+        :title="t('header.notifications')"
       >
         <BeanieIcon name="bell" size="md" />
         <!-- Heritage Orange notification dot -->
@@ -385,7 +389,7 @@ async function handleSignOut() {
             class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
             @mousedown.prevent="handleSignOut"
           >
-            Sign Out
+            {{ t('auth.signOut') }}
           </button>
           <!-- Sign out (Cognito configured, logged in with account) -->
           <button
@@ -394,7 +398,7 @@ async function handleSignOut() {
             class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
             @mousedown.prevent="handleSignOut"
           >
-            Sign Out
+            {{ t('auth.signOut') }}
           </button>
           <!-- Switch to account (Cognito configured, but currently using local-only mode) -->
           <button
@@ -403,7 +407,7 @@ async function handleSignOut() {
             class="text-primary-600 dark:text-primary-400 w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
             @mousedown.prevent="handleSignOut"
           >
-            Sign In with Account
+            {{ t('auth.signInWithAccount') }}
           </button>
         </div>
       </div>

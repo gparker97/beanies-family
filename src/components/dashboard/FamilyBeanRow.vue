@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import type { Gender, AgeGroup } from '@/types/models';
 
 const familyStore = useFamilyStore();
+const { t } = useTranslation();
 
 const emit = defineEmits<{
   'add-member': [];
@@ -14,11 +16,11 @@ const emit = defineEmits<{
 function getRoleLabel(role: string): string {
   switch (role) {
     case 'owner':
-      return 'Parent';
+      return t('dashboard.roleParent');
     case 'admin':
-      return 'Parent';
+      return t('dashboard.roleParent');
     case 'member':
-      return 'Little Bean';
+      return t('dashboard.roleLittleBean');
     default:
       return role;
   }
@@ -30,7 +32,7 @@ function getRoleLabel(role: string): string {
     <div
       class="font-outfit text-secondary-500/45 mb-3 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
     >
-      Your Beans
+      {{ t('dashboard.yourBeans') }}
     </div>
     <div class="flex gap-4 overflow-x-auto py-2">
       <!-- Family members -->
@@ -79,7 +81,7 @@ function getRoleLabel(role: string): string {
         <div
           class="font-outfit text-secondary-500/30 text-[0.7rem] font-semibold dark:text-gray-500"
         >
-          Add Bean
+          {{ t('dashboard.addBean') }}
         </div>
       </button>
     </div>
