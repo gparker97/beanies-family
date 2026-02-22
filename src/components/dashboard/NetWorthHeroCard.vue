@@ -175,7 +175,7 @@ const chartOptions = computed(() => ({
       border: { display: false },
       ticks: {
         color: 'rgba(255,255,255,0.2)',
-        font: { family: 'Outfit', size: 9, weight: '400' as const },
+        font: { family: 'Outfit', size: 9, weight: 'normal' as const },
         maxRotation: 0,
         maxTicksLimit: 6,
         callback: function (
