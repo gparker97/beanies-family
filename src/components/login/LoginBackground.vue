@@ -5,8 +5,10 @@ const { t } = useTranslation();
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-slate-900">
-    <div class="w-full max-w-md">
+  <div
+    class="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#F8F9FA] via-[#FEF0E8] to-[#EBF5FD] p-4 dark:from-[#1a252f] dark:via-[#2C3E50] dark:to-[#1a252f]"
+  >
+    <div class="w-full max-w-[580px]">
       <div class="mb-8 text-center">
         <img
           src="/brand/beanies_celebrating_line_transparent_600x600.png"

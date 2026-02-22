@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { SetupPage } from '../page-objects/SetupPage';
 import { DashboardPage } from '../page-objects/DashboardPage';
 import { AccountsPage } from '../page-objects/AccountsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
@@ -14,9 +13,6 @@ test.describe('Account Management', () => {
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
     await bypassLoginIfNeeded(page);
-
-    const setupPage = new SetupPage(page);
-    await setupPage.completeSetup();
 
     const accountsPage = new AccountsPage(page);
     await accountsPage.goto();
@@ -43,9 +39,6 @@ test.describe('Account Management', () => {
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
     await bypassLoginIfNeeded(page);
-
-    const setupPage = new SetupPage(page);
-    await setupPage.completeSetup();
 
     const accountsPage = new AccountsPage(page);
     await accountsPage.goto();

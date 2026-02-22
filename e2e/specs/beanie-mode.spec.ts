@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { SetupPage } from '../page-objects/SetupPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 
@@ -10,10 +9,6 @@ test.describe('Beanie Mode', () => {
     await dbHelper.clearAllData();
     await page.goto('/');
     await bypassLoginIfNeeded(page);
-
-    // Complete setup
-    const setupPage = new SetupPage(page);
-    await setupPage.completeSetup();
   });
 
   test('settings shows beanie mode toggle, off by default', async ({ page }) => {

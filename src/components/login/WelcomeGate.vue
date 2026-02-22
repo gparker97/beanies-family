@@ -3,7 +3,7 @@ import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
 
-type LoginView = 'signin' | 'create' | 'join';
+type LoginView = 'load-pod' | 'create' | 'join';
 
 const emit = defineEmits<{
   navigate: [view: LoginView];
@@ -11,31 +11,23 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="mb-2 text-center">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        {{ t('login.welcomeTitle') }}
-      </h2>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('login.welcomeSubtitle') }}
+  <div class="space-y-6">
+    <div class="text-center">
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        {{ t('loginV6.welcomePrompt') }}
       </p>
     </div>
 
-    <!-- Sign In -->
-    <button
-      class="hover:border-primary-300 dark:hover:border-primary-600 w-full rounded-lg border border-gray-200 p-4 text-left transition-colors hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-800"
-      @click="emit('navigate', 'signin')"
-    >
-      <div class="flex items-center gap-3">
+    <div class="flex flex-col gap-4 sm:flex-row">
+      <!-- Sign in to your pod -->
+      <button
+        class="flex-1 rounded-3xl bg-white p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-slate-800"
+        @click="emit('navigate', 'load-pod')"
+      >
         <div
-          class="bg-primary-100 dark:bg-primary-900/30 flex h-10 w-10 items-center justify-center rounded-full"
+          class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2C3E50] dark:bg-slate-600"
         >
-          <svg
-            class="text-primary-600 dark:text-primary-400 h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -44,27 +36,21 @@ const emit = defineEmits<{
             />
           </svg>
         </div>
-        <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('login.signIn') }}</p>
-        </div>
-      </div>
-    </button>
+        <p class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+          {{ t('loginV6.signInTitle') }}
+        </p>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('loginV6.signInSubtitle') }}
+        </p>
+      </button>
 
-    <!-- Create Pod -->
-    <button
-      class="hover:border-primary-300 dark:hover:border-primary-600 w-full rounded-lg border border-gray-200 p-4 text-left transition-colors hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-800"
-      @click="emit('navigate', 'create')"
-    >
-      <div class="flex items-center gap-3">
-        <div
-          class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
-        >
-          <svg
-            class="h-5 w-5 text-green-600 dark:text-green-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
+      <!-- Create a new pod -->
+      <button
+        class="flex-1 rounded-3xl bg-gradient-to-br from-[#F15D22] to-[#E67E22] p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+        @click="emit('navigate', 'create')"
+      >
+        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+          <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -73,24 +59,24 @@ const emit = defineEmits<{
             />
           </svg>
         </div>
-        <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('login.createPod') }}</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('login.createPodDesc') }}</p>
-        </div>
-      </div>
-    </button>
+        <p class="font-outfit text-base font-bold text-white">
+          {{ t('loginV6.createTitle') }}
+        </p>
+        <p class="mt-1 text-sm text-white/80">
+          {{ t('loginV6.createSubtitle') }}
+        </p>
+      </button>
 
-    <!-- Join Pod -->
-    <button
-      class="hover:border-primary-300 dark:hover:border-primary-600 w-full rounded-lg border border-gray-200 p-4 text-left transition-colors hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-800"
-      @click="emit('navigate', 'join')"
-    >
-      <div class="flex items-center gap-3">
+      <!-- Join an existing pod -->
+      <button
+        class="flex-1 rounded-3xl bg-white p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl dark:bg-slate-800"
+        @click="emit('navigate', 'join')"
+      >
         <div
-          class="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30"
+          class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#AED6F1]/30 dark:bg-[#AED6F1]/10"
         >
           <svg
-            class="h-5 w-5 text-blue-600 dark:text-blue-400"
+            class="h-6 w-6 text-[#2C3E50] dark:text-[#AED6F1]"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -103,11 +89,13 @@ const emit = defineEmits<{
             />
           </svg>
         </div>
-        <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">{{ t('login.joinPod') }}</p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('login.joinPodDesc') }}</p>
-        </div>
-      </div>
-    </button>
+        <p class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+          {{ t('loginV6.joinTitle') }}
+        </p>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('loginV6.joinSubtitle') }}
+        </p>
+      </button>
+    </div>
   </div>
 </template>

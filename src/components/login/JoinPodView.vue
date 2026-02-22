@@ -8,9 +8,12 @@ import { useTranslation } from '@/composables/useTranslation';
 const { t } = useTranslation();
 const route = useRoute();
 
+type LoginView = 'create';
+
 const emit = defineEmits<{
   back: [];
   'signed-in': [destination: string];
+  navigate: [view: LoginView];
 }>();
 
 const familyCode = ref('');
@@ -18,7 +21,6 @@ const formError = ref<string | null>(null);
 const roleParam = ref<'parent' | 'child'>('parent');
 
 onMounted(() => {
-  // Pre-fill family code from query param
   const code = route.query.code;
   if (typeof code === 'string' && code) {
     familyCode.value = code;
@@ -37,33 +39,36 @@ async function handleSubmit() {
     return;
   }
 
-  // For now, joining a pod means navigating to setup with the family code
-  // The full magic link flow (DynamoDB registry + file reference) is a future issue
-  emit('signed-in', `/setup?code=${familyCode.value.trim()}&role=${roleParam.value}`);
+  // Join pod requires a server-side registry to validate family codes.
+  // This feature is not yet implemented — show an informative error.
+  formError.value = t('loginV6.joinNotAvailable');
 }
 </script>
 
 <template>
-  <div>
-    <div class="mb-4 flex items-center gap-2">
-      <button
-        class="rounded-lg p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-300"
-        @click="$emit('back')"
-      >
-        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M15 19l-7-7 7-7"
-          />
-        </svg>
-      </button>
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        {{ t('login.joinPod') }}
+  <div class="mx-auto max-w-[440px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+    <!-- Back button -->
+    <button
+      class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      @click="$emit('back')"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      {{ t('action.back') }}
+    </button>
+
+    <!-- Header -->
+    <div class="mb-6 text-center">
+      <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        {{ t('loginV6.joinTitle') }}
       </h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        {{ t('loginV6.joinSubtitle') }}
+      </p>
     </div>
 
+    <!-- Error -->
     <div
       v-if="formError"
       class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
@@ -72,30 +77,76 @@ async function handleSubmit() {
     </div>
 
     <form @submit.prevent="handleSubmit">
-      <div class="space-y-4">
-        <div>
-          <BaseInput
-            v-model="familyCode"
-            :label="t('login.familyCode')"
-            :placeholder="t('login.familyCodePlaceholder')"
-            required
-          />
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('login.familyCodeHelp') }}
-          </p>
-        </div>
-        <!-- Role indicator (read-only, determined by invite link) -->
-        <div class="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 dark:bg-slate-800">
-          <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('login.joiningAs') }}:</span>
-          <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {{ roleParam === 'child' ? t('login.inviteAsChild') : t('login.inviteAsParent') }}
-          </span>
+      <!-- Family code input -->
+      <BaseInput
+        v-model="familyCode"
+        :label="t('loginV6.joinInput')"
+        :placeholder="t('login.familyCodePlaceholder')"
+        required
+      />
+
+      <!-- Role indicator -->
+      <div
+        class="mt-4 flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-slate-700/50"
+      >
+        <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('login.joiningAs') }}:</span>
+        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {{ roleParam === 'child' ? t('loginV6.littleBean') : t('loginV6.parentBean') }}
+        </span>
+      </div>
+
+      <!-- What happens next card -->
+      <div class="mt-6 rounded-2xl bg-[#2C3E50] p-5 dark:bg-slate-700">
+        <p class="mb-3 text-sm font-semibold text-white">
+          {{ t('loginV6.whatsNext') }}
+        </p>
+        <div class="space-y-2.5">
+          <div class="flex items-start gap-3">
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+            >
+              1
+            </div>
+            <p class="text-sm text-white/80">{{ t('loginV6.joinStep1') }}</p>
+          </div>
+          <div class="flex items-start gap-3">
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+            >
+              2
+            </div>
+            <p class="text-sm text-white/80">{{ t('loginV6.joinStep2') }}</p>
+          </div>
+          <div class="flex items-start gap-3">
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+            >
+              3
+            </div>
+            <p class="text-sm text-white/80">{{ t('loginV6.joinStep3') }}</p>
+          </div>
         </div>
       </div>
 
+      <!-- Submit button -->
       <BaseButton type="submit" class="mt-6 w-full">
-        {{ t('login.joinPod') }}
+        {{ t('loginV6.joinButton') }}
       </BaseButton>
     </form>
+
+    <!-- Footer link -->
+    <div class="mt-6 text-center">
+      <span class="text-sm text-gray-500 dark:text-gray-400">
+        {{ t('loginV6.wantYourOwn') }}
+      </span>
+      {{ ' ' }}
+      <button
+        type="button"
+        class="text-sm font-medium text-[#F15D22] hover:text-[#E67E22]"
+        @click="emit('navigate', 'create')"
+      >
+        {{ t('loginV6.createLink') }}
+      </button>
+    </div>
   </div>
 </template>

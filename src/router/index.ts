@@ -19,12 +19,6 @@ const routes: RouteRecordRaw[] = [
     props: { initialView: 'join' },
   },
   {
-    path: '/setup',
-    name: 'Setup',
-    component: () => import('@/pages/SetupPage.vue'),
-    meta: { title: 'Setup', requiresSetup: false, requiresAuth: true },
-  },
-  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/pages/DashboardPage.vue'),
