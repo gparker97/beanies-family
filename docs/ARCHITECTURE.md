@@ -184,7 +184,7 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Navigation items defined once in `src/constants/navigation.ts` as a shared `NavItemDef[]`
 - `PRIMARY_NAV_ITEMS` (7 items) and `SECONDARY_NAV_ITEMS` (2 items) exported for consumers
 - Desktop sidebar (`AppSidebar.vue`) consumes these constants with emoji icons and active state styling
-- Designed for reuse by future mobile bottom nav and hamburger menu (see v4 UI proposal)
+- Designed for reuse by future mobile bottom nav and hamburger menu (see v5 UI proposal)
 - Each item has: `labelKey` (i18n), `path` (route), `emoji` (icon), `section` (primary/secondary)
 
 ### Authentication (Optional)
@@ -204,7 +204,7 @@ FamilyMember (0..1) ───▶ (N) Goal
 
 ## UI Design System
 
-The app follows the **Nook UI** design system (v4 proposal: `docs/brand/beanies-ui-framework-proposal-v4.html`):
+The app follows the **Nook UI** design system (v5 proposal: `docs/brand/beanies-ui-framework-proposal-v5.html`):
 
 - **Shape language**: Squircle corners (24px+ radius) on all containers
 - **Shadows**: Diffused and subtle (`--card-shadow`, `--card-hover-shadow`)
