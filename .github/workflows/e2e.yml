@@ -1,40 +1,51 @@
-name: E2E Tests
+name: Full E2E Tests (All Browsers)
 
 on:
   pull_request:
     types: [labeled]
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 6am UTC
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
   e2e:
-    name: E2E Tests
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    name: E2E — ${{ matrix.browser }}
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-    steps:
-      - uses: actions/checkout@v6
 
-      - name: Setup Node
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install dependencies
-        run: npm ci --prefer-offline
+        run: npm ci
 
-      - name: Install Playwright
+      - name: Install Playwright browser
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run E2E tests
         run: npx playwright test --project=${{ matrix.browser }}
 
-      - name: Upload results
-        uses: actions/upload-artifact@v6
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-${{ matrix.browser }}
+          name: playwright-report-${{ matrix.browser }}
           path: playwright-report/
-          retention-days: 30
+          retention-days: 14
