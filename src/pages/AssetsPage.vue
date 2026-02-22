@@ -517,7 +517,7 @@ function getAppreciationPercent(asset: Asset): number {
             </div>
 
             <!-- Value Display -->
-            <div class="mb-4 grid grid-cols-2 gap-4">
+            <div class="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
                 <p class="mb-1 text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   {{ t('common.currentValue') }}

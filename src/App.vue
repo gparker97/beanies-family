@@ -3,9 +3,12 @@ import { onMounted, computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
+import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
+import MobileHamburgerMenu from '@/components/common/MobileHamburgerMenu.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { needsLegacyMigration, runLegacyMigration } from '@/services/migration/legacyMigration';
@@ -37,8 +40,10 @@ const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
 const authStore = useAuthStore();
+const { isMobile, isDesktop } = useBreakpoint();
 
 const isInitializing = ref(true);
+const isMenuOpen = ref(false);
 
 const showLayout = computed(() => {
   // Don't show sidebar/header on setup, login, magic link callback, or 404 pages
@@ -303,15 +308,22 @@ onMounted(async () => {
     <ConfirmModal />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
-      <AppSidebar />
+      <!-- Desktop sidebar -->
+      <AppSidebar v-if="isDesktop" />
 
       <div class="flex min-w-0 flex-1 flex-col">
-        <AppHeader />
+        <AppHeader @toggle-menu="isMenuOpen = !isMenuOpen" />
 
-        <main class="flex-1 overflow-auto p-6">
+        <main class="flex-1 overflow-auto p-4 md:p-6" :class="{ 'pb-24': isMobile }">
           <router-view />
         </main>
       </div>
+
+      <!-- Mobile bottom nav -->
+      <MobileBottomNav v-if="isMobile" />
+
+      <!-- Mobile hamburger menu -->
+      <MobileHamburgerMenu :open="isMenuOpen" @close="isMenuOpen = false" />
     </div>
 
     <div v-else>

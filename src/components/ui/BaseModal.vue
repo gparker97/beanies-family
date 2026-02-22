@@ -1,18 +1,24 @@
 <script setup lang="ts">
-import { watch, onMounted, onUnmounted } from 'vue';
+import { computed, watch, onMounted, onUnmounted } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 interface Props {
   open: boolean;
   title?: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   closable?: boolean;
+  fullscreenMobile?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   closable: true,
+  fullscreenMobile: false,
 });
+
+const { isMobile } = useBreakpoint();
+const isFullscreen = computed(() => props.fullscreenMobile && isMobile.value);
 
 const emit = defineEmits<{
   close: [];
@@ -83,8 +89,12 @@ onUnmounted(() => {
         >
           <div
             v-if="open"
-            class="relative flex max-h-[calc(100vh-2rem)] w-full flex-col rounded-3xl bg-white shadow-xl dark:bg-slate-800"
-            :class="sizeClasses[size]"
+            class="relative flex w-full flex-col bg-white shadow-xl dark:bg-slate-800"
+            :class="
+              isFullscreen
+                ? 'h-full max-h-full rounded-none'
+                : ['max-h-[calc(100vh-2rem)] rounded-3xl', sizeClasses[size]]
+            "
           >
             <!-- Header -->
             <div
