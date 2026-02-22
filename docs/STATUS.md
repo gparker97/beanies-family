@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-22
-> **Updated by:** Claude (mobile responsive layout #63)
+> **Updated by:** Claude (count-up animations + mobile responsive #63)
 
 ## Current Phase
 
@@ -351,6 +351,16 @@
   - ReportsPage: `w-64`/`w-48`/`w-40` → `w-full md:w-*` (4 fixed-width selects)
   - FamilyPage: `grid-cols-2`/`grid-cols-3` → responsive variants (4 form grids)
 
+### Count-Up Animation for All Summary Cards
+
+- **`src/composables/useAnimatedCurrency.ts`** — Reusable composable wrapping `useCountUp` + `convertToDisplay` + `formatCurrencyWithCode` + privacy mode masking. Returns `{ formatted, displayValue }`. When privacy mode is on, target drops to 0 so revealing figures triggers a fresh count-up from zero
+- **NetWorthHeroCard** — Hero net worth amount (800ms duration) and change amount (200ms delay) now animate on load and when values change
+- **AccountsPage** — 3 summary cards (Total Assets, Total Liabilities, Net Worth) with staggered delays (0/100/200ms)
+- **TransactionsPage** — 6 summary cards: 3 transaction tab (Period Income, Expenses, Net) + 3 recurring tab (Monthly Income, Expenses, Net) with staggered delays
+- **AssetsPage** — 4 summary cards (Total Asset Value, Total Loans, Net Asset Value, Appreciation/Depreciation) with staggered delays (0/100/200/300ms)
+- **GoalsPage** — 3 integer count cards (Active, Completed, Overdue goals) using `useCountUp` directly with staggered delays
+- All animations respect `prefers-reduced-motion` accessibility setting
+
 ### Recent Fixes
 
 - **Multi-family isolation hardening** — Fixed cross-family data leakage when authenticated user's familyId could not be resolved:
@@ -422,6 +432,7 @@
 - [x] Replace native confirm/alert dialogs with branded modal (Issue #56) ✓
 - [ ] Switchable UI themes (Issue #41)
 - [ ] Data validation and error handling improvements
+- [x] Mobile responsive layout (Issue #63) ✓
 - [ ] Responsive design polish
 - [ ] Financial forecasting / projections page
 
