@@ -88,8 +88,8 @@ export const useSyncStore = defineStore('sync', () => {
 
     if (granted) {
       // Permission granted - load from file to get latest data
-      const hasData = await syncService.loadAndImport();
-      if (hasData) {
+      const loadResult = await syncService.loadAndImport();
+      if (loadResult.success) {
         lastSync.value = toISODateString(new Date());
         await reloadAllStores();
       }
@@ -180,14 +180,24 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Load data from the currently configured sync file
    */
-  async function loadFromFile(): Promise<boolean> {
-    const success = await syncService.loadAndImport();
-    if (success) {
+  async function loadFromFile(): Promise<{ success: boolean; needsPassword?: boolean }> {
+    const result = await syncService.loadAndImport();
+
+    // If file needs password, store it for later decryption
+    if (result.needsPassword && result.fileHandle && result.rawSyncData) {
+      pendingEncryptedFile.value = {
+        fileHandle: result.fileHandle,
+        rawSyncData: result.rawSyncData,
+      };
+      return { success: false, needsPassword: true };
+    }
+
+    if (result.success) {
       lastSync.value = toISODateString(new Date());
       // Reload all stores after import
       await reloadAllStores();
     }
-    return success;
+    return { success: result.success };
   }
 
   /**

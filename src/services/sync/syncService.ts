@@ -376,16 +376,26 @@ export async function load(): Promise<SyncFileData | null> {
  * Checks that the sync file's familyId matches the active family to prevent
  * cross-family data leakage (e.g., loading one family's sync file into another's DB).
  */
-export async function loadAndImport(): Promise<boolean> {
+export async function loadAndImport(): Promise<{
+  success: boolean;
+  needsPassword?: boolean;
+  fileHandle?: FileSystemFileHandle;
+  rawSyncData?: SyncFileData;
+}> {
   const syncData = await load();
   if (!syncData) {
     // No data or error - state already updated by load()
-    return false;
+    return { success: false };
   }
 
   if (syncData.encrypted) {
     updateState({ lastError: 'Encrypted file - password required' });
-    return false;
+    return {
+      success: false,
+      needsPassword: true,
+      fileHandle: currentFileHandle ?? undefined,
+      rawSyncData: syncData,
+    };
   }
 
   // Guard: if sync file has a familyId (v2.0+), it must match the active family
@@ -398,7 +408,7 @@ export async function loadAndImport(): Promise<boolean> {
       lastError: 'Sync file belongs to a different family',
       isConfigured: false,
     });
-    return false;
+    return { success: false };
   }
 
   // If no active family (e.g. sign-in flow), activate from file's familyId
@@ -409,10 +419,10 @@ export async function loadAndImport(): Promise<boolean> {
 
   try {
     await importSyncFileData(syncData);
-    return true;
+    return { success: true };
   } catch (e) {
     updateState({ lastError: (e as Error).message });
-    return false;
+    return { success: false };
   }
 }
 
@@ -454,6 +464,18 @@ export function cancelPendingSave(): void {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
+  }
+}
+
+/**
+ * Flush any pending debounced save immediately.
+ * Call before sign-out to ensure recent changes are persisted to file.
+ */
+export async function flushPendingSave(): Promise<void> {
+  if (saveDebounceTimer) {
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = null;
+    await save(sessionPassword ?? undefined);
   }
 }
 
