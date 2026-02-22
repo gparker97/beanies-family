@@ -240,6 +240,13 @@ export async function save(password?: string): Promise<boolean> {
     return false;
   }
 
+  // Guard: if encryption is required but no password provided, refuse to write
+  // plaintext. This is the last line of defense against all encryption bypass bugs.
+  if (!password && isEncryptionRequiredFn && isEncryptionRequiredFn()) {
+    console.warn('[syncService] save() blocked: encryption is enabled but no password provided');
+    return false;
+  }
+
   updateState({ isSyncing: true, lastError: null });
 
   try {
@@ -435,6 +442,17 @@ export async function loadAndImport(): Promise<{
   }
 }
 
+// Callback to check if encryption is required (set by syncStore)
+let isEncryptionRequiredFn: (() => boolean) | null = null;
+
+/**
+ * Register a callback that returns whether encryption is currently enabled.
+ * Used by triggerDebouncedSave and flushPendingSave to prevent plaintext writes.
+ */
+export function setEncryptionRequiredCallback(fn: () => boolean): void {
+  isEncryptionRequiredFn = fn;
+}
+
 // Store the current session password for auto-sync
 let sessionPassword: string | null = null;
 
@@ -453,8 +471,9 @@ export function getSessionPassword(): string | null {
 }
 
 /**
- * Trigger a debounced save (for auto-sync)
- * Uses the session password if set
+ * Trigger a debounced save (for auto-sync).
+ * If encryption is enabled (via callback) but no session password is available,
+ * the save is skipped entirely to prevent writing plaintext to an encrypted file.
  */
 export function triggerDebouncedSave(): void {
   if (saveDebounceTimer) {
@@ -462,6 +481,13 @@ export function triggerDebouncedSave(): void {
   }
 
   saveDebounceTimer = setTimeout(() => {
+    // Check encryption requirement via callback before saving
+    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
+      console.warn(
+        '[syncService] Auto-save skipped: encryption is enabled but no session password available'
+      );
+      return;
+    }
     save(sessionPassword ?? undefined).catch(console.error);
   }, DEBOUNCE_MS);
 }
@@ -479,11 +505,20 @@ export function cancelPendingSave(): void {
 /**
  * Flush any pending debounced save immediately.
  * Call before sign-out to ensure recent changes are persisted to file.
+ * If encryption is enabled but no session password is available,
+ * the save is skipped to prevent writing plaintext.
  */
 export async function flushPendingSave(): Promise<void> {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
+    // Guard: never write plaintext when encryption is required
+    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
+      console.warn(
+        '[syncService] Flush skipped: encryption is enabled but no session password available'
+      );
+      return;
+    }
     await save(sessionPassword ?? undefined);
   }
 }

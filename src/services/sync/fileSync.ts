@@ -137,6 +137,9 @@ export async function importSyncFileData(syncFile: SyncFileData): Promise<void> 
           lastSyncTimestamp: undefined,
           // Preserve local-only UI preferences
           preferredCurrencies: localPreferredCurrencies,
+          // Preserve local encryption setting — never import this from the file,
+          // as it could propagate a corrupted false value from a buggy session
+          encryptionEnabled: localSettings.encryptionEnabled,
         }
       : null,
   };
@@ -162,11 +165,28 @@ export function openFilePicker(): Promise<File | null> {
 }
 
 /**
- * Full export flow: create sync data and download as file
+ * Full export flow: create sync data and download as file.
+ * If a password is provided, the exported file will be encrypted.
  */
-export async function exportToFile(filename?: string): Promise<void> {
-  const syncData = await createSyncFileData(false);
-  downloadAsFile(syncData, filename);
+export async function exportToFile(filename?: string, password?: string): Promise<void> {
+  if (password) {
+    const syncData = await createSyncFileData(true);
+    const dataJson = JSON.stringify(syncData.data);
+    const { encryptSyncData } = await import('@/services/crypto/encryption');
+    const encryptedData = await encryptSyncData(dataJson, password);
+    const encryptedSyncData: SyncFileData = {
+      version: syncData.version,
+      exportedAt: syncData.exportedAt,
+      encrypted: true,
+      data: encryptedData as unknown as ExportedData,
+      familyId: syncData.familyId,
+      familyName: syncData.familyName,
+    };
+    downloadAsFile(encryptedSyncData, filename);
+  } else {
+    const syncData = await createSyncFileData(false);
+    downloadAsFile(syncData, filename);
+  }
 }
 
 /**
