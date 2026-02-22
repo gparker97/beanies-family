@@ -47,6 +47,8 @@ export interface GlobalSettings {
   isLocalOnlyMode?: boolean;
   beanieMode?: boolean;
   soundEnabled?: boolean;
+  isTrustedDevice?: boolean;
+  trustedDevicePromptShown?: boolean;
 }
 
 // Family member gender and age group for avatar selection

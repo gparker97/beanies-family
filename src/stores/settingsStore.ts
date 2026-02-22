@@ -42,6 +42,10 @@ export const useSettingsStore = defineStore('settings', () => {
   });
   const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
   const onboardingCompleted = computed(() => settings.value.onboardingCompleted ?? true);
+  const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
+  const trustedDevicePromptShown = computed(
+    () => globalSettings.value.trustedDevicePromptShown ?? false
+  );
 
   // Apply theme to document
   watch(
@@ -329,6 +333,19 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setTrustedDevice(trusted: boolean): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      isTrustedDevice: trusted,
+      trustedDevicePromptShown: true,
+    });
+  }
+
+  async function setTrustedDevicePromptShown(): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      trustedDevicePromptShown: true,
+    });
+  }
+
   function resetState() {
     settings.value = settingsRepo.getDefaultSettings();
     isLoading.value = false;
@@ -365,6 +382,8 @@ export const useSettingsStore = defineStore('settings', () => {
     effectiveDisplayCurrencies,
     customInstitutions,
     onboardingCompleted,
+    isTrustedDevice,
+    trustedDevicePromptShown,
     // Actions
     loadGlobalSettings,
     loadSettings,
@@ -386,6 +405,8 @@ export const useSettingsStore = defineStore('settings', () => {
     updateExchangeRates,
     addExchangeRate,
     removeExchangeRate,
+    setTrustedDevice,
+    setTrustedDevicePromptShown,
     convertAmount,
     resetState,
   };

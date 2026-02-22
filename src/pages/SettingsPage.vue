@@ -66,6 +66,11 @@ onMounted(async () => {
   await syncStore.initialize();
 });
 
+async function handleTrustedDeviceToggle(event: Event) {
+  const target = event.target as HTMLInputElement;
+  await settingsStore.setTrustedDevice(target.checked);
+}
+
 async function handleBeanieToggle(event: Event) {
   const target = event.target as HTMLInputElement;
   await settingsStore.setBeanieMode(target.checked);
@@ -636,10 +641,33 @@ function formatLastSync(timestamp: string | null): string {
     </div>
 
     <!-- Security Settings (only shown when auth is configured) -->
-    <div v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode">
+    <div v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode" class="space-y-4">
       <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
         {{ t('settings.security') }}
       </h2>
+
+      <!-- Trusted device toggle -->
+      <BaseCard>
+        <div
+          class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+        >
+          <div>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('trust.settingsLabel') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('trust.settingsDesc') }}
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            :checked="settingsStore.isTrustedDevice"
+            class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
+            @change="handleTrustedDeviceToggle"
+          />
+        </div>
+      </BaseCard>
+
       <PasskeySettings />
     </div>
 
