@@ -670,6 +670,7 @@ const STRING_DEFS = {
   'settings.dataLoadedSuccess': { en: 'Data loaded successfully!' },
   'settings.encryptDataFile': { en: 'Encrypt data file' },
   'settings.encrypted': { en: 'Encrypted' },
+  'settings.unencrypted': { en: 'Unencrypted' },
   'settings.encryptionDescription': {
     en: 'Protect your data with password encryption',
     beanie: 'Lock your beans with a password',

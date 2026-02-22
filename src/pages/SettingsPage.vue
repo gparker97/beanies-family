@@ -519,6 +519,17 @@ function formatLastSync(timestamp: string | null): string {
                         />
                         {{ t('settings.encrypted') }}
                       </span>
+                      <span
+                        v-else
+                        class="ml-2 inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                      >
+                        <img
+                          src="/brand/beanies_open_eyes_transparent_512x512.png"
+                          alt=""
+                          class="mr-1 h-3 w-3"
+                        />
+                        {{ t('settings.unencrypted') }}
+                      </span>
                     </p>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                       {{ t('settings.encryptionDescription') }}
