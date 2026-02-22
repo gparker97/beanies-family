@@ -249,15 +249,7 @@ async function handleSetEncryptionPassword(password: string) {
   navigateToDashboard();
 }
 
-/**
- * Skip encryption (user chose not to set a password) and go to dashboard.
- */
-async function handleSkipEncryption() {
-  showEncryptModal.value = false;
-  await completeOnboarding();
-  celebrate('setup-complete');
-  navigateToDashboard();
-}
+// Encryption is mandatory — no skip option. The modal is non-closable.
 
 /**
  * For browsers without File System Access API: complete setup without file.
@@ -701,7 +693,7 @@ async function completeJoinerSetup() {
       :description="t('password.strongPasswordDescription')"
       :confirm-label="t('password.setAndContinue')"
       :require-confirmation="true"
-      @close="handleSkipEncryption"
+      :closable="false"
       @confirm="handleSetEncryptionPassword"
     />
 

@@ -23,12 +23,10 @@ const { t } = useTranslation();
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
-const showDisableEncryptionConfirm = ref(false);
 const importError = ref<string | null>(null);
 const importSuccess = ref(false);
 
 // Encryption modal state
-const showEnableEncryptionModal = ref(false);
 const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
 const isProcessingEncryption = ref(false);
@@ -144,42 +142,9 @@ function handleDecryptModalClose() {
   encryptionError.value = null;
 }
 
-function handleEncryptionToggle() {
-  if (syncStore.isEncryptionEnabled) {
-    // Show confirmation warning before disabling encryption
-    showDisableEncryptionConfirm.value = true;
-  } else {
-    // Enable encryption - show password modal
-    showEnableEncryptionModal.value = true;
-  }
-}
+// Encryption is always enabled — toggle/disable functions removed
 
-async function handleEnableEncryption(password: string) {
-  isProcessingEncryption.value = true;
-  encryptionError.value = null;
-
-  const success = await syncStore.enableEncryption(password);
-
-  isProcessingEncryption.value = false;
-
-  if (success) {
-    showEnableEncryptionModal.value = false;
-  } else {
-    encryptionError.value = syncStore.error ?? 'Failed to enable encryption';
-  }
-}
-
-async function handleDisableEncryptionConfirmed() {
-  showDisableEncryptionConfirm.value = false;
-  isProcessingEncryption.value = true;
-  await syncStore.disableEncryption();
-  isProcessingEncryption.value = false;
-}
-
-function handleEnableEncryptionModalClose() {
-  showEnableEncryptionModal.value = false;
-  encryptionError.value = null;
-}
+// Enable encryption modal removed — encryption is always mandatory
 
 async function handleManualExport() {
   await syncStore.manualExport();
@@ -497,21 +462,19 @@ function formatLastSync(timestamp: string | null): string {
                 </p>
               </div>
 
-              <!-- Encryption toggle -->
+              <!-- Encryption status (always enabled) -->
               <div class="mt-4 border-t border-gray-200 pt-4 dark:border-slate-700">
-                <label class="flex cursor-pointer items-center gap-3">
+                <div class="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    :checked="syncStore.isEncryptionEnabled"
-                    :disabled="isProcessingEncryption"
-                    class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded"
-                    @click.prevent="handleEncryptionToggle"
+                    checked
+                    disabled
+                    class="text-primary-600 h-4 w-4 rounded opacity-60"
                   />
                   <div>
                     <p class="font-medium text-gray-900 dark:text-gray-100">
                       {{ t('settings.encryptDataFile') }}
                       <span
-                        v-if="syncStore.isEncryptionEnabled"
                         class="ml-2 inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
                       >
                         <img
@@ -525,32 +488,6 @@ function formatLastSync(timestamp: string | null): string {
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                       {{ t('settings.encryptionDescription') }}
                     </p>
-                  </div>
-                </label>
-
-                <!-- Disable encryption confirmation -->
-                <div
-                  v-if="showDisableEncryptionConfirm"
-                  class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20"
-                >
-                  <p class="mb-3 text-sm text-red-800 dark:text-red-200">
-                    {{ t('settings.disableEncryptionWarning') }}
-                  </p>
-                  <div class="flex gap-2">
-                    <BaseButton
-                      variant="danger"
-                      size="sm"
-                      @click="handleDisableEncryptionConfirmed"
-                    >
-                      {{ t('settings.yesDisableEncryption') }}
-                    </BaseButton>
-                    <BaseButton
-                      variant="ghost"
-                      size="sm"
-                      @click="showDisableEncryptionConfirm = false"
-                    >
-                      {{ t('action.cancel') }}
-                    </BaseButton>
                   </div>
                 </div>
 
@@ -742,17 +679,6 @@ function formatLastSync(timestamp: string | null): string {
         </div>
       </div>
     </BaseCard>
-
-    <!-- Enable Encryption Password Modal -->
-    <PasswordModal
-      :open="showEnableEncryptionModal"
-      :title="t('password.setPassword')"
-      :description="t('password.setPasswordDescription')"
-      :confirm-label="t('password.enableEncryption')"
-      :require-confirmation="true"
-      @close="handleEnableEncryptionModalClose"
-      @confirm="handleEnableEncryption"
-    />
 
     <!-- Decrypt File Password Modal -->
     <PasswordModal
