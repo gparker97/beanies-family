@@ -65,6 +65,9 @@ export const useSyncStore = defineStore('sync', () => {
     error.value = state.lastError;
   });
 
+  // Register encryption check callback so syncService can guard against plaintext writes
+  syncService.setEncryptionRequiredCallback(() => isEncryptionEnabled.value);
+
   /**
    * Initialize sync - restore file handle if available
    */
@@ -92,15 +95,17 @@ export const useSyncStore = defineStore('sync', () => {
       if (loadResult.success) {
         lastSync.value = toISODateString(new Date());
         await reloadAllStores();
+        // Only set up auto-sync after data is fully loaded (password not needed)
+        setupAutoSync();
       } else if (loadResult.needsPassword && loadResult.fileHandle && loadResult.rawSyncData) {
-        // File is encrypted — store for later decryption
+        // File is encrypted — store for later decryption.
+        // Do NOT set up auto-sync yet — we don't have the password,
+        // and any store changes would trigger a plaintext write.
         pendingEncryptedFile.value = {
           fileHandle: loadResult.fileHandle,
           rawSyncData: loadResult.rawSyncData,
         };
       }
-      // Set up auto-sync now that we have permission
-      setupAutoSync();
     }
 
     return granted;
@@ -202,9 +207,6 @@ export const useSyncStore = defineStore('sync', () => {
       lastSync.value = toISODateString(new Date());
       // Reload all stores after import
       await reloadAllStores();
-
-      // File loaded without needing password → it's unencrypted
-      await saveSettings({ encryptionEnabled: false });
     }
     return { success: result.success };
   }
@@ -233,10 +235,9 @@ export const useSyncStore = defineStore('sync', () => {
       // Reload all stores after import
       await reloadAllStores();
 
-      // Update settings — file loaded without password means unencrypted
+      // Update settings — preserve encryption state from the loaded file
       await saveSettings({
         syncEnabled: true,
-        encryptionEnabled: false,
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: lastSync.value,
       });
@@ -263,20 +264,26 @@ export const useSyncStore = defineStore('sync', () => {
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
 
-      // Set the session password for future saves
+      // Set the session password for future saves BEFORE reloading stores
+      // so auto-sync (if armed) will have the password available
       sessionPassword.value = password;
       syncService.setSessionPassword(password);
 
-      // Reload all stores after import
-      await reloadAllStores();
-
       // Update settings to reflect sync is enabled with encryption
+      // Do this BEFORE reloading stores to ensure encryptionEnabled is true
+      // before any auto-sync watcher fires
       await saveSettings({
         syncEnabled: true,
         encryptionEnabled: true,
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: lastSync.value,
       });
+
+      // Reload all stores after import
+      await reloadAllStores();
+
+      // Now that password is set and encryption is enabled, arm auto-sync
+      setupAutoSync();
     }
 
     return result;
@@ -372,9 +379,11 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = null;
     sessionPassword.value = null;
     syncService.setSessionPassword(null);
+    // Do NOT reset encryptionEnabled — it should persist as a user preference.
+    // When reconnecting to the same or a new encrypted file, the setting
+    // will already be correct and won't cause a plaintext write window.
     await saveSettings({
       syncEnabled: false,
-      encryptionEnabled: false,
       syncFilePath: undefined,
       lastSyncTimestamp: undefined,
     });
@@ -384,7 +393,8 @@ export const useSyncStore = defineStore('sync', () => {
    * Manual export (fallback for browsers without File System Access API)
    */
   async function manualExport(): Promise<void> {
-    await exportToFile();
+    const password = isEncryptionEnabled.value ? (sessionPassword.value ?? undefined) : undefined;
+    await exportToFile(undefined, password);
     lastSync.value = toISODateString(new Date());
   }
 
