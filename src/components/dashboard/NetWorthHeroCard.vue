@@ -91,7 +91,7 @@ watch(
 
 const chartDataConfig = computed(() => {
   const data = props.historyData;
-  if (!isUnlocked.value || data.length === 0) {
+  if (data.length === 0) {
     return {
       labels: [] as string[],
       datasets: [],
@@ -322,23 +322,23 @@ const periodLabel = computed(() => {
 
     <!-- Chart area -->
     <div class="relative mt-5 h-28">
-      <div v-if="!isUnlocked" class="flex h-full items-center justify-center">
-        <span class="font-outfit text-[0.75rem] font-medium text-white/20">
-          {{ t('dashboard.chartHidden') }}
-        </span>
-      </div>
-      <div v-else-if="historyData.length === 0" class="flex h-full items-center justify-center">
+      <div v-if="historyData.length === 0" class="flex h-full items-center justify-center">
         <span class="font-outfit text-[0.75rem] font-medium text-white/20">
           {{ t('dashboard.noDataYet') }}
         </span>
       </div>
-      <Line
+      <div
         v-else
-        :key="chartCanvasKey"
-        :data="chartDataWithDot"
-        :options="chartOptions"
-        class="h-full w-full"
-      />
+        class="h-full w-full transition-all duration-300"
+        :class="{ 'pointer-events-none blur-md': !isUnlocked }"
+      >
+        <Line
+          :key="chartCanvasKey"
+          :data="chartDataWithDot"
+          :options="chartOptions"
+          class="h-full w-full"
+        />
+      </div>
     </div>
   </div>
 </template>
