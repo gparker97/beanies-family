@@ -96,6 +96,13 @@ resource "aws_cognito_user_pool" "main" {
   }
 }
 
+# ── Cognito Domain (required for link-based email verification) ────────────
+
+resource "aws_cognito_user_pool_domain" "main" {
+  domain       = var.app_name
+  user_pool_id = aws_cognito_user_pool.main.id
+}
+
 # ── App Client (SPA — no client secret) ─────────────────────────────────────
 
 resource "aws_cognito_user_pool_client" "web" {
