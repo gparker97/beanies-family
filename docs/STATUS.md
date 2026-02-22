@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-22
-> **Updated by:** Claude (AWS deployment + infrastructure)
+> **Updated by:** Claude (Login page UI redesign)
 
 ## Current Phase
 
@@ -123,8 +123,7 @@
 
 - **Password service** (`src/services/auth/passwordService.ts`): PBKDF2 hashing (100k iterations, SHA-256, 16-byte salt, 32-byte hash) with constant-time verification
 - **Auth store** (`src/stores/authStore.ts`): complete rewrite — signIn (member picker + password), signUp (owner creates pod), setPassword (joiner onboarding), signOut
-- **Login flow**: WelcomeGate → SignInView (member picker + password) / CreatePodView (local auth) / JoinPodView (family code entry)
-- **Joiner onboarding**: SetupPage includes password creation fields during joiner profile setup
+- **Login flow**: WelcomeGate → LoadPodView (file picker + decrypt modal) → PickBeanView (member picker + password) / CreatePodView (3-step wizard) / JoinPodView (family code entry)
 - **Data model**: `passwordHash` and `requiresPassword` fields on `FamilyMember`
 - Route guards: all app routes have `requiresAuth: true`, login route exempt
 - App.vue bootstrap simplified: global settings → auth init → family resolution → data load
@@ -357,6 +356,22 @@
 - Hamburger menu shows dual sign-out options when trusted device is on
 - 8 new i18n keys for trust prompt, settings toggle, and sign-out options
 
+### Login Page UI Redesign (Issue #69) — Closed
+
+- **5-view login flow** per v6 wireframes replacing the old 4-view monolithic flow:
+  - **Welcome Gate (00a)** — Three large branded path cards: "Sign in to your pod", "Create a new pod!" (Heritage Orange gradient), "Join an existing pod"
+  - **Load Pod (00b)** — File picker drop zone, disabled cloud connector placeholders (Google Drive, Dropbox, iCloud), security messaging cards, integrated decrypt modal (BaseModal with password input, auto-decrypt via sessionStorage cached password)
+  - **Pick Bean (00b-3)** — Avatar grid with `BeanieAvatar` at 88px, green/orange status indicators, password form for sign-in or create-password for new members, back button returns to avatar grid when member selected
+  - **Create Pod (00c)** — 3-step mini-onboarding wizard: Step 1 name/password → Step 2 choose storage (local file via `showSaveFilePicker`) → Step 3 add family members. Navigates directly to `/dashboard`
+  - **Join Pod (00d)** — Family code input with dark slate "What happens next?" info card. Shows informative error (server-side registry not yet implemented)
+- **`/welcome` dedicated route** — Unauthenticated users always land on Welcome Gate first; auto-load to Load Pod only triggers after clicking "Sign in to your pod"
+- **`LoginBackground.vue`** — Warm gradient (`from-[#F8F9FA] via-[#FEF0E8] to-[#EBF5FD]`), wider `max-w-[580px]`
+- **`LoginSecurityFooter.vue`** — Compact inline footer with 4 security badges at `opacity-30`
+- **`LoginPage.vue`** — 5-view orchestrator with store initialization on mount, auto-load deferred to navigation
+- **Legacy setup wizard removed** — `SetupPage.vue` deleted, `/setup` route removed, create pod wizard handles full onboarding
+- **Deleted**: `SignInView.vue`, `TrustBadges.vue`, `SetupPage.vue`
+- **~50 new i18n keys** in `uiStrings.ts` under `loginV6.*` namespace
+
 ### Recent Fixes
 
 - **Multi-family isolation hardening** — Fixed cross-family data leakage when authenticated user's familyId could not be resolved:
@@ -461,7 +476,7 @@ Additionally, v6 includes all previous v4/v5 screens: Dashboard, Accounts (card 
 | Issue | Screen                                                               | Status     |
 | ----- | -------------------------------------------------------------------- | ---------- |
 | #68   | Budget page — family budget tracking with category budgets           | New screen |
-| #69   | Login page UI redesign — Welcome Gate + full auth flow per v6        | Redesign   |
+| #69   | Login page UI redesign — Welcome Gate + full auth flow per v6        | **Done** ✓ |
 | #70   | Accounts page redesign — Assets/Liabilities hero + Cards/List toggle | Redesign   |
 | #71   | Transactions page — full ledger view                                 | Redesign   |
 | #72   | Landing page — public-facing hero page                               | New screen |
@@ -534,3 +549,4 @@ _(None currently tracked)_
 | 2026-02-22 | Site deployed to beanies.family                            | Production build, S3 sync, CloudFront CDN, HTTPS via ACM                                                                  |
 | 2026-02-22 | Trusted device mode (#74)                                  | Persistent IndexedDB cache across sign-outs for instant returning user access; explicit "Sign out & clear data" option    |
 | 2026-02-22 | Post-sign-in redirect checks onboarding status             | New users redirected to /setup instead of /dashboard; direct DB read after sign-in for reliability                        |
+| 2026-02-22 | Login page UI redesign per v6 wireframes (#69)             | 5-view flow (welcome/load-pod/pick-bean/create/join), legacy SetupPage removed, /welcome dedicated route                  |
