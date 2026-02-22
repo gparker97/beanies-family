@@ -7,6 +7,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { FamilyMember } from '@/types/models';
@@ -14,6 +15,7 @@ import type { FamilyMember } from '@/types/models';
 const { t } = useTranslation();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
+const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const settingsStore = useSettingsStore();
 
@@ -28,6 +30,8 @@ const selectedMember = ref<FamilyMember | null>(null);
 const formError = ref<string | null>(null);
 const needsFileLoad = ref(false);
 const isLoadingFile = ref(false);
+const needsDecryptPassword = ref(false);
+const decryptPassword = ref('');
 
 // All selectable members (both with and without passwords)
 const allMembers = computed(() => familyStore.members);
@@ -40,6 +44,11 @@ const isCreatingPassword = computed(
 onMounted(async () => {
   // If no members loaded yet, we need to load the file first
   if (familyStore.members.length === 0) {
+    // Activate last active family so sync can find the stored file handle
+    if (!familyContextStore.activeFamilyId) {
+      await familyContextStore.initialize();
+    }
+
     // Try to initialize sync to check if file is configured
     if (!syncStore.isConfigured) {
       await syncStore.initialize();
@@ -48,7 +57,11 @@ onMounted(async () => {
     if (syncStore.isConfigured && !syncStore.needsPermission) {
       isLoadingFile.value = true;
       try {
-        await syncStore.loadFromFile();
+        const loadResult = await syncStore.loadFromFile();
+        if (!loadResult.success && loadResult.needsPassword) {
+          // File is encrypted — show decrypt password form
+          needsDecryptPassword.value = true;
+        }
       } catch {
         // File load failed
       }
@@ -56,14 +69,9 @@ onMounted(async () => {
     }
 
     // If still no members, user needs to load a file manually
-    if (familyStore.members.length === 0) {
+    if (familyStore.members.length === 0 && !needsFileLoad.value) {
       needsFileLoad.value = true;
     }
-  }
-
-  // Auto-select if only one member total
-  if (allMembers.value.length === 1) {
-    selectedMember.value = allMembers.value[0]!;
   }
 });
 
@@ -136,15 +144,39 @@ async function handleLoadFile() {
     const result = await syncStore.loadFromNewFile();
     if (result.success) {
       needsFileLoad.value = false;
-      // Auto-select if only one member
-      if (allMembers.value.length === 1) {
-        selectedMember.value = allMembers.value[0]!;
-      }
+    } else if (result.needsPassword) {
+      // File is encrypted — show decrypt password form
+      needsDecryptPassword.value = true;
     } else {
       formError.value = t('auth.fileLoadFailed');
     }
   } catch {
     formError.value = t('auth.fileLoadFailed');
+  } finally {
+    isLoadingFile.value = false;
+  }
+}
+
+async function handleDecrypt() {
+  if (!decryptPassword.value) {
+    formError.value = t('password.required');
+    return;
+  }
+
+  isLoadingFile.value = true;
+  formError.value = null;
+
+  try {
+    const result = await syncStore.decryptPendingFile(decryptPassword.value);
+    if (result.success) {
+      needsDecryptPassword.value = false;
+      needsFileLoad.value = false;
+      decryptPassword.value = '';
+    } else {
+      formError.value = result.error ?? t('password.decryptionError');
+    }
+  } catch {
+    formError.value = t('password.decryptionError');
   } finally {
     isLoadingFile.value = false;
   }
@@ -185,13 +217,32 @@ async function handleLoadFile() {
     </div>
 
     <!-- Need to load file first -->
-    <div v-else-if="needsFileLoad" class="space-y-4">
+    <div v-else-if="needsFileLoad && !needsDecryptPassword" class="space-y-4">
       <p class="text-sm text-gray-600 dark:text-gray-400">
         {{ t('auth.loadFileFirst') }}
       </p>
       <BaseButton class="w-full" @click="handleLoadFile">
         {{ t('auth.openDataFile') }}
       </BaseButton>
+    </div>
+
+    <!-- Encrypted file needs password -->
+    <div v-else-if="needsDecryptPassword" class="space-y-4">
+      <p class="text-sm text-gray-600 dark:text-gray-400">
+        {{ t('password.encryptedFileDescription') }}
+      </p>
+      <form @submit.prevent="handleDecrypt">
+        <BaseInput
+          v-model="decryptPassword"
+          :label="t('password.password')"
+          type="password"
+          :placeholder="t('password.enterPasswordPlaceholder')"
+          required
+        />
+        <BaseButton type="submit" class="mt-4 w-full" :disabled="isLoadingFile">
+          {{ t('password.decryptAndLoad') }}
+        </BaseButton>
+      </form>
     </div>
 
     <!-- No members at all -->
@@ -203,20 +254,15 @@ async function handleLoadFile() {
 
     <!-- Member picker + password form -->
     <div v-else>
-      <!-- Member picker -->
-      <div v-if="allMembers.length > 1 || !selectedMember" class="mb-4 space-y-2">
+      <!-- Member picker — always shown so user can see all members -->
+      <div v-if="!selectedMember" class="mb-4 space-y-2">
         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
           {{ t('auth.selectMember') }}
         </p>
         <button
           v-for="member in allMembers"
           :key="member.id"
-          class="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors"
-          :class="
-            selectedMember?.id === member.id
-              ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-              : 'border-gray-200 hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-800'
-          "
+          class="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 text-left transition-colors hover:bg-gray-50 dark:border-slate-700 dark:hover:bg-slate-800"
           @click="selectMember(member)"
         >
           <BeanieAvatar :variant="getMemberAvatarVariant(member)" :color="member.color" size="sm" />
@@ -235,19 +281,30 @@ async function handleLoadFile() {
 
       <!-- Selected member + password -->
       <form v-if="selectedMember" @submit.prevent="handleSignIn">
-        <!-- Show selected member when there are multiple -->
-        <div
-          v-if="allMembers.length > 1"
-          class="mb-4 flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-slate-800"
-        >
+        <!-- Show who is signing in -->
+        <div class="mb-4 flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-slate-800">
           <BeanieAvatar
             :variant="getMemberAvatarVariant(selectedMember)"
             :color="selectedMember.color"
             size="sm"
           />
-          <div>
+          <div class="flex-1">
             <p class="font-medium text-gray-900 dark:text-gray-100">{{ selectedMember.name }}</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ selectedMember.email }}</p>
           </div>
+          <button
+            v-if="allMembers.length > 1"
+            type="button"
+            class="text-primary-600 hover:text-primary-700 dark:text-primary-400 text-sm"
+            @click="
+              selectedMember = null;
+              password = '';
+              confirmPassword = '';
+              formError = null;
+            "
+          >
+            {{ t('action.change') }}
+          </button>
         </div>
 
         <!-- Creating password for first time -->

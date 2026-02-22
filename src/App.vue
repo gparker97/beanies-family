@@ -103,8 +103,8 @@ async function loadFamilyData() {
 
   // Path 1: File configured + we have permission → load from file (source of truth)
   if (syncStore.isConfigured && !syncStore.needsPermission) {
-    const hasData = await syncStore.loadFromFile();
-    if (hasData) {
+    const loadResult = await syncStore.loadFromFile();
+    if (loadResult.success) {
       if (redirectToSetupIfNeeded()) return;
       memberFilterStore.initialize();
       const result = await processRecurringItems();
