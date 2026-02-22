@@ -7,7 +7,9 @@
 >
 > - `docs/STATUS.md` — Current project status and progress
 > - `docs/ARCHITECTURE.md` — System architecture, data flow, and key patterns
+> - `docs/PERFORMANCE.md` — Client-side performance thresholds and mitigation strategies
 > - `docs/adr/` — Architectural Decision Records (ADRs) for all major design decisions
+> - `docs/plans/` — Accepted implementation plans (saved before work begins, kept as historical record)
 >
 > **Brand:**
 >
@@ -234,6 +236,8 @@ npm run lint
 - **Stores**: Use Pinia composition API style
 - **Types**: Centralized in `src/types/models.ts`
 - **CSS**: Tailwind utility classes, custom CSS variables for theming
+- **UI Text / i18n**: All user-visible text **must** go through the translation system — never hardcode English strings in templates. Define strings in `src/services/translation/uiStrings.ts` and use `{{ t('key') }}` in templates via `useTranslation()`. This enables Chinese translation, beanie mode overrides, and future languages. See ADR-008 for details.
+- **Plans**: When plan mode is used, save the accepted plan to `docs/plans/` before implementation begins (see Plans Archive below).
 
 ## Current Status (MVP - Phase 1)
 
@@ -284,6 +288,38 @@ Every issue must have relevant labels applied. When creating or triaging issues,
 5. **Special** (as needed): `security`, `auth`, `privacy`
 6. **Status**: Apply `ready-for-testing` when implementation is complete and ready for review
 
+## Plans Archive
+
+Implementation plans created during plan mode must be saved to `docs/plans/` **before** implementation begins. This provides a version-controlled record of what was planned and why, enabling future reference when improving or extending features.
+
+**Workflow:**
+
+1. Plan mode produces a plan document
+2. Once the user approves the plan, save it to `docs/plans/YYYY-MM-DD-<short-slug>.md` (e.g., `docs/plans/2026-02-22-currency-chips-and-language-picker.md`)
+3. Begin implementation
+4. The plan file stays in the repo permanently — it is a historical record
+
+**Plan file format:**
+
+```markdown
+# Plan: <Title>
+
+> Date: YYYY-MM-DD
+> Related issues: #<number>, #<number>
+
+## Context
+
+<Why this work is needed>
+
+## Approach
+
+<The accepted implementation plan>
+
+## Files affected
+
+<List of files to be created or modified>
+```
+
 ## Notes for AI Assistants
 
 - This is a Phase 1 MVP - prioritize core functionality
@@ -293,3 +329,5 @@ Every issue must have relevant labels applied. When creating or triaging issues,
 - Maintain TypeScript type safety
 - Use Tailwind CSS for styling
 - Test changes with `npm run dev`
+- **i18n**: Never hardcode user-visible English text in Vue templates. Always add strings to `src/services/translation/uiStrings.ts` and use `t('key')` via `useTranslation()`.
+- **Plans**: When exiting plan mode, save the accepted plan to `docs/plans/` before writing any code.
