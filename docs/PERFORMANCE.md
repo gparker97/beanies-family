@@ -11,7 +11,7 @@ User Action → Vue Component → Pinia Store → IndexedDB
                                     ↓
                               Computed Props → Chart.js / DOM
                                     ↓
-                              File Sync → Encrypted JSON File
+                              File Sync → Encrypted .beanpod File
 ```
 
 Every operation in this pipeline runs on the browser's **main thread** (JavaScript is single-threaded). Long-running computations block the UI, causing jank, frozen interactions, or unresponsive pages. Understanding where the bottlenecks are — and at what scale — is key to keeping the app fast.
@@ -50,14 +50,14 @@ Every operation in this pipeline runs on the browser's **main thread** (JavaScri
 
 This is the **most realistic bottleneck** for beanies.family. Operations that block the main thread:
 
-| Operation                  | Complexity                      | When it hurts                    |
-| -------------------------- | ------------------------------- | -------------------------------- |
-| Net worth history replay   | O(n) over all transactions      | 10K+ transactions                |
-| Sorting/filtering lists    | O(n log n)                      | 10K+ visible records             |
-| Currency conversion (bulk) | O(n) with rate lookups          | Displaying all-account summaries |
-| Chart.js rendering         | O(n) data points                | 500+ chart points                |
-| Vue computed recomputation | Cascading on dependency changes | Deep dependency chains           |
-| File sync (JSON serialise) | O(n) over entire dataset        | 5MB+ file size                   |
+| Operation                      | Complexity                      | When it hurts                    |
+| ------------------------------ | ------------------------------- | -------------------------------- |
+| Net worth history replay       | O(n) over all transactions      | 10K+ transactions                |
+| Sorting/filtering lists        | O(n log n)                      | 10K+ visible records             |
+| Currency conversion (bulk)     | O(n) with rate lookups          | Displaying all-account summaries |
+| Chart.js rendering             | O(n) data points                | 500+ chart points                |
+| Vue computed recomputation     | Cascading on dependency changes | Deep dependency chains           |
+| File sync (.beanpod serialise) | O(n) over entire dataset        | 5MB+ file size                   |
 
 **Risk level: Medium-term.** The `useNetWorthHistory` composable replays all transactions backwards on every period change. At 10K+ transactions with multiple currency conversions, this can cause noticeable jank (50-200ms blocking).
 

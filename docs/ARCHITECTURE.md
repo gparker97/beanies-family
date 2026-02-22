@@ -32,7 +32,7 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
           ▼           ▼           ▼           ▼
     ┌──────────┐ ┌─────────┐ ┌──────────┐
     │ Local    │ │ Exchange │ │ MyMemory │
-    │ .json    │ │ Rate API │ │ Translate│
+    │ .beanpod │ │ Rate API │ │ Translate│
     │ File     │ │ (CDN)    │ │ API      │
     └──────────┘ └─────────┘ └──────────┘
 ```
@@ -43,7 +43,7 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 2. Components call **Pinia store actions** (never IndexedDB directly)
 3. Stores call **IndexedDB repository** methods for persistence
 4. Stores hold reactive state for the UI layer
-5. If sync is enabled, data changes trigger **debounced saves** to local JSON file
+5. If sync is enabled, data changes trigger **debounced saves** to local `.beanpod` file
 
 ## Layer Responsibilities
 

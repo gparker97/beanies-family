@@ -76,7 +76,7 @@ export function validateSyncFileData(data: unknown): data is SyncFileData {
 }
 
 /**
- * Downloads data as a JSON file (fallback for browsers without File System Access API)
+ * Downloads data as a .beanpod file (fallback for browsers without File System Access API)
  */
 export function downloadAsFile(data: SyncFileData, filename?: string): void {
   const json = JSON.stringify(data, null, 2);
@@ -84,7 +84,7 @@ export function downloadAsFile(data: SyncFileData, filename?: string): void {
   const url = URL.createObjectURL(blob);
 
   const date = new Date().toISOString().split('T')[0];
-  const defaultFilename = `gp-family-finance-${date}.json`;
+  const defaultFilename = `my-family-${date}.beanpod`;
 
   const a = document.createElement('a');
   a.href = url;
@@ -145,13 +145,13 @@ export async function importSyncFileData(syncFile: SyncFileData): Promise<void> 
 }
 
 /**
- * Opens a file picker for selecting a JSON file (fallback)
+ * Opens a file picker for selecting a .beanpod or .json file (fallback)
  */
 export function openFilePicker(): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.json,application/json';
+    input.accept = '.beanpod,.json,application/json';
     input.onchange = () => {
       const file = input.files?.[0] ?? null;
       resolve(file);
