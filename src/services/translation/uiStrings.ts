@@ -77,6 +77,7 @@ const STRING_DEFS = {
   'action.confirm': { en: 'Confirm' },
   'action.close': { en: 'Close' },
   'action.back': { en: 'Back' },
+  'action.change': { en: 'Change' },
   'action.next': { en: 'Next' },
   'action.submit': { en: 'Submit' },
   'action.search': { en: 'Search' },

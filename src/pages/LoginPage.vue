@@ -8,8 +8,10 @@ import WelcomeGate from '@/components/login/WelcomeGate.vue';
 import SignInView from '@/components/login/SignInView.vue';
 import CreatePodView from '@/components/login/CreatePodView.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
+import { useSyncStore } from '@/stores/syncStore';
 
 const router = useRouter();
+const syncStore = useSyncStore();
 
 type LoginView = 'welcome' | 'signin' | 'create' | 'join';
 
@@ -24,6 +26,7 @@ function handleNavigate(view: 'signin' | 'create' | 'join') {
 }
 
 function handleSignedIn(destination: string) {
+  syncStore.setupAutoSync();
   router.replace(destination);
 }
 </script>

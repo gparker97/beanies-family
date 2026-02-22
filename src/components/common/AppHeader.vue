@@ -39,13 +39,15 @@ const { t } = useTranslation();
 
 // ── Page title / Dashboard greeting ──────────────────────────────────────
 const isDashboard = computed(() => route.name === 'Dashboard');
-const ownerName = computed(() => familyStore.owner?.name || 'there');
+const memberName = computed(
+  () => familyStore.currentMember?.name || familyStore.owner?.name || 'there'
+);
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
-  if (hour < 12) return `${t('greeting.morning')} ${ownerName.value}`;
-  if (hour < 18) return `${t('greeting.afternoon')} ${ownerName.value}`;
-  return `${t('greeting.evening')} ${ownerName.value}`;
+  if (hour < 12) return `${t('greeting.morning')} ${memberName.value}`;
+  if (hour < 18) return `${t('greeting.afternoon')} ${memberName.value}`;
+  return `${t('greeting.evening')} ${memberName.value}`;
 });
 
 const todayFormatted = computed(() => {

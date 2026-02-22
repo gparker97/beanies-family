@@ -8,6 +8,7 @@ import { useFamilyContextStore } from './familyContextStore';
 import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
+import { flushPendingSave } from '@/services/sync/syncService';
 
 export interface AuthUser {
   memberId: string;
@@ -103,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: member.role,
       };
       isAuthenticated.value = true;
+      familyStore.setCurrentMember(member.id);
 
       return { success: true };
     } catch (e) {
@@ -212,6 +214,7 @@ export const useAuthStore = defineStore('auth', () => {
         role: member?.role,
       };
       isAuthenticated.value = true;
+      familyStore.setCurrentMember(memberId);
 
       return { success: true };
     } catch (e) {
@@ -225,6 +228,9 @@ export const useAuthStore = defineStore('auth', () => {
    * File handle is preserved so next login auto-reconnects to the data file.
    */
   async function signOut(): Promise<void> {
+    // Flush any pending debounced save so recent changes persist to file
+    await flushPendingSave();
+
     const familyId = currentUser.value?.familyId;
 
     // Delete the per-family IndexedDB cache unless this is a trusted device
@@ -247,6 +253,9 @@ export const useAuthStore = defineStore('auth', () => {
    * regardless of trusted device status. Also resets the trust flag.
    */
   async function signOutAndClearData(): Promise<void> {
+    // Flush any pending debounced save so recent changes persist to file
+    await flushPendingSave();
+
     const familyId = currentUser.value?.familyId;
 
     // Always delete regardless of trust setting

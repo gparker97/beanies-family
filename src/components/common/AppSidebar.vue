@@ -30,8 +30,8 @@ const secondaryItems = computed(() =>
   }))
 );
 
-const ownerRef = computed(() => familyStore.owner ?? null);
-const { variant: ownerVariant, color: ownerColor } = useMemberAvatar(ownerRef);
+const currentMemberRef = computed(() => familyStore.currentMember ?? familyStore.owner ?? null);
+const { variant: memberVariant, color: memberColor } = useMemberAvatar(currentMemberRef);
 
 function isActive(path: string): boolean {
   return route.path === path;
@@ -111,16 +111,20 @@ const encryptionTitle = computed(() => {
     </nav>
 
     <!-- User Profile Card -->
-    <div v-if="familyStore.owner" class="mt-3 rounded-2xl bg-white/[0.04] p-3">
+    <div v-if="currentMemberRef" class="mt-3 rounded-2xl bg-white/[0.04] p-3">
       <div class="flex items-center gap-2.5">
-        <BeanieAvatar :variant="ownerVariant" :color="ownerColor" size="md" />
+        <BeanieAvatar :variant="memberVariant" :color="memberColor" size="md" />
         <div class="min-w-0">
           <p class="font-outfit truncate text-[1rem] font-semibold text-white">
-            {{ familyStore.owner.name }}
+            {{ currentMemberRef.name }}
           </p>
           <p class="truncate text-[0.85rem] text-white/35">
             {{
-              familyStore.owner.role === 'owner' ? t('family.role.owner') : familyStore.owner.role
+              currentMemberRef.role === 'owner'
+                ? t('family.role.owner')
+                : currentMemberRef.role === 'admin'
+                  ? t('family.role.admin')
+                  : t('family.role.member')
             }}
           </p>
         </div>
