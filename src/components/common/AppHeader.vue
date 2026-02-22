@@ -119,10 +119,7 @@ function closeProfileDropdown() {
   showProfileDropdown.value = false;
 }
 
-async function handleSignOut() {
-  showProfileDropdown.value = false;
-
-  // Reset all data stores before sign-out clears auth state
+function resetAllStores() {
   useSyncStore().resetState();
   useFamilyStore().resetState();
   useAccountsStore().resetState();
@@ -132,8 +129,19 @@ async function handleSignOut() {
   useRecurringStore().resetState();
   useSettingsStore().resetState();
   useMemberFilterStore().resetState();
+}
 
+async function handleSignOut() {
+  showProfileDropdown.value = false;
+  resetAllStores();
   await authStore.signOut();
+  router.replace('/login');
+}
+
+async function handleSignOutAndClearData() {
+  showProfileDropdown.value = false;
+  resetAllStores();
+  await authStore.signOutAndClearData();
   router.replace('/login');
 }
 </script>
@@ -452,6 +460,19 @@ async function handleSignOut() {
               @mousedown.prevent="handleSignOut"
             >
               {{ t('auth.signOut') }}
+            </button>
+            <!-- Sign out & clear data (trusted device, Cognito configured) -->
+            <button
+              v-if="
+                authStore.isAuthConfigured &&
+                !authStore.isLocalOnlyMode &&
+                useSettingsStore().isTrustedDevice
+              "
+              type="button"
+              class="w-full px-4 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+              @mousedown.prevent="handleSignOutAndClearData"
+            >
+              {{ t('auth.signOutClearData') }}
             </button>
             <!-- Switch to account (Cognito configured, but currently using local-only mode) -->
             <button
