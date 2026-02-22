@@ -7,7 +7,7 @@ import type { CurrencyCode, ExchangeRate } from '@/types/models';
  * Format currency with code prefix (e.g., "USD $100.00", "SGD $100.00")
  * Uses $ for dollar-based currencies, otherwise the currency's symbol
  */
-function formatCurrencyWithCode(amount: number, currencyCode: CurrencyCode): string {
+export function formatCurrencyWithCode(amount: number, currencyCode: CurrencyCode): string {
   const info = getCurrencyInfo(currencyCode);
   const decimals = info?.decimals ?? 2;
 
