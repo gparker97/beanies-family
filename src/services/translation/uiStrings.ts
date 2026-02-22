@@ -907,6 +907,9 @@ const STRING_DEFS = {
     en: 'No members have set a password yet. Please complete onboarding first.',
   },
   'auth.fileLoadFailed': { en: 'Failed to load file. Please try again.' },
+  'auth.fileNotEncryptedWarning': {
+    en: 'This data file is not encrypted. Anyone with access to the file can view your family data. You can enable encryption in Settings.',
+  },
   'auth.password': { en: 'Password' },
   'auth.enterYourPassword': { en: 'Enter your password' },
   'auth.signInFailed': { en: 'Sign in failed' },
