@@ -1,10 +1,10 @@
 # Architecture Overview
 
-> **Last updated:** 2026-02-17
+> **Last updated:** 2026-02-22
 
 ## High-Level Architecture
 
-GP Family Finance Planner is a **local-first, single-page application** (SPA) built with Vue 3. All data is stored client-side in IndexedDB, with optional file-based sync for backup and multi-device use.
+beanies.family is a **local-first, single-page application** (SPA) built with Vue 3. All data is stored client-side in IndexedDB with an encrypted local file as source of truth. Optional AWS Cognito authentication provides per-user data isolation.
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -74,16 +74,36 @@ GP Family Finance Planner is a **local-first, single-page application** (SPA) bu
 
 - `useCurrencyDisplay`: Currency conversion and formatting with exchange rate lookups
 - `useExchangeRates`: Exchange rate management and auto-update
-- `useTranslation`: Translation with IndexedDB caching
+- `useTranslation`: Translation with IndexedDB caching and beanie mode
+- `usePrivacyMode`: Global privacy toggle (mask/reveal financial figures)
+- `useCountUp`: Animated number transitions with ease-out cubic easing
+- `useReducedMotion`: Respects `prefers-reduced-motion` system preference
+- `useCelebration`: Singleton celebration triggers (toasts + modals)
+- `useConfirm`: Singleton branded confirmation dialogs (`confirm()` / `alert()`)
+- `useSounds`: Web Audio API synthesised sound effects (zero bundle size)
+- `useInstitutionOptions`: Merges predefined + custom institutions for combobox
+- `useMemberAvatar`: Maps member gender/age to avatar variant + PNG path
+
+### Constants (`src/constants/`)
+
+- `icons.ts`: Central registry of ~72 beanie-styled SVG icon definitions
+- `navigation.ts`: Shared `NavItemDef[]` consumed by sidebar (and future mobile nav)
+- `avatars.ts`: Avatar variant → PNG path mappings
+- `institutions.ts`: 22 predefined global banks for combobox
+- `categories.ts`: Income/expense category definitions
+- `currencies.ts`: Supported currencies with metadata
 
 ### UI Components (`src/components/ui/`)
 
-- Reusable base components: BaseButton, BaseCard, BaseInput, BaseModal, BaseSelect
-- Consistent styling via Tailwind CSS utility classes
+- Base components: BaseButton, BaseCard, BaseCombobox, BaseInput, BaseModal, BaseSelect, BaseMultiSelect
+- Brand components: BeanieIcon, BeanieAvatar, BeanieSpinner, ConfirmModal, CelebrationOverlay, EmptyStateIllustration
+- Consistent styling via Tailwind CSS 4 utility classes with brand design tokens
 
 ## Database Schema
 
-**Database name:** `gp-family-finance` (version 3)
+### Per-Family Databases
+
+Each family gets its own IndexedDB: `gp-family-finance-{familyId}` (version 3). This provides clean tenant isolation — no `familyId` columns needed on records.
 
 | Object Store   | Key         | Indexes                            |
 | -------------- | ----------- | ---------------------------------- |
@@ -97,7 +117,20 @@ GP Family Finance Planner is a **local-first, single-page application** (SPA) bu
 | syncQueue      | id (UUID)   | by-synced, by-timestamp            |
 | translations   | id (string) | by-language                        |
 
-A secondary database (`gp-finance-file-handles`, version 1) stores the File System Access API file handle for sync file persistence across browser sessions.
+### Registry Database
+
+A shared `gp-finance-registry` database stores cross-family metadata:
+
+| Object Store       | Purpose                                     |
+| ------------------ | ------------------------------------------- |
+| families           | Family list (id, name, createdAt)           |
+| userFamilyMappings | Maps auth users to families                 |
+| cachedAuthSessions | Offline auth tokens (7-day grace period)    |
+| globalSettings     | Device-level prefs (theme, language, rates) |
+
+### File Handle Database
+
+`gp-finance-file-handles` (version 1) stores File System Access API handles per family using `syncFile-{familyId}` keys.
 
 ## Entity Relationships
 
@@ -128,14 +161,15 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Exchange rates fetched from free API, cached in settings, refreshed every 24h
 - Multi-hop conversion supported (e.g., SGD→USD→EUR via base currencies)
 
-### Sync Model
+### File-First Architecture
 
-- **File-based sync** using the File System Access API (Chrome/Edge)
-- File handle persisted in a separate IndexedDB database across sessions
-- Sync file format: versioned JSON with optional AES-GCM encryption
+- **Encrypted local file is the source of truth** — IndexedDB is an ephemeral cache deleted on sign-out
+- File handle persisted in a per-family IndexedDB database across sessions
+- Sync file format v2.0: versioned JSON with `familyId`, optional AES-GCM encryption
 - **Full replace strategy**: file always wins on import (not merge-based)
 - Auto-sync uses debounced saves (2-second delay) after data changes
 - Manual export/import fallback for browsers without File System Access API
+- Sync guards validate `familyId` on save, load, and decrypt to prevent cross-family data leakage
 
 ### Recurring Transactions
 
@@ -145,9 +179,35 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Day-of-month capped to actual days in month (e.g., 31st → 28th in February)
 - Generated transactions are linked back via `recurringItemId`
 
+### Navigation Architecture
+
+- Navigation items defined once in `src/constants/navigation.ts` as a shared `NavItemDef[]`
+- `PRIMARY_NAV_ITEMS` (7 items) and `SECONDARY_NAV_ITEMS` (2 items) exported for consumers
+- Desktop sidebar (`AppSidebar.vue`) consumes these constants with emoji icons and active state styling
+- Designed for reuse by future mobile bottom nav and hamburger menu (see v4 UI proposal)
+- Each item has: `labelKey` (i18n), `path` (route), `emoji` (icon), `section` (primary/secondary)
+
+### Authentication (Optional)
+
+- AWS Cognito integration (disabled when env vars not set)
+- "Continue without account" mode preserves local-only behavior
+- Auth resolution chain: JWT claims → Cognito attributes → registry lookup → cached session
+- Per-family database isolation prevents cross-user data leakage
+- 7-day offline grace period for cached auth tokens
+
 ## Testing
 
 - **Unit tests**: Vitest with happy-dom, files co-located as `*.test.ts`
 - **E2E tests**: Playwright with Chromium/Firefox/WebKit, page object model pattern
 - **E2E structure**: `e2e/specs/` for tests, `e2e/page-objects/` for page abstractions, `e2e/helpers/` for IndexedDB utilities
 - **Linting**: ESLint + Prettier + Stylelint with Husky pre-commit hooks
+
+## UI Design System
+
+The app follows the **Nook UI** design system (v4 proposal: `docs/brand/beanies-ui-framework-proposal-v4.html`):
+
+- **Shape language**: Squircle corners (24px+ radius) on all containers
+- **Shadows**: Diffused and subtle (`--card-shadow`, `--card-hover-shadow`)
+- **Typography**: Outfit for headings/amounts, Inter for body/data
+- **Brand colors**: Heritage Orange (CTAs), Deep Slate (anchor), Sky Silk (calm), Terracotta (warmth), Cloud White (space)
+- **Theme skill**: `.claude/skills/beanies-theme.md` — comprehensive design reference
