@@ -383,7 +383,7 @@
 
 - **Terraform IaC** (`infrastructure/`) — Modular Terraform configuration with S3 backend + DynamoDB locking
   - `frontend` module: S3 bucket (CloudFront OAC), CloudFront distribution (HTTPS, gzip, SPA routing), ACM cert (DNS-validated), Route53 A/AAAA records
-  - `auth` module: Cognito User Pool (email sign-in, link-based verification, custom attributes `familyId`/`familyRole`), SPA app client (no secret, SRP auth)
+  - `auth` module: Cognito User Pool (email sign-in, code-based verification, custom attributes `familyId`/`familyRole`), SPA app client (no secret, SRP auth)
 - **CI/CD Pipeline** (`.github/workflows/deploy.yml`) — Two-job GitHub Actions workflow:
   - `test` job: lint, type-check, Vitest unit tests, Playwright E2E (chromium), production build
   - `deploy` job: S3 sync + CloudFront cache invalidation (only runs after tests pass)
@@ -528,3 +528,5 @@ _(None currently tracked)_
 | 2026-02-22 | AWS infrastructure via Terraform (#8-#11)                  | S3/CloudFront/ACM/Route53 for hosting, Cognito for auth, modular IaC with remote state                                    |
 | 2026-02-22 | CI/CD pipeline with E2E gating (#11)                       | GitHub Actions: lint + type-check + unit tests + Playwright E2E must pass before deploy to production                     |
 | 2026-02-22 | Site deployed to beanies.family                            | Production build with Cognito env vars, S3 sync, CloudFront CDN, HTTPS via ACM                                            |
+| 2026-02-22 | Switched email verification from link to code              | Link-based verification redirected to AWS-hosted page with no return; code-based keeps user in the app                    |
+| 2026-02-22 | Post-sign-in redirect checks onboarding status             | New users redirected to /setup instead of /dashboard; direct DB read after sign-in for reliability                        |

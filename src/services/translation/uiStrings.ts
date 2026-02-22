@@ -812,6 +812,13 @@ const STRING_DEFS = {
   'auth.invalidMagicLink': { en: 'Invalid magic link. Please request a new one.' },
   'auth.unexpectedState': { en: 'Unexpected authentication state.' },
   'auth.expiredMagicLink': { en: 'Invalid or expired magic link code.' },
+  'auth.verificationCode': { en: 'Verification code' },
+  'auth.enterVerificationCode': { en: 'Enter the 6-digit code sent to' },
+  'auth.verify': { en: 'Verify' },
+  'auth.verifying': { en: 'Verifying...' },
+  'auth.invalidCode': { en: 'Invalid verification code. Please try again.' },
+  'auth.resendCode': { en: 'Resend code' },
+  'auth.codeSent': { en: 'A new code has been sent to your email.' },
 
   // Common actions (additional)
   'action.ok': { en: 'OK' },
@@ -853,11 +860,11 @@ const STRING_DEFS = {
   },
 
   // Trusted device
-  'trust.title': { en: 'Trust this device?' },
+  'trust.title': { en: 'Do you trust this device?' },
   'trust.description': {
-    en: 'Keep your data cached locally for instant access next time you sign in.',
+    en: 'If this is a trusted device (i.e. your personal phone or laptop), you can keep your data cached locally for instant access next time you sign in.',
   },
-  'trust.trustButton': { en: 'Trust this device' },
+  'trust.trustButton': { en: 'Are you on a device that you trust?' },
   'trust.notNow': { en: 'Not now' },
   'trust.hint': {
     en: 'You can change this in Settings. Use "Sign out & clear data" to remove cached data.',

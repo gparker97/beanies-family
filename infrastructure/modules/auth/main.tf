@@ -22,12 +22,11 @@ resource "aws_cognito_user_pool" "main" {
     temporary_password_validity_days = 7
   }
 
-  # Email verification — link-based (no code input in the app)
+  # Email verification — code-based (user enters 6-digit code in the app)
   verification_message_template {
-    default_email_option  = "CONFIRM_WITH_LINK"
-    email_subject         = "beanies.family — Verify your email"
-    email_subject_by_link = "beanies.family — Verify your email"
-    email_message_by_link = <<-HTML
+    default_email_option = "CONFIRM_WITH_CODE"
+    email_subject        = "beanies.family — Verify your email"
+    email_message        = <<-HTML
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -41,9 +40,11 @@ resource "aws_cognito_user_pool" "main" {
 </td></tr>
 <tr><td style="padding:32px;">
 <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#2C3E50;">Welcome to the family!</h1>
-<p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.5;">You are one step away from getting started. Verify your email address to activate your account.</p>
-<p style="text-align:center;margin:0 0 24px;">{##Verify my email##}</p>
-<p style="margin:0;font-size:13px;color:#8899aa;line-height:1.5;text-align:center;">After verifying, <a href="https://beanies.family/login" style="color:#F15D22;text-decoration:none;font-weight:500;">return to beanies.family</a> to sign in and complete your setup.</p>
+<p style="margin:0 0 24px;font-size:15px;color:#5a6a7a;line-height:1.5;">You are one step away from getting started. Enter the code below to verify your email address.</p>
+<div style="text-align:center;margin:0 0 24px;">
+<span style="display:inline-block;font-size:32px;font-weight:700;letter-spacing:8px;color:#2C3E50;background-color:#F8F9FA;border-radius:12px;padding:16px 28px;">{####}</span>
+</div>
+<p style="margin:0;font-size:13px;color:#8899aa;line-height:1.5;text-align:center;">This code expires in 24 hours.</p>
 </td></tr>
 <tr><td style="padding:20px 32px;border-top:1px solid #f0f0f0;text-align:center;">
 <p style="margin:0;font-size:12px;color:#aabbcc;font-style:italic;">every bean counts</p>
@@ -122,7 +123,7 @@ resource "aws_cognito_user_pool" "main" {
   }
 }
 
-# ── Cognito Domain (required for link-based email verification) ────────────
+# ── Cognito Domain (kept for potential hosted UI use) ──────────────────────
 
 resource "aws_cognito_user_pool_domain" "main" {
   domain       = var.app_name
