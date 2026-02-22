@@ -436,7 +436,7 @@ async function deleteCompletedGoal(id: string) {
 
         <BaseSelect v-model="newGoal.type" :options="goalTypes" :label="t('goals.goalType')" />
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <BaseInput
             v-model="newGoal.targetAmount"
             type="number"
@@ -497,7 +497,7 @@ async function deleteCompletedGoal(id: string) {
 
         <BaseSelect v-model="editGoal.type" :options="goalTypes" :label="t('goals.goalType')" />
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <BaseInput
             v-model="editGoal.targetAmount"
             type="number"

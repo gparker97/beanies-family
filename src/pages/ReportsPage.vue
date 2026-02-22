@@ -686,7 +686,7 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
   <div class="space-y-6">
     <!-- Global Family Member Filter -->
     <div class="flex flex-wrap gap-4">
-      <div class="w-64">
+      <div class="w-full md:w-64">
         <BaseSelect
           v-model="selectedMember"
           :options="familyMemberOptions"
@@ -707,7 +707,7 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
               {{ t('reports.netWorthDescription') }}
             </p>
           </div>
-          <div class="w-48">
+          <div class="w-full md:w-48">
             <BaseSelect v-model="selectedDateRange" :options="dateRangeOptions" />
           </div>
         </div>
@@ -777,14 +777,14 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
               {{ t('reports.incomeVsExpensesDescription') }}
             </p>
           </div>
-          <div class="flex gap-3">
-            <div class="w-40">
+          <div class="flex flex-wrap gap-3">
+            <div class="w-full md:w-40">
               <BaseSelect
                 v-model="selectedIncomeExpenseRange"
                 :options="incomeExpenseRangeOptions"
               />
             </div>
-            <div class="w-48">
+            <div class="w-full md:w-48">
               <BaseSelect v-model="selectedCategory" :options="categoryOptions" />
             </div>
           </div>

@@ -343,7 +343,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           required
         />
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <BaseSelect
             v-model="newMember.gender"
             :options="genderOptions"
@@ -363,7 +363,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('family.dateOfBirth') }}
           </label>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <BaseSelect
               v-model="dobMonth"
               :options="monthOptions"
@@ -448,7 +448,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           required
         />
 
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <BaseSelect
             v-model="editMember.gender"
             :options="genderOptions"
@@ -468,7 +468,7 @@ function openCreateAccountModal(memberName: string, memberEmail: string) {
           <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('family.dateOfBirth') }}
           </label>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <BaseSelect
               v-model="editDobMonth"
               :options="monthOptions"

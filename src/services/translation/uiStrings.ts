@@ -851,6 +851,15 @@ const STRING_DEFS = {
   'passkey.removeConfirm': {
     en: 'Remove this passkey? You will no longer be able to sign in with it.',
   },
+
+  // Mobile navigation
+  'mobile.nook': { en: 'Nook', beanie: 'Nook' },
+  'mobile.pod': { en: 'Pod', beanie: 'Pod' },
+  'mobile.menu': { en: 'Menu' },
+  'mobile.closeMenu': { en: 'Close menu' },
+  'mobile.navigation': { en: 'Navigation' },
+  'mobile.controls': { en: 'Controls' },
+  'mobile.viewingAll': { en: 'Viewing: All Members' },
 } satisfies Record<string, StringEntry>;
 
 /**

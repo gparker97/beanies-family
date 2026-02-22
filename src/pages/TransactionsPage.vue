@@ -999,7 +999,7 @@ function applyCustomDateRange() {
           :label="t('form.category')"
         />
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <BaseInput
             v-model="newTransaction.amount"
             type="number"
@@ -1062,7 +1062,7 @@ function applyCustomDateRange() {
           :label="t('form.category')"
         />
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <BaseInput
             v-model="editTransaction.amount"
             type="number"
