@@ -871,7 +871,7 @@ const STRING_DEFS = {
   },
   'trust.settingsLabel': { en: 'Trusted device' },
   'trust.settingsDesc': {
-    en: 'Keep data cached locally between sign-ins for faster access',
+    en: 'Keep data cached locally (unecrypted) between sign-ins for faster access',
   },
   'auth.signOutClearData': { en: 'Sign out & clear data' },
 
