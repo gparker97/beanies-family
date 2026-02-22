@@ -34,7 +34,6 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "amazon-cognito-identity-js": "^6.3.16",
     "chart.js": "^4.5.1",
     "idb": "^8.0.3",
     "pinia": "^3.0.4",

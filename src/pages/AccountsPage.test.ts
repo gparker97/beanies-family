@@ -46,6 +46,7 @@ vi.mock('@/stores/familyStore', () => ({
         ageGroup: 'adult',
         role: 'owner',
         color: '#3b82f6',
+        requiresPassword: false,
       },
       {
         id: 'member-2',
@@ -55,6 +56,7 @@ vi.mock('@/stores/familyStore', () => ({
         ageGroup: 'adult',
         role: 'member',
         color: '#10b981',
+        requiresPassword: false,
       },
     ],
   })),

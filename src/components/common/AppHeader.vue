@@ -395,14 +395,6 @@ async function handleSignOutAndClearData() {
           <span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F15D22]" />
         </button>
 
-        <!-- Offline badge -->
-        <span
-          v-if="authStore.isOfflineSession"
-          class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-        >
-          Offline
-        </span>
-
         <!-- Profile dropdown (avatar + chevron only) -->
         <div class="relative">
           <button
@@ -443,45 +435,22 @@ async function handleSignOutAndClearData() {
                 {{ authStore.currentUser.email }}
               </p>
             </div>
-            <!-- Sign out — always available when authenticated -->
+            <!-- Sign out -->
             <button
-              v-if="authStore.isAuthenticated && !authStore.isAuthConfigured"
               type="button"
               class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
               @mousedown.prevent="handleSignOut"
             >
               {{ t('auth.signOut') }}
             </button>
-            <!-- Sign out (Cognito configured, logged in with account) -->
+            <!-- Sign out & clear data (trusted device) -->
             <button
-              v-if="authStore.isAuthConfigured && !authStore.isLocalOnlyMode"
-              type="button"
-              class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
-              @mousedown.prevent="handleSignOut"
-            >
-              {{ t('auth.signOut') }}
-            </button>
-            <!-- Sign out & clear data (trusted device, Cognito configured) -->
-            <button
-              v-if="
-                authStore.isAuthConfigured &&
-                !authStore.isLocalOnlyMode &&
-                useSettingsStore().isTrustedDevice
-              "
+              v-if="useSettingsStore().isTrustedDevice"
               type="button"
               class="w-full px-4 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
               @mousedown.prevent="handleSignOutAndClearData"
             >
               {{ t('auth.signOutClearData') }}
-            </button>
-            <!-- Switch to account (Cognito configured, but currently using local-only mode) -->
-            <button
-              v-if="authStore.isAuthConfigured && authStore.isLocalOnlyMode"
-              type="button"
-              class="text-primary-600 dark:text-primary-400 w-full px-4 py-2 text-left text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-              @mousedown.prevent="handleSignOut"
-            >
-              {{ t('auth.signInWithAccount') }}
             </button>
           </div>
         </div>

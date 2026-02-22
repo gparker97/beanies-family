@@ -21,7 +21,7 @@ export const useFamilyStore = defineStore('family', () => {
 
   const hasOwner = computed(() => !!owner.value);
 
-  const isSetupComplete = computed(() => hasOwner.value);
+  const isSetupComplete = computed(() => hasOwner.value || members.value.length > 0);
 
   // Actions
   async function loadMembers() {

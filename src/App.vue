@@ -58,12 +58,12 @@ function handleDeclineTrust() {
 }
 
 const showLayout = computed(() => {
-  // Don't show sidebar/header on setup, login, magic link callback, or 404 pages
+  // Don't show sidebar/header on setup, login, or 404 pages
   return (
     route.name !== 'Setup' &&
     route.name !== 'NotFound' &&
     route.name !== 'Login' &&
-    route.name !== 'MagicLinkCallback'
+    route.name !== 'JoinFamily'
   );
 });
 
@@ -199,12 +199,12 @@ onMounted(async () => {
       translationStore.loadTranslations(settingsStore.language).catch(console.error);
     }
 
-    // Step 2: Initialize auth
+    // Step 2: Initialize auth (checks registry for existing families)
     await authStore.initializeAuth();
 
-    // If auth is required and user is not authenticated, redirect to login
+    // If not authenticated, redirect to login (unless already on login page)
     if (authStore.needsAuth) {
-      if (route.name !== 'Login' && route.name !== 'MagicLinkCallback') {
+      if (route.name !== 'Login' && route.name !== 'JoinFamily') {
         router.replace('/login');
       }
       return;
@@ -216,55 +216,27 @@ onMounted(async () => {
     }
 
     // Step 4: Resolve active family
-    // If auth resolved a specific family, use it authoritatively (don't let
-    // familyContextStore.initialize() override it with lastActiveFamilyId)
     const authFamilyId = authStore.currentUser?.familyId;
 
-    // DEBUG: trace family resolution
-    console.log('[App] Auth user:', JSON.stringify(authStore.currentUser));
-    console.log('[App] Auth familyId:', authFamilyId, 'type:', typeof authFamilyId);
-
     if (authFamilyId) {
-      // Auth resolved a family — switch to it and load families list
+      // Auth resolved a family — switch to it
       const { closeDatabase } = await import('@/services/indexeddb/database');
       await closeDatabase();
       const switched = await familyContextStore.switchFamily(authFamilyId);
       await familyContextStore.reload();
-      console.log(
-        '[App] switchFamily result:',
-        switched,
-        'active:',
-        familyContextStore.activeFamilyId
-      );
 
       if (!switched) {
-        // Family not in registry on this device — create with the auth-resolved ID
-        // (NOT a random new ID, which would lose the association with the Cognito user)
-        console.warn(`Auth family ${authFamilyId} not found in registry, creating with auth ID`);
         const family = await familyContextStore.createFamilyWithId(authFamilyId, 'My Family');
         if (!family) {
           console.error('Failed to create family');
           return;
         }
       }
-    } else if (!authStore.isLocalOnlyMode && authStore.isAuthenticated) {
-      // Authenticated but familyId could not be resolved from any source.
-      // DO NOT fall back to initialize() — that loads lastActiveFamilyId which
-      // could belong to a DIFFERENT user, causing cross-family data leakage.
-      console.warn('[App] Authenticated user but no familyId resolved — creating new family');
-      const family = await familyContextStore.createFamily('My Family');
-      if (!family) {
-        console.error('Failed to create family for authenticated user');
-        return;
-      }
     } else {
-      // Local-only mode (no auth configured) — safe to use lastActiveFamilyId
-      console.log('[App] Local-only mode, using initialize() fallback');
+      // No auth family — use lastActiveFamilyId or create new
       const activeFamily = await familyContextStore.initialize();
-      console.log('[App] initialize() returned:', activeFamily?.id, activeFamily?.name);
 
       if (!activeFamily) {
-        // No family exists yet — first-time user or fresh device
         const family = await familyContextStore.createFamily('My Family');
         if (!family) {
           console.error('Failed to create default family');
@@ -274,25 +246,18 @@ onMounted(async () => {
     }
 
     // Step 5: Load family data from the active per-family DB
-    // Close any previously opened DB to ensure we open the correct family's DB
-    const { closeDatabase: closeDb, getActiveFamilyId: getActiveId } =
-      await import('@/services/indexeddb/database');
+    const { closeDatabase: closeDb } = await import('@/services/indexeddb/database');
     await closeDb();
-    console.log('[App] Before loadFamilyData, activeFamily:', getActiveId());
     await loadFamilyData();
-    console.log(
-      '[App] After loadFamilyData, members:',
-      familyStore.members.map((m) => m.name)
-    );
 
-    // Auto-update exchange rates if enabled (non-blocking, requires active family)
+    // Auto-update exchange rates if enabled (non-blocking)
     if (settingsStore.exchangeRateAutoUpdate) {
       updateRatesIfStale().catch(console.error);
     }
-    // Show trust device prompt for cloud users who haven't been asked yet
+
+    // Show trust device prompt after first successful sign-in + data load
     if (
       authStore.isAuthenticated &&
-      !authStore.isLocalOnlyMode &&
       !settingsStore.trustedDevicePromptShown &&
       familyStore.isSetupComplete
     ) {

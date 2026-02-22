@@ -2,12 +2,10 @@
  * WebAuthn/Passkey service for FIDO2 biometric authentication.
  *
  * This service wraps the Web Authentication API (navigator.credentials)
- * for passkey registration and sign-in. It requires:
- * - A Cognito User Pool with WebAuthn support enabled
- * - A relying party (RP) configuration matching the app domain
- *
- * Note: Full passkey auth requires server-side challenge generation.
- * The current implementation provides the client-side primitives.
+ * for passkey registration and sign-in. Full passkey auth requires
+ * server-side challenge generation, which will be implemented in a
+ * future phase. The current implementation provides the client-side
+ * primitives and stores passkey metadata in localStorage for MVP.
  */
 
 export interface PasskeyInfo {
@@ -46,7 +44,7 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
  * Register a new passkey for the user.
  *
  * In a full implementation, the challenge and user info would come from
- * the server (Cognito + Lambda). This provides the client-side flow.
+ * the server. This provides the client-side flow.
  */
 export async function registerPasskey(
   userId: string,

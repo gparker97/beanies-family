@@ -102,6 +102,7 @@ describe('TransactionsPage - Date Filter', () => {
     ageGroup: 'adult',
     role: 'owner',
     color: '#3b82f6',
+    requiresPassword: false,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
