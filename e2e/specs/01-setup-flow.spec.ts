@@ -47,8 +47,8 @@ test.describe('Setup Flow', () => {
 
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // Should still be on login page with custom JS validation error
-    await expect(page).toHaveURL('/login');
+    // Should still be on welcome page with custom JS validation error
+    await expect(page).toHaveURL('/welcome');
     await expect(page.getByText('Please fill in all fields')).toBeVisible();
   });
 });
