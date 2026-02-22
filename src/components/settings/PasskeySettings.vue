@@ -9,6 +9,7 @@ import {
   removePasskey,
   type PasskeyInfo,
 } from '@/services/auth/passkeyService';
+import { confirm as showConfirm } from '@/composables/useConfirm';
 
 const supported = ref(false);
 const platformAvailable = ref(false);
@@ -28,8 +29,10 @@ function handleRegister() {
     'Passkey registration requires server-side infrastructure (AWS Cognito WebAuthn challenge). This will be available once the backend is deployed.';
 }
 
-function handleRemove(credentialId: string) {
-  if (confirm('Remove this passkey? You will no longer be able to sign in with it.')) {
+async function handleRemove(credentialId: string) {
+  if (
+    await showConfirm({ title: 'confirm.removePasskeyTitle', message: 'passkey.removeConfirm' })
+  ) {
     removePasskey(credentialId);
     passkeys.value = listRegisteredPasskeys();
   }

@@ -6,6 +6,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import CreateMemberAccountModal from '@/components/family/CreateMemberAccountModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -189,10 +190,13 @@ async function saveEditMember() {
 async function deleteMember(id: string) {
   const member = familyStore.members.find((m) => m.id === id);
   if (member?.role === 'owner') {
-    alert(t('family.cannotDeleteOwner'));
+    await showAlert({
+      title: 'confirm.cannotDeleteOwnerTitle',
+      message: 'family.cannotDeleteOwner',
+    });
     return;
   }
-  if (confirm(t('family.deleteConfirm'))) {
+  if (await showConfirm({ title: 'confirm.deleteMemberTitle', message: 'family.deleteConfirm' })) {
     await familyStore.deleteMember(id);
   }
 }

@@ -5,6 +5,7 @@ import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
+import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { needsLegacyMigration, runLegacyMigration } from '@/services/migration/legacyMigration';
@@ -299,6 +300,7 @@ onMounted(async () => {
 
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />
+    <ConfirmModal />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <AppSidebar />
