@@ -33,6 +33,7 @@ const isLoadingFile = ref(false);
 const needsDecryptPassword = ref(false);
 const decryptPassword = ref('');
 const needsPermissionGrant = ref(false);
+const fileUnencrypted = ref(false);
 
 // All selectable members (both with and without passwords)
 const allMembers = computed(() => familyStore.members);
@@ -58,6 +59,8 @@ onMounted(async () => {
         if (!loadResult.success && loadResult.needsPassword) {
           // File is encrypted — show decrypt password form
           needsDecryptPassword.value = true;
+        } else if (loadResult.success && !syncStore.isEncryptionEnabled) {
+          fileUnencrypted.value = true;
         }
       } catch {
         // File load failed
@@ -150,7 +153,10 @@ async function handleGrantPermission() {
     if (granted) {
       needsPermissionGrant.value = false;
       if (familyStore.members.length > 0) {
-        // Data loaded successfully
+        // Data loaded successfully — check if unencrypted
+        if (!syncStore.isEncryptionEnabled) {
+          fileUnencrypted.value = true;
+        }
       } else if (syncStore.hasPendingEncryptedFile) {
         // File is encrypted — show decrypt form
         needsDecryptPassword.value = true;
@@ -180,6 +186,7 @@ async function handleSwitchFamily() {
   formError.value = null;
   needsDecryptPassword.value = false;
   decryptPassword.value = '';
+  fileUnencrypted.value = false;
   await handleLoadFile();
 }
 
@@ -191,6 +198,7 @@ async function handleLoadFile() {
     const result = await syncStore.loadFromNewFile();
     if (result.success) {
       needsFileLoad.value = false;
+      fileUnencrypted.value = !syncStore.isEncryptionEnabled;
     } else if (result.needsPassword) {
       // File is encrypted — show decrypt password form
       needsDecryptPassword.value = true;
@@ -321,6 +329,23 @@ async function handleDecrypt() {
 
     <!-- Member picker + password form -->
     <div v-else>
+      <!-- Unencrypted file warning -->
+      <div
+        v-if="fileUnencrypted"
+        class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
+      >
+        <div class="flex items-start gap-2">
+          <img
+            src="/brand/beanies_open_eyes_transparent_512x512.png"
+            alt=""
+            class="mt-0.5 h-4 w-4 flex-shrink-0"
+          />
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            {{ t('auth.fileNotEncryptedWarning') }}
+          </p>
+        </div>
+      </div>
+
       <!-- Member picker — always shown so user can see all members -->
       <div v-if="!selectedMember" class="mb-4 space-y-2">
         <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
