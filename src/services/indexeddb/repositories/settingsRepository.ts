@@ -30,6 +30,7 @@ export function getDefaultSettings(): Settings {
     aiApiKeys: {},
     preferredCurrencies: [],
     customInstitutions: [],
+    onboardingCompleted: true,
     createdAt: now,
     updatedAt: now,
   };

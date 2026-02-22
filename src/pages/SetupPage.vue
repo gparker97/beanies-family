@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { celebrate } from '@/composables/useCelebration';
 import PasswordModal from '@/components/common/PasswordModal.vue';
@@ -40,6 +40,18 @@ const form = reactive({
   name: '',
   email: '',
   baseCurrency: DEFAULT_CURRENCY,
+});
+
+// Pre-populate form with existing data from cloud signup
+onMounted(() => {
+  const owner = familyStore.members.find((m) => m.role === 'owner');
+  if (owner) {
+    form.name = owner.name;
+    form.email = owner.email;
+  }
+  if (hasAuthEmail.value && !form.email) {
+    form.email = authStore.currentUser!.email;
+  }
 });
 
 const errors = reactive({
@@ -109,20 +121,31 @@ async function createProfileAndSettings(): Promise<boolean> {
   isSubmitting.value = true;
 
   try {
-    // Create the owner profile
-    const randomColor = colors[Math.floor(Math.random() * colors.length)] ?? '#3b82f6';
     const email = hasAuthEmail.value ? authStore.currentUser!.email : form.email.trim();
-    const member = await familyStore.createMember({
-      name: form.name.trim(),
-      email,
-      gender: 'male',
-      ageGroup: 'adult',
-      role: 'owner',
-      color: randomColor,
-    });
+    const existingOwner = familyStore.members.find((m) => m.role === 'owner');
 
-    if (member) {
-      familyStore.setCurrentMember(member.id);
+    if (existingOwner) {
+      // Owner already exists (cloud signup) — update with any edits from the form
+      await familyStore.updateMember(existingOwner.id, {
+        name: form.name.trim(),
+        email,
+      });
+      familyStore.setCurrentMember(existingOwner.id);
+    } else {
+      // Create the owner profile
+      const randomColor = colors[Math.floor(Math.random() * colors.length)] ?? '#3b82f6';
+      const member = await familyStore.createMember({
+        name: form.name.trim(),
+        email,
+        gender: 'male',
+        ageGroup: 'adult',
+        role: 'owner',
+        color: randomColor,
+      });
+
+      if (member) {
+        familyStore.setCurrentMember(member.id);
+      }
     }
 
     // Set base currency
@@ -167,9 +190,14 @@ async function handleCreateNewFile() {
 /**
  * After encryption password is set, navigate to dashboard.
  */
+async function completeOnboarding() {
+  await settingsStore.setOnboardingCompleted(true);
+}
+
 async function handleSetEncryptionPassword(password: string) {
   const success = await syncStore.enableEncryption(password);
   showEncryptModal.value = false;
+  await completeOnboarding();
   if (success) {
     celebrate('first-save');
     syncStore.setupAutoSync();
@@ -186,8 +214,9 @@ async function handleSetEncryptionPassword(password: string) {
 /**
  * Skip encryption (user chose not to set a password) and go to dashboard.
  */
-function handleSkipEncryption() {
+async function handleSkipEncryption() {
   showEncryptModal.value = false;
+  await completeOnboarding();
   celebrate('setup-complete');
   syncStore.setupAutoSync();
   router.replace('/dashboard');
@@ -202,6 +231,7 @@ async function handleDownloadFallback() {
 
   // Manual export as download
   await syncStore.manualExport();
+  await completeOnboarding();
   celebrate('setup-complete');
   router.replace('/dashboard');
 }
@@ -230,6 +260,7 @@ async function loadExistingData() {
           familyStore.setCurrentMember(owner.id);
         }
       }
+      await completeOnboarding();
       syncStore.setupAutoSync();
       // Navigate to dashboard
       router.replace('/dashboard');
@@ -259,6 +290,7 @@ async function handleDecryptFile(password: string) {
         familyStore.setCurrentMember(owner.id);
       }
     }
+    await completeOnboarding();
     syncStore.setupAutoSync();
     // Navigate to dashboard
     router.replace('/dashboard');

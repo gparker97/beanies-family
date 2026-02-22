@@ -248,6 +248,7 @@ export interface Settings {
   aiApiKeys: AIApiKeys;
   preferredCurrencies?: CurrencyCode[];
   customInstitutions?: string[];
+  onboardingCompleted?: boolean;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

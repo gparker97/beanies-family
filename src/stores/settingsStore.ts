@@ -41,6 +41,7 @@ export const useSettingsStore = defineStore('settings', () => {
     return Array.from(set);
   });
   const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
+  const onboardingCompleted = computed(() => settings.value.onboardingCompleted ?? true);
 
   // Apply theme to document
   watch(
@@ -255,6 +256,14 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setOnboardingCompleted(completed: boolean): Promise<void> {
+    try {
+      settings.value = await settingsRepo.saveSettings({ onboardingCompleted: completed });
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update onboarding status';
+    }
+  }
+
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -355,6 +364,7 @@ export const useSettingsStore = defineStore('settings', () => {
     preferredCurrencies,
     effectiveDisplayCurrencies,
     customInstitutions,
+    onboardingCompleted,
     // Actions
     loadGlobalSettings,
     loadSettings,
@@ -369,6 +379,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setBeanieMode,
     setSoundEnabled,
     setPreferredCurrencies,
+    setOnboardingCompleted,
     addCustomInstitution,
     removeCustomInstitution,
     setExchangeRateAutoUpdate,
