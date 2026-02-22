@@ -202,6 +202,9 @@ export const useSyncStore = defineStore('sync', () => {
       lastSync.value = toISODateString(new Date());
       // Reload all stores after import
       await reloadAllStores();
+
+      // File loaded without needing password → it's unencrypted
+      await saveSettings({ encryptionEnabled: false });
     }
     return { success: result.success };
   }
@@ -230,9 +233,10 @@ export const useSyncStore = defineStore('sync', () => {
       // Reload all stores after import
       await reloadAllStores();
 
-      // Update settings to reflect sync is enabled with the new file
+      // Update settings — file loaded without password means unencrypted
       await saveSettings({
         syncEnabled: true,
+        encryptionEnabled: false,
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: lastSync.value,
       });
