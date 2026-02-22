@@ -7,7 +7,7 @@
 
 beanies.family is a PWA-enabled app that needs responsive mobile and tablet support. The desktop layout uses a permanent Deep Slate sidebar for navigation. This sidebar is too wide for mobile viewports (< 768px) and must be replaced with mobile-appropriate navigation patterns.
 
-The v4 UI framework proposal (`docs/brand/beanies-ui-framework-proposal-v4.html`) defines the target mobile experience.
+The v5 UI framework proposal (`docs/brand/beanies-ui-framework-proposal-v5.html`) defines the target mobile experience.
 
 ## Decisions
 
@@ -65,5 +65,5 @@ Tailwind CSS responsive prefixes (`sm:`, `md:`, `lg:`) handle layout shifts. Mob
 ## References
 
 - Issue #63: Mobile responsive bottom tab navigation, hamburger menu, and responsive layouts
-- v4 UI proposal: `docs/brand/beanies-ui-framework-proposal-v4.html` (Mobile section)
+- v5 UI proposal: `docs/brand/beanies-ui-framework-proposal-v5.html` (Mobile section)
 - `src/constants/navigation.ts`: Shared navigation definitions
