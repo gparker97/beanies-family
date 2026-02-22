@@ -9,6 +9,7 @@ interface Props {
   description?: string;
   confirmLabel?: string;
   requireConfirmation?: boolean;
+  closable?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -16,6 +17,7 @@ const props = withDefaults(defineProps<Props>(), {
   description: undefined,
   confirmLabel: undefined,
   requireConfirmation: false,
+  closable: true,
 });
 
 const emit = defineEmits<{
@@ -78,7 +80,7 @@ function resetForm() {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="resolvedTitle" @close="handleClose">
+  <BaseModal :open="open" :title="resolvedTitle" :closable="closable" @close="handleClose">
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <p class="text-sm text-gray-600 dark:text-gray-400">
         {{ resolvedDescription }}
@@ -148,7 +150,7 @@ function resetForm() {
       </div>
 
       <div class="flex justify-end gap-3 pt-4">
-        <BaseButton variant="ghost" type="button" @click="handleClose">
+        <BaseButton v-if="closable" variant="ghost" type="button" @click="handleClose">
           {{ t('action.cancel') }}
         </BaseButton>
         <BaseButton type="submit" :disabled="!canSubmit">

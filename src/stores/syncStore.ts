@@ -92,6 +92,12 @@ export const useSyncStore = defineStore('sync', () => {
       if (loadResult.success) {
         lastSync.value = toISODateString(new Date());
         await reloadAllStores();
+      } else if (loadResult.needsPassword && loadResult.fileHandle && loadResult.rawSyncData) {
+        // File is encrypted — store for later decryption
+        pendingEncryptedFile.value = {
+          fileHandle: loadResult.fileHandle,
+          rawSyncData: loadResult.rawSyncData,
+        };
       }
       // Set up auto-sync now that we have permission
       setupAutoSync();
