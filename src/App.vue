@@ -58,8 +58,13 @@ function handleDeclineTrust() {
 }
 
 const showLayout = computed(() => {
-  // Don't show sidebar/header on login or 404 pages
-  return route.name !== 'NotFound' && route.name !== 'Login' && route.name !== 'JoinFamily';
+  // Don't show sidebar/header on login, welcome, or 404 pages
+  return (
+    route.name !== 'NotFound' &&
+    route.name !== 'Welcome' &&
+    route.name !== 'Login' &&
+    route.name !== 'JoinFamily'
+  );
 });
 
 /**
@@ -186,8 +191,8 @@ onMounted(async () => {
     if (authStore.needsAuth) {
       // E2E auto-auth: restore from sessionStorage (dev mode only)
       if (!authStore.restoreE2EAuth()) {
-        if (route.name !== 'Login' && route.name !== 'JoinFamily') {
-          router.replace('/login');
+        if (route.name !== 'Welcome' && route.name !== 'Login' && route.name !== 'JoinFamily') {
+          router.replace('/welcome');
         }
         return;
       }

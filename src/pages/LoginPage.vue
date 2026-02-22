@@ -30,21 +30,10 @@ const fileUnencrypted = ref(false);
 const isInitializing = ref(true);
 
 onMounted(async () => {
-  // If no members loaded yet, initialize file context
+  // Initialize stores but always show the Welcome Gate first
   if (familyStore.members.length === 0) {
     await familyContextStore.initialize();
     await syncStore.initialize();
-
-    if (syncStore.isConfigured && !syncStore.needsPermission) {
-      // Has a configured file — go to load-pod with auto-load
-      activeView.value = 'load-pod';
-      autoLoadPod.value = true;
-    } else if (syncStore.isConfigured && syncStore.needsPermission) {
-      // File handle exists but needs permission
-      activeView.value = 'load-pod';
-      needsPermissionGrant.value = true;
-    }
-    // else: no file handle — show welcome
   } else {
     // Members already loaded (e.g. navigated back) — go to pick-bean
     activeView.value = 'pick-bean';
@@ -56,8 +45,14 @@ onMounted(async () => {
 
 function handleNavigate(view: 'load-pod' | 'create' | 'join') {
   activeView.value = view;
-  needsPermissionGrant.value = false;
-  autoLoadPod.value = false;
+  if (view === 'load-pod') {
+    // Auto-load if file handle is configured and we have permission
+    autoLoadPod.value = syncStore.isConfigured && !syncStore.needsPermission;
+    needsPermissionGrant.value = syncStore.isConfigured && syncStore.needsPermission;
+  } else {
+    autoLoadPod.value = false;
+    needsPermissionGrant.value = false;
+  }
 }
 
 function handleFileLoaded() {
