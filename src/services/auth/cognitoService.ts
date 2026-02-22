@@ -24,6 +24,7 @@ function getUserPool(): CognitoUserPool {
 export interface SignUpParams {
   email: string;
   password: string;
+  name: string;
   familyId: string;
   familyRole: string;
 }
@@ -57,6 +58,7 @@ export function signUp(params: SignUpParams): Promise<ISignUpResult> {
 
   const attributeList = [
     new CognitoUserAttribute({ Name: 'email', Value: params.email }),
+    new CognitoUserAttribute({ Name: 'name', Value: params.name }),
     new CognitoUserAttribute({ Name: 'custom:familyId', Value: params.familyId }),
     new CognitoUserAttribute({ Name: 'custom:familyRole', Value: params.familyRole }),
   ];
