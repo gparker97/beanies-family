@@ -136,6 +136,16 @@ async function handleSignIn() {
   }
 }
 
+async function handleSwitchFamily() {
+  selectedMember.value = null;
+  password.value = '';
+  confirmPassword.value = '';
+  formError.value = null;
+  needsDecryptPassword.value = false;
+  decryptPassword.value = '';
+  await handleLoadFile();
+}
+
 async function handleLoadFile() {
   isLoadingFile.value = true;
   formError.value = null;
@@ -351,6 +361,15 @@ async function handleDecrypt() {
           }}
         </BaseButton>
       </form>
+
+      <!-- Switch to different family -->
+      <button
+        type="button"
+        class="mt-4 w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+        @click="handleSwitchFamily"
+      >
+        {{ t('auth.switchFamily') }}
+      </button>
     </div>
   </div>
 </template>
