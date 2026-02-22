@@ -9,7 +9,7 @@ Users need a way to back up data and sync between devices without relying on a c
 
 ## Decision
 
-Use the **File System Access API** to read/write a local JSON file as the sync target. This allows users to place the file in a cloud-synced folder (Google Drive, Dropbox, OneDrive) for cross-device sync without the app needing OAuth or API integrations.
+Use the **File System Access API** to read/write a local `.beanpod` file (JSON format) as the sync target. This allows users to place the file in a cloud-synced folder (Google Drive, Dropbox, OneDrive) for cross-device sync without the app needing OAuth or API integrations.
 
 ### Implementation Details
 
@@ -17,7 +17,7 @@ Use the **File System Access API** to read/write a local JSON file as the sync t
 - **File operations**: `src/services/sync/fileSync.ts` — creates/validates/imports sync data
 - **File handle persistence**: `src/services/sync/fileHandleStore.ts` — stores the `FileSystemFileHandle` in a separate IndexedDB database so the file can be re-accessed across browser sessions
 - **Capability detection**: `src/services/sync/capabilities.ts` — checks browser support
-- **Sync file format**: Versioned JSON (currently `1.0`) containing all entity data
+- **Sync file format**: Versioned JSON with `.beanpod` extension (currently `2.0`) containing all entity data
 - **Auto-sync**: Debounced saves (2-second delay) triggered by data changes
 - **Encryption**: Optional AES-GCM encryption of the data section (see ADR-003)
 
