@@ -209,7 +209,7 @@ npm run lint
 
 ## Key Implementation Details
 
-1. **File-First Architecture**: Encrypted local file is the source of truth. IndexedDB is a temporary cache deleted on sign-out
+1. **File-First Architecture**: Encrypted `.beanpod` file is the source of truth. IndexedDB is a temporary cache deleted on sign-out
 2. **Multi-Currency**: Amounts stored with original currency, converted on-demand for display
 3. **Family Profiles**: Each member has their own accounts/transactions, with shared family goals
 4. **PWA Ready**: Service worker and manifest configured for offline support
@@ -222,6 +222,7 @@ npm run lint
 | ------------------- | ---------------------------------------------------------------------- |
 | `beanies.family`    | Beanies, beanies, Beanies Family, GP Family Planner, GP Family Finance |
 | _Every bean counts_ | Every Bean Counts, every bean counts.                                  |
+| `.beanpod`          | `.json` (for family data files)                                        |
 | Family Data File    | Sync File                                                              |
 | Family Data Options | File Sync (in Settings)                                                |
 | My Family's Data    | Sync File (in Settings configured state)                               |

@@ -188,11 +188,11 @@ export async function selectSyncFile(): Promise<boolean> {
   try {
     // Show save file picker (allows creating new or selecting existing)
     const handle = await window.showSaveFilePicker({
-      suggestedName: 'gp-family-finance-sync.json',
+      suggestedName: 'my-family.beanpod',
       types: [
         {
-          description: 'Finance Data',
-          accept: { 'application/json': ['.json'] },
+          description: 'beanies.family Data File',
+          accept: { 'application/json': ['.beanpod', '.json'] },
         },
       ],
     });
@@ -539,8 +539,8 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
     const handles = await window.showOpenFilePicker({
       types: [
         {
-          description: 'Finance Data',
-          accept: { 'application/json': ['.json'] },
+          description: 'beanies.family Data File',
+          accept: { 'application/json': ['.beanpod', '.json'] },
         },
       ],
       multiple: false,
