@@ -43,10 +43,10 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
       }
 
       // v2: remove cachedSessions store (Cognito removed)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (oldVersion < 2 && (db as any).objectStoreNames.contains('cachedSessions')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (db as any).deleteObjectStore('cachedSessions');
+      // Cast to native IDBDatabase to access stores not in the typed schema
+      const rawDb = db as unknown as IDBDatabase;
+      if (oldVersion < 2 && rawDb.objectStoreNames.contains('cachedSessions')) {
+        rawDb.deleteObjectStore('cachedSessions');
       }
 
       if (!db.objectStoreNames.contains('globalSettings')) {
