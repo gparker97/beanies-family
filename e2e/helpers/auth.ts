@@ -31,6 +31,10 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Next' }).click();
 
     // Step 2: Storage & pod password
+    // Wait for step 2 to fully render (signUp is async, so step 1's Next
+    // triggers an async flow that sets currentStep = 2 on completion).
+    await page.getByText('Save & secure your pod').waitFor({ state: 'visible', timeout: 10000 });
+
     // The Local button triggers showSaveFilePicker (native OS dialog) which
     // cannot be automated in headless browsers. Skip to step 3 using the
     // dev-mode E2E hook exposed by CreatePodView.
