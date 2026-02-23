@@ -106,7 +106,6 @@ async function handleGrantPermission() {
 }
 
 async function handleLoadFile() {
-  isLoadingFile.value = true;
   formError.value = null;
 
   try {
@@ -123,8 +122,6 @@ async function handleLoadFile() {
     }
   } catch {
     formError.value = syncStore.error || t('auth.fileLoadFailed');
-  } finally {
-    isLoadingFile.value = false;
   }
 }
 
@@ -193,7 +190,7 @@ function handleSwitchFamily() {
       {{ formError }}
     </div>
 
-    <!-- Loading state -->
+    <!-- Loading state (only for auto-load and permission grant) -->
     <div v-if="isLoadingFile" class="py-12 text-center">
       <div
         class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
@@ -235,14 +232,14 @@ function handleSwitchFamily() {
     <!-- Drop zone / file picker -->
     <template v-else>
       <button
-        class="group w-full cursor-pointer rounded-2xl border-2 border-dashed border-gray-300 p-8 text-center transition-all hover:border-[#F15D22] hover:bg-[#FEF0E8]/30 dark:border-slate-600 dark:hover:border-[#F15D22] dark:hover:bg-[#F15D22]/5"
+        class="group w-full cursor-pointer rounded-3xl border-[3px] border-dashed border-[#F15D22]/20 bg-gradient-to-br from-[#F15D22]/[0.02] to-[#AED6F1]/[0.04] px-[30px] py-[40px] text-center transition-all hover:border-[#F15D22]/40 hover:bg-[#FEF0E8]/30 dark:border-[#F15D22]/15 dark:from-[#F15D22]/[0.03] dark:to-[#AED6F1]/[0.02] dark:hover:border-[#F15D22]/30"
         @click="handleLoadFile"
       >
         <div
-          class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100 transition-colors group-hover:bg-[#F15D22]/10 dark:bg-slate-700"
+          class="mx-auto mb-3 flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-gray-100 transition-colors group-hover:bg-[#F15D22]/10 dark:bg-slate-700"
         >
           <svg
-            class="h-7 w-7 text-gray-400 transition-colors group-hover:text-[#F15D22] dark:text-gray-500"
+            class="h-8 w-8 text-gray-400 transition-colors group-hover:text-[#F15D22] dark:text-gray-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -260,6 +257,9 @@ function handleSwitchFamily() {
         </p>
         <p class="mt-1 text-sm text-[#F15D22]">
           {{ t('loginV6.dropZoneBrowse') }}
+        </p>
+        <p class="mt-2 text-[0.7rem] font-semibold text-[#F15D22]/70">
+          {{ t('loginV6.acceptsBeanpod') }}
         </p>
       </button>
 
@@ -301,59 +301,91 @@ function handleSwitchFamily() {
       </div>
 
       <!-- Security messaging -->
-      <div class="mt-6 grid grid-cols-3 gap-3">
-        <div class="rounded-xl bg-gray-50 p-3 text-center dark:bg-slate-700/50">
-          <svg
-            class="mx-auto mb-1.5 h-5 w-5 text-[#2C3E50] dark:text-gray-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <!-- Card 1: Your Data, Your Cloud -->
+        <div
+          class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+        >
+          <div
+            class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#6EE7B7]/[0.12]"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-            />
-          </svg>
-          <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+            <svg
+              class="h-5 w-5 text-[#10b981]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+              />
+            </svg>
+          </div>
+          <p class="text-[0.68rem] font-bold text-gray-700 dark:text-gray-300">
             {{ t('loginV6.securityYourData') }}
           </p>
-        </div>
-        <div class="rounded-xl bg-gray-50 p-3 text-center dark:bg-slate-700/50">
-          <svg
-            class="mx-auto mb-1.5 h-5 w-5 text-[#2C3E50] dark:text-gray-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-          <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
-            {{ t('loginV6.securityEncrypted') }}
+          <p class="mt-0.5 text-[0.62rem] opacity-35">
+            {{ t('loginV6.securityYourDataDesc') }}
           </p>
         </div>
-        <div class="rounded-xl bg-gray-50 p-3 text-center dark:bg-slate-700/50">
-          <svg
-            class="mx-auto mb-1.5 h-5 w-5 text-[#2C3E50] dark:text-gray-300"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+
+        <!-- Card 2: AES-256 Encrypted -->
+        <div
+          class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+        >
+          <div
+            class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#F15D22]/10"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-            />
-          </svg>
-          <p class="text-xs font-medium text-gray-700 dark:text-gray-300">
+            <svg
+              class="h-5 w-5 text-[#F15D22]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <p class="text-[0.68rem] font-bold text-gray-700 dark:text-gray-300">
+            {{ t('loginV6.securityEncrypted') }}
+          </p>
+          <p class="mt-0.5 text-[0.62rem] opacity-35">
+            {{ t('loginV6.securityEncryptedDesc') }}
+          </p>
+        </div>
+
+        <!-- Card 3: Zero Servers -->
+        <div
+          class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+        >
+          <div
+            class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#AED6F1]/20"
+          >
+            <svg
+              class="h-5 w-5 text-[#3498db]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+              />
+            </svg>
+          </div>
+          <p class="text-[0.68rem] font-bold text-gray-700 dark:text-gray-300">
             {{ t('loginV6.securityZeroServers') }}
+          </p>
+          <p class="mt-0.5 text-[0.62rem] opacity-35">
+            {{ t('loginV6.securityZeroServersDesc') }}
           </p>
         </div>
       </div>
@@ -374,7 +406,7 @@ function handleSwitchFamily() {
         <!-- File loaded badge -->
         <div
           v-if="loadedFileName"
-          class="mx-auto mb-4 inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1.5 text-sm text-green-700 dark:bg-green-900/30 dark:text-green-400"
+          class="mx-auto mb-4 inline-flex items-center gap-2 rounded-full bg-[#27AE60]/[0.08] px-3 py-1.5 text-[0.68rem] font-semibold text-[#27AE60] dark:bg-green-900/30 dark:text-green-400"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -385,13 +417,7 @@ function handleSwitchFamily() {
             />
           </svg>
           {{ loadedFileName }} {{ t('loginV6.fileLoaded') }}
-        </div>
-
-        <!-- Lock icon -->
-        <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#2C3E50] to-[#3D5368]"
-        >
-          <svg class="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="h-3 w-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -402,10 +428,10 @@ function handleSwitchFamily() {
         </div>
 
         <!-- Heading -->
-        <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit text-[1.2rem] font-bold text-gray-900 dark:text-gray-100">
           {{ t('loginV6.unlockTitle') }}
         </h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        <p class="mt-1 text-[0.75rem] opacity-40">
           {{ t('loginV6.unlockSubtitle') }}
         </p>
       </div>
@@ -435,7 +461,7 @@ function handleSwitchFamily() {
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
 
-        <p class="mt-3 text-center text-xs text-gray-400 opacity-60">
+        <p class="mt-3 text-center text-[0.68rem] opacity-30">
           {{ t('loginV6.unlockFooter') }}
         </p>
       </form>
