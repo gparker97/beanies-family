@@ -942,6 +942,7 @@ const STRING_DEFS = {
   'loginV6.confirmPodPassword': { en: 'Confirm pod password' },
   'loginV6.addMemberFailed': { en: 'Failed to add member. Please try again.' },
   'loginV6.removeMember': { en: 'Remove' },
+  'loginV6.you': { en: 'You' },
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
