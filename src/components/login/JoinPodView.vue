@@ -18,16 +18,11 @@ const emit = defineEmits<{
 
 const familyCode = ref('');
 const formError = ref<string | null>(null);
-const roleParam = ref<'parent' | 'child'>('parent');
 
 onMounted(() => {
   const code = route.query.code;
   if (typeof code === 'string' && code) {
     familyCode.value = code;
-  }
-  const role = route.query.role;
-  if (role === 'child') {
-    roleParam.value = 'child';
   }
 });
 
@@ -84,16 +79,6 @@ async function handleSubmit() {
         :placeholder="t('login.familyCodePlaceholder')"
         required
       />
-
-      <!-- Role indicator -->
-      <div
-        class="mt-4 flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2 dark:bg-slate-700/50"
-      >
-        <span class="text-sm text-gray-500 dark:text-gray-400">{{ t('login.joiningAs') }}:</span>
-        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {{ roleParam === 'child' ? t('loginV6.littleBean') : t('loginV6.parentBean') }}
-        </span>
-      </div>
 
       <!-- What happens next card -->
       <div class="mt-6 rounded-2xl bg-[#2C3E50] p-5 dark:bg-slate-700">
