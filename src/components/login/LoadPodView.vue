@@ -186,6 +186,10 @@ async function handleDrop(e: DragEvent) {
   const item = items[0];
   if (!item || item.kind !== 'file') return;
 
+  // Grab the File synchronously — dataTransfer is cleared after the event handler returns
+  const file = item.getAsFile();
+  if (!file) return;
+
   // Try to get a FileSystemFileHandle for persistent access (Chromium only)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fileHandle: any;
@@ -200,9 +204,6 @@ async function handleDrop(e: DragEvent) {
       // Fall back to File-only path
     }
   }
-
-  const file = item.getAsFile();
-  if (!file) return;
 
   // Validate file extension
   if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
