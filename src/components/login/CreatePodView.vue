@@ -107,28 +107,32 @@ async function handleChooseLocalStorage() {
 async function handleStep2Next() {
   formError.value = null;
 
-  // Validate pod password if provided
-  if (podPassword.value) {
-    if (podPassword.value.length < 8) {
-      formError.value = t('auth.passwordMinLength');
-      return;
-    }
-    if (podPassword.value !== confirmPodPassword.value) {
-      formError.value = t('auth.passwordsDoNotMatch');
-      return;
-    }
-
-    // Enable encryption with the pod password
-    if (syncStore.isConfigured) {
-      await syncStore.enableEncryption(podPassword.value);
-    }
+  // Storage location is required
+  if (!storageSaved.value) {
+    formError.value = t('setup.fileCreateFailed');
+    return;
   }
 
-  currentStep.value = 3;
-  formError.value = null;
-}
+  // Pod password is required
+  if (!podPassword.value) {
+    formError.value = t('auth.passwordMinLength');
+    return;
+  }
 
-function handleStep2Skip() {
+  if (podPassword.value.length < 8) {
+    formError.value = t('auth.passwordMinLength');
+    return;
+  }
+  if (podPassword.value !== confirmPodPassword.value) {
+    formError.value = t('auth.passwordsDoNotMatch');
+    return;
+  }
+
+  // Enable encryption with the pod password
+  if (syncStore.isConfigured) {
+    await syncStore.enableEncryption(podPassword.value);
+  }
+
   currentStep.value = 3;
   formError.value = null;
 }
@@ -519,22 +523,15 @@ function handleBack() {
           type="password"
           :placeholder="t('auth.confirmPasswordPlaceholder')"
         />
-        <p v-if="!podPassword" class="text-[0.68rem] text-gray-400 opacity-60">
-          {{ t('loginV6.podPasswordOptional') }}
-        </p>
       </div>
 
-      <BaseButton class="mt-6 w-full" @click="handleStep2Next">
+      <BaseButton
+        class="mt-6 w-full"
+        :disabled="!storageSaved || !podPassword"
+        @click="handleStep2Next"
+      >
         {{ t('loginV6.createNext') }}
       </BaseButton>
-      <button
-        v-if="!storageSaved && !podPassword"
-        type="button"
-        class="mt-2 w-full text-center text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-        @click="handleStep2Skip"
-      >
-        {{ t('loginV6.skip') }}
-      </button>
     </div>
 
     <!-- Step 3: Add Family Members -->
@@ -546,8 +543,42 @@ function handleBack() {
         {{ t('loginV6.addBeansSubtitle') }}
       </p>
 
-      <!-- Added members list -->
-      <div v-if="addedMembers.length > 0" class="mb-4 space-y-2">
+      <!-- Owner + added members list -->
+      <div class="mb-4 space-y-2">
+        <!-- Owner (always shown, non-removable) -->
+        <div
+          v-if="familyStore.owner"
+          class="flex items-center gap-3 rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50"
+        >
+          <BeanieAvatar
+            :variant="
+              getMemberAvatarVariant({
+                gender: familyStore.owner.gender,
+                ageGroup: ownerRole === 'child' ? 'child' : 'adult',
+              })
+            "
+            :color="familyStore.owner.color"
+            size="sm"
+          />
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {{ familyStore.owner.name }}
+              <span
+                class="ml-1.5 inline-block rounded-full bg-[#F15D22]/15 px-2 py-0.5 text-[0.65rem] font-semibold text-[#F15D22]"
+                >{{ t('loginV6.you') }}</span
+              >
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{
+                ownerRole === 'child'
+                  ? '🌱 ' + t('loginV6.littleBean')
+                  : '🫘 ' + t('loginV6.parentBean')
+              }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Additional members -->
         <div
           v-for="member in addedMembers"
           :key="member.id"
