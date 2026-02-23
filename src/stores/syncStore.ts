@@ -246,6 +246,36 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Load a file that was dropped onto the drop zone (drag-and-drop).
+   */
+  async function loadFromDroppedFile(
+    file: File,
+    fileHandle?: FileSystemFileHandle
+  ): Promise<{ success: boolean; needsPassword?: boolean }> {
+    const result = await syncService.loadDroppedFile(file, fileHandle);
+
+    if (result.needsPassword && result.rawSyncData) {
+      pendingEncryptedFile.value = {
+        fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
+        rawSyncData: result.rawSyncData,
+      };
+      return { success: false, needsPassword: true };
+    }
+
+    if (result.success) {
+      needsPermission.value = false;
+      lastSync.value = toISODateString(new Date());
+      await reloadAllStores();
+      await saveSettings({
+        syncEnabled: true,
+        syncFilePath: fileName.value ?? undefined,
+        lastSyncTimestamp: lastSync.value,
+      });
+    }
+    return { success: result.success };
+  }
+
+  /**
    * Decrypt and load the pending encrypted file
    */
   async function decryptPendingFile(
@@ -509,6 +539,7 @@ export const useSyncStore = defineStore('sync', () => {
     checkForConflicts,
     loadFromFile,
     loadFromNewFile,
+    loadFromDroppedFile,
     decryptPendingFile,
     clearPendingEncryptedFile,
     enableEncryption,
