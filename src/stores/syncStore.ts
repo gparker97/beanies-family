@@ -8,10 +8,12 @@ import { useFamilyStore } from './familyStore';
 import { useGoalsStore } from './goalsStore';
 import { useRecurringStore } from './recurringStore';
 import { useSettingsStore } from './settingsStore';
+import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
 import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
 import { exportToFile, importFromFile } from '@/services/sync/fileSync';
+import * as registry from '@/services/registry/registryService';
 import * as syncService from '@/services/sync/syncService';
 import type { SyncFileData } from '@/types/models';
 import { toISODateString } from '@/utils/date';
@@ -126,6 +128,17 @@ export const useSyncStore = defineStore('sync', () => {
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: toISODateString(new Date()),
       });
+      // Fire-and-forget: register family in cloud registry
+      const ctx = useFamilyContextStore();
+      if (ctx.activeFamilyId) {
+        registry
+          .registerFamily(ctx.activeFamilyId, {
+            provider: 'local',
+            displayPath: fileName.value,
+            familyName: ctx.activeFamilyName,
+          })
+          .catch(() => {});
+      }
     }
     return success;
   }
@@ -404,6 +417,12 @@ export const useSyncStore = defineStore('sync', () => {
    * Disconnect from sync file
    */
   async function disconnect(): Promise<void> {
+    // Fire-and-forget: remove family from cloud registry before clearing state
+    const ctx = useFamilyContextStore();
+    if (ctx.activeFamilyId) {
+      registry.removeFamily(ctx.activeFamilyId).catch(() => {});
+    }
+
     await syncService.disconnect();
     needsPermission.value = false;
     lastSync.value = null;
