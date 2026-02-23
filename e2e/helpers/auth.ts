@@ -31,8 +31,26 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // Step 2: Choose storage — skip
-    await page.getByRole('button', { name: 'Skip for now' }).click();
+    // Step 2: Choose storage & set pod password
+    // The Local button triggers showSaveFilePicker which can't be automated,
+    // so we mock it: click Local with the picker stubbed to resolve immediately.
+    await page.evaluate(() => {
+      (window as any).showSaveFilePicker = async () => ({
+        kind: 'file',
+        name: 'e2e-test.beanpod',
+        createWritable: async () => ({
+          write: async () => {},
+          close: async () => {},
+        }),
+        getFile: async () => new File(['{}'], 'e2e-test.beanpod'),
+        queryPermission: async () => 'granted',
+        requestPermission: async () => 'granted',
+      });
+    });
+    await page.getByRole('button', { name: 'Local' }).click();
+    await page.getByLabel('Pod data file encryption password').fill(E2E_PASSWORD);
+    await page.getByLabel('Confirm pod password').fill(E2E_PASSWORD);
+    await page.getByRole('button', { name: 'Next' }).click();
 
     // Step 3: Add family members — finish (goes to /dashboard)
     await page.getByRole('button', { name: 'Finish' }).click();
