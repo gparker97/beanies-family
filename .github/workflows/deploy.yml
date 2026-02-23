@@ -39,6 +39,9 @@ jobs:
 
       - name: Build for production
         run: npm run build
+        env:
+          VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
+          VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

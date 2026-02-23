@@ -341,3 +341,13 @@ export interface SyncStatus {
   isSyncing: boolean;
   error: string | null;
 }
+
+// Family registry — maps familyId to file location metadata
+export interface RegistryEntry {
+  familyId: UUID;
+  provider: 'local' | 'google_drive';
+  fileId?: string | null; // Google Drive file ID (future)
+  displayPath?: string | null;
+  familyName?: string | null;
+  updatedAt: ISODateString;
+}

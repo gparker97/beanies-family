@@ -35,3 +35,18 @@ module "frontend" {
   }
 }
 
+module "registry" {
+  source = "./modules/registry"
+
+  app_name       = var.app_name
+  environment    = var.environment
+  domain_name    = "api.${var.domain_name}"
+  hosted_zone_id = var.hosted_zone_id
+  api_key        = var.registry_api_key
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+}
+

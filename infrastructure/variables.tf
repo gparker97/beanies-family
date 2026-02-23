@@ -27,3 +27,9 @@ variable "hosted_zone_id" {
   type        = string
   default     = "Z104262530APLWP19OU4P"
 }
+
+variable "registry_api_key" {
+  description = "API key for the family registry service"
+  type        = string
+  sensitive   = true
+}
