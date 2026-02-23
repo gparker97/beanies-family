@@ -54,7 +54,7 @@ function handleInput(event: Event) {
     <label
       v-if="label"
       :for="inputId"
-      class="block text-sm font-medium text-gray-700 dark:text-gray-300"
+      class="font-outfit block text-[0.6rem] font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
     >
       {{ label }}
       <span v-if="required" class="text-red-500">*</span>

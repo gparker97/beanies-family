@@ -210,8 +210,30 @@ async function handleSignIn() {
       </button>
     </div>
 
+    <!-- Info bubble (shown when no member selected and members exist) -->
+    <div
+      v-if="allMembers.length > 0 && !selectedMember"
+      class="mt-6 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
+    >
+      <div
+        class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"
+      >
+        <svg class="h-4 w-4 text-[#6EE7B7]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
+      </div>
+      <p class="text-[0.7rem] font-semibold opacity-50">
+        {{ t('loginV6.pickBeanInfoText') }}
+      </p>
+    </div>
+
     <!-- Password form (shown when member selected) -->
-    <form v-else @submit.prevent="handleSignIn">
+    <form v-if="selectedMember" @submit.prevent="handleSignIn">
       <!-- Selected member card -->
       <div class="mb-4 flex items-center gap-3 rounded-2xl bg-gray-50 p-4 dark:bg-slate-700/50">
         <BeanieAvatar
@@ -280,10 +302,10 @@ async function handleSignIn() {
       </BaseButton>
     </form>
 
-    <!-- Switch family link -->
+    <!-- Switch family button -->
     <button
       type="button"
-      class="mt-6 w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      class="mt-6 w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-gray-400 dark:hover:bg-slate-700"
       @click="$emit('back')"
     >
       {{ t('loginV6.switchFamily') }}

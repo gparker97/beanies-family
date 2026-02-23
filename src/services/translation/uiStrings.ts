@@ -31,7 +31,7 @@ type StringEntry = { en: string; beanie?: string };
 const STRING_DEFS = {
   // App branding
   'app.name': { en: 'beanies.family' },
-  'app.tagline': { en: 'Every bean counts' },
+  'app.tagline': { en: 'every bean counts' },
   'app.version': { en: 'v1.0.0 - MVP' },
 
   // Common labels
@@ -927,7 +927,7 @@ const STRING_DEFS = {
 
   // Login redesign — Welcome Gate / Join Pod / Invite
   'login.welcomeTitle': { en: 'Welcome to the family', beanie: 'Welcome to the pod' },
-  'login.welcomeSubtitle': { en: "Your family's finances, together", beanie: 'Every bean counts' },
+  'login.welcomeSubtitle': { en: "Your family's finances, together", beanie: 'every bean counts' },
   'login.signIn': { en: 'Sign in' },
   'login.createPod': { en: 'Create a new pod' },
   'login.joinPod': { en: 'Join a pod' },
@@ -954,7 +954,7 @@ const STRING_DEFS = {
   'loginV6.badgeLove': { en: 'Built with Love' },
   'loginV6.badgeZeroServers': { en: 'Zero Data on Our Servers' },
   'loginV6.welcomePrompt': { en: 'What would you like to do?' },
-  'loginV6.signInTitle': { en: 'Sign in to your pod', beanie: 'Open your pod' },
+  'loginV6.signInTitle': { en: 'Sign in', beanie: 'Sign in to your pod' },
   'loginV6.signInSubtitle': { en: 'Load your family data file' },
   'loginV6.createTitle': { en: 'Create a new pod!', beanie: 'Start a new pod!' },
   'loginV6.createSubtitle': {
@@ -985,8 +985,8 @@ const STRING_DEFS = {
   'loginV6.littleBean': { en: 'Little Bean' },
   'loginV6.setupNeeded': { en: 'Set up' },
   'loginV6.signInAs': { en: 'Sign in as' },
-  'loginV6.createStep1': { en: 'Name & Password' },
-  'loginV6.createStep2': { en: 'Storage' },
+  'loginV6.createStep1': { en: 'You' },
+  'loginV6.createStep2': { en: 'Save & Secure' },
   'loginV6.createStep3': { en: 'Family' },
   'loginV6.createNext': { en: 'Next' },
   'loginV6.createButton': { en: 'Create Pod' },
@@ -1015,6 +1015,42 @@ const STRING_DEFS = {
   },
   'loginV6.wantYourOwn': { en: 'Want your own?' },
   'loginV6.createLink': { en: 'Create a new pod' },
+  'loginV6.acceptsBeanpod': { en: 'Accepts .beanpod files' },
+  'loginV6.securityYourDataDesc': {
+    en: 'Your pod file lives in your cloud storage. We never see it.',
+  },
+  'loginV6.securityEncryptedDesc': {
+    en: 'Military-grade AES-256 encryption protects your data.',
+  },
+  'loginV6.securityZeroServersDesc': {
+    en: 'No servers, no tracking, no data collection.',
+  },
+  'loginV6.pickBeanInfoText': {
+    en: 'Onboarded beans can sign in with their password. New beans need to create a password first.',
+  },
+  'loginV6.growPodTitle': { en: 'Grow a brand-new pod' },
+  'loginV6.growPodSubtitle': {
+    en: 'Name your family pod and create your sign-in password.',
+  },
+  'loginV6.encryptionPasswordLabel': { en: 'Pod data file encryption password' },
+  'loginV6.signInPasswordLabel': { en: 'Your sign-in password' },
+  'loginV6.signInPasswordHint': {
+    en: "You'll use this password to sign into your bean profile",
+  },
+  'loginV6.storageDescription': {
+    en: "We don't store your data on any server or database \u2014 your family's finances stay entirely in your hands. Choose where your encrypted .beanpod file lives, and only you hold the key.",
+  },
+  'loginV6.storageSectionLabel': { en: 'Where should we save your pod?' },
+  'loginV6.step2Title': { en: 'Save & secure your pod' },
+  'loginV6.step2Subtitle': {
+    en: 'Choose where to store your encrypted data file and set a password to protect it.',
+  },
+  'loginV6.podPasswordOptional': {
+    en: 'Optional \u2014 you can enable encryption later in Settings',
+  },
+  'loginV6.confirmPodPassword': { en: 'Confirm pod password' },
+  'loginV6.addMemberFailed': { en: 'Failed to add member. Please try again.' },
+  'loginV6.removeMember': { en: 'Remove' },
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
