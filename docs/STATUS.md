@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-22
-> **Updated by:** Claude (Login page UI redesign)
+> **Last updated:** 2026-02-23
+> **Updated by:** Claude (critical encryption security fix #84, family role display fix)
 
 ## Current Phase
 
@@ -372,6 +372,20 @@
 - **Deleted**: `SignInView.vue`, `TrustBadges.vue`, `SetupPage.vue`
 - **~50 new i18n keys** in `uiStrings.ts` under `loginV6.*` namespace
 
+### Encryption Pipeline Security Hardening (Issue #84) — Closed
+
+- **Critical security fix**: 7 bugs in the sync pipeline could cause encrypted `.beanpod` files to be silently written in plaintext
+- **`syncService.ts`**: Added `setEncryptionRequiredCallback()` — `triggerDebouncedSave()`, `flushPendingSave()`, and `save()` now refuse to write when encryption is required but no password is available (defense-in-depth)
+- **`syncStore.ts`**: Removed hardcoded `encryptionEnabled: false` from `loadFromFile()`, `loadFromNewFile()`, and `disconnect()` — encryption setting now persists correctly across file operations
+- **`syncStore.ts`**: `requestPermission()` no longer arms auto-sync before password is available; `decryptPendingFile()` sets password and encryption flag before reloading stores, then arms auto-sync
+- **`MobileHamburgerMenu.vue`**: Fixed sign-out order — `signOut()` now flushes pending saves before `resetAllStores()` clears the session password (matching AppHeader pattern)
+- **`fileSync.ts`**: `exportToFile()` now respects encryption settings; `importSyncFileData()` preserves local `encryptionEnabled` value instead of importing from file
+
+### Family Member Role Display Fix
+
+- `FamilyBeanRow.vue` `getRoleLabel` now checks `member.ageGroup` (adult/child) instead of only `member.role`
+- Adults with 'member' role correctly show "Parent"/"Big Bean" instead of "Little Bean"
+
 ### Recent Fixes
 
 - **Multi-family isolation hardening** — Fixed cross-family data leakage when authenticated user's familyId could not be resolved:
@@ -550,3 +564,4 @@ _(None currently tracked)_
 | 2026-02-22 | Trusted device mode (#74)                                  | Persistent IndexedDB cache across sign-outs for instant returning user access; explicit "Sign out & clear data" option    |
 | 2026-02-22 | Post-sign-in redirect checks onboarding status             | New users redirected to /setup instead of /dashboard; direct DB read after sign-in for reliability                        |
 | 2026-02-22 | Login page UI redesign per v6 wireframes (#69)             | 5-view flow (welcome/load-pod/pick-bean/create/join), legacy SetupPage removed, /welcome dedicated route                  |
+| 2026-02-23 | Encryption pipeline security hardening (#84)               | 7 bugs fixed: defense-in-depth guards prevent plaintext writes when encryption is enabled                                 |
