@@ -27,8 +27,8 @@ test.describe('Account Management', () => {
     // Unlock privacy mode to reveal masked financial figures
     await dashboardPage.unlockPrivacyMode();
 
-    // Use auto-waiting assertion (data loads asynchronously)
-    await expect(dashboardPage.netWorthValue).toContainText('5,000');
+    // Use auto-waiting assertion (data loads asynchronously from IndexedDB)
+    await expect(dashboardPage.netWorthValue).toContainText('5,000', { timeout: 10000 });
   });
 
   test('should create multiple accounts', async ({ page }) => {
