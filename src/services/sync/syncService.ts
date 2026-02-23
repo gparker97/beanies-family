@@ -677,6 +677,99 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
 }
 
 /**
+ * Load a file that was dropped onto the drop zone (drag-and-drop).
+ * Accepts a File object and an optional FileSystemFileHandle for persistent access.
+ * If a handle is provided (Chromium), the file is stored for auto-sync.
+ */
+export async function loadDroppedFile(
+  file: File,
+  fileHandle?: FileSystemFileHandle
+): Promise<OpenFileResult> {
+  try {
+    updateState({ isSyncing: true, lastError: null });
+
+    const text = await file.text();
+
+    if (!text.trim()) {
+      updateState({ isSyncing: false, lastError: 'File is empty' });
+      return { success: false };
+    }
+
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      updateState({ isSyncing: false, lastError: 'Invalid JSON file' });
+      return { success: false };
+    }
+
+    const obj = data as Record<string, unknown>;
+    if (
+      typeof obj.version !== 'string' ||
+      typeof obj.exportedAt !== 'string' ||
+      typeof obj.encrypted !== 'boolean'
+    ) {
+      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
+      return { success: false };
+    }
+
+    // If encrypted, return early with needsPassword flag
+    if (obj.encrypted === true) {
+      updateState({ isSyncing: false, lastError: null });
+      return {
+        success: false,
+        needsPassword: true,
+        fileHandle,
+        rawSyncData: data as SyncFileData,
+      };
+    }
+
+    // For unencrypted files, do full validation
+    if (!validateSyncFileData(data)) {
+      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
+      return { success: false };
+    }
+
+    const syncData = data as SyncFileData;
+
+    // Adopt the file's family identity
+    let activeFamilyId = getActiveFamilyId();
+    if (syncData.familyId) {
+      if (syncData.familyId !== activeFamilyId) {
+        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
+        activeFamilyId = syncData.familyId;
+      }
+    } else if (!activeFamilyId) {
+      const newFamilyId = generateUUID();
+      await createFamilyWithId(newFamilyId, 'My Family');
+      activeFamilyId = newFamilyId;
+    }
+
+    // Import the data
+    await importSyncFileData(syncData);
+
+    // If we have a file handle, store it for persistent sync
+    if (fileHandle) {
+      await storeFileHandle(fileHandle);
+      currentFileHandle = fileHandle;
+      currentFileHandleFamilyId = activeFamilyId;
+    }
+
+    updateState({
+      isConfigured: !!fileHandle,
+      fileName: file.name,
+      isSyncing: false,
+      lastError: null,
+    });
+
+    return { success: true, data: syncData };
+  } catch (e) {
+    updateState({ isSyncing: false, lastError: (e as Error).message });
+    return { success: false };
+  }
+}
+
+/**
  * Decrypt and import data from an encrypted file.
  * Call this after openAndLoadFile returns needsPassword: true
  */
