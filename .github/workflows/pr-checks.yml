@@ -3,6 +3,12 @@ name: PR Checks
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - 'tasks/**'
+      - 'LICENSE'
+      - '.claude/**'
 
 jobs:
   static-analysis:
