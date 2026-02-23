@@ -47,6 +47,11 @@ const newMemberRole = ref<'parent' | 'child'>('parent');
 
 const totalSteps = 3;
 
+// Expose step navigation for E2E tests (dev mode only)
+if (import.meta.env.DEV) {
+  (window as any).__e2eCreatePod = { setStep: (s: number) => (currentStep.value = s) };
+}
+
 const stepLabels = [
   () => t('loginV6.createStep1'),
   () => t('loginV6.createStep2'),

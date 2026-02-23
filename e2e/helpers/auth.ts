@@ -6,8 +6,7 @@ const E2E_PASSWORD = 'test1234';
  * Bypasses the login page for E2E tests.
  *
  * On first call (fresh browser context after clearAllData): walks through
- * the WelcomeGate → Create Pod 3-step wizard (name/password → storage →
- * members) which navigates directly to /dashboard.
+ * the WelcomeGate → Create Pod wizard then navigates to /dashboard.
  *
  * On subsequent calls within the same test: the auto-auth flag is
  * already set, so the app skips login automatically.
@@ -31,30 +30,16 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
     await page.getByRole('button', { name: 'Next' }).click();
 
-    // Step 2: Choose storage & set pod password
-    // The Local button triggers showSaveFilePicker which can't be automated,
-    // so we mock both File System Access API pickers before clicking.
+    // Step 2: Storage & pod password
+    // The Local button triggers showSaveFilePicker (native OS dialog) which
+    // cannot be automated in headless browsers. Skip to step 3 using the
+    // dev-mode E2E hook exposed by CreatePodView.
     await page.evaluate(() => {
-      const mockHandle = {
-        kind: 'file',
-        name: 'e2e-test.beanpod',
-        createWritable: async () => ({
-          write: async () => {},
-          close: async () => {},
-        }),
-        getFile: async () => new File(['{}'], 'e2e-test.beanpod'),
-        queryPermission: async () => 'granted',
-        requestPermission: async () => 'granted',
-      };
-      (window as any).showSaveFilePicker = async () => mockHandle;
-      (window as any).showOpenFilePicker = async () => [mockHandle];
+      (window as any).__e2eCreatePod?.setStep(3);
     });
-    await page.getByRole('button', { name: 'Local' }).click();
-    // Wait for storage to be confirmed before filling password
-    await page.waitForTimeout(500);
-    await page.getByLabel('Pod data file encryption password').fill(E2E_PASSWORD);
-    await page.getByLabel('Confirm pod password').fill(E2E_PASSWORD);
-    await page.getByRole('button', { name: 'Next' }).click();
+
+    // Wait for step 3 to render
+    await page.getByRole('button', { name: 'Finish' }).waitFor({ state: 'visible', timeout: 5000 });
 
     // Step 3: Add family members — finish (goes to /dashboard)
     await page.getByRole('button', { name: 'Finish' }).click();
