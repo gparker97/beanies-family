@@ -199,7 +199,7 @@ async function handleDrop(e: DragEvent) {
         item as DataTransferItem & { getAsFileSystemHandle(): Promise<FileSystemHandle> }
       ).getAsFileSystemHandle();
       if (handle?.kind === 'file') {
-        fileHandle = handle;
+        fileHandle = handle as FileSystemFileHandle;
       }
     } catch {
       // Fall back to File-only path
