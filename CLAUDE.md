@@ -78,7 +78,6 @@ gp-family-finance-planner/
 │   │   ├── ForecastPage.vue       # Financial projections
 │   │   ├── FamilyPage.vue         # Family member management
 │   │   ├── SettingsPage.vue       # App settings
-│   │   ├── SetupPage.vue          # First-run wizard
 │   │   └── NotFoundPage.vue       # 404 page
 │   ├── router/
 │   │   └── index.ts               # Route definitions
@@ -287,7 +286,7 @@ Every issue must have relevant labels applied. When creating or triaging issues,
 
 1. **Type** (required — pick one): `enhancement`, `bug`, `refactor`, `performance`, `accessibility`, `documentation`, `testing`
 2. **Priority** (required — pick one): `priority: critical`, `priority: high`, `priority: medium`, `priority: low`
-3. **Page** (if applicable — pick all that apply): `page: dashboard`, `page: accounts`, `page: transactions`, `page: assets`, `page: goals`, `page: reports`, `page: forecast`, `page: family`, `page: settings`, `page: setup`, `page: login`
+3. **Page** (if applicable — pick all that apply): `page: dashboard`, `page: accounts`, `page: transactions`, `page: assets`, `page: goals`, `page: reports`, `page: forecast`, `page: family`, `page: settings`, `page: login`
 4. **Area** (if applicable — pick all that apply): `area: ui`, `area: data`, `area: sync`, `area: brand`, `area: i18n`, `area: pwa`
 5. **Special** (as needed): `security`, `auth`, `privacy`
 6. **Status**: Apply `ready-for-testing` when implementation is complete and ready for review
