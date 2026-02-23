@@ -3,6 +3,9 @@
 > **IMPORTANT — Read before starting any work:**
 > Always read `docs/STATUS.md` before beginning or continuing work on this project. It contains the latest project status, what is in progress, and recent decisions. Update it when completing significant work or making architectural decisions.
 >
+> **IMPORTANT — Deployment:**
+> NEVER deploy to production unless the user explicitly asks you to deploy. The deploy workflow (`Deploy beanies PROD`) is manual-only (`workflow_dispatch`). Do not trigger it proactively — wait for an explicit instruction like "deploy to prod" or "push to prod".
+>
 > **Key project documents in `docs/`:**
 >
 > - `docs/STATUS.md` — Current project status and progress

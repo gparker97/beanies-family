@@ -1,4 +1,5 @@
 <script setup lang="ts">
+/* global FileSystemFileHandle, FileSystemHandle */
 import { ref, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -191,12 +192,12 @@ async function handleDrop(e: DragEvent) {
   if (!file) return;
 
   // Try to get a FileSystemFileHandle for persistent access (Chromium only)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let fileHandle: any;
+  let fileHandle: FileSystemFileHandle | undefined;
   if ('getAsFileSystemHandle' in item) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const handle = await (item as any).getAsFileSystemHandle();
+      const handle = await (
+        item as DataTransferItem & { getAsFileSystemHandle(): Promise<FileSystemHandle> }
+      ).getAsFileSystemHandle();
       if (handle?.kind === 'file') {
         fileHandle = handle;
       }
