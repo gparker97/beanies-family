@@ -213,7 +213,7 @@ function handleBack() {
         class="mx-auto h-[100px] w-[100px]"
       />
       <p class="font-outfit text-[0.85rem] font-bold text-[#2C3E50] dark:text-gray-200">
-        {{ t('app.name') }}
+        beanies<span class="text-[#F15D22]">.family</span>
       </p>
     </div>
 
@@ -281,7 +281,7 @@ function handleBack() {
     <!-- Step 1: About You -->
     <div v-if="currentStep === 1">
       <h2 class="font-outfit mb-1 text-xl font-bold text-gray-900 dark:text-gray-100">
-        🌱 {{ t('loginV6.growPodTitle') }}
+        {{ t('loginV6.growPodTitle') }} 🌱
       </h2>
       <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
         {{ t('loginV6.growPodSubtitle') }}
