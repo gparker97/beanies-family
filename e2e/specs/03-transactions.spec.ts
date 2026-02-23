@@ -38,8 +38,8 @@ test.describe('Transaction Management', () => {
     // Unlock privacy mode to reveal masked financial figures
     await dashboardPage.unlockPrivacyMode();
 
-    // Use auto-waiting assertion (data loads asynchronously)
-    await expect(dashboardPage.monthlyIncomeValue).toContainText('5,000');
+    // Use auto-waiting assertion (data loads asynchronously from IndexedDB)
+    await expect(dashboardPage.monthlyIncomeValue).toContainText('5,000', { timeout: 10000 });
   });
 
   test('should create expense and update dashboard', async ({ page }) => {
@@ -75,7 +75,7 @@ test.describe('Transaction Management', () => {
     // Unlock privacy mode to reveal masked financial figures
     await dashboardPage.unlockPrivacyMode();
 
-    // Use auto-waiting assertion (data loads asynchronously)
-    await expect(dashboardPage.monthlyExpensesValue).toContainText('150');
+    // Use auto-waiting assertion (data loads asynchronously from IndexedDB)
+    await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout: 10000 });
   });
 });
