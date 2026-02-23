@@ -27,6 +27,8 @@ const formError = ref<string | null>(null);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
 const loadedFileName = ref<string | null>(null);
+const isDragging = ref(false);
+let dragCounter = 0;
 
 /**
  * Try to auto-decrypt using a cached sessionStorage password.
@@ -151,6 +153,83 @@ async function handleDecrypt() {
   }
 }
 
+function handleDragEnter(e: DragEvent) {
+  e.preventDefault();
+  dragCounter++;
+  isDragging.value = true;
+}
+
+function handleDragLeave() {
+  dragCounter--;
+  if (dragCounter <= 0) {
+    dragCounter = 0;
+    isDragging.value = false;
+  }
+}
+
+function handleDragOver(e: DragEvent) {
+  e.preventDefault();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'copy';
+  }
+}
+
+async function handleDrop(e: DragEvent) {
+  e.preventDefault();
+  dragCounter = 0;
+  isDragging.value = false;
+  formError.value = null;
+
+  const items = e.dataTransfer?.items;
+  if (!items || items.length === 0) return;
+
+  const item = items[0];
+  if (!item || item.kind !== 'file') return;
+
+  // Try to get a FileSystemFileHandle for persistent access (Chromium only)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fileHandle: any;
+  if ('getAsFileSystemHandle' in item) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handle = await (item as any).getAsFileSystemHandle();
+      if (handle?.kind === 'file') {
+        fileHandle = handle;
+      }
+    } catch {
+      // Fall back to File-only path
+    }
+  }
+
+  const file = item.getAsFile();
+  if (!file) return;
+
+  // Validate file extension
+  if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
+    formError.value = t('auth.fileLoadFailed');
+    return;
+  }
+
+  isLoadingFile.value = true;
+  try {
+    const result = await syncStore.loadFromDroppedFile(file, fileHandle);
+    if (result.success) {
+      emit('file-loaded');
+    } else if (result.needsPassword) {
+      loadedFileName.value = file.name;
+      showDecryptModal.value = true;
+    } else if (syncStore.error) {
+      formError.value = syncStore.error;
+    } else {
+      formError.value = t('auth.fileLoadFailed');
+    }
+  } catch {
+    formError.value = syncStore.error || t('auth.fileLoadFailed');
+  } finally {
+    isLoadingFile.value = false;
+  }
+}
+
 function handleSwitchFamily() {
   formError.value = null;
   decryptPassword.value = '';
@@ -160,7 +239,7 @@ function handleSwitchFamily() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[480px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
     <!-- Back button -->
     <button
       class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
@@ -231,15 +310,37 @@ function handleSwitchFamily() {
 
     <!-- Drop zone / file picker -->
     <template v-else>
-      <button
-        class="group w-full cursor-pointer rounded-3xl border-[3px] border-dashed border-[#F15D22]/20 bg-gradient-to-br from-[#F15D22]/[0.02] to-[#AED6F1]/[0.04] px-[30px] py-[40px] text-center transition-all hover:border-[#F15D22]/40 hover:bg-[#FEF0E8]/30 dark:border-[#F15D22]/15 dark:from-[#F15D22]/[0.03] dark:to-[#AED6F1]/[0.02] dark:hover:border-[#F15D22]/30"
+      <div
+        role="button"
+        tabindex="0"
+        class="group w-full cursor-pointer rounded-3xl border-[3px] border-dashed px-[30px] py-[40px] text-center transition-all"
+        :class="
+          isDragging
+            ? 'border-[#F15D22] bg-[#FEF0E8]/40 dark:border-[#F15D22]/60 dark:bg-[#F15D22]/10'
+            : 'border-[#F15D22]/20 bg-gradient-to-br from-[#F15D22]/[0.02] to-[#AED6F1]/[0.04] hover:border-[#F15D22]/40 hover:bg-[#FEF0E8]/30 dark:border-[#F15D22]/15 dark:from-[#F15D22]/[0.03] dark:to-[#AED6F1]/[0.02] dark:hover:border-[#F15D22]/30'
+        "
         @click="handleLoadFile"
+        @keydown.enter="handleLoadFile"
+        @dragenter="handleDragEnter"
+        @dragleave="handleDragLeave"
+        @dragover="handleDragOver"
+        @drop="handleDrop"
       >
         <div
-          class="mx-auto mb-3 flex h-[72px] w-[72px] items-center justify-center rounded-[22px] bg-gray-100 transition-colors group-hover:bg-[#F15D22]/10 dark:bg-slate-700"
+          class="mx-auto mb-3 flex h-[72px] w-[72px] items-center justify-center rounded-[22px] transition-colors"
+          :class="
+            isDragging
+              ? 'bg-[#F15D22]/15 dark:bg-[#F15D22]/20'
+              : 'bg-gray-100 group-hover:bg-[#F15D22]/10 dark:bg-slate-700'
+          "
         >
           <svg
-            class="h-8 w-8 text-gray-400 transition-colors group-hover:text-[#F15D22] dark:text-gray-500"
+            class="h-8 w-8 transition-colors"
+            :class="
+              isDragging
+                ? 'text-[#F15D22]'
+                : 'text-gray-400 group-hover:text-[#F15D22] dark:text-gray-500'
+            "
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -261,7 +362,7 @@ function handleSwitchFamily() {
         <p class="mt-2 text-[0.7rem] font-semibold text-[#F15D22]/70">
           {{ t('loginV6.acceptsBeanpod') }}
         </p>
-      </button>
+      </div>
 
       <!-- Cloud connectors (future) -->
       <div class="mt-4 flex gap-3">
