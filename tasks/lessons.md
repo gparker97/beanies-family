@@ -52,3 +52,22 @@ Then use it in E2E tests to skip the unmockable step entirely.
 **Pattern:** `authStore.signUp()` creates the owner member via `familyStore.createMember()` (which adds to `members` array) but does **not** call `familyStore.setCurrentMember()`. So `familyStore.currentMember` remains `null` during the Create Pod wizard.
 
 **Rule:** During the signup/create-pod flow, use `familyStore.owner` (computed from `members.find(m => m.role === 'owner')`) to reference the current user, not `familyStore.currentMember`.
+
+## 4. E2E: Use explicit timeouts for async dashboard assertions
+
+**Date:** 2026-02-23
+**Context:** Flaky `toContainText('150')` failure on monthly expenses stat
+
+**Pattern:** Dashboard stats load asynchronously — the page navigates, IndexedDB queries run, Pinia stores recompute, and Vue re-renders. On slow CI runners (shared GitHub Actions VMs) this chain can exceed Playwright's default 5s `expect` timeout, causing intermittent failures even though the data is correct.
+
+**Symptom:** `expect(locator).toContainText('150')` fails with `unexpected value "USD $0.00"` — the stat simply hasn't updated yet.
+
+**Rule:** Always use an explicit `{ timeout: 10000 }` on `toContainText` / `toHaveText` assertions that check values loaded asynchronously from IndexedDB, especially after a page navigation:
+
+```typescript
+// BAD: default 5s timeout, flaky on slow CI
+await expect(dashboardPage.monthlyExpensesValue).toContainText('150');
+
+// GOOD: explicit 10s timeout for async data
+await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout: 10000 });
+```
