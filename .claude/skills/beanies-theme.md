@@ -145,7 +145,7 @@ All assets in `public/brand/`.
 ### Transparent vs Opaque selection
 
 - **Transparent:** Use wherever the image overlays content, colored backgrounds, or dark mode surfaces (sidebar logo, header branding, celebration overlays, watermarks, dark mode)
-- **Opaque:** Use for standalone display on white/light backgrounds (login hero, setup wizard, favicon source)
+- **Opaque:** Use for standalone display on white/light backgrounds (login hero, favicon source)
 
 ---
 
@@ -332,7 +332,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 
 | Trigger | Asset | Mode | Message |
 |---------|-------|------|---------|
-| Complete setup wizard | `beanies-celebrating-line.png` | Modal | "Setup complete — ready to start counting your beanies!" |
+| Create new pod | `beanies-celebrating-line.png` | Modal | "Pod created — ready to start counting your beanies!" |
 | First bank account | `beanies-celebrating-circle.png` | Toast | "Your first bean is planted!" |
 | First transaction | `beanies-celebrating-circle.png` | Toast | "Every beanie counts!" |
 | Goal reached 100% | `beanies-celebrating-line.png` | Modal | "Goal complete! The beanies are proud!" |
@@ -493,23 +493,23 @@ Dashboard and shared components implementing the Nook UI design system. Use thes
 
 ---
 
-## Onboarding / Setup Design
+## Onboarding / Create Pod Flow
 
-The setup wizard (`src/pages/SetupPage.vue`) uses a 3-step warm welcome flow:
+The Create Pod flow (`src/components/login/CreatePodView.vue`) is a 3-step wizard accessed from the login page:
 
 | Step | Title | Content |
 |------|-------|---------|
-| 1 | Create Your Profile | Name, email, gender, age group, avatar preview |
-| 2 | Set Your Preferences | Base currency selector |
-| 3 | Secure Your Data | File creation with encryption password |
+| 1 | You | Pod name, your name/role, sign-in password |
+| 2 | Save & Secure | Choose storage location, set pod encryption password |
+| 3 | Family | Add family members (optional, can skip) |
 
 ### Design Patterns
 
-- **Step indicator:** Horizontal dots with Heritage Orange active state
-- **Navigation:** Back/Next buttons (ghost + primary), disabled until validation passes
-- **Brand voice:** Warm CTAs ("Let's get you set up"), security reassurance bullets using `beanies_impact_bullet_transparent_192x192.png`
-- **Footer note:** "Your data is encrypted and stored in a file you control — not on our servers."
-- **Celebration:** On completion, fires `celebrate('setup-complete')` modal
+- **Step indicator:** Horizontal steps with Heritage Orange active state
+- **Navigation:** Back/Next buttons, disabled until validation passes
+- **Brand voice:** Warm CTAs ("Grow a brand-new pod"), security reassurance
+- **Storage options:** Local file (`.beanpod`), with cloud connectors coming soon
+- **Celebration:** On completion, navigates to the dashboard with the new pod loaded
 
 ---
 

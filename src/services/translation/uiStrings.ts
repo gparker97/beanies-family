@@ -723,117 +723,28 @@ const STRING_DEFS = {
     en: 'This file is encrypted. Enter your password to decrypt and load your data.',
   },
 
-  // Setup — Joiner onboarding
-  'setup.joinerTitle': { en: 'Complete your profile', beanie: 'Set up your beanie' },
-  'setup.joinerSubtitle': { en: 'Tell us a bit about yourself' },
-  'setup.dateOfBirth': { en: 'Date of birth', beanie: 'Bean birthday' },
-  'setup.selectColor': { en: 'Pick your color' },
-  'setup.completeProfile': { en: 'Done' },
-
-  // Setup
-  'setup.subtitle': { en: "Let's get you set up" },
-  'setup.createProfile': { en: 'Create Your Profile' },
+  // Setup (kept: keys used by CreatePodView.vue)
   'setup.yourName': { en: 'Your Name' },
-  'setup.enterYourName': { en: 'Enter your name' },
-  'setup.emailAddress': { en: 'Email Address' },
-  'setup.enterYourEmail': { en: 'Enter your email' },
-  'setup.haveExistingFile': { en: 'Have an existing data file?' },
-  'setup.setPreferences': { en: 'Set Your Preferences' },
-  'setup.baseCurrencyHint': {
-    en: 'This will be your primary currency for displaying totals',
-  },
-  'setup.secureData': { en: 'Secure Your Data' },
-  'setup.securityDescription': {
-    en: 'Your data is encrypted and saved to a file you control. No data is stored on our servers. You can place this file in Google Drive, Dropbox, or any synced folder for cloud backup.',
-  },
-  'setup.securityEncrypted': { en: 'Encrypted with a password only you know' },
-  'setup.securityAutoSaved': { en: 'Saved automatically as you make changes' },
-  'setup.securityYouControl': { en: 'You control where the file is stored' },
-  'setup.createDataFile': { en: 'Create New Family Data File' },
-  'setup.loadExistingFile': { en: 'Load Existing Family Data File' },
-  'setup.browserWarning': {
-    en: 'For automatic saving, use Chrome or Edge. You can still download your data manually.',
-  },
-  'setup.downloadData': { en: 'Download Your Data' },
-  'setup.footerNote': {
-    en: 'Your data is encrypted and stored in a file you control — not on our servers.',
-  },
-  'setup.nameRequired': { en: 'Name is required' },
-  'setup.emailRequired': { en: 'Email is required' },
-  'setup.invalidEmail': { en: 'Please enter a valid email address' },
   'setup.fileCreateFailed': {
     en: 'Failed to create file. Please try again.',
   },
-  'setup.encryptionFailed': {
-    en: 'Failed to encrypt file. You can configure encryption later in Settings.',
-  },
 
-  // Auth / Login
-  'auth.signIn': { en: 'Sign In' },
+  // Auth
   'auth.signingIn': { en: 'Signing in...' },
-  'auth.createAccount': { en: 'Create Account' },
   'auth.creatingAccount': { en: 'Creating account...' },
   'auth.signOut': { en: 'Sign Out' },
-  'auth.signInWithAccount': { en: 'Sign In with Account' },
-  'auth.checkEmail': { en: 'Check your email' },
-  'auth.magicLinkSentTo': { en: 'We sent a magic link to' },
-  'auth.magicLinkAction': { en: 'Click the link to sign in.' },
-  'auth.backToSignIn': { en: 'Back to sign in' },
-  'auth.sendMagicLink': { en: 'Send Magic Link' },
-  'auth.sendingMagicLink': { en: 'Sending...' },
-  'auth.signInPassword': { en: 'Sign in with password instead' },
-  'auth.signInMagicLink': { en: 'Sign in with magic link' },
-  'auth.signInPasskey': { en: 'Sign in with passkey' },
-  'auth.continueWithoutAccount': { en: 'Continue without an account' },
-  'auth.enterEmailPassword': { en: 'Please enter your email and password' },
   'auth.fillAllFields': { en: 'Please fill in all fields' },
   'auth.passwordsDoNotMatch': { en: 'Passwords do not match' },
   'auth.passwordMinLength': { en: 'Password must be at least 8 characters' },
-  'auth.needsPassword': { en: 'Set up' },
   'auth.createPasswordPrompt': {
     en: 'Create a password for your account. You will use this to sign in next time.',
   },
   'auth.createPasswordPlaceholder': { en: 'Choose a password (min 8 characters)' },
   'auth.createAndSignIn': { en: 'Create Password & Sign In' },
-  'auth.accountCreated': {
-    en: 'Account created! We sent a verification link to',
-  },
-  'auth.verifyEmail': {
-    en: 'Please click the link in the email to verify your account before signing in.',
-  },
-  'auth.magicLinkFailed': {
-    en: 'Unable to send magic link. Please try signing in with a password.',
-  },
-  'auth.passkeyNotAvailable': {
-    en: 'Passkey sign-in requires server-side infrastructure. This will be available once the backend is deployed.',
-  },
-  'auth.notConfigured': { en: 'Authentication is not configured' },
-  'auth.securityEncrypted': {
-    en: 'Your data is encrypted and stored in a file you control',
-  },
-  'auth.securityNoServers': {
-    en: 'No data is stored on our servers — everything stays on your device',
-  },
-  'auth.securityBackup': {
-    en: 'Back up easily by saving your data file to Google Drive, Dropbox, or any cloud folder',
-  },
   'auth.familyName': { en: 'Family Name' },
   'auth.familyNamePlaceholder': { en: 'The Smith Family' },
   'auth.yourNamePlaceholder': { en: 'John Smith' },
   'auth.passwordPlaceholder': { en: 'At least 8 characters' },
-  'auth.verifyingMagicLink': { en: 'Verifying your magic link...' },
-  'auth.signedInRedirecting': { en: 'Signed in successfully! Redirecting...' },
-  'auth.backToLogin': { en: 'Back to login' },
-  'auth.invalidMagicLink': { en: 'Invalid magic link. Please request a new one.' },
-  'auth.unexpectedState': { en: 'Unexpected authentication state.' },
-  'auth.expiredMagicLink': { en: 'Invalid or expired magic link code.' },
-  'auth.verificationCode': { en: 'Verification code' },
-  'auth.enterVerificationCode': { en: 'Enter the 6-digit code sent to' },
-  'auth.verify': { en: 'Verify' },
-  'auth.verifying': { en: 'Verifying...' },
-  'auth.invalidCode': { en: 'Invalid verification code. Please try again.' },
-  'auth.resendCode': { en: 'Resend code' },
-  'auth.codeSent': { en: 'A new code has been sent to your email.' },
 
   // Common actions (additional)
   'action.ok': { en: 'OK' },
@@ -894,12 +805,6 @@ const STRING_DEFS = {
   'auth.selectMember': { en: 'Select your profile' },
   'auth.enterPassword': { en: 'Please enter your password' },
   'auth.loadingFile': { en: 'counting beans...', beanie: 'counting beans...' },
-  'auth.loadFileFirst': {
-    en: 'Open your family data file to sign in',
-    beanie: 'Open your bean file to get back in the pod',
-  },
-  'auth.openDataFile': { en: 'Open data file' },
-  'auth.switchFamily': { en: 'Switch to a different family' },
   'auth.reconnectFile': {
     en: 'Your data file was found but needs permission to access. Click below to reconnect.',
   },
@@ -919,25 +824,11 @@ const STRING_DEFS = {
   'auth.confirmPassword': { en: 'Confirm password' },
   'auth.confirmPasswordPlaceholder': { en: 'Re-enter your password' },
 
-  // Login redesign — Role selection / Invite
+  // Login — Invite / Join
   'login.inviteAsParent': { en: 'Parent', beanie: 'Big Bean' },
   'login.inviteAsChild': { en: 'Child', beanie: 'Little Bean' },
   'login.inviteRoleLabel': { en: 'Inviting as' },
-  'login.joiningAs': { en: 'Joining as' },
-
-  // Login redesign — Welcome Gate / Join Pod / Invite
-  'login.welcomeTitle': { en: 'Welcome to the family', beanie: 'Welcome to the pod' },
-  'login.welcomeSubtitle': { en: "Your family's finances, together", beanie: 'every bean counts' },
-  'login.signIn': { en: 'Sign in' },
-  'login.createPod': { en: 'Create a new pod' },
-  'login.joinPod': { en: 'Join a pod' },
-  'login.createPodDesc': { en: 'Start a new family pod' },
-  'login.joinPodDesc': { en: "Join your family's existing pod" },
-  'login.backToWelcome': { en: 'Back' },
-  'login.familyCode': { en: 'Family code' },
   'login.familyCodePlaceholder': { en: 'Enter the code from your family' },
-  'login.familyCodeHelp': { en: 'Ask your family admin for the invite code' },
-  'login.joiningPod': { en: 'Joining pod...' },
   'login.inviteTitle': { en: 'Invite family member' },
   'login.inviteDesc': {
     en: 'Share this code with family members so they can join your pod',
