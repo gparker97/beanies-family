@@ -157,7 +157,7 @@ async function handleAddMember() {
     ageGroup: (newMemberRole.value === 'child' ? 'child' : 'adult') as AgeGroup,
     role: 'member' as const,
     color: getNextColor(),
-    requiresPassword: false,
+    requiresPassword: true,
   };
 
   const member = await familyStore.createMember(memberInput);
