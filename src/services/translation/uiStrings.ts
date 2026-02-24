@@ -869,6 +869,8 @@ const STRING_DEFS = {
   'passkey.needsEncryption': {
     en: 'Biometric login requires file encryption to be enabled.',
   },
+  'passkey.rename': { en: 'Rename' },
+  'passkey.renameLabel': { en: 'Device name' },
 
   // Trusted device
   'trust.title': { en: 'Do you trust this device?' },

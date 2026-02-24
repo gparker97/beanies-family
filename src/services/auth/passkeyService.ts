@@ -353,15 +353,45 @@ export async function invalidatePasskeysForPasswordChange(
   }
 }
 
+export async function renamePasskey(credentialId: string, label: string): Promise<void> {
+  await passkeyRepo.updatePasskey(credentialId, { label });
+}
+
 // --- Utility ---
+
+function guessBrowser(ua: string): string {
+  // Order matters — check more specific strings first
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/OPR\/|Opera/.test(ua)) return 'Opera';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Safari\//.test(ua) && !/Chrome/.test(ua)) return 'Safari';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  return 'Browser';
+}
+
+function guessOS(ua: string): string {
+  if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+  if (/Mac/.test(ua)) return 'macOS';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Windows/.test(ua)) return 'Windows';
+  if (/Linux/.test(ua)) return 'Linux';
+  if (/CrOS/.test(ua)) return 'ChromeOS';
+  return '';
+}
 
 function guessAuthenticatorLabel(): string {
   const ua = navigator.userAgent;
-  if (/Mac/.test(ua)) return 'Touch ID';
-  if (/iPhone|iPad/.test(ua)) return 'Face ID';
-  if (/Windows/.test(ua)) return 'Windows Hello';
-  if (/Android/.test(ua)) return 'Fingerprint';
-  return 'Biometric';
+  let base: string;
+  if (/iPhone|iPad|iPod/.test(ua)) base = 'Face ID';
+  else if (/Mac/.test(ua)) base = 'Touch ID';
+  else if (/Windows/.test(ua)) base = 'Windows Hello';
+  else if (/Android/.test(ua)) base = 'Fingerprint';
+  else base = 'Biometric';
+
+  const browser = guessBrowser(ua);
+  const os = guessOS(ua);
+  const context = os ? `${browser}, ${os}` : browser;
+  return `${base} · ${context}`;
 }
 
 function bufferToBase64(buffer: ArrayBuffer): string {
