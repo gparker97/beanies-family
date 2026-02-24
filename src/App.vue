@@ -50,8 +50,12 @@ const isInitializing = ref(true);
 const isMenuOpen = ref(false);
 const showTrustPrompt = ref(false);
 
-function handleTrustDevice() {
-  settingsStore.setTrustedDevice(true);
+async function handleTrustDevice() {
+  await settingsStore.setTrustedDevice(true);
+  // If there's already a session password, cache it for the newly trusted device
+  if (syncStore.currentSessionPassword) {
+    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword);
+  }
   showTrustPrompt.value = false;
 }
 
@@ -107,6 +111,24 @@ async function loadFamilyData() {
       // Auto-sync is always on when file is configured + has permission
       syncStore.setupAutoSync();
       return;
+    }
+
+    // File needs password — try cached password from trusted device
+    if (loadResult.needsPassword) {
+      const cachedPw = settingsStore.getCachedEncryptionPassword();
+      if (cachedPw) {
+        const decryptResult = await syncStore.decryptPendingFile(cachedPw);
+        if (decryptResult.success) {
+          memberFilterStore.initialize();
+          const result = await processRecurringItems();
+          if (result.processed > 0) {
+            await transactionsStore.loadTransactions();
+          }
+          return;
+        }
+        // Cached password was wrong — clear it
+        await settingsStore.clearCachedEncryptionPassword();
+      }
     }
   }
 

@@ -46,6 +46,7 @@ export const useSyncStore = defineStore('sync', () => {
   });
 
   const hasSessionPassword = computed(() => sessionPassword.value !== null);
+  const currentSessionPassword = computed(() => sessionPassword.value);
 
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
 
@@ -323,6 +324,10 @@ export const useSyncStore = defineStore('sync', () => {
         lastSyncTimestamp: lastSync.value,
       });
 
+      // Cache password on trusted devices so it survives page refresh
+      const settingsStore = useSettingsStore();
+      await settingsStore.cacheEncryptionPassword(password);
+
       // Reload all stores after import
       await reloadAllStores();
 
@@ -361,6 +366,8 @@ export const useSyncStore = defineStore('sync', () => {
     if (success) {
       lastSync.value = toISODateString(new Date());
       await saveSettings({ lastSyncTimestamp: lastSync.value });
+      // Cache password on trusted devices
+      await settingsStore.cacheEncryptionPassword(password);
     } else {
       // Rollback on failure
       sessionPassword.value = null;
@@ -429,6 +436,10 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = null;
     sessionPassword.value = null;
     syncService.setSessionPassword(null);
+
+    // Clear cached encryption password
+    const settingsStore = useSettingsStore();
+    await settingsStore.clearCachedEncryptionPassword();
     // Do NOT reset encryptionEnabled — it should persist as a user preference.
     // When reconnecting to the same or a new encrypted file, the setting
     // will already be correct and won't cause a plaintext write window.
@@ -549,6 +560,7 @@ export const useSyncStore = defineStore('sync', () => {
     syncStatus,
     isEncryptionEnabled,
     hasSessionPassword,
+    currentSessionPassword,
     hasPendingEncryptedFile,
     // Actions
     initialize,

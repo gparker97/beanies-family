@@ -35,6 +35,7 @@ export interface GlobalSettings {
   soundEnabled?: boolean;
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
+  cachedEncryptionPassword?: string | null;
 }
 
 // Family member gender and age group for avatar selection
