@@ -17,7 +17,7 @@ npm run translate zh
 ### What It Does
 
 1. **Reads source strings** from `src/services/translation/uiStrings.ts`
-2. **Compares** with existing translations in `src/services/translation/translations/{language}.json`
+2. **Compares** with existing translations in `public/translations/{language}.json`
 3. **Identifies** missing or outdated translations (based on hash)
 4. **Fetches** translations from MyMemory API
 5. **Updates** the JSON file with new translations
@@ -32,7 +32,7 @@ npm run translate zh
 
 ### Output
 
-The script updates: `src/services/translation/translations/{language}.json`
+The script updates: `public/translations/{language}.json`
 
 Example output:
 
@@ -61,7 +61,7 @@ Example output:
 💾 Saving translation file...
 
 ✅ Successfully updated 37 translations!
-   File: src/services/translation/translations/zh.json
+   File: public/translations/zh.json
    Total translations: 287/287
 
 📝 Next steps:

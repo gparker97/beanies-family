@@ -28,7 +28,7 @@ export interface TranslationEntry {
  */
 export async function loadTranslationFile(language: LanguageCode): Promise<TranslationFile | null> {
   try {
-    const response = await fetch(`/src/services/translation/translations/${language}.json`);
+    const response = await fetch(`/translations/${language}.json`);
     if (!response.ok) {
       return null;
     }

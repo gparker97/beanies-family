@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-23
-> **Updated by:** Claude (critical encryption security fix #84, family role display fix)
+> **Last updated:** 2026-02-24
+> **Updated by:** Claude (PWA functionality #6, mobile language spinner fix, E2E TrustDeviceModal fix)
 
 ## Current Phase
 
@@ -336,6 +336,21 @@
   - ReportsPage: `w-64`/`w-48`/`w-40` → `w-full md:w-*` (4 fixed-width selects)
   - FamilyPage: `grid-cols-2`/`grid-cols-3` → responsive variants (4 form grids)
 
+### PWA Functionality (Issue #6) — Closed
+
+- **`index.html`** — Added PWA meta tags: `theme-color` (with dark mode media variant), `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title`, `description`
+- **`vite.config.ts`** — Completed manifest (`start_url`, `scope`, `orientation`, `categories`); changed `registerType` from `autoUpdate` to `prompt` for user-controlled SW updates
+- **`src/composables/useOnline.ts`** — Singleton reactive `isOnline` ref with `online`/`offline` event listeners
+- **`src/composables/usePWA.ts`** — `canInstall`, `isInstalled`, `installApp()`, `dismissInstallPrompt()` with 7-day localStorage dismissal persistence; `beforeinstallprompt` handling, standalone mode detection
+- **`src/components/common/OfflineBanner.vue`** — Heritage Orange slide-down banner when offline ("You're offline — changes are saved locally"), `aria-live="polite"`
+- **`src/components/common/InstallPrompt.vue`** — Dismissible install card shown 30s after page load with brand icon, install/dismiss buttons, bottom-positioned on mobile, bottom-right on desktop
+- **`src/components/common/UpdatePrompt.vue`** — Deep Slate banner using `useRegisterSW` from `virtual:pwa-register/vue` with "Update now" / "Later" buttons, hourly background update checks
+- **Settings page** — "Install App" card section visible when installable or already installed (green checkmark)
+- **`MobileHamburgerMenu.vue`** — Added loading spinner to mobile language selector (was missing visual feedback during translation)
+- 12 new i18n keys with beanie mode overrides (`pwa.*`, `settings.installApp*`)
+- 4 new test files (19 tests): useOnline, usePWA, OfflineBanner, MobileBottomNav
+- **E2E fix** — TrustDeviceModal dismissed in auth helper to prevent pointer event interception in CI
+
 ### Count-Up Animation for All Summary Cards
 
 - **`src/composables/useAnimatedCurrency.ts`** — Reusable composable wrapping `useCountUp` + `convertToDisplay` + `formatCurrencyWithCode` + privacy mode masking. Returns `{ formatted, displayValue }`. When privacy mode is on, target drops to 0 so revealing figures triggers a fresh count-up from zero
@@ -505,7 +520,7 @@ Existing issues updated with v5/v6 references: #60, #61, #62, #69.
 
 - [ ] Budget page with category budgets and spending vs planned (#68)
 - [ ] Data import/export (CSV, etc.)
-- [ ] PWA offline support (service worker)
+- [x] PWA offline support / install prompt / SW update prompt (#6) ✓
 - [ ] Google Drive sync (OAuth integration)
 - [ ] Skip/modify individual recurring occurrences
 - [ ] Landing/marketing page (#72)
@@ -565,3 +580,5 @@ _(None currently tracked)_
 | 2026-02-22 | Post-sign-in redirect checks onboarding status             | New users redirected to /setup instead of /dashboard; direct DB read after sign-in for reliability                        |
 | 2026-02-22 | Login page UI redesign per v6 wireframes (#69)             | 5-view flow (welcome/load-pod/pick-bean/create/join), legacy SetupPage removed, /welcome dedicated route                  |
 | 2026-02-23 | Encryption pipeline security hardening (#84)               | 7 bugs fixed: defense-in-depth guards prevent plaintext writes when encryption is enabled                                 |
+| 2026-02-24 | PWA functionality complete (#6)                            | Offline banner, install prompt (30s delay, 7-day dismiss), SW update prompt, manifest completion, meta tags               |
+| 2026-02-24 | SW registerType changed to `prompt`                        | User-controlled updates instead of silent auto-update; hourly background check for new versions                           |
