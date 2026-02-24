@@ -233,9 +233,10 @@ export const useSyncStore = defineStore('sync', () => {
     const result = await syncService.openAndLoadFile();
 
     // If file needs password, store it for later decryption
-    if (result.needsPassword && result.fileHandle && result.rawSyncData) {
+    // On mobile there's no fileHandle, so we use an empty placeholder
+    if (result.needsPassword && result.rawSyncData) {
       pendingEncryptedFile.value = {
-        fileHandle: result.fileHandle,
+        fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
         rawSyncData: result.rawSyncData,
       };
       return { success: false, needsPassword: true };
