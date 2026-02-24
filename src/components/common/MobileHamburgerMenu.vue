@@ -268,20 +268,45 @@ const encryptionLabel = computed(() => {
                   :key="lang.code"
                   type="button"
                   class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[0.75rem] transition-colors"
-                  :class="
+                  :class="[
                     lang.code === settingsStore.language
                       ? 'bg-[#F15D22]/20 text-white'
-                      : 'text-white/40 hover:bg-white/[0.05] hover:text-white/60'
-                  "
+                      : 'text-white/40 hover:bg-white/[0.05] hover:text-white/60',
+                    translationStore.isLoading ? 'pointer-events-none opacity-50' : '',
+                  ]"
+                  :disabled="translationStore.isLoading"
                   @click="selectLanguage(lang.code)"
                 >
-                  <img
-                    v-if="lang.flagIcon"
-                    :src="lang.flagIcon"
-                    :alt="lang.name"
-                    class="h-4 w-5 rounded-sm object-cover"
-                  />
-                  <span v-else class="text-sm">{{ lang.flag }}</span>
+                  <!-- Loading spinner on active language -->
+                  <svg
+                    v-if="translationStore.isLoading && lang.code === settingsStore.language"
+                    class="h-4 w-4 animate-spin text-[#F15D22]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    />
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  <template v-else>
+                    <img
+                      v-if="lang.flagIcon"
+                      :src="lang.flagIcon"
+                      :alt="lang.name"
+                      class="h-4 w-5 rounded-sm object-cover"
+                    />
+                    <span v-else class="text-sm">{{ lang.flag }}</span>
+                  </template>
                   <span>{{ lang.nativeName }}</span>
                 </button>
               </div>
