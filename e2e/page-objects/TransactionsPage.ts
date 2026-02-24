@@ -37,7 +37,7 @@ export class TransactionsPage {
       await this.page.getByLabel('Category').selectOption(data.category);
     }
     await this.page.getByRole('button', { name: 'Add Transaction' }).last().click();
-    await expect(this.page.getByRole('dialog')).not.toBeVisible();
+    await expect(this.page.locator('[role="dialog"]')).toHaveCount(0);
   }
 
   async getTransactionCount(): Promise<number> {

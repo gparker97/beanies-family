@@ -72,7 +72,7 @@ export class AssetsPage {
     } catch {
       // No celebration modal appeared — that's fine
     }
-    await expect(this.page.getByRole('dialog')).not.toBeVisible();
+    await expect(this.page.locator('[role="dialog"]')).toHaveCount(0);
   }
 
   async getAssetCount(): Promise<number> {

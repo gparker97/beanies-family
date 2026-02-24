@@ -58,7 +58,7 @@ test.describe('Account Institution Combobox', () => {
     } catch {
       // No celebration modal
     }
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
 
     const card = page.locator('[data-testid="account-card"]');
     await expect(card).toContainText('HSBC');
@@ -131,7 +131,7 @@ test.describe('Account Institution Combobox', () => {
 
     // Save edit
     await page.getByTestId('save-edit-btn').click();
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
 
     // Verify card updated
     const card = page.locator('[data-testid="account-card"]');
