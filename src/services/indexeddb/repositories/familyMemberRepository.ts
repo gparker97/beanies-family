@@ -13,7 +13,7 @@ function applyDefaults(member: FamilyMember): FamilyMember {
     ...member,
     gender: member.gender ?? 'other',
     ageGroup: member.ageGroup ?? 'adult',
-    requiresPassword: member.requiresPassword ?? !member.passwordHash,
+    requiresPassword: member.passwordHash ? false : (member.requiresPassword ?? true),
   };
 }
 
