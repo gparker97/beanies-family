@@ -92,7 +92,7 @@ resource "aws_lambda_function" "registry" {
     variables = {
       TABLE_NAME       = aws_dynamodb_table.registry.name
       REGISTRY_API_KEY = var.api_key
-      CORS_ORIGIN      = var.cors_origin
+      CORS_ORIGIN      = join(",", var.cors_origins)
     }
   }
 
@@ -109,7 +109,7 @@ resource "aws_apigatewayv2_api" "registry" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    allow_origins = [var.cors_origin]
+    allow_origins = var.cors_origins
     allow_methods = ["GET", "PUT", "DELETE", "OPTIONS"]
     allow_headers = ["Content-Type", "x-api-key"]
     max_age       = 86400

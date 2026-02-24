@@ -7,8 +7,10 @@ import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { timeAgo } from '@/utils/date';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
+import { useSyncStore } from '@/stores/syncStore';
 import type {
   CreateFamilyMemberInput,
   FamilyMember,
@@ -19,6 +21,7 @@ import type {
 
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
+const syncStore = useSyncStore();
 const { t } = useTranslation();
 
 const showAddModal = ref(false);
@@ -31,14 +34,15 @@ const showInviteModal = ref(false);
 const inviteCopiedCode = ref(false);
 const inviteCopiedLink = ref(false);
 
-const inviteRole = ref<'parent' | 'child'>('parent');
 const inviteCode = computed(() => familyContextStore.activeFamilyId ?? '');
-const inviteLink = computed(
-  () => `${window.location.origin}/join?code=${inviteCode.value}&role=${inviteRole.value}`
-);
+const inviteLink = computed(() => {
+  const fam = inviteCode.value;
+  const p = 'local';
+  const ref = syncStore.fileName ? btoa(syncStore.fileName) : '';
+  return `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${ref}`;
+});
 
 function openInviteModal() {
-  inviteRole.value = 'parent';
   inviteCopiedCode.value = false;
   inviteCopiedLink.value = false;
   showInviteModal.value = true;
@@ -65,6 +69,22 @@ async function copyInviteLink() {
     }, 2000);
   } catch {
     // fallback
+  }
+}
+
+// Per-member invite copy feedback
+const copiedMemberId = ref<string | null>(null);
+
+async function copyMemberInviteLink(memberId: string) {
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    copiedMemberId.value = memberId;
+    setTimeout(() => {
+      copiedMemberId.value = null;
+    }, 2000);
+  } catch {
+    // fallback — open the invite modal instead
+    openInviteModal();
   }
 }
 
@@ -173,8 +193,26 @@ const editMember = ref({
 const editDobMonth = ref('1');
 const editDobDay = ref('1');
 const editDobYear = ref('');
+const editModalCopied = ref(false);
+
+const editingMemberFull = computed(() =>
+  editingMemberId.value ? familyStore.members.find((m) => m.id === editingMemberId.value) : null
+);
+
+async function copyEditModalInviteLink() {
+  try {
+    await navigator.clipboard.writeText(inviteLink.value);
+    editModalCopied.value = true;
+    setTimeout(() => {
+      editModalCopied.value = false;
+    }, 2000);
+  } catch {
+    // ignore
+  }
+}
 
 function openEditModal(member: FamilyMember) {
+  editModalCopied.value = false;
   editingMemberId.value = member.id;
   editMember.value = {
     name: member.name,
@@ -335,8 +373,48 @@ function cancelEditFamilyName() {
             <p class="truncate text-sm text-gray-500 dark:text-gray-400">
               {{ member.email }}
             </p>
+            <!-- Status badge -->
+            <div class="mt-1.5 flex items-center gap-2">
+              <span
+                v-if="member.requiresPassword"
+                class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                {{ t('family.status.waitingToJoin') }}
+              </span>
+              <template v-else>
+                <span
+                  class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                >
+                  <span class="h-1.5 w-1.5 rounded-full bg-green-500" />
+                  {{ t('family.status.active') }}
+                </span>
+                <span class="text-xs text-gray-400 dark:text-gray-500">
+                  {{
+                    member.lastLoginAt
+                      ? t('family.lastSeen').replace('{date}', timeAgo(member.lastLoginAt))
+                      : t('family.neverLoggedIn')
+                  }}
+                </span>
+              </template>
+            </div>
+            <!-- Copied feedback -->
+            <p
+              v-if="copiedMemberId === member.id"
+              class="mt-1 text-xs font-medium text-green-600 dark:text-green-400"
+            >
+              {{ t('family.linkCopied') }}
+            </p>
           </div>
           <div class="flex flex-shrink-0 gap-1">
+            <button
+              v-if="member.requiresPassword"
+              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
+              :title="t('family.copyInviteLinkHint')"
+              @click="copyMemberInviteLink(member.id)"
+            >
+              <BeanieIcon name="copy" size="md" />
+            </button>
             <button
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
               :title="t('family.editMember')"
@@ -551,6 +629,36 @@ function cancelEditFamilyName() {
             />
           </div>
         </div>
+
+        <!-- Invite section (only for unclaimed members) -->
+        <div
+          v-if="editingMemberFull?.requiresPassword"
+          class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-900/20"
+        >
+          <h4 class="mb-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+            {{ t('family.inviteSection.title') }}
+          </h4>
+          <p class="mb-3 text-sm text-amber-800 dark:text-amber-300">
+            {{ t('family.inviteSection.desc') }}
+          </p>
+          <ol
+            class="mb-4 list-inside list-decimal space-y-1 text-sm text-amber-700 dark:text-amber-300/90"
+          >
+            <li>{{ t('family.inviteSection.step1') }}</li>
+            <li>{{ t('family.inviteSection.step2') }}</li>
+            <li>{{ t('family.inviteSection.step3') }}</li>
+          </ol>
+          <div class="flex items-center gap-2">
+            <code
+              class="flex-1 truncate rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs text-gray-900 select-all dark:border-amber-700 dark:bg-slate-800 dark:text-gray-100"
+            >
+              {{ inviteLink }}
+            </code>
+            <BaseButton variant="secondary" @click="copyEditModalInviteLink">
+              {{ editModalCopied ? t('login.copied') : t('login.copyLink') }}
+            </BaseButton>
+          </div>
+        </div>
       </form>
 
       <template #footer>
@@ -576,40 +684,24 @@ function cancelEditFamilyName() {
           {{ t('login.inviteDesc') }}
         </p>
 
-        <!-- Role Toggle -->
+        <!-- Shareable Link -->
         <div>
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('login.inviteRoleLabel') }}
+            {{ t('login.inviteLink') }}
           </label>
-          <div class="inline-flex rounded-lg border border-gray-200 dark:border-slate-600">
-            <button
-              type="button"
-              class="rounded-l-lg px-4 py-2 text-sm font-medium transition-colors"
-              :class="
-                inviteRole === 'parent'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700'
-              "
-              @click="inviteRole = 'parent'"
+          <div class="flex items-center gap-2">
+            <code
+              class="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
             >
-              {{ t('login.inviteAsParent') }}
-            </button>
-            <button
-              type="button"
-              class="rounded-r-lg px-4 py-2 text-sm font-medium transition-colors"
-              :class="
-                inviteRole === 'child'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:text-gray-300 dark:hover:bg-slate-700'
-              "
-              @click="inviteRole = 'child'"
-            >
-              {{ t('login.inviteAsChild') }}
-            </button>
+              {{ inviteLink }}
+            </code>
+            <BaseButton variant="secondary" @click="copyInviteLink">
+              {{ inviteCopiedLink ? t('login.copied') : t('login.copyLink') }}
+            </BaseButton>
           </div>
         </div>
 
-        <!-- Family Code -->
+        <!-- Family Code (manual fallback) -->
         <div>
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('login.inviteCode') }}
@@ -626,21 +718,28 @@ function cancelEditFamilyName() {
           </div>
         </div>
 
-        <!-- Shareable Link -->
-        <div>
-          <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('login.inviteLink') }}
-          </label>
-          <div class="flex items-center gap-2">
-            <code
-              class="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+        <!-- File sharing info card -->
+        <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 dark:bg-amber-900/20">
+          <div
+            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-amber-100 dark:bg-amber-800/30"
+          >
+            <svg
+              class="h-4 w-4 text-amber-600 dark:text-amber-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {{ inviteLink }}
-            </code>
-            <BaseButton variant="secondary" @click="copyInviteLink">
-              {{ inviteCopiedLink ? t('login.copied') : t('login.copyLink') }}
-            </BaseButton>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
           </div>
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            {{ t('join.shareFileNote') }}
+          </p>
         </div>
       </div>
 

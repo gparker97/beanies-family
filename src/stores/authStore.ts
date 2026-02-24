@@ -106,6 +106,10 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = true;
       familyStore.setCurrentMember(member.id);
 
+      // Track last login timestamp
+      const now = toISODateString(new Date());
+      familyStore.updateMember(member.id, { lastLoginAt: now });
+
       return { success: true };
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Sign in failed';
@@ -224,6 +228,55 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Join an existing family as a pre-created member.
+   * Sets the member's password, creates a UserFamilyMapping, and marks onboarding complete.
+   */
+  async function joinFamily(params: {
+    memberId: string;
+    password: string;
+    familyId: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      // Set password (this also auto-signs in and sets currentMember)
+      const result = await setPassword(params.memberId, params.password);
+      if (!result.success) return result;
+
+      // Create UserFamilyMapping in registry DB
+      const familyStore = useFamilyStore();
+
+      // Track last login timestamp for the newly joined member
+      const now = toISODateString(new Date());
+      await familyStore.updateMember(params.memberId, { lastLoginAt: now });
+
+      const member = familyStore.members.find((m) => m.id === params.memberId);
+      const registryDb = await getRegistryDatabase();
+      await registryDb.add('userFamilyMappings', {
+        id: generateUUID(),
+        email: member?.email ?? '',
+        familyId: params.familyId,
+        familyRole: member?.role === 'owner' ? 'owner' : 'member',
+        memberId: params.memberId,
+        lastActiveAt: toISODateString(new Date()),
+      });
+
+      // Mark onboarding as completed
+      const settingsStore = useSettingsStore();
+      await settingsStore.setOnboardingCompleted(true);
+
+      return { success: true };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to join family';
+      error.value = message;
+      return { success: false, error: message };
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /**
    * Sign out: reset auth state and optionally delete IndexedDB cache.
    * File handle is preserved so next login auto-reconnects to the data file.
    */
@@ -308,6 +361,7 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signUp,
     setPassword,
+    joinFamily,
     signOut,
     signOutAndClearData,
     restoreE2EAuth,

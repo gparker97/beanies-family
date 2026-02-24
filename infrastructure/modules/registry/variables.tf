@@ -24,8 +24,8 @@ variable "api_key" {
   sensitive   = true
 }
 
-variable "cors_origin" {
-  description = "Allowed CORS origin"
-  type        = string
-  default     = "https://beanies.family"
+variable "cors_origins" {
+  description = "Allowed CORS origins"
+  type        = list(string)
+  default     = ["https://beanies.family", "http://localhost:5173"]
 }
