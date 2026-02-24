@@ -3,13 +3,15 @@
  * Translation Update Script
  *
  * Automatically updates translation JSON files by:
- * 1. Reading English source strings from uiStrings.ts
+ * 1. Reading English source strings from uiStrings.ts (STRING_DEFS)
  * 2. Comparing with existing translations
  * 3. Fetching missing/outdated translations from API
- * 4. Updating the translation JSON files
+ * 4. Removing stale keys no longer in STRING_DEFS
+ * 5. Updating the translation JSON files
  *
- * Usage: node scripts/updateTranslations.mjs [language]
- * Example: node scripts/updateTranslations.mjs zh
+ * Usage:
+ *   node scripts/updateTranslations.mjs --all     # Translate all languages (default)
+ *   node scripts/updateTranslations.mjs zh         # Translate a single language
  */
 
 import fs from 'fs';
@@ -23,7 +25,8 @@ const __dirname = path.dirname(__filename);
 const MYMEMORY_API_URL = 'https://api.mymemory.translated.net/get';
 const REQUEST_DELAY_MS = 250; // Delay between requests
 
-// Language configuration
+// Language configuration — single source of truth for all supported languages.
+// To add a new language: add an entry here + create `npm run translate:<code>` in package.json.
 const LANGUAGES = {
   zh: {
     code: 'zh',
@@ -53,39 +56,71 @@ function hashString(str) {
 }
 
 /**
- * Parse UI_STRINGS from uiStrings.ts
+ * Parse STRING_DEFS from uiStrings.ts
+ *
+ * Extracts all { en: '...' } entries from the STRING_DEFS object.
+ * Ignores optional 'beanie' fields — only the 'en' value is needed.
+ *
+ * Uses a line-by-line approach to handle values containing `{` and `}`
+ * characters (e.g. 'Must be at least {min} characters').
  */
 function parseUIStrings() {
   const filePath = path.join(__dirname, '../src/services/translation/uiStrings.ts');
   const content = fs.readFileSync(filePath, 'utf-8');
 
-  // Extract UI_STRINGS object
-  const match = content.match(/export const UI_STRINGS = \{([\s\S]*?)\} as const;/);
-  if (!match) {
-    throw new Error('Could not parse UI_STRINGS from uiStrings.ts');
+  // Verify STRING_DEFS exists
+  if (!content.includes('const STRING_DEFS')) {
+    throw new Error(
+      'Could not find STRING_DEFS in uiStrings.ts. Expected `const STRING_DEFS = { ... } satisfies Record<string, StringEntry>`.'
+    );
   }
 
-  const stringsContent = match[1];
+  const lines = content.split('\n');
   const strings = {};
+  let currentKey = null;
+  let inStringDefs = false;
 
-  // Parse key-value pairs using regex
-  // Matches patterns like: 'key': 'value' or "key": "value"
-  const regex = /['"]([^'"]+)['"]\s*:\s*['"]([^'"\\]*(\\.[^'"\\]*)*)['"]/g;
-  let regexMatch;
+  for (const line of lines) {
+    // Detect start/end of STRING_DEFS block
+    if (line.includes('const STRING_DEFS')) {
+      inStringDefs = true;
+      continue;
+    }
+    if (inStringDefs && line.match(/^\}\s*satisfies/)) {
+      break;
+    }
+    if (!inStringDefs) continue;
 
-  while ((regexMatch = regex.exec(stringsContent)) !== null) {
-    const key = regexMatch[1];
-    const text = regexMatch[2];
-    strings[key] = {
-      text,
-      hash: hashString(text),
-    };
+    // Match a key line: 'some.key': { ... or 'some.key': {
+    const keyMatch = line.match(/^\s+'([^']+)'\s*:\s*\{/);
+    if (keyMatch) {
+      currentKey = keyMatch[1];
+    }
+
+    // Match en value on same or subsequent line (single-quoted)
+    if (currentKey) {
+      const enSingle = line.match(/en\s*:\s*'((?:[^'\\]|\\.)*)'/);
+      if (enSingle) {
+        const text = enSingle[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+        strings[currentKey] = { text, hash: hashString(text) };
+        currentKey = null;
+        continue;
+      }
+      // Double-quoted en value
+      const enDouble = line.match(/en\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if (enDouble) {
+        const text = enDouble[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+        strings[currentKey] = { text, hash: hashString(text) };
+        currentKey = null;
+        continue;
+      }
+    }
   }
 
-  console.log(`   Parsed ${Object.keys(strings).length} strings`);
+  console.log(`   Parsed ${Object.keys(strings).length} strings from STRING_DEFS`);
 
   if (Object.keys(strings).length === 0) {
-    throw new Error('Failed to parse any strings from uiStrings.ts. Check the file format.');
+    throw new Error('Failed to parse any strings from uiStrings.ts. Check the STRING_DEFS format.');
   }
 
   return strings;
@@ -137,12 +172,11 @@ async function translate(text, targetLang) {
     const data = await response.json();
 
     if (data.responseStatus !== 200) {
-      console.warn(`Translation failed for "${text}": ${data.responseDetails}`);
+      console.warn(`   ⚠ Translation failed for "${text}": ${data.responseDetails}`);
       return text; // Fallback to original
     }
 
     // Decode HTML entities
-    const textarea = { innerHTML: data.responseData.translatedText };
     const decoded = data.responseData.translatedText
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
@@ -152,31 +186,48 @@ async function translate(text, targetLang) {
 
     return decoded;
   } catch (error) {
-    console.error(`Error translating "${text}":`, error.message);
+    console.error(`   ✗ Error translating "${text}":`, error.message);
     return text; // Fallback to original
   }
 }
 
 /**
- * Main update function
+ * Remove stale keys from translation file that no longer exist in STRING_DEFS.
+ * Returns the number of keys removed.
  */
-async function updateTranslations(language) {
-  console.log(`\n🌐 Updating translations for: ${LANGUAGES[language].name} (${language})\n`);
+function removeStaleKeys(translationFile, sourceStrings) {
+  const validKeys = new Set(Object.keys(sourceStrings));
+  const staleKeys = Object.keys(translationFile.translations).filter((key) => !validKeys.has(key));
 
-  // Step 1: Parse source strings
-  console.log('📖 Reading source strings from uiStrings.ts...');
-  const sourceStrings = parseUIStrings();
+  for (const key of staleKeys) {
+    delete translationFile.translations[key];
+  }
+
+  return staleKeys.length;
+}
+
+/**
+ * Update translations for a single language.
+ * Returns { translated, staleRemoved, total, upToDate } counts.
+ */
+async function updateTranslations(language, sourceStrings) {
+  console.log(`\n🌐 ${LANGUAGES[language].name} (${language})`);
+  console.log(`${'─'.repeat(40)}`);
+
   const totalKeys = Object.keys(sourceStrings).length;
-  console.log(`   Found ${totalKeys} strings\n`);
 
-  // Step 2: Load existing translations
-  console.log('📂 Loading existing translation file...');
+  // Load existing translations
   const translationFile = loadTranslationFile(language);
   const existingCount = Object.keys(translationFile.translations).length;
-  console.log(`   Found ${existingCount} existing translations\n`);
+  console.log(`   Existing: ${existingCount} translations`);
 
-  // Step 3: Find missing or outdated translations
-  console.log('🔍 Checking for missing or outdated translations...');
+  // Remove stale keys
+  const staleRemoved = removeStaleKeys(translationFile, sourceStrings);
+  if (staleRemoved > 0) {
+    console.log(`   Removed ${staleRemoved} stale key(s)`);
+  }
+
+  // Find missing or outdated translations
   const toTranslate = [];
 
   for (const [key, { text, hash }] of Object.entries(sourceStrings)) {
@@ -189,18 +240,26 @@ async function updateTranslations(language) {
     }
   }
 
-  console.log(`   Missing: ${toTranslate.filter((t) => t.reason === 'missing').length}`);
-  console.log(`   Outdated: ${toTranslate.filter((t) => t.reason === 'outdated').length}`);
-  console.log(`   Total to translate: ${toTranslate.length}\n`);
+  const missing = toTranslate.filter((t) => t.reason === 'missing').length;
+  const outdated = toTranslate.filter((t) => t.reason === 'outdated').length;
 
   if (toTranslate.length === 0) {
-    console.log('✅ All translations are up to date!\n');
-    return;
+    console.log(`   ✅ All ${totalKeys} translations up to date`);
+    // Still save if stale keys were removed
+    if (staleRemoved > 0) {
+      translationFile.meta.lastUpdated = new Date().toISOString().split('T')[0];
+      translationFile.meta.translationCount = Object.keys(translationFile.translations).length;
+      saveTranslationFile(language, translationFile);
+      console.log(`   💾 Saved (stale keys removed)`);
+    }
+    return { translated: 0, staleRemoved, total: totalKeys, upToDate: true };
   }
 
-  // Step 4: Translate missing/outdated strings
-  console.log(`🔄 Translating ${toTranslate.length} strings (this may take a few minutes)...\n`);
+  console.log(
+    `   Missing: ${missing} | Outdated: ${outdated} | To translate: ${toTranslate.length}`
+  );
 
+  // Translate missing/outdated strings
   let completed = 0;
   for (const { key, text, hash, reason } of toTranslate) {
     const translation = await translate(text, language);
@@ -223,20 +282,14 @@ async function updateTranslations(language) {
     }
   }
 
-  // Step 5: Update metadata and save
-  console.log('\n💾 Saving translation file...');
+  // Update metadata and save
   translationFile.meta.lastUpdated = new Date().toISOString().split('T')[0];
   translationFile.meta.translationCount = Object.keys(translationFile.translations).length;
-
   saveTranslationFile(language, translationFile);
 
-  console.log(`\n✅ Successfully updated ${toTranslate.length} translations!`);
-  console.log(`   File: public/translations/${language}.json`);
-  console.log(`   Total translations: ${translationFile.meta.translationCount}/${totalKeys}\n`);
-  console.log('📝 Next steps:');
-  console.log('   1. Review the changes in the JSON file');
-  console.log('   2. Commit the updated translation file to git');
-  console.log('   3. Test the translations in the app\n');
+  console.log(`   💾 Saved: ${translationFile.meta.translationCount}/${totalKeys} translations`);
+
+  return { translated: toTranslate.length, staleRemoved, total: totalKeys, upToDate: false };
 }
 
 /**
@@ -244,25 +297,74 @@ async function updateTranslations(language) {
  */
 async function main() {
   const args = process.argv.slice(2);
-  const language = args[0] || 'zh';
 
-  if (!LANGUAGES[language]) {
-    console.error(`\n❌ Error: Unknown language "${language}"`);
-    console.error(`   Supported languages: ${Object.keys(LANGUAGES).join(', ')}\n`);
-    process.exit(1);
+  // Determine which languages to translate
+  let languagesToTranslate;
+
+  if (args.length === 0 || args[0] === '--all') {
+    // Default: translate all languages
+    languagesToTranslate = Object.keys(LANGUAGES);
+  } else {
+    const language = args[0];
+    if (!LANGUAGES[language]) {
+      console.error(`\n❌ Error: Unknown language "${language}"`);
+      console.error(`   Supported languages: ${Object.keys(LANGUAGES).join(', ')}`);
+      console.error(`   Use --all to translate all languages\n`);
+      process.exit(1);
+    }
+    languagesToTranslate = [language];
   }
 
-  try {
-    await updateTranslations(language);
-  } catch (error) {
-    console.error('\n❌ Error:', error.message);
-    console.error(error.stack);
+  console.log(`\n📖 Reading source strings from uiStrings.ts...`);
+  const sourceStrings = parseUIStrings();
+  const totalKeys = Object.keys(sourceStrings).length;
+  console.log(`   Found ${totalKeys} source strings\n`);
+
+  console.log(
+    `🌍 Translating ${languagesToTranslate.length} language(s): ${languagesToTranslate.join(', ')}`
+  );
+
+  // Track results for summary
+  const results = {};
+  let hasErrors = false;
+
+  for (const lang of languagesToTranslate) {
+    try {
+      results[lang] = await updateTranslations(lang, sourceStrings);
+    } catch (error) {
+      console.error(`\n   ❌ Error processing ${lang}: ${error.message}`);
+      hasErrors = true;
+      results[lang] = { error: error.message };
+    }
+  }
+
+  // Print summary
+  console.log(`\n${'═'.repeat(50)}`);
+  console.log(`📊 Translation Summary`);
+  console.log(`${'═'.repeat(50)}`);
+  console.log(`   Source strings: ${totalKeys}`);
+
+  for (const [lang, result] of Object.entries(results)) {
+    if (result.error) {
+      console.log(`   ${LANGUAGES[lang].name} (${lang}): ❌ Error — ${result.error}`);
+    } else if (result.upToDate && result.staleRemoved === 0) {
+      console.log(`   ${LANGUAGES[lang].name} (${lang}): ✅ Up to date`);
+    } else {
+      const parts = [];
+      if (result.translated > 0) parts.push(`${result.translated} translated`);
+      if (result.staleRemoved > 0) parts.push(`${result.staleRemoved} stale removed`);
+      console.log(`   ${LANGUAGES[lang].name} (${lang}): ${parts.join(', ')}`);
+    }
+  }
+
+  console.log(`${'═'.repeat(50)}\n`);
+
+  if (hasErrors) {
     process.exit(1);
   }
 }
 
 // Run if called directly
-// Always run when this script is executed
 main().catch((error) => {
   console.error('\n❌ Fatal error:', error.message);
   process.exit(1);

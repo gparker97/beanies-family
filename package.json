@@ -17,7 +17,7 @@
     "test:e2e:firefox": "playwright test --project=firefox",
     "test:e2e:webkit": "playwright test --project=webkit",
     "test:e2e:report": "playwright show-report",
-    "translate": "node scripts/updateTranslations.mjs",
+    "translate": "node scripts/updateTranslations.mjs --all",
     "translate:zh": "node scripts/updateTranslations.mjs zh",
     "lint": "npm run lint:eslint && npm run lint:style",
     "lint:eslint": "eslint .",

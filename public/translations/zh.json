@@ -2,19 +2,19 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-02-10",
-    "translationCount": 287
+    "lastUpdated": "2026-02-24",
+    "translationCount": 655
   },
   "translations": {
     "app.name": {
-      "translation": "全科医生家庭计划员",
-      "hash": "26sbf7",
-      "lastUpdated": "2026-02-10"
+      "translation": "beanies.family",
+      "hash": "1i3nyj",
+      "lastUpdated": "2026-02-24"
     },
     "app.tagline": {
-      "translation": "智能财务规划",
-      "hash": "hyfuaz",
-      "lastUpdated": "2026-02-10"
+      "translation": "每一颗豆子都很重要",
+      "hash": "13n1gv",
+      "lastUpdated": "2026-02-24"
     },
     "app.version": {
       "translation": "v1.0.0 - MVP",
@@ -147,9 +147,9 @@
       "lastUpdated": "2026-02-10"
     },
     "nav.family": {
-      "translation": "科",
-      "hash": "yohf9g",
-      "lastUpdated": "2026-02-10"
+      "translation": "家庭中心",
+      "hash": "ovna2v",
+      "lastUpdated": "2026-02-24"
     },
     "nav.settings": {
       "translation": "设置",
@@ -262,9 +262,9 @@
       "lastUpdated": "2026-02-10"
     },
     "dashboard.netWorth": {
-      "translation": "净值",
-      "hash": "pp2nez",
-      "lastUpdated": "2026-02-10"
+      "translation": "家庭净值",
+      "hash": "h7lb3j",
+      "lastUpdated": "2026-02-24"
     },
     "dashboard.assets": {
       "translation": "资产",
@@ -362,9 +362,9 @@
       "lastUpdated": "2026-02-10"
     },
     "recurring.getStarted": {
-      "translation": "点击",
-      "hash": "xfbm48",
-      "lastUpdated": "2026-02-10"
+      "translation": "单击“添加定期”以设置自动交易。",
+      "hash": "ot0q40",
+      "lastUpdated": "2026-02-24"
     },
     "recurring.addItem": {
       "translation": "添加定期项目",
@@ -512,9 +512,9 @@
       "lastUpdated": "2026-02-10"
     },
     "transactions.getStarted": {
-      "translation": "点击",
-      "hash": "xfbm48",
-      "lastUpdated": "2026-02-10"
+      "translation": "点击“添加交易”即可开始。",
+      "hash": "myk3nb",
+      "lastUpdated": "2026-02-24"
     },
     "transactions.allTransactions": {
       "translation": "所有交易",
@@ -752,9 +752,9 @@
       "lastUpdated": "2026-02-10"
     },
     "goals.getStarted": {
-      "translation": "点击",
-      "hash": "xfbm48",
-      "lastUpdated": "2026-02-10"
+      "translation": "单击“添加目标”以创建您的第一个财务目标。",
+      "hash": "8iz8ww",
+      "lastUpdated": "2026-02-24"
     },
     "goals.allGoals": {
       "translation": "所有目标",
@@ -1147,9 +1147,9 @@
       "lastUpdated": "2026-02-10"
     },
     "settings.appName": {
-      "translation": "全科医生家庭计划员",
-      "hash": "26sbf7",
-      "lastUpdated": "2026-02-10"
+      "translation": "beanies.family",
+      "hash": "1i3nyj",
+      "lastUpdated": "2026-02-24"
     },
     "settings.version": {
       "translation": "1.0.0版（ MVP ）",
@@ -1162,9 +1162,9 @@
       "lastUpdated": "2026-02-10"
     },
     "settings.privacyNote": {
-      "translation": "您的数据存储在本地浏览器中，除非您启用文件同步，否则永远不会离开您的设备。",
-      "hash": "v6855t",
-      "lastUpdated": "2026-02-10"
+      "translation": "您的数据将被加密并保存到您控制的文件中。我们的服务器上不会存储任何内容—您的财务数据永远不会离开您的设备。",
+      "hash": "9cf8jv",
+      "lastUpdated": "2026-02-24"
     },
     "form.name": {
       "translation": "姓名",
@@ -1237,9 +1237,9 @@
       "lastUpdated": "2026-02-10"
     },
     "form.institution": {
-      "translation": "法法机构",
-      "hash": "sp2uzs",
-      "lastUpdated": "2026-02-10"
+      "translation": "拥有账户",
+      "hash": "d9of4v",
+      "lastUpdated": "2026-02-24"
     },
     "form.frequency": {
       "translation": "频率",
@@ -1440,6 +1440,1846 @@
       "translation": "今年",
       "hash": "mwclmn",
       "lastUpdated": "2026-02-10"
+    },
+    "action.change": {
+      "translation": "改",
+      "hash": "xczjyo",
+      "lastUpdated": "2026-02-24"
+    },
+    "goals.reopenGoal": {
+      "translation": "重新打开目标",
+      "hash": "tnb61i",
+      "lastUpdated": "2026-02-24"
+    },
+    "goals.noCompletedGoals": {
+      "translation": "还没有已完成的目标。",
+      "hash": "3j391i",
+      "lastUpdated": "2026-02-24"
+    },
+    "goals.completedOn": {
+      "translation": "已完成",
+      "hash": "9xualn",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.gender": {
+      "translation": "性别",
+      "hash": "z7qr4x",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.gender.male": {
+      "translation": "男",
+      "hash": "1f8kt",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.gender.female": {
+      "translation": "女",
+      "hash": "yqofos",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.gender.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.ageGroup": {
+      "translation": "年龄段",
+      "hash": "wldg6a",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.ageGroup.adult": {
+      "translation": "成人",
+      "hash": "11kyoq",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.ageGroup.child": {
+      "translation": "子",
+      "hash": "12quws",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.dateOfBirth": {
+      "translation": "出生日期：",
+      "hash": "99ja0",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.dateOfBirth.month": {
+      "translation": "月",
+      "hash": "18ddnk",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.dateOfBirth.day": {
+      "translation": "白天",
+      "hash": "1gu4",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.dateOfBirth.year": {
+      "translation": "年（选填）",
+      "hash": "pox6x0",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.avatarPreview": {
+      "translation": "头像预览",
+      "hash": "vj6ynz",
+      "lastUpdated": "2026-02-24"
+    },
+    "forecast.comingSoon": {
+      "translation": "即将在您的Bean Patch上推出",
+      "hash": "coeti",
+      "lastUpdated": "2026-02-24"
+    },
+    "forecast.comingSoonDescription": {
+      "translation": "我们正在种植一些特别的东西。财务预测将帮助您了解您的豆子走向何方。",
+      "hash": "v2l67z",
+      "lastUpdated": "2026-02-24"
+    },
+    "forecast.feature.projections": {
+      "translation": "经常性交易预测",
+      "hash": "cpi8nz",
+      "lastUpdated": "2026-02-24"
+    },
+    "forecast.feature.cashFlow": {
+      "translation": "现金流量预测（ 3、6和12个月）",
+      "hash": "p3gw1h",
+      "lastUpdated": "2026-02-24"
+    },
+    "forecast.feature.goals": {
+      "translation": "目标实现预测",
+      "hash": "dua5p6",
+      "lastUpdated": "2026-02-24"
+    },
+    "forecast.feature.scenarios": {
+      "translation": "“如果”场景模拟",
+      "hash": "qm1472",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.beanieMode": {
+      "translation": "豆豆模式",
+      "hash": "2ytcp5",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.beanieModeDescription": {
+      "translation": "用友好的豆豆主题语言替换标准标签",
+      "hash": "c5uge9",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.beanieModeDisabled": {
+      "translation": "Beanie Mode仅提供英语版本",
+      "hash": "j17yj7",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.soundEffects": {
+      "translation": "声音特效",
+      "hash": "wcxfm7",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.soundEffectsDescription": {
+      "translation": "为行动和庆祝活动播放有趣的声音",
+      "hash": "ijbch1",
+      "lastUpdated": "2026-02-24"
+    },
+    "form.country": {
+      "translation": "国籍",
+      "hash": "rnr43u",
+      "lastUpdated": "2026-02-24"
+    },
+    "form.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-02-24"
+    },
+    "form.searchInstitutions": {
+      "translation": "搜索机构...",
+      "hash": "yhl3t1",
+      "lastUpdated": "2026-02-24"
+    },
+    "form.searchCountries": {
+      "translation": "搜索地区",
+      "hash": "dnnqlq",
+      "lastUpdated": "2026-02-24"
+    },
+    "form.enterCustomName": {
+      "translation": "输入机构名称",
+      "hash": "ejx2ud",
+      "lastUpdated": "2026-02-24"
+    },
+    "form.customBadge": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-02-24"
+    },
+    "notFound.heading": {
+      "translation": "哎呀！这个豆子丢了……",
+      "hash": "er7gvu",
+      "lastUpdated": "2026-02-24"
+    },
+    "notFound.description": {
+      "translation": "您要查找的页面已失效。让我们带你回到你的豆子。",
+      "hash": "wpdaea",
+      "lastUpdated": "2026-02-24"
+    },
+    "notFound.goHome": {
+      "translation": "返回到仪表盘",
+      "hash": "2q3gqw",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.tomorrow": {
+      "translation": "明天",
+      "hash": "g30o2j",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.days": {
+      "translation": "天",
+      "hash": "1txlj",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.currentMonth": {
+      "translation": "本月",
+      "hash": "pki2ft",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.lastMonth": {
+      "translation": "上月",
+      "hash": "uq6buy",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.last3Months": {
+      "translation": "过去 3 个月",
+      "hash": "mpuhx2",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.last6Months": {
+      "translation": "过去 6 个月",
+      "hash": "7a34pl",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.last12Months": {
+      "translation": "过去 12 个月",
+      "hash": "kwhz3s",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.last2Years": {
+      "translation": "最近两年",
+      "hash": "c9hfq6",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.customRange": {
+      "translation": "自定义范围",
+      "hash": "fjlhrm",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.allTime": {
+      "translation": "所有時間",
+      "hash": "ttx99o",
+      "lastUpdated": "2026-02-24"
+    },
+    "date.previousMonth": {
+      "translation": "上月",
+      "hash": "ti6f4n",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.january": {
+      "translation": "1 月",
+      "hash": "2ogddi",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.february": {
+      "translation": "2 月",
+      "hash": "3amlha",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.march": {
+      "translation": "3 月",
+      "hash": "184ieb",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.april": {
+      "translation": "4 月",
+      "hash": "11sk86",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.may": {
+      "translation": "五月",
+      "hash": "1nid",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.june": {
+      "translation": "<g id=\"775\">6 </g><g id=\"778\">月 </g><g id=\"782\">12 </g><g id=\"785\">日</g>",
+      "hash": "1dqhu",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.july": {
+      "translation": "7 月",
+      "hash": "1dqgo",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.august": {
+      "translation": "8月",
+      "hash": "wm5mar",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.september": {
+      "translation": "9 月",
+      "hash": "feq8f",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.october": {
+      "translation": "10 月",
+      "hash": "pp6m8",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.november": {
+      "translation": "11月",
+      "hash": "s6ds2a",
+      "lastUpdated": "2026-02-24"
+    },
+    "month.december": {
+      "translation": "十二月",
+      "hash": "aczpl1",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.savingsGoals": {
+      "translation": "储蓄目标",
+      "hash": "uo0bl3",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.seeAll": {
+      "translation": "查看全部",
+      "hash": "avz62u",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.yourBeans": {
+      "translation": "你家",
+      "hash": "doqo0f",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.addBean": {
+      "translation": "添加家属",
+      "hash": "w0tmyf",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.healthy": {
+      "translation": "健康",
+      "hash": "ucd4zn",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.savingsRate": {
+      "translation": "储蓄率",
+      "hash": "1e7aqh",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.recurringSummary": {
+      "translation": "定期摘要",
+      "hash": "5lg36r",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.netRecurring": {
+      "translation": "经常性净额（每月）",
+      "hash": "nwr6f2",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.upcoming": {
+      "translation": "近期賽事",
+      "hash": "moghmk",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.noRecurringItems": {
+      "translation": "尚无定期项目",
+      "hash": "z713ne",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.roleParent": {
+      "translation": "同上级",
+      "hash": "vm3ara",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.roleLittleBean": {
+      "translation": "Little Bean",
+      "hash": "ourpt2",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.chartHidden": {
+      "translation": "图表已隐藏",
+      "hash": "yo2clo",
+      "lastUpdated": "2026-02-24"
+    },
+    "dashboard.noDataYet": {
+      "translation": "还没有数据",
+      "hash": "gtk3pt",
+      "lastUpdated": "2026-02-24"
+    },
+    "greeting.morning": {
+      "translation": "早安式",
+      "hash": "39c27p",
+      "lastUpdated": "2026-02-24"
+    },
+    "greeting.afternoon": {
+      "translation": "下午好",
+      "hash": "hwwi37",
+      "lastUpdated": "2026-02-24"
+    },
+    "greeting.evening": {
+      "translation": "晚上好",
+      "hash": "4t35on",
+      "lastUpdated": "2026-02-24"
+    },
+    "header.hideFinancialFigures": {
+      "translation": "隐藏财务数据",
+      "hash": "xni1bu",
+      "lastUpdated": "2026-02-24"
+    },
+    "header.showFinancialFigures": {
+      "translation": "显示财务数据",
+      "hash": "r37c97",
+      "lastUpdated": "2026-02-24"
+    },
+    "header.financialFiguresVisible": {
+      "translation": "财务数据可见",
+      "hash": "k8ztxy",
+      "lastUpdated": "2026-02-24"
+    },
+    "header.financialFiguresHidden": {
+      "translation": "财务数据已隐藏",
+      "hash": "e5vm32",
+      "lastUpdated": "2026-02-24"
+    },
+    "header.notifications": {
+      "translation": "消息推送",
+      "hash": "y97he0",
+      "lastUpdated": "2026-02-24"
+    },
+    "sidebar.noDataFile": {
+      "translation": "无数据文件",
+      "hash": "o86rhv",
+      "lastUpdated": "2026-02-24"
+    },
+    "sidebar.dataEncrypted": {
+      "translation": "数据已被加密",
+      "hash": "d292we",
+      "lastUpdated": "2026-02-24"
+    },
+    "sidebar.notEncrypted": {
+      "translation": "未加密",
+      "hash": "rgc7fb",
+      "lastUpdated": "2026-02-24"
+    },
+    "sidebar.noDataFileConfigured": {
+      "translation": "未配置数据文件",
+      "hash": "oig94l",
+      "lastUpdated": "2026-02-24"
+    },
+    "sidebar.dataEncryptedFull": {
+      "translation": "数据加密（ AES-256-GCM ）",
+      "hash": "y2bt0a",
+      "lastUpdated": "2026-02-24"
+    },
+    "sidebar.dataFileNotEncrypted": {
+      "translation": "数据文件未加密",
+      "hash": "meb609",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.showing": {
+      "translation": "显示",
+      "hash": "4iv9aj",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.income": {
+      "translation": "收入",
+      "hash": "yqip87",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.expenses": {
+      "translation": "开支",
+      "hash": "uxsm9x",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.net": {
+      "translation": "對銷金額",
+      "hash": "1ocd",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.noTransactionsForPeriod": {
+      "translation": "未找到此期间的交易",
+      "hash": "g6hv6q",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.tryDifferentRange": {
+      "translation": "请尝试选择其他日期范围或添加新交易。",
+      "hash": "bc6qsl",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.deleteConfirm": {
+      "translation": "是否确实要删除此事务？",
+      "hash": "xlbaf2",
+      "lastUpdated": "2026-02-24"
+    },
+    "transactions.descriptionPlaceholder": {
+      "translation": "例如：生鲜杂货购物",
+      "hash": "pif3wf",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next3Months": {
+      "translation": "后3个月",
+      "hash": "uevfn7",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next6Months": {
+      "translation": "今后6个月",
+      "hash": "ez42fq",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next1Year": {
+      "translation": "下一年",
+      "hash": "im41w9",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next2Years": {
+      "translation": "2年",
+      "hash": "ngzha3",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next5Years": {
+      "translation": "5年",
+      "hash": "3ixq0y",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next10Years": {
+      "translation": "未来10年",
+      "hash": "gxajoe",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next15Years": {
+      "translation": "15年",
+      "hash": "ekf6jd",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.next20Years": {
+      "translation": "20年",
+      "hash": "bwbxdt",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.allFamilyMembers": {
+      "translation": "家庭成员",
+      "hash": "wa59us",
+      "lastUpdated": "2026-02-24"
+    },
+    "reports.allCategories": {
+      "translation": "所有类别",
+      "hash": "ssmuv9",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.cannotDeleteOwner": {
+      "translation": "无法删除所有者帐户。",
+      "hash": "eggqfp",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.deleteConfirm": {
+      "translation": "您确定要删除这个成员吗？",
+      "hash": "qvl2ub",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.editFamilyName": {
+      "translation": "家族名称",
+      "hash": "ngvfm9",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.createLogin": {
+      "translation": "创建登录表单",
+      "hash": "3cuqth",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.enterName": {
+      "translation": "输入名称",
+      "hash": "igv5rn",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.enterEmail": {
+      "translation": "输入电子邮件",
+      "hash": "456ss4",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.emailNotSet": {
+      "translation": "还没有电子邮箱",
+      "hash": "4s61wb",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.profileColor": {
+      "translation": "简介颜色",
+      "hash": "t63504",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.year": {
+      "translation": "年份",
+      "hash": "1mz4t",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.status.waitingToJoin": {
+      "translation": "等待加入",
+      "hash": "cbrex0",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.status.active": {
+      "translation": "状态",
+      "hash": "wchdly",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.lastSeen": {
+      "translation": "{date}最后一次浏览",
+      "hash": "pxmken",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.neverLoggedIn": {
+      "translation": "从未登录",
+      "hash": "vmcl57",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.inviteMember": {
+      "translation": "邀请{name}",
+      "hash": "gdhm5u",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.linkCopied": {
+      "translation": "邀请链接已复制！",
+      "hash": "685v3m",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.copyInviteLinkHint": {
+      "translation": "复制魔术链接并与家人分享",
+      "hash": "688bhk",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.inviteSection.title": {
+      "translation": "邀请加入",
+      "hash": "sebp2w",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.inviteSection.desc": {
+      "translation": "此会员尚未加入。分享以下链接，以便他们设置账号。",
+      "hash": "hv7gf7",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.inviteSection.step1": {
+      "translation": "复制邀请链接并发送给他们",
+      "hash": "7ng9ta",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.inviteSection.step2": {
+      "translation": "他们打开链接并选择密码",
+      "hash": "43g5kx",
+      "lastUpdated": "2026-02-24"
+    },
+    "family.inviteSection.step3": {
+      "translation": "他们已加入！他们现在可以使用自己的账号登录了",
+      "hash": "978nw5",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.preferredCurrencies": {
+      "translation": "首选货币",
+      "hash": "cu3pgu",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.preferredCurrenciesHint": {
+      "translation": "最多选择4种货币显示在标题中",
+      "hash": "o4e94",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.addCurrency": {
+      "translation": "添加货币...",
+      "hash": "m42kda",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.familyDataOptions": {
+      "translation": "家庭数据选项",
+      "hash": "xrzr5w",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.familyDataDescription": {
+      "translation": "您家人的财务数据经过加密，并安全地存储在您控制的文件中。",
+      "hash": "5fjpjm",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.saveDataToFile": {
+      "translation": "将数据保存到文件",
+      "hash": "j3i7qs",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.createOrLoadDataFile": {
+      "translation": "创建加密数据文件或加载现有文件。",
+      "hash": "iusu00",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.createNewDataFile": {
+      "translation": "创建新的家庭数据文件",
+      "hash": "avtnzu",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.loadExistingDataFile": {
+      "translation": "加载现有家庭数据文件",
+      "hash": "7djowh",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.loadFileConfirmation": {
+      "translation": "这将用所选文件的内容替换所有本地数据，并将其设置为您的数据文件。是否继续？",
+      "hash": "n5veoh",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.yesLoadFile": {
+      "translation": "是，加载文件",
+      "hash": "15uaw5",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.grantPermissionPrompt": {
+      "translation": "单击以授予访问数据文件的权限。",
+      "hash": "7jtm6",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.grantPermission": {
+      "translation": "授予许可",
+      "hash": "5z9gnn",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.myFamilyData": {
+      "translation": "我家",
+      "hash": "h2uyoq",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.saving": {
+      "translation": "正在保存…",
+      "hash": "wq7jzg",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.error": {
+      "translation": "错误",
+      "hash": "1410q0",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.saved": {
+      "translation": "已保存",
+      "hash": "1bfcyv",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.lastSaved": {
+      "translation": "上次保存时间",
+      "hash": "un4cjn",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.loadAnotherDataFile": {
+      "translation": "加载另一个家庭数据文件",
+      "hash": "b3ofl9",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.switchDataFile": {
+      "translation": "切换到其他数据文件",
+      "hash": "cpbhe5",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.browse": {
+      "translation": "浏览...",
+      "hash": "h0impw",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.switchFileConfirmation": {
+      "translation": "这将用所选文件的内容替换所有本地数据并切换到该文件。是否继续？",
+      "hash": "88ccd",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.dataLoadedSuccess": {
+      "translation": "载入成功",
+      "hash": "mn74et",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.encryptDataFile": {
+      "translation": "加密数据文件",
+      "hash": "3uryv",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.encrypted": {
+      "translation": "已加密",
+      "hash": "b77azg",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.unencrypted": {
+      "translation": "未加密",
+      "hash": "fmk6ol",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.encryptionDescription": {
+      "translation": "使用密码加密保护您的数据",
+      "hash": "efg87s",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.disableEncryptionWarning": {
+      "translation": "禁用加密意味着您的财务数据将以明文形式存储，任何人都可以读取该文件。您确定吗？",
+      "hash": "5mzufr",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.yesDisableEncryption": {
+      "translation": "禁用加密",
+      "hash": "uogs3u",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.passwordNote": {
+      "translation": "注意：返回访问数据时，您需要输入密码。",
+      "hash": "hhs5u",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.noAutoSyncWarning": {
+      "translation": "您的浏览器不支持自动保存文件。改用手动导出/导入。要自动保存，请使用Chrome或Edge。",
+      "hash": "miiip9",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.downloadYourData": {
+      "translation": "下载数据",
+      "hash": "zaxczl",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.downloadDataDescription": {
+      "translation": "将数据下载为JSON文件",
+      "hash": "jito8o",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.loadDataFile": {
+      "translation": "加载数据文件",
+      "hash": "w3vuzc",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.loadDataFileDescription": {
+      "translation": "从JSON文件加载数据",
+      "hash": "jljuqj",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.security": {
+      "translation": "安全",
+      "hash": "grkjmo",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.exportTranslationCache": {
+      "translation": "导出翻译缓存",
+      "hash": "ib0pfr",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.exportTranslationCacheDescription": {
+      "translation": "将缓存的翻译下载为JSON文件以提交到存储库",
+      "hash": "yg2btz",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.exportTranslations": {
+      "translation": "导出翻译",
+      "hash": "sitb1u",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.setPassword": {
+      "translation": "加密密码",
+      "hash": "es4koq",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.setPasswordDescription": {
+      "translation": "选择一个强密码来加密您的数据文件。每次打开应用时，您都需要输入此密码。",
+      "hash": "e5zsdn",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.enableEncryption": {
+      "translation": "启用加密",
+      "hash": "vblkg0",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.enterPassword": {
+      "translation": "输入密码",
+      "hash": "etxder",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.enterPasswordDescription": {
+      "translation": "此文件已加密。输入您的密码以解密和加载数据。",
+      "hash": "3abmai",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.decryptAndLoad": {
+      "translation": "解密并加载",
+      "hash": "oveka5",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.encryptionError": {
+      "translation": "加密错误",
+      "hash": "htttez",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.password": {
+      "translation": "密码",
+      "hash": "l71ry3",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.enterPasswordPlaceholder": {
+      "translation": "输入密码",
+      "hash": "drftoj",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.confirmPassword": {
+      "translation": "确认密码",
+      "hash": "re9mij",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.confirmPasswordPlaceholder": {
+      "translation": "确认密码",
+      "hash": "qbs2sb",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.required": {
+      "translation": "密码为必填项",
+      "hash": "qd3fv4",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.mismatch": {
+      "translation": "密码匹配不上",
+      "hash": "yop623",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.decryptionError": {
+      "translation": "å®è£",
+      "hash": "ez3w8z",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.setAndContinue": {
+      "translation": "设置密码并继续",
+      "hash": "moas6g",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.strongPasswordDescription": {
+      "translation": "选择强密码以保护您的数据文件。每次打开应用时，您都需要输入此密码。",
+      "hash": "ng22kf",
+      "lastUpdated": "2026-02-24"
+    },
+    "password.encryptedFileDescription": {
+      "translation": "此文件已加密。输入您的密码以解密和加载您的数据。",
+      "hash": "hbnawi",
+      "lastUpdated": "2026-02-24"
+    },
+    "setup.yourName": {
+      "translation": "您的名字",
+      "hash": "x9rq20",
+      "lastUpdated": "2026-02-24"
+    },
+    "setup.fileCreateFailed": {
+      "translation": "创建文件失败。请重试。",
+      "hash": "lz82hz",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.signingIn": {
+      "translation": "登录中...",
+      "hash": "nals8e",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.creatingAccount": {
+      "translation": "正在创建帐户...",
+      "hash": "1b1rk8",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.signOut": {
+      "translation": "注销",
+      "hash": "66wnsb",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.fillAllFields": {
+      "translation": "请填写所有字段",
+      "hash": "n7celo",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.passwordsDoNotMatch": {
+      "translation": "密码匹配不上",
+      "hash": "yop623",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.passwordMinLength": {
+      "translation": "密码必须至少为 8 个字符",
+      "hash": "hl3u3v",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.createPasswordPrompt": {
+      "translation": "为您的账号创建密码。您下次将使用此功能登录。",
+      "hash": "hssssq",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.createPasswordPlaceholder": {
+      "translation": "选择密码（最少8个字符）",
+      "hash": "4t6dwe",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.createAndSignIn": {
+      "translation": "创建密码并登录",
+      "hash": "3fv777",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.familyName": {
+      "translation": "姓",
+      "hash": "a3acp3",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.familyNamePlaceholder": {
+      "translation": "史密斯家",
+      "hash": "168s0g",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.yourNamePlaceholder": {
+      "translation": "HUGO ZOE",
+      "hash": "4mmf8u",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.passwordPlaceholder": {
+      "translation": "至少 8 个字符",
+      "hash": "dzn5w6",
+      "lastUpdated": "2026-02-24"
+    },
+    "action.ok": {
+      "translation": "确认",
+      "hash": "1y4",
+      "lastUpdated": "2026-02-24"
+    },
+    "action.continue": {
+      "translation": "继续",
+      "hash": "8b7kmx",
+      "lastUpdated": "2026-02-24"
+    },
+    "action.apply": {
+      "translation": "确认",
+      "hash": "11sitq",
+      "lastUpdated": "2026-02-24"
+    },
+    "action.download": {
+      "translation": "下载",
+      "hash": "ooknmw",
+      "lastUpdated": "2026-02-24"
+    },
+    "action.load": {
+      "translation": "载入",
+      "hash": "1evpi",
+      "lastUpdated": "2026-02-24"
+    },
+    "action.seeAll": {
+      "translation": "查看全部",
+      "hash": "axeiuk",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.deleteAccountTitle": {
+      "translation": "删除帐户",
+      "hash": "qffm48",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.deleteTransactionTitle": {
+      "translation": "删除交易",
+      "hash": "3sqzvb",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.deleteRecurringTitle": {
+      "translation": "删除重复性开支",
+      "hash": "9z0ip7",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.deleteAssetTitle": {
+      "translation": "删除文件",
+      "hash": "yrztmt",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.deleteGoalTitle": {
+      "translation": "删除目标",
+      "hash": "81o0a0",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.deleteMemberTitle": {
+      "translation": "移除家庭成员",
+      "hash": "ddollm",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.removePasskeyTitle": {
+      "translation": "删除密钥",
+      "hash": "unar5a",
+      "lastUpdated": "2026-02-24"
+    },
+    "confirm.cannotDeleteOwnerTitle": {
+      "translation": "无法删除所有者",
+      "hash": "xkshlx",
+      "lastUpdated": "2026-02-24"
+    },
+    "accounts.deleteConfirm": {
+      "translation": "您确定要删除此帐号吗?",
+      "hash": "6fzwq5",
+      "lastUpdated": "2026-02-24"
+    },
+    "assets.deleteConfirm": {
+      "translation": "您确定要删除此资产？",
+      "hash": "d6hm5s",
+      "lastUpdated": "2026-02-24"
+    },
+    "goals.deleteConfirm": {
+      "translation": "您确认要删除此目标吗？",
+      "hash": "oou6r9",
+      "lastUpdated": "2026-02-24"
+    },
+    "goals.deleteCompletedConfirm": {
+      "translation": "您确认要删除此目标吗？",
+      "hash": "go2lqi",
+      "lastUpdated": "2026-02-24"
+    },
+    "passkey.removeConfirm": {
+      "translation": "删除此密钥？您将无法再使用它登录。",
+      "hash": "axeuzj",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.title": {
+      "translation": "您信任此设备吗？",
+      "hash": "7do6d",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.description": {
+      "translation": "如果这是受信任的设备（即您的个人手机或笔记本电脑） ，您可以将数据缓存在本地，以便下次登录时即时访问。",
+      "hash": "xubr5s",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.trustButton": {
+      "translation": "是，我信任此设备",
+      "hash": "kuxkwy",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.notNow": {
+      "translation": "立即购买",
+      "hash": "8bjtp3",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.hint": {
+      "translation": "您可以在“设置”中更改此设置。使用“注销并清除数据”删除缓存数据。",
+      "hash": "ioyc3v",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.settingsLabel": {
+      "translation": "受信任的设备",
+      "hash": "eklni9",
+      "lastUpdated": "2026-02-24"
+    },
+    "trust.settingsDesc": {
+      "translation": "在登录之间保持数据本地缓存（未加密） ，以加快访问速度",
+      "hash": "t7awi7",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.signOutClearData": {
+      "translation": "注销并清除数据",
+      "hash": "xq3sk",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.selectMember": {
+      "translation": "选择你的资料",
+      "hash": "3ps5og",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.enterPassword": {
+      "translation": "请输入密码",
+      "hash": "p3sj9m",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.loadingFile": {
+      "translation": "数着豆子……",
+      "hash": "wg3bo8",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.reconnectFile": {
+      "translation": "已找到您的数据文件，但需要访问权限。点击下方重新连接。",
+      "hash": "bfz4tj",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.reconnectButton": {
+      "translation": "重新连接到数据文件",
+      "hash": "mtvwgm",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.noMembersWithPassword": {
+      "translation": "还没有成员设置密码。请先完成入驻流程。",
+      "hash": "kbuga6",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.fileLoadFailed": {
+      "translation": "加载失败，点击重试",
+      "hash": "7dqurh",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.fileNotEncryptedWarning": {
+      "translation": "此数据文件未加密。任何有权访问该文件的人都可以查看您的家庭数据。您可以在“设置”中启用加密。",
+      "hash": "sgxyta",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.password": {
+      "translation": "密码",
+      "hash": "l71ry3",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.enterYourPassword": {
+      "translation": "输入您的密码",
+      "hash": "t35tog",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.signInFailed": {
+      "translation": "登录失败",
+      "hash": "uge3h1",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.signUpFailed": {
+      "translation": "注册失败",
+      "hash": "dir00v",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.createPassword": {
+      "translation": "创建密码",
+      "hash": "lnb1fm",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.confirmPassword": {
+      "translation": "确认密码",
+      "hash": "qbs2sb",
+      "lastUpdated": "2026-02-24"
+    },
+    "auth.confirmPasswordPlaceholder": {
+      "translation": "确认您的密码",
+      "hash": "7k2ifu",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteAsParent": {
+      "translation": "同上级",
+      "hash": "vm3ara",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteAsChild": {
+      "translation": "子",
+      "hash": "12quws",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteRoleLabel": {
+      "translation": "邀请为",
+      "hash": "4twzjg",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.familyCodePlaceholder": {
+      "translation": "请输入家庭成员提供的代码",
+      "hash": "1pux6f",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteTitle": {
+      "translation": "邀请家庭成员",
+      "hash": "v7kych",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteDesc": {
+      "translation": "与家人分享此代码，以便他们加入您的Pod",
+      "hash": "i5urn5",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteCode": {
+      "translation": "《家庭法典》",
+      "hash": "a3o1l5",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.inviteLink": {
+      "translation": "分享该链接",
+      "hash": "bp3rhe",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.copied": {
+      "translation": "已复制！",
+      "hash": "rqllj7",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.copyCode": {
+      "translation": "复制代码",
+      "hash": "dyi1yg",
+      "lastUpdated": "2026-02-24"
+    },
+    "login.copyLink": {
+      "translation": "复制链接",
+      "hash": "dycfa3",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.badgeEncrypted": {
+      "translation": "端到端加密",
+      "hash": "fwfdz5",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.badgeSecurity": {
+      "translation": "银行级证券",
+      "hash": "msym9m",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.badgeLove": {
+      "translation": " Built with",
+      "hash": "ni5cie",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.badgeZeroServers": {
+      "translation": "服务器上的零数据",
+      "hash": "rk9n5l",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.welcomePrompt": {
+      "translation": "您希望如何处理?",
+      "hash": "5pcods",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.signInTitle": {
+      "translation": "登陆",
+      "hash": "8yrbnc",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.signInSubtitle": {
+      "translation": "加载您的家庭数据文件",
+      "hash": "97e6g9",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createTitle": {
+      "translation": "新建 ",
+      "hash": "jyjrmp",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createSubtitle": {
+      "translation": "开启家庭理财之旅",
+      "hash": "s7clhk",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinTitle": {
+      "translation": "加入现有Pod",
+      "hash": "mv6p3n",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinSubtitle": {
+      "translation": "您的家人正在等您",
+      "hash": "qfbb9u",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.loadPodTitle": {
+      "translation": "加载您的Pod",
+      "hash": "pjnzjm",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.loadPodSubtitle": {
+      "translation": "您的数据始终保存在您的设备上",
+      "hash": "r7dkie",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.dropZoneText": {
+      "translation": "将您的.beanpod文件拖放到此处",
+      "hash": "jpueh",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.dropZoneBrowse": {
+      "translation": "单击浏览",
+      "hash": "xjjn5m",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.cloudComingSoon": {
+      "translation": "即将推出",
+      "hash": "3kerkq",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.securityYourData": {
+      "translation": "您的数据，您的云",
+      "hash": "xxn899",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.securityEncrypted": {
+      "translation": "AES-256加密",
+      "hash": "5jq54p",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.securityZeroServers": {
+      "translation": "零服务器，零跟踪",
+      "hash": "ibwppf",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.fileLoaded": {
+      "translation": "已装入",
+      "hash": "i5fn5n",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.unlockTitle": {
+      "translation": "解锁您的Pod",
+      "hash": "6trm5o",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.unlockSubtitle": {
+      "translation": "输入您的Pod密码以解密您的家庭数据",
+      "hash": "b1fjp0",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.unlockButton": {
+      "translation": "解锁Pod",
+      "hash": "iq8xux",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.unlockFooter": {
+      "translation": "此密码可解密您的本地数据。我们不会存储或恢复它。",
+      "hash": "ef1524",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.switchFamily": {
+      "translation": "切换到其他家庭",
+      "hash": "oxzb7",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.pickBeanTitle": {
+      "translation": "谁在登录？",
+      "hash": "oyxgll",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.pickBeanSubtitle": {
+      "translation": "挑选你的豆子",
+      "hash": "flbfxa",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.parentBean": {
+      "translation": "Parent Bean",
+      "hash": "rn7fru",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.littleBean": {
+      "translation": "Little Bean",
+      "hash": "ourpt2",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.setupNeeded": {
+      "translation": "成立",
+      "hash": "u4re87",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.signInAs": {
+      "translation": "登录为",
+      "hash": "fth4om",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createStep1": {
+      "translation": "您",
+      "hash": "1wqn",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createStep2": {
+      "translation": "保存并保护",
+      "hash": "s40sfo",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createStep3": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createNext": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createButton": {
+      "translation": "创建Pod",
+      "hash": "ffzwm7",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.alreadyHavePod": {
+      "translation": "已经有pod了？",
+      "hash": "my3wvr",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.loadItLink": {
+      "translation": "加载",
+      "hash": "x3hdol",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.passwordHint": {
+      "translation": "这会加密您的数据文件",
+      "hash": "erkyln",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.storageTitle": {
+      "translation": "我们应该将您的Pod保存在哪里？",
+      "hash": "m246ci",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.storageLocal": {
+      "translation": "本地文件",
+      "hash": "hgy21b",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.storageLocalDesc": {
+      "translation": "将.beanpod文件保存到您的设备",
+      "hash": "tx1o2z",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.addBeansTitle": {
+      "translation": "添加家庭成员",
+      "hash": "lo5fij",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.addBeansSubtitle": {
+      "translation": "您稍后可以随时添加更多",
+      "hash": "dmy140",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.addMember": {
+      "translation": "添加成员",
+      "hash": "nibw07",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.finish": {
+      "translation": "完成日期",
+      "hash": "yswf5f",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.skip": {
+      "translation": "暂时跳过",
+      "hash": "r83laa",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinInput": {
+      "translation": "家庭代码或魔术链接",
+      "hash": "zhztnx",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.whatsNext": {
+      "translation": "接下来会发生什么？",
+      "hash": "3ebjz3",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinStep1": {
+      "translation": "我们将验证您的家庭成员并加载数据文件",
+      "hash": "vij2cf",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinStep2": {
+      "translation": "您将选择您的个人资料并创建密码",
+      "hash": "qvxbp4",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinStep3": {
+      "translation": "登录成功！",
+      "hash": "ndf84a",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinButton": {
+      "translation": "加入我家人的Pod",
+      "hash": "nikpcd",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.joinNotAvailable": {
+      "translation": "加入pod尚不可用。请您的家人与您共享他们的.beanpod文件，并改用“登录您的pod”。",
+      "hash": "e0ztid",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.wantYourOwn": {
+      "translation": "想要订购自己的餐点吗？",
+      "hash": "yzy84q",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.createLink": {
+      "translation": "新建 ",
+      "hash": "7in3em",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.acceptsBeanpod": {
+      "translation": "接受.beanpod文件",
+      "hash": "1p04wd",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.securityYourDataDesc": {
+      "translation": "您的pod文件位于云存储中。我们从未见过它。",
+      "hash": "qeoucr",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.securityEncryptedDesc": {
+      "translation": "军用级AES-256加密可保护您的数据。",
+      "hash": "3dup7a",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.securityZeroServersDesc": {
+      "translation": "没有服务器，没有跟踪，没有数据收集。",
+      "hash": "oe362c",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.pickBeanInfoText": {
+      "translation": "Onboarded Bean可以使用其密码登录。新Bean需要先创建密码。",
+      "hash": "f0463e",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.growPodTitle": {
+      "translation": "种植全新的豆荚",
+      "hash": "hjrzl9",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.growPodSubtitle": {
+      "translation": "为家庭pod命名并创建登录密码。",
+      "hash": "qmufhz",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.encryptionPasswordLabel": {
+      "translation": "Pod数据文件加密密码",
+      "hash": "bqsff5",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.signInPasswordLabel": {
+      "translation": "您的登录密码",
+      "hash": "csyyj7",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.signInPasswordHint": {
+      "translation": "您将使用此密码登录Bean配置文件",
+      "hash": "ch0rc",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.storageDescription": {
+      "translation": "我们不会将您的数据存储在任何服务器或数据库上\\ u2014您家庭的财务状况完全由您掌控。选择加密的.beanpod文件所在的位置，只有您持有密钥。",
+      "hash": "9526bv",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.storageSectionLabel": {
+      "translation": "我们应该将您的Pod保存在哪里？",
+      "hash": "m246ci",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.step2Title": {
+      "translation": "保存和保护您的Pod",
+      "hash": "n4ov50",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.step2Subtitle": {
+      "translation": "选择存储加密数据文件的位置，并设置密码进行保护。",
+      "hash": "umwod3",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.podPasswordOptional": {
+      "translation": "可选\\ u2014您可以稍后在“设置”中启用加密",
+      "hash": "593trh",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.confirmPodPassword": {
+      "translation": "确认Pod密码",
+      "hash": "5zu846",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.addMemberFailed": {
+      "translation": "添加失败请重试",
+      "hash": "4fa42k",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.removeMember": {
+      "translation": "移除",
+      "hash": "ulvuxo",
+      "lastUpdated": "2026-02-24"
+    },
+    "loginV6.you": {
+      "translation": "您",
+      "hash": "1wqn",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.verifyTitle": {
+      "translation": "您的家庭",
+      "hash": "85abj9",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.verifySubtitle": {
+      "translation": "让我们帮您找到家人",
+      "hash": "93ayzn",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.lookingUp": {
+      "translation": "正在查找您的家人...",
+      "hash": "5i53x7",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.familyFound": {
+      "translation": "找到家人了！",
+      "hash": "lw569x",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.familyNotFound": {
+      "translation": "未找到家庭。请检查代码并重试。",
+      "hash": "jvrrp9",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.registryOffline": {
+      "translation": "我们无法访问注册表。您仍然可以通过直接加载共享文件来加入。",
+      "hash": "b2oytd",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.needsFile": {
+      "translation": "您需要家庭数据文件",
+      "hash": "3oa5aq",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.needsFileDesc": {
+      "translation": "要求所有者通过电子邮件、共享云文件夹或USB与您共享.beanpod文件。",
+      "hash": "4varky",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.expectedFile": {
+      "translation": "查找名为的文件：",
+      "hash": "mffwzy",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.fileMismatch": {
+      "translation": "此文件属于不同的家庭。请加载正确的文件。",
+      "hash": "56i79y",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.loadFileButton": {
+      "translation": "加载.beanpod文件",
+      "hash": "q1p6j",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.dropZoneText": {
+      "translation": "将共享的.beanpod文件拖放到此处",
+      "hash": "hfcdo6",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.pickMemberTitle": {
+      "translation": "您是哪一个？",
+      "hash": "t7ru3r",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.pickMemberSubtitle": {
+      "translation": "选择为您创建的个人资料",
+      "hash": "10vcii",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.noUnclaimedMembers": {
+      "translation": "未找到无人认领的个人资料。请家庭主人先创建您的个人资料。",
+      "hash": "7nwdn9",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.setPasswordTitle": {
+      "translation": "创建您的密码",
+      "hash": "47qmn0",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.setPasswordSubtitle": {
+      "translation": "此密码仅供您登录",
+      "hash": "5591es",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.completing": {
+      "translation": "正在加入您的家庭...",
+      "hash": "f2iyzp",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.success": {
+      "translation": "欢迎加入我们的大家庭！",
+      "hash": "svqc5j",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.shareFileNote": {
+      "translation": "重要提示：还与他们共享.beanpod文件（电子邮件、云文件夹或USB ）",
+      "hash": "t3gf3d",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.enterCodeManually": {
+      "translation": "或手动输入家庭代码",
+      "hash": "9fvg5q",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.codeInputLabel": {
+      "translation": "《家庭法典》",
+      "hash": "a3o1l5",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.codeInputHint": {
+      "translation": "粘贴家庭代码或家庭成员共享的邀请链接",
+      "hash": "vrbtao",
+      "lastUpdated": "2026-02-24"
+    },
+    "join.next": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.offlineBanner": {
+      "translation": "您处于离线状态—更改将保存在本地",
+      "hash": "bvoj94",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.installTitle": {
+      "translation": "安装beanies.family",
+      "hash": "3v0ots",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.installDescription": {
+      "translation": "添加到主屏幕以获得最佳体验",
+      "hash": "ugfhl2",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.installButton": {
+      "translation": "安装",
+      "hash": "b4j8n9",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.installDismiss": {
+      "translation": "立即购买",
+      "hash": "8bjtp3",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.updateAvailable": {
+      "translation": "有新版本可用",
+      "hash": "68shei",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.updateButton": {
+      "translation": "现在更新",
+      "hash": "s1qxwf",
+      "lastUpdated": "2026-02-24"
+    },
+    "pwa.updateDismiss": {
+      "translation": "以后",
+      "hash": "17krcc",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.installApp": {
+      "translation": "安装模块",
+      "hash": "80ulus",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.installAppDesc": {
+      "translation": "在此设备上安装beanies.family ，以便快速访问",
+      "hash": "ri20c9",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.installAppButton": {
+      "translation": "安装beanies.family",
+      "hash": "3v0ots",
+      "lastUpdated": "2026-02-24"
+    },
+    "settings.appInstalled": {
+      "translation": "已安装未安装",
+      "hash": "e5x3ct",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.nook": {
+      "translation": "Nook",
+      "hash": "1g60t",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.pod": {
+      "translation": "吊舱",
+      "hash": "1q1x",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.menu": {
+      "translation": "菜单",
+      "hash": "1fblr",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.closeMenu": {
+      "translation": "关闭菜单",
+      "hash": "23b0bd",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.navigation": {
+      "translation": "导航",
+      "hash": "799rrg",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.controls": {
+      "translation": "控件",
+      "hash": "8b1t7u",
+      "lastUpdated": "2026-02-24"
+    },
+    "mobile.viewingAll": {
+      "translation": "查看：所有成员",
+      "hash": "gbts47",
+      "lastUpdated": "2026-02-24"
     }
   }
 }
