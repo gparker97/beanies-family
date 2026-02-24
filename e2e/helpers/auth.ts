@@ -57,6 +57,17 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
 
   await page.waitForURL('/dashboard');
 
+  // Dismiss TrustDeviceModal if it appears (triggered by freshSignIn).
+  // The modal races with navigation, so give it a short window to show up.
+  const notNowButton = page.getByRole('button', { name: 'Not now' });
+  const modalAppeared = await notNowButton
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (modalAppeared) {
+    await notNowButton.click();
+  }
+
   // Ensure auto-auth flag is set for subsequent page loads
   await page.evaluate(() => {
     sessionStorage.setItem('e2e_auto_auth', 'true');
