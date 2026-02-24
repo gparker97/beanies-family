@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['brand/*.png', 'icons/*.png'],
       manifest: {
         name: 'beanies.family',
@@ -17,6 +17,10 @@ export default defineConfig({
         theme_color: '#2C3E50',
         background_color: '#2C3E50',
         display: 'standalone',
+        start_url: '/',
+        scope: '/',
+        orientation: 'any',
+        categories: ['finance', 'productivity'],
         icons: [
           {
             src: 'brand/beanies_logo_transparent_logo_only_192x192.png',
