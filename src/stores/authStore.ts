@@ -51,6 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
   const currentUser = ref<AuthUser | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+  const freshSignIn = ref(false);
 
   // Getters
   const needsAuth = computed(() => !isAuthenticated.value);
@@ -136,6 +137,7 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      freshSignIn.value = true;
       persistSession(user);
       familyStore.setCurrentMember(member.id);
 
@@ -216,6 +218,7 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      freshSignIn.value = true;
       persistSession(user);
 
       return { success: true };
@@ -254,6 +257,7 @@ export const useAuthStore = defineStore('auth', () => {
       };
       currentUser.value = user;
       isAuthenticated.value = true;
+      freshSignIn.value = true;
       persistSession(user);
       familyStore.setCurrentMember(memberId);
 
@@ -392,6 +396,7 @@ export const useAuthStore = defineStore('auth', () => {
     currentUser,
     isLoading,
     error,
+    freshSignIn,
     // Getters
     needsAuth,
     displayName,
