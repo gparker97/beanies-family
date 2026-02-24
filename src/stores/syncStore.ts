@@ -11,6 +11,7 @@ import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
 import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
+import { invalidatePasskeysForPasswordChange } from '@/services/auth/passkeyService';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
 import { exportToFile, importFromFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
@@ -47,6 +48,9 @@ export const useSyncStore = defineStore('sync', () => {
 
   const hasSessionPassword = computed(() => sessionPassword.value !== null);
   const currentSessionPassword = computed(() => sessionPassword.value);
+
+  // DEK-based encryption for passkey PRF sessions
+  const sessionDEK = ref<CryptoKey | null>(null);
 
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
 
@@ -339,6 +343,44 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Decrypt and load the pending encrypted file using a CryptoKey (passkey PRF path).
+   * Unlike decryptPendingFile, this stores the DEK for future saves instead of a password.
+   */
+  async function decryptPendingFileWithDEK(
+    dek: CryptoKey
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!pendingEncryptedFile.value) {
+      return { success: false, error: 'No pending encrypted file' };
+    }
+
+    const { fileHandle, rawSyncData } = pendingEncryptedFile.value;
+    const result = await syncService.decryptAndImportWithKey(fileHandle, rawSyncData, dek);
+
+    if (result.success) {
+      pendingEncryptedFile.value = null;
+      needsPermission.value = false;
+      lastSync.value = toISODateString(new Date());
+
+      // Store the DEK and salt for future saves
+      sessionDEK.value = dek;
+      syncService.setSessionDEK(dek, result.salt);
+
+      // Update settings
+      await saveSettings({
+        syncEnabled: true,
+        encryptionEnabled: true,
+        syncFilePath: fileName.value ?? undefined,
+        lastSyncTimestamp: lastSync.value,
+      });
+
+      await reloadAllStores();
+      setupAutoSync();
+    }
+
+    return result;
+  }
+
+  /**
    * Clear the pending encrypted file (user cancelled)
    */
   function clearPendingEncryptedFile(): void {
@@ -361,6 +403,10 @@ export const useSyncStore = defineStore('sync', () => {
     const settingsStore = useSettingsStore();
     await settingsStore.loadSettings();
 
+    // Clear any DEK-based session (password takes over)
+    sessionDEK.value = null;
+    syncService.setSessionDEK(null);
+
     // Re-save the file encrypted - pass password directly to ensure encryption happens
     const success = await syncService.save(password);
     if (success) {
@@ -368,6 +414,12 @@ export const useSyncStore = defineStore('sync', () => {
       await saveSettings({ lastSyncTimestamp: lastSync.value });
       // Cache password on trusted devices
       await settingsStore.cacheEncryptionPassword(password);
+
+      // Invalidate passkey registrations (password changed, wrapped DEKs are stale)
+      const familyContextStore = useFamilyContextStore();
+      if (familyContextStore.activeFamilyId) {
+        await invalidatePasskeysForPasswordChange(familyContextStore.activeFamilyId, password);
+      }
     } else {
       // Rollback on failure
       sessionPassword.value = null;
@@ -435,7 +487,9 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = false;
     lastSync.value = null;
     sessionPassword.value = null;
+    sessionDEK.value = null;
     syncService.setSessionPassword(null);
+    syncService.setSessionDEK(null);
 
     // Clear cached encryption password
     const settingsStore = useSettingsStore();
@@ -534,6 +588,7 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = null;
     needsPermission.value = false;
     sessionPassword.value = null;
+    sessionDEK.value = null;
     pendingEncryptedFile.value = null;
   }
 
@@ -561,6 +616,7 @@ export const useSyncStore = defineStore('sync', () => {
     isEncryptionEnabled,
     hasSessionPassword,
     currentSessionPassword,
+    sessionDEK,
     hasPendingEncryptedFile,
     // Actions
     initialize,
@@ -573,6 +629,7 @@ export const useSyncStore = defineStore('sync', () => {
     loadFromNewFile,
     loadFromDroppedFile,
     decryptPendingFile,
+    decryptPendingFileWithDEK,
     clearPendingEncryptedFile,
     enableEncryption,
     disableEncryption,

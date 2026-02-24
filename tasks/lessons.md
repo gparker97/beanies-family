@@ -89,3 +89,21 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout:
 **Pattern:** Renaming a GitHub repo is low-risk because GitHub sets up automatic redirects from the old URL. The main tasks are: (1) rename on GitHub Settings, (2) update local remote URL with `git remote set-url`, (3) sweep codebase for hardcoded references to old name.
 
 **Rule:** Before renaming, grep the entire codebase (including CI workflows, Terraform, wiki, docs) for the old name. After renaming, run a deploy to verify nothing broke. If `package.json` name was already different from the repo name, there's even less to change.
+
+## 7. PBKDF2 salt rotation invalidates wrapped DEKs
+
+**Date:** 2026-02-24
+**Context:** Passkey biometric login returned "incorrect key" after sign-out
+
+**Pattern:** `encryptData()` generates a new random PBKDF2 salt on every call. When a passkey wraps the DEK (derived from password + salt), any subsequent save that re-encrypts the file generates a new salt, making the wrapped DEK stale. This happens silently — e.g., `flushPendingSave()` on sign-out re-encrypts with a fresh salt.
+
+**Symptom:** Passkey registration succeeds, but biometric login fails with "incorrect key" because the file's salt no longer matches the salt the DEK was derived from.
+
+**Rule:** When using key-wrapping (AES-KW) with PBKDF2-derived keys, ensure the encryption salt remains stable after wrapping:
+
+1. After wrapping a DEK, switch to `encryptDataWithKey(data, key, originalSalt)` which preserves the salt
+2. Always store a cached password as fallback alongside PRF-wrapped DEKs
+3. On login, try DEK decryption first, fall back to cached password if the DEK is stale
+4. Design a graceful fallback chain: DEK → cached password → manual password entry
+5. **Return fallback data alongside primary data** — when `authenticateWithPasskey` returns a DEK on the PRF path, also return `cachedPassword` so the caller can fall back. Don't assume the primary path will always succeed.
+6. **Force-save after registration** — `navigator.credentials.create()` pauses JS for user interaction (biometric prompt). During this pause, debounced auto-saves (password-based, new random salt) can fire, making the just-wrapped DEK stale. Force an immediate DEK-based save after registration to re-align the file's salt.

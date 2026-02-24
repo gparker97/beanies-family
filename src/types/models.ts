@@ -36,6 +36,24 @@ export interface GlobalSettings {
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
   cachedEncryptionPassword?: string | null;
+  passkeyPromptShown?: boolean;
+}
+
+// PasskeyRegistration - Stored in registry DB (survives sign-out)
+export interface PasskeyRegistration {
+  credentialId: string; // base64url credential ID (keyPath)
+  memberId: UUID; // FK to FamilyMember
+  familyId: UUID; // FK to Family
+  publicKey: string; // base64 public key
+  transports?: string[]; // AuthenticatorTransport hints
+  prfSupported: boolean; // PRF available during registration?
+  wrappedDEK?: string; // base64 AES-KW wrapped DEK (PRF path)
+  wrappedDEKSalt?: string; // base64 HKDF salt (PRF path)
+  encryptionSalt?: string; // base64 PBKDF2 salt from file (PRF path)
+  cachedPassword?: string; // Cached encryption password (non-PRF path)
+  label: string; // e.g. "MacBook Touch ID"
+  createdAt: ISODateString;
+  lastUsedAt?: ISODateString;
 }
 
 // Family member gender and age group for avatar selection

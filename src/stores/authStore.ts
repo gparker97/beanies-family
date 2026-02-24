@@ -1,6 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
+import {
+  registerPasskeyForMember,
+  authenticateWithPasskey,
+  hasRegisteredPasskeys,
+} from '@/services/auth/passkeyService';
 import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
@@ -318,6 +323,135 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Sign in using a registered passkey (biometric).
+   * Returns dek (PRF path) or cachedPassword (non-PRF path) for file decryption.
+   */
+  async function signInWithPasskey(familyId: string): Promise<{
+    success: boolean;
+    dek?: CryptoKey;
+    cachedPassword?: string;
+    error?: string;
+  }> {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const result = await authenticateWithPasskey({ familyId });
+      if (!result.success || !result.memberId) {
+        error.value = result.error ?? 'Passkey authentication failed';
+        return { success: false, error: error.value };
+      }
+
+      // The member data may not be loaded yet (file not decrypted),
+      // so we create a session with just the memberId.
+      // After file decryption, we'll have full member info.
+      const familyContextStore = useFamilyContextStore();
+
+      const user: AuthUser = {
+        memberId: result.memberId,
+        email: '', // Will be filled after file decryption
+        familyId: familyContextStore.activeFamilyId ?? familyId,
+        role: undefined,
+      };
+      currentUser.value = user;
+      isAuthenticated.value = true;
+      freshSignIn.value = true;
+      persistSession(user);
+
+      return {
+        success: true,
+        dek: result.dek,
+        cachedPassword: result.cachedPassword,
+      };
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Passkey sign in failed';
+      return { success: false, error: error.value };
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /**
+   * After file decryption, update the auth session with full member data.
+   */
+  function updateSessionWithMemberData(): void {
+    if (!currentUser.value) return;
+
+    const familyStore = useFamilyStore();
+    const member = familyStore.members.find((m) => m.id === currentUser.value?.memberId);
+    if (member) {
+      currentUser.value = {
+        ...currentUser.value,
+        email: member.email,
+        role: member.role,
+      };
+      persistSession(currentUser.value);
+      familyStore.setCurrentMember(member.id);
+
+      // Track last login timestamp
+      const now = toISODateString(new Date());
+      familyStore.updateMember(member.id, { lastLoginAt: now });
+    }
+  }
+
+  /**
+   * Register a passkey for the current user.
+   * If PRF succeeds, switches the sync session to DEK-based encryption
+   * so the wrapped DEK stays valid across saves.
+   */
+  async function registerPasskeyForCurrentUser(
+    encryptionPassword: string,
+    encryptedFileBlob: string,
+    label?: string
+  ): Promise<{ success: boolean; error?: string; prfSupported?: boolean }> {
+    if (!currentUser.value) {
+      return { success: false, error: 'Not signed in' };
+    }
+
+    const familyStore = useFamilyStore();
+    const member = familyStore.members.find((m) => m.id === currentUser.value?.memberId);
+    if (!member) {
+      return { success: false, error: 'Member not found' };
+    }
+
+    const result = await registerPasskeyForMember({
+      memberId: member.id,
+      memberName: member.name,
+      memberEmail: member.email,
+      familyId: currentUser.value.familyId ?? '',
+      encryptionPassword,
+      encryptedFileBlob,
+      label,
+    });
+
+    // If PRF succeeded and we got a DEK, switch the sync session to use it.
+    // This ensures future saves (including sign-out flush) use encryptDataWithKey
+    // with a stable salt, keeping the wrapped DEK valid.
+    if (result.success && result.dek && result.dekSalt) {
+      const { useSyncStore } = await import('./syncStore');
+      const syncStore = useSyncStore();
+      const { setSessionDEK } = await import('@/services/sync/syncService');
+      syncStore.sessionDEK = result.dek;
+      setSessionDEK(result.dek, result.dekSalt);
+
+      // Force an immediate save so the file is encrypted with the DEK's stable salt.
+      // This closes a race condition where a debounced auto-save (password-based)
+      // could fire during the biometric prompt, re-encrypting with a new random salt
+      // and making the just-wrapped DEK stale.
+      await syncStore.syncNow(true);
+    }
+
+    return result;
+  }
+
+  /**
+   * Check if any passkeys are registered for a given family.
+   */
+  async function checkHasRegisteredPasskeys(familyId: string): Promise<boolean> {
+    return hasRegisteredPasskeys(familyId);
+  }
+
+  /**
    * Sign out: reset auth state and optionally delete IndexedDB cache.
    * File handle is preserved so next login auto-reconnects to the data file.
    */
@@ -404,6 +538,10 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     initializeAuth,
     signIn,
+    signInWithPasskey,
+    updateSessionWithMemberData,
+    registerPasskeyForCurrentUser,
+    checkHasRegisteredPasskeys,
     signUp,
     setPassword,
     joinFamily,

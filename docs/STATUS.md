@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-24
-> **Updated by:** Claude (automated translation pipeline, Playwright CI caching, mobile privacy toggle, issue #16 update)
+> **Updated by:** Claude (passkey/biometric login implementation — issue #16)
 
 ## Current Phase
 
@@ -129,9 +129,17 @@
 - App.vue bootstrap simplified: global settings → auth init → family resolution → data load
 - ADR-014 (file-based auth decision), supersedes ADR-010 and ADR-013
 
-### Passkey (WebAuthn) Authentication (Future)
+### Passkey / Biometric Authentication (Issue #16)
 
-- `passkeyService.ts`: feature detection, registration, sign-in, passkey management (localStorage for MVP)
+- `passkeyCrypto.ts`: PRF helpers, HKDF key derivation, AES-KW DEK wrapping/unwrapping
+- `passkeyService.ts`: Full WebAuthn registration + assertion with PRF and non-PRF paths
+- `passkeyRepository.ts`: IndexedDB CRUD for passkey registrations (registry DB v3)
+- Dual-path strategy: PRF (true passwordless) + cached password fallback (Firefox)
+- `BiometricLoginView.vue`: One-tap biometric login on returning devices
+- `PasskeyPromptModal.vue`: Post-sign-in prompt to enable biometric login
+- `PasskeySettings.vue`: Full management UI (register, list, remove passkeys)
+- Password change invalidates PRF-wrapped DEKs, updates cached passwords
+- ADR-015 documents the architectural decision
 - `PasskeySettings.vue` component: lists registered passkeys, register new, remove existing
 - Requires server-side challenge generation for full flow (deferred)
 
@@ -446,7 +454,7 @@
 
 ## In Progress
 
-- **Multi-Family with File-Based Auth** — Per-family databases, file-based authentication (Cognito removed), passkey support deferred
+- **Multi-Family with File-Based Auth** — Per-family databases, file-based authentication (Cognito removed), passkey/biometric login implemented
 
 ### Completed Goals Section (Issue #55)
 
@@ -600,3 +608,4 @@ _(None currently tracked)_
 | 2026-02-24 | Playwright browser caching in CI                           | Cache `~/.cache/ms-playwright` keyed on browser + version; saves ~8 min per E2E job (chromium download)                                                 |
 | 2026-02-24 | Mobile privacy toggle in header                            | Show/hide figures icon always visible on mobile/tablet (not buried in hamburger menu) for better UX                                                     |
 | 2026-02-24 | Issue #16 updated: unified passkey login + data unlock     | Single biometric gesture replaces both member password and encryption password; password fallback preserved                                             |
+| 2026-02-24 | Issue #16 implemented: passkey/biometric login             | PRF + cached password dual-path, BiometricLoginView, PasskeyPromptModal, PasskeySettings rewrite, registry DB v3 with passkeys store (ADR-015)          |

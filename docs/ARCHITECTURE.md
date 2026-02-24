@@ -1,6 +1,6 @@
 # Architecture Overview
 
-> **Last updated:** 2026-02-22
+> **Last updated:** 2026-02-24
 
 ## High-Level Architecture
 
@@ -122,11 +122,12 @@ Each family gets its own IndexedDB: `gp-family-finance-{familyId}` (version 3). 
 
 A shared `gp-finance-registry` database stores cross-family metadata:
 
-| Object Store       | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| families           | Family list (id, name, createdAt)           |
-| userFamilyMappings | Maps auth users to families                 |
-| globalSettings     | Device-level prefs (theme, language, rates) |
+| Object Store       | Purpose                                                          |
+| ------------------ | ---------------------------------------------------------------- |
+| families           | Family list (id, name, createdAt)                                |
+| userFamilyMappings | Maps auth users to families                                      |
+| globalSettings     | Device-level prefs (theme, language, rates)                      |
+| passkeys           | WebAuthn passkey registrations (device-level, survives sign-out) |
 
 ### File Handle Database
 
@@ -191,6 +192,12 @@ FamilyMember (0..1) ───▶ (N) Goal
 
 - **File-based auth**: PBKDF2 password hashes stored directly in the family data file alongside `FamilyMember` records
 - **Two-layer security**: (1) AES-GCM file encryption password protects data at rest, (2) per-member PBKDF2 password proves identity within the family
+- **Biometric login (passkeys)**: WebAuthn replaces both passwords with a single biometric gesture. Two paths:
+  - **PRF path**: Authenticator PRF output → HKDF → AES-KW unwraps the file DEK directly (true passwordless)
+  - **Cached password path**: Passkey authenticates member, cached encryption password decrypts the file (Firefox fallback)
+  - Passkey registrations stored in registry DB (device-level, survives sign-out)
+  - Password changes invalidate PRF-wrapped DEKs and update cached passwords
+  - See ADR-015 for the full decision record
 - **Member lifecycle**: Owner creates member → shares invite → member claims record and sets password during joiner onboarding
 - Per-family database isolation prevents cross-user data leakage
 - No cloud auth dependencies — the data file IS the auth database
