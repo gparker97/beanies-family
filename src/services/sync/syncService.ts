@@ -575,14 +575,11 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
   }
 
   try {
-    // Show open file picker to select existing file
+    // Show open file picker to select existing file.
+    // No type filter — Android's system picker filters by MIME type and doesn't
+    // recognise .beanpod as application/json, greying those files out.
+    // We validate file contents after reading instead.
     const handles = await window.showOpenFilePicker({
-      types: [
-        {
-          description: 'beanies.family Data File',
-          accept: { 'application/json': ['.beanpod', '.json'] },
-        },
-      ],
       multiple: false,
     });
 
