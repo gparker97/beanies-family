@@ -107,3 +107,21 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout:
 4. Design a graceful fallback chain: DEK → cached password → manual password entry
 5. **Return fallback data alongside primary data** — when `authenticateWithPasskey` returns a DEK on the PRF path, also return `cachedPassword` so the caller can fall back. Don't assume the primary path will always succeed.
 6. **Force-save after registration** — `navigator.credentials.create()` pauses JS for user interaction (biometric prompt). During this pause, debounced auto-saves (password-based, new random salt) can fire, making the just-wrapped DEK stale. Force an immediate DEK-based save after registration to re-align the file's salt.
+
+## 8. Keep test mocks in sync when adding new module exports
+
+**Date:** 2026-02-24
+**Context:** `passwordCache.test.ts` CI failure — `setSessionDEK` and `flushPendingSave` missing from `syncService` mock
+
+**Pattern:** When a module gains new exports (e.g. `syncService.ts` added `setSessionDEK` and `flushPendingSave`), any `vi.mock()` for that module in existing tests will throw at runtime if the mocked code path calls the new export. Vitest's factory mocks are exhaustive — unmocked exports become `undefined`, which throws `No "X" export is defined on the mock`.
+
+**Symptom:** Tests that previously passed start failing with `[vitest] No "setSessionDEK" export is defined on the "@/services/sync/syncService" mock. Did you forget to return it from "vi.mock"?` — even though the test file wasn't changed.
+
+**Rule:** When adding a new export to a module, grep the test suite for `vi.mock('...<that module>')` and add the new export to every mock factory. Quick check:
+
+```bash
+# After adding exports to src/services/sync/syncService.ts:
+grep -r "vi.mock.*syncService" src/ --include='*.test.ts' -l
+```
+
+Then verify each match includes the new export in its mock factory.

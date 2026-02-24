@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-24
-> **Updated by:** Claude (passkey/biometric login implementation — issue #16)
+> **Updated by:** Claude (biometric login family-switching fix — issue #16 follow-up)
 
 ## Current Phase
 
@@ -422,6 +422,13 @@
 
 - `FamilyBeanRow.vue` `getRoleLabel` now checks `member.ageGroup` (adult/child) instead of only `member.role`
 - Adults with 'member' role correctly show "Parent"/"Big Bean" instead of "Little Bean"
+
+### Biometric Login After Family Switching (Issue #16 follow-up)
+
+- **LoadPodView.vue** — Added biometric detection before password modal: checks `isPlatformAuthenticatorAvailable()` + `hasRegisteredPasskeys()` when encrypted file is loaded, emits `biometric-available` event to switch to BiometricLoginView
+- **LoginPage.vue** — Handles `biometric-available` event from LoadPodView, `biometricDeclined` flag prevents loops when user clicks "Use password instead", resets on family switch/navigation
+- **authStore.ts** — Fixed `signInWithPasskey()` using stale `familyContextStore.activeFamilyId` instead of the authoritative `familyId` parameter during family switching
+- **passwordCache.test.ts** — Added missing `setSessionDEK` and `flushPendingSave` to syncService mock (pre-existing CI failure)
 
 ### Recent Fixes
 
