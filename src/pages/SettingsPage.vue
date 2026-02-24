@@ -204,6 +204,9 @@ async function handleExportTranslations() {
 }
 
 async function handleClearData() {
+  // Clear cached encryption password and trust flag from registry DB before wiping per-family data
+  await settingsStore.clearCachedEncryptionPassword();
+  await settingsStore.setTrustedDevice(false);
   await clearAllData();
   showClearConfirm.value = false;
   window.location.reload();
