@@ -60,8 +60,24 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline
 
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ matrix.browser }}-${{ steps.pw-version.outputs.version }}
+
       - name: Install Playwright
         run: npx playwright install --with-deps ${{ matrix.browser }}
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+
+      - name: Install Playwright deps (OS libraries only)
+        run: npx playwright install-deps ${{ matrix.browser }}
+        if: steps.pw-cache.outputs.cache-hit == 'true'
 
       - name: Run E2E tests
         run: npx playwright test --project=${{ matrix.browser }}
