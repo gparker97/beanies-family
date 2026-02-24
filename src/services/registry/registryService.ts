@@ -3,9 +3,12 @@ import type { RegistryEntry } from '@/types/models';
 const API_URL = import.meta.env.VITE_REGISTRY_API_URL as string | undefined;
 const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY as string | undefined;
 
-function isConfigured(): boolean {
+export function isRegistryConfigured(): boolean {
   return Boolean(API_URL && API_KEY);
 }
+
+/** @deprecated internal alias kept for backward compat */
+const isConfigured = isRegistryConfigured;
 
 async function request(method: string, familyId: string, body?: object): Promise<Response> {
   const res = await fetch(`${API_URL}/family/${familyId}`, {

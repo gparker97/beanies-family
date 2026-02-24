@@ -89,6 +89,8 @@ onUnmounted(() => {
         >
           <div
             v-if="open"
+            role="dialog"
+            aria-modal="true"
             class="relative flex w-full flex-col bg-white shadow-xl dark:bg-slate-800"
             :class="
               isFullscreen

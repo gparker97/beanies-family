@@ -61,6 +61,7 @@ export interface FamilyMember {
   color: string; // UI differentiation
   passwordHash?: string; // PBKDF2 hash in "salt:hash" format
   requiresPassword: boolean; // true when member needs to set a password
+  lastLoginAt?: ISODateString;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
