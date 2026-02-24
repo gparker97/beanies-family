@@ -17,6 +17,33 @@ export interface AuthUser {
   role?: string;
 }
 
+const SESSION_KEY = 'beanies_auth_session';
+
+function persistSession(user: AuthUser): void {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+  } catch {
+    // sessionStorage unavailable (e.g. private browsing) — silent fail
+  }
+}
+
+function clearSession(): void {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    // silent fail
+  }
+}
+
+function restoreSession(): AuthUser | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
   // State
   const isInitialized = ref(false);
@@ -48,9 +75,13 @@ export const useAuthStore = defineStore('auth', () => {
       const families = await db.getAll('families');
 
       if (families.length > 0) {
-        // Family exists — user will authenticate after file loads
+        // Try restoring a previous session (survives page refresh)
+        const saved = restoreSession();
+        if (saved) {
+          currentUser.value = saved;
+          isAuthenticated.value = true;
+        }
         isInitialized.value = true;
-        // Don't set isAuthenticated yet — wait for signIn()
         return;
       }
 
@@ -97,13 +128,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       const familyContextStore = useFamilyContextStore();
 
-      currentUser.value = {
+      const user: AuthUser = {
         memberId: member.id,
         email: member.email,
         familyId: familyContextStore.activeFamilyId ?? undefined,
         role: member.role,
       };
+      currentUser.value = user;
       isAuthenticated.value = true;
+      persistSession(user);
       familyStore.setCurrentMember(member.id);
 
       // Track last login timestamp
@@ -175,13 +208,15 @@ export const useAuthStore = defineStore('auth', () => {
       await settingsStore.setOnboardingCompleted(true);
 
       // Auto sign in
-      currentUser.value = {
+      const user: AuthUser = {
         memberId: member!.id,
         email: params.email,
         familyId: family.id,
         role: 'owner',
       };
+      currentUser.value = user;
       isAuthenticated.value = true;
+      persistSession(user);
 
       return { success: true };
     } catch (e) {
@@ -211,13 +246,15 @@ export const useAuthStore = defineStore('auth', () => {
       const familyContextStore = useFamilyContextStore();
       const member = familyStore.members.find((m) => m.id === memberId);
 
-      currentUser.value = {
+      const user: AuthUser = {
         memberId,
         email: member?.email ?? '',
         familyId: familyContextStore.activeFamilyId ?? undefined,
         role: member?.role,
       };
+      currentUser.value = user;
       isAuthenticated.value = true;
+      persistSession(user);
       familyStore.setCurrentMember(memberId);
 
       return { success: true };
@@ -299,6 +336,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
+    clearSession();
   }
 
   /**
@@ -344,6 +382,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
+    clearSession();
   }
 
   return {
