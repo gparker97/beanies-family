@@ -37,6 +37,9 @@ dist-ssr
 playwright-report
 test-results
 
+# Lambda build artifacts
+infrastructure/lambda/**/lambda.zip
+
 # Terraform
 infrastructure/.terraform/
 infrastructure/**/.terraform/
