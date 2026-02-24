@@ -7,6 +7,10 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import {
+  isPlatformAuthenticatorAvailable,
+  hasRegisteredPasskeys,
+} from '@/services/auth/passkeyService';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -17,12 +21,14 @@ const SESSION_PASSWORD_KEY = 'beanies-file-password';
 const props = defineProps<{
   needsPermissionGrant?: boolean;
   autoLoad?: boolean;
+  skipBiometric?: boolean;
 }>();
 
 const emit = defineEmits<{
   back: [];
   'file-loaded': [];
   'switch-family': [];
+  'biometric-available': [payload: { familyId: string; familyName?: string }];
 }>();
 
 const isLoadingFile = ref(false);
@@ -59,6 +65,32 @@ async function tryAutoDecrypt(): Promise<boolean> {
   return false;
 }
 
+/**
+ * Check if biometric login is available for the given family.
+ * Returns true if biometric-available was emitted (caller should stop the password flow).
+ */
+async function checkBiometricForFamily(familyId: string, familyName?: string): Promise<boolean> {
+  if (props.skipBiometric) return false;
+  try {
+    const hasPlatform = await isPlatformAuthenticatorAvailable();
+    if (!hasPlatform) return false;
+    const hasPasskeys = await hasRegisteredPasskeys(familyId);
+    if (!hasPasskeys) return false;
+    emit('biometric-available', { familyId, familyName });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract familyId/familyName from the pending encrypted file's raw sync data.
+ */
+function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
+  const raw = syncStore.pendingEncryptedFile?.rawSyncData;
+  return { familyId: raw?.familyId, familyName: raw?.familyName };
+}
+
 onMounted(async () => {
   if (props.autoLoad) {
     await autoLoadFile();
@@ -74,8 +106,13 @@ async function autoLoadFile() {
     if (!loadResult.success && loadResult.needsPassword) {
       // File is encrypted — try cached password before showing modal
       if (!(await tryAutoDecrypt())) {
-        loadedFileName.value = syncStore.fileName;
-        showDecryptModal.value = true;
+        const { familyId, familyName } = getPendingFamilyInfo();
+        if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+          // Biometric flow will handle decryption — don't show password modal
+        } else {
+          loadedFileName.value = syncStore.fileName;
+          showDecryptModal.value = true;
+        }
       } else {
         emit('file-loaded');
       }
@@ -97,8 +134,13 @@ async function handleGrantPermission() {
     if (granted) {
       if (syncStore.hasPendingEncryptedFile) {
         if (!(await tryAutoDecrypt())) {
-          loadedFileName.value = syncStore.fileName;
-          showDecryptModal.value = true;
+          const { familyId, familyName } = getPendingFamilyInfo();
+          if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+            // Biometric flow will handle decryption
+          } else {
+            loadedFileName.value = syncStore.fileName;
+            showDecryptModal.value = true;
+          }
         } else {
           emit('file-loaded');
         }
@@ -123,8 +165,13 @@ async function handleLoadFile() {
     if (result.success) {
       emit('file-loaded');
     } else if (result.needsPassword) {
-      loadedFileName.value = syncStore.fileName;
-      showDecryptModal.value = true;
+      const { familyId, familyName } = getPendingFamilyInfo();
+      if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+        // Biometric flow will handle decryption
+      } else {
+        loadedFileName.value = syncStore.fileName;
+        showDecryptModal.value = true;
+      }
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -226,8 +273,13 @@ async function handleDrop(e: DragEvent) {
     if (result.success) {
       emit('file-loaded');
     } else if (result.needsPassword) {
-      loadedFileName.value = file.name;
-      showDecryptModal.value = true;
+      const { familyId, familyName } = getPendingFamilyInfo();
+      if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+        // Biometric flow will handle decryption
+      } else {
+        loadedFileName.value = file.name;
+        showDecryptModal.value = true;
+      }
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {

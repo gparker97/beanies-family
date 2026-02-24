@@ -34,6 +34,7 @@ const fileUnencrypted = ref(false);
 const isInitializing = ref(true);
 const biometricFamilyId = ref('');
 const biometricFamilyName = ref<string | undefined>();
+const biometricDeclined = ref(false);
 
 onMounted(async () => {
   // Initialize stores but always show the Welcome Gate first
@@ -77,6 +78,7 @@ onMounted(async () => {
 });
 
 function handleNavigate(view: 'load-pod' | 'create' | 'join') {
+  biometricDeclined.value = false;
   activeView.value = view;
   if (view === 'load-pod') {
     // Auto-load if file handle is configured and we have permission
@@ -88,6 +90,12 @@ function handleNavigate(view: 'load-pod' | 'create' | 'join') {
   }
 }
 
+function handleBiometricAvailable(payload: { familyId: string; familyName?: string }) {
+  biometricFamilyId.value = payload.familyId;
+  biometricFamilyName.value = payload.familyName;
+  activeView.value = 'biometric';
+}
+
 function handleFileLoaded() {
   fileUnencrypted.value = !syncStore.isEncryptionEnabled;
   activeView.value = 'pick-bean';
@@ -97,11 +105,13 @@ function handleSwitchFamily() {
   // Reset state and go to load-pod without auto-load
   needsPermissionGrant.value = false;
   autoLoadPod.value = false;
+  biometricDeclined.value = false;
   activeView.value = 'load-pod';
 }
 
 function handleBiometricFallback() {
   // Fall back to password flow — go to load-pod with auto-load
+  biometricDeclined.value = true;
   autoLoadPod.value = syncStore.isConfigured && !syncStore.needsPermission;
   needsPermissionGrant.value = syncStore.isConfigured && syncStore.needsPermission;
   activeView.value = 'load-pod';
@@ -137,9 +147,11 @@ function handleSignedIn(destination: string) {
         v-else-if="activeView === 'load-pod'"
         :needs-permission-grant="needsPermissionGrant"
         :auto-load="autoLoadPod"
+        :skip-biometric="biometricDeclined"
         @back="activeView = 'welcome'"
         @file-loaded="handleFileLoaded"
         @switch-family="handleSwitchFamily"
+        @biometric-available="handleBiometricAvailable"
       />
 
       <PickBeanView

@@ -345,12 +345,10 @@ export const useAuthStore = defineStore('auth', () => {
       // The member data may not be loaded yet (file not decrypted),
       // so we create a session with just the memberId.
       // After file decryption, we'll have full member info.
-      const familyContextStore = useFamilyContextStore();
-
       const user: AuthUser = {
         memberId: result.memberId,
         email: '', // Will be filled after file decryption
-        familyId: familyContextStore.activeFamilyId ?? familyId,
+        familyId,
         role: undefined,
       };
       currentUser.value = user;
