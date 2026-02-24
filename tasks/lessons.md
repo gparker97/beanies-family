@@ -71,3 +71,12 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150');
 // GOOD: explicit 10s timeout for async data
 await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout: 10000 });
 ```
+
+## 5. Translation script must stay in sync with uiStrings.ts format
+
+**Date:** 2026-02-24
+**Context:** `scripts/updateTranslations.mjs` parser broke when `UI_STRINGS` was refactored to `STRING_DEFS`
+
+**Pattern:** The translation script (`scripts/updateTranslations.mjs`) parses `uiStrings.ts` at the text level (not via TypeScript imports). Any structural refactoring of `uiStrings.ts` — renaming the main object, changing the export pattern, switching from `as const` to `satisfies`, etc. — can silently break the parser.
+
+**Rule:** Whenever you modify the structure of `uiStrings.ts` (not just adding/removing string entries), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm the parser still extracts all keys correctly.

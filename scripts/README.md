@@ -1,100 +1,59 @@
-# Translation Scripts
+# Scripts
 
-## Update Translations
+## Translation Update (`updateTranslations.mjs`)
 
-Automatically fetch and update translation files with missing or outdated translations.
+Automatically updates translation JSON files by parsing `STRING_DEFS` from `uiStrings.ts` and translating missing or outdated strings via the MyMemory API.
 
 ### Usage
 
 ```bash
-# Update Chinese translations
-npm run translate:zh
+# Translate all configured languages (default)
+npm run translate
 
-# Or specify language manually
-npm run translate zh
+# Translate a single language
+npm run translate:zh
 ```
 
 ### What It Does
 
-1. **Reads source strings** from `src/services/translation/uiStrings.ts`
+1. **Parses `STRING_DEFS`** from `src/services/translation/uiStrings.ts` (line-by-line parser)
 2. **Compares** with existing translations in `public/translations/{language}.json`
-3. **Identifies** missing or outdated translations (based on hash)
-4. **Fetches** translations from MyMemory API
-5. **Updates** the JSON file with new translations
+3. **Identifies** missing or outdated translations (hash-based comparison)
+4. **Removes stale keys** no longer present in `STRING_DEFS`
+5. **Fetches** translations from MyMemory API for missing/outdated strings
+6. **Saves** updated JSON files
 
 ### Features
 
-- ✅ **Smart detection**: Only translates changed or missing strings
-- ✅ **Hash-based tracking**: Automatically detects when English text changes
-- ✅ **Progress reporting**: Shows real-time progress with emojis
-- ✅ **API-friendly**: Includes delays to respect API rate limits
-- ✅ **Safe fallbacks**: Uses original text if translation fails
+- **Multi-language**: `--all` flag (default) translates all configured languages
+- **Hash-based tracking**: Only re-translates when English source text changes
+- **Stale key cleanup**: Removes translations for deleted source strings
+- **CI-friendly**: Summary output, exit 0 when up to date, non-zero on errors
+- **API-friendly**: 250ms delay between requests to respect rate limits
+- **Safe fallbacks**: Uses original text if translation API fails
 
-### Output
+### Automated Pipeline
 
-The script updates: `public/translations/{language}.json`
+A GitHub Actions workflow (`.github/workflows/translation-sync.yml`) runs this script daily at 3 AM UTC, commits any changes, and deploys to production. See `docs/TRANSLATION.md` for full details.
 
-Example output:
+### Adding a New Language
 
-```
-🌐 Updating translations for: 中文 (简体) (zh)
-
-📖 Reading source strings from uiStrings.ts...
-   Found 287 strings
-
-📂 Loading existing translation file...
-   Found 250 existing translations
-
-🔍 Checking for missing or outdated translations...
-   Missing: 35
-   Outdated: 2
-   Total to translate: 37
-
-🔄 Translating 37 strings (this may take a few minutes)...
-
-   [3%] 🆕 app.newFeature
-        "New Feature" → "新功能"
-   [5%] 🔄 settings.title
-        "Settings" → "设置"
-   ...
-
-💾 Saving translation file...
-
-✅ Successfully updated 37 translations!
-   File: public/translations/zh.json
-   Total translations: 287/287
-
-📝 Next steps:
-   1. Review the changes in the JSON file
-   2. Commit the updated translation file to git
-   3. Test the translations in the app
-```
-
-### Adding New Languages
-
-To add support for a new language, edit `scripts/updateTranslations.mjs`:
+1. Add an entry to `LANGUAGES` in `scripts/updateTranslations.mjs`:
 
 ```javascript
 const LANGUAGES = {
-  zh: {
-    code: 'zh',
-    name: '中文 (简体)',
-    myMemoryCode: 'zh-CN',
-  },
-  es: {
-    // Add new language
-    code: 'es',
-    name: 'Español',
-    myMemoryCode: 'es',
-  },
+  zh: { code: 'zh', name: '中文 (简体)', myMemoryCode: 'zh-CN' },
+  es: { code: 'es', name: 'Español', myMemoryCode: 'es' }, // new
 };
 ```
 
-Then add a corresponding npm script in `package.json`:
+2. Add an npm script in `package.json`:
 
 ```json
 "translate:es": "node scripts/updateTranslations.mjs es"
 ```
+
+3. Run `npm run translate:es` to generate the initial translation file.
 
 ### API Information
 
@@ -102,21 +61,22 @@ Uses [MyMemory Translation API](https://mymemory.translated.net/):
 
 - Free tier: 50,000 characters/day
 - Rate limit: ~1 request per 250ms (respectful)
-- No API key required (but included for higher limits)
+- No API key required (email parameter for higher limits)
 
 ### Troubleshooting
 
 **Translation quality issues?**
 
-- Manually edit the JSON file to fix translations
-- The hash will remain the same, so your fix won't be overwritten
+- Edit the JSON file directly to fix translations
+- Keep the `hash` unchanged — your fix won't be overwritten
 
 **API rate limit errors?**
 
 - Increase `REQUEST_DELAY_MS` in the script
-- Wait a few minutes and try again
+- Wait and retry the next day
 
 **Script fails to parse uiStrings.ts?**
 
-- Ensure the `UI_STRINGS` object format hasn't changed
-- Check for syntax errors in uiStrings.ts
+- Ensure `const STRING_DEFS = { ... } satisfies Record<string, StringEntry>` format
+- Keys must be single-quoted: `'key.name': {`
+- `en:` values can be single or double-quoted
