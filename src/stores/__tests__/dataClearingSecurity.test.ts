@@ -76,13 +76,13 @@ vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
 }));
 
 // Database operations
-const mockDeleteFamilyDatabase = vi.fn(async () => {});
+const mockDeleteFamilyDatabase = vi.fn(async (_familyId?: string) => {});
 const mockClearAllData = vi.fn(async () => {});
 const mockGetActiveFamilyId = vi.fn(() => 'family-123');
 
 vi.mock('@/services/indexeddb/database', () => ({
-  deleteFamilyDatabase: (...args: unknown[]) => mockDeleteFamilyDatabase(...args),
-  clearAllData: (...args: unknown[]) => mockClearAllData(...args),
+  deleteFamilyDatabase: (familyId?: string) => mockDeleteFamilyDatabase(familyId),
+  clearAllData: () => mockClearAllData(),
   getActiveFamilyId: () => mockGetActiveFamilyId(),
   getDatabase: vi.fn(async () => ({})),
   initializeDatabase: vi.fn(async () => ({})),
@@ -105,7 +105,7 @@ vi.mock('@/services/sync/syncService', () => ({
   getFileTimestamp: vi.fn(async () => null),
   setSessionPassword: vi.fn(),
   triggerDebouncedSave: vi.fn(),
-  flushPendingSave: (...args: unknown[]) => mockFlushPendingSave(...args),
+  flushPendingSave: () => mockFlushPendingSave(),
   cancelPendingSave: vi.fn(),
   reset: vi.fn(),
   getState: vi.fn(() => ({
@@ -469,8 +469,8 @@ describe('Sensitive Data Clearing Security', () => {
 
       expect(mockFlushPendingSave).toHaveBeenCalled();
       // flush should be called before deleteFamilyDatabase
-      const flushOrder = mockFlushPendingSave.mock.invocationCallOrder[0];
-      const deleteOrder = mockDeleteFamilyDatabase.mock.invocationCallOrder[0];
+      const flushOrder = mockFlushPendingSave.mock.invocationCallOrder[0]!;
+      const deleteOrder = mockDeleteFamilyDatabase.mock.invocationCallOrder[0]!;
       expect(flushOrder).toBeLessThan(deleteOrder);
     });
   });
