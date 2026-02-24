@@ -11,7 +11,13 @@ import {
   importSyncFileData,
   openFilePicker,
 } from './fileSync';
-import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
+import {
+  encryptSyncData,
+  decryptSyncData,
+  encryptDataWithKey,
+  decryptDataWithKey,
+  extractSaltFromEncrypted,
+} from '@/services/crypto/encryption';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { SyncFileData } from '@/types/models';
@@ -91,6 +97,8 @@ export function reset(): void {
   currentFileHandle = null;
   currentFileHandleFamilyId = null;
   sessionPassword = null;
+  sessionDEK = null;
+  sessionDEKSalt = null;
   updateState({
     isInitialized: false,
     isConfigured: false,
@@ -245,10 +253,12 @@ export async function save(password?: string): Promise<boolean> {
     return false;
   }
 
-  // Guard: if encryption is required but no password provided, refuse to write
+  // Guard: if encryption is required but no password/DEK provided, refuse to write
   // plaintext. This is the last line of defense against all encryption bypass bugs.
-  if (!password && isEncryptionRequiredFn && isEncryptionRequiredFn()) {
-    console.warn('[syncService] save() blocked: encryption is enabled but no password provided');
+  if (!password && !sessionDEK && isEncryptionRequiredFn && isEncryptionRequiredFn()) {
+    console.warn(
+      '[syncService] save() blocked: encryption is enabled but no password or DEK provided'
+    );
     return false;
   }
 
@@ -262,13 +272,28 @@ export async function save(password?: string): Promise<boolean> {
       return false;
     }
 
-    // Create sync data
-    const syncData = await createSyncFileData(!!password);
+    // Create sync data — mark as encrypted if password or DEK is provided
+    const needsEncryption = !!(password || sessionDEK);
+    const syncData = await createSyncFileData(needsEncryption);
 
     let fileContent: string;
 
-    if (password) {
-      // Encrypt the data section
+    if (sessionDEK && sessionDEKSalt) {
+      // DEK-based encryption (passkey PRF path)
+      const dataJson = JSON.stringify(syncData.data);
+      const encryptedData = await encryptDataWithKey(dataJson, sessionDEK, sessionDEKSalt);
+
+      const encryptedSyncData: Record<string, unknown> = {
+        version: syncData.version,
+        exportedAt: syncData.exportedAt,
+        encrypted: true,
+        data: encryptedData,
+      };
+      if (syncData.familyId) encryptedSyncData.familyId = syncData.familyId;
+      if (syncData.familyName) encryptedSyncData.familyName = syncData.familyName;
+      fileContent = JSON.stringify(encryptedSyncData, null, 2);
+    } else if (password) {
+      // Password-based encryption (standard path)
       const dataJson = JSON.stringify(syncData.data);
       const encryptedData = await encryptSyncData(dataJson, password);
 
@@ -279,7 +304,7 @@ export async function save(password?: string): Promise<boolean> {
         version: syncData.version,
         exportedAt: syncData.exportedAt,
         encrypted: true,
-        data: encryptedData, // This is now a string (base64 encrypted)
+        data: encryptedData,
       };
       if (syncData.familyId) {
         encryptedSyncData.familyId = syncData.familyId;
@@ -478,6 +503,33 @@ export function getSessionPassword(): string | null {
 }
 
 /**
+ * Get the current session file handle (for reading encrypted blob during passkey registration).
+ */
+export function getSessionFileHandle(): FileSystemFileHandle | null {
+  return currentFileHandle;
+}
+
+// Session DEK for PRF-based passkey sessions (CryptoKey instead of password)
+let sessionDEK: CryptoKey | null = null;
+let sessionDEKSalt: Uint8Array | null = null;
+
+/**
+ * Set the session DEK for PRF-based passkey sessions.
+ * When set, save() will use this key for encryption instead of the password.
+ */
+export function setSessionDEK(dek: CryptoKey | null, salt?: Uint8Array | null): void {
+  sessionDEK = dek;
+  sessionDEKSalt = salt ?? null;
+}
+
+/**
+ * Get the current session DEK
+ */
+export function getSessionDEK(): CryptoKey | null {
+  return sessionDEK;
+}
+
+/**
  * Trigger a debounced save (for auto-sync).
  * If encryption is enabled (via callback) but no session password is available,
  * the save is skipped entirely to prevent writing plaintext to an encrypted file.
@@ -489,9 +541,9 @@ export function triggerDebouncedSave(): void {
 
   saveDebounceTimer = setTimeout(() => {
     // Check encryption requirement via callback before saving
-    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
+    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword && !sessionDEK) {
       console.warn(
-        '[syncService] Auto-save skipped: encryption is enabled but no session password available'
+        '[syncService] Auto-save skipped: encryption is enabled but no session password or DEK available'
       );
       return;
     }
@@ -520,9 +572,9 @@ export async function flushPendingSave(): Promise<void> {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
     // Guard: never write plaintext when encryption is required
-    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
+    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword && !sessionDEK) {
       console.warn(
-        '[syncService] Flush skipped: encryption is enabled but no session password available'
+        '[syncService] Flush skipped: encryption is enabled but no session password or DEK available'
       );
       return;
     }
@@ -940,6 +992,78 @@ export async function decryptAndImport(
     if (errorMessage.includes('Incorrect password') || errorMessage.includes('corrupted')) {
       updateState({ isSyncing: false, lastError: 'Incorrect password' });
       return { success: false, error: 'Incorrect password' };
+    }
+    updateState({ isSyncing: false, lastError: errorMessage });
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Decrypt and import using a CryptoKey (passkey PRF path).
+ * Same as decryptAndImport but uses a pre-derived DEK instead of a password.
+ */
+export async function decryptAndImportWithKey(
+  fileHandle: FileSystemFileHandle,
+  rawSyncData: SyncFileData,
+  dek: CryptoKey
+): Promise<{ success: boolean; error?: string; salt?: Uint8Array }> {
+  updateState({ isSyncing: true, lastError: null });
+
+  try {
+    const encryptedData = rawSyncData.data as unknown as string;
+
+    // Decrypt using the DEK directly
+    const decryptedJson = await decryptDataWithKey(encryptedData, dek);
+    const decryptedData = JSON.parse(decryptedJson);
+
+    // Extract salt for future saves with the same key
+    const salt = extractSaltFromEncrypted(encryptedData);
+
+    const syncData: SyncFileData = {
+      version: rawSyncData.version,
+      exportedAt: rawSyncData.exportedAt,
+      encrypted: false,
+      data: decryptedData,
+      familyId: rawSyncData.familyId,
+      familyName: rawSyncData.familyName,
+    };
+
+    if (!validateSyncFileData(syncData)) {
+      updateState({ isSyncing: false, lastError: 'Invalid data structure after decryption' });
+      return { success: false, error: 'Invalid data structure after decryption' };
+    }
+
+    let activeFamilyId = getActiveFamilyId();
+    if (syncData.familyId) {
+      if (syncData.familyId !== activeFamilyId) {
+        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
+        activeFamilyId = syncData.familyId;
+      }
+    } else if (!activeFamilyId) {
+      const newFamilyId = generateUUID();
+      await createFamilyWithId(newFamilyId, 'My Family');
+      activeFamilyId = newFamilyId;
+    }
+
+    await importSyncFileData(syncData);
+
+    await storeFileHandle(fileHandle);
+    currentFileHandle = fileHandle;
+    currentFileHandleFamilyId = activeFamilyId;
+
+    updateState({
+      isConfigured: true,
+      fileName: fileHandle.name,
+      isSyncing: false,
+      lastError: null,
+    });
+
+    return { success: true, salt };
+  } catch (e) {
+    const errorMessage = (e as Error).message;
+    if (errorMessage.includes('Incorrect key') || errorMessage.includes('corrupted')) {
+      updateState({ isSyncing: false, lastError: 'Incorrect key' });
+      return { success: false, error: 'Incorrect key' };
     }
     updateState({ isSyncing: false, lastError: errorMessage });
     return { success: false, error: errorMessage };

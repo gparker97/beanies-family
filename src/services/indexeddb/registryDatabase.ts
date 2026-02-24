@@ -1,8 +1,13 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Family, UserFamilyMapping, GlobalSettings } from '@/types/models';
+import type {
+  Family,
+  UserFamilyMapping,
+  GlobalSettings,
+  PasskeyRegistration,
+} from '@/types/models';
 
 const REGISTRY_DB_NAME = 'gp-finance-registry';
-const REGISTRY_DB_VERSION = 2;
+const REGISTRY_DB_VERSION = 3;
 
 export interface RegistryDB extends DBSchema {
   families: {
@@ -20,6 +25,14 @@ export interface RegistryDB extends DBSchema {
   globalSettings: {
     key: string;
     value: GlobalSettings;
+  };
+  passkeys: {
+    key: string;
+    value: PasskeyRegistration;
+    indexes: {
+      'by-memberId': string;
+      'by-familyId': string;
+    };
   };
 }
 
@@ -51,6 +64,13 @@ export async function getRegistryDatabase(): Promise<IDBPDatabase<RegistryDB>> {
 
       if (!db.objectStoreNames.contains('globalSettings')) {
         db.createObjectStore('globalSettings', { keyPath: 'id' });
+      }
+
+      // v3: add passkeys store for WebAuthn/biometric credentials
+      if (!db.objectStoreNames.contains('passkeys')) {
+        const passkeyStore = db.createObjectStore('passkeys', { keyPath: 'credentialId' });
+        passkeyStore.createIndex('by-memberId', 'memberId', { unique: false });
+        passkeyStore.createIndex('by-familyId', 'familyId', { unique: false });
       }
     },
   });

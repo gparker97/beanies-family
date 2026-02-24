@@ -46,6 +46,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
   );
+  const passkeyPromptShown = computed(() => globalSettings.value.passkeyPromptShown ?? false);
 
   // Apply theme to document
   watch(
@@ -346,6 +347,12 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   }
 
+  async function setPasskeyPromptShown(): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      passkeyPromptShown: true,
+    });
+  }
+
   /**
    * Cache the encryption password on trusted devices so it survives page refresh.
    * Only stores when isTrustedDevice is true.
@@ -411,6 +418,7 @@ export const useSettingsStore = defineStore('settings', () => {
     onboardingCompleted,
     isTrustedDevice,
     trustedDevicePromptShown,
+    passkeyPromptShown,
     // Actions
     loadGlobalSettings,
     loadSettings,
@@ -434,6 +442,7 @@ export const useSettingsStore = defineStore('settings', () => {
     removeExchangeRate,
     setTrustedDevice,
     setTrustedDevicePromptShown,
+    setPasskeyPromptShown,
     cacheEncryptionPassword,
     getCachedEncryptionPassword,
     clearCachedEncryptionPassword,

@@ -793,6 +793,7 @@ const STRING_DEFS = {
   'action.download': { en: 'Download' },
   'action.load': { en: 'Load' },
   'action.seeAll': { en: 'See All' },
+  'action.tryAgain': { en: 'Try again' },
 
   // Confirmation dialog titles
   'confirm.deleteAccountTitle': { en: 'Delete Account', beanie: 'Remove Bean Jar' },
@@ -823,6 +824,50 @@ const STRING_DEFS = {
   },
   'passkey.removeConfirm': {
     en: 'Remove this passkey? You will no longer be able to sign in with it.',
+  },
+
+  // Passkey / biometric login
+  'passkey.signInButton': { en: 'Sign in with biometric' },
+  'passkey.usePassword': { en: 'Use password instead' },
+  'passkey.authenticating': { en: 'Verifying...' },
+  'passkey.welcomeBack': { en: 'Welcome back' },
+  'passkey.promptTitle': { en: 'Unlock with your face or fingerprint?' },
+  'passkey.promptDescription': {
+    en: 'Next time you sign in, one tap is all it takes. No more typing passwords.',
+  },
+  'passkey.promptEnable': { en: 'Enable biometric login' },
+  'passkey.promptDecline': { en: 'Not now' },
+  'passkey.promptHint': { en: 'You can manage this in Settings at any time.' },
+  'passkey.registerButton': { en: 'Register new biometric' },
+  'passkey.registerSuccess': { en: 'Biometric login enabled!' },
+  'passkey.registerError': { en: 'Failed to register biometric. Please try again.' },
+  'passkey.signInError': { en: 'Biometric sign-in failed. Please try with your password.' },
+  'passkey.dekStale': {
+    en: 'Your encryption key has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
+  },
+  'passkey.dekAndPasswordFailed': {
+    en: 'Your encryption password has changed. Please sign in with your password and re-register biometric in Settings.',
+  },
+  'passkey.passwordChanged': {
+    en: 'Your encryption password has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
+  },
+  'passkey.prfFull': { en: 'Full unlock' },
+  'passkey.prfCached': { en: 'Cached password' },
+  'passkey.lastUsed': { en: 'Last used' },
+  'passkey.neverUsed': { en: 'Never used' },
+  'passkey.noAuthenticator': {
+    en: 'No biometric authenticator detected on this device.',
+  },
+  'passkey.registeredPasskeys': { en: 'Registered biometrics' },
+  'passkey.settingsTitle': { en: 'Biometric Login' },
+  'passkey.settingsDescription': {
+    en: 'Sign in with your fingerprint, face, or device PIN instead of a password.',
+  },
+  'passkey.enterEncryptionPassword': { en: 'Enter your encryption password to register' },
+  'passkey.noPasskeys': { en: 'No biometric logins registered yet.' },
+  'passkey.unsupported': { en: 'Your browser does not support biometric login (WebAuthn).' },
+  'passkey.needsEncryption': {
+    en: 'Biometric login requires file encryption to be enabled.',
   },
 
   // Trusted device
