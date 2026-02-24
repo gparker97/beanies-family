@@ -72,8 +72,6 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150');
 await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout: 10000 });
 ```
 
-<<<<<<< Updated upstream
-
 ## 5. Translation script must stay in sync with uiStrings.ts format
 
 **Date:** 2026-02-24
@@ -81,9 +79,9 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout:
 
 **Pattern:** The translation script (`scripts/updateTranslations.mjs`) parses `uiStrings.ts` at the text level (not via TypeScript imports). Any structural refactoring of `uiStrings.ts` — renaming the main object, changing the export pattern, switching from `as const` to `satisfies`, etc. — can silently break the parser.
 
-# **Rule:** Whenever you modify the structure of `uiStrings.ts` (not just adding/removing string entries), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm the parser still extracts all keys correctly.
+**Rule:** Whenever you modify the structure of `uiStrings.ts` (not just adding/removing string entries), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm the parser still extracts all keys correctly.
 
-## 5. Repo rename: GitHub redirects handle most things automatically
+## 6. Repo rename: GitHub redirects handle most things automatically
 
 **Date:** 2026-02-24
 **Context:** Renamed repo from `gp-family-finance-planner` to `beanies-family`
@@ -91,5 +89,3 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout:
 **Pattern:** Renaming a GitHub repo is low-risk because GitHub sets up automatic redirects from the old URL. The main tasks are: (1) rename on GitHub Settings, (2) update local remote URL with `git remote set-url`, (3) sweep codebase for hardcoded references to old name.
 
 **Rule:** Before renaming, grep the entire codebase (including CI workflows, Terraform, wiki, docs) for the old name. After renaming, run a deploy to verify nothing broke. If `package.json` name was already different from the repo name, there's even less to change.
-
-> > > > > > > Stashed changes
