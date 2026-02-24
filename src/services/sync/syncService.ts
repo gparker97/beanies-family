@@ -292,8 +292,10 @@ export async function save(password?: string): Promise<boolean> {
       fileContent = JSON.stringify(syncData, null, 2);
     }
 
-    // Write to file
+    // Write to file — truncate first to prevent stale trailing bytes when
+    // the new content is shorter than the previous write (e.g. shorter familyName).
     const writable = await currentFileHandle.createWritable();
+    await writable.truncate(0);
     await writable.write(fileContent);
     await writable.close();
 
