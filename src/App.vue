@@ -162,6 +162,9 @@ async function loadFromIndexedDBCache() {
 
 onMounted(async () => {
   try {
+    // Ensure initial route is resolved before checking route names
+    await router.isReady();
+
     // Step 1: Load global settings (theme, language) — works before any family is active
     await settingsStore.loadGlobalSettings();
 

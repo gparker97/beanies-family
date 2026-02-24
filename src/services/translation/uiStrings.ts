@@ -630,6 +630,45 @@ const STRING_DEFS = {
   'family.enterEmail': { en: 'Enter email' },
   'family.profileColor': { en: 'Profile Color' },
   'family.year': { en: 'Year' },
+  'family.status.waitingToJoin': {
+    en: 'Waiting to join',
+    beanie: 'Waiting to sprout',
+  },
+  'family.status.active': {
+    en: 'Active',
+    beanie: 'Sprouted',
+  },
+  'family.lastSeen': { en: 'Last seen {date}' },
+  'family.neverLoggedIn': { en: 'Never signed in' },
+  'family.inviteMember': { en: 'Invite {name}' },
+  'family.linkCopied': {
+    en: 'Invite link copied!',
+    beanie: 'Magic bean link copied!',
+  },
+  'family.copyInviteLinkHint': {
+    en: 'Copy and share your magic link with your family member',
+    beanie: 'Copy the magic bean link for this beanie',
+  },
+  'family.inviteSection.title': {
+    en: 'Invite to join',
+    beanie: 'Sprout this beanie',
+  },
+  'family.inviteSection.desc': {
+    en: "This member hasn't joined yet. Share the link below so they can set up their account.",
+    beanie: "This beanie hasn't sprouted yet! Share the magic link so they can join the pod.",
+  },
+  'family.inviteSection.step1': {
+    en: 'Copy the invite link and send it to them',
+    beanie: 'Copy the magic bean link and send it their way',
+  },
+  'family.inviteSection.step2': {
+    en: 'They open the link and choose a password',
+    beanie: 'They open the link and pick a secret bean code',
+  },
+  'family.inviteSection.step3': {
+    en: "They're in! They can now sign in with their own account",
+    beanie: "They've sprouted! They can now sign into the pod",
+  },
 
   // Settings (additional)
   'settings.preferredCurrencies': { en: 'Preferred Currencies' },
@@ -897,9 +936,9 @@ const STRING_DEFS = {
   'loginV6.skip': { en: 'Skip for now' },
   'loginV6.joinInput': { en: 'Family code or magic link' },
   'loginV6.whatsNext': { en: 'What happens next?' },
-  'loginV6.joinStep1': { en: "We'll verify your code" },
-  'loginV6.joinStep2': { en: "You'll enter the pod password" },
-  'loginV6.joinStep3': { en: "Then you'll find yourself in the family" },
+  'loginV6.joinStep1': { en: "We'll verify your family and load the data file" },
+  'loginV6.joinStep2': { en: "You'll pick your profile and create a password" },
+  'loginV6.joinStep3': { en: "Then you're in!", beanie: "Then you're a bean!" },
   'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'Join the Pod!' },
   'loginV6.joinNotAvailable': {
     en: 'Joining a pod isn\'t available yet. Ask your family to share their .beanpod file with you and use "Sign in to your pod" instead.',
@@ -943,6 +982,50 @@ const STRING_DEFS = {
   'loginV6.addMemberFailed': { en: 'Failed to add member. Please try again.' },
   'loginV6.removeMember': { en: 'Remove' },
   'loginV6.you': { en: 'You' },
+
+  // Join flow (magic link invites)
+  'join.verifyTitle': { en: 'Join your family', beanie: 'Join your pod!' },
+  'join.verifySubtitle': { en: "Let's find your family" },
+  'join.lookingUp': { en: 'Looking up your family...', beanie: 'Finding your pod...' },
+  'join.familyFound': { en: 'Family found!', beanie: 'Pod found!' },
+  'join.familyNotFound': {
+    en: 'Family not found. Check the code and try again.',
+    beanie: 'Pod not found. Check the code and try again.',
+  },
+  'join.registryOffline': {
+    en: "We couldn't reach the registry. You can still join by loading the shared file directly.",
+  },
+  'join.needsFile': { en: 'You need the family data file', beanie: 'You need the pod file' },
+  'join.needsFileDesc': {
+    en: 'Ask the owner to share the .beanpod file with you via email, a shared cloud folder, or USB.',
+  },
+  'join.expectedFile': { en: 'Look for a file named:' },
+  'join.fileMismatch': {
+    en: 'This file belongs to a different family. Please load the correct file.',
+    beanie: 'This file belongs to a different pod. Please load the correct file.',
+  },
+  'join.loadFileButton': { en: 'Load .beanpod file' },
+  'join.dropZoneText': { en: 'Drop the shared .beanpod file here' },
+  'join.pickMemberTitle': { en: 'Which one is you?', beanie: 'Pick your bean!' },
+  'join.pickMemberSubtitle': { en: 'Select the profile created for you' },
+  'join.noUnclaimedMembers': {
+    en: 'No unclaimed profiles found. Ask the family owner to create your profile first.',
+    beanie: 'No unclaimed beans found. Ask the pod owner to plant your bean first.',
+  },
+  'join.setPasswordTitle': { en: 'Create your password' },
+  'join.setPasswordSubtitle': { en: 'This password is just for you to sign in' },
+  'join.completing': { en: 'Joining your family...', beanie: 'Planting your bean...' },
+  'join.success': { en: 'Welcome to the family!', beanie: 'Welcome to the pod!' },
+  'join.shareFileNote': {
+    en: 'Important: also share the .beanpod file with them (email, cloud folder, or USB)',
+  },
+  'join.enterCodeManually': { en: 'Or enter a family code manually' },
+  'join.codeInputLabel': { en: 'Family code' },
+  'join.codeInputHint': {
+    en: 'Paste the family code or invite link shared by your family member',
+    beanie: 'Paste the pod code or invite link shared by your pod mate',
+  },
+  'join.next': { en: 'Next' },
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
