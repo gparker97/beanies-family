@@ -379,9 +379,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
-    // Clear trust flag
+    // Clear trust flag and cached encryption password
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
+    await settingsStore.clearCachedEncryptionPassword();
 
     // Clear auth state
     currentUser.value = null;

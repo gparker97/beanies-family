@@ -346,6 +346,33 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   }
 
+  /**
+   * Cache the encryption password on trusted devices so it survives page refresh.
+   * Only stores when isTrustedDevice is true.
+   */
+  async function cacheEncryptionPassword(password: string): Promise<void> {
+    if (!isTrustedDevice.value) return;
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      cachedEncryptionPassword: password,
+    });
+  }
+
+  /**
+   * Retrieve the cached encryption password (returns null if not cached).
+   */
+  function getCachedEncryptionPassword(): string | null {
+    return globalSettings.value.cachedEncryptionPassword ?? null;
+  }
+
+  /**
+   * Clear the cached encryption password.
+   */
+  async function clearCachedEncryptionPassword(): Promise<void> {
+    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+      cachedEncryptionPassword: null,
+    });
+  }
+
   function resetState() {
     settings.value = settingsRepo.getDefaultSettings();
     isLoading.value = false;
@@ -407,6 +434,9 @@ export const useSettingsStore = defineStore('settings', () => {
     removeExchangeRate,
     setTrustedDevice,
     setTrustedDevicePromptShown,
+    cacheEncryptionPassword,
+    getCachedEncryptionPassword,
+    clearCachedEncryptionPassword,
     convertAmount,
     resetState,
   };

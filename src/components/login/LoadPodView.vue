@@ -5,9 +5,11 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 
 const { t } = useTranslation();
+const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 
 const SESSION_PASSWORD_KEY = 'beanies-file-password';
@@ -36,20 +38,25 @@ let dragCounter = 0;
  * Returns true if decryption succeeded.
  */
 async function tryAutoDecrypt(): Promise<boolean> {
-  try {
-    const cached = sessionStorage.getItem(SESSION_PASSWORD_KEY);
-    if (!cached) return false;
+  // Try sessionStorage first (current session), then trusted device cache (persistent)
+  const passwords = [
+    sessionStorage.getItem(SESSION_PASSWORD_KEY),
+    settingsStore.getCachedEncryptionPassword(),
+  ].filter(Boolean) as string[];
 
-    const result = await syncStore.decryptPendingFile(cached);
-    if (result.success) {
-      return true;
+  for (const pw of passwords) {
+    try {
+      const result = await syncStore.decryptPendingFile(pw);
+      if (result.success) return true;
+    } catch {
+      // Try next password
     }
-    sessionStorage.removeItem(SESSION_PASSWORD_KEY);
-    return false;
-  } catch {
-    sessionStorage.removeItem(SESSION_PASSWORD_KEY);
-    return false;
   }
+
+  // All attempts failed — clear stale caches
+  sessionStorage.removeItem(SESSION_PASSWORD_KEY);
+  await settingsStore.clearCachedEncryptionPassword();
+  return false;
 }
 
 onMounted(async () => {
@@ -141,6 +148,7 @@ async function handleDecrypt() {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
       sessionStorage.setItem(SESSION_PASSWORD_KEY, decryptPassword.value);
+      // decryptPendingFile already caches on trusted devices via syncStore
       showDecryptModal.value = false;
       decryptPassword.value = '';
       emit('file-loaded');
