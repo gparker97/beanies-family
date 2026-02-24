@@ -245,22 +245,27 @@ onMounted(async () => {
     if (settingsStore.exchangeRateAutoUpdate) {
       updateRatesIfStale().catch(console.error);
     }
+  } finally {
+    // Always dismiss the loading overlay, even on early return or error
+    isInitializing.value = false;
+  }
+});
 
-    // Show trust device prompt after first successful sign-in + data load
-    // (suppressed during E2E auto-auth to avoid blocking test interactions)
+// Show trust device prompt exactly once — after a fresh sign-in completes and data loads.
+// Not triggered on session restore (page refresh) since freshSignIn stays false.
+watch(
+  () => authStore.freshSignIn,
+  (isFresh) => {
     if (
-      authStore.isAuthenticated &&
+      isFresh &&
       !settingsStore.trustedDevicePromptShown &&
       familyStore.isSetupComplete &&
       sessionStorage.getItem('e2e_auto_auth') !== 'true'
     ) {
       showTrustPrompt.value = true;
     }
-  } finally {
-    // Always dismiss the loading overlay, even on early return or error
-    isInitializing.value = false;
   }
-});
+);
 </script>
 
 <template>

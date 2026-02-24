@@ -829,7 +829,7 @@ const STRING_DEFS = {
   'trust.description': {
     en: 'If this is a trusted device (i.e. your personal phone or laptop), you can keep your data cached locally for instant access next time you sign in.',
   },
-  'trust.trustButton': { en: 'Are you on a device that you trust?' },
+  'trust.trustButton': { en: 'Yes, I trust this device' },
   'trust.notNow': { en: 'Not now' },
   'trust.hint': {
     en: 'You can change this in Settings. Use "Sign out & clear data" to remove cached data.',
