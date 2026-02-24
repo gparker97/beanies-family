@@ -7,6 +7,7 @@ import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 
 import { useTranslation } from '@/composables/useTranslation';
+import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { clearAllData } from '@/services/indexeddb/database';
@@ -20,6 +21,7 @@ const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
+const { canInstall, isInstalled, installApp } = usePWA();
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
@@ -648,6 +650,31 @@ function formatLastSync(timestamp: string | null): string {
         </div>
       </BaseCard>
     </div>
+
+    <!-- Install App (only when installable) -->
+    <BaseCard v-if="canInstall || isInstalled" :title="t('settings.installApp')">
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            {{ isInstalled ? t('settings.appInstalled') : t('settings.installAppDesc') }}
+          </p>
+        </div>
+        <BaseButton
+          v-if="canInstall && !isInstalled"
+          variant="primary"
+          size="sm"
+          @click="installApp()"
+        >
+          {{ t('settings.installAppButton') }}
+        </BaseButton>
+        <span
+          v-else-if="isInstalled"
+          class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+        >
+          &#x2713;
+        </span>
+      </div>
+    </BaseCard>
 
     <!-- Security Settings -->
     <div v-if="authStore.isAuthenticated" class="space-y-4">
