@@ -8,6 +8,7 @@ import {
   isPlatformAuthenticatorAvailable,
   listRegisteredPasskeys,
   removePasskey,
+  renamePasskey,
 } from '@/services/auth/passkeyService';
 import { getSessionFileHandle } from '@/services/sync/syncService';
 import { useAuthStore } from '@/stores/authStore';
@@ -27,6 +28,8 @@ const statusMessage = ref<{ text: string; type: 'success' | 'error' } | null>(nu
 const isRegistering = ref(false);
 const showPasswordInput = ref(false);
 const registrationPassword = ref('');
+const editingId = ref<string | null>(null);
+const editLabel = ref('');
 
 onMounted(async () => {
   supported.value = isWebAuthnSupported();
@@ -93,6 +96,25 @@ async function handleRemove(credentialId: string) {
     await removePasskey(credentialId);
     await loadPasskeys();
   }
+}
+
+function startEditing(passkey: PasskeyRegistration) {
+  editingId.value = passkey.credentialId;
+  editLabel.value = passkey.label;
+}
+
+function cancelEditing() {
+  editingId.value = null;
+  editLabel.value = '';
+}
+
+async function saveLabel(credentialId: string) {
+  const trimmed = editLabel.value.trim();
+  if (!trimmed) return;
+  await renamePasskey(credentialId, trimmed);
+  editingId.value = null;
+  editLabel.value = '';
+  await loadPasskeys();
 }
 
 async function getEncryptedFileBlob(): Promise<string | null> {
@@ -172,13 +194,75 @@ function formatDate(dateStr: string): string {
           :key="passkey.credentialId"
           class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 dark:border-slate-700"
         >
-          <div>
+          <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {{ passkey.label }}
-              </p>
+              <!-- Inline edit mode -->
+              <template v-if="editingId === passkey.credentialId">
+                <form
+                  class="flex items-center gap-1"
+                  @submit.prevent="saveLabel(passkey.credentialId)"
+                >
+                  <input
+                    v-model="editLabel"
+                    type="text"
+                    :placeholder="t('passkey.renameLabel')"
+                    class="w-48 rounded border border-gray-300 bg-white px-2 py-0.5 text-sm text-gray-900 focus:border-[#F15D22] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+                    @keydown.escape="cancelEditing"
+                  />
+                  <button
+                    type="submit"
+                    :aria-label="t('action.save')"
+                    class="rounded p-0.5 text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    :aria-label="t('action.cancel')"
+                    class="rounded p-0.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                    @click="cancelEditing"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </form>
+              </template>
+              <!-- Display mode -->
+              <template v-else>
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {{ passkey.label }}
+                </p>
+                <button
+                  :aria-label="t('passkey.rename')"
+                  :title="t('passkey.rename')"
+                  class="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+                  @click="startEditing(passkey)"
+                >
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
+                  </svg>
+                </button>
+              </template>
               <span
-                class="rounded-full px-2 py-0.5 text-xs"
+                class="shrink-0 rounded-full px-2 py-0.5 text-xs"
                 :class="
                   passkey.prfSupported && passkey.wrappedDEK
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -201,7 +285,7 @@ function formatDate(dateStr: string): string {
             </p>
           </div>
           <button
-            class="text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+            class="shrink-0 text-sm text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
             @click="handleRemove(passkey.credentialId)"
           >
             {{ t('action.delete') }}
