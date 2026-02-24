@@ -12,6 +12,8 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
+import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
+import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
@@ -49,6 +51,7 @@ const { isMobile, isDesktop } = useBreakpoint();
 const isInitializing = ref(true);
 const isMenuOpen = ref(false);
 const showTrustPrompt = ref(false);
+const showPasskeyPrompt = ref(false);
 
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
@@ -62,6 +65,46 @@ async function handleTrustDevice() {
 function handleDeclineTrust() {
   settingsStore.setTrustedDevicePromptShown();
   showTrustPrompt.value = false;
+}
+
+async function handleEnablePasskey() {
+  showPasskeyPrompt.value = false;
+  await settingsStore.setPasskeyPromptShown();
+
+  const password = syncStore.currentSessionPassword;
+  if (!password) return;
+
+  // Get the encrypted file blob for the registration
+  // We need the raw encrypted data to extract the PBKDF2 salt
+  const encryptedBlob = await getEncryptedFileBlob();
+  if (!encryptedBlob) return;
+
+  await authStore.registerPasskeyForCurrentUser(password, encryptedBlob);
+}
+
+function handleDeclinePasskey() {
+  settingsStore.setPasskeyPromptShown();
+  showPasskeyPrompt.value = false;
+}
+
+/**
+ * Read the current encrypted file to get the raw blob for passkey registration.
+ */
+async function getEncryptedFileBlob(): Promise<string | null> {
+  try {
+    const { getSessionFileHandle } = await import('@/services/sync/syncService');
+    const handle = getSessionFileHandle();
+    if (!handle) return null;
+    const file = await handle.getFile();
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (parsed.encrypted && typeof parsed.data === 'string') {
+      return parsed.data;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 const showLayout = computed(() => {
@@ -276,17 +319,35 @@ onMounted(async () => {
   }
 });
 
-// Show trust device prompt exactly once — after a fresh sign-in completes and data loads.
+// Show passkey or trust device prompt after fresh sign-in.
+// Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
 watch(
   () => authStore.freshSignIn,
-  (isFresh) => {
+  async (isFresh) => {
     if (
-      isFresh &&
-      !settingsStore.trustedDevicePromptShown &&
-      familyStore.isSetupComplete &&
-      sessionStorage.getItem('e2e_auto_auth') !== 'true'
+      !isFresh ||
+      !familyStore.isSetupComplete ||
+      sessionStorage.getItem('e2e_auto_auth') === 'true'
     ) {
+      return;
+    }
+
+    // Try passkey prompt first (if not already shown and encryption is enabled)
+    if (
+      !settingsStore.passkeyPromptShown &&
+      syncStore.isEncryptionEnabled &&
+      syncStore.isConfigured
+    ) {
+      const hasPlatform = await isPlatformAuthenticatorAvailable();
+      if (hasPlatform) {
+        showPasskeyPrompt.value = true;
+        return;
+      }
+    }
+
+    // Fall back to trust device prompt
+    if (!settingsStore.trustedDevicePromptShown) {
       showTrustPrompt.value = true;
     }
   }
@@ -324,6 +385,11 @@ watch(
       :open="showTrustPrompt"
       @trust="handleTrustDevice"
       @decline="handleDeclineTrust"
+    />
+    <PasskeyPromptModal
+      :open="showPasskeyPrompt"
+      @enable="handleEnablePasskey"
+      @decline="handleDeclinePasskey"
     />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
