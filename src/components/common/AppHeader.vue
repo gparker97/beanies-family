@@ -186,15 +186,50 @@ async function handleSignOutAndClearData() {
         </h1>
       </div>
 
-      <!-- Right: Notification bell -->
-      <button
-        type="button"
-        class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white text-gray-500 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-400 dark:shadow-none"
-        :aria-label="t('header.notifications')"
-      >
-        <BeanieIcon name="bell" size="md" />
-        <span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F15D22]" />
-      </button>
+      <!-- Right: Privacy toggle + Notification bell -->
+      <div class="flex items-center gap-2">
+        <!-- Privacy mode toggle -->
+        <button
+          type="button"
+          class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+          :aria-label="
+            isUnlocked ? t('header.hideFinancialFigures') : t('header.showFinancialFigures')
+          "
+          :title="isUnlocked ? t('header.hideFinancialFigures') : t('header.showFinancialFigures')"
+          @click="handlePrivacyToggle"
+        >
+          <img
+            v-if="isUnlocked"
+            src="/brand/beanies_open_eyes_transparent_512x512.png"
+            :alt="t('header.financialFiguresVisible')"
+            class="h-7 w-7"
+            :class="{ 'animate-beanie-blink': privacyAnimating }"
+            @animationend="privacyAnimating = false"
+          />
+          <img
+            v-else
+            src="/brand/beanies_covering_eyes_transparent_512x512.png"
+            :alt="t('header.financialFiguresHidden')"
+            class="h-7 w-7"
+            :class="{ 'animate-beanie-blink': privacyAnimating }"
+            @animationend="privacyAnimating = false"
+          />
+          <span
+            v-if="isUnlocked"
+            class="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full bg-[#27AE60]"
+          />
+        </button>
+
+        <!-- Notification bell -->
+        <button
+          type="button"
+          class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white text-gray-500 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-400 dark:shadow-none"
+          :aria-label="t('header.notifications')"
+        >
+          <BeanieIcon name="bell" size="md" />
+          <span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F15D22]" />
+        </button>
+      </div>
     </template>
 
     <!-- ═══ DESKTOP HEADER ═══ -->
