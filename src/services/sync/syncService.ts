@@ -5,7 +5,12 @@ import {
   clearFileHandle,
   verifyPermission,
 } from './fileHandleStore';
-import { createSyncFileData, validateSyncFileData, importSyncFileData } from './fileSync';
+import {
+  createSyncFileData,
+  validateSyncFileData,
+  importSyncFileData,
+  openFilePicker,
+} from './fileSync';
 import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
@@ -564,9 +569,9 @@ export async function hasPermission(): Promise<boolean> {
  * - rawSyncData: the raw sync data structure (for encrypted files, data is a string)
  */
 export async function openAndLoadFile(): Promise<OpenFileResult> {
+  // Mobile / legacy browsers: fall back to <input type="file">
   if (!supportsFileSystemAccess()) {
-    updateState({ lastError: 'File System Access API not supported' });
-    return { success: false };
+    return openAndLoadFileFallback();
   }
 
   try {
@@ -671,6 +676,101 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
       updateState({ isSyncing: false });
       return { success: false };
     }
+    updateState({ isSyncing: false, lastError: (e as Error).message });
+    return { success: false };
+  }
+}
+
+/**
+ * Fallback for openAndLoadFile when File System Access API is not available
+ * (mobile browsers, Firefox, etc.). Uses <input type="file"> instead.
+ * No file handle is stored, so auto-sync won't be available.
+ */
+async function openAndLoadFileFallback(): Promise<OpenFileResult> {
+  try {
+    const file = await openFilePicker();
+    if (!file) {
+      return { success: false };
+    }
+
+    // Validate extension
+    if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
+      updateState({ isSyncing: false, lastError: 'Please select a .beanpod or .json file' });
+      return { success: false };
+    }
+
+    updateState({ isSyncing: true, lastError: null });
+
+    const text = await file.text();
+
+    if (!text.trim()) {
+      updateState({ isSyncing: false, lastError: 'File is empty' });
+      return { success: false };
+    }
+
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      updateState({ isSyncing: false, lastError: 'Invalid JSON file' });
+      return { success: false };
+    }
+
+    // Relaxed validation for encrypted files
+    const obj = data as Record<string, unknown>;
+    if (
+      typeof obj.version !== 'string' ||
+      typeof obj.exportedAt !== 'string' ||
+      typeof obj.encrypted !== 'boolean'
+    ) {
+      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
+      return { success: false };
+    }
+
+    // If encrypted, return early with needsPassword flag (no handle on mobile)
+    if (obj.encrypted === true) {
+      updateState({ isSyncing: false, lastError: null });
+      return {
+        success: false,
+        needsPassword: true,
+        rawSyncData: data as SyncFileData,
+      };
+    }
+
+    // Full validation for unencrypted files
+    if (!validateSyncFileData(data)) {
+      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
+      return { success: false };
+    }
+
+    const syncData = data as SyncFileData;
+
+    // Adopt family identity from the file
+    let activeFamilyId = getActiveFamilyId();
+    if (syncData.familyId) {
+      if (syncData.familyId !== activeFamilyId) {
+        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
+        activeFamilyId = syncData.familyId;
+      }
+    } else if (!activeFamilyId) {
+      const newFamilyId = generateUUID();
+      await createFamilyWithId(newFamilyId, 'My Family');
+      activeFamilyId = newFamilyId;
+    }
+
+    // Import the data
+    await importSyncFileData(syncData);
+
+    // No file handle on mobile — mark as configured but without auto-sync
+    updateState({
+      isConfigured: true,
+      fileName: file.name,
+      isSyncing: false,
+      lastError: null,
+    });
+
+    return { success: true, data: syncData };
+  } catch (e) {
     updateState({ isSyncing: false, lastError: (e as Error).message });
     return { success: false };
   }

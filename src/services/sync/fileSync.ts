@@ -154,7 +154,9 @@ export function openFilePicker(): Promise<File | null> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.beanpod,.json,application/json';
+    // Mobile browsers don't recognise .beanpod (no registered MIME type),
+    // so we accept all files and validate the extension at runtime instead.
+    input.accept = '';
     input.onchange = () => {
       const file = input.files?.[0] ?? null;
       resolve(file);
