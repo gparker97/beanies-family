@@ -1028,6 +1028,29 @@ const STRING_DEFS = {
   },
   'join.next': { en: 'Next' },
 
+  // PWA / Offline / Install
+  'pwa.offlineBanner': {
+    en: "You're offline — changes are saved locally",
+    beanie: "You're offline — beans are safe in the pod",
+  },
+  'pwa.installTitle': { en: 'Install beanies.family', beanie: 'Install beanies.family' },
+  'pwa.installDescription': {
+    en: 'Add to your home screen for the best experience',
+    beanie: 'Plant the app on your home screen',
+  },
+  'pwa.installButton': { en: 'Install', beanie: 'Plant it!' },
+  'pwa.installDismiss': { en: 'Not now' },
+  'pwa.updateAvailable': { en: 'A new version is available', beanie: 'Fresh beans are ready!' },
+  'pwa.updateButton': { en: 'Update now', beanie: 'Get the fresh beans' },
+  'pwa.updateDismiss': { en: 'Later' },
+  'settings.installApp': { en: 'Install App' },
+  'settings.installAppDesc': {
+    en: 'Install beanies.family on this device for quick access',
+    beanie: 'Plant beanies.family on this device',
+  },
+  'settings.installAppButton': { en: 'Install beanies.family' },
+  'settings.appInstalled': { en: 'App is installed', beanie: 'App is planted!' },
+
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
   'mobile.pod': { en: 'Pod', beanie: 'Pod' },

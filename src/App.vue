@@ -5,6 +5,9 @@ import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
 import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
 import MobileHamburgerMenu from '@/components/common/MobileHamburgerMenu.vue';
+import OfflineBanner from '@/components/common/OfflineBanner.vue';
+import InstallPrompt from '@/components/common/InstallPrompt.vue';
+import UpdatePrompt from '@/components/common/UpdatePrompt.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
@@ -286,6 +289,11 @@ watch(
         <BeanieSpinner size="xl" label />
       </div>
     </Transition>
+
+    <!-- PWA banners -->
+    <OfflineBanner />
+    <UpdatePrompt />
+    <InstallPrompt />
 
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />
