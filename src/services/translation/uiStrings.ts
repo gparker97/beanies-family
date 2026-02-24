@@ -628,6 +628,7 @@ const STRING_DEFS = {
   'family.createLogin': { en: 'Create Login' },
   'family.enterName': { en: 'Enter name' },
   'family.enterEmail': { en: 'Enter email' },
+  'family.emailNotSet': { en: 'No email yet' },
   'family.profileColor': { en: 'Profile Color' },
   'family.year': { en: 'Year' },
   'family.status.waitingToJoin': {

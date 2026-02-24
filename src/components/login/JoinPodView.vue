@@ -8,6 +8,7 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { isTemporaryEmail } from '@/utils/email';
 import { lookupFamily, isRegistryConfigured } from '@/services/registry/registryService';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -754,7 +755,12 @@ function handleBack() {
             <p class="font-outfit font-semibold text-gray-900 dark:text-gray-100">
               {{ selectedMember?.name }}
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ selectedMember?.email }}</p>
+            <p
+              v-if="selectedMember?.email && !isTemporaryEmail(selectedMember.email)"
+              class="text-xs text-gray-500 dark:text-gray-400"
+            >
+              {{ selectedMember.email }}
+            </p>
           </div>
           <button
             v-if="unclaimedMembers.length > 1"

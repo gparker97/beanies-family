@@ -23,6 +23,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { isTemporaryEmail } from '@/utils/email';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const emit = defineEmits<{ toggleMenu: [] }>();
@@ -433,7 +434,9 @@ async function handleSignOutAndClearData() {
                 {{ familyContextStore.activeFamilyName }}
               </p>
               <p
-                v-if="authStore.currentUser?.email"
+                v-if="
+                  authStore.currentUser?.email && !isTemporaryEmail(authStore.currentUser.email)
+                "
                 class="text-xs text-gray-500 dark:text-gray-400"
               >
                 {{ authStore.currentUser.email }}

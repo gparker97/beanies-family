@@ -5,6 +5,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { isTemporaryEmail } from '@/utils/email';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -245,7 +246,12 @@ async function handleSignIn() {
           <p class="font-outfit font-semibold text-gray-900 dark:text-gray-100">
             {{ selectedMember.name }}
           </p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ selectedMember.email }}</p>
+          <p
+            v-if="!isTemporaryEmail(selectedMember.email)"
+            class="text-xs text-gray-500 dark:text-gray-400"
+          >
+            {{ selectedMember.email }}
+          </p>
         </div>
         <button
           v-if="allMembers.length > 1"

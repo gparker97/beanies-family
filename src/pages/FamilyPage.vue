@@ -8,6 +8,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { timeAgo } from '@/utils/date';
+import { isTemporaryEmail } from '@/utils/email';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -216,7 +217,7 @@ function openEditModal(member: FamilyMember) {
   editingMemberId.value = member.id;
   editMember.value = {
     name: member.name,
-    email: member.email,
+    email: isTemporaryEmail(member.email) ? '' : member.email,
     gender: member.gender || 'other',
     ageGroup: member.ageGroup || 'adult',
     color: member.color,
@@ -233,14 +234,18 @@ function closeEditModal() {
 }
 
 async function saveEditMember() {
-  if (!editMember.value.name.trim() || !editMember.value.email.trim()) return;
+  if (!editMember.value.name.trim()) return;
   if (!editingMemberId.value) return;
+
+  // If the user entered a real email, use it; otherwise keep whatever the member already has
+  const originalMember = familyStore.members.find((m) => m.id === editingMemberId.value);
+  const emailToSave = editMember.value.email.trim() || originalMember?.email || '';
 
   isSubmitting.value = true;
   try {
     const input: UpdateFamilyMemberInput = {
       name: editMember.value.name,
-      email: editMember.value.email,
+      email: emailToSave,
       gender: editMember.value.gender,
       ageGroup: editMember.value.ageGroup,
       color: editMember.value.color,
@@ -371,7 +376,7 @@ function cancelEditFamilyName() {
               />
             </div>
             <p class="truncate text-sm text-gray-500 dark:text-gray-400">
-              {{ member.email }}
+              {{ isTemporaryEmail(member.email) ? t('family.emailNotSet') : member.email }}
             </p>
             <!-- Status badge -->
             <div class="mt-1.5 flex items-center gap-2">
@@ -540,7 +545,12 @@ function cancelEditFamilyName() {
     </BaseModal>
 
     <!-- Edit Member Modal -->
-    <BaseModal :open="showEditModal" :title="t('family.editMember')" @close="closeEditModal">
+    <BaseModal
+      :open="showEditModal"
+      :title="t('family.editMember')"
+      size="xl"
+      @close="closeEditModal"
+    >
       <form class="space-y-4" @submit.prevent="saveEditMember">
         <BaseInput
           v-model="editMember.name"
@@ -554,7 +564,7 @@ function cancelEditFamilyName() {
           type="email"
           :label="t('form.email')"
           :placeholder="t('family.enterEmail')"
-          required
+          :required="!!editMember.email"
         />
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
