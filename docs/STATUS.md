@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-24
-> **Updated by:** Claude (PWA functionality #6, mobile language spinner fix, E2E TrustDeviceModal fix)
+> **Updated by:** Claude (automated translation pipeline, Playwright CI caching, mobile privacy toggle, issue #16 update)
 
 ## Current Phase
 
@@ -351,6 +351,20 @@
 - 4 new test files (19 tests): useOnline, usePWA, OfflineBanner, MobileBottomNav
 - **E2E fix** — TrustDeviceModal dismissed in auth helper to prevent pointer event interception in CI
 
+### Automated Translation Pipeline
+
+- Fixed broken `scripts/updateTranslations.mjs` parser (was matching `UI_STRINGS`, now parses `STRING_DEFS` line-by-line)
+- Added `--all` flag for multi-language translation (default behavior), stale key cleanup, CI-friendly summary output
+- Populated `public/translations/zh.json` with all 655 translations (was 287)
+- Created `.github/workflows/translation-sync.yml` — daily cron at 3 AM UTC with conditional auto-deploy
+- Updated `package.json` translate scripts, `scripts/README.md`, ADR-008, new `docs/TRANSLATION.md`
+- Added Playwright browser caching to CI workflow (saves ~8 min per E2E run)
+
+### Mobile Privacy Toggle
+
+- Show/hide financial figures icon now always visible in mobile/tablet header (previously buried in hamburger menu)
+- Sits next to notification bell with same squircle styling, beanie blink animation, and green status dot
+
 ### Count-Up Animation for All Summary Cards
 
 - **`src/composables/useAnimatedCurrency.ts`** — Reusable composable wrapping `useCountUp` + `convertToDisplay` + `formatCurrencyWithCode` + privacy mode masking. Returns `{ formatted, displayValue }`. When privacy mode is on, target drops to 0 so revealing figures triggers a fresh count-up from zero
@@ -583,3 +597,6 @@ _(None currently tracked)_
 | 2026-02-24 | PWA functionality complete (#6)                            | Offline banner, install prompt (30s delay, 7-day dismiss), SW update prompt, manifest completion, meta tags                                             |
 | 2026-02-24 | SW registerType changed to `prompt`                        | User-controlled updates instead of silent auto-update; hourly background check for new versions                                                         |
 | 2026-02-24 | Automated translation pipeline                             | Fixed broken translation script (STRING_DEFS parser), added --all multi-lang support, stale key cleanup, daily GitHub Actions workflow with auto-deploy |
+| 2026-02-24 | Playwright browser caching in CI                           | Cache `~/.cache/ms-playwright` keyed on browser + version; saves ~8 min per E2E job (chromium download)                                                 |
+| 2026-02-24 | Mobile privacy toggle in header                            | Show/hide figures icon always visible on mobile/tablet (not buried in hamburger menu) for better UX                                                     |
+| 2026-02-24 | Issue #16 updated: unified passkey login + data unlock     | Single biometric gesture replaces both member password and encryption password; password fallback preserved                                             |
