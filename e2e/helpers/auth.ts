@@ -22,6 +22,13 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
   if (isOnWelcome) {
     await createPodButton.click();
 
+    // Set auto-auth flag BEFORE signUp triggers (Next click calls signUp
+    // which sets freshSignIn=true; the TrustDeviceModal watcher fires
+    // immediately and must see this flag to stay suppressed).
+    await page.evaluate(() => {
+      sessionStorage.setItem('e2e_auto_auth', 'true');
+    });
+
     // Step 1: Name & Password
     await page.getByLabel('Family Name').fill('Test Family');
     await page.getByLabel('Your Name').fill('John Doe');
@@ -44,12 +51,6 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
 
     // Wait for step 3 to render
     await page.getByRole('button', { name: 'Finish' }).waitFor({ state: 'visible', timeout: 5000 });
-
-    // Set auto-auth flag BEFORE clicking Finish so the TrustDeviceModal
-    // guard sees it and doesn't pop up over the dashboard.
-    await page.evaluate(() => {
-      sessionStorage.setItem('e2e_auto_auth', 'true');
-    });
 
     // Step 3: Add family members — finish (goes to /dashboard)
     await page.getByRole('button', { name: 'Finish' }).click();
