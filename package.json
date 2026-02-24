@@ -46,7 +46,7 @@
     "@heroicons/vue": "^2.2.0",
     "@microsoft/eslint-plugin-sdl": "^1.1.0",
     "@playwright/test": "^1.58.2",
-    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/postcss": "^4.2.1",
     "@types/node": "^25.3.0",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/test-utils": "^2.4.6",
@@ -60,7 +60,7 @@
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-vue": "^10.8.0",
     "fake-indexeddb": "^6.2.5",
-    "happy-dom": "^20.5.0",
+    "happy-dom": "^20.7.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "postcss": "^8.5.6",
@@ -77,6 +77,6 @@
     "vite-plugin-pwa": "^1.2.0",
     "vitest": "^4.0.18",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^3.1.4"
+    "vue-tsc": "^3.2.5"
   }
 }
