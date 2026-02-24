@@ -95,10 +95,7 @@ function parseUIStrings() {
  * Load existing translation file
  */
 function loadTranslationFile(language) {
-  const filePath = path.join(
-    __dirname,
-    `../src/services/translation/translations/${language}.json`
-  );
+  const filePath = path.join(__dirname, `../public/translations/${language}.json`);
 
   if (!fs.existsSync(filePath)) {
     return {
@@ -119,10 +116,7 @@ function loadTranslationFile(language) {
  * Save translation file
  */
 function saveTranslationFile(language, data) {
-  const filePath = path.join(
-    __dirname,
-    `../src/services/translation/translations/${language}.json`
-  );
+  const filePath = path.join(__dirname, `../public/translations/${language}.json`);
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
 }
 
@@ -237,7 +231,7 @@ async function updateTranslations(language) {
   saveTranslationFile(language, translationFile);
 
   console.log(`\n✅ Successfully updated ${toTranslate.length} translations!`);
-  console.log(`   File: src/services/translation/translations/${language}.json`);
+  console.log(`   File: public/translations/${language}.json`);
   console.log(`   Total translations: ${translationFile.meta.translationCount}/${totalKeys}\n`);
   console.log('📝 Next steps:');
   console.log('   1. Review the changes in the JSON file');
