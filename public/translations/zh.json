@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-02-24",
-    "translationCount": 655
+    "lastUpdated": "2026-02-25",
+    "translationCount": 686
   },
   "translations": {
     "app.name": {
@@ -3280,6 +3280,161 @@
       "translation": "查看：所有成员",
       "hash": "gbts47",
       "lastUpdated": "2026-02-24"
+    },
+    "action.tryAgain": {
+      "translation": "再试一次",
+      "hash": "agecuz",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.signInButton": {
+      "translation": "使用生物识别登录",
+      "hash": "wglnbe",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.usePassword": {
+      "translation": "请改用密码",
+      "hash": "vrlktm",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.authenticating": {
+      "translation": " 验证中...",
+      "hash": "2y7yn9",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.welcomeBack": {
+      "translation": "欢迎回来 ",
+      "hash": "oat",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.promptTitle": {
+      "translation": "使用面部或指纹解锁？",
+      "hash": "k07gbo",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.promptDescription": {
+      "translation": "下次登录时，只需轻触一下即可。无需再输入密码。",
+      "hash": "khgbr3",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.promptEnable": {
+      "translation": "启用生物识别登录",
+      "hash": "rkdsos",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.promptDecline": {
+      "translation": "立即购买",
+      "hash": "8bjtp3",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.promptHint": {
+      "translation": "您可以随时在“设置”中进行管理。",
+      "hash": "tj3k1m",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.registerButton": {
+      "translation": "注册新的生物识别",
+      "hash": "1uvmvv",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.registerSuccess": {
+      "translation": "生物识别登录已启用！",
+      "hash": "yy9pk1",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.registerError": {
+      "translation": "注册生物识别失败。请重试。",
+      "hash": "5e3sd6",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.signInError": {
+      "translation": "生物识别登录失败。请使用您的密码尝试。",
+      "hash": "1ys9nd",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.dekStale": {
+      "translation": "自生物识别设置以来，您的加密密钥已更改。请使用您的密码登录，然后在“设置”中重新注册生物识别。",
+      "hash": "kbgu1x",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.dekAndPasswordFailed": {
+      "translation": "您的加密密码已更改。请使用您的密码登录，然后在“设置”中重新注册生物识别。",
+      "hash": "9jy7g3",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.passwordChanged": {
+      "translation": "自生物识别设置以来，您的加密密码已更改。请使用您的密码登录，然后在“设置”中重新注册生物识别。",
+      "hash": "9i1n0f",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.prfFull": {
+      "translation": "完全解锁",
+      "hash": "aq2lzp",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.prfCached": {
+      "translation": "缓存密码",
+      "hash": "vpszi1",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.lastUsed": {
+      "translation": "最后使用",
+      "hash": "5jy2op",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.neverUsed": {
+      "translation": "从未使用过",
+      "hash": "vrt81d",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.noAuthenticator": {
+      "translation": "此设备上未检测到生物识别身份验证器。",
+      "hash": "5h7ppp",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.registeredPasskeys": {
+      "translation": "已注册的生物识别技术",
+      "hash": "tkib5z",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.settingsTitle": {
+      "translation": "生物识别登录",
+      "hash": "i4rxdt",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.settingsDescription": {
+      "translation": "使用指纹、面部或设备PIN而不是密码登录。",
+      "hash": "ezysm9",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.enterEncryptionPassword": {
+      "translation": "输入您的加密密码进行注册",
+      "hash": "5ysb6j",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.noPasskeys": {
+      "translation": "尚未注册生物识别登录。",
+      "hash": "lg3ggb",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.unsupported": {
+      "translation": "您的浏览器不支持生物识别登录(WebAuthn)。",
+      "hash": "e5z6v4",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.needsEncryption": {
+      "translation": "生物识别登录需要启用文件加密。",
+      "hash": "fnfxgx",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.rename": {
+      "translation": "重命名",
+      "hash": "ulvijm",
+      "lastUpdated": "2026-02-25"
+    },
+    "passkey.renameLabel": {
+      "translation": "设备名称",
+      "hash": "13nt2t",
+      "lastUpdated": "2026-02-25"
     }
   }
 }
