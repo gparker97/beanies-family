@@ -15,7 +15,7 @@ export default defineConfig({
         short_name: 'beanies',
         description: 'Every bean counts — family planning made simple',
         theme_color: '#2C3E50',
-        background_color: '#2C3E50',
+        background_color: '#F8F9FA',
         display: 'standalone',
         start_url: '/',
         scope: '/',
