@@ -14,6 +14,7 @@ import {
   Filler,
 } from 'chart.js';
 import { BaseCard, BaseSelect } from '@/components/ui';
+import StatTile from '@/components/common/StatTile.vue';
 
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -715,48 +716,35 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
 
       <!-- Summary Stats -->
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div
-          class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-4 text-white"
-        >
-          <p class="text-sm text-white/80">{{ t('reports.currentNetWorth') }}</p>
-          <p class="mt-1 text-xl font-bold">
-            {{
-              formatMasked(
-                formatInDisplayCurrency(calculateCurrentNetWorth(), settingsStore.baseCurrency)
-              )
-            }}
-          </p>
-        </div>
-        <div class="rounded-xl bg-gradient-to-br from-purple-500 to-violet-600 p-4 text-white">
-          <p class="text-sm text-purple-100">{{ t('reports.projectedNetWorth') }}</p>
-          <p class="mt-1 text-xl font-bold">
-            {{
-              formatMasked(
-                formatInDisplayCurrency(totalProjectedNetWorth, settingsStore.baseCurrency)
-              )
-            }}
-          </p>
-        </div>
-        <div
-          class="rounded-xl p-4 text-white"
-          :class="
-            netWorthChange >= 0
-              ? 'bg-gradient-to-br from-green-500 to-emerald-600'
-              : 'bg-gradient-to-br from-red-500 to-rose-600'
+        <StatTile
+          :label="t('reports.currentNetWorth')"
+          :value="
+            formatMasked(
+              formatInDisplayCurrency(calculateCurrentNetWorth(), settingsStore.baseCurrency)
+            )
           "
-        >
-          <p :class="netWorthChange >= 0 ? 'text-green-100' : 'text-red-100'" class="text-sm">
-            {{ t('reports.projectedChange') }}
-          </p>
-          <p class="mt-1 text-xl font-bold">
-            {{
-              formatMasked(
-                (netWorthChange >= 0 ? '+' : '') +
-                  formatInDisplayCurrency(netWorthChange, settingsStore.baseCurrency)
-              )
-            }}
-          </p>
-        </div>
+          tint="slate"
+          dark
+        />
+        <StatTile
+          :label="t('reports.projectedNetWorth')"
+          :value="
+            formatMasked(
+              formatInDisplayCurrency(totalProjectedNetWorth, settingsStore.baseCurrency)
+            )
+          "
+          tint="purple"
+        />
+        <StatTile
+          :label="t('reports.projectedChange')"
+          :value="
+            formatMasked(
+              (netWorthChange >= 0 ? '+' : '') +
+                formatInDisplayCurrency(netWorthChange, settingsStore.baseCurrency)
+            )
+          "
+          :tint="netWorthChange >= 0 ? 'green' : 'orange'"
+        />
       </div>
 
       <!-- Chart -->
@@ -793,38 +781,27 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
 
       <!-- Summary Stats -->
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-4 text-white">
-          <p class="text-sm text-green-100">{{ t('reports.totalIncome') }}</p>
-          <p class="mt-1 text-xl font-bold">
-            {{ formatMasked(formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency)) }}
-          </p>
-        </div>
-        <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-4 text-white">
-          <p class="text-sm text-red-100">{{ t('reports.totalExpenses') }}</p>
-          <p class="mt-1 text-xl font-bold">
-            {{ formatMasked(formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency)) }}
-          </p>
-        </div>
-        <div
-          class="rounded-xl p-4 text-white"
-          :class="
-            netCashFlow >= 0
-              ? 'from-secondary-500 to-secondary-700 bg-gradient-to-br'
-              : 'bg-gradient-to-br from-orange-500 to-amber-600'
+        <StatTile
+          :label="t('reports.totalIncome')"
+          :value="formatMasked(formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency))"
+          tint="green"
+        />
+        <StatTile
+          :label="t('reports.totalExpenses')"
+          :value="formatMasked(formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency))"
+          tint="orange"
+        />
+        <StatTile
+          :label="t('reports.netCashFlow')"
+          :value="
+            formatMasked(
+              (netCashFlow >= 0 ? '+' : '') +
+                formatInDisplayCurrency(netCashFlow, settingsStore.baseCurrency)
+            )
           "
-        >
-          <p :class="netCashFlow >= 0 ? 'text-white/80' : 'text-orange-100'" class="text-sm">
-            {{ t('reports.netCashFlow') }}
-          </p>
-          <p class="mt-1 text-xl font-bold">
-            {{
-              formatMasked(
-                (netCashFlow >= 0 ? '+' : '') +
-                  formatInDisplayCurrency(netCashFlow, settingsStore.baseCurrency)
-              )
-            }}
-          </p>
-        </div>
+          :tint="netCashFlow >= 0 ? 'slate' : 'orange'"
+          :dark="netCashFlow >= 0"
+        />
       </div>
 
       <!-- Chart -->

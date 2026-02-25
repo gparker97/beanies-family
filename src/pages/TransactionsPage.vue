@@ -8,7 +8,7 @@ import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import { useAnimatedCurrency } from '@/composables/useAnimatedCurrency';
+import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -234,7 +234,6 @@ const dateFilteredExpenses = computed(() =>
     .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
 );
 
-// Animated summary card values
 const baseCurrency = computed(() => settingsStore.baseCurrency);
 
 // Transaction tab cards
@@ -253,30 +252,6 @@ const periodExpensesTotal = computed(
       : 0)
 );
 const periodNetTotal = computed(() => periodIncomeTotal.value - periodExpensesTotal.value);
-
-const { formatted: animatedPeriodIncome } = useAnimatedCurrency(periodIncomeTotal, baseCurrency);
-const { formatted: animatedPeriodExpenses } = useAnimatedCurrency(
-  periodExpensesTotal,
-  baseCurrency,
-  100
-);
-const { formatted: animatedPeriodNet } = useAnimatedCurrency(periodNetTotal, baseCurrency, 200);
-
-// Recurring tab cards
-const { formatted: animatedRecurringIncome } = useAnimatedCurrency(
-  computed(() => recurringStore.filteredTotalMonthlyRecurringIncome),
-  baseCurrency
-);
-const { formatted: animatedRecurringExpenses } = useAnimatedCurrency(
-  computed(() => recurringStore.filteredTotalMonthlyRecurringExpenses),
-  baseCurrency,
-  100
-);
-const { formatted: animatedRecurringNet } = useAnimatedCurrency(
-  computed(() => recurringStore.filteredNetMonthlyRecurring),
-  baseCurrency,
-  200
-);
 
 function getAccountName(accountId: string): string {
   const account = accountsStore.accounts.find((a) => a.id === accountId);
@@ -473,8 +448,8 @@ function applyCustomDateRange() {
           class="rounded-t-lg px-4 py-2.5 text-sm font-medium transition-all"
           :class="
             activeTab === 'recurring'
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-md'
-              : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-600 hover:from-gray-200 hover:to-gray-100 dark:from-slate-700 dark:to-slate-600 dark:text-gray-300 dark:hover:from-slate-600 dark:hover:to-slate-500'
+              ? 'text-primary-500 bg-[var(--tint-orange-8)] font-semibold'
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
           "
           @click="activeTab = 'recurring'"
         >
@@ -491,8 +466,8 @@ function applyCustomDateRange() {
           class="rounded-t-lg px-4 py-2.5 text-sm font-medium transition-all"
           :class="
             activeTab === 'transactions'
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-md'
-              : 'bg-gradient-to-r from-gray-100 to-gray-50 text-gray-600 hover:from-gray-200 hover:to-gray-100 dark:from-slate-700 dark:to-slate-600 dark:text-gray-300 dark:hover:from-slate-600 dark:hover:to-slate-500'
+              ? 'text-primary-500 bg-[var(--tint-orange-8)] font-semibold'
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
           "
           @click="activeTab = 'transactions'"
         >
@@ -516,7 +491,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'current_month'
-                  ? 'bg-primary-500 text-white shadow-md'
+                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('current_month')"
@@ -527,7 +502,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'last_month'
-                  ? 'bg-primary-500 text-white shadow-md'
+                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('last_month')"
@@ -538,7 +513,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'last_3_months'
-                  ? 'bg-primary-500 text-white shadow-md'
+                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('last_3_months')"
@@ -549,7 +524,7 @@ function applyCustomDateRange() {
               class="rounded-lg px-3 py-1.5 text-sm transition-all"
               :class="
                 dateFilterType === 'custom'
-                  ? 'bg-primary-500 text-white shadow-md'
+                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
               "
               @click="setDateFilter('custom')"
@@ -606,90 +581,45 @@ function applyCustomDateRange() {
         </div>
       </div>
 
-      <!-- Summary Cards with Gradients -->
+      <!-- Summary Cards -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <!-- Period Income -->
-        <div
-          class="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-5 text-white shadow-lg"
+        <SummaryStatCard
+          :label="`${t('transactions.income')} (${dateFilterLabel})`"
+          :amount="periodIncomeTotal"
+          :currency="baseCurrency"
+          tint="green"
         >
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-green-100">
-                {{ t('transactions.income') }} ({{ dateFilterLabel }})
-              </p>
-              <p class="mt-1 text-2xl font-bold">
-                {{ animatedPeriodIncome }}
-              </p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <BeanieIcon name="arrow-up" size="lg" />
-            </div>
-          </div>
-        </div>
+          <template #icon>
+            <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
+          </template>
+        </SummaryStatCard>
 
-        <!-- Period Expenses -->
-        <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-5 text-white shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-red-100">
-                {{ t('transactions.expenses') }} ({{ dateFilterLabel }})
-              </p>
-              <p class="mt-1 text-2xl font-bold">
-                {{ animatedPeriodExpenses }}
-              </p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <BeanieIcon name="arrow-down" size="lg" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Net Cash Flow -->
-        <div
-          class="rounded-xl p-5 text-white shadow-lg"
-          :class="
-            dateFilteredIncome +
-              (dateFilterType === 'current_month'
-                ? recurringStore.filteredTotalMonthlyRecurringIncome
-                : 0) -
-              dateFilteredExpenses -
-              (dateFilterType === 'current_month'
-                ? recurringStore.filteredTotalMonthlyRecurringExpenses
-                : 0) >=
-            0
-              ? 'from-secondary-500 to-secondary-700 bg-gradient-to-br'
-              : 'bg-gradient-to-br from-orange-500 to-amber-600'
-          "
+        <SummaryStatCard
+          :label="`${t('transactions.expenses')} (${dateFilterLabel})`"
+          :amount="periodExpensesTotal"
+          :currency="baseCurrency"
+          tint="orange"
         >
-          <div class="flex items-center justify-between">
-            <div>
-              <p
-                class="text-sm font-medium"
-                :class="
-                  dateFilteredIncome +
-                    (dateFilterType === 'current_month'
-                      ? recurringStore.filteredTotalMonthlyRecurringIncome
-                      : 0) -
-                    dateFilteredExpenses -
-                    (dateFilterType === 'current_month'
-                      ? recurringStore.filteredTotalMonthlyRecurringExpenses
-                      : 0) >=
-                  0
-                    ? 'text-white/80'
-                    : 'text-orange-100'
-                "
-              >
-                {{ t('transactions.net') }} ({{ dateFilterLabel }})
-              </p>
-              <p class="mt-1 text-2xl font-bold">
-                {{ animatedPeriodNet }}
-              </p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <BeanieIcon name="bar-chart" size="lg" />
-            </div>
-          </div>
-        </div>
+          <template #icon>
+            <BeanieIcon name="arrow-down" size="md" class="text-primary-500" />
+          </template>
+        </SummaryStatCard>
+
+        <SummaryStatCard
+          :label="`${t('transactions.net')} (${dateFilterLabel})`"
+          :amount="periodNetTotal"
+          :currency="baseCurrency"
+          tint="slate"
+          :dark="periodNetTotal >= 0"
+        >
+          <template #icon>
+            <BeanieIcon
+              name="bar-chart"
+              size="md"
+              :class="periodNetTotal >= 0 ? 'text-white' : 'text-primary-500'"
+            />
+          </template>
+        </SummaryStatCard>
       </div>
 
       <!-- Transactions List -->
@@ -711,11 +641,11 @@ function applyCustomDateRange() {
           >
             <div class="flex items-center gap-4">
               <div
-                class="flex h-10 w-10 items-center justify-center rounded-lg"
+                class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
                 :class="
                   transaction.type === 'income'
-                    ? 'bg-green-100 dark:bg-green-900/30'
-                    : 'bg-red-100 dark:bg-red-900/30'
+                    ? 'bg-[var(--tint-success-10)]'
+                    : 'bg-[var(--tint-orange-8)]'
                 "
               >
                 <!-- Recurring indicator -->
@@ -803,70 +733,47 @@ function applyCustomDateRange() {
 
     <!-- Recurring Tab -->
     <template v-else>
-      <!-- Recurring Summary with Gradients -->
+      <!-- Recurring Summary -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <!-- Monthly Recurring Income -->
-        <div
-          class="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-5 text-white shadow-lg"
+        <SummaryStatCard
+          :label="t('recurring.monthlyIncome')"
+          :amount="recurringStore.filteredTotalMonthlyRecurringIncome"
+          :currency="baseCurrency"
+          tint="green"
         >
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-green-100">{{ t('recurring.monthlyIncome') }}</p>
-              <p class="mt-1 text-2xl font-bold">
-                {{ animatedRecurringIncome }}
-              </p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <BeanieIcon name="repeat" size="lg" />
-            </div>
-          </div>
-        </div>
+          <template #icon>
+            <BeanieIcon name="repeat" size="md" class="text-[#27AE60]" />
+          </template>
+        </SummaryStatCard>
 
-        <!-- Monthly Recurring Expenses -->
-        <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-5 text-white shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-red-100">{{ t('recurring.monthlyExpenses') }}</p>
-              <p class="mt-1 text-2xl font-bold">
-                {{ animatedRecurringExpenses }}
-              </p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <BeanieIcon name="repeat" size="lg" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Net Monthly Recurring -->
-        <div
-          class="rounded-xl p-5 text-white shadow-lg"
-          :class="
-            recurringStore.filteredNetMonthlyRecurring >= 0
-              ? 'from-secondary-500 to-secondary-700 bg-gradient-to-br'
-              : 'bg-gradient-to-br from-orange-500 to-amber-600'
-          "
+        <SummaryStatCard
+          :label="t('recurring.monthlyExpenses')"
+          :amount="recurringStore.filteredTotalMonthlyRecurringExpenses"
+          :currency="baseCurrency"
+          tint="orange"
         >
-          <div class="flex items-center justify-between">
-            <div>
-              <p
-                class="text-sm font-medium"
-                :class="
-                  recurringStore.filteredNetMonthlyRecurring >= 0
-                    ? 'text-white/80'
-                    : 'text-orange-100'
-                "
-              >
-                {{ t('recurring.netMonthly') }}
-              </p>
-              <p class="mt-1 text-2xl font-bold">
-                {{ animatedRecurringNet }}
-              </p>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-              <BeanieIcon name="bar-chart" size="lg" />
-            </div>
-          </div>
-        </div>
+          <template #icon>
+            <BeanieIcon name="repeat" size="md" class="text-primary-500" />
+          </template>
+        </SummaryStatCard>
+
+        <SummaryStatCard
+          :label="t('recurring.netMonthly')"
+          :amount="recurringStore.filteredNetMonthlyRecurring"
+          :currency="baseCurrency"
+          tint="slate"
+          :dark="recurringStore.filteredNetMonthlyRecurring >= 0"
+        >
+          <template #icon>
+            <BeanieIcon
+              name="bar-chart"
+              size="md"
+              :class="
+                recurringStore.filteredNetMonthlyRecurring >= 0 ? 'text-white' : 'text-primary-500'
+              "
+            />
+          </template>
+        </SummaryStatCard>
       </div>
 
       <!-- Recurring Items List -->
@@ -889,11 +796,11 @@ function applyCustomDateRange() {
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">
                 <div
-                  class="flex h-10 w-10 items-center justify-center rounded-lg"
+                  class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
                   :class="
                     item.type === 'income'
-                      ? 'bg-green-100 dark:bg-green-900/30'
-                      : 'bg-red-100 dark:bg-red-900/30'
+                      ? 'bg-[var(--tint-success-10)]'
+                      : 'bg-[var(--tint-orange-8)]'
                   "
                 >
                   <BeanieIcon
