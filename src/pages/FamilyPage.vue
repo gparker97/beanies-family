@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { BaseCard, BaseButton, BaseInput, BaseModal, BaseSelect } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -20,6 +21,7 @@ import type {
   AgeGroup,
 } from '@/types/models';
 
+const route = useRoute();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
@@ -232,6 +234,17 @@ function closeEditModal() {
   showEditModal.value = false;
   editingMemberId.value = null;
 }
+
+// Open modals from query params (e.g. navigated from Family Nook)
+onMounted(() => {
+  if (route.query.add === 'true') {
+    openAddModal();
+  } else if (route.query.edit) {
+    const memberId = route.query.edit as string;
+    const member = familyStore.members.find((m) => m.id === memberId);
+    if (member) openEditModal(member);
+  }
+});
 
 async function saveEditMember() {
   if (!editMember.value.name.trim()) return;

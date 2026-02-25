@@ -71,8 +71,14 @@
   --tint-slate-5: rgb(44 62 80 / 5%);
   --tint-slate-10: rgb(44 62 80 / 10%);
   --tint-success-10: rgb(39 174 96 / 10%);
+  --tint-purple-6: rgb(155 89 182 / 6%);
   --tint-purple-8: rgb(155 89 182 / 8%);
+  --tint-purple-12: rgb(155 89 182 / 12%);
   --tint-purple-15: rgb(155 89 182 / 15%);
+  --tint-green-4: rgb(39 174 96 / 4%);
+  --tint-green-10: rgb(39 174 96 / 10%);
+  --tint-terracotta-5: rgb(230 126 34 / 5%);
+  --tint-orange-4: rgb(241 93 34 / 4%);
 }
 
 /* Dark mode variables */
@@ -92,8 +98,14 @@
   --tint-slate-5: rgb(255 255 255 / 5%);
   --tint-slate-10: rgb(255 255 255 / 10%);
   --tint-success-10: rgb(39 174 96 / 15%);
+  --tint-purple-6: rgb(155 89 182 / 10%);
   --tint-purple-8: rgb(155 89 182 / 12%);
+  --tint-purple-12: rgb(155 89 182 / 16%);
   --tint-purple-15: rgb(155 89 182 / 20%);
+  --tint-green-4: rgb(39 174 96 / 6%);
+  --tint-green-10: rgb(39 174 96 / 15%);
+  --tint-terracotta-5: rgb(230 126 34 / 8%);
+  --tint-orange-4: rgb(241 93 34 / 6%);
 }
 
 /* ─── Micro-animation keyframes ────────────────────────────────────────── */
