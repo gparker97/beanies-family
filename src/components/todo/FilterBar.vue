@@ -24,9 +24,9 @@ const emit = defineEmits<{
     <!-- Filter chips -->
     <div class="flex flex-wrap gap-1.5">
       <button
-        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all"
         :class="
-          activeFilter === 'all' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+          activeFilter === 'all' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-60'
         "
         :style="
           activeFilter === 'all'
@@ -38,9 +38,9 @@ const emit = defineEmits<{
         {{ t('todo.filter.all') }} ({{ todoStore.todos.length }})
       </button>
       <button
-        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all"
         :class="
-          activeFilter === 'open' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+          activeFilter === 'open' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-60'
         "
         :style="
           activeFilter === 'open'
@@ -52,9 +52,9 @@ const emit = defineEmits<{
         {{ t('todo.filter.open') }} ({{ todoStore.openTodos.length }})
       </button>
       <button
-        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all"
         :class="
-          activeFilter === 'done' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+          activeFilter === 'done' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-60'
         "
         :style="
           activeFilter === 'done'
@@ -66,11 +66,11 @@ const emit = defineEmits<{
         {{ t('todo.filter.done') }} ({{ todoStore.completedTodos.length }})
       </button>
       <button
-        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all"
         :class="
           activeFilter === 'scheduled'
             ? 'text-white shadow-sm'
-            : 'text-[var(--color-text)] opacity-40'
+            : 'text-[var(--color-text)] opacity-60'
         "
         :style="
           activeFilter === 'scheduled'
@@ -82,9 +82,9 @@ const emit = defineEmits<{
         📅 {{ t('todo.filter.scheduled') }}
       </button>
       <button
-        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all"
         :class="
-          activeFilter === 'noDate' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+          activeFilter === 'noDate' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-60'
         "
         :style="
           activeFilter === 'noDate'
@@ -99,7 +99,7 @@ const emit = defineEmits<{
 
     <!-- Sort -->
     <div class="relative">
-      <span class="font-outfit text-[0.6rem] font-medium opacity-30">
+      <span class="font-outfit text-xs font-medium opacity-40">
         Sort:
         {{
           sortBy === 'newest'

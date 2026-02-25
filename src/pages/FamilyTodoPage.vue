@@ -169,7 +169,7 @@ async function handleDelete(id: string) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-5">
+  <div class="space-y-6">
     <!-- Page header -->
     <div class="flex items-center justify-between">
       <div>
