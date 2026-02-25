@@ -1197,7 +1197,7 @@ const STRING_DEFS = {
   },
 
   // Family Nook
-  'nook.welcomeHome': { en: 'Welcome Home, {name}', beanie: 'Welcome to the Nook, {name}' },
+  'nook.welcomeHome': { en: 'Welcome Home, {name}', beanie: 'Welcome to your Nook, {name}' },
   'nook.familyAtAGlance': {
     en: 'Your family at a glance',
     beanie: 'Your bean pod at a glance',
