@@ -270,24 +270,30 @@ async function deleteCompletedGoal(id: string) {
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-      <BaseCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.activeGoals') }}</p>
-        <p class="text-primary-600 dark:text-primary-400 mt-1 text-2xl font-bold">
+      <div class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <p class="nook-section-label text-secondary-500 dark:text-gray-400">
+          {{ t('goals.activeGoals') }}
+        </p>
+        <p class="text-primary-600 dark:text-primary-400 font-outfit mt-1 text-2xl font-extrabold">
           {{ Math.round(animatedActiveCount) }}
         </p>
-      </BaseCard>
-      <BaseCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.completedGoals') }}</p>
-        <p class="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">
+      </div>
+      <div class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <p class="nook-section-label text-secondary-500 dark:text-gray-400">
+          {{ t('goals.completedGoals') }}
+        </p>
+        <p class="font-outfit mt-1 text-2xl font-extrabold text-green-600 dark:text-green-400">
           {{ Math.round(animatedCompletedCount) }}
         </p>
-      </BaseCard>
-      <BaseCard>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('goals.overdueGoals') }}</p>
-        <p class="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">
+      </div>
+      <div class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <p class="nook-section-label text-secondary-500 dark:text-gray-400">
+          {{ t('goals.overdueGoals') }}
+        </p>
+        <p class="font-outfit mt-1 text-2xl font-extrabold text-red-600 dark:text-red-400">
           {{ Math.round(animatedOverdueCount) }}
         </p>
-      </BaseCard>
+      </div>
     </div>
 
     <BaseCard :title="t('goals.activeGoals')">
@@ -303,7 +309,7 @@ async function deleteCompletedGoal(id: string) {
         <div
           v-for="goal in filteredGoalsByPriority"
           :key="goal.id"
-          class="rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+          class="rounded-[var(--sq)] bg-white p-4 shadow-[var(--card-shadow)] dark:bg-slate-800"
         >
           <div class="mb-2 flex items-center justify-between">
             <div>
@@ -383,7 +389,7 @@ async function deleteCompletedGoal(id: string) {
         <div
           v-for="goal in filteredCompletedGoalsSorted"
           :key="goal.id"
-          class="rounded-lg border border-gray-200 bg-gray-50/50 p-4 dark:border-slate-700 dark:bg-slate-800/50"
+          class="rounded-[var(--sq)] bg-gray-50/50 p-4 shadow-[var(--card-shadow)] dark:bg-slate-800/50"
         >
           <div class="mb-2 flex items-center justify-between">
             <div>
