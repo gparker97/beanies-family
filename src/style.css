@@ -1,5 +1,8 @@
 @import url('tailwindcss');
 
+/* Use class-based dark mode (.dark on <html>) instead of prefers-color-scheme */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ─── Brand colour theme (Tailwind 4 @theme) ──────────────────────────────
    Defines semantic utility classes: bg-primary-500, text-secondary, etc.
    Heritage Orange  #F15D22  — primary actions, CTAs, growth
