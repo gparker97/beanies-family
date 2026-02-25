@@ -98,21 +98,13 @@ const emit = defineEmits<{
     </div>
 
     <!-- Sort -->
-    <div class="relative">
-      <span class="font-outfit text-xs font-medium opacity-40">
+    <div class="flex items-center gap-1.5">
+      <span class="font-outfit text-xs font-medium text-[var(--color-text)] opacity-50">
         Sort:
-        {{
-          sortBy === 'newest'
-            ? t('todo.sort.newest')
-            : sortBy === 'oldest'
-              ? t('todo.sort.oldest')
-              : t('todo.sort.dueDate')
-        }}
-        ▾
       </span>
       <select
         :value="sortBy"
-        class="absolute inset-0 cursor-pointer opacity-0"
+        class="beanies-input font-outfit cursor-pointer rounded-lg border-gray-200 py-1.5 pr-7 pl-2 text-xs font-semibold text-[var(--color-text)] dark:border-slate-600"
         @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value as TodoSort)"
       >
         <option value="newest">{{ t('todo.sort.newest') }}</option>
