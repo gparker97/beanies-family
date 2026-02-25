@@ -125,3 +125,22 @@ grep -r "vi.mock.*syncService" src/ --include='*.test.ts' -l
 ```
 
 Then verify each match includes the new export in its mock factory.
+
+## 9. File System Access API: concurrent writes corrupt files
+
+**Date:** 2026-02-25
+**Context:** `.beanpod` data file corruption — stale trailing bytes appended after valid JSON
+
+**Pattern:** The File System Access API's `createWritable()` does not guarantee atomic writes for local file system files. When two `save()` calls execute concurrently (e.g. debounced auto-save racing with a forced save from sign-out or passkey registration), their `truncate`/`write`/`close` operations can interleave. If the second write produces shorter content, the tail of the first write's content remains as stale bytes at the end of the file, corrupting the JSON.
+
+**Symptom:** Valid JSON followed by garbage characters at EOF. Example: `..."familyName": "Greg Beanies Dev"}"My Family"\n}` — the file has the correct new content, but the tail of a previous (shorter) write's content remains.
+
+**Root cause:** No write mutex in `save()`. The `truncate(0)` fix (commit e74add6) only prevents corruption from sequential writes of different lengths; it does NOT protect against concurrent writes whose operations interleave at the stream level.
+
+**Fix (multi-layered):**
+
+1. **Write mutex:** Serialize all `save()` calls via a Promise-based lock (`saveInProgress`). Each call waits for any in-flight save to finish before starting.
+2. **Write-then-truncate:** Instead of `truncate(0)` → `write(content)`, use `seek(0)` → `write(content)` → `truncate(contentLength)`. This ensures the file is exactly the right size regardless of interleaving.
+3. **Explicit `keepExistingData: false`:** Pass it explicitly to `createWritable()` to guarantee the temp file starts empty across all browser implementations.
+
+**Rule:** Any async function that writes to a shared file via the File System Access API MUST be serialized with a mutex. Debouncing alone is insufficient — it prevents rapid re-triggering but does not prevent overlapping async operations.
