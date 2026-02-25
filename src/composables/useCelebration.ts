@@ -31,7 +31,7 @@ const configs: Record<
   'setup-complete': {
     type: 'modal',
     message: 'Setup complete — ready to start counting your beanies!',
-    asset: '/brand/beanies_celebrating_line_transparent_600x600.png',
+    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
   'first-account': {
     type: 'modal',
@@ -46,7 +46,7 @@ const configs: Record<
   'goal-reached': {
     type: 'modal',
     message: 'Goal complete! The beanies are proud!',
-    asset: '/brand/beanies_celebrating_line_transparent_600x600.png',
+    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
   'first-save': {
     type: 'toast',
@@ -56,7 +56,7 @@ const configs: Record<
   'debt-free': {
     type: 'modal',
     message: 'Debt-free! The beanies are celebrating!',
-    asset: '/brand/beanies_celebrating_line_transparent_600x600.png',
+    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
 };
 
