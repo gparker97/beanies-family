@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, toRaw } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -14,7 +15,6 @@ import { COUNTRIES } from '@/constants/countries';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getAssetTypeIcon } from '@/constants/icons';
-import { useAnimatedCurrency } from '@/composables/useAnimatedCurrency';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -35,27 +35,11 @@ const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
-// Animated summary card values
 const baseCurrency = computed(() => settingsStore.baseCurrency);
-const { formatted: animatedAssetValue } = useAnimatedCurrency(
-  computed(() => assetsStore.filteredTotalAssetValue),
-  baseCurrency
-);
-const { formatted: animatedLoanValue } = useAnimatedCurrency(
-  computed(() => assetsStore.filteredTotalLoanValue),
-  baseCurrency,
-  100
-);
-const { formatted: animatedNetAssetValue } = useAnimatedCurrency(
-  computed(() => assetsStore.filteredNetAssetValue),
-  baseCurrency,
-  200
-);
-const { formatted: animatedAppreciation } = useAnimatedCurrency(
-  computed(() => Math.abs(assetsStore.totalAppreciation)),
-  baseCurrency,
-  300
-);
+const totalAssetValue = computed(() => assetsStore.filteredTotalAssetValue);
+const totalLoanValue = computed(() => assetsStore.filteredTotalLoanValue);
+const netAssetValue = computed(() => assetsStore.filteredNetAssetValue);
+const totalAppreciation = computed(() => assetsStore.totalAppreciation);
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -362,87 +346,55 @@ function getAppreciationPercent(asset: Asset): number {
     </div>
 
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-4">
-      <!-- Total Asset Value -->
-      <div
-        class="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-5 text-white shadow-lg"
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <SummaryStatCard
+        :label="t('common.totalValue')"
+        :amount="totalAssetValue"
+        :currency="baseCurrency"
+        tint="green"
       >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-green-100">{{ t('common.totalValue') }}</p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedAssetValue }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon name="building" size="lg" />
-          </div>
-        </div>
-      </div>
+        <template #icon>
+          <BeanieIcon name="building" size="md" class="text-[#27AE60]" />
+        </template>
+      </SummaryStatCard>
 
-      <!-- Total Loans -->
-      <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-5 text-white shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-red-100">{{ t('common.assetLoans') }}</p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedLoanValue }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon name="wallet" size="lg" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Net Asset Value -->
-      <div
-        class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-5 text-white shadow-lg"
+      <SummaryStatCard
+        :label="t('common.assetLoans')"
+        :amount="totalLoanValue"
+        :currency="baseCurrency"
+        tint="orange"
       >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-white/80">{{ t('common.netAssetValue') }}</p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedNetAssetValue }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon name="dollar-circle" size="lg" />
-          </div>
-        </div>
-      </div>
+        <template #icon>
+          <BeanieIcon name="wallet" size="md" class="text-primary-500" />
+        </template>
+      </SummaryStatCard>
 
-      <!-- Total Appreciation -->
-      <div
-        class="rounded-xl p-5 text-white shadow-lg"
-        :class="
-          assetsStore.totalAppreciation >= 0
-            ? 'bg-gradient-to-br from-teal-500 to-cyan-600'
-            : 'bg-gradient-to-br from-orange-500 to-amber-600'
-        "
+      <SummaryStatCard
+        :label="t('common.netAssetValue')"
+        :amount="netAssetValue"
+        :currency="baseCurrency"
+        tint="slate"
+        dark
       >
-        <div class="flex items-center justify-between">
-          <div>
-            <p
-              class="text-sm font-medium"
-              :class="assetsStore.totalAppreciation >= 0 ? 'text-teal-100' : 'text-orange-100'"
-            >
-              {{
-                assetsStore.totalAppreciation >= 0
-                  ? t('common.appreciation')
-                  : t('common.depreciation')
-              }}
-            </p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedAppreciation }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon v-if="assetsStore.totalAppreciation >= 0" name="trending-up" size="lg" />
-            <BeanieIcon v-else name="trending-down" size="lg" />
-          </div>
-        </div>
-      </div>
+        <template #icon>
+          <BeanieIcon name="dollar-circle" size="md" class="text-white" />
+        </template>
+      </SummaryStatCard>
+
+      <SummaryStatCard
+        :label="totalAppreciation >= 0 ? t('common.appreciation') : t('common.depreciation')"
+        :amount="Math.abs(totalAppreciation)"
+        :currency="baseCurrency"
+        :tint="totalAppreciation >= 0 ? 'green' : 'orange'"
+      >
+        <template #icon>
+          <BeanieIcon
+            :name="totalAppreciation >= 0 ? 'trending-up' : 'trending-down'"
+            size="md"
+            :class="totalAppreciation >= 0 ? 'text-[#27AE60]' : 'text-primary-500'"
+          />
+        </template>
+      </SummaryStatCard>
     </div>
 
     <!-- Empty State -->
@@ -476,7 +428,9 @@ function getAppreciationPercent(asset: Asset): number {
               :style="{ color: getAssetTypeIcon(group.type)?.color }"
             />
           </div>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ group.label }}</h2>
+          <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
+            {{ group.label }}
+          </h2>
           <span class="text-sm text-gray-500 dark:text-gray-400">({{ group.assets.length }})</span>
         </div>
 
@@ -486,14 +440,14 @@ function getAppreciationPercent(asset: Asset): number {
             v-for="asset in group.assets"
             :key="asset.id"
             data-testid="asset-card"
-            class="rounded-xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
           >
             <!-- Card Header -->
             <div class="mb-4 flex items-start justify-between">
               <div class="flex items-center gap-3">
                 <!-- Asset Type Icon -->
                 <div
-                  class="flex h-12 w-12 items-center justify-center rounded-xl"
+                  class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
                   :class="[
                     getAssetTypeConfig(asset.type).bgColor,
                     getAssetTypeConfig(asset.type).darkBgColor,
@@ -539,7 +493,7 @@ function getAppreciationPercent(asset: Asset): number {
                 <p class="mb-1 text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
                   {{ t('common.currentValue') }}
                 </p>
-                <div class="text-xl font-bold">
+                <div class="font-outfit text-xl font-extrabold">
                   <CurrencyAmount
                     :amount="asset.currentValue"
                     :currency="asset.currency"

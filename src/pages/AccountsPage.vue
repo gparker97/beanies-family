@@ -5,7 +5,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import { useAnimatedCurrency } from '@/composables/useAnimatedCurrency';
+import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
@@ -118,22 +118,11 @@ const accountsByType = computed(() => {
     }));
 });
 
-// Animated summary card values
+// Summary card values
 const baseCurrency = computed(() => settingsStore.baseCurrency);
-const { formatted: animatedAssets } = useAnimatedCurrency(
-  computed(() => accountsStore.filteredTotalAssets),
-  baseCurrency
-);
-const { formatted: animatedLiabilities } = useAnimatedCurrency(
-  computed(() => accountsStore.filteredTotalLiabilities),
-  baseCurrency,
-  100
-);
-const { formatted: animatedNetWorth } = useAnimatedCurrency(
-  computed(() => accountsStore.filteredTotalBalance),
-  baseCurrency,
-  200
-);
+const totalAssets = computed(() => accountsStore.filteredTotalAssets);
+const totalLiabilities = computed(() => accountsStore.filteredTotalLiabilities);
+const totalBalance = computed(() => accountsStore.filteredTotalBalance);
 
 function getAccountTypeLabel(type: AccountType): string {
   return accountTypes.value.find((t) => t.value === type)?.label || type;
@@ -294,54 +283,39 @@ async function deleteAccount(id: string) {
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-      <!-- Total Assets -->
-      <div
-        class="rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 p-5 text-white shadow-lg"
+      <SummaryStatCard
+        :label="t('common.totalAssets')"
+        :amount="totalAssets"
+        :currency="baseCurrency"
+        tint="green"
       >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-green-100">{{ t('common.totalAssets') }}</p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedAssets }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon name="arrow-up" size="lg" />
-          </div>
-        </div>
-      </div>
+        <template #icon>
+          <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
+        </template>
+      </SummaryStatCard>
 
-      <!-- Total Liabilities -->
-      <div class="rounded-xl bg-gradient-to-br from-red-500 to-rose-600 p-5 text-white shadow-lg">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-red-100">{{ t('common.totalLiabilities') }}</p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedLiabilities }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon name="arrow-down" size="lg" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Net Worth -->
-      <div
-        class="from-secondary-500 to-secondary-700 rounded-xl bg-gradient-to-br p-5 text-white shadow-lg"
+      <SummaryStatCard
+        :label="t('common.totalLiabilities')"
+        :amount="totalLiabilities"
+        :currency="baseCurrency"
+        tint="orange"
       >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-white/80">{{ t('dashboard.netWorth') }}</p>
-            <p class="mt-1 text-2xl font-bold">
-              {{ animatedNetWorth }}
-            </p>
-          </div>
-          <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
-            <BeanieIcon name="dollar-circle" size="lg" />
-          </div>
-        </div>
-      </div>
+        <template #icon>
+          <BeanieIcon name="arrow-down" size="md" class="text-primary-500" />
+        </template>
+      </SummaryStatCard>
+
+      <SummaryStatCard
+        :label="t('dashboard.netWorth')"
+        :amount="totalBalance"
+        :currency="baseCurrency"
+        tint="slate"
+        dark
+      >
+        <template #icon>
+          <BeanieIcon name="dollar-circle" size="md" class="text-white" />
+        </template>
+      </SummaryStatCard>
     </div>
 
     <!-- Empty State -->
@@ -375,7 +349,9 @@ async function deleteAccount(id: string) {
               :class="getAccountTypeConfig(group.type).iconColor"
             />
           </div>
-          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ group.label }}</h2>
+          <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
+            {{ group.label }}
+          </h2>
           <span class="text-sm text-gray-500 dark:text-gray-400"
             >({{ group.accounts.length }})</span
           >
@@ -387,7 +363,7 @@ async function deleteAccount(id: string) {
             v-for="account in group.accounts"
             :key="account.id"
             data-testid="account-card"
-            class="rounded-xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
             :class="{ 'opacity-60': !account.isActive }"
           >
             <!-- Card Header -->
@@ -395,7 +371,7 @@ async function deleteAccount(id: string) {
               <div class="flex items-center gap-3">
                 <!-- Account Type Icon -->
                 <div
-                  class="flex h-12 w-12 items-center justify-center rounded-xl"
+                  class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
                   :class="[
                     getAccountTypeConfig(account.type).bgColor,
                     getAccountTypeConfig(account.type).darkBgColor,
@@ -443,7 +419,7 @@ async function deleteAccount(id: string) {
               <p class="mb-1 text-xs tracking-wide text-gray-500 uppercase dark:text-gray-400">
                 {{ t('form.balance') }}
               </p>
-              <div class="text-2xl font-bold">
+              <div class="font-outfit text-2xl font-extrabold">
                 <CurrencyAmount
                   :amount="account.balance"
                   :currency="account.currency"
