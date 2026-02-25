@@ -96,12 +96,7 @@ const timeAgo = computed(() => {
   >
     <!-- Checkbox -->
     <button
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
-      :class="
-        todo.dueDate
-          ? 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]'
-          : 'border-[rgba(44,62,80,0.2)] hover:border-[rgba(44,62,80,0.4)]'
-      "
+      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-[2.5px] border-[var(--color-primary-500)] transition-colors hover:bg-[var(--tint-orange-8)]"
       @click="emit('toggle', todo.id)"
     />
 
@@ -122,15 +117,6 @@ const timeAgo = computed(() => {
 
         <!-- No date set -->
         <span v-else class="text-xs opacity-35">No date set</span>
-
-        <!-- On calendar badge (only if has date) -->
-        <span
-          v-if="todo.dueDate"
-          class="rounded-md px-2 py-0.5 text-[0.7rem]"
-          style="background: var(--tint-silk-20); color: #3a7bad"
-        >
-          📆 {{ t('todo.onCalendar') }}
-        </span>
 
         <!-- Assignee chip (gradient background with member color) -->
         <span
