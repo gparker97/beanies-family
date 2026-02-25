@@ -71,6 +71,8 @@ export function validateSyncFileData(data: unknown): data is SyncFileData {
   // recurringItems is optional for backward compatibility with older sync files
   if (innerData.recurringItems !== undefined && !Array.isArray(innerData.recurringItems))
     return false;
+  // todos is optional for backward compatibility with older sync files
+  if (innerData.todos !== undefined && !Array.isArray(innerData.todos)) return false;
 
   return true;
 }

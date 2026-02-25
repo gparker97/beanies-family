@@ -87,7 +87,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/todo',
     name: 'Todo',
-    component: () => import('@/pages/DashboardPage.vue'),
+    component: () => import('@/pages/FamilyTodoPage.vue'),
     meta: { title: 'Family To-Do', requiresAuth: true },
   },
   {
