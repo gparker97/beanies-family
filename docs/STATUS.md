@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-25
-> **Updated by:** Claude (Family Nook home screen — #97)
+> **Updated by:** Claude (Family Nook complete — #97 done, deployed to prod)
 
 ## Current Phase
 
@@ -42,7 +42,7 @@
 - Settings page (currency, theme, sync, encryption)
 - First-run setup wizard
 - Multi-currency display with global display currency selector
-- Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards, todo widget, milestones, piggy bank card, recent activity feed
+- Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards, inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed. Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
 
 ### Beanie Brand Asset Icons
 
@@ -572,8 +572,8 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 ### New Issues Created
 
 | Issue | Title                                                           | Priority |
-| ----- | --------------------------------------------------------------- | -------- |
-| #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     |
+| ----- | --------------------------------------------------------------- | -------- | ------- |
+| #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     | ✅ Done |
 | #98   | Family Planner 📅: calendar and scheduling hub                  | High     |
 | #99   | Family To-Do ✅: standalone task management page                | High     |
 | #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     |
