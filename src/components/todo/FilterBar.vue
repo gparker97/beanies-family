@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
-import type { UIStringKey } from '@/services/translation/uiStrings';
+import { useTodoStore } from '@/stores/todoStore';
 
 const { t } = useTranslation();
+const todoStore = useTodoStore();
 
 export type TodoFilter = 'all' | 'open' | 'done' | 'scheduled' | 'noDate';
 export type TodoSort = 'newest' | 'oldest' | 'dueDate';
@@ -16,14 +17,6 @@ const emit = defineEmits<{
   'update:activeFilter': [filter: TodoFilter];
   'update:sortBy': [sort: TodoSort];
 }>();
-
-const filters: { value: TodoFilter; labelKey: UIStringKey }[] = [
-  { value: 'all', labelKey: 'todo.filter.all' },
-  { value: 'open', labelKey: 'todo.filter.open' },
-  { value: 'done', labelKey: 'todo.filter.done' },
-  { value: 'scheduled', labelKey: 'todo.filter.scheduled' },
-  { value: 'noDate', labelKey: 'todo.filter.noDate' },
-];
 </script>
 
 <template>
@@ -31,34 +24,101 @@ const filters: { value: TodoFilter; labelKey: UIStringKey }[] = [
     <!-- Filter chips -->
     <div class="flex flex-wrap gap-1.5">
       <button
-        v-for="filter in filters"
-        :key="filter.value"
-        class="rounded-full px-3 py-1.5 text-xs font-medium transition-all"
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
         :class="
-          activeFilter === filter.value
-            ? 'text-white shadow-sm'
-            : 'bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
+          activeFilter === 'all' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
         "
         :style="
-          activeFilter === filter.value
+          activeFilter === 'all'
             ? 'background: linear-gradient(135deg, #9b59b6, #8e44ad)'
-            : undefined
+            : 'background: var(--tint-slate-5)'
         "
-        @click="emit('update:activeFilter', filter.value)"
+        @click="emit('update:activeFilter', 'all')"
       >
-        {{ t(filter.labelKey) }}
+        {{ t('todo.filter.all') }} ({{ todoStore.todos.length }})
+      </button>
+      <button
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        :class="
+          activeFilter === 'open' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+        "
+        :style="
+          activeFilter === 'open'
+            ? 'background: linear-gradient(135deg, #9b59b6, #8e44ad)'
+            : 'background: var(--tint-slate-5)'
+        "
+        @click="emit('update:activeFilter', 'open')"
+      >
+        {{ t('todo.filter.open') }} ({{ todoStore.openTodos.length }})
+      </button>
+      <button
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        :class="
+          activeFilter === 'done' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+        "
+        :style="
+          activeFilter === 'done'
+            ? 'background: linear-gradient(135deg, #9b59b6, #8e44ad)'
+            : 'background: var(--tint-slate-5)'
+        "
+        @click="emit('update:activeFilter', 'done')"
+      >
+        {{ t('todo.filter.done') }} ({{ todoStore.completedTodos.length }})
+      </button>
+      <button
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        :class="
+          activeFilter === 'scheduled'
+            ? 'text-white shadow-sm'
+            : 'text-[var(--color-text)] opacity-40'
+        "
+        :style="
+          activeFilter === 'scheduled'
+            ? 'background: linear-gradient(135deg, #9b59b6, #8e44ad)'
+            : 'background: var(--tint-slate-5)'
+        "
+        @click="emit('update:activeFilter', 'scheduled')"
+      >
+        📅 {{ t('todo.filter.scheduled') }}
+      </button>
+      <button
+        class="font-outfit rounded-xl px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all"
+        :class="
+          activeFilter === 'noDate' ? 'text-white shadow-sm' : 'text-[var(--color-text)] opacity-40'
+        "
+        :style="
+          activeFilter === 'noDate'
+            ? 'background: linear-gradient(135deg, #9b59b6, #8e44ad)'
+            : 'background: var(--tint-slate-5)'
+        "
+        @click="emit('update:activeFilter', 'noDate')"
+      >
+        ⚡ {{ t('todo.filter.noDate') }}
       </button>
     </div>
 
-    <!-- Sort dropdown -->
-    <select
-      :value="sortBy"
-      class="rounded-lg border border-[var(--color-border)] bg-transparent px-2 py-1 text-xs text-[var(--color-text-muted)] transition-colors outline-none focus:border-purple-400 dark:text-white"
-      @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value as TodoSort)"
-    >
-      <option value="newest">{{ t('todo.sort.newest') }}</option>
-      <option value="oldest">{{ t('todo.sort.oldest') }}</option>
-      <option value="dueDate">{{ t('todo.sort.dueDate') }}</option>
-    </select>
+    <!-- Sort -->
+    <div class="relative">
+      <span class="font-outfit text-[0.6rem] font-medium opacity-30">
+        Sort:
+        {{
+          sortBy === 'newest'
+            ? t('todo.sort.newest')
+            : sortBy === 'oldest'
+              ? t('todo.sort.oldest')
+              : t('todo.sort.dueDate')
+        }}
+        ▾
+      </span>
+      <select
+        :value="sortBy"
+        class="absolute inset-0 cursor-pointer opacity-0"
+        @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value as TodoSort)"
+      >
+        <option value="newest">{{ t('todo.sort.newest') }}</option>
+        <option value="oldest">{{ t('todo.sort.oldest') }}</option>
+        <option value="dueDate">{{ t('todo.sort.dueDate') }}</option>
+      </select>
+    </div>
   </div>
 </template>

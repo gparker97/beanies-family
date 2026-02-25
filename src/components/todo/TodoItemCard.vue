@@ -2,7 +2,6 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import type { TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
@@ -31,118 +30,143 @@ const completedByMember = computed(() => {
 const formattedDate = computed(() => {
   if (!props.todo.dueDate) return null;
   const date = new Date(props.todo.dueDate);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+  const day = date.getDate();
+  const month = date.toLocaleDateString(undefined, { month: 'short' });
+  return `${weekday} ${day} ${month}`;
+});
+
+const timeAgo = computed(() => {
+  const now = new Date();
+  const created = new Date(props.todo.createdAt);
+  const diffMs = now.getTime() - created.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return 'Added today';
+  if (diffDays === 1) return 'Added yesterday';
+  return `Added ${diffDays} days ago`;
 });
 </script>
 
 <template>
+  <!-- Completed task card -->
   <div
-    class="group flex items-start gap-3 rounded-xl border border-[var(--color-border)] bg-white p-3 transition-all dark:bg-[var(--color-surface)]"
-    :class="[
-      todo.completed ? 'opacity-60' : 'hover:shadow-md',
-      !todo.completed ? 'border-l-[3px] border-l-purple-400' : '',
-    ]"
-    style="box-shadow: var(--card-shadow)"
+    v-if="todo.completed"
+    class="group flex items-center gap-3.5 rounded-2xl p-3.5 opacity-50"
+    style="background: var(--tint-slate-5)"
   >
-    <!-- Checkbox -->
+    <!-- Green checkbox -->
     <button
-      class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors"
-      :class="
-        todo.completed
-          ? 'border-green-500 bg-green-500 text-white'
-          : 'border-purple-400 hover:bg-[var(--tint-purple-8)]'
-      "
+      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg"
+      style="background: #27ae60"
       @click="emit('toggle', todo.id)"
     >
-      <BeanieIcon v-if="todo.completed" name="check" size="xs" />
+      <span class="text-[0.65rem] font-bold text-white">✓</span>
     </button>
 
     <!-- Content -->
     <div class="min-w-0 flex-1">
-      <p
-        class="text-sm font-medium"
-        :class="
-          todo.completed
-            ? 'text-[var(--color-text-muted)] line-through'
-            : 'text-[var(--color-text)]'
-        "
-      >
+      <p class="font-outfit text-[0.85rem] font-semibold line-through">
         {{ todo.title }}
       </p>
-
-      <div class="mt-1 flex flex-wrap items-center gap-2">
-        <!-- Assignee chip -->
-        <span
-          v-if="assignee"
-          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-          style="background: var(--tint-slate-5)"
-        >
-          <span
-            class="inline-block h-2.5 w-2.5 rounded-full"
-            :style="{ backgroundColor: assignee.color }"
-          />
-          {{ assignee.name }}
-        </span>
-
-        <!-- Date badge -->
-        <span
-          v-if="formattedDate"
-          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-          :style="{
-            background: todo.completed ? 'var(--tint-slate-5)' : 'var(--tint-orange-8)',
-          }"
-        >
-          <BeanieIcon name="calendar" size="xs" />
-          {{ formattedDate }}
-          <span v-if="todo.dueTime" class="text-[var(--color-text-muted)]">{{ todo.dueTime }}</span>
-        </span>
-
-        <!-- On calendar badge -->
-        <span
-          v-if="todo.dueDate && !todo.completed"
-          class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs"
-          style="background: var(--tint-silk-10); color: var(--color-secondary-500)"
-        >
-          {{ t('todo.onCalendar') }}
-        </span>
-
-        <!-- Completed info -->
-        <span
-          v-if="todo.completed && completedByMember"
-          class="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400"
-        >
-          <BeanieIcon name="check" size="xs" />
-          {{ t('todo.doneBy') }} {{ completedByMember.name }}
+      <div class="mt-1 flex items-center gap-2">
+        <span v-if="completedByMember" class="text-[0.55rem]">
+          ✅ {{ t('todo.doneBy') }} {{ completedByMember.name }}
         </span>
       </div>
     </div>
 
-    <!-- Actions -->
-    <div
-      class="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
-    >
-      <template v-if="todo.completed">
-        <button
-          class="rounded-md px-2 py-1 text-xs font-medium text-purple-500 transition-colors hover:bg-[var(--tint-purple-8)]"
-          @click="emit('toggle', todo.id)"
+    <!-- Undo button -->
+    <div class="flex shrink-0 gap-1.5">
+      <button
+        class="flex h-7 w-7 items-center justify-center rounded-[9px] text-[0.6rem] opacity-40 transition-opacity hover:opacity-70"
+        style="background: rgb(255 255 255 / 50%)"
+        @click="emit('toggle', todo.id)"
+      >
+        ↩️
+      </button>
+    </div>
+  </div>
+
+  <!-- Open task card -->
+  <div
+    v-else
+    class="group flex items-center gap-3.5 rounded-2xl border p-3.5 transition-all hover:bg-[var(--tint-orange-8)]"
+    :class="todo.dueDate ? 'border-[rgba(241,93,34,0.08)]' : 'border-[var(--tint-slate-5)]'"
+    :style="{
+      background: todo.dueDate ? 'rgba(241, 93, 34, 0.04)' : 'white',
+    }"
+  >
+    <!-- Checkbox -->
+    <button
+      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
+      :class="
+        todo.dueDate
+          ? 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]'
+          : 'border-[rgba(44,62,80,0.15)] hover:border-[rgba(44,62,80,0.3)]'
+      "
+      @click="emit('toggle', todo.id)"
+    />
+
+    <!-- Content -->
+    <div class="min-w-0 flex-1">
+      <p class="font-outfit text-[0.85rem] font-semibold text-[var(--color-text)]">
+        {{ todo.title }}
+      </p>
+      <div class="mt-1 flex flex-wrap items-center gap-2">
+        <!-- Date (always first, orange color) -->
+        <span
+          v-if="formattedDate"
+          class="text-[0.6rem] font-semibold"
+          :style="{ color: 'var(--color-primary-500)' }"
         >
-          {{ t('todo.undo') }}
-        </button>
-      </template>
-      <template v-else>
-        <button
-          class="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)]"
-          @click="emit('edit', todo)"
+          📅 {{ formattedDate }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
+        </span>
+
+        <!-- No date set -->
+        <span v-else class="text-[0.55rem] opacity-35">No date set</span>
+
+        <!-- On calendar badge (only if has date) -->
+        <span
+          v-if="todo.dueDate"
+          class="rounded-md px-2 py-0.5 text-[0.55rem]"
+          style="background: var(--tint-silk-20); color: #3a7bad"
         >
-          <BeanieIcon name="edit" size="sm" />
-        </button>
-        <button
-          class="flex h-7 w-7 items-center justify-center rounded-md text-[var(--color-text-muted)] transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
-          @click="emit('delete', todo.id)"
+          📆 {{ t('todo.onCalendar') }}
+        </span>
+
+        <!-- Assignee chip (gradient background with member color) -->
+        <span
+          v-if="assignee"
+          class="rounded-md px-2 py-0.5 text-[0.55rem] font-medium text-white"
+          :style="{
+            background: `linear-gradient(135deg, ${assignee.color}, ${assignee.color}cc)`,
+          }"
         >
-          <BeanieIcon name="trash" size="sm" />
-        </button>
-      </template>
+          {{ assignee.name }}
+        </span>
+
+        <!-- Time ago -->
+        <span class="text-[0.5rem] opacity-30">{{ timeAgo }}</span>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div class="flex shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+      <button
+        class="flex h-7 w-7 items-center justify-center rounded-[9px] text-[0.65rem] opacity-30 transition-opacity hover:opacity-60"
+        style="background: var(--tint-slate-5)"
+        @click="emit('edit', todo)"
+      >
+        ✏️
+      </button>
+      <button
+        class="flex h-7 w-7 items-center justify-center rounded-[9px] text-[0.65rem] opacity-30 transition-opacity hover:opacity-60"
+        style="background: var(--tint-slate-5)"
+        @click="emit('delete', todo.id)"
+      >
+        🗑️
+      </button>
     </div>
   </div>
 </template>

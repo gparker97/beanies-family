@@ -9,7 +9,6 @@ import { useAuthStore } from '@/stores/authStore';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
@@ -174,8 +173,8 @@ async function handleDelete(id: string) {
     <!-- Page header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="font-outfit text-2xl font-extrabold text-[var(--color-text)]">
-          {{ t('todo.title') }}
+        <h1 class="font-outfit text-[1.6rem] font-extrabold text-[var(--color-text)]">
+          ✅ {{ t('todo.title') }}
         </h1>
         <p class="mt-0.5 text-sm text-[var(--color-text-muted)]">
           {{ t('todo.subtitle') }}
@@ -237,7 +236,7 @@ async function handleDelete(id: string) {
           class="flex items-center gap-2 text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
           @click="showCompletedSection = !showCompletedSection"
         >
-          <BeanieIcon :name="showCompletedSection ? 'chevron-up' : 'chevron-down'" size="sm" />
+          <span class="text-xs opacity-50">{{ showCompletedSection ? '▲' : '▼' }}</span>
           <span class="nook-section-label text-green-600 dark:text-green-400">
             {{ t('todo.section.completed') }} ({{ displayedCompletedTodos.length }})
           </span>
