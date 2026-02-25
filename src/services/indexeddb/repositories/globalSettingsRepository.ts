@@ -7,7 +7,7 @@ const GLOBAL_SETTINGS_ID = 'global_settings';
 export function getDefaultGlobalSettings(): GlobalSettings {
   return {
     id: GLOBAL_SETTINGS_ID,
-    theme: 'system',
+    theme: 'light',
     language: DEFAULT_LANGUAGE,
     lastActiveFamilyId: null,
     exchangeRates: [],
