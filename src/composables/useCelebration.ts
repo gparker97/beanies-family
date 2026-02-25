@@ -1,5 +1,7 @@
 import { ref } from 'vue';
 import { playChime, playFanfare } from '@/composables/useSounds';
+import { useTranslationStore } from '@/stores/translationStore';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 type CelebrationType = 'toast' | 'modal';
 
@@ -26,36 +28,36 @@ const activeModal = ref<Celebration | null>(null);
 
 const configs: Record<
   CelebrationTrigger,
-  { type: CelebrationType; message: string; asset: string }
+  { type: CelebrationType; messageKey: UIStringKey; asset: string }
 > = {
   'setup-complete': {
     type: 'modal',
-    message: 'Setup complete — ready to start counting your beanies!',
+    messageKey: 'celebration.setupComplete',
     asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
   'first-account': {
     type: 'modal',
-    message: 'Your first bean is planted!',
+    messageKey: 'celebration.firstAccount',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
   'first-transaction': {
     type: 'toast',
-    message: 'Every beanie counts!',
+    messageKey: 'celebration.firstTransaction',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
   'goal-reached': {
     type: 'modal',
-    message: 'Goal complete! The beanies are proud!',
+    messageKey: 'celebration.goalReached',
     asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
   'first-save': {
     type: 'toast',
-    message: 'Your beanies are safe and encrypted!',
+    messageKey: 'celebration.firstSave',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
   'debt-free': {
     type: 'modal',
-    message: 'Debt-free! The beanies are celebrating!',
+    messageKey: 'celebration.debtFree',
     asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
 };
@@ -64,7 +66,16 @@ export function celebrate(trigger: CelebrationTrigger): void {
   const config = configs[trigger];
   if (!config) return;
 
-  const celebration: Celebration = { id: nextId++, ...config };
+  // Resolve translation at call time (store is initialized by this point)
+  const translationStore = useTranslationStore();
+  const message = translationStore.t(config.messageKey);
+
+  const celebration: Celebration = {
+    id: nextId++,
+    type: config.type,
+    message,
+    asset: config.asset,
+  };
 
   if (config.type === 'toast') {
     toasts.value.push(celebration);
