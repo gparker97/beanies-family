@@ -8,12 +8,13 @@ import type {
   Settings,
   SyncQueueItem,
   RecurringItem,
+  TodoItem,
   TranslationCacheEntry,
 } from '@/types/models';
 
 const LEGACY_DB_NAME = 'gp-family-finance';
 const DB_NAME_PREFIX = 'gp-family-finance-';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export interface FinanceDB extends DBSchema {
   familyMembers: {
@@ -45,6 +46,11 @@ export interface FinanceDB extends DBSchema {
     key: string;
     value: RecurringItem;
     indexes: { 'by-accountId': string; 'by-type': string; 'by-isActive': number };
+  };
+  todos: {
+    key: string;
+    value: TodoItem;
+    indexes: { 'by-assigneeId': string; 'by-completed': number; 'by-dueDate': string };
   };
   settings: {
     key: string;
@@ -108,6 +114,14 @@ function createFinanceDB(dbName: string): Promise<IDBPDatabase<FinanceDB>> {
         recurringStore.createIndex('by-accountId', 'accountId', { unique: false });
         recurringStore.createIndex('by-type', 'type', { unique: false });
         recurringStore.createIndex('by-isActive', 'isActive', { unique: false });
+      }
+
+      // Todos store
+      if (!db.objectStoreNames.contains('todos')) {
+        const todosStore = db.createObjectStore('todos', { keyPath: 'id' });
+        todosStore.createIndex('by-assigneeId', 'assigneeId', { unique: false });
+        todosStore.createIndex('by-completed', 'completed', { unique: false });
+        todosStore.createIndex('by-dueDate', 'dueDate', { unique: false });
       }
 
       // Settings store
@@ -241,6 +255,7 @@ export async function clearAllData(): Promise<void> {
       'assets',
       'goals',
       'recurringItems',
+      'todos',
       'settings',
       'syncQueue',
     ],
@@ -254,6 +269,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('assets').clear(),
     tx.objectStore('goals').clear(),
     tx.objectStore('recurringItems').clear(),
+    tx.objectStore('todos').clear(),
     tx.objectStore('settings').clear(),
     tx.objectStore('syncQueue').clear(),
     tx.done,
@@ -267,13 +283,14 @@ export interface ExportedData {
   assets: Asset[];
   goals: Goal[];
   recurringItems: RecurringItem[];
+  todos?: TodoItem[];
   settings: Settings | null;
 }
 
 export async function exportAllData(): Promise<ExportedData> {
   const db = await getDatabase();
 
-  const [familyMembers, accounts, transactions, assets, goals, recurringItems, settings] =
+  const [familyMembers, accounts, transactions, assets, goals, recurringItems, todos, settings] =
     await Promise.all([
       db.getAll('familyMembers'),
       db.getAll('accounts'),
@@ -281,6 +298,7 @@ export async function exportAllData(): Promise<ExportedData> {
       db.getAll('assets'),
       db.getAll('goals'),
       db.getAll('recurringItems'),
+      db.getAll('todos'),
       db.get('settings', 'app_settings'),
     ]);
 
@@ -291,6 +309,7 @@ export async function exportAllData(): Promise<ExportedData> {
     assets,
     goals,
     recurringItems,
+    todos,
     settings: settings ?? null,
   };
 }
@@ -300,7 +319,16 @@ export async function importAllData(data: ExportedData): Promise<void> {
 
   // Clear existing data first (file always wins)
   const clearTx = db.transaction(
-    ['familyMembers', 'accounts', 'transactions', 'assets', 'goals', 'recurringItems', 'settings'],
+    [
+      'familyMembers',
+      'accounts',
+      'transactions',
+      'assets',
+      'goals',
+      'recurringItems',
+      'todos',
+      'settings',
+    ],
     'readwrite'
   );
 
@@ -311,13 +339,23 @@ export async function importAllData(data: ExportedData): Promise<void> {
     clearTx.objectStore('assets').clear(),
     clearTx.objectStore('goals').clear(),
     clearTx.objectStore('recurringItems').clear(),
+    clearTx.objectStore('todos').clear(),
     clearTx.objectStore('settings').clear(),
     clearTx.done,
   ]);
 
   // Import all data
   const importTx = db.transaction(
-    ['familyMembers', 'accounts', 'transactions', 'assets', 'goals', 'recurringItems', 'settings'],
+    [
+      'familyMembers',
+      'accounts',
+      'transactions',
+      'assets',
+      'goals',
+      'recurringItems',
+      'todos',
+      'settings',
+    ],
     'readwrite'
   );
 
@@ -352,6 +390,13 @@ export async function importAllData(data: ExportedData): Promise<void> {
   if (data.recurringItems) {
     for (const recurringItem of data.recurringItems) {
       promises.push(importTx.objectStore('recurringItems').add(recurringItem));
+    }
+  }
+
+  // Import todos (if present - handle legacy files without this field)
+  if (data.todos) {
+    for (const todo of data.todos) {
+      promises.push(importTx.objectStore('todos').add(todo));
     }
   }
 

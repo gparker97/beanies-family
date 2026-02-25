@@ -222,6 +222,25 @@ export interface Goal {
   updatedAt: ISODateString;
 }
 
+// Todo item - Family task management
+export interface TodoItem {
+  id: UUID;
+  title: string;
+  description?: string;
+  assigneeId?: UUID; // FK to FamilyMember (who should do it)
+  dueDate?: ISODateString; // ISO date (no time = untimed task)
+  dueTime?: string; // HH:mm
+  completed: boolean;
+  completedBy?: UUID; // FK to FamilyMember
+  completedAt?: ISODateString;
+  createdBy: UUID; // FK to FamilyMember
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
+
 // Exchange rate for currency conversion
 export interface ExchangeRate {
   from: CurrencyCode;
@@ -282,6 +301,7 @@ export type EntityType =
   | 'asset'
   | 'goal'
   | 'recurringItem'
+  | 'todo'
   | 'settings';
 
 export interface SyncQueueItem {
@@ -350,6 +370,7 @@ export interface SyncFileData {
     assets: Asset[];
     goals: Goal[];
     recurringItems: RecurringItem[];
+    todos?: TodoItem[];
     settings: Settings | null;
   };
 }

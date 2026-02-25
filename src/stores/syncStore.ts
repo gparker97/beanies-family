@@ -7,6 +7,7 @@ import { useAssetsStore } from './assetsStore';
 import { useFamilyStore } from './familyStore';
 import { useGoalsStore } from './goalsStore';
 import { useRecurringStore } from './recurringStore';
+import { useTodoStore } from './todoStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
@@ -536,6 +537,7 @@ export const useSyncStore = defineStore('sync', () => {
     const goalsStore = useGoalsStore();
     const settingsStore = useSettingsStore();
     const recurringStore = useRecurringStore();
+    const todoStore = useTodoStore();
 
     await Promise.all([
       familyStore.loadMembers(),
@@ -545,6 +547,7 @@ export const useSyncStore = defineStore('sync', () => {
       goalsStore.loadGoals(),
       settingsStore.loadSettings(),
       recurringStore.loadRecurringItems(),
+      todoStore.loadTodos(),
     ]);
   }
 
@@ -564,6 +567,7 @@ export const useSyncStore = defineStore('sync', () => {
         useAssetsStore().assets,
         useGoalsStore().goals,
         useRecurringStore().recurringItems,
+        useTodoStore().todos,
       ],
       () => {
         // Auto-save whenever file is configured and accessible

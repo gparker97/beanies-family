@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-02-25",
-    "translationCount": 694
+    "translationCount": 724
   },
   "translations": {
     "app.name": {
@@ -3474,6 +3474,156 @@
     "passkey.renameLabel": {
       "translation": "设备名称",
       "hash": "13nt2t",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.title": {
+      "translation": "家庭待办事项",
+      "hash": "ssz2wx",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.subtitle": {
+      "translation": "跟踪全家人的任务",
+      "hash": "5mc3by",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.newTask": {
+      "translation": "新任务",
+      "hash": "mvaw5h",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.quickAddPlaceholder": {
+      "translation": "需要做什么？",
+      "hash": "sfkjtm",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.editTask": {
+      "translation": "编辑任务",
+      "hash": "1ax49n",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.deleteTask": {
+      "translation": "删除任务",
+      "hash": "81w15m",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.deleteConfirm": {
+      "translation": "您确认要删除此任务吗？",
+      "hash": "ohxfjb",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.noTodos": {
+      "translation": "还没有任务",
+      "hash": "ygnaaf",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.getStarted": {
+      "translation": "添加您的第一个任务以开始！",
+      "hash": "s9rpbi",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.filter.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.filter.open": {
+      "translation": "开设",
+      "hash": "1gtii",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.filter.done": {
+      "translation": "完成",
+      "hash": "19s4i",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.filter.scheduled": {
+      "translation": "已预定",
+      "hash": "uhfekt",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.filter.noDate": {
+      "translation": "按日期",
+      "hash": "9kjdyr",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.sort.newest": {
+      "translation": "最新的",
+      "hash": "nt4ba",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.sort.oldest": {
+      "translation": "最早的",
+      "hash": "1f51n5",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.sort.dueDate": {
+      "translation": "到期日",
+      "hash": "vzzrsq",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.section.open": {
+      "translation": "未完成的任务",
+      "hash": "e37l88",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.section.completed": {
+      "translation": "已完成",
+      "hash": "9xualn",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.assignTo": {
+      "translation": "分配给",
+      "hash": "efgkwk",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.unassigned": {
+      "translation": "未分配",
+      "hash": "ixsnsp",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.allBeans": {
+      "translation": "所有豆类",
+      "hash": "1376f8",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.dueDate": {
+      "translation": "到期日",
+      "hash": "vzzrsq",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.dueTime": {
+      "translation": "时间",
+      "hash": "1jvfx",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.description": {
+      "translation": "表述",
+      "hash": "xqskk",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.onCalendar": {
+      "translation": "在日历上查看",
+      "hash": "sveben",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.doneBy": {
+      "translation": "由完成",
+      "hash": "d3evl7",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.undo": {
+      "translation": "撤销",
+      "hash": "1klxg",
+      "lastUpdated": "2026-02-25"
+    },
+    "todo.taskTitle": {
+      "translation": "任务标题",
+      "hash": "ouxt7h",
+      "lastUpdated": "2026-02-25"
+    },
+    "confirm.deleteTodoTitle": {
+      "translation": "删除任务",
+      "hash": "81w15m",
       "lastUpdated": "2026-02-25"
     }
   }

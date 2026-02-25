@@ -34,6 +34,10 @@
   --color-terracotta-400: #e67e22;
   --color-terracotta-500: #ca6f1e;
 
+  /* Purple (To-Do accent) */
+  --color-purple-400: #9b59b6;
+  --color-purple-500: #8e44ad;
+
   /* Fonts */
   --font-outfit: 'Outfit', sans-serif;
   --font-inter: 'Inter', system-ui, sans-serif;
@@ -67,6 +71,8 @@
   --tint-slate-5: rgb(44 62 80 / 5%);
   --tint-slate-10: rgb(44 62 80 / 10%);
   --tint-success-10: rgb(39 174 96 / 10%);
+  --tint-purple-8: rgb(155 89 182 / 8%);
+  --tint-purple-15: rgb(155 89 182 / 15%);
 }
 
 /* Dark mode variables */
@@ -86,6 +92,8 @@
   --tint-slate-5: rgb(255 255 255 / 5%);
   --tint-slate-10: rgb(255 255 255 / 10%);
   --tint-success-10: rgb(39 174 96 / 15%);
+  --tint-purple-8: rgb(155 89 182 / 12%);
+  --tint-purple-15: rgb(155 89 182 / 20%);
 }
 
 /* ─── Micro-animation keyframes ────────────────────────────────────────── */
