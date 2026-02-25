@@ -161,6 +161,13 @@ function closeViewModal() {
   viewingTodo.value = null;
 }
 
+function viewToDelete() {
+  if (!viewingTodo.value) return;
+  const id = viewingTodo.value.id;
+  closeViewModal();
+  handleDelete(id);
+}
+
 function viewToEdit() {
   if (!viewingTodo.value) return;
   const todo = viewingTodo.value;
@@ -434,14 +441,7 @@ async function handleDelete(id: string) {
       <template #footer>
         <div class="flex justify-between">
           <BaseButton @click="viewToEdit"> ✏️ {{ t('action.edit') }} </BaseButton>
-          <BaseButton
-            variant="secondary"
-            class="text-red-500"
-            @click="
-              closeViewModal();
-              handleDelete(viewingTodo!.id);
-            "
-          >
+          <BaseButton variant="secondary" class="text-red-500" @click="viewToDelete">
             🗑️ {{ t('action.delete') }}
           </BaseButton>
         </div>
