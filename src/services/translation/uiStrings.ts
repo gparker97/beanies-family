@@ -1145,6 +1145,13 @@ const STRING_DEFS = {
   'todo.doneBy': { en: 'Done by' },
   'todo.undo': { en: 'Undo' },
   'todo.taskTitle': { en: 'Task title' },
+  'todo.viewTask': { en: 'Task Details' },
+  'todo.noDescription': { en: 'No description' },
+  'todo.createdBy': { en: 'Created by' },
+  'todo.status': { en: 'Status' },
+  'todo.status.open': { en: 'Open' },
+  'todo.status.completed': { en: 'Completed' },
+  'todo.noDueDate': { en: 'No due date' },
   'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'Remove Task' },
 
   // Mobile navigation
