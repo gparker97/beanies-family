@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/authStore';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
@@ -24,6 +25,10 @@ const familyStore = useFamilyStore();
 const authStore = useAuthStore();
 
 const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
+
+const memberOptions = computed(() =>
+  familyStore.members.map((m) => ({ value: m.id, label: m.name }))
+);
 
 // Local filter state
 const activeFilter = ref<TodoFilter>('all');
@@ -266,52 +271,33 @@ async function handleDelete(id: string) {
       <form class="space-y-4" @submit.prevent="saveEdit">
         <BaseInput v-model="editForm.title" :label="t('todo.taskTitle')" required />
 
-        <div>
-          <label class="mb-1 block text-sm font-medium text-[var(--color-text)]">
+        <div class="space-y-1">
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('todo.description') }}
           </label>
-          <textarea
-            v-model="editForm.description"
-            rows="2"
-            class="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm transition-colors outline-none focus:border-purple-400 dark:text-white"
-          />
+          <textarea v-model="editForm.description" rows="2" class="beanies-input w-full" />
         </div>
 
-        <div>
-          <label class="mb-1 block text-sm font-medium text-[var(--color-text)]">
-            {{ t('todo.assignTo') }}
-          </label>
-          <select
-            v-model="editForm.assigneeId"
-            class="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm transition-colors outline-none focus:border-purple-400 dark:text-white"
-          >
-            <option value="">{{ t('todo.unassigned') }}</option>
-            <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
-              {{ member.name }}
-            </option>
-          </select>
-        </div>
+        <BaseSelect
+          :model-value="editForm.assigneeId"
+          :options="memberOptions"
+          :label="t('todo.assignTo')"
+          :placeholder="t('todo.unassigned')"
+          @update:model-value="editForm.assigneeId = String($event)"
+        />
 
         <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="mb-1 block text-sm font-medium text-[var(--color-text)]">
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('todo.dueDate') }}
             </label>
-            <input
-              v-model="editForm.dueDate"
-              type="date"
-              class="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm transition-colors outline-none focus:border-purple-400 dark:text-white"
-            />
+            <input v-model="editForm.dueDate" type="date" class="beanies-input w-full" />
           </div>
-          <div>
-            <label class="mb-1 block text-sm font-medium text-[var(--color-text)]">
+          <div class="space-y-1">
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t('todo.dueTime') }}
             </label>
-            <input
-              v-model="editForm.dueTime"
-              type="time"
-              class="w-full rounded-lg border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm transition-colors outline-none focus:border-purple-400 dark:text-white"
-            />
+            <input v-model="editForm.dueTime" type="time" class="beanies-input w-full" />
           </div>
         </div>
       </form>
