@@ -67,7 +67,7 @@ const timeAgo = computed(() => {
 
     <!-- Content (clickable for view) -->
     <div class="min-w-0 flex-1 cursor-pointer" @click="emit('view', todo)">
-      <p class="font-outfit text-[0.95rem] font-semibold line-through">
+      <p class="font-outfit text-base font-semibold line-through">
         {{ todo.title }}
       </p>
       <div class="mt-1 flex items-center gap-2">
@@ -102,7 +102,7 @@ const timeAgo = computed(() => {
 
     <!-- Content (clickable for view) -->
     <div class="min-w-0 flex-1 cursor-pointer" @click="emit('view', todo)">
-      <p class="font-outfit text-[0.95rem] font-semibold text-[var(--color-text)]">
+      <p class="font-outfit text-base font-semibold text-[var(--color-text)]">
         {{ todo.title }}
       </p>
       <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
