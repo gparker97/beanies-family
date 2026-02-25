@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-24
-> **Updated by:** Claude (biometric login family-switching fix — issue #16 follow-up)
+> **Last updated:** 2026-02-25
+> **Updated by:** Claude (v7 UI framework proposal — issues, theme, and docs update)
 
 ## Current Phase
 
@@ -542,6 +542,58 @@ Additionally, v6 includes all previous v4/v5 screens: Dashboard, Accounts (card 
 | #62   | Onboarding redesign — v6 welcome flow with illustrations             | Redesign   |
 
 Existing issues updated with v5/v6 references: #60, #61, #62, #69.
+
+## v7 UI Framework Proposal
+
+A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework-proposal-v7.html`, introducing a major structural reorganisation: the app shifts from finance-first to **family-first**, with three new pages and a collapsible accordion sidebar.
+
+### Key Changes in v7
+
+1. **Sidebar accordion restructure** — Flat nav replaced with two collapsible sections:
+   - **The Piggy Bank 🐷** (finance): Overview, Accounts, Budgets, Transactions
+   - **The Treehouse 🌳** (family): Family Nook, Family Planner, Family To-Do, Family Hub
+   - Settings pinned at bottom, outside both accordions
+
+2. **Family Nook 🏡** — New home screen after login (replaces finance dashboard as entry point). Shows today's schedule, events, milestones, activity feed, shared to-do widget, and Piggy Bank quick-access card
+
+3. **Family Planner 📅** — Calendar and scheduling hub absorbing the old Family Hub calendar. Month/week/day/agenda views, event categorisation, family member filtering
+
+4. **Family To-Do ✅** — Standalone task management page at `/todo`. Quick-add, assignees, date integration with calendar. Purple (#9B59B6) accent colour for to-do elements
+
+5. **Updated mobile bottom tab bar** — 5 tabs: 🏡 Nook, 📅 Planner, 🐷 Piggy Bank, 📋 Budget, 👨‍👩‍👦 Pod
+
+6. **Family Hub updated** — Calendar removed (→ Family Planner), now focused on personal member activity and milestones
+
+7. **Budget page enhancements** — 3 transaction entry methods (Quick Add, Batch Add, CSV Upload), time-position marker, motivational emoji messages, category spending bars
+
+8. **Transactions ledger** — Recurring/one-time type pills, summary pills, enhanced add modal with recurring toggle
+
+### New Issues Created
+
+| Issue | Title                                                           | Priority |
+| ----- | --------------------------------------------------------------- | -------- |
+| #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     |
+| #98   | Family Planner 📅: calendar and scheduling hub                  | High     |
+| #99   | Family To-Do ✅: standalone task management page                | High     |
+| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     |
+| #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   |
+
+### Existing Issues Updated
+
+- **#73** (Family Hub redesign) — Updated for v7: calendar removed, personal activity focus
+- **#68** (Budget page) — Updated with 3 entry methods, motivational messages, category bars
+- **#71** (Transactions page) — Updated with recurring/one-time type pills, enhanced modal
+- **#20** (Family activity tracking) — Closed, superseded by Family Nook + Family Planner
+
+### New Brand Vocabulary (v7)
+
+| Term               | Meaning                                         |
+| ------------------ | ----------------------------------------------- |
+| The Piggy Bank 🐷  | Finance section (sidebar accordion)             |
+| The Treehouse 🌳   | Family section (sidebar accordion)              |
+| The Family Nook 🏡 | Home screen after login (family-first overview) |
+| Family Planner 📅  | Calendar and scheduling hub                     |
+| Family To-Do ✅    | Shared family task management                   |
 
 ## Future Phases
 

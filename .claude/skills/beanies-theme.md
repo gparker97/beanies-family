@@ -33,6 +33,7 @@ Use this skill whenever writing UI copy, designing components, choosing colors, 
 - Heritage Orange replaces all primary `blue-*` usage throughout the UI
 - Keep `red-*` only for destructive actions (delete buttons) and hard form validation errors
 - Keep `green-*` for income indicators
+- **To-Do purple accent:** `#9B59B6` — used for to-do elements, task badges, and Family To-Do page accents
 
 ### Dark mode
 
@@ -254,11 +255,20 @@ Progress bars:         Heritage Orange → Terracotta gradient, 10px radius
 
 ### Desktop Sidebar
 
-The Deep Slate sidebar is the app's anchor. It houses the brand logo (actual logo image in squircle + wordmark with Heritage Orange ".family" + italic tagline), primary navigation, and user profile. At the bottom, subtle security indicators show the save filename and encryption status.
+The Deep Slate sidebar is the app's anchor. It houses the brand logo (actual logo image in squircle + wordmark with Heritage Orange ".family" + italic tagline), primary navigation organised into collapsible accordion sections, and user profile. At the bottom, subtle security indicators show the save filename and encryption status. Settings is pinned below the accordions.
 
-**Nav items:** The Nook, Accounts, Budgets, Goals, Calendar, Family Hub, Documents, Settings
+**Accordion sections:**
+
+| Section | Icon | Color | Items |
+|---------|------|-------|-------|
+| The Piggy Bank 🐷 | 🐷 | Heritage Orange tint | Overview, Accounts, Budgets, Transactions |
+| The Treehouse 🌳 | 🌳 | Green (#6EE7B7) tint | Family Nook, Family Planner, Family To-Do, Family Hub |
+
+**Settings** — pinned at sidebar bottom, outside both accordions.
 
 **Active nav item:** Orange gradient background + 4px Heritage Orange left bar indicator. Nav items use `rounded-2xl`.
+
+**Accordion behaviour:** Each section can expand/collapse independently. Navigating to a page auto-expands its parent accordion. Collapse arrows rotate on toggle.
 
 ### Desktop Header Toolbar
 
@@ -288,13 +298,13 @@ The header uses **visual icons instead of text labels**. All controls are image-
 - Family & More: Family Hub, Documents, Settings
 - Footer: Security indicators (save file + AES-256 encryption)
 
-**Bottom Tab Bar:** Four tabs — Nook, Accounts, Goals, Pod. Active tab uses Heritage Orange tint (orange-10 background). Icons are emoji-style for warmth.
+**Bottom Tab Bar:** Five tabs — 🏡 Nook, 📅 Planner, 🐷 Piggy Bank, 📋 Budget, 👨‍👩‍👦 Pod. Active tab uses Heritage Orange tint (orange-10 background). Icons are emoji-style for warmth.
 
 ---
 
 ## Dashboard Layout — "The Nook"
 
-The main dashboard follows a strict layout hierarchy:
+**Note:** In v7, the financial dashboard is now "The Piggy Bank — Finance Overview" and lives under The Piggy Bank 🐷 accordion. The Family Nook 🏡 is the new home screen after login (see Brand Vocabulary below). The Piggy Bank dashboard follows a strict layout hierarchy:
 
 | Order | Element | Notes |
 |-------|---------|-------|
@@ -363,6 +373,11 @@ Security is foundational but should feel safe, never scary. Security UI communic
 | Little Bean | Child family member |
 | Add Bean | Invite/add family member |
 | Growing | Progress/savings state |
+| The Piggy Bank 🐷 | Finance section (sidebar accordion) |
+| The Treehouse 🌳 | Family section (sidebar accordion) |
+| The Family Nook 🏡 | Home screen after login (family-first overview) |
+| Family Planner 📅 | Calendar and scheduling hub |
+| Family To-Do ✅ | Shared family task management |
 
 ### Preferred Phrasing
 
@@ -566,6 +581,7 @@ Single input accepting `BEAN-XXXX` code or `beanies.family/join/...` link. Dark 
 ## Reference
 
 - Full CIG v2: `docs/brand/beanies-cig-v2.html`
+- UI framework proposal (v7): `docs/brand/beanies-ui-framework-proposal-v7.html`
 - UI framework proposal (v6): `docs/brand/beanies-ui-framework-proposal-v6.html`
 - UI framework proposal (v5): `docs/brand/beanies-ui-framework-proposal-v5.html`
 - Brand assets: `public/brand/`

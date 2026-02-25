@@ -261,6 +261,14 @@ Implemented:
 - [x] First-run setup wizard
 - [x] Dark mode support
 
+Pending (v7 — New Pages & Navigation):
+
+- [ ] Sidebar accordion restructure: Piggy Bank 🐷 + Treehouse 🌳 (#100)
+- [ ] Family Nook 🏡 homepage (#97)
+- [ ] Family Planner 📅 calendar hub (#98)
+- [ ] Family To-Do ✅ task management (#99)
+- [ ] Mobile bottom tab bar: 5-tab layout (#101)
+
 Pending (Future Phases):
 
 - [ ] Google Drive encrypted sync
