@@ -35,12 +35,12 @@ const STRING_DEFS = {
   'app.version': { en: 'v1.0.0 - MVP' },
 
   // Common labels
-  'common.totalAssets': { en: 'Total Assets', beanie: 'All Your Assets' },
-  'common.totalLiabilities': { en: 'Total Liabilities', beanie: 'Beans Owed' },
+  'common.totalAssets': { en: 'Total Assets', beanie: 'Total Assets' },
+  'common.totalLiabilities': { en: 'Total Liabilities', beanie: 'Total Liabilities' },
   'common.totalValue': { en: 'Total Value', beanie: 'Total Value' },
   'common.netAssetValue': { en: 'Net Asset Value', beanie: 'Net Asset Value' },
-  'common.appreciation': { en: 'Appreciation', beanie: 'Bean Growth' },
-  'common.depreciation': { en: 'Depreciation', beanie: 'Shrinking Beans' },
+  'common.appreciation': { en: 'Appreciation', beanie: 'Appreciation' },
+  'common.depreciation': { en: 'Depreciation', beanie: 'Depreciation' },
   'common.assetLoans': { en: 'Asset Loans' },
   'common.loanOutstanding': { en: 'Loan Outstanding' },
   'common.purchaseValue': { en: 'Purchase Value', beanie: 'What You Paid' },
@@ -53,7 +53,7 @@ const STRING_DEFS = {
   'status.excluded': { en: 'Excluded' },
   'status.paused': { en: 'Paused', beanie: 'Snoozing' },
   'status.recurring': { en: 'Recurring' },
-  'status.completed': { en: 'Completed', beanie: 'Harvested!' },
+  'status.completed': { en: 'Completed', beanie: 'Done!' },
   'status.overdue': { en: 'Overdue' },
 
   // Navigation
@@ -101,15 +101,15 @@ const STRING_DEFS = {
 
   // Dashboard
   'dashboard.netWorth': { en: 'Family Net Worth', beanie: 'Alllllll Your Beans' },
-  'dashboard.assets': { en: 'Assets', beanie: 'Your Beans' },
+  'dashboard.assets': { en: 'Assets', beanie: 'Your Assets' },
   'dashboard.liabilities': { en: 'Liabilities', beanie: 'Beans Owed' },
   'dashboard.monthlyIncome': { en: 'Monthly Income', beanie: 'Beans Coming In' },
   'dashboard.monthlyExpenses': { en: 'Monthly Expenses', beanie: 'Beans Going Out' },
-  'dashboard.netCashFlow': { en: 'Net Cash Flow', beanie: 'Monthly Bean Flow' },
-  'dashboard.recentTransactions': { en: 'Recent Transactions', beanie: 'Recent Bean Moves' },
+  'dashboard.netCashFlow': { en: 'Net Cash Flow', beanie: 'Net Cash Flow' },
+  'dashboard.recentTransactions': { en: 'Recent Transactions', beanie: 'Recent Transactions' },
   'dashboard.upcomingTransactions': { en: 'Upcoming Transactions', beanie: 'Coming Up' },
-  'dashboard.assetsSummary': { en: 'Assets Summary', beanie: 'Bean Summary' },
-  'dashboard.activeGoals': { en: 'Active Goals', beanie: 'Growing Goals' },
+  'dashboard.assetsSummary': { en: 'Assets Summary', beanie: 'Assets Summary' },
+  'dashboard.activeGoals': { en: 'Active Goals', beanie: 'Beanie Goals' },
   'dashboard.noTransactions': {
     en: 'No transactions yet. Add your first transaction to get started.',
     beanie: 'Nothing yet — add your first one to get growing!',
@@ -128,8 +128,8 @@ const STRING_DEFS = {
   },
 
   // Recurring
-  'recurring.title': { en: 'Recurring', beanie: 'Regular Beans' },
-  'recurring.items': { en: 'Recurring Items', beanie: 'Regular Bean Moves' },
+  'recurring.title': { en: 'Recurring', beanie: 'Recurring' },
+  'recurring.items': { en: 'Recurring Items', beanie: 'Recurring Items' },
   'recurring.monthlyIncome': {
     en: 'Monthly Recurring Income',
     beanie: 'Beans Coming In Each Month',
@@ -139,13 +139,13 @@ const STRING_DEFS = {
     beanie: 'Beans Going Out Each Month',
   },
   'recurring.netMonthly': { en: 'Monthly Savings', beanie: 'Beans Saved Each Month' },
-  'recurring.noItems': { en: 'No recurring items yet.', beanie: 'No regular bean moves yet.' },
+  'recurring.noItems': { en: 'No recurring items yet.', beanie: 'No recurring items yet.' },
   'recurring.getStarted': {
     en: 'Click "Add Recurring" to set up automatic transactions.',
-    beanie: 'Click "Add Regular Bean" to plant some automatic moves.',
+    beanie: 'Click "Add Recurring" to plant some automatic moves.',
   },
-  'recurring.addItem': { en: 'Add Recurring Item', beanie: 'Add Regular Bean' },
-  'recurring.editItem': { en: 'Edit Recurring Item', beanie: 'Edit Regular Bean' },
+  'recurring.addItem': { en: 'Add Recurring Item', beanie: 'Add Recurring Bean' },
+  'recurring.editItem': { en: 'Edit Recurring Item', beanie: 'Edit Recurring Bean' },
   'recurring.deleteConfirm': {
     en: 'Are you sure you want to delete this recurring item? Existing transactions will not be affected.',
   },
@@ -157,36 +157,36 @@ const STRING_DEFS = {
     en: 'Manage your bank accounts and credit cards',
     beanie: 'Where your beans live',
   },
-  'accounts.addAccount': { en: 'Add Account', beanie: 'Add a Jar' },
-  'accounts.editAccount': { en: 'Edit Account', beanie: 'Edit Jar' },
-  'accounts.deleteAccount': { en: 'Delete Account', beanie: 'Remove Jar' },
-  'accounts.noAccounts': { en: 'No accounts yet', beanie: 'No jars yet' },
+  'accounts.addAccount': { en: 'Add Account', beanie: 'Add an Account' },
+  'accounts.editAccount': { en: 'Edit Account', beanie: 'Edit an Account' },
+  'accounts.deleteAccount': { en: 'Delete Account', beanie: 'Remove Account' },
+  'accounts.noAccounts': { en: 'No accounts yet', beanie: 'No acocunts yet' },
   'accounts.getStarted': {
     en: 'Get started by adding your first account',
     beanie: 'Add your first bean jar to get growing!',
   },
-  'accounts.totalBalance': { en: 'Total Balance', beanie: 'Total in Jars' },
-  'accounts.accountName': { en: 'Account Name', beanie: 'Jar Name' },
-  'accounts.accountType': { en: 'Account Type', beanie: 'Jar Type' },
-  'accounts.currentBalance': { en: 'Current Balance', beanie: 'Beans in Jar' },
-  'accounts.type.checking': { en: 'Checking Account', beanie: 'Spending Jar' },
-  'accounts.type.savings': { en: 'Savings Account', beanie: 'Growing Jar' },
+  'accounts.totalBalance': { en: 'Total Balance', beanie: 'Total Beans' },
+  'accounts.accountName': { en: 'Account Name', beanie: 'Account Name' },
+  'accounts.accountType': { en: 'Account Type', beanie: 'Account Type' },
+  'accounts.currentBalance': { en: 'Current Balance', beanie: 'Beans Today' },
+  'accounts.type.checking': { en: 'Checking Account', beanie: 'Checking Account' },
+  'accounts.type.savings': { en: 'Savings Account', beanie: 'Savings Account' },
   'accounts.type.credit_card': { en: 'Credit Card' },
-  'accounts.type.investment': { en: 'Investment Account', beanie: 'Growing Beans' },
-  'accounts.type.crypto': { en: 'Cryptocurrency', beanie: 'Crypto Beans' },
+  'accounts.type.investment': { en: 'Investment Account', beanie: 'Investment Account' },
+  'accounts.type.crypto': { en: 'Cryptocurrency', beanie: 'Crypto Account' },
   'accounts.type.cash': { en: 'Cash', beanie: 'Pocket Beans' },
   'accounts.type.loan': { en: 'Loan', beanie: 'Borrowed Beans' },
   'accounts.type.other': { en: 'Other' },
 
   // Transactions
-  'transactions.title': { en: 'Transactions', beanie: 'Bean Moves' },
+  'transactions.title': { en: 'Transactions', beanie: 'Transaction' },
   'transactions.subtitle': {
     en: 'Track your income and expenses',
     beanie: 'Watch your beans come and go',
   },
-  'transactions.addTransaction': { en: 'Add Transaction', beanie: 'Add Bean Move' },
-  'transactions.editTransaction': { en: 'Edit Transaction', beanie: 'Edit Bean Move' },
-  'transactions.deleteTransaction': { en: 'Delete Transaction', beanie: 'Remove Bean Move' },
+  'transactions.addTransaction': { en: 'Add Transaction', beanie: 'Add Transaction' },
+  'transactions.editTransaction': { en: 'Edit Transaction', beanie: 'Edit Transaction' },
+  'transactions.deleteTransaction': { en: 'Delete Transaction', beanie: 'Remove Transaction' },
   'transactions.noTransactions': {
     en: 'No transactions recorded yet.',
     beanie: 'No bean moves recorded yet.',
@@ -195,30 +195,30 @@ const STRING_DEFS = {
     en: 'Click "Add Transaction" to get started.',
     beanie: 'Click "Add Bean Move" to start tracking.',
   },
-  'transactions.allTransactions': { en: 'All Transactions', beanie: 'All Bean Moves' },
+  'transactions.allTransactions': { en: 'All Transactions', beanie: 'All Transactions' },
   'transactions.thisMonthIncome': { en: 'This Month Income', beanie: 'Beans In This Month' },
   'transactions.thisMonthExpenses': { en: 'This Month Expenses', beanie: 'Beans Out This Month' },
-  'transactions.netCashFlow': { en: 'Net Cash Flow', beanie: 'Bean Flow' },
-  'transactions.oneTime': { en: 'One Time Transactions', beanie: 'One-off Bean Moves' },
+  'transactions.netCashFlow': { en: 'Net Cash Flow', beanie: 'Net Bean Flow' },
+  'transactions.oneTime': { en: 'One Time Transactions', beanie: 'One-off Transaction' },
   'transactions.recurringTransactions': {
     en: 'Recurring Transactions',
     beanie: 'Regular Bean Moves',
   },
-  'transactions.addRecurring': { en: 'Add Recurring', beanie: 'Add Regular Bean' },
-  'transactions.type.income': { en: 'Income', beanie: 'Beans In' },
-  'transactions.type.expense': { en: 'Expense', beanie: 'Beans Out' },
-  'transactions.type.transfer': { en: 'Transfer', beanie: 'Move Between Jars' },
+  'transactions.addRecurring': { en: 'Add Recurring', beanie: 'Add Recurring' },
+  'transactions.type.income': { en: 'Income', beanie: 'Income' },
+  'transactions.type.expense': { en: 'Expense', beanie: 'Expense' },
+  'transactions.type.transfer': { en: 'Transfer', beanie: 'Transfer' },
 
   // Assets
   'assets.title': { en: 'Assets', beanie: 'Big Beans' },
   'assets.subtitle': {
     en: 'Track your property, vehicles, and valuables',
-    beanie: 'Your biggest beans — property, vehicles, and more',
+    beanie: 'Your biggest stuff — property, vehicles, and more',
   },
   'assets.addAsset': { en: 'Add Asset' },
   'assets.editAsset': { en: 'Edit Asset' },
   'assets.deleteAsset': { en: 'Delete Asset' },
-  'assets.noAssets': { en: 'No assets yet', beanie: 'No big beans yet' },
+  'assets.noAssets': { en: 'No assets yet', beanie: 'No stuff created yet' },
   'assets.getStarted': {
     en: 'Get started by adding your first asset',
     beanie: 'Add your first big bean!',
@@ -249,7 +249,7 @@ const STRING_DEFS = {
   'assets.type.other': { en: 'Other' },
 
   // Goals
-  'goals.title': { en: 'Goals', beanie: 'Bean Dreams' },
+  'goals.title': { en: 'Goals', beanie: 'Beanie Goals' },
   'goals.subtitle': {
     en: 'Set and track your financial goals',
     beanie: 'Plant a goal and watch it grow',
@@ -257,19 +257,19 @@ const STRING_DEFS = {
   'goals.addGoal': { en: 'Add Goal' },
   'goals.editGoal': { en: 'Edit Goal' },
   'goals.deleteGoal': { en: 'Delete Goal' },
-  'goals.noGoals': { en: 'No goals set yet.', beanie: 'No bean dreams planted yet.' },
+  'goals.noGoals': { en: 'No goals set yet.', beanie: 'No goals planted yet.' },
   'goals.getStarted': {
     en: 'Click "Add Goal" to create your first financial goal.',
     beanie: 'Click "Add Goal" to plant your first bean dream!',
   },
   'goals.allGoals': { en: 'All Goals' },
-  'goals.activeGoals': { en: 'Active Goals', beanie: 'Growing Goals' },
-  'goals.completedGoals': { en: 'Completed Goals', beanie: 'Harvested Goals!' },
+  'goals.activeGoals': { en: 'Active Goals', beanie: 'Ongoing Goals' },
+  'goals.completedGoals': { en: 'Completed Goals', beanie: 'Completed Goals!' },
   'goals.overdueGoals': { en: 'Overdue Goals' },
   'goals.goalName': { en: 'Goal Name' },
   'goals.goalType': { en: 'Goal Type' },
   'goals.assignTo': { en: 'Assign to' },
-  'goals.familyWide': { en: 'Family-wide goal', beanie: 'A goal for the whole pod' },
+  'goals.familyWide': { en: 'Family-wide goal', beanie: 'A goal for your whole pod' },
   'goals.deadlineOptional': { en: 'Deadline (Optional)' },
   'goals.type.savings': { en: 'Savings', beanie: 'Saving Beans' },
   'goals.type.debt_payoff': { en: 'Debt Payoff' },
@@ -282,9 +282,9 @@ const STRING_DEFS = {
   'goals.priority.critical': { en: 'Critical' },
   'goals.progress': { en: 'Progress', beanie: 'Growth' },
   'goals.deadline': { en: 'Deadline' },
-  'goals.reopenGoal': { en: 'Reopen Goal', beanie: 'Replant This Bean!' },
-  'goals.noCompletedGoals': { en: 'No completed goals yet.', beanie: 'No beans harvested yet.' },
-  'goals.completedOn': { en: 'Completed', beanie: 'Harvested' },
+  'goals.reopenGoal': { en: 'Reopen Goal', beanie: 'Replant This Beanie!' },
+  'goals.noCompletedGoals': { en: 'No completed goals yet.', beanie: 'No goals completed yet.' },
+  'goals.completedOn': { en: 'Completed', beanie: 'Done' },
 
   // Family
   'family.title': { en: 'Family', beanie: 'The Pod' },
@@ -293,19 +293,19 @@ const STRING_DEFS = {
   'family.deleteMember': { en: 'Delete Member', beanie: 'Remove Beanie' },
   'family.noMembers': {
     en: 'No family members yet.',
-    beanie: 'The pod is empty — add your first beanie!',
+    beanie: 'Your bean pod is empty — add your first beanie!',
   },
-  'family.role.owner': { en: 'Owner', beanie: 'Head Bean' },
-  'family.role.admin': { en: 'Admin', beanie: 'Big Bean' },
+  'family.role.owner': { en: 'Owner', beanie: 'Head Beanie' },
+  'family.role.admin': { en: 'Admin', beanie: 'Admin Beanie' },
   'family.role.member': { en: 'Member', beanie: 'Beanie' },
   'family.gender': { en: 'Gender' },
-  'family.gender.male': { en: 'Male', beanie: 'Boy Bean' },
-  'family.gender.female': { en: 'Female', beanie: 'Girl Bean' },
+  'family.gender.male': { en: 'Male', beanie: 'Boy Beanie' },
+  'family.gender.female': { en: 'Female', beanie: 'Girl Beanie' },
   'family.gender.other': { en: 'Other' },
   'family.ageGroup': { en: 'Age Group' },
-  'family.ageGroup.adult': { en: 'Adult', beanie: 'Big Bean' },
-  'family.ageGroup.child': { en: 'Child', beanie: 'Little Bean' },
-  'family.dateOfBirth': { en: 'Date of Birth', beanie: 'Bean Birthday' },
+  'family.ageGroup.adult': { en: 'Adult', beanie: 'Big Beanie' },
+  'family.ageGroup.child': { en: 'Child', beanie: 'Little Beanie' },
+  'family.dateOfBirth': { en: 'Date of Birth', beanie: 'Beanie Birthday' },
   'family.dateOfBirth.month': { en: 'Month' },
   'family.dateOfBirth.day': { en: 'Day' },
   'family.dateOfBirth.year': { en: 'Year (optional)' },
@@ -315,20 +315,20 @@ const STRING_DEFS = {
   'reports.title': { en: 'Reports', beanie: 'Bean Reports' },
   'reports.subtitle': {
     en: 'Visualize your financial data with charts and reports',
-    beanie: 'See how your beans are growing',
+    beanie: 'See how your beanies are growing',
   },
   'reports.noData': {
     en: 'No data available for reports yet.',
-    beanie: 'Not enough beans to report yet!',
+    beanie: 'No beanies to make a report yet!',
   },
   'reports.familyMember': { en: 'Family Member' },
-  'reports.netWorthOverTime': { en: 'Net Worth Over Time', beanie: 'Bean Count Over Time' },
+  'reports.netWorthOverTime': { en: 'Net Worth Over Time', beanie: 'Net Worth Over Time' },
   'reports.netWorthDescription': {
     en: 'Projected net worth based on current assets and recurring transactions',
     beanie: 'How your bean patch could grow',
   },
-  'reports.currentNetWorth': { en: 'Current Net Worth', beanie: 'Bean Count Today' },
-  'reports.projectedNetWorth': { en: 'Projected Net Worth', beanie: 'Projected Bean Count' },
+  'reports.currentNetWorth': { en: 'Current Net Worth', beanie: 'Net Worth Now' },
+  'reports.projectedNetWorth': { en: 'Projected Net Worth', beanie: 'Net Worth Later' },
   'reports.projectedChange': { en: 'Projected Change' },
   'reports.incomeVsExpenses': { en: 'Income vs Expenses', beanie: 'Beans In vs Beans Out' },
   'reports.incomeVsExpensesDescription': {
@@ -347,7 +347,7 @@ const STRING_DEFS = {
   },
   'forecast.comingSoon': { en: 'Coming soon to your bean patch' },
   'forecast.comingSoonDescription': {
-    en: "We're growing something special. Financial forecasting will help you see where your beans are headed.",
+    en: "We're growing something special. Financial forecasting will help you see where your beanies are headed.",
   },
   'forecast.feature.projections': { en: 'Recurring transaction projections' },
   'forecast.feature.cashFlow': { en: 'Cash flow forecast (3, 6, and 12 months)' },
@@ -356,7 +356,7 @@ const STRING_DEFS = {
 
   // Settings
   'settings.title': { en: 'Settings' },
-  'settings.subtitle': { en: 'Configure your app preferences', beanie: 'Tune your bean patch' },
+  'settings.subtitle': { en: 'Configure your app preferences', beanie: 'Tune your beanie patch' },
   'settings.general': { en: 'General' },
   'settings.baseCurrency': { en: 'Base Currency' },
   'settings.baseCurrencyHint': {
@@ -398,30 +398,33 @@ const STRING_DEFS = {
   'settings.exportData': { en: 'Export Data', beanie: 'Pack Up Your Beans' },
   'settings.exportDataDescription': {
     en: 'Download all your data as a JSON file',
-    beanie: 'Download all your beans as a file',
+    beanie: 'Download all your beanies as a file',
   },
   'settings.clearAllData': { en: 'Clear All Data' },
   'settings.clearAllDataDescription': {
     en: 'Permanently delete all your data',
-    beanie: 'Remove all your beans from this device',
+    beanie: 'Remove all your beanies from this device',
   },
   'settings.clearData': { en: 'Clear Data' },
   'settings.clearDataConfirmation': {
     en: 'Are you sure you want to delete all your data? This action cannot be undone.',
     beanie: 'This will clear ALL your beans. Are you really sure? This cannot be undone.',
   },
-  'settings.yesDeleteEverything': { en: 'Yes, Delete Everything', beanie: 'Yes, Clear the Pod' },
+  'settings.yesDeleteEverything': {
+    en: 'Yes, Delete Everything',
+    beanie: 'Yes, Clear my bean pod',
+  },
   'settings.about': { en: 'About' },
   'settings.appName': { en: 'beanies.family' },
   'settings.version': { en: 'Version 1.0.0 (MVP)' },
   'settings.appDescription': {
     en: 'A local-first, privacy-focused family finance application.',
-    beanie: "A private, local-first home for your family's beans.",
+    beanie: "A private, local-first home for your family's beanies.",
   },
   'settings.privacyNote': {
     en: 'Your data is encrypted and saved to a file you control. Nothing is stored on our servers — your financial data never leaves your device.',
     beanie:
-      'Your beans are encrypted and saved to a file only you control. They never leave your device.',
+      'Your beanies are fully encrypted and saved to a file only you control. They never leave your device.',
   },
 
   // Form labels
@@ -439,10 +442,10 @@ const STRING_DEFS = {
   'form.fromAccount': { en: 'From Account' },
   'form.toAccount': { en: 'To Account' },
   'form.owner': { en: 'Owner' },
-  'form.institution': { en: 'Financial Institution', beanie: 'Bean Bank' },
+  'form.institution': { en: 'Financial Institution', beanie: 'Banks' },
   'form.country': { en: 'Country' },
   'form.other': { en: 'Other' },
-  'form.searchInstitutions': { en: 'Search institutions...', beanie: 'Find a bean bank...' },
+  'form.searchInstitutions': { en: 'Search institutions...', beanie: 'Find your bank...' },
   'form.searchCountries': { en: 'Search countries...' },
   'form.enterCustomName': { en: 'Enter institution name' },
   'form.customBadge': { en: 'Custom' },
@@ -453,11 +456,14 @@ const STRING_DEFS = {
   'form.frequency.yearly': { en: 'Yearly' },
   'form.startDate': { en: 'Start Date' },
   'form.endDate': { en: 'End Date' },
-  'form.targetAmount': { en: 'Target Amount', beanie: 'Target Beans' },
+  'form.targetAmount': { en: 'Target Amount', beanie: 'Target To Reach' },
   'form.currentAmount': { en: 'Current Amount', beanie: 'Beans So Far' },
   'form.priority': { en: 'Priority' },
   'form.notes': { en: 'Notes' },
-  'form.includeInNetWorth': { en: 'Include in Net Worth', beanie: 'Count in my bean total' },
+  'form.includeInNetWorth': {
+    en: 'Include in Net Worth',
+    beanie: 'Count this in my total net worth',
+  },
   'form.isActive': { en: 'Active' },
   'form.required': { en: 'Required' },
 
@@ -470,44 +476,44 @@ const STRING_DEFS = {
   // Confirmation dialogs
   'confirm.delete': {
     en: 'Are you sure you want to delete this item?',
-    beanie: 'Remove this bean for good?',
+    beanie: 'Remove this item for good?',
   },
   'confirm.deleteAccount': {
     en: 'Are you sure you want to delete this account? All associated transactions will also be deleted.',
-    beanie: 'Remove this bean jar? All the beans inside go with it.',
+    beanie: 'Remove this account? All the beans inside go with it.',
   },
   'confirm.deleteMember': {
     en: 'Are you sure you want to delete this family member?',
-    beanie: 'Remove this beanie from the pod?',
+    beanie: 'Remove this beanie from your pod?',
   },
   'confirm.unsavedChanges': {
     en: 'You have unsaved changes. Are you sure you want to leave?',
-    beanie: "You've got unsaved beans! Leave anyway?",
+    beanie: "You've got unsaved changes! Leave anyway?",
   },
 
   // Success messages
-  'success.saved': { en: 'Changes saved successfully', beanie: 'Beans saved!' },
-  'success.created': { en: 'Created successfully', beanie: 'Bean added!' },
+  'success.saved': { en: 'Changes saved successfully', beanie: 'Beanies saved!' },
+  'success.created': { en: 'Created successfully', beanie: 'Beanie added!' },
   'success.deleted': { en: 'Deleted successfully', beanie: 'Gone!' },
-  'success.updated': { en: 'Updated successfully', beanie: 'Beans updated!' },
+  'success.updated': { en: 'Updated successfully', beanie: 'Beanies updated!' },
 
   // Error messages
   'error.generic': {
     en: 'Something went wrong. Please try again.',
     beanie: 'Hmm, a bean got stuck. Try again?',
   },
-  'error.loadFailed': { en: 'Failed to load data', beanie: "Couldn't load your beans" },
-  'error.saveFailed': { en: 'Failed to save changes', beanie: "Hmm, couldn't save your beans" },
-  'error.deleteFailed': { en: 'Failed to delete', beanie: "Couldn't remove that bean" },
+  'error.loadFailed': { en: 'Failed to load data', beanie: "Couldn't load your beanies" },
+  'error.saveFailed': { en: 'Failed to save changes', beanie: "Hmm, couldn't save your beanies" },
+  'error.deleteFailed': { en: 'Failed to delete', beanie: "Couldn't remove that beanie" },
   'error.networkError': {
     en: 'Network error. Please check your connection.',
-    beanie: 'No connection — your beans are still here though!',
+    beanie: 'No connection — your beanies are still here though!',
   },
 
   // Not Found (404)
   'notFound.heading': { en: 'Oops! This bean got lost...' },
   'notFound.description': {
-    en: "The page you're looking for has wandered off. Let's get you back to your beans.",
+    en: "The page you're looking for has wandered off. Let's get you back to your beanies.",
   },
   'notFound.goHome': { en: 'Back to Dashboard' },
 
@@ -552,16 +558,16 @@ const STRING_DEFS = {
   'month.december': { en: 'December' },
 
   // Dashboard (additional)
-  'dashboard.savingsGoals': { en: 'Savings Goals', beanie: 'Bean Dreams' },
+  'dashboard.savingsGoals': { en: 'Savings Goals', beanie: 'Your Savings Goals' },
   'dashboard.seeAll': { en: 'See All →' },
-  'dashboard.yourBeans': { en: 'Your Family', beanie: 'The Pod' },
-  'dashboard.addBean': { en: 'Add Family Member', beanie: 'Add a Beanie' },
+  'dashboard.yourBeans': { en: 'Your Family', beanie: 'Your Bean Pod' },
+  'dashboard.addBean': { en: 'Add Family Member', beanie: 'Add a beanie' },
   'dashboard.healthy': { en: 'Healthy', beanie: 'Growing Strong' },
   'dashboard.savingsRate': { en: 'savings rate' },
-  'dashboard.recurringSummary': { en: 'Recurring Summary', beanie: 'Regular Bean Summary' },
-  'dashboard.netRecurring': { en: 'Net Recurring (Monthly)', beanie: 'Net Beans (Monthly)' },
+  'dashboard.recurringSummary': { en: 'Recurring Summary', beanie: 'Recurring Summary' },
+  'dashboard.netRecurring': { en: 'Net Recurring (Monthly)', beanie: 'Recurring (Monthly)' },
   'dashboard.upcoming': { en: 'Upcoming', beanie: 'Coming Up' },
-  'dashboard.noRecurringItems': { en: 'No recurring items yet', beanie: 'No regular beans yet' },
+  'dashboard.noRecurringItems': { en: 'No recurring items yet', beanie: 'No recurring beans yet' },
   'dashboard.roleParent': { en: 'Parent', beanie: 'Big Bean' },
   'dashboard.roleLittleBean': { en: 'Little Bean' },
   'dashboard.chartHidden': { en: 'Chart hidden' },
@@ -581,8 +587,8 @@ const STRING_DEFS = {
     en: 'Show financial figures',
     beanie: 'Show the beans',
   },
-  'header.financialFiguresVisible': { en: 'Financial figures visible' },
-  'header.financialFiguresHidden': { en: 'Financial figures hidden' },
+  'header.financialFiguresVisible': { en: 'Finances visible' },
+  'header.financialFiguresHidden': { en: 'Finances hidden' },
   'header.notifications': { en: 'Notifications' },
 
   // Sidebar
@@ -600,15 +606,15 @@ const STRING_DEFS = {
   'transactions.net': { en: 'Net' },
   'transactions.noTransactionsForPeriod': {
     en: 'No transactions found for this period',
-    beanie: 'No bean moves found for this period',
+    beanie: 'No transactions found for this period',
   },
   'transactions.tryDifferentRange': {
     en: 'Try selecting a different date range or add a new transaction.',
-    beanie: 'Try a different date range or add a new bean move.',
+    beanie: 'Try a different date range or add a new transaction.',
   },
   'transactions.deleteConfirm': {
     en: 'Are you sure you want to delete this transaction?',
-    beanie: 'Remove this bean move for good?',
+    beanie: 'Remove this transaction for good?',
   },
   'transactions.descriptionPlaceholder': {
     en: 'e.g., Grocery shopping',
@@ -630,7 +636,7 @@ const STRING_DEFS = {
   'family.cannotDeleteOwner': { en: 'Cannot delete the owner account.' },
   'family.deleteConfirm': {
     en: 'Are you sure you want to remove this family member?',
-    beanie: 'Remove this beanie from the pod?',
+    beanie: 'Remove this beanie from your pod?',
   },
   'family.editFamilyName': { en: 'Edit family name' },
   'family.createLogin': { en: 'Create Login' },
@@ -641,11 +647,11 @@ const STRING_DEFS = {
   'family.year': { en: 'Year' },
   'family.status.waitingToJoin': {
     en: 'Waiting to join',
-    beanie: 'Waiting to sprout',
+    beanie: 'Waiting to join',
   },
   'family.status.active': {
     en: 'Active',
-    beanie: 'Sprouted',
+    beanie: 'Active',
   },
   'family.lastSeen': { en: 'Last seen {date}' },
   'family.neverLoggedIn': { en: 'Never signed in' },
@@ -660,11 +666,11 @@ const STRING_DEFS = {
   },
   'family.inviteSection.title': {
     en: 'Invite to join',
-    beanie: 'Sprout this beanie',
+    beanie: 'Invite this beanie',
   },
   'family.inviteSection.desc': {
     en: "This member hasn't joined yet. Share the link below so they can set up their account.",
-    beanie: "This beanie hasn't sprouted yet! Share the magic link so they can join the pod.",
+    beanie: "This beanie hasn't joined yet! Share the magic link so they can join your pod.",
   },
   'family.inviteSection.step1': {
     en: 'Copy the invite link and send it to them',
@@ -672,11 +678,11 @@ const STRING_DEFS = {
   },
   'family.inviteSection.step2': {
     en: 'They open the link and choose a password',
-    beanie: 'They open the link and pick a secret bean code',
+    beanie: 'They open the link and pick a secret password',
   },
   'family.inviteSection.step3': {
     en: "They're in! They can now sign in with their own account",
-    beanie: "They've sprouted! They can now sign into the pod",
+    beanie: "They're in! They can now sign into your family pod",
   },
 
   // Settings (additional)
@@ -804,11 +810,11 @@ const STRING_DEFS = {
   'action.tryAgain': { en: 'Try again' },
 
   // Confirmation dialog titles
-  'confirm.deleteAccountTitle': { en: 'Delete Account', beanie: 'Remove Bean Jar' },
-  'confirm.deleteTransactionTitle': { en: 'Delete Transaction', beanie: 'Remove Bean Move' },
-  'confirm.deleteRecurringTitle': { en: 'Delete Recurring Item', beanie: 'Remove Regular Bean' },
-  'confirm.deleteAssetTitle': { en: 'Delete Asset', beanie: 'Remove Valuable Bean' },
-  'confirm.deleteGoalTitle': { en: 'Delete Goal', beanie: 'Remove Bean Dream' },
+  'confirm.deleteAccountTitle': { en: 'Delete Account', beanie: 'Remove Account' },
+  'confirm.deleteTransactionTitle': { en: 'Delete Transaction', beanie: 'Remove Transaction' },
+  'confirm.deleteRecurringTitle': { en: 'Delete Recurring Item', beanie: 'Remove Recurring Item' },
+  'confirm.deleteAssetTitle': { en: 'Delete Asset', beanie: 'Remove Your Asset' },
+  'confirm.deleteGoalTitle': { en: 'Delete Goal', beanie: 'Remove Your Goal' },
   'confirm.deleteMemberTitle': { en: 'Remove Family Member', beanie: 'Remove Beanie' },
   'confirm.removePasskeyTitle': { en: 'Remove Passkey' },
   'confirm.cannotDeleteOwnerTitle': { en: 'Cannot Delete Owner' },
@@ -940,15 +946,18 @@ const STRING_DEFS = {
   'loginV6.badgeLove': { en: 'Built with Love' },
   'loginV6.badgeZeroServers': { en: 'Zero Data on Our Servers' },
   'loginV6.welcomePrompt': { en: 'What would you like to do?' },
-  'loginV6.signInTitle': { en: 'Sign in', beanie: 'Sign in to your pod' },
+  'loginV6.signInTitle': { en: 'Sign in', beanie: 'Sign in to your bean pod' },
   'loginV6.signInSubtitle': { en: 'Load your family data file' },
-  'loginV6.createTitle': { en: 'Create a new pod!', beanie: 'Start a new pod!' },
+  'loginV6.createTitle': { en: 'Create a new pod!', beanie: 'Start a new bean pod!' },
   'loginV6.createSubtitle': {
     en: "Start your family's financial journey",
     beanie: 'Plant your first bean!',
   },
   'loginV6.joinTitle': { en: 'Join an existing pod' },
-  'loginV6.joinSubtitle': { en: 'Your family is waiting for you', beanie: 'Your pod awaits!' },
+  'loginV6.joinSubtitle': {
+    en: 'Your family is waiting for you',
+    beanie: 'Your family pod is waiting for you!',
+  },
   'loginV6.loadPodTitle': { en: 'Load your pod' },
   'loginV6.loadPodSubtitle': { en: 'Your data stays on your device — always' },
   'loginV6.dropZoneText': { en: 'Drop your .beanpod file here' },
@@ -960,15 +969,15 @@ const STRING_DEFS = {
   'loginV6.fileLoaded': { en: 'loaded' },
   'loginV6.unlockTitle': { en: 'Unlock your pod' },
   'loginV6.unlockSubtitle': { en: 'Enter your pod password to decrypt your family data' },
-  'loginV6.unlockButton': { en: 'Unlock Pod' },
+  'loginV6.unlockButton': { en: 'Unlock Your Pod' },
   'loginV6.unlockFooter': {
     en: "This password decrypts your local data. We don't store or recover it.",
   },
   'loginV6.switchFamily': { en: 'Switch to a different family' },
-  'loginV6.pickBeanTitle': { en: "Who's signing in?", beanie: 'Pick your bean!' },
+  'loginV6.pickBeanTitle': { en: "Who's signing in?", beanie: 'Which beanie are you?' },
   'loginV6.pickBeanSubtitle': { en: 'Pick your bean' },
-  'loginV6.parentBean': { en: 'Parent Bean', beanie: 'Big Bean' },
-  'loginV6.littleBean': { en: 'Little Bean' },
+  'loginV6.parentBean': { en: 'Parent / Adult', beanie: 'Big Beanie' },
+  'loginV6.littleBean': { en: 'Child', beanie: 'Little Beanie' },
   'loginV6.setupNeeded': { en: 'Set up' },
   'loginV6.signInAs': { en: 'Sign in as' },
   'loginV6.createStep1': { en: 'You' },
@@ -994,8 +1003,8 @@ const STRING_DEFS = {
   'loginV6.whatsNext': { en: 'What happens next?' },
   'loginV6.joinStep1': { en: "We'll verify your family and load the data file" },
   'loginV6.joinStep2': { en: "You'll pick your profile and create a password" },
-  'loginV6.joinStep3': { en: "Then you're in!", beanie: "Then you're a bean!" },
-  'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'Join the Pod!' },
+  'loginV6.joinStep3': { en: "Then you're in!", beanie: "Then you're a beanie!" },
+  'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'Join your Pod!' },
   'loginV6.joinNotAvailable': {
     en: 'Joining a pod isn\'t available yet. Ask your family to share their .beanpod file with you and use "Sign in to your pod" instead.',
   },
@@ -1040,18 +1049,21 @@ const STRING_DEFS = {
   'loginV6.you': { en: 'You' },
 
   // Join flow (magic link invites)
-  'join.verifyTitle': { en: 'Join your family', beanie: 'Join your pod!' },
+  'join.verifyTitle': { en: 'Join your family', beanie: 'Join your family pod!' },
   'join.verifySubtitle': { en: "Let's find your family" },
   'join.lookingUp': { en: 'Looking up your family...', beanie: 'Finding your pod...' },
-  'join.familyFound': { en: 'Family found!', beanie: 'Pod found!' },
+  'join.familyFound': { en: 'Family found!', beanie: 'Found your pod!' },
   'join.familyNotFound': {
     en: 'Family not found. Check the code and try again.',
-    beanie: 'Pod not found. Check the code and try again.',
+    beanie: 'Your family pod could not be found. Check the code and try again.',
   },
   'join.registryOffline': {
     en: "We couldn't reach the registry. You can still join by loading the shared file directly.",
   },
-  'join.needsFile': { en: 'You need the family data file', beanie: 'You need the pod file' },
+  'join.needsFile': {
+    en: 'You need the family data file',
+    beanie: 'You need the family pod data file',
+  },
   'join.needsFileDesc': {
     en: 'Ask the owner to share the .beanpod file with you via email, a shared cloud folder, or USB.',
   },
@@ -1066,12 +1078,12 @@ const STRING_DEFS = {
   'join.pickMemberSubtitle': { en: 'Select the profile created for you' },
   'join.noUnclaimedMembers': {
     en: 'No unclaimed profiles found. Ask the family owner to create your profile first.',
-    beanie: 'No unclaimed beans found. Ask the pod owner to plant your bean first.',
+    beanie: 'No unclaimed beanies found. Ask your pod owner to create your profile first.',
   },
   'join.setPasswordTitle': { en: 'Create your password' },
   'join.setPasswordSubtitle': { en: 'This password is just for you to sign in' },
-  'join.completing': { en: 'Joining your family...', beanie: 'Planting your bean...' },
-  'join.success': { en: 'Welcome to the family!', beanie: 'Welcome to the pod!' },
+  'join.completing': { en: 'Joining your family...', beanie: 'Joining your beanies...' },
+  'join.success': { en: 'Welcome to the family!', beanie: 'Welcome to your pod!' },
   'join.shareFileNote': {
     en: 'Important: also share the .beanpod file with them (email, cloud folder, or USB)',
   },
@@ -1079,7 +1091,7 @@ const STRING_DEFS = {
   'join.codeInputLabel': { en: 'Family code' },
   'join.codeInputHint': {
     en: 'Paste the family code or invite link shared by your family member',
-    beanie: 'Paste the pod code or invite link shared by your pod mate',
+    beanie: 'Paste the family pod code or invite link shared by your family member',
   },
   'join.next': { en: 'Next' },
 
@@ -1095,8 +1107,11 @@ const STRING_DEFS = {
   },
   'pwa.installButton': { en: 'Install', beanie: 'Plant it!' },
   'pwa.installDismiss': { en: 'Not now' },
-  'pwa.updateAvailable': { en: 'A new version is available', beanie: 'Fresh beans are ready!' },
-  'pwa.updateButton': { en: 'Update now', beanie: 'Get the fresh beans' },
+  'pwa.updateAvailable': {
+    en: 'A new version is available',
+    beanie: 'A new version is available!',
+  },
+  'pwa.updateButton': { en: 'Update now', beanie: 'Get the freshest beans' },
   'pwa.updateDismiss': { en: 'Later' },
   'settings.installApp': { en: 'Install App' },
   'settings.installAppDesc': {
@@ -1104,7 +1119,7 @@ const STRING_DEFS = {
     beanie: 'Plant beanies.family on this device',
   },
   'settings.installAppButton': { en: 'Install beanies.family' },
-  'settings.appInstalled': { en: 'App is installed', beanie: 'App is planted!' },
+  'settings.appInstalled': { en: 'App is installed', beanie: 'Your beanie app is planted!' },
 
   // Family To-Do
   'todo.title': { en: 'To-Do List', beanie: 'Our To-do List' },
@@ -1157,23 +1172,23 @@ const STRING_DEFS = {
   // Celebrations
   'celebration.setupComplete': {
     en: 'Setup complete — ready to start counting!',
-    beanie: 'Setup complete — ready to start counting your beanies!',
+    beanie: 'Setup complete — ready to start counting your beans!',
   },
   'celebration.firstAccount': {
     en: 'Your first account is set up!',
-    beanie: 'Your first bean is planted!',
+    beanie: 'Nice! Your first bean is planted!',
   },
   'celebration.firstTransaction': {
     en: 'Every transaction counts!',
-    beanie: 'Every beanie counts!',
+    beanie: 'Yes! Every beanie counts!',
   },
   'celebration.goalReached': {
-    en: 'Goal complete! Well done!',
-    beanie: 'Goal complete! The beanies are proud!',
+    en: 'Task complete! Well done!',
+    beanie: 'Task complete! The beanies are proud!',
   },
   'celebration.firstSave': {
-    en: 'Your data is safe and encrypted!',
-    beanie: 'Your beanies are safe and encrypted!',
+    en: 'Your data is safe and encrypted',
+    beanie: 'All your beans are safely encrypted!',
   },
   'celebration.debtFree': {
     en: 'Debt-free! Time to celebrate!',
@@ -1182,7 +1197,7 @@ const STRING_DEFS = {
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
-  'mobile.pod': { en: 'Pod', beanie: 'Pod' },
+  'mobile.pod': { en: 'Family', beanie: 'Your Pod' },
   'mobile.menu': { en: 'Menu' },
   'mobile.closeMenu': { en: 'Close menu' },
   'mobile.navigation': { en: 'Navigation' },
