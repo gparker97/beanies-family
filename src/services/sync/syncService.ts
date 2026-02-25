@@ -667,6 +667,10 @@ export async function hasPermission(): Promise<boolean> {
  * - rawSyncData: the raw sync data structure (for encrypted files, data is a string)
  */
 export async function openAndLoadFile(): Promise<OpenFileResult> {
+  // Cancel any pending auto-save from a previously loaded file to prevent
+  // it from firing after the file handle has been switched.
+  cancelPendingSave();
+
   // Mobile / legacy browsers: fall back to <input type="file">
   if (!supportsFileSystemAccess()) {
     return openAndLoadFileFallback();
@@ -783,6 +787,7 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
  */
 async function openAndLoadFileFallback(): Promise<OpenFileResult> {
   try {
+    cancelPendingSave();
     const file = await openFilePicker();
     if (!file) {
       return { success: false };
@@ -880,6 +885,7 @@ export async function loadDroppedFile(
   file: File,
   fileHandle?: FileSystemFileHandle
 ): Promise<OpenFileResult> {
+  cancelPendingSave();
   try {
     updateState({ isSyncing: true, lastError: null });
 
@@ -973,6 +979,7 @@ export async function decryptAndImport(
   rawSyncData: SyncFileData,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
+  cancelPendingSave();
   updateState({ isSyncing: true, lastError: null });
 
   try {
@@ -1051,6 +1058,7 @@ export async function decryptAndImportWithKey(
   rawSyncData: SyncFileData,
   dek: CryptoKey
 ): Promise<{ success: boolean; error?: string; salt?: Uint8Array }> {
+  cancelPendingSave();
   updateState({ isSyncing: true, lastError: null });
 
   try {
