@@ -18,8 +18,8 @@ const emit = defineEmits<{
   <div class="flex flex-wrap gap-2">
     <!-- All Beans -->
     <button
-      class="font-outfit inline-flex items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[0.6rem] font-semibold transition-all"
-      :class="selected === 'all' ? 'text-white' : 'text-[var(--color-text)] opacity-50'"
+      class="font-outfit inline-flex items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-xs font-semibold transition-all"
+      :class="selected === 'all' ? 'text-white' : 'text-[var(--color-text)] opacity-65'"
       :style="
         selected === 'all'
           ? 'background: linear-gradient(135deg, var(--color-secondary-500), #3D5368)'
@@ -27,7 +27,7 @@ const emit = defineEmits<{
       "
       @click="emit('update:selected', 'all')"
     >
-      <span class="text-[0.65rem]">👨‍👩‍👦</span>
+      <span class="text-xs">👨‍👩‍👦</span>
       {{ t('todo.allBeans') }}
     </button>
 
@@ -35,8 +35,8 @@ const emit = defineEmits<{
     <button
       v-for="member in familyStore.members"
       :key="member.id"
-      class="font-outfit inline-flex items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[0.6rem] font-semibold transition-all"
-      :class="selected === member.id ? 'text-white' : 'text-[var(--color-text)] opacity-50'"
+      class="font-outfit inline-flex items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-xs font-semibold transition-all"
+      :class="selected === member.id ? 'text-white' : 'text-[var(--color-text)] opacity-65'"
       :style="
         selected === member.id
           ? 'background: linear-gradient(135deg, var(--color-secondary-500), #3D5368)'
@@ -45,7 +45,7 @@ const emit = defineEmits<{
       @click="emit('update:selected', member.id)"
     >
       <span
-        class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.5rem] font-bold text-white"
+        class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
         :style="{ background: `linear-gradient(135deg, ${member.color}, ${member.color}dd)` }"
       >
         {{ member.name.charAt(0).toUpperCase() }}
@@ -55,8 +55,8 @@ const emit = defineEmits<{
 
     <!-- Unassigned -->
     <button
-      class="font-outfit inline-flex items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-[0.6rem] font-semibold transition-all"
-      :class="selected === 'unassigned' ? 'text-white' : 'text-[var(--color-text)] opacity-50'"
+      class="font-outfit inline-flex items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-xs font-semibold transition-all"
+      :class="selected === 'unassigned' ? 'text-white' : 'text-[var(--color-text)] opacity-65'"
       :style="
         selected === 'unassigned'
           ? 'background: linear-gradient(135deg, var(--color-secondary-500), #3D5368)'
@@ -64,7 +64,7 @@ const emit = defineEmits<{
       "
       @click="emit('update:selected', 'unassigned')"
     >
-      <span class="text-[0.55rem] opacity-60">🚫</span>
+      <span class="text-xs opacity-60">🚫</span>
       {{ t('todo.unassigned') }}
     </button>
   </div>
