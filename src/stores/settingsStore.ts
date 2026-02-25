@@ -53,17 +53,23 @@ export const useSettingsStore = defineStore('settings', () => {
     theme,
     (newTheme) => {
       const html = document.documentElement;
+      let isDark = false;
       if (newTheme === 'dark') {
+        isDark = true;
+      } else if (newTheme === 'system') {
+        isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
+
+      if (isDark) {
         html.classList.add('dark');
-      } else if (newTheme === 'light') {
-        html.classList.remove('dark');
       } else {
-        // System preference
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          html.classList.add('dark');
-        } else {
-          html.classList.remove('dark');
-        }
+        html.classList.remove('dark');
+      }
+
+      // Keep browser chrome in sync
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) {
+        meta.setAttribute('content', isDark ? '#1a252f' : '#F8F9FA');
       }
     },
     { immediate: true }

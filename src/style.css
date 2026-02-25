@@ -45,6 +45,8 @@
 
 /* ─── CSS custom properties (used in non-Tailwind contexts) ─────────────── */
 :root {
+  color-scheme: light;
+
   --color-primary: #f15d22;
   --color-primary-dark: #d14d1a;
   --color-secondary: #2c3e50;
@@ -83,6 +85,8 @@
 
 /* Dark mode variables */
 .dark {
+  color-scheme: dark;
+
   --color-background: #1a252f;
   --color-surface: #34495e;
   --color-text: #ecf0f1;

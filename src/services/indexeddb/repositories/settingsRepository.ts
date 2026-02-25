@@ -21,7 +21,7 @@ export function getDefaultSettings(): Settings {
     exchangeRates: [],
     exchangeRateAutoUpdate: true,
     exchangeRateLastFetch: null,
-    theme: 'system',
+    theme: 'light',
     language: DEFAULT_LANGUAGE,
     syncEnabled: false,
     autoSyncEnabled: true,
