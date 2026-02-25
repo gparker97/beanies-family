@@ -126,7 +126,6 @@ export async function importSyncFileData(syncFile: SyncFileData): Promise<void> 
 
   // Read local-only preferences before import overwrites them
   const localSettings = await getSettings();
-  const localPreferredCurrencies = localSettings.preferredCurrencies;
 
   // Remove sync-related settings from imported data to preserve local sync config
   const importData: ExportedData = {
@@ -137,8 +136,6 @@ export async function importSyncFileData(syncFile: SyncFileData): Promise<void> 
           // Preserve these fields from local settings (don't overwrite sync config)
           syncFilePath: undefined,
           lastSyncTimestamp: undefined,
-          // Preserve local-only UI preferences
-          preferredCurrencies: localPreferredCurrencies,
           // Preserve local encryption setting — never import this from the file,
           // as it could propagate a corrupted false value from a buggy session
           encryptionEnabled: localSettings.encryptionEnabled,

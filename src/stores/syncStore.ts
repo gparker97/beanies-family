@@ -568,6 +568,7 @@ export const useSyncStore = defineStore('sync', () => {
         useGoalsStore().goals,
         useRecurringStore().recurringItems,
         useTodoStore().todos,
+        useSettingsStore().settings,
       ],
       () => {
         // Auto-save whenever file is configured and accessible
