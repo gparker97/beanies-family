@@ -36,6 +36,10 @@ const sortBy = ref<TodoSort>('newest');
 const memberFilter = ref('all');
 const showCompletedSection = ref(false);
 
+// View modal state
+const showViewModal = ref(false);
+const viewingTodo = ref<TodoItem | null>(null);
+
 // Edit modal state
 const showEditModal = ref(false);
 const editingTodo = ref<TodoItem | null>(null);
@@ -123,6 +127,45 @@ async function handleQuickAdd(payload: { title: string; dueDate?: string; assign
 
 async function handleToggle(id: string) {
   await todoStore.toggleComplete(id, currentMemberId.value);
+}
+
+// View modal helpers
+const viewAssignee = computed(() => {
+  if (!viewingTodo.value?.assigneeId) return null;
+  return familyStore.members.find((m) => m.id === viewingTodo.value!.assigneeId);
+});
+
+const viewCompletedBy = computed(() => {
+  if (!viewingTodo.value?.completedBy) return null;
+  return familyStore.members.find((m) => m.id === viewingTodo.value!.completedBy);
+});
+
+const viewCreatedBy = computed(() => {
+  if (!viewingTodo.value?.createdBy) return null;
+  return familyStore.members.find((m) => m.id === viewingTodo.value!.createdBy);
+});
+
+const viewFormattedDate = computed(() => {
+  if (!viewingTodo.value?.dueDate) return null;
+  const date = new Date(viewingTodo.value.dueDate);
+  return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+});
+
+function openViewModal(todo: TodoItem) {
+  viewingTodo.value = todo;
+  showViewModal.value = true;
+}
+
+function closeViewModal() {
+  showViewModal.value = false;
+  viewingTodo.value = null;
+}
+
+function viewToEdit() {
+  if (!viewingTodo.value) return;
+  const todo = viewingTodo.value;
+  closeViewModal();
+  openEditModal(todo);
 }
 
 function openEditModal(todo: TodoItem) {
@@ -228,6 +271,7 @@ async function handleDelete(id: string) {
             :key="todo.id"
             :todo="todo"
             @toggle="handleToggle"
+            @view="openViewModal"
             @edit="openEditModal"
             @delete="handleDelete"
           />
@@ -259,12 +303,150 @@ async function handleDelete(id: string) {
             :key="todo.id"
             :todo="todo"
             @toggle="handleToggle"
+            @view="openViewModal"
             @edit="openEditModal"
             @delete="handleDelete"
           />
         </div>
       </div>
     </template>
+
+    <!-- View Modal -->
+    <BaseModal :open="showViewModal" :title="t('todo.viewTask')" @close="closeViewModal">
+      <div v-if="viewingTodo" class="space-y-5">
+        <!-- Title -->
+        <h3
+          class="font-outfit text-lg font-bold text-[var(--color-text)]"
+          :class="{ 'line-through opacity-50': viewingTodo.completed }"
+        >
+          {{ viewingTodo.title }}
+        </h3>
+
+        <!-- Description -->
+        <div>
+          <p
+            class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
+          >
+            {{ t('todo.description') }}
+          </p>
+          <p
+            v-if="viewingTodo.description"
+            class="text-sm leading-relaxed text-[var(--color-text)]"
+          >
+            {{ viewingTodo.description }}
+          </p>
+          <p v-else class="text-sm text-[var(--color-text-muted)] italic">
+            {{ t('todo.noDescription') }}
+          </p>
+        </div>
+
+        <!-- Details grid -->
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Status -->
+          <div>
+            <p
+              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
+            >
+              {{ t('todo.status') }}
+            </p>
+            <span
+              v-if="viewingTodo.completed"
+              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-green-700"
+              style="background: var(--tint-success-10)"
+            >
+              ✅ {{ t('todo.status.completed') }}
+            </span>
+            <span
+              v-else
+              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-purple-700"
+              style="background: var(--tint-purple-15)"
+            >
+              {{ t('todo.status.open') }}
+            </span>
+          </div>
+
+          <!-- Assignee -->
+          <div>
+            <p
+              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
+            >
+              {{ t('todo.assignTo') }}
+            </p>
+            <span
+              v-if="viewAssignee"
+              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-white"
+              :style="{
+                background: `linear-gradient(135deg, ${viewAssignee.color}, ${viewAssignee.color}cc)`,
+              }"
+            >
+              {{ viewAssignee.name }}
+            </span>
+            <span v-else class="text-sm text-[var(--color-text-muted)]">
+              {{ t('todo.unassigned') }}
+            </span>
+          </div>
+
+          <!-- Due date -->
+          <div>
+            <p
+              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
+            >
+              {{ t('todo.dueDate') }}
+            </p>
+            <span
+              v-if="viewFormattedDate"
+              class="text-sm font-semibold"
+              style="color: var(--color-primary)"
+            >
+              📅 {{ viewFormattedDate }}
+              <template v-if="viewingTodo.dueTime"> &middot; {{ viewingTodo.dueTime }}</template>
+            </span>
+            <span v-else class="text-sm text-[var(--color-text-muted)]">
+              {{ t('todo.noDueDate') }}
+            </span>
+          </div>
+
+          <!-- Created by -->
+          <div>
+            <p
+              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
+            >
+              {{ t('todo.createdBy') }}
+            </p>
+            <span v-if="viewCreatedBy" class="text-sm text-[var(--color-text)]">
+              {{ viewCreatedBy.name }}
+            </span>
+            <span v-else class="text-sm text-[var(--color-text-muted)]">—</span>
+          </div>
+        </div>
+
+        <!-- Completed by (if done) -->
+        <div v-if="viewingTodo.completed && viewCompletedBy">
+          <p
+            class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
+          >
+            {{ t('todo.doneBy') }}
+          </p>
+          <span class="text-sm text-[var(--color-text)]"> ✅ {{ viewCompletedBy.name }} </span>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-between">
+          <BaseButton
+            variant="secondary"
+            class="text-red-500"
+            @click="
+              closeViewModal();
+              handleDelete(viewingTodo!.id);
+            "
+          >
+            🗑️ {{ t('todo.deleteTask') }}
+          </BaseButton>
+          <BaseButton @click="viewToEdit"> ✏️ {{ t('action.edit') }} </BaseButton>
+        </div>
+      </template>
+    </BaseModal>
 
     <!-- Edit Modal -->
     <BaseModal :open="showEditModal" :title="t('todo.editTask')" @close="closeEditModal">
