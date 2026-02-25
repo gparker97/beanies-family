@@ -433,6 +433,7 @@ async function handleDelete(id: string) {
 
       <template #footer>
         <div class="flex justify-between">
+          <BaseButton @click="viewToEdit"> ✏️ {{ t('action.edit') }} </BaseButton>
           <BaseButton
             variant="secondary"
             class="text-red-500"
@@ -441,9 +442,8 @@ async function handleDelete(id: string) {
               handleDelete(viewingTodo!.id);
             "
           >
-            🗑️ {{ t('todo.deleteTask') }}
+            🗑️ {{ t('action.delete') }}
           </BaseButton>
-          <BaseButton @click="viewToEdit"> ✏️ {{ t('action.edit') }} </BaseButton>
         </div>
       </template>
     </BaseModal>
