@@ -12,7 +12,7 @@ export default defineConfig({
       includeAssets: ['brand/*.png', 'icons/*.png'],
       manifest: {
         name: 'beanies.family',
-        short_name: 'beanies',
+        short_name: 'beanies.family',
         description: 'Every bean counts — family planning made simple',
         theme_color: '#2C3E50',
         background_color: '#F8F9FA',
