@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-02-25",
-    "translationCount": 686
+    "translationCount": 694
   },
   "translations": {
     "app.name": {
@@ -3280,6 +3280,46 @@
       "translation": "查看：所有成员",
       "hash": "gbts47",
       "lastUpdated": "2026-02-24"
+    },
+    "nav.section.treehouse": {
+      "translation": "The Treehouse",
+      "hash": "a3ovmb",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.section.piggyBank": {
+      "translation": "小猪存钱罐",
+      "hash": "la8u9h",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.nook": {
+      "translation": "Family Nook",
+      "hash": "a3an4p",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.planner": {
+      "translation": "家庭计划员",
+      "hash": "8vqdpm",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.todo": {
+      "translation": "家庭待办事项",
+      "hash": "ssz2wx",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.overview": {
+      "translation": "概述",
+      "hash": "9u3rtl",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.budgets": {
+      "translation": "预算",
+      "hash": "v9r3xq",
+      "lastUpdated": "2026-02-25"
+    },
+    "nav.comingSoon": {
+      "translation": "很快",
+      "hash": "1jcyj",
+      "lastUpdated": "2026-02-25"
     },
     "action.tryAgain": {
       "translation": "再试一次",

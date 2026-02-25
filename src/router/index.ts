@@ -73,6 +73,30 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Family Members', requiresAuth: true },
   },
   {
+    path: '/nook',
+    name: 'Nook',
+    component: () => import('@/pages/DashboardPage.vue'),
+    meta: { title: 'Family Nook', requiresAuth: true },
+  },
+  {
+    path: '/planner',
+    name: 'Planner',
+    component: () => import('@/pages/DashboardPage.vue'),
+    meta: { title: 'Family Planner', requiresAuth: true },
+  },
+  {
+    path: '/todo',
+    name: 'Todo',
+    component: () => import('@/pages/DashboardPage.vue'),
+    meta: { title: 'Family To-Do', requiresAuth: true },
+  },
+  {
+    path: '/budgets',
+    name: 'Budgets',
+    component: () => import('@/pages/DashboardPage.vue'),
+    meta: { title: 'Budgets', requiresAuth: true },
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/pages/SettingsPage.vue'),

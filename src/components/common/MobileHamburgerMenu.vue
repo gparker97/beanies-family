@@ -2,13 +2,21 @@
 import { computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES } from '@/constants/languages';
-import { NAV_ITEMS } from '@/constants/navigation';
+import {
+  NAV_SECTIONS,
+  TREEHOUSE_ITEMS,
+  PIGGY_BANK_ITEMS,
+  PINNED_ITEMS,
+  type NavItemDef,
+} from '@/constants/navigation';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -30,24 +38,43 @@ const router = useRouter();
 const { t } = useTranslation();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
+const goalsStore = useGoalsStore();
 const memberFilterStore = useMemberFilterStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
+const { isOpen, toggle: toggleSection } = useSidebarAccordion();
 
 const ownerRef = computed(() => familyStore.owner ?? null);
 const { variant: ownerVariant, color: ownerColor } = useMemberAvatar(ownerRef);
 
-const navItems = computed(() =>
-  NAV_ITEMS.map((item) => ({
+const badges = computed<Record<string, number>>(() => ({
+  activeGoals: goalsStore.activeGoals.length,
+}));
+
+function mapItems(items: NavItemDef[]) {
+  return items.map((item) => ({
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,
     active: route.path === item.path,
+    comingSoon: item.comingSoon ?? false,
+    badge: item.badgeKey ? (badges.value[item.badgeKey] ?? 0) : 0,
+  }));
+}
+
+const sections = computed(() =>
+  NAV_SECTIONS.map((section) => ({
+    id: section.id,
+    label: t(section.labelKey),
+    emoji: section.emoji,
+    items: section.id === 'treehouse' ? mapItems(TREEHOUSE_ITEMS) : mapItems(PIGGY_BANK_ITEMS),
   }))
 );
+
+const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
 
 // Member filter display
 const memberFilterLabel = computed(() => {
@@ -333,10 +360,68 @@ const encryptionLabel = computed(() => {
             <!-- Divider -->
             <div class="mx-5 my-3 h-px bg-white/[0.08]" />
 
-            <!-- Navigation -->
-            <nav class="flex-1 space-y-0.5 px-4">
+            <!-- Accordion Navigation -->
+            <nav class="flex-1 space-y-1 px-4">
+              <div v-for="section in sections" :key="section.id">
+                <!-- Section Header -->
+                <button
+                  type="button"
+                  class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[0.7rem] font-semibold tracking-wider text-white/50 uppercase transition-colors hover:text-white/70"
+                  @click="toggleSection(section.id as 'treehouse' | 'piggyBank')"
+                >
+                  <span class="text-sm">{{ section.emoji }}</span>
+                  <span class="flex-1 text-left">{{ section.label }}</span>
+                  <BeanieIcon
+                    name="chevron-down"
+                    size="xs"
+                    class="text-white/30 transition-transform duration-200"
+                    :class="{ 'rotate-180': !isOpen(section.id as 'treehouse' | 'piggyBank') }"
+                  />
+                </button>
+
+                <!-- Section Items -->
+                <div v-show="isOpen(section.id as 'treehouse' | 'piggyBank')" class="space-y-0.5">
+                  <button
+                    v-for="item in section.items"
+                    :key="item.path"
+                    type="button"
+                    class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1rem] font-medium transition-all duration-150"
+                    :class="[
+                      item.active
+                        ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                        : 'border-l-4 border-transparent hover:bg-white/[0.05]',
+                      item.comingSoon && !item.active
+                        ? 'text-white/25'
+                        : !item.active
+                          ? 'text-white/40 hover:text-white/70'
+                          : '',
+                    ]"
+                    @click="navigateTo(item.path)"
+                  >
+                    <span class="w-6 text-center text-base">{{ item.emoji }}</span>
+                    <span class="flex-1">{{ item.label }}</span>
+                    <span
+                      v-if="item.badge > 0"
+                      class="min-w-[1.2rem] rounded-full bg-[#F15D22] px-1.5 text-center text-[0.6rem] font-semibold text-white"
+                    >
+                      {{ item.badge }}
+                    </span>
+                    <span
+                      v-if="item.comingSoon"
+                      class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
+                    >
+                      {{ t('nav.comingSoon') }}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Divider -->
+              <div class="mx-2 my-2 h-px bg-white/[0.08]" />
+
+              <!-- Pinned: Settings -->
               <button
-                v-for="item in navItems"
+                v-for="item in pinnedItems"
                 :key="item.path"
                 type="button"
                 class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1rem] font-medium transition-all duration-150"

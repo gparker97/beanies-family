@@ -2,33 +2,46 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
+import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
-import { PRIMARY_NAV_ITEMS, SECONDARY_NAV_ITEMS } from '@/constants/navigation';
+import {
+  NAV_SECTIONS,
+  TREEHOUSE_ITEMS,
+  PIGGY_BANK_ITEMS,
+  PINNED_ITEMS,
+  type NavItemDef,
+} from '@/constants/navigation';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useGoalsStore } from '@/stores/goalsStore';
 import { useSyncStore } from '@/stores/syncStore';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const goalsStore = useGoalsStore();
 const syncStore = useSyncStore();
+const { isOpen, toggle } = useSidebarAccordion();
 
-const primaryItems = computed(() =>
-  PRIMARY_NAV_ITEMS.map((item) => ({
+const badges = computed<Record<string, number>>(() => ({
+  activeGoals: goalsStore.activeGoals.length,
+}));
+
+function mapItems(items: NavItemDef[]) {
+  return items.map((item) => ({
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,
-  }))
-);
+    comingSoon: item.comingSoon ?? false,
+    badge: item.badgeKey ? (badges.value[item.badgeKey] ?? 0) : 0,
+  }));
+}
 
-const secondaryItems = computed(() =>
-  SECONDARY_NAV_ITEMS.map((item) => ({
-    label: t(item.labelKey),
-    path: item.path,
-    emoji: item.emoji,
-  }))
-);
+const treehouseItems = computed(() => mapItems(TREEHOUSE_ITEMS));
+const piggyBankItems = computed(() => mapItems(PIGGY_BANK_ITEMS));
+const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
 
 const currentMemberRef = computed(() => familyStore.currentMember ?? familyStore.owner ?? null);
 const { variant: memberVariant, color: memberColor } = useMemberAvatar(currentMemberRef);
@@ -46,6 +59,15 @@ const encryptionTitle = computed(() => {
   if (syncStore.isEncryptionEnabled) return t('sidebar.dataEncryptedFull');
   return t('sidebar.dataFileNotEncrypted');
 });
+
+const sections = computed(() =>
+  NAV_SECTIONS.map((section) => ({
+    id: section.id,
+    label: t(section.labelKey),
+    emoji: section.emoji,
+    items: section.id === 'treehouse' ? treehouseItems.value : piggyBankItems.value,
+  }))
+);
 </script>
 
 <template>
@@ -73,29 +95,68 @@ const encryptionTitle = computed(() => {
       </div>
     </div>
 
-    <!-- Primary Navigation -->
-    <nav class="flex-1 space-y-0.5 overflow-y-auto">
-      <button
-        v-for="item in primaryItems"
-        :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
-        :class="
-          isActive(item.path)
-            ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
-            : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
-        "
-        @click="navigateTo(item.path)"
-      >
-        <span class="w-6 text-center text-base">{{ item.emoji }}</span>
-        <span>{{ item.label }}</span>
-      </button>
+    <!-- Accordion Navigation -->
+    <nav class="flex-1 space-y-1 overflow-y-auto">
+      <div v-for="section in sections" :key="section.id">
+        <!-- Section Header -->
+        <button
+          class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[0.7rem] font-semibold tracking-wider text-white/50 uppercase transition-colors hover:text-white/70"
+          @click="toggle(section.id as 'treehouse' | 'piggyBank')"
+        >
+          <span class="text-sm">{{ section.emoji }}</span>
+          <span class="flex-1 text-left">{{ section.label }}</span>
+          <BeanieIcon
+            name="chevron-down"
+            size="xs"
+            class="text-white/30 transition-transform duration-200"
+            :class="{ 'rotate-180': !isOpen(section.id as 'treehouse' | 'piggyBank') }"
+          />
+        </button>
 
-      <!-- Section divider -->
+        <!-- Section Items -->
+        <div v-show="isOpen(section.id as 'treehouse' | 'piggyBank')" class="space-y-0.5">
+          <button
+            v-for="item in section.items"
+            :key="item.path"
+            class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
+            :class="[
+              isActive(item.path)
+                ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                : 'border-l-4 border-transparent hover:bg-white/[0.05]',
+              item.comingSoon && !isActive(item.path)
+                ? 'text-white/25'
+                : !isActive(item.path)
+                  ? 'text-white/40 hover:text-white/70'
+                  : '',
+            ]"
+            @click="navigateTo(item.path)"
+          >
+            <span class="w-6 text-center text-base">{{ item.emoji }}</span>
+            <span class="flex-1">{{ item.label }}</span>
+            <!-- Badge (e.g. active goals count) -->
+            <span
+              v-if="item.badge > 0"
+              class="min-w-[1.2rem] rounded-full bg-[#F15D22] px-1.5 text-center text-[0.6rem] font-semibold text-white"
+            >
+              {{ item.badge }}
+            </span>
+            <!-- Coming soon indicator -->
+            <span
+              v-if="item.comingSoon"
+              class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
+            >
+              {{ t('nav.comingSoon') }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Divider -->
       <div class="mx-2 my-2 h-px bg-white/[0.08]" />
 
-      <!-- Secondary Navigation -->
+      <!-- Pinned: Settings -->
       <button
-        v-for="item in secondaryItems"
+        v-for="item in pinnedItems"
         :key="item.path"
         class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
         :class="
@@ -135,7 +196,6 @@ const encryptionTitle = computed(() => {
     <div class="mt-3 space-y-1 px-1">
       <!-- File name -->
       <div v-if="syncStore.isConfigured && syncStore.fileName" class="flex items-center gap-1.5">
-        <!-- Tiny file icon -->
         <svg
           class="h-3 w-3 flex-shrink-0 text-white/30"
           fill="none"

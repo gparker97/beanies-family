@@ -66,6 +66,14 @@ const STRING_DEFS = {
   'nav.forecast': { en: 'Forecast', beanie: 'Bean Forecast' },
   'nav.family': { en: 'Family Hub', beanie: 'Family Hub' },
   'nav.settings': { en: 'Settings' },
+  'nav.section.treehouse': { en: 'The Treehouse', beanie: 'The Treehouse' },
+  'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'The Piggy Bank' },
+  'nav.nook': { en: 'Family Nook', beanie: 'Family Nook' },
+  'nav.planner': { en: 'Family Planner', beanie: 'Family Planner' },
+  'nav.todo': { en: 'Family To-Do', beanie: 'Family To-Do' },
+  'nav.overview': { en: 'Overview', beanie: 'Your Nook' },
+  'nav.budgets': { en: 'Budgets', beanie: 'Bean Budget' },
+  'nav.comingSoon': { en: 'Soon', beanie: 'Soon' },
 
   // Common actions
   'action.add': { en: 'Add' },
