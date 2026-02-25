@@ -60,11 +60,17 @@ const encryptionTitle = computed(() => {
   return t('sidebar.dataFileNotEncrypted');
 });
 
+const SECTION_COLORS: Record<string, string> = {
+  treehouse: 'text-[#F15D22]',
+  piggyBank: 'text-[#27AE60]',
+};
+
 const sections = computed(() =>
   NAV_SECTIONS.map((section) => ({
     id: section.id,
     label: t(section.labelKey),
     emoji: section.emoji,
+    color: SECTION_COLORS[section.id] ?? 'text-white/50',
     items: section.id === 'treehouse' ? treehouseItems.value : piggyBankItems.value,
   }))
 );
@@ -100,10 +106,11 @@ const sections = computed(() =>
       <div v-for="section in sections" :key="section.id">
         <!-- Section Header -->
         <button
-          class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[0.7rem] font-semibold tracking-wider text-white/50 uppercase transition-colors hover:text-white/70"
+          class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[0.85rem] font-bold tracking-wide uppercase transition-colors"
+          :class="section.color"
           @click="toggle(section.id as 'treehouse' | 'piggyBank')"
         >
-          <span class="text-sm">{{ section.emoji }}</span>
+          <span class="text-base">{{ section.emoji }}</span>
           <span class="flex-1 text-left">{{ section.label }}</span>
           <BeanieIcon
             name="chevron-down"
