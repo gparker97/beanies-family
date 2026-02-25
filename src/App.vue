@@ -52,6 +52,7 @@ const isInitializing = ref(true);
 const isMenuOpen = ref(false);
 const showTrustPrompt = ref(false);
 const showPasskeyPrompt = ref(false);
+const passkeyPromptDismissed = ref(false);
 
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
@@ -69,7 +70,7 @@ function handleDeclineTrust() {
 
 async function handleEnablePasskey() {
   showPasskeyPrompt.value = false;
-  await settingsStore.setPasskeyPromptShown();
+  passkeyPromptDismissed.value = true;
 
   const password = syncStore.currentSessionPassword;
   if (!password) return;
@@ -83,7 +84,7 @@ async function handleEnablePasskey() {
 }
 
 function handleDeclinePasskey() {
-  settingsStore.setPasskeyPromptShown();
+  passkeyPromptDismissed.value = true;
   showPasskeyPrompt.value = false;
 }
 
@@ -322,9 +323,10 @@ onMounted(async () => {
 // Show passkey or trust device prompt after fresh sign-in.
 // Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
+// Watches both freshSignIn and route.path so it re-fires after Create/Join navigates to /dashboard.
 watch(
-  () => authStore.freshSignIn,
-  async (isFresh) => {
+  () => [authStore.freshSignIn, route.path] as const,
+  async ([isFresh, path], oldVal) => {
     if (
       !isFresh ||
       !familyStore.isSetupComplete ||
@@ -333,16 +335,28 @@ watch(
       return;
     }
 
-    // Try passkey prompt first (if not already shown and encryption is enabled)
-    if (
-      !settingsStore.passkeyPromptShown &&
-      syncStore.isEncryptionEnabled &&
-      syncStore.isConfigured
-    ) {
-      const hasPlatform = await isPlatformAuthenticatorAvailable();
-      if (hasPlatform) {
-        showPasskeyPrompt.value = true;
-        return;
+    // Don't show modal over the login/welcome UI
+    if (path === '/welcome' || path === '/login' || path === '/join') {
+      return;
+    }
+
+    // Reset dismiss flag on new sign-in (freshSignIn transitioned from false to true)
+    if (oldVal && !oldVal[0] && isFresh) {
+      passkeyPromptDismissed.value = false;
+    }
+
+    // Try passkey prompt first (per-family check, encryption must be enabled)
+    if (!passkeyPromptDismissed.value && syncStore.isEncryptionEnabled && syncStore.isConfigured) {
+      const familyId = authStore.currentUser?.familyId;
+      if (familyId) {
+        const hasPasskeys = await authStore.checkHasRegisteredPasskeys(familyId);
+        if (!hasPasskeys) {
+          const hasPlatform = await isPlatformAuthenticatorAvailable();
+          if (hasPlatform) {
+            showPasskeyPrompt.value = true;
+            return;
+          }
+        }
       }
     }
 
