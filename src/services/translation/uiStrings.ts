@@ -894,13 +894,13 @@ const STRING_DEFS = {
   'trust.trustButton': { en: 'Yes, I trust this device' },
   'trust.notNow': { en: 'Not now' },
   'trust.hint': {
-    en: 'You can change this in Settings. Use "Sign out & clear data" to remove cached data.',
+    en: 'You can change this in Settings. Use "Sign Out / Clear Data" to remove cached data.',
   },
   'trust.settingsLabel': { en: 'Trusted device' },
   'trust.settingsDesc': {
     en: 'Keep data cached locally (unecrypted) between sign-ins for faster access',
   },
-  'auth.signOutClearData': { en: 'Sign out & clear data' },
+  'auth.signOutClearData': { en: 'Sign Out & Clear Data' },
 
   // File-based auth
   'auth.selectMember': { en: 'Select your profile' },
