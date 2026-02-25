@@ -63,38 +63,33 @@ function handleKeydown(e: KeyboardEvent) {
       </button>
     </div>
 
-    <!-- Date button -->
-    <button
-      type="button"
-      class="relative flex shrink-0 items-center gap-1.5 rounded-2xl px-4 py-3.5 transition-colors"
+    <!-- Date picker -->
+    <div
+      class="flex shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors"
       :class="dueDate ? 'bg-[var(--tint-orange-8)]' : ''"
       :style="!dueDate ? 'background: var(--tint-slate-5)' : undefined"
-      @click="($refs.dateInput as HTMLInputElement)?.showPicker()"
     >
       <span class="text-base">📅</span>
-      <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-        t('todo.dueDate')
-      }}</span>
       <input
-        ref="dateInput"
         v-model="dueDate"
         type="date"
-        class="absolute inset-0 cursor-pointer opacity-0"
+        class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-3 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+        :style="{ color: dueDate ? 'var(--color-primary)' : 'var(--color-text)' }"
       />
-    </button>
+    </div>
 
-    <!-- Assign button -->
+    <!-- Assign dropdown -->
     <div
-      class="relative flex shrink-0 items-center gap-1.5 rounded-2xl px-4 py-3.5 transition-colors"
+      class="flex shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors"
       :class="assigneeId ? 'bg-[var(--tint-purple-8)]' : ''"
       :style="!assigneeId ? 'background: var(--tint-slate-5)' : undefined"
     >
       <span class="text-base">👤</span>
-      <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-        t('todo.assignTo')
-      }}</span>
-      <select v-model="assigneeId" class="absolute inset-0 cursor-pointer opacity-0">
-        <option value="">{{ t('todo.unassigned') }}</option>
+      <select
+        v-model="assigneeId"
+        class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-3 text-xs font-semibold text-[var(--color-text)] shadow-none focus:shadow-none focus:ring-0"
+      >
+        <option value="">{{ t('todo.assignTo') }}</option>
         <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
           {{ member.name }}
         </option>
