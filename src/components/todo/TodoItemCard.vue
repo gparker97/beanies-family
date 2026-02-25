@@ -37,6 +37,19 @@ const formattedDate = computed(() => {
   return `${weekday} ${day} ${month}`;
 });
 
+const isOverdue = computed(() => {
+  if (props.todo.completed || !props.todo.dueDate) return false;
+  const now = new Date();
+  const dueDate = new Date(props.todo.dueDate);
+  if (props.todo.dueTime) {
+    const parts = props.todo.dueTime.split(':').map(Number);
+    dueDate.setHours(parts[0] ?? 23, parts[1] ?? 59, 0, 0);
+  } else {
+    dueDate.setHours(23, 59, 59, 999);
+  }
+  return now > dueDate;
+});
+
 const timeAgo = computed(() => {
   const now = new Date();
   const created = new Date(props.todo.createdAt);
@@ -70,6 +83,12 @@ const timeAgo = computed(() => {
       <p class="font-outfit text-base font-semibold line-through">
         {{ todo.title }}
       </p>
+      <p
+        v-if="todo.description"
+        class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[var(--color-text-muted)]"
+      >
+        {{ todo.description }}
+      </p>
       <div class="mt-1 flex items-center gap-2">
         <span v-if="completedByMember" class="text-xs">
           ✅ {{ t('todo.doneBy') }} {{ completedByMember.name }}
@@ -92,11 +111,21 @@ const timeAgo = computed(() => {
   <!-- Open task card -->
   <div
     v-else
-    class="group flex items-center gap-4 rounded-2xl border border-[var(--tint-slate-5)] bg-white p-4 transition-all hover:bg-[var(--tint-orange-8)] dark:bg-slate-800"
+    class="group flex items-center gap-4 rounded-2xl border p-4 transition-all"
+    :class="
+      isOverdue
+        ? 'border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50'
+        : 'border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-800'
+    "
   >
     <!-- Checkbox -->
     <button
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-[2.5px] border-[var(--color-primary-500)] transition-colors hover:bg-[var(--tint-orange-8)]"
+      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
+      :class="
+        isOverdue
+          ? 'border-red-400 hover:bg-red-100 dark:border-red-500'
+          : 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]'
+      "
       @click="emit('toggle', todo.id)"
     />
 
@@ -105,10 +134,25 @@ const timeAgo = computed(() => {
       <p class="font-outfit text-base font-semibold text-[var(--color-text)]">
         {{ todo.title }}
       </p>
+      <p
+        v-if="todo.description"
+        class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[var(--color-text-muted)]"
+      >
+        {{ todo.description }}
+      </p>
       <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
-        <!-- Date (always first, orange color) -->
+        <!-- Date — orange pill with overdue tag when past due -->
         <span
-          v-if="formattedDate"
+          v-if="formattedDate && isOverdue"
+          class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
+        >
+          ⏰{{ formattedDate }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
+          <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.55rem] font-bold uppercase">
+            {{ t('todo.overdue') }}
+          </span>
+        </span>
+        <span
+          v-else-if="formattedDate"
           class="text-xs font-semibold"
           :style="{ color: 'var(--color-primary-500)' }"
         >

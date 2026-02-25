@@ -288,7 +288,7 @@ const STRING_DEFS = {
 
   // Family
   'family.title': { en: 'Family', beanie: 'The Pod' },
-  'family.addMember': { en: 'Add Member', beanie: 'Add a Beanie' },
+  'family.addMember': { en: 'Add Member', beanie: 'Add a beanie' },
   'family.editMember': { en: 'Edit Member', beanie: 'Edit Beanie' },
   'family.deleteMember': { en: 'Delete Member', beanie: 'Remove Beanie' },
   'family.noMembers': {
@@ -930,7 +930,7 @@ const STRING_DEFS = {
   'login.inviteAsChild': { en: 'Child', beanie: 'Little Bean' },
   'login.inviteRoleLabel': { en: 'Inviting as' },
   'login.familyCodePlaceholder': { en: 'Enter the code from your family' },
-  'login.inviteTitle': { en: 'Invite family member' },
+  'login.inviteTitle': { en: 'Invite family member', beanie: 'Invite your beanies' },
   'login.inviteDesc': {
     en: 'Share this code with family members so they can join your pod',
   },
@@ -1167,6 +1167,7 @@ const STRING_DEFS = {
   'todo.status.open': { en: 'Open' },
   'todo.status.completed': { en: 'Completed' },
   'todo.noDueDate': { en: 'No due date' },
+  'todo.overdue': { en: 'Overdue', beanie: 'Past the beanie deadline!' },
   'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'Remove Task' },
 
   // Celebrations
@@ -1194,6 +1195,53 @@ const STRING_DEFS = {
     en: 'Debt-free! Time to celebrate!',
     beanie: 'Debt-free! The beanies are celebrating!',
   },
+
+  // Family Nook
+  'nook.welcomeHome': { en: 'Welcome Home, {name}', beanie: 'Welcome to the Nook, {name}' },
+  'nook.familyAtAGlance': {
+    en: 'Your family at a glance',
+    beanie: 'Your bean pod at a glance',
+  },
+  'nook.statusGreatWeek': {
+    en: "Everyone's having a great week!",
+    beanie: 'The beanies are thriving!',
+  },
+  'nook.statusSummary': {
+    en: '{tasks} completed \u00B7 {milestones} approaching',
+    beanie: '{tasks} beans counted \u00B7 {milestones} goals sprouting',
+  },
+  'nook.yourBeans': { en: 'Your Beans', beanie: 'Your Bean Pod' },
+  'nook.addBean': { en: 'Add Bean', beanie: 'Add a beanie' },
+  'nook.todaySchedule': { en: "Today's Schedule", beanie: "Today's Beanie Schedule" },
+  'nook.thisWeek': { en: 'This Week', beanie: 'This Week' },
+  'nook.fullCalendar': { en: 'Full Calendar', beanie: 'Full Calendar' },
+  'nook.familyTodo': { en: 'Family To-Do', beanie: 'Beanie To-Do' },
+  'nook.openCount': { en: '{count} open', beanie: '{count} open' },
+  'nook.viewAll': { en: 'View All', beanie: 'View All' },
+  'nook.moretasks': { en: 'more tasks', beanie: 'more beans to count' },
+  'nook.addTaskPlaceholder': {
+    en: 'Add a task for the family...',
+    beanie: 'Add a task for the beanies...',
+  },
+  'nook.milestones': { en: 'Family Milestones', beanie: 'Beanie Milestones' },
+  'nook.upcoming': { en: 'Upcoming', beanie: 'Sprouting Soon' },
+  'nook.daysAway': { en: '{days} days away', beanie: '{days} sleeps away' },
+  'nook.completedRecently': { en: 'Completed recently!', beanie: 'Beans counted!' },
+  'nook.piggyBank': { en: 'The Piggy Bank', beanie: 'The Piggy Bank' },
+  'nook.familyNetWorth': { en: 'Family Net Worth', beanie: 'Alllllll Your Beans' },
+  'nook.thisMonth': { en: 'this month', beanie: 'this moon' },
+  'nook.monthlyBudget': { en: 'Monthly Budget', beanie: 'Monthly Bean Budget' },
+  'nook.openPiggyBank': { en: 'Open The Piggy Bank', beanie: 'Open The Piggy Bank' },
+  'nook.recentActivity': { en: 'Recent Family Activity', beanie: 'Recent Beanie Activity' },
+  'nook.seeAll': { en: 'See All', beanie: 'See All' },
+  'nook.noEvents': { en: 'No events scheduled', beanie: 'No beans on the calendar' },
+  'nook.comingSoon': { en: 'Coming soon', beanie: 'Coming soon' },
+  'nook.noMilestones': { en: 'No milestones yet', beanie: 'No milestones yet' },
+  'nook.noActivity': { en: 'No recent activity', beanie: 'The beanies are resting' },
+  'nook.birthday': { en: "{name}'s Birthday", beanie: "{name}'s Bean Day" },
+  'nook.taskCompleted': { en: 'completed a task', beanie: 'counted a bean' },
+  'nook.spent': { en: 'Spent', beanie: 'Spent' },
+  'nook.received': { en: 'Received', beanie: 'Received' },
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },

@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-25
-> **Updated by:** Claude (v7 UI framework proposal — issues, theme, and docs update)
+> **Updated by:** Claude (Family Nook home screen — #97)
 
 ## Current Phase
 
@@ -42,6 +42,7 @@
 - Settings page (currency, theme, sync, encryption)
 - First-run setup wizard
 - Multi-currency display with global display currency selector
+- Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards, todo widget, milestones, piggy bank card, recent activity feed
 
 ### Beanie Brand Asset Icons
 

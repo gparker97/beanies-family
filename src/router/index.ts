@@ -3,7 +3,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/dashboard',
+    redirect: '/nook',
   },
   {
     path: '/welcome',
@@ -75,7 +75,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/nook',
     name: 'Nook',
-    component: () => import('@/pages/DashboardPage.vue'),
+    component: () => import('@/pages/FamilyNookPage.vue'),
     meta: { title: 'Family Nook', requiresAuth: true },
   },
   {
