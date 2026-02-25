@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils';
 import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
 
 // Mock vue-router
-const mockRoute = { path: '/dashboard' };
+const mockRoute = { path: '/nook' };
 const mockPush = vi.fn();
 
 vi.mock('vue-router', () => ({
@@ -20,7 +20,7 @@ vi.mock('@/composables/useTranslation', () => ({
 describe('MobileBottomNav', () => {
   beforeEach(() => {
     mockPush.mockClear();
-    mockRoute.path = '/dashboard';
+    mockRoute.path = '/nook';
   });
 
   it('renders 4 navigation tabs', () => {
@@ -30,7 +30,7 @@ describe('MobileBottomNav', () => {
   });
 
   it('highlights active tab based on current route', () => {
-    mockRoute.path = '/dashboard';
+    mockRoute.path = '/nook';
     const wrapper = mount(MobileBottomNav);
     const buttons = wrapper.findAll('button');
 
