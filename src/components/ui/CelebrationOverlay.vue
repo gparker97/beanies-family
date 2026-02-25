@@ -34,7 +34,7 @@ const { toasts, activeModal, dismissModal } = useCelebration();
             <img
               :src="activeModal.asset"
               :alt="activeModal.message"
-              class="mx-auto mb-6 h-36 w-36 object-contain"
+              class="mx-auto mb-6 w-full max-w-xs object-contain"
             />
             <p class="font-outfit text-secondary-500 text-xl font-bold dark:text-gray-100">
               {{ activeModal.message }}
