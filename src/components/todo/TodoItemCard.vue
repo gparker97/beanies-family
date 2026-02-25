@@ -13,6 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   toggle: [id: string];
+  view: [todo: TodoItem];
   edit: [todo: TodoItem];
   delete: [id: string];
 }>();
@@ -64,8 +65,8 @@ const timeAgo = computed(() => {
       <span class="text-xs font-bold text-white">✓</span>
     </button>
 
-    <!-- Content -->
-    <div class="min-w-0 flex-1">
+    <!-- Content (clickable for view) -->
+    <div class="min-w-0 flex-1 cursor-pointer" @click="emit('view', todo)">
       <p class="font-outfit text-[0.95rem] font-semibold line-through">
         {{ todo.title }}
       </p>
@@ -104,8 +105,8 @@ const timeAgo = computed(() => {
       @click="emit('toggle', todo.id)"
     />
 
-    <!-- Content -->
-    <div class="min-w-0 flex-1">
+    <!-- Content (clickable for view) -->
+    <div class="min-w-0 flex-1 cursor-pointer" @click="emit('view', todo)">
       <p class="font-outfit text-[0.95rem] font-semibold text-[var(--color-text)]">
         {{ todo.title }}
       </p>
