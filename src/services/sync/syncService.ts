@@ -44,6 +44,12 @@ export interface SyncServiceState {
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 2000;
 
+// Write mutex — prevents concurrent save() calls from interleaving writes.
+// Without this, two overlapping saves can corrupt the file: if the second write
+// is shorter than the first, the tail of the first write remains as trailing bytes
+// (e.g. a shorter familyName leaves stale JSON after the closing brace).
+let saveInProgress: Promise<boolean> | null = null;
+
 // Current file handle (in-memory for session) and the family it belongs to
 let currentFileHandle: FileSystemFileHandle | null = null;
 let currentFileHandleFamilyId: string | null = null;
@@ -233,10 +239,42 @@ export async function selectSyncFile(): Promise<boolean> {
 }
 
 /**
- * Save current data to the sync file
+ * Save current data to the sync file.
+ * Serialized via a write mutex to prevent concurrent saves from corrupting
+ * the file (see saveInProgress). If a save is already running, this call
+ * waits for it to finish before starting its own write.
  * @param password - If provided, the data will be encrypted with this password
  */
 export async function save(password?: string): Promise<boolean> {
+  // Wait for any in-flight save to complete before starting a new one.
+  // This prevents two overlapping createWritable/write/close sequences
+  // from interleaving, which can leave stale trailing bytes in the file.
+  if (saveInProgress) {
+    try {
+      await saveInProgress;
+    } catch {
+      // Previous save failed — proceed with ours regardless
+    }
+  }
+
+  const promise = doSave(password);
+  saveInProgress = promise;
+
+  try {
+    return await promise;
+  } finally {
+    // Only clear if we're still the active save (another may have queued)
+    if (saveInProgress === promise) {
+      saveInProgress = null;
+    }
+  }
+}
+
+/**
+ * Internal save implementation — callers must go through save() which
+ * serializes access via the write mutex.
+ */
+async function doSave(password?: string): Promise<boolean> {
   if (!currentFileHandle) {
     updateState({ lastError: 'No file configured' });
     return false;
@@ -317,11 +355,17 @@ export async function save(password?: string): Promise<boolean> {
       fileContent = JSON.stringify(syncData, null, 2);
     }
 
-    // Write to file — truncate first to prevent stale trailing bytes when
-    // the new content is shorter than the previous write (e.g. shorter familyName).
-    const writable = await currentFileHandle.createWritable();
-    await writable.truncate(0);
-    await writable.write(fileContent);
+    // Write to file atomically:
+    // 1. Seek to position 0 to ensure we write from the start
+    // 2. Write the full content
+    // 3. Truncate to the exact content length to remove any stale trailing bytes
+    //    (safer than truncate-first, which is vulnerable to interleaving if the
+    //    mutex is ever bypassed or the browser allows multiple writable streams)
+    const writable = await currentFileHandle.createWritable({ keepExistingData: false });
+    const contentBytes = new TextEncoder().encode(fileContent);
+    await writable.write({ type: 'seek', position: 0 });
+    await writable.write(contentBytes);
+    await writable.truncate(contentBytes.byteLength);
     await writable.close();
 
     updateState({ isSyncing: false, lastError: null });
