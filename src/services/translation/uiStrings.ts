@@ -57,23 +57,23 @@ const STRING_DEFS = {
   'status.overdue': { en: 'Overdue' },
 
   // Navigation
-  'nav.dashboard': { en: 'Dashboard', beanie: 'Your Nook' },
-  'nav.accounts': { en: 'Accounts' },
-  'nav.transactions': { en: 'Transactions' },
-  'nav.assets': { en: 'Assets' },
-  'nav.goals': { en: 'Goals' },
+  'nav.dashboard': { en: 'Financial Dashboard', beanie: 'finance corner' },
+  'nav.accounts': { en: 'Accounts', beanie: 'accounts' },
+  'nav.transactions': { en: 'Transactions', beanie: 'transactions' },
+  'nav.assets': { en: 'Assets', beanie: 'our things' },
+  'nav.goals': { en: 'Goals', beanie: 'our goals' },
   'nav.reports': { en: 'Reports' },
-  'nav.forecast': { en: 'Forecast', beanie: 'Bean Forecast' },
-  'nav.family': { en: 'Family Hub', beanie: 'Family Hub' },
+  'nav.forecast': { en: 'Forecast', beanie: 'finance forecast' },
+  'nav.family': { en: 'Family Hub', beanie: 'my family' },
   'nav.settings': { en: 'Settings' },
-  'nav.section.treehouse': { en: 'The Treehouse', beanie: 'The Treehouse' },
-  'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'The Piggy Bank' },
-  'nav.nook': { en: 'Family Nook', beanie: 'Family Nook' },
-  'nav.planner': { en: 'Family Planner', beanie: 'Family Planner' },
-  'nav.todo': { en: 'Family To-Do', beanie: 'Family To-Do' },
-  'nav.overview': { en: 'Overview', beanie: 'Your Nook' },
-  'nav.budgets': { en: 'Budgets', beanie: 'Bean Budget' },
-  'nav.comingSoon': { en: 'Soon', beanie: 'Soon' },
+  'nav.section.treehouse': { en: 'The Treehouse', beanie: 'family treehouse' },
+  'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'piggy bank' },
+  'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },
+  'nav.planner': { en: 'Family Planner', beanie: 'our plans' },
+  'nav.todo': { en: 'Family To-Do', beanie: 'to-do list' },
+  'nav.overview': { en: 'Overview', beanie: 'finance corner' },
+  'nav.budgets': { en: 'Budgets', beanie: 'our budgets' },
+  'nav.comingSoon': { en: 'Soon!', beanie: 'soon!' },
 
   // Common actions
   'action.add': { en: 'Add' },
@@ -1107,10 +1107,10 @@ const STRING_DEFS = {
   'settings.appInstalled': { en: 'App is installed', beanie: 'App is planted!' },
 
   // Family To-Do
-  'todo.title': { en: 'Family To-Do', beanie: 'Family To-Do' },
+  'todo.title': { en: 'To-Do List', beanie: 'Our To-do List' },
   'todo.subtitle': {
     en: 'Keep track of tasks for the whole family',
-    beanie: 'Keep your beans busy!',
+    beanie: 'What are your beanies busy with today?',
   },
   'todo.newTask': { en: 'New Task', beanie: 'New Task' },
   'todo.quickAddPlaceholder': { en: 'What needs to be done?', beanie: 'What needs doing, bean?' },
@@ -1153,6 +1153,32 @@ const STRING_DEFS = {
   'todo.status.completed': { en: 'Completed' },
   'todo.noDueDate': { en: 'No due date' },
   'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'Remove Task' },
+
+  // Celebrations
+  'celebration.setupComplete': {
+    en: 'Setup complete — ready to start counting!',
+    beanie: 'Setup complete — ready to start counting your beanies!',
+  },
+  'celebration.firstAccount': {
+    en: 'Your first account is set up!',
+    beanie: 'Your first bean is planted!',
+  },
+  'celebration.firstTransaction': {
+    en: 'Every transaction counts!',
+    beanie: 'Every beanie counts!',
+  },
+  'celebration.goalReached': {
+    en: 'Goal complete! Well done!',
+    beanie: 'Goal complete! The beanies are proud!',
+  },
+  'celebration.firstSave': {
+    en: 'Your data is safe and encrypted!',
+    beanie: 'Your beanies are safe and encrypted!',
+  },
+  'celebration.debtFree': {
+    en: 'Debt-free! Time to celebrate!',
+    beanie: 'Debt-free! The beanies are celebrating!',
+  },
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'Nook' },
