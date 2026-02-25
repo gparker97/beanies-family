@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
@@ -18,6 +19,7 @@ import MemberFilterChips from '@/components/todo/MemberFilterChips.vue';
 import type { TodoFilter, TodoSort } from '@/components/todo/FilterBar.vue';
 import type { TodoItem } from '@/types/models';
 
+const route = useRoute();
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const todoStore = useTodoStore();
@@ -145,6 +147,19 @@ const viewCreatedBy = computed(() => {
   return familyStore.members.find((m) => m.id === viewingTodo.value!.createdBy);
 });
 
+const viewIsOverdue = computed(() => {
+  if (!viewingTodo.value || viewingTodo.value.completed || !viewingTodo.value.dueDate) return false;
+  const now = new Date();
+  const dueDate = new Date(viewingTodo.value.dueDate);
+  if (viewingTodo.value.dueTime) {
+    const parts = viewingTodo.value.dueTime.split(':').map(Number);
+    dueDate.setHours(parts[0] ?? 23, parts[1] ?? 59, 0, 0);
+  } else {
+    dueDate.setHours(23, 59, 59, 999);
+  }
+  return now > dueDate;
+});
+
 const viewFormattedDate = computed(() => {
   if (!viewingTodo.value?.dueDate) return null;
   const date = new Date(viewingTodo.value.dueDate);
@@ -155,6 +170,15 @@ function openViewModal(todo: TodoItem) {
   viewingTodo.value = todo;
   showViewModal.value = true;
 }
+
+// Open view modal from query param (e.g. navigated from Family Nook)
+onMounted(() => {
+  const viewId = route.query.view as string | undefined;
+  if (viewId) {
+    const todo = todoStore.todos.find((t) => t.id === viewId);
+    if (todo) openViewModal(todo);
+  }
+});
 
 function closeViewModal() {
   showViewModal.value = false;
@@ -319,7 +343,7 @@ async function handleDelete(id: string) {
     </template>
 
     <!-- View Modal -->
-    <BaseModal :open="showViewModal" :title="t('todo.viewTask')" @close="closeViewModal">
+    <BaseModal :open="showViewModal" :title="t('todo.viewTask')" size="2xl" @close="closeViewModal">
       <div v-if="viewingTodo" class="space-y-5">
         <!-- Title -->
         <h3
@@ -338,7 +362,7 @@ async function handleDelete(id: string) {
           </p>
           <p
             v-if="viewingTodo.description"
-            class="text-sm leading-relaxed text-[var(--color-text)]"
+            class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)]"
           >
             {{ viewingTodo.description }}
           </p>
@@ -401,7 +425,17 @@ async function handleDelete(id: string) {
               {{ t('todo.dueDate') }}
             </p>
             <span
-              v-if="viewFormattedDate"
+              v-if="viewFormattedDate && viewIsOverdue"
+              class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-1 text-sm font-semibold text-white"
+            >
+              ⏰ {{ viewFormattedDate }}
+              <template v-if="viewingTodo.dueTime"> &middot; {{ viewingTodo.dueTime }}</template>
+              <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.6rem] font-bold uppercase">
+                {{ t('todo.overdue') }}
+              </span>
+            </span>
+            <span
+              v-else-if="viewFormattedDate"
               class="text-sm font-semibold"
               style="color: var(--color-primary)"
             >
@@ -449,7 +483,7 @@ async function handleDelete(id: string) {
     </BaseModal>
 
     <!-- Edit Modal -->
-    <BaseModal :open="showEditModal" :title="t('todo.editTask')" @close="closeEditModal">
+    <BaseModal :open="showEditModal" :title="t('todo.editTask')" size="2xl" @close="closeEditModal">
       <form class="space-y-4" @submit.prevent="saveEdit">
         <BaseInput v-model="editForm.title" :label="t('todo.taskTitle')" required />
 
@@ -457,7 +491,7 @@ async function handleDelete(id: string) {
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('todo.description') }}
           </label>
-          <textarea v-model="editForm.description" rows="2" class="beanies-input w-full" />
+          <textarea v-model="editForm.description" rows="5" class="beanies-input w-full" />
         </div>
 
         <BaseSelect
