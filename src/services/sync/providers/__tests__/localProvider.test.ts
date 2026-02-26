@@ -60,8 +60,8 @@ describe('LocalStorageProvider', () => {
       await provider.write('{"test":"data"}');
 
       expect(mockHandle.createWritable).toHaveBeenCalledWith({ keepExistingData: false });
-      const writable = await (mockHandle.createWritable as ReturnType<typeof vi.fn>).mock.results[0]
-        .value;
+      const writable = await (mockHandle.createWritable as ReturnType<typeof vi.fn>).mock
+        .results[0]!.value;
       expect(writable.write).toHaveBeenCalledTimes(2); // seek + write
       expect(writable.truncate).toHaveBeenCalled();
       expect(writable.close).toHaveBeenCalled();
