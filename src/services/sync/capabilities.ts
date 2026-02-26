@@ -11,6 +11,8 @@ export interface SyncCapabilities {
   showOpenFilePicker: boolean;
   /** Supports Web Crypto API for encryption */
   webCrypto: boolean;
+  /** Google Drive integration is configured (client ID present) */
+  googleDrive: boolean;
   /** Manual export/import always available */
   manualSync: boolean;
 }
@@ -40,6 +42,13 @@ export function supportsWebCrypto(): boolean {
 /**
  * Get all sync capabilities for the current browser
  */
+/**
+ * Check if Google Drive integration is configured
+ */
+export function supportsGoogleDrive(): boolean {
+  return !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+}
+
 export function getSyncCapabilities(): SyncCapabilities {
   const hasFileSystemAccess = supportsFileSystemAccess();
 
@@ -48,6 +57,7 @@ export function getSyncCapabilities(): SyncCapabilities {
     showSaveFilePicker: hasFileSystemAccess,
     showOpenFilePicker: hasFileSystemAccess,
     webCrypto: supportsWebCrypto(),
+    googleDrive: supportsGoogleDrive(),
     manualSync: true, // Always available via Blob download/upload
   };
 }
