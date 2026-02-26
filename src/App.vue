@@ -77,14 +77,25 @@ async function handleEnablePasskey() {
   passkeyPromptDismissed.value = true;
 
   const password = syncStore.currentSessionPassword;
-  if (!password) return;
+  if (!password) {
+    console.warn('[passkey] No session password available for passkey registration');
+    return;
+  }
 
-  // Get the encrypted file blob for the registration
-  // We need the raw encrypted data to extract the PBKDF2 salt
-  const encryptedBlob = await getEncryptedFileBlob();
-  if (!encryptedBlob) return;
+  try {
+    const encryptedBlob = await getEncryptedFileBlob();
+    if (!encryptedBlob) {
+      console.warn('[passkey] Could not read encrypted file blob for passkey registration');
+      return;
+    }
 
-  await authStore.registerPasskeyForCurrentUser(password, encryptedBlob);
+    const result = await authStore.registerPasskeyForCurrentUser(password, encryptedBlob);
+    if (!result.success) {
+      console.warn('[passkey] Registration failed:', result.error);
+    }
+  } catch (e) {
+    console.warn('[passkey] Unexpected error during passkey registration:', e);
+  }
 }
 
 function handleDeclinePasskey() {
@@ -94,14 +105,15 @@ function handleDeclinePasskey() {
 
 /**
  * Read the current encrypted file to get the raw blob for passkey registration.
+ * Works with any storage provider (local file or Google Drive).
  */
 async function getEncryptedFileBlob(): Promise<string | null> {
   try {
-    const { getSessionFileHandle } = await import('@/services/sync/syncService');
-    const handle = getSessionFileHandle();
-    if (!handle) return null;
-    const file = await handle.getFile();
-    const text = await file.text();
+    const { getProvider } = await import('@/services/sync/syncService');
+    const provider = getProvider();
+    if (!provider) return null;
+    const text = await provider.read();
+    if (!text) return null;
     const parsed = JSON.parse(text);
     if (parsed.encrypted && typeof parsed.data === 'string') {
       return parsed.data;
