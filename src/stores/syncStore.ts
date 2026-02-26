@@ -134,6 +134,8 @@ export const useSyncStore = defineStore('sync', () => {
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: toISODateString(new Date()),
       });
+      // Arm auto-sync so future changes are saved to the file
+      setupAutoSync();
       // Fire-and-forget: register family in cloud registry
       const ctx = useFamilyContextStore();
       if (ctx.activeFamilyId) {
@@ -261,6 +263,9 @@ export const useSyncStore = defineStore('sync', () => {
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: lastSync.value,
       });
+
+      // Arm auto-sync so future changes are saved to the file
+      setupAutoSync();
     }
     return { success: result.success };
   }
@@ -291,6 +296,8 @@ export const useSyncStore = defineStore('sync', () => {
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: lastSync.value,
       });
+      // Arm auto-sync so future changes are saved to the file
+      setupAutoSync();
     }
     return { success: result.success };
   }
@@ -551,15 +558,22 @@ export const useSyncStore = defineStore('sync', () => {
     ]);
   }
 
+  // Track the stop handle so we never register duplicate watchers
+  let autoSyncStopHandle: ReturnType<typeof watch> | null = null;
+
   /**
    * Setup auto-sync watchers for all data stores.
    * Auto-sync is always on when file is configured + has permission.
+   * Safe to call multiple times — duplicate watchers are prevented.
    */
   function setupAutoSync(): void {
     if (!supportsAutoSync.value) return;
 
+    // Guard: don't register a second watcher if one is already active
+    if (autoSyncStopHandle) return;
+
     // Watch for changes in all data stores
-    watch(
+    autoSyncStopHandle = watch(
       () => [
         useFamilyStore().members,
         useAccountsStore().accounts,
@@ -584,6 +598,11 @@ export const useSyncStore = defineStore('sync', () => {
    * Reset all sync state (used on sign-out)
    */
   function resetState() {
+    // Tear down auto-sync watcher so it can be re-armed for the next session/family
+    if (autoSyncStopHandle) {
+      autoSyncStopHandle();
+      autoSyncStopHandle = null;
+    }
     syncService.reset();
     isInitialized.value = false;
     isConfigured.value = false;
