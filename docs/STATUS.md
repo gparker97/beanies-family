@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-25
-> **Updated by:** Claude (Family Nook complete — #97 done, deployed to prod)
+> **Last updated:** 2026-02-26
+> **Updated by:** Claude (Cross-device sync #103 closed, cloud relay #104 planned)
 
 ## Current Phase
 
@@ -431,6 +431,35 @@
 - **authStore.ts** — Fixed `signInWithPasskey()` using stale `familyContextStore.activeFamilyId` instead of the authoritative `familyId` parameter during family switching
 - **passwordCache.test.ts** — Added missing `setSessionDEK` and `flushPendingSave` to syncService mock (pre-existing CI failure)
 
+### Cross-Device Sync (Issue #103) — Closed
+
+- **`syncStore.ts` — `reloadIfFileChanged()`**: Lightweight `getFileTimestamp()` check, full reload only when file is newer. Handles encrypted files via session password → session DEK → cached password fallback chain
+- **`syncStore.ts` — `startFilePolling()` / `stopFilePolling()`**: 10-second interval polling for external file changes, auto-started by `setupAutoSync()`, stopped on sign-out/disconnect
+- **`App.vue` — visibility change handling**: `reloadIfFileChanged()` on tab/app resume; `syncStore.syncNow(true)` force save on `hidden` to prevent data loss on quick reload
+- **Data loss fix**: `flushPendingSave()` + `syncNow(true)` on `visibilityState: hidden` ensures debounced saves are flushed before page reload
+- Cloud relay for near-instant sync planned as follow-up (#104, `docs/plans/2026-02-26-cloud-relay-sync.md`)
+
+### Family Nook Landing Page Fix
+
+- All 5 login components (PickBeanView, BiometricLoginView, JoinPodView, CreatePodView, LoadPodView) now redirect to `/nook` instead of `/dashboard` after sign-in
+- NotFoundPage "Go Home" button navigates to `/nook`
+- E2E tests updated to expect `/nook` after authentication
+
+### Biometric Login Fallback Fix (LoadPodView)
+
+- Fixed bug where "use password instead" after biometric prompt showed old family members instead of decrypt modal
+- Root cause: `autoLoadFile()` called `syncStore.loadFromFile()` reading from old configured file handle instead of pending encrypted file
+- Fix: check `syncStore.hasPendingEncryptedFile` before re-reading
+
+### Deploy Workflow CI Gating
+
+- Updated `.github/workflows/deploy.yml` to poll for CI/security check completion (15s interval, 10min timeout) instead of failing immediately
+- Fails immediately if no CI run exists for the latest commit (prevents bypassing CI)
+
+### NookGreeting UI Cleanup
+
+- Removed duplicate notification bell and privacy mask icons from `NookGreeting.vue` (already present in header)
+
 ### Recent Fixes
 
 - **Multi-family isolation hardening** — Fixed cross-family data leakage when authenticated user's familyId could not be resolved:
@@ -603,6 +632,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 - [ ] Budget page with category budgets and spending vs planned (#68)
 - [ ] Data import/export (CSV, etc.)
 - [x] PWA offline support / install prompt / SW update prompt (#6) ✓
+- [ ] Cloud relay for near-instant cross-device sync (#104)
 - [ ] Google Drive sync (OAuth integration)
 - [ ] Skip/modify individual recurring occurrences
 - [ ] Landing/marketing page (#72)
@@ -669,3 +699,5 @@ _(None currently tracked)_
 | 2026-02-24 | Mobile privacy toggle in header                            | Show/hide figures icon always visible on mobile/tablet (not buried in hamburger menu) for better UX                                                     |
 | 2026-02-24 | Issue #16 updated: unified passkey login + data unlock     | Single biometric gesture replaces both member password and encryption password; password fallback preserved                                             |
 | 2026-02-24 | Issue #16 implemented: passkey/biometric login             | PRF + cached password dual-path, BiometricLoginView, PasskeyPromptModal, PasskeySettings rewrite, registry DB v3 with passkeys store (ADR-015)          |
+| 2026-02-26 | Cross-device sync via file polling (#103)                  | 10s file polling + visibility-change reload + force save on hidden; near-instant relay planned as #104                                                  |
+| 2026-02-26 | Cloud relay plan created (#104)                            | AWS API Gateway WebSocket + Lambda + DynamoDB for near-instant cross-device notifications; plan at `docs/plans/2026-02-26-cloud-relay-sync.md`          |
