@@ -215,21 +215,19 @@ export async function authenticateWithPasskey(
     return { success: false, error: 'No passkeys registered for this family' };
   }
 
-  // Build allowCredentials from registrations
-  const allowCredentials: PublicKeyCredentialDescriptor[] = registrations.map((reg) => ({
-    type: 'public-key' as const,
-    id: base64urlToBuffer(reg.credentialId),
-    transports: (reg.transports ?? []) as AuthenticatorTransport[],
-  }));
-
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const rpId = window.location.hostname;
   const prfExtension = buildPRFExtension();
 
+  // Discoverable credential mode: omit allowCredentials entirely.
+  // All passkeys are registered with residentKey: 'required', so the browser
+  // discovers them by rpId alone — searching Windows Hello, Chrome passkey
+  // manager, iCloud Keychain, etc. This avoids Chrome 130+ falling back to
+  // the QR-code cross-device flow when credential IDs don't match the
+  // current credential resolver.
   const publicKeyOptions: PublicKeyCredentialRequestOptions = {
     challenge,
     rpId,
-    allowCredentials,
     userVerification: 'required',
     timeout: 60000,
     extensions: prfExtension as AuthenticationExtensionsClientInputs,
@@ -254,11 +252,27 @@ export async function authenticateWithPasskey(
     return { success: false, error: 'No assertion returned' };
   }
 
-  // Match credential to registration
+  // Match credential to registration using multiple signals
   const credentialId = bufferToBase64url(assertion.rawId);
   const registration = registrations.find((r) => r.credentialId === credentialId);
+
   if (!registration) {
-    return { success: false, error: 'Credential not recognized' };
+    // Credential ID not found locally — check userHandle for diagnostics.
+    // During registration, user.id = TextEncoder.encode(memberId), so the
+    // assertion's userHandle tells us which member the passkey belongs to.
+    const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
+    const userHandle = assertionResponse.userHandle;
+    if (userHandle && userHandle.byteLength > 0) {
+      const memberIdFromHandle = new TextDecoder().decode(userHandle);
+      const memberMatch = registrations.find((r) => r.memberId === memberIdFromHandle);
+      if (memberMatch) {
+        // The user's member is known but this credential was registered on
+        // another device — we don't have the local decryption materials.
+        return { success: false, error: 'CROSS_DEVICE_CREDENTIAL' };
+      }
+    }
+    // Neither credential ID nor userHandle matches this family's registrations
+    return { success: false, error: 'WRONG_FAMILY_CREDENTIAL' };
   }
 
   // Update last used timestamp
@@ -379,7 +393,7 @@ function guessOS(ua: string): string {
   return '';
 }
 
-function guessAuthenticatorLabel(): string {
+export function guessAuthenticatorLabel(): string {
   const ua = navigator.userAgent;
   let base: string;
   if (/iPhone|iPad|iPod/.test(ua)) base = 'Face ID';
@@ -394,7 +408,7 @@ function guessAuthenticatorLabel(): string {
   return `${base} · ${context}`;
 }
 
-function bufferToBase64(buffer: ArrayBuffer): string {
+export function bufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -403,7 +417,7 @@ function bufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-function base64ToBuffer(base64: string): ArrayBuffer {
+export function base64ToBuffer(base64: string): ArrayBuffer {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -412,11 +426,11 @@ function base64ToBuffer(base64: string): ArrayBuffer {
   return bytes.buffer as ArrayBuffer;
 }
 
-function bufferToBase64url(buffer: ArrayBuffer): string {
+export function bufferToBase64url(buffer: ArrayBuffer): string {
   return bufferToBase64(buffer).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function base64urlToBuffer(base64url: string): ArrayBuffer {
+export function base64urlToBuffer(base64url: string): ArrayBuffer {
   const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   return base64ToBuffer(padded);

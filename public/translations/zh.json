@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-02-25",
-    "translationCount": 724
+    "lastUpdated": "2026-02-26",
+    "translationCount": 773
   },
   "translations": {
     "app.name": {
@@ -112,9 +112,9 @@
       "lastUpdated": "2026-02-10"
     },
     "nav.dashboard": {
-      "translation": "仪表板",
-      "hash": "ft8p6c",
-      "lastUpdated": "2026-02-10"
+      "translation": "财务登记簿",
+      "hash": "iple2l",
+      "lastUpdated": "2026-02-26"
     },
     "nav.accounts": {
       "translation": "账户",
@@ -1527,9 +1527,9 @@
       "lastUpdated": "2026-02-24"
     },
     "forecast.comingSoonDescription": {
-      "translation": "我们正在种植一些特别的东西。财务预测将帮助您了解您的豆子走向何方。",
-      "hash": "v2l67z",
-      "lastUpdated": "2026-02-24"
+      "translation": "我们正在种植一些特别的东西。财务预测将帮助您了解您的Beanies的发展方向。",
+      "hash": "4z6nff",
+      "lastUpdated": "2026-02-26"
     },
     "forecast.feature.projections": {
       "translation": "经常性交易预测",
@@ -1612,9 +1612,9 @@
       "lastUpdated": "2026-02-24"
     },
     "notFound.description": {
-      "translation": "您要查找的页面已失效。让我们带你回到你的豆子。",
-      "hash": "wpdaea",
-      "lastUpdated": "2026-02-24"
+      "translation": "您要查找的页面已失效。让我们带你回到你的帽子上。",
+      "hash": "xk3gcm",
+      "lastUpdated": "2026-02-26"
     },
     "notFound.goHome": {
       "translation": "返回到仪表盘",
@@ -1832,14 +1832,14 @@
       "lastUpdated": "2026-02-24"
     },
     "header.financialFiguresVisible": {
-      "translation": "财务数据可见",
-      "hash": "k8ztxy",
-      "lastUpdated": "2026-02-24"
+      "translation": "财务可见",
+      "hash": "5gxxo5",
+      "lastUpdated": "2026-02-26"
     },
     "header.financialFiguresHidden": {
-      "translation": "财务数据已隐藏",
-      "hash": "e5vm32",
-      "lastUpdated": "2026-02-24"
+      "translation": "财务隐藏",
+      "hash": "w0m5an",
+      "lastUpdated": "2026-02-26"
     },
     "header.notifications": {
       "translation": "消息推送",
@@ -2542,9 +2542,9 @@
       "lastUpdated": "2026-02-24"
     },
     "trust.hint": {
-      "translation": "您可以在“设置”中更改此设置。使用“注销并清除数据”删除缓存数据。",
-      "hash": "ioyc3v",
-      "lastUpdated": "2026-02-24"
+      "translation": "您可以在“设置”中更改此设置。使用“注销/清除数据”删除缓存数据。",
+      "hash": "k1nybi",
+      "lastUpdated": "2026-02-26"
     },
     "trust.settingsLabel": {
       "translation": "受信任的设备",
@@ -2558,8 +2558,8 @@
     },
     "auth.signOutClearData": {
       "translation": "注销并清除数据",
-      "hash": "xq3sk",
-      "lastUpdated": "2026-02-24"
+      "hash": "i2sq7g",
+      "lastUpdated": "2026-02-26"
     },
     "auth.selectMember": {
       "translation": "选择你的资料",
@@ -2802,9 +2802,9 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.unlockButton": {
-      "translation": "解锁Pod",
-      "hash": "iq8xux",
-      "lastUpdated": "2026-02-24"
+      "translation": "解锁您的Pod",
+      "hash": "5raq5o",
+      "lastUpdated": "2026-02-26"
     },
     "loginV6.unlockFooter": {
       "translation": "此密码可解密您的本地数据。我们不会存储或恢复它。",
@@ -2827,14 +2827,14 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.parentBean": {
-      "translation": "Parent Bean",
-      "hash": "rn7fru",
-      "lastUpdated": "2026-02-24"
+      "translation": "家长/成人",
+      "hash": "ebu2vn",
+      "lastUpdated": "2026-02-26"
     },
     "loginV6.littleBean": {
-      "translation": "Little Bean",
-      "hash": "ourpt2",
-      "lastUpdated": "2026-02-24"
+      "translation": "子",
+      "hash": "12quws",
+      "lastUpdated": "2026-02-26"
     },
     "loginV6.setupNeeded": {
       "translation": "成立",
@@ -3252,9 +3252,9 @@
       "lastUpdated": "2026-02-24"
     },
     "mobile.pod": {
-      "translation": "吊舱",
-      "hash": "1q1x",
-      "lastUpdated": "2026-02-24"
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-02-26"
     },
     "mobile.menu": {
       "translation": "菜单",
@@ -3292,9 +3292,9 @@
       "lastUpdated": "2026-02-25"
     },
     "nav.nook": {
-      "translation": "Family Nook",
-      "hash": "a3an4p",
-      "lastUpdated": "2026-02-25"
+      "translation": "家庭控制面板",
+      "hash": "7brcuw",
+      "lastUpdated": "2026-02-26"
     },
     "nav.planner": {
       "translation": "家庭计划员",
@@ -3317,9 +3317,9 @@
       "lastUpdated": "2026-02-25"
     },
     "nav.comingSoon": {
-      "translation": "很快",
-      "hash": "1jcyj",
-      "lastUpdated": "2026-02-25"
+      "translation": "快啦！",
+      "hash": "1bo5ra",
+      "lastUpdated": "2026-02-26"
     },
     "action.tryAgain": {
       "translation": "再试一次",
@@ -3327,9 +3327,9 @@
       "lastUpdated": "2026-02-25"
     },
     "passkey.signInButton": {
-      "translation": "使用生物识别登录",
-      "hash": "wglnbe",
-      "lastUpdated": "2026-02-25"
+      "translation": "生物识别登录",
+      "hash": "j8ri8w",
+      "lastUpdated": "2026-02-26"
     },
     "passkey.usePassword": {
       "translation": "请改用密码",
@@ -3477,9 +3477,9 @@
       "lastUpdated": "2026-02-25"
     },
     "todo.title": {
-      "translation": "家庭待办事项",
-      "hash": "ssz2wx",
-      "lastUpdated": "2026-02-25"
+      "translation": "待办事项列表",
+      "hash": "zabt3z",
+      "lastUpdated": "2026-02-26"
     },
     "todo.subtitle": {
       "translation": "跟踪全家人的任务",
@@ -3625,6 +3625,251 @@
       "translation": "删除任务",
       "hash": "81w15m",
       "lastUpdated": "2026-02-25"
+    },
+    "passkey.crossDeviceError": {
+      "translation": "此生物识别已在其他设备上注册。使用您的密码登录，并在“设置”中在此设备上注册生物识别。",
+      "hash": "qkn3am",
+      "lastUpdated": "2026-02-26"
+    },
+    "passkey.wrongFamilyError": {
+      "translation": "此生物识别不属于当前家庭。请重试。",
+      "hash": "4tynm9",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.viewTask": {
+      "translation": "任务详细信息",
+      "hash": "reft0n",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.noDescription": {
+      "translation": "无说明",
+      "hash": "ehdwoz",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.createdBy": {
+      "translation": "创建者：",
+      "hash": "fethe9",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.status": {
+      "translation": "状态",
+      "hash": "twsvse",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.status.open": {
+      "translation": "开设",
+      "hash": "1gtii",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.status.completed": {
+      "translation": "已完成",
+      "hash": "9xualn",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.noDueDate": {
+      "translation": "无到期日期",
+      "hash": "i6tjg9",
+      "lastUpdated": "2026-02-26"
+    },
+    "todo.overdue": {
+      "translation": "超期",
+      "hash": "9hd20w",
+      "lastUpdated": "2026-02-26"
+    },
+    "celebration.setupComplete": {
+      "translation": "设置完成—准备开始计数！",
+      "hash": "vm5294",
+      "lastUpdated": "2026-02-26"
+    },
+    "celebration.firstAccount": {
+      "translation": "您的第一个帐户已设置完毕！",
+      "hash": "mnbv6q",
+      "lastUpdated": "2026-02-26"
+    },
+    "celebration.firstTransaction": {
+      "translation": "每笔交易都很重要！",
+      "hash": "nojudm",
+      "lastUpdated": "2026-02-26"
+    },
+    "celebration.goalReached": {
+      "translation": "任务完成！做得好！",
+      "hash": "k78iqo",
+      "lastUpdated": "2026-02-26"
+    },
+    "celebration.firstSave": {
+      "translation": "您的数据是安全且加密的",
+      "hash": "8f2cbv",
+      "lastUpdated": "2026-02-26"
+    },
+    "celebration.debtFree": {
+      "translation": "无债！是时候庆祝了！",
+      "hash": "j08ocv",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.welcomeHome": {
+      "translation": "欢迎回家， {name}",
+      "hash": "yejkc8",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.familyAtAGlance": {
+      "translation": "您的家人一览",
+      "hash": "c4u9m7",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.statusGreatWeek": {
+      "translation": "每个人都有一个美好的一周！",
+      "hash": "28huqx",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.statusSummary": {
+      "translation": "{tasks}已完成\\ u00B7 {milestones}接近",
+      "hash": "6dsjq8",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.yourBeans": {
+      "translation": "你的豆子",
+      "hash": "xva652",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.addBean": {
+      "translation": "添加Bean",
+      "hash": "kctipd",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.todaySchedule": {
+      "translation": "今天的日程安排",
+      "hash": "1mt17u",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.thisWeek": {
+      "translation": "本周",
+      "hash": "mwbbqu",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.fullCalendar": {
+      "translation": "完整行事曆",
+      "hash": "849z1r",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.familyTodo": {
+      "translation": "家庭待办事项",
+      "hash": "ssz2wx",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.openCount": {
+      "translation": "{count}个打开",
+      "hash": "sxgdq9",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.viewAll": {
+      "translation": "檢視全部",
+      "hash": "ktimxy",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.moretasks": {
+      "translation": "更多任务",
+      "hash": "niuiv1",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.addTaskPlaceholder": {
+      "translation": "为家庭添加任务...",
+      "hash": "f3mrk7",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.milestones": {
+      "translation": "家庭里程碑",
+      "hash": "57bnlr",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.upcoming": {
+      "translation": "近期賽事",
+      "hash": "moghmk",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.daysAway": {
+      "translation": "还有{days}天",
+      "hash": "wc1mqm",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.completedRecently": {
+      "translation": "最近完成！",
+      "hash": "5tpp38",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.piggyBank": {
+      "translation": "小猪存钱罐",
+      "hash": "la8u9h",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.familyNetWorth": {
+      "translation": "家庭净值",
+      "hash": "h7lb3j",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.thisMonth": {
+      "translation": "本月",
+      "hash": "x3y936",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.monthlyBudget": {
+      "translation": "月度预算",
+      "hash": "6u6rjs",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.openPiggyBank": {
+      "translation": "打开小猪库",
+      "hash": "ahpikh",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.recentActivity": {
+      "translation": "最近的家庭活动",
+      "hash": "knrc12",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.seeAll": {
+      "translation": "查看全部",
+      "hash": "axeiuk",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.noEvents": {
+      "translation": "沒有安排的活動。",
+      "hash": "a2dqgr",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.comingSoon": {
+      "translation": "即将推出",
+      "hash": "3kerkq",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.noMilestones": {
+      "translation": "尚无里程碑",
+      "hash": "j56za",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.noActivity": {
+      "translation": "最近没有活动",
+      "hash": "jw765x",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.birthday": {
+      "translation": "{name}的生日",
+      "hash": "1v598m",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.taskCompleted": {
+      "translation": "已完成一项任务",
+      "hash": "ivciav",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.spent": {
+      "translation": "已花费",
+      "hash": "1bole6",
+      "lastUpdated": "2026-02-26"
+    },
+    "nook.received": {
+      "translation": "已接收",
+      "hash": "cb04jj",
+      "lastUpdated": "2026-02-26"
     }
   }
 }
