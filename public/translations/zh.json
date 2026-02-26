@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-02-26",
-    "translationCount": 773
+    "translationCount": 801
   },
   "translations": {
     "app.name": {
@@ -3869,6 +3869,146 @@
     "nook.received": {
       "translation": "已接收",
       "hash": "cb04jj",
+      "lastUpdated": "2026-02-26"
+    },
+    "loginV6.recommended": {
+      "translation": "建議使用",
+      "hash": "jo0amd",
+      "lastUpdated": "2026-02-26"
+    },
+    "loginV6.googleDriveCardDesc": {
+      "translation": "从云存储加载",
+      "hash": "cqtri9",
+      "lastUpdated": "2026-02-26"
+    },
+    "loginV6.dropboxCardDesc": {
+      "translation": "与Dropbox同步",
+      "hash": "4p93nd",
+      "lastUpdated": "2026-02-26"
+    },
+    "loginV6.iCloudCardDesc": {
+      "translation": "与iCloud同步",
+      "hash": "1ol6v3",
+      "lastUpdated": "2026-02-26"
+    },
+    "loginV6.localFileCardDesc": {
+      "translation": "从您的设备打开.beanpod",
+      "hash": "x0q1ht",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.connecting": {
+      "translation": "正在连接到 Google 云端硬盘...",
+      "hash": "tl246q",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.connected": {
+      "translation": "已连接到Google云端硬盘",
+      "hash": "eaquk1",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.disconnect": {
+      "translation": "断开与Google云端硬盘的连接",
+      "hash": "yl57i1",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.selectFile": {
+      "translation": "从 Google Drive 中选择",
+      "hash": "ooo8vv",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.noFilesFound": {
+      "translation": "在Google云端硬盘上找不到pod文件",
+      "hash": "wql84j",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.reconnect": {
+      "translation": "重新连接",
+      "hash": "lihjux",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.sessionExpired": {
+      "translation": "Google会话已过期。请重新连接以继续保存。",
+      "hash": "3sck0h",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.authFailed": {
+      "translation": "Google登录失败，请重试。",
+      "hash": "jlre08",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.notConfigured": {
+      "translation": "未配置Google云端硬盘。",
+      "hash": "25xnpm",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.offlineQueued": {
+      "translation": "离线。重新连接后，更改将保存。",
+      "hash": "qv84d3",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.loadError": {
+      "translation": "无法从Google云端硬盘加载",
+      "hash": "vqjg0v",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.filePickerTitle": {
+      "translation": "您在Google云端硬盘上的Pod",
+      "hash": "pt6w9r",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.lastModified": {
+      "translation": "上次修改",
+      "hash": "lw7kel",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.refresh": {
+      "translation": "重新整理",
+      "hash": "pjrwp1",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.storageLabel": {
+      "translation": "Google Drive",
+      "hash": "dnein7",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.fileCreated": {
+      "translation": "您的Pod已在Google云端硬盘上创建。",
+      "hash": "j9evrs",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.fileLocation": {
+      "translation": "位置： beanies.family文件夹",
+      "hash": "d8wzaw",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.shareHint": {
+      "translation": "要与家人共享，请在Google云端硬盘中打开此文件，并具有读写权限。",
+      "hash": "f5zpl",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.openInDrive": {
+      "translation": "在Google云端硬盘中打开",
+      "hash": "fi2bp4",
+      "lastUpdated": "2026-02-26"
+    },
+    "googleDrive.savedTo": {
+      "translation": "已保存到Google云端硬盘",
+      "hash": "uv7ccx",
+      "lastUpdated": "2026-02-26"
+    },
+    "storage.localFile": {
+      "translation": "本地文件",
+      "hash": "hhihm7",
+      "lastUpdated": "2026-02-26"
+    },
+    "storage.dropbox": {
+      "translation": "Dropbox",
+      "hash": "bnhtpg",
+      "lastUpdated": "2026-02-26"
+    },
+    "storage.iCloud": {
+      "translation": "iCloud",
+      "hash": "k8k71w",
       "lastUpdated": "2026-02-26"
     }
   }
