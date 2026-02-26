@@ -486,6 +486,8 @@ export const useSyncStore = defineStore('sync', () => {
    * Disconnect from sync file
    */
   async function disconnect(): Promise<void> {
+    stopFilePolling();
+
     // Fire-and-forget: remove family from cloud registry before clearing state
     const ctx = useFamilyContextStore();
     if (ctx.activeFamilyId) {
@@ -622,6 +624,88 @@ export const useSyncStore = defineStore('sync', () => {
   // Track the stop handle so we never register duplicate watchers
   let autoSyncStopHandle: ReturnType<typeof watch> | null = null;
 
+  // File polling for cross-device sync detection
+  const FILE_POLL_INTERVAL = 10_000; // 10 seconds
+  let filePollingTimer: ReturnType<typeof setInterval> | null = null;
+  let isCheckingFile = false;
+
+  /**
+   * Check if the sync file has been modified externally and reload if so.
+   * Used by both visibility-change detection and background polling.
+   * Returns true if data was reloaded.
+   */
+  async function reloadIfFileChanged(): Promise<boolean> {
+    // Guards: skip if not ready, already checking, or mid-reload
+    if (!isConfigured.value || needsPermission.value || isReloading || isCheckingFile) return false;
+
+    isCheckingFile = true;
+    try {
+      const { hasConflict } = await checkForConflicts();
+      if (!hasConflict) return false;
+
+      // File is newer — flush any pending local save first, then reload
+      await syncService.flushPendingSave();
+
+      const loadResult = await loadFromFile();
+      if (loadResult.success) return true;
+
+      // Handle encrypted file — try session password, cached password, or DEK
+      if (loadResult.needsPassword) {
+        // Try session password (set during initial sign-in)
+        if (sessionPassword.value) {
+          const result = await decryptPendingFile(sessionPassword.value);
+          return result.success;
+        }
+
+        // Try DEK from passkey authentication
+        if (sessionDEK.value) {
+          const result = await decryptPendingFileWithDEK(sessionDEK.value);
+          return result.success;
+        }
+
+        // Try cached password from trusted device
+        const settingsStore = useSettingsStore();
+        const cachedPw = settingsStore.getCachedEncryptionPassword();
+        if (cachedPw) {
+          const result = await decryptPendingFile(cachedPw);
+          return result.success;
+        }
+
+        // Can't auto-decrypt — clear the pending file to avoid stale state
+        pendingEncryptedFile.value = null;
+      }
+
+      return false;
+    } catch (e) {
+      console.warn('[syncStore] reloadIfFileChanged failed:', e);
+      return false;
+    } finally {
+      isCheckingFile = false;
+    }
+  }
+
+  /**
+   * Start polling the sync file for external changes (cross-device sync).
+   * Polls every 10 seconds using the lightweight getFileTimestamp() check.
+   * Safe to call multiple times — duplicate timers are prevented.
+   */
+  function startFilePolling(): void {
+    if (filePollingTimer) return;
+    filePollingTimer = setInterval(() => {
+      reloadIfFileChanged().catch(console.warn);
+    }, FILE_POLL_INTERVAL);
+  }
+
+  /**
+   * Stop file polling (called on sign-out / disconnect).
+   */
+  function stopFilePolling(): void {
+    if (filePollingTimer) {
+      clearInterval(filePollingTimer);
+      filePollingTimer = null;
+    }
+  }
+
   /**
    * Setup auto-sync watchers for all data stores.
    * Auto-sync is always on when file is configured + has permission.
@@ -656,6 +740,9 @@ export const useSyncStore = defineStore('sync', () => {
       },
       { deep: true }
     );
+
+    // Start polling for external file changes (cross-device sync)
+    startFilePolling();
   }
 
   /**
@@ -673,6 +760,7 @@ export const useSyncStore = defineStore('sync', () => {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
     }
+    stopFilePolling();
     syncService.reset();
     isInitialized.value = false;
     isConfigured.value = false;
@@ -734,6 +822,7 @@ export const useSyncStore = defineStore('sync', () => {
     manualImport,
     reloadAllStores,
     setupAutoSync,
+    reloadIfFileChanged,
     resetState,
     clearError,
   };
