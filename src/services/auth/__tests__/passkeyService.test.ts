@@ -189,8 +189,10 @@ describe('authenticateWithPasskey', () => {
     await authenticateWithPasskey({ familyId: 'family-1' });
 
     expect(getMock).toHaveBeenCalledTimes(1);
-    const opts = getMock.mock.calls[0]![0] as { publicKey: PublicKeyCredentialRequestOptions };
-    expect(opts.publicKey.allowCredentials).toBeUndefined();
+    const callArgs = getMock.mock.calls[0] as unknown as [
+      { publicKey: PublicKeyCredentialRequestOptions },
+    ];
+    expect(callArgs[0].publicKey.allowCredentials).toBeUndefined();
   });
 
   it('matches credential to correct registration by ID', async () => {
