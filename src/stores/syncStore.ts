@@ -54,6 +54,7 @@ export const useSyncStore = defineStore('sync', () => {
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
   const isGoogleDriveConnected = computed(() => storageProviderType.value === 'google_drive');
+  const driveFileId = computed(() => syncService.getProvider()?.getFileId() ?? null);
   const showGoogleReconnect = ref(false);
 
   // Capabilities
@@ -1030,6 +1031,7 @@ export const useSyncStore = defineStore('sync', () => {
     hasPendingEncryptedFile,
     storageProviderType,
     isGoogleDriveConnected,
+    driveFileId,
     isGoogleDriveAvailable,
     showGoogleReconnect,
     // Actions

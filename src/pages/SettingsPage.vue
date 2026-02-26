@@ -463,7 +463,11 @@ function formatLastSync(timestamp: string | null): string {
                   </p>
                 </div>
                 <a
-                  href="https://drive.google.com"
+                  :href="
+                    syncStore.driveFileId
+                      ? `https://drive.google.com/file/d/${syncStore.driveFileId}/view`
+                      : 'https://drive.google.com'
+                  "
                   target="_blank"
                   rel="noopener noreferrer"
                   class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
