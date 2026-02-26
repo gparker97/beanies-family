@@ -1117,15 +1117,15 @@ const STRING_DEFS = {
     en: 'A new version is available',
     beanie: 'A new version is available!',
   },
-  'pwa.updateButton': { en: 'Update now', beanie: 'get fresh beanies!' },
-  'pwa.updateDismiss': { en: 'Later' },
-  'settings.installApp': { en: 'Install App' },
+  'pwa.updateButton': { en: 'Update now', beanie: 'gimme fresh beans!' },
+  'pwa.updateDismiss': { en: 'Later', beanie: 'later' },
+  'settings.installApp': { en: 'Install App', beanie: 'install app' },
   'settings.installAppDesc': {
     en: 'Install beanies.family on this device for quick access',
-    beanie: 'Plant beanies.family on this device',
+    beanie: 'install beanies.family app!',
   },
   'settings.installAppButton': { en: 'Install beanies.family' },
-  'settings.appInstalled': { en: 'App is installed', beanie: 'Your beanie app is planted!' },
+  'settings.appInstalled': { en: 'App is installed', beanie: 'your beanies are installed!' },
 
   // Family To-Do
   'todo.title': { en: 'To-Do List', beanie: 'Our To-do List' },
@@ -1134,7 +1134,10 @@ const STRING_DEFS = {
     beanie: 'What are your beanies busy with today?',
   },
   'todo.newTask': { en: 'New Task', beanie: 'New Task' },
-  'todo.quickAddPlaceholder': { en: 'What needs to be done?', beanie: 'What needs doing, bean?' },
+  'todo.quickAddPlaceholder': {
+    en: 'What needs to be done?',
+    beanie: 'what needs doing, my bean?',
+  },
   'todo.editTask': { en: 'Edit Task' },
   'todo.deleteTask': { en: 'Delete Task' },
   'todo.deleteConfirm': {
