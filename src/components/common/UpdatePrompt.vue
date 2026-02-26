@@ -13,8 +13,14 @@ const { needRefresh, updateServiceWorker } = useRegisterSW({
   },
 });
 
-function handleUpdate() {
-  updateServiceWorker();
+async function handleUpdate() {
+  try {
+    await updateServiceWorker();
+  } catch {
+    // Fallback: hard reload if service worker update fails (e.g. desktop browser)
+  }
+  // If still on the page after a short delay, force a hard reload
+  setTimeout(() => window.location.reload(), 500);
 }
 
 function handleDismiss() {
@@ -25,15 +31,15 @@ function handleDismiss() {
 <template>
   <Transition
     enter-active-class="transition-all duration-300 ease-out"
-    enter-from-class="-translate-y-full opacity-0"
+    enter-from-class="translate-y-4 opacity-0"
     enter-to-class="translate-y-0 opacity-100"
     leave-active-class="transition-all duration-200 ease-in"
     leave-from-class="translate-y-0 opacity-100"
-    leave-to-class="-translate-y-full opacity-0"
+    leave-to-class="translate-y-4 opacity-0"
   >
     <div
       v-if="needRefresh"
-      class="fixed top-0 right-0 left-0 z-[200] flex items-center justify-center gap-3 bg-[#2C3E50] px-4 py-2.5 text-sm text-white shadow-md"
+      class="fixed right-4 bottom-4 z-[200] flex items-center gap-3 rounded-lg bg-[#2C3E50] px-4 py-3 text-sm text-white shadow-lg"
       role="alert"
     >
       <span>{{ t('pwa.updateAvailable') }}</span>
