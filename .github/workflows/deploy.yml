@@ -17,31 +17,95 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check Main Branch CI passed for HEAD
+      - name: Wait for Main Branch CI to pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHA=${{ github.sha }}
-          echo "Checking Main Branch CI for commit $SHA..."
-          result=$(gh run list --repo ${{ github.repository }} --workflow=main-ci.yml --branch=main --commit=$SHA --limit=1 --json conclusion -q '.[0].conclusion')
-          if [ "$result" != "success" ]; then
-            echo "::error::Main Branch CI has not passed for commit $SHA (status: ${result:-not found})"
-            exit 1
-          fi
-          echo "Main Branch CI: passed"
+          WORKFLOW="main-ci.yml"
+          TIMEOUT=600  # 10 minutes
+          INTERVAL=15
+          ELAPSED=0
 
-      - name: Check Security Scanning passed for HEAD
+          echo "Waiting for Main Branch CI to pass for commit $SHA..."
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            result=$(gh run list --repo ${{ github.repository }} --workflow=$WORKFLOW --branch=main --commit=$SHA --limit=1 --json conclusion,status -q '.[0]')
+
+            if [ -z "$result" ] || [ "$result" = "null" ]; then
+              echo "No run found yet, waiting ${INTERVAL}s... (${ELAPSED}s elapsed)"
+              sleep $INTERVAL
+              ELAPSED=$((ELAPSED + INTERVAL))
+              continue
+            fi
+
+            status=$(echo "$result" | jq -r '.status')
+            conclusion=$(echo "$result" | jq -r '.conclusion')
+
+            if [ "$status" = "completed" ]; then
+              if [ "$conclusion" = "success" ]; then
+                echo "Main Branch CI: passed"
+                break
+              else
+                echo "::error::Main Branch CI failed for commit $SHA (conclusion: $conclusion)"
+                exit 1
+              fi
+            fi
+
+            echo "Main Branch CI still running (status: $status), waiting ${INTERVAL}s... (${ELAPSED}s elapsed)"
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "::error::Timed out waiting for Main Branch CI after ${TIMEOUT}s"
+            exit 1
+          fi
+
+      - name: Wait for Security Scanning to pass
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           SHA=${{ github.sha }}
-          echo "Checking Security Scanning for commit $SHA..."
-          result=$(gh run list --repo ${{ github.repository }} --workflow=security.yml --branch=main --commit=$SHA --limit=1 --json conclusion -q '.[0].conclusion')
-          if [ "$result" != "success" ]; then
-            echo "::error::Security Scanning has not passed for commit $SHA (status: ${result:-not found})"
+          WORKFLOW="security.yml"
+          TIMEOUT=600  # 10 minutes
+          INTERVAL=15
+          ELAPSED=0
+
+          echo "Waiting for Security Scanning to pass for commit $SHA..."
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            result=$(gh run list --repo ${{ github.repository }} --workflow=$WORKFLOW --branch=main --commit=$SHA --limit=1 --json conclusion,status -q '.[0]')
+
+            if [ -z "$result" ] || [ "$result" = "null" ]; then
+              echo "No run found yet, waiting ${INTERVAL}s... (${ELAPSED}s elapsed)"
+              sleep $INTERVAL
+              ELAPSED=$((ELAPSED + INTERVAL))
+              continue
+            fi
+
+            status=$(echo "$result" | jq -r '.status')
+            conclusion=$(echo "$result" | jq -r '.conclusion')
+
+            if [ "$status" = "completed" ]; then
+              if [ "$conclusion" = "success" ]; then
+                echo "Security Scanning: passed"
+                break
+              else
+                echo "::error::Security Scanning failed for commit $SHA (conclusion: $conclusion)"
+                exit 1
+              fi
+            fi
+
+            echo "Security Scanning still running (status: $status), waiting ${INTERVAL}s... (${ELAPSED}s elapsed)"
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "::error::Timed out waiting for Security Scanning after ${TIMEOUT}s"
             exit 1
           fi
-          echo "Security Scanning: passed"
 
   build:
     name: Build for production
