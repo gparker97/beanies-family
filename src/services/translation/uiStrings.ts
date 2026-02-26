@@ -856,6 +856,12 @@ const STRING_DEFS = {
   'passkey.registerSuccess': { en: 'Biometric login enabled!' },
   'passkey.registerError': { en: 'Failed to register biometric. Please try again.' },
   'passkey.signInError': { en: 'Biometric sign-in failed. Please try with your password.' },
+  'passkey.crossDeviceError': {
+    en: 'This biometric was registered on another device. Sign in with your password and register biometric on this device in Settings.',
+  },
+  'passkey.wrongFamilyError': {
+    en: 'This biometric does not belong to the current family. Please try again.',
+  },
   'passkey.dekStale': {
     en: 'Your encryption key has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
   },
