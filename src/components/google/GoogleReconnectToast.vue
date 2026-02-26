@@ -29,7 +29,7 @@ async function handleReconnect() {
 <template>
   <div
     v-if="!dismissed"
-    class="fixed right-4 bottom-4 z-50 flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 shadow-lg ring-1 ring-amber-200 dark:bg-amber-900/80 dark:ring-amber-700"
+    class="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 shadow-lg ring-1 ring-amber-200 dark:bg-amber-900/80 dark:ring-amber-700"
   >
     <svg
       class="h-5 w-5 flex-shrink-0 text-amber-600 dark:text-amber-400"

@@ -39,7 +39,7 @@ function handleDismiss() {
   >
     <div
       v-if="needRefresh"
-      class="fixed right-4 bottom-4 z-[200] flex items-center gap-3 rounded-lg bg-[#2C3E50] px-4 py-3 text-sm text-white shadow-lg"
+      class="flex items-center gap-3 rounded-lg bg-[#2C3E50] px-4 py-3 text-sm text-white shadow-lg"
       role="alert"
     >
       <span>{{ t('pwa.updateAvailable') }}</span>

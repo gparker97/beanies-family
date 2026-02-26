@@ -426,12 +426,18 @@ watch(
 
     <!-- PWA banners -->
     <OfflineBanner />
-    <UpdatePrompt />
-    <InstallPrompt />
-    <GoogleReconnectToast
-      v-if="syncStore.showGoogleReconnect"
-      @reconnected="syncStore.showGoogleReconnect = false"
-    />
+
+    <!-- Bottom-right toast stack -->
+    <div
+      class="fixed right-4 bottom-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
+    >
+      <GoogleReconnectToast
+        v-if="syncStore.showGoogleReconnect"
+        @reconnected="syncStore.showGoogleReconnect = false"
+      />
+      <UpdatePrompt />
+      <InstallPrompt />
+    </div>
 
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />
