@@ -160,7 +160,7 @@ const STRING_DEFS = {
   'accounts.addAccount': { en: 'Add Account', beanie: 'Add an Account' },
   'accounts.editAccount': { en: 'Edit Account', beanie: 'Edit an Account' },
   'accounts.deleteAccount': { en: 'Delete Account', beanie: 'Remove Account' },
-  'accounts.noAccounts': { en: 'No accounts yet', beanie: 'No acocunts yet' },
+  'accounts.noAccounts': { en: 'No accounts yet', beanie: 'No accounts yet' },
   'accounts.getStarted': {
     en: 'Get started by adding your first account',
     beanie: 'Add your first bean jar to get growing!',
