@@ -495,7 +495,7 @@ function handleBack() {
               {{
                 isSavingStorage && storageType !== 'google_drive'
                   ? t('googleDrive.connecting')
-                  : 'Google Drive'
+                  : t('googleDrive.storageLabel')
               }}
             </span>
           </button>
@@ -515,7 +515,7 @@ function handleBack() {
             </svg>
             <span
               class="font-outfit text-center text-[0.68rem] font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
-              >Google Drive</span
+              >{{ t('googleDrive.storageLabel') }}</span
             >
             <span
               class="mt-1 rounded-full bg-[#F15D22]/10 px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap text-[#F15D22]"
@@ -539,7 +539,7 @@ function handleBack() {
             </svg>
             <span
               class="font-outfit text-center text-[0.68rem] font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
-              >Dropbox</span
+              >{{ t('storage.dropbox') }}</span
             >
             <span
               class="mt-1 rounded-full bg-[#F15D22]/10 px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap text-[#F15D22]"
@@ -563,7 +563,7 @@ function handleBack() {
             </svg>
             <span
               class="font-outfit text-center text-[0.68rem] font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
-              >iCloud</span
+              >{{ t('storage.iCloud') }}</span
             >
             <span
               class="mt-1 rounded-full bg-[#F15D22]/10 px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap text-[#F15D22]"
@@ -616,7 +616,7 @@ function handleBack() {
                   ? 'text-green-700 dark:text-green-400'
                   : 'text-gray-900 dark:text-gray-100'
               "
-              >Local File</span
+              >{{ t('storage.localFile') }}</span
             >
           </button>
         </div>

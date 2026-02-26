@@ -1284,6 +1284,9 @@ const STRING_DEFS = {
   },
   'googleDrive.openInDrive': { en: 'Open in Google Drive' },
   'googleDrive.savedTo': { en: 'Saved to Google Drive' },
+  'storage.localFile': { en: 'Local File' },
+  'storage.dropbox': { en: 'Dropbox' },
+  'storage.iCloud': { en: 'iCloud' },
 } satisfies Record<string, StringEntry>;
 
 /**
