@@ -64,7 +64,7 @@ describe('driveService', () => {
       expect(fetch).toHaveBeenCalledTimes(2);
 
       // Second call to create should be POST
-      const createCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+      const createCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[1]!;
       expect(createCall[1]?.method).toBe('POST');
     });
 
@@ -86,7 +86,7 @@ describe('driveService', () => {
       const result = await createFile(mockToken, 'folder-1', 'test.beanpod', '{"data":"test"}');
       expect(result).toEqual({ fileId: 'file-new', name: 'test.beanpod' });
 
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('uploadType=multipart');
       expect(call[1]?.method).toBe('POST');
       expect(call[1]?.body).toContain('test.beanpod');
@@ -100,7 +100,7 @@ describe('driveService', () => {
 
       await updateFile(mockToken, 'file-1', '{"updated":"data"}');
 
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('file-1');
       expect(call[0]).toContain('uploadType=media');
       expect(call[1]?.method).toBe('PATCH');
@@ -119,7 +119,7 @@ describe('driveService', () => {
       const content = await readFile(mockToken, 'file-1');
       expect(content).toBe('{"version":"2.0","data":{}}');
 
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('alt=media');
     });
 
@@ -142,7 +142,7 @@ describe('driveService', () => {
       const time = await getFileModifiedTime(mockToken, 'file-1');
       expect(time).toBe('2026-02-26T12:00:00Z');
 
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('fields=modifiedTime');
     });
 
@@ -185,7 +185,7 @@ describe('driveService', () => {
 
       await deleteFile(mockToken, 'file-to-delete');
 
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('file-to-delete');
       expect(call[1]?.method).toBe('DELETE');
     });
@@ -223,7 +223,7 @@ describe('driveService', () => {
 
       await listBeanpodFiles(mockToken, 'folder-1');
 
-      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[1]?.headers?.Authorization).toBe(`Bearer ${mockToken}`);
     });
   });
