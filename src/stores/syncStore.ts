@@ -835,15 +835,18 @@ export const useSyncStore = defineStore('sync', () => {
       // Save initial data
       await syncNow();
 
-      // Update settings
-      await saveSettings({
-        syncEnabled: true,
-        syncFilePath: provider.getDisplayName(),
-        lastSyncTimestamp: toISODateString(new Date()),
-      });
-
-      // Arm auto-sync
-      setupAutoSync();
+      // Update settings — suppress auto-sync watcher during setup to avoid
+      // redundant writes (auto-sync is armed later by the caller)
+      isReloading = true;
+      try {
+        await saveSettings({
+          syncEnabled: true,
+          syncFilePath: provider.getDisplayName(),
+          lastSyncTimestamp: toISODateString(new Date()),
+        });
+      } finally {
+        isReloading = false;
+      }
 
       // Register with cloud registry
       if (ctx.activeFamilyId) {

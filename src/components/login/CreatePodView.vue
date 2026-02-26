@@ -114,6 +114,7 @@ async function handleChooseLocalStorage() {
 
 async function handleChooseGoogleDriveStorage() {
   if (!syncStore.isGoogleDriveAvailable) return;
+  if (storageType.value === 'google_drive') return; // Already connected
 
   isSavingStorage.value = true;
   formError.value = null;
