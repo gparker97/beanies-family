@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed, ref, watch } from 'vue';
+import { onMounted, onUnmounted, computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppHeader from '@/components/common/AppHeader.vue';
 import AppSidebar from '@/components/common/AppSidebar.vue';
@@ -32,6 +32,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
+import { flushPendingSave } from '@/services/sync/syncService';
 
 const route = useRoute();
 const router = useRouter();
@@ -322,6 +323,25 @@ onMounted(async () => {
     // Always dismiss the loading overlay, even on early return or error
     isInitializing.value = false;
   }
+});
+
+// Flush pending debounced saves before the page unloads (prevents data loss on refresh)
+function handleVisibilityChange() {
+  if (document.visibilityState === 'hidden') {
+    flushPendingSave();
+  }
+}
+
+function handleBeforeUnload() {
+  flushPendingSave();
+}
+
+document.addEventListener('visibilitychange', handleVisibilityChange);
+window.addEventListener('beforeunload', handleBeforeUnload);
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  window.removeEventListener('beforeunload', handleBeforeUnload);
 });
 
 // Show passkey or trust device prompt after fresh sign-in.

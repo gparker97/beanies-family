@@ -584,6 +584,7 @@ export function triggerDebouncedSave(): void {
   }
 
   saveDebounceTimer = setTimeout(() => {
+    saveDebounceTimer = null;
     // Check encryption requirement via callback before saving
     if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword && !sessionDEK) {
       console.warn(
