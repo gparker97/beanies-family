@@ -130,6 +130,7 @@ jobs:
         env:
           VITE_REGISTRY_API_URL: ${{ secrets.REGISTRY_API_URL }}
           VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
