@@ -575,15 +575,15 @@ function handleBack() {
           <button
             class="flex flex-1 flex-col items-center rounded-[14px] border-2 px-2.5 py-3.5 transition-all"
             :class="
-              storageSaved
+              storageType === 'local'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
-                : 'border-[#F15D22] bg-[#F15D22]/[0.08] hover:bg-[#F15D22]/15 dark:bg-[#F15D22]/10'
+                : 'border-transparent bg-[#AED6F1]/15 hover:border-[#F15D22]/40 hover:bg-[#F15D22]/5 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
             "
             :disabled="isSavingStorage"
             @click="handleChooseLocalStorage"
           >
             <svg
-              v-if="storageSaved"
+              v-if="storageType === 'local'"
               class="mb-1.5 h-6 w-6 text-green-600 dark:text-green-400"
               fill="none"
               stroke="currentColor"
@@ -598,7 +598,7 @@ function handleBack() {
             </svg>
             <svg
               v-else
-              class="mb-1.5 h-6 w-6 opacity-40"
+              class="mb-1.5 h-6 w-6 text-[#F15D22]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -612,11 +612,11 @@ function handleBack() {
             <span
               class="font-outfit text-[0.68rem] font-semibold"
               :class="
-                storageSaved
+                storageType === 'local'
                   ? 'text-green-700 dark:text-green-400'
                   : 'text-gray-900 dark:text-gray-100'
               "
-              >Local</span
+              >Local File</span
             >
           </button>
         </div>
