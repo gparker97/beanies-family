@@ -1117,7 +1117,7 @@ const STRING_DEFS = {
     en: 'A new version is available',
     beanie: 'A new version is available!',
   },
-  'pwa.updateButton': { en: 'Update now', beanie: 'Get the freshest beans' },
+  'pwa.updateButton': { en: 'Update now', beanie: 'get fresh beanies!' },
   'pwa.updateDismiss': { en: 'Later' },
   'settings.installApp': { en: 'Install App' },
   'settings.installAppDesc': {
