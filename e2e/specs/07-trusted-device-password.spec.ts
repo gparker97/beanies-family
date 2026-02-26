@@ -98,8 +98,10 @@ test.describe('Trusted Device Password Cache', () => {
     const settings = await getGlobalSettings(page);
     // After fresh setup, global settings should exist (created by the app)
     expect(settings).not.toBeNull();
-    // No cached password by default
-    expect(settings!.cachedEncryptionPassword ?? null).toBeNull();
+    // No cached passwords by default
+    const passwords =
+      (settings!.cachedEncryptionPasswords as Record<string, string> | undefined) ?? {};
+    expect(Object.keys(passwords)).toHaveLength(0);
     // Not trusted by default (e2e_auto_auth suppresses the trust prompt)
     expect(settings!.isTrustedDevice).toBeFalsy();
   });
@@ -109,13 +111,14 @@ test.describe('Trusted Device Password Cache', () => {
     await updateGlobalSettings(page, {
       isTrustedDevice: true,
       trustedDevicePromptShown: true,
-      cachedEncryptionPassword: 'test-encryption-pw',
+      cachedEncryptionPasswords: { 'test-family': 'test-encryption-pw' },
     });
 
     // Verify it was written
     let settings = await getGlobalSettings(page);
     expect(settings!.isTrustedDevice).toBe(true);
-    expect(settings!.cachedEncryptionPassword).toBe('test-encryption-pw');
+    let cached = settings!.cachedEncryptionPasswords as Record<string, string>;
+    expect(cached['test-family']).toBe('test-encryption-pw');
 
     // Reload page — IndexedDB persists
     await page.reload();
@@ -123,7 +126,8 @@ test.describe('Trusted Device Password Cache', () => {
 
     // Verify password survived reload
     settings = await getGlobalSettings(page);
-    expect(settings!.cachedEncryptionPassword).toBe('test-encryption-pw');
+    cached = settings!.cachedEncryptionPasswords as Record<string, string>;
+    expect(cached['test-family']).toBe('test-encryption-pw');
   });
 
   test('clear all data removes cached password and trust flag', async ({ page }) => {
@@ -131,12 +135,13 @@ test.describe('Trusted Device Password Cache', () => {
     await updateGlobalSettings(page, {
       isTrustedDevice: true,
       trustedDevicePromptShown: true,
-      cachedEncryptionPassword: 'test-encryption-pw',
+      cachedEncryptionPasswords: { 'test-family': 'test-encryption-pw' },
     });
 
     // Verify it's there
     let settings = await getGlobalSettings(page);
-    expect(settings!.cachedEncryptionPassword).toBe('test-encryption-pw');
+    const cached = settings!.cachedEncryptionPasswords as Record<string, string>;
+    expect(cached['test-family']).toBe('test-encryption-pw');
 
     // Navigate to settings
     await page.goto('/settings');
@@ -158,8 +163,9 @@ test.describe('Trusted Device Password Cache', () => {
     // After clearing all data, the registry DB should be deleted
     settings = await getGlobalSettings(page);
     if (settings) {
-      // If settings still exist, password and trust should be cleared
-      expect(settings.cachedEncryptionPassword ?? null).toBeFalsy();
+      // If settings still exist, passwords should be cleared
+      const pw = (settings.cachedEncryptionPasswords as Record<string, string> | undefined) ?? {};
+      expect(Object.keys(pw)).toHaveLength(0);
     }
     // If settings is null (DB deleted entirely), that's also acceptable
   });

@@ -1,24 +1,13 @@
 /**
  * WebAuthn/Passkey service for biometric authentication and file decryption.
  *
- * Two paths:
- * 1. PRF path: WebAuthn PRF extension → HKDF → AES-KW wrap/unwrap DEK → decrypt file directly
- * 2. Non-PRF path: Passkey authenticates member, cached password used to decrypt file
+ * Flow: Passkey authenticates member → cached password used to decrypt file.
  *
  * Challenge generation is client-side via crypto.getRandomValues().
  * Acceptable for local-first — no network replay threat.
  */
 
-import {
-  isPRFSupported,
-  getPRFOutput,
-  generateHKDFSalt,
-  deriveWrappingKey,
-  wrapDEK,
-  unwrapDEK,
-  buildPRFExtension,
-} from './passkeyCrypto';
-import { deriveExtractableKey, extractSaltFromEncrypted } from '@/services/crypto/encryption';
+import { isPRFSupported, buildPRFExtension } from './passkeyCrypto';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 import type { PasskeyRegistration } from '@/types/models';
 import { toISODateString } from '@/utils/date';
@@ -52,7 +41,6 @@ export interface RegisterPasskeyParams {
   memberEmail: string;
   familyId: string;
   encryptionPassword: string;
-  encryptedFileBlob: string; // base64 encrypted data (to extract PBKDF2 salt)
   label?: string;
 }
 
@@ -60,10 +48,6 @@ export interface RegisterPasskeyResult {
   success: boolean;
   error?: string;
   prfSupported?: boolean;
-  /** If PRF succeeded, the extractable DEK for use as sessionDEK */
-  dek?: CryptoKey;
-  /** If PRF succeeded, the PBKDF2 salt used to derive the DEK */
-  dekSalt?: Uint8Array;
 }
 
 export async function registerPasskeyForMember(
@@ -73,8 +57,7 @@ export async function registerPasskeyForMember(
     return { success: false, error: 'WebAuthn is not supported in this browser' };
   }
 
-  const { memberId, memberName, memberEmail, familyId, encryptionPassword, encryptedFileBlob } =
-    params;
+  const { memberId, memberName, memberEmail, familyId, encryptionPassword } = params;
 
   // Generate client-side challenge
   const challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -137,54 +120,14 @@ export async function registerPasskeyForMember(
     createdAt: toISODateString(new Date()),
   };
 
-  // Always cache the password as fallback — even on PRF path.
-  // The PRF-wrapped DEK can become stale if the file is re-encrypted with
-  // a new PBKDF2 salt (e.g. by password-based auto-sync on another device).
-  // The cached password lets us recover gracefully.
+  // Cache the password for file decryption during biometric login
   registration.cachedPassword = encryptionPassword;
-
-  let registeredDEK: CryptoKey | undefined;
-  let registeredDEKSalt: Uint8Array | undefined;
-
-  if (prfAvailable) {
-    // PRF path: wrap the DEK (allows true passwordless decryption)
-    try {
-      const prfOutput = getPRFOutput(extensionResults);
-      if (!prfOutput) {
-        return { success: false, error: 'PRF output missing despite being supported' };
-      }
-
-      // Extract PBKDF2 salt from the encrypted file
-      const pbkdf2Salt = extractSaltFromEncrypted(encryptedFileBlob);
-
-      // Derive the extractable DEK using the password + same salt
-      const dek = await deriveExtractableKey(encryptionPassword, pbkdf2Salt);
-
-      // Derive wrapping key from PRF output
-      const hkdfSalt = generateHKDFSalt();
-      const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
-
-      // Wrap the DEK
-      registration.wrappedDEK = await wrapDEK(dek, wrappingKey);
-      registration.wrappedDEKSalt = bufferToBase64(hkdfSalt.buffer as ArrayBuffer);
-      registration.encryptionSalt = bufferToBase64(pbkdf2Salt.buffer as ArrayBuffer);
-
-      registeredDEK = dek;
-      registeredDEKSalt = pbkdf2Salt;
-    } catch (err) {
-      // PRF wrapping failed — cached password is still stored
-      console.warn('PRF DEK wrapping failed, cached password will be used:', err);
-      registration.prfSupported = false;
-    }
-  }
 
   await passkeyRepo.savePasskeyRegistration(registration);
 
   return {
     success: true,
     prfSupported: registration.prfSupported,
-    dek: registeredDEK,
-    dekSalt: registeredDEKSalt,
   };
 }
 
@@ -197,8 +140,7 @@ export interface AuthenticatePasskeyParams {
 export interface AuthenticatePasskeyResult {
   success: boolean;
   memberId?: string;
-  dek?: CryptoKey; // PRF path: unwrapped DEK
-  cachedPassword?: string; // Non-PRF path: encryption password
+  cachedPassword?: string; // Encryption password for file decryption
   error?: string;
 }
 
@@ -280,31 +222,7 @@ export async function authenticateWithPasskey(
     lastUsedAt: toISODateString(new Date()),
   });
 
-  // Try PRF path if registration has wrapped DEK
-  if (registration.prfSupported && registration.wrappedDEK && registration.wrappedDEKSalt) {
-    const extensionResults = assertion.getClientExtensionResults();
-    const prfOutput = getPRFOutput(extensionResults);
-
-    if (prfOutput) {
-      try {
-        const hkdfSalt = new Uint8Array(base64ToBuffer(registration.wrappedDEKSalt));
-        const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
-        const dek = await unwrapDEK(registration.wrappedDEK, wrappingKey);
-
-        return {
-          success: true,
-          memberId: registration.memberId,
-          dek,
-          cachedPassword: registration.cachedPassword,
-        };
-      } catch (err) {
-        console.warn('PRF unwrap failed:', err);
-        // Fall through to cached password if available
-      }
-    }
-  }
-
-  // Non-PRF path or PRF failed — use cached password
+  // Use cached password for file decryption
   if (registration.cachedPassword) {
     return {
       success: true,
@@ -335,6 +253,7 @@ export async function hasRegisteredPasskeys(familyId: string): Promise<boolean> 
 
 export async function removePasskey(credentialId: string): Promise<void> {
   await passkeyRepo.removePasskeyRegistration(credentialId);
+  await signalCredentialsRemoved([credentialId]);
 }
 
 export async function removeAllPasskeysForMember(memberId: string): Promise<void> {
@@ -342,28 +261,46 @@ export async function removeAllPasskeysForMember(memberId: string): Promise<void
 }
 
 /**
- * Invalidate PRF-wrapped DEKs for a family (e.g. when encryption password changes).
- * Non-PRF registrations get their cached password updated.
+ * Signal to the platform authenticator that the given credential IDs are no
+ * longer valid. Uses the WebAuthn Signal API (Chrome/Edge 132+, Safari 26+).
+ * This causes Windows Hello / iCloud Keychain / Google Password Manager to
+ * stop showing these credentials in the passkey picker.
+ *
+ * Silently no-ops if the Signal API is not supported.
+ */
+export async function signalCredentialsRemoved(credentialIds: string[]): Promise<void> {
+  if (
+    typeof PublicKeyCredential === 'undefined' ||
+    typeof PublicKeyCredential.signalUnknownCredential !== 'function'
+  ) {
+    return;
+  }
+
+  const rpId = window.location.hostname;
+
+  for (const credentialId of credentialIds) {
+    try {
+      await PublicKeyCredential.signalUnknownCredential({ rpId, credentialId });
+    } catch {
+      // Signal is best-effort — ignore errors
+    }
+  }
+}
+
+/**
+ * Update cached password for all passkey registrations in a family.
+ * Called when the encryption password changes.
  */
 export async function invalidatePasskeysForPasswordChange(
   familyId: string,
   newPassword?: string
 ): Promise<void> {
+  if (!newPassword) return;
   const registrations = await passkeyRepo.getPasskeysByFamily(familyId);
   for (const reg of registrations) {
-    if (reg.prfSupported && reg.wrappedDEK) {
-      // PRF path: invalidate wrapped DEK — user must re-register
-      await passkeyRepo.updatePasskey(reg.credentialId, {
-        wrappedDEK: undefined,
-        wrappedDEKSalt: undefined,
-        encryptionSalt: undefined,
-      });
-    } else if (reg.cachedPassword && newPassword) {
-      // Non-PRF path: update cached password
-      await passkeyRepo.updatePasskey(reg.credentialId, {
-        cachedPassword: newPassword,
-      });
-    }
+    await passkeyRepo.updatePasskey(reg.credentialId, {
+      cachedPassword: newPassword,
+    });
   }
 }
 

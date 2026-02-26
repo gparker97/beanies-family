@@ -132,6 +132,24 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
   }
 
   /**
+   * Delete all local data for a family and remove it from the registry.
+   * Cannot delete the currently active family.
+   */
+  async function deleteLocalFamily(familyId: string): Promise<boolean> {
+    try {
+      await familyContext.deleteLocalFamily(familyId);
+      allFamilies.value = allFamilies.value.filter((f) => f.id !== familyId);
+      if (activeFamily.value?.id === familyId) {
+        activeFamily.value = null;
+      }
+      return true;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to delete family';
+      return false;
+    }
+  }
+
+  /**
    * Reload the families list.
    */
   async function reload(): Promise<void> {
@@ -154,6 +172,7 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
     createFamily,
     createFamilyWithId,
     updateFamilyName,
+    deleteLocalFamily,
     reload,
   };
 });

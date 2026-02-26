@@ -2,6 +2,7 @@ import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
 import {
   setActiveFamily as setActiveFamilyDB,
   getActiveFamilyId,
+  deleteFamilyDatabase,
 } from '@/services/indexeddb/database';
 import {
   getGlobalSettings,
@@ -138,4 +139,61 @@ export async function updateFamilyName(familyId: string, name: string): Promise<
  */
 export function hasActiveFamily(): boolean {
   return getActiveFamilyId() !== null;
+}
+
+/**
+ * Delete all local data for a family: IndexedDB, passkeys, file handles,
+ * provider config, cached password, and registry entry.
+ */
+export async function deleteLocalFamily(familyId: string): Promise<void> {
+  // 1. Delete the family's IndexedDB database (data cache)
+  await deleteFamilyDatabase(familyId);
+
+  // 2. Remove all passkey registrations and signal platform authenticator
+  const { getPasskeysByFamily, removePasskeyRegistration } =
+    await import('@/services/indexeddb/repositories/passkeyRepository');
+  const passkeys = await getPasskeysByFamily(familyId);
+  const credentialIds = passkeys.map((pk) => pk.credentialId);
+  for (const pk of passkeys) {
+    await removePasskeyRegistration(pk.credentialId);
+  }
+  // Signal to Windows Hello / iCloud Keychain to stop showing these credentials
+  if (credentialIds.length > 0) {
+    const { signalCredentialsRemoved } = await import('@/services/auth/passkeyService');
+    await signalCredentialsRemoved(credentialIds);
+  }
+
+  // 3. Clear file handle and provider config
+  const { clearFileHandleForFamily, clearProviderConfig } =
+    await import('@/services/sync/fileHandleStore');
+  await clearFileHandleForFamily(familyId);
+  await clearProviderConfig(familyId);
+
+  // 4. Clear cached encryption password
+  const { saveGlobalSettings, getGlobalSettings: getGS } =
+    await import('@/services/indexeddb/repositories/globalSettingsRepository');
+  const gs = await getGS();
+  if (gs.cachedEncryptionPasswords?.[familyId]) {
+    const updated = { ...gs.cachedEncryptionPasswords };
+    delete updated[familyId];
+    await saveGlobalSettings({ cachedEncryptionPasswords: updated });
+  }
+
+  // 5. Remove from local registry
+  const db = await getRegistryDatabase();
+  await db.delete('families', familyId);
+
+  // 6. If this was the last active family, clear lastActiveFamilyId
+  const currentGs = await getGS();
+  if (currentGs.lastActiveFamilyId === familyId) {
+    await setLastActiveFamilyId(null);
+  }
+
+  // 7. Unregister from remote registry (fire-and-forget)
+  try {
+    const { removeFamily } = await import('@/services/registry/registryService');
+    await removeFamily(familyId);
+  } catch {
+    // Non-critical — remote registry may not be configured
+  }
 }

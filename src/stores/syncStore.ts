@@ -80,9 +80,6 @@ export const useSyncStore = defineStore('sync', () => {
   const hasSessionPassword = computed(() => sessionPassword.value !== null);
   const currentSessionPassword = computed(() => sessionPassword.value);
 
-  // DEK-based encryption for passkey PRF sessions
-  const sessionDEK = ref<CryptoKey | null>(null);
-
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
 
   // Getters
@@ -428,74 +425,14 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Cache password on trusted devices so it survives page refresh
       const settingsStore = useSettingsStore();
-      await settingsStore.cacheEncryptionPassword(password);
+      if (familyCtx.activeFamilyId) {
+        await settingsStore.cacheEncryptionPassword(password, familyCtx.activeFamilyId);
+      }
 
       // Reload all stores after import
       await reloadAllStores();
 
       // Now that password is set and encryption is enabled, arm auto-sync
-      setupAutoSync();
-    }
-
-    return result;
-  }
-
-  /**
-   * Decrypt and load the pending encrypted file using a CryptoKey (passkey PRF path).
-   * Unlike decryptPendingFile, this stores the DEK for future saves instead of a password.
-   */
-  async function decryptPendingFileWithDEK(
-    dek: CryptoKey
-  ): Promise<{ success: boolean; error?: string }> {
-    if (!pendingEncryptedFile.value) {
-      return { success: false, error: 'No pending encrypted file' };
-    }
-
-    const { fileHandle, rawSyncData, driveFileId, driveFileName } = pendingEncryptedFile.value;
-    const result = await syncService.decryptAndImportWithKey(fileHandle, rawSyncData, dek);
-
-    if (result.success) {
-      // Sync Pinia family context with DB-level family identity (see decryptPendingFile)
-      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
-      const activeFamilyId = getActiveFamilyId();
-      const familyCtx = useFamilyContextStore();
-      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
-        await familyCtx.switchFamily(activeFamilyId);
-      }
-
-      // If loaded from Google Drive, persist the config directly
-      if (driveFileId && driveFileName) {
-        const { storeProviderConfig, clearFileHandleForFamily } =
-          await import('@/services/sync/fileHandleStore');
-        if (activeFamilyId) {
-          await clearFileHandleForFamily(activeFamilyId);
-          await storeProviderConfig(activeFamilyId, {
-            type: 'google_drive',
-            driveFileId,
-            driveFileName,
-          });
-        }
-        const provider = GoogleDriveProvider.fromExisting(driveFileId, driveFileName);
-        syncService.setProvider(provider);
-      }
-
-      pendingEncryptedFile.value = null;
-      needsPermission.value = false;
-      lastSync.value = toISODateString(new Date());
-
-      // Store the DEK and salt for future saves
-      sessionDEK.value = dek;
-      syncService.setSessionDEK(dek, result.salt);
-
-      // Update settings
-      await saveSettings({
-        syncEnabled: true,
-        encryptionEnabled: true,
-        syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value,
-      });
-
-      await reloadAllStores();
       setupAutoSync();
     }
 
@@ -525,20 +462,18 @@ export const useSyncStore = defineStore('sync', () => {
     const settingsStore = useSettingsStore();
     await settingsStore.loadSettings();
 
-    // Clear any DEK-based session (password takes over)
-    sessionDEK.value = null;
-    syncService.setSessionDEK(null);
-
     // Re-save the file encrypted - pass password directly to ensure encryption happens
     const success = await syncService.save(password);
     if (success) {
       lastSync.value = toISODateString(new Date());
       await saveSettings({ lastSyncTimestamp: lastSync.value });
       // Cache password on trusted devices
-      await settingsStore.cacheEncryptionPassword(password);
-
-      // Invalidate passkey registrations (password changed, wrapped DEKs are stale)
       const familyContextStore = useFamilyContextStore();
+      if (familyContextStore.activeFamilyId) {
+        await settingsStore.cacheEncryptionPassword(password, familyContextStore.activeFamilyId);
+      }
+
+      // Update cached password in passkey registrations
       if (familyContextStore.activeFamilyId) {
         await invalidatePasskeysForPasswordChange(familyContextStore.activeFamilyId, password);
       }
@@ -618,15 +553,13 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = false;
     lastSync.value = null;
     sessionPassword.value = null;
-    sessionDEK.value = null;
     storageProviderType.value = null;
     showGoogleReconnect.value = false;
     syncService.setSessionPassword(null);
-    syncService.setSessionDEK(null);
 
-    // Clear cached encryption password
+    // Clear cached encryption password for this family
     const settingsStore = useSettingsStore();
-    await settingsStore.clearCachedEncryptionPassword();
+    await settingsStore.clearCachedEncryptionPassword(ctx.activeFamilyId ?? undefined);
     // Do NOT reset encryptionEnabled — it should persist as a user preference.
     // When reconnecting to the same or a new encrypted file, the setting
     // will already be correct and won't cause a plaintext write window.
@@ -770,7 +703,7 @@ export const useSyncStore = defineStore('sync', () => {
       const loadResult = await loadFromFile();
       if (loadResult.success) return true;
 
-      // Handle encrypted file — try session password, cached password, or DEK
+      // Handle encrypted file — try session password, then cached password
       if (loadResult.needsPassword) {
         // Try session password (set during initial sign-in)
         if (sessionPassword.value) {
@@ -778,15 +711,11 @@ export const useSyncStore = defineStore('sync', () => {
           return result.success;
         }
 
-        // Try DEK from passkey authentication
-        if (sessionDEK.value) {
-          const result = await decryptPendingFileWithDEK(sessionDEK.value);
-          return result.success;
-        }
-
         // Try cached password from trusted device
+        const familyCtx = useFamilyContextStore();
         const settingsStore = useSettingsStore();
-        const cachedPw = settingsStore.getCachedEncryptionPassword();
+        const familyId = familyCtx.activeFamilyId;
+        const cachedPw = familyId ? settingsStore.getCachedEncryptionPassword(familyId) : null;
         if (cachedPw) {
           const result = await decryptPendingFile(cachedPw);
           return result.success;
@@ -891,7 +820,6 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = null;
     needsPermission.value = false;
     sessionPassword.value = null;
-    sessionDEK.value = null;
     storageProviderType.value = null;
     showGoogleReconnect.value = false;
     pendingEncryptedFile.value = null;
@@ -1119,7 +1047,6 @@ export const useSyncStore = defineStore('sync', () => {
     isEncryptionEnabled,
     hasSessionPassword,
     currentSessionPassword,
-    sessionDEK,
     hasPendingEncryptedFile,
     storageProviderType,
     isGoogleDriveConnected,
@@ -1141,7 +1068,6 @@ export const useSyncStore = defineStore('sync', () => {
     loadFromGoogleDrive,
     listGoogleDriveFiles,
     decryptPendingFile,
-    decryptPendingFileWithDEK,
     clearPendingEncryptedFile,
     enableEncryption,
     disableEncryption,

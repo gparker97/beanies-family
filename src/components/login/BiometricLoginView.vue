@@ -43,32 +43,10 @@ async function handleBiometricLogin() {
       return;
     }
 
-    // Try decryption: DEK first (PRF path), then cached password as fallback.
-    // The DEK can become stale if the file was re-encrypted with a new PBKDF2 salt
-    // (e.g. by auto-sync or sign-out flush). Cached password always works.
+    // Decrypt with cached password
     let decryptSuccess = false;
 
-    if (result.dek) {
-      const dekResult = await syncStore.decryptPendingFileWithDEK(result.dek);
-      if (dekResult.success) {
-        decryptSuccess = true;
-      } else if (result.cachedPassword) {
-        // DEK stale — fall back to cached password
-        console.warn('[BiometricLogin] DEK decrypt failed, trying cached password');
-        // Need to reload the pending file since decryptPendingFileWithDEK may have cleared it
-        if (!syncStore.hasPendingEncryptedFile) {
-          await syncStore.loadFromFile();
-        }
-        const pwResult = await syncStore.decryptPendingFile(result.cachedPassword);
-        decryptSuccess = pwResult.success;
-        if (!decryptSuccess) {
-          errorMessage.value = t('passkey.dekAndPasswordFailed');
-        }
-      } else {
-        errorMessage.value = t('passkey.dekStale');
-      }
-    } else if (result.cachedPassword) {
-      // Non-PRF path: decrypt with cached password
+    if (result.cachedPassword) {
       const pwResult = await syncStore.decryptPendingFile(result.cachedPassword);
       decryptSuccess = pwResult.success;
       if (!decryptSuccess) {

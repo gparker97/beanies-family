@@ -17,7 +17,6 @@ const mockGlobalSettings: GlobalSettings = {
   exchangeRateLastFetch: null,
   isTrustedDevice: false,
   trustedDevicePromptShown: false,
-  cachedEncryptionPassword: null,
 };
 
 let savedGlobalSettings = { ...mockGlobalSettings };
@@ -181,6 +180,13 @@ vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
   createRecurringItem: vi.fn(),
   updateRecurringItem: vi.fn(),
   deleteRecurringItem: vi.fn(),
+}));
+
+vi.mock('@/stores/familyContextStore', () => ({
+  useFamilyContextStore: () => ({
+    activeFamilyId: 'family-123',
+    activeFamilyName: 'Test Family',
+  }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -409,17 +415,17 @@ describe('Sensitive Data Clearing Security', () => {
   // 1. signOutAndClearData() — full destructive sign-out
   // =========================================================================
   describe('signOutAndClearData() — full destructive sign-out', () => {
-    it('clears cachedEncryptionPassword from global settings', async () => {
+    it('clears cachedEncryptionPasswords from global settings', async () => {
       const { auth, settings } = populateAllStores();
 
       // Trust device and cache a password
       await settings.setTrustedDevice(true);
-      await settings.cacheEncryptionPassword('my-encryption-key');
-      expect(settings.getCachedEncryptionPassword()).toBe('my-encryption-key');
+      await settings.cacheEncryptionPassword('my-encryption-key', 'family-123');
+      expect(settings.getCachedEncryptionPassword('family-123')).toBe('my-encryption-key');
 
       await auth.signOutAndClearData();
 
-      expect(settings.getCachedEncryptionPassword()).toBeNull();
+      expect(settings.getCachedEncryptionPassword('family-123')).toBeNull();
     });
 
     it('resets isTrustedDevice to false', async () => {
@@ -554,12 +560,12 @@ describe('Sensitive Data Clearing Security', () => {
     it('preserves cached encryption password for auto-reconnect', async () => {
       const { auth, settings } = populateAllStores();
       await settings.setTrustedDevice(true);
-      await settings.cacheEncryptionPassword('keep-this-password');
+      await settings.cacheEncryptionPassword('keep-this-password', 'family-123');
 
       await auth.signOut();
 
       // Cached password persists — by design for trusted device auto-reconnect
-      expect(settings.getCachedEncryptionPassword()).toBe('keep-this-password');
+      expect(settings.getCachedEncryptionPassword('family-123')).toBe('keep-this-password');
     });
   });
 
@@ -702,16 +708,16 @@ describe('Sensitive Data Clearing Security', () => {
   // 5. Settings "Clear Data" path
   // =========================================================================
   describe('Settings "Clear Data" path', () => {
-    it('clears cachedEncryptionPassword before wiping', async () => {
+    it('clears cachedEncryptionPasswords before wiping', async () => {
       const { settings } = populateAllStores();
       await settings.setTrustedDevice(true);
-      await settings.cacheEncryptionPassword('cached-pw');
-      expect(settings.getCachedEncryptionPassword()).toBe('cached-pw');
+      await settings.cacheEncryptionPassword('cached-pw', 'family-123');
+      expect(settings.getCachedEncryptionPassword('family-123')).toBe('cached-pw');
 
-      // Simulate the SettingsPage handleClearData flow
+      // Simulate the SettingsPage handleClearData flow (clears all families)
       await settings.clearCachedEncryptionPassword();
 
-      expect(settings.getCachedEncryptionPassword()).toBeNull();
+      expect(settings.getCachedEncryptionPassword('family-123')).toBeNull();
     });
 
     it('resets isTrustedDevice to false', async () => {
@@ -748,7 +754,7 @@ describe('Sensitive Data Clearing Security', () => {
           .saveGlobalSettings
       );
       origSaveGlobalSettings.mockImplementation(async (partial: Partial<GlobalSettings>) => {
-        if (partial.cachedEncryptionPassword === null) callOrder.push('clearPassword');
+        if ('cachedEncryptionPasswords' in partial) callOrder.push('clearPassword');
         if (partial.isTrustedDevice === false) callOrder.push('clearTrust');
         savedGlobalSettings = { ...savedGlobalSettings, ...partial, id: 'global_settings' };
         return { ...savedGlobalSettings };
