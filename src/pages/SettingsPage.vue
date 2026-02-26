@@ -464,8 +464,8 @@ function formatLastSync(timestamp: string | null): string {
                 </div>
                 <a
                   :href="
-                    syncStore.driveFileId
-                      ? `https://drive.google.com/file/d/${syncStore.driveFileId}/view`
+                    syncStore.driveFolderId
+                      ? `https://drive.google.com/drive/folders/${syncStore.driveFolderId}`
                       : 'https://drive.google.com'
                   "
                   target="_blank"

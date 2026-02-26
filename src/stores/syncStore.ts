@@ -28,6 +28,7 @@ import {
   getOrCreateAppFolder,
   listBeanpodFiles,
   clearFolderCache,
+  getAppFolderId,
 } from '@/services/google/driveService';
 import { clearQueue } from '@/services/sync/offlineQueue';
 import type { SyncFileData } from '@/types/models';
@@ -55,6 +56,7 @@ export const useSyncStore = defineStore('sync', () => {
   const storageProviderType = ref<StorageProviderType | null>(null);
   const isGoogleDriveConnected = computed(() => storageProviderType.value === 'google_drive');
   const driveFileId = computed(() => syncService.getProvider()?.getFileId() ?? null);
+  const driveFolderId = computed(() => getAppFolderId());
   const showGoogleReconnect = ref(false);
 
   // Capabilities
@@ -1032,6 +1034,7 @@ export const useSyncStore = defineStore('sync', () => {
     storageProviderType,
     isGoogleDriveConnected,
     driveFileId,
+    driveFolderId,
     isGoogleDriveAvailable,
     showGoogleReconnect,
     // Actions

@@ -4,6 +4,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
@@ -428,8 +429,15 @@ function handleBack() {
             :disabled="isSavingStorage"
             @click="handleChooseGoogleDriveStorage"
           >
+            <!-- Spinner while connecting -->
+            <BeanieSpinner
+              v-if="isSavingStorage && storageType !== 'google_drive'"
+              size="sm"
+              class="mb-1.5"
+            />
+            <!-- Green check when connected -->
             <svg
-              v-if="storageType === 'google_drive'"
+              v-else-if="storageType === 'google_drive'"
               class="mb-1.5 h-6 w-6 text-green-600 dark:text-green-400"
               fill="none"
               stroke="currentColor"
@@ -442,6 +450,7 @@ function handleBack() {
                 d="M5 13l4 4L19 7"
               />
             </svg>
+            <!-- Default Drive icon -->
             <svg v-else class="mb-1.5 h-6 w-6 opacity-60" viewBox="0 0 24 24" fill="currentColor">
               <path
                 d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
@@ -454,8 +463,13 @@ function handleBack() {
                   ? 'text-green-700 dark:text-green-400'
                   : 'text-gray-900 dark:text-gray-100'
               "
-              >Google Drive</span
             >
+              {{
+                isSavingStorage && storageType !== 'google_drive'
+                  ? t('googleDrive.connecting')
+                  : 'Google Drive'
+              }}
+            </span>
           </button>
           <div
             v-else
@@ -820,10 +834,13 @@ function handleBack() {
             </div>
           </div>
 
-          <!-- Open in Drive link -->
+          <!-- Open folder in Drive link -->
           <a
-            v-if="syncStore.driveFileId"
-            :href="`https://drive.google.com/file/d/${syncStore.driveFileId}/view`"
+            :href="
+              syncStore.driveFolderId
+                ? `https://drive.google.com/drive/folders/${syncStore.driveFolderId}`
+                : 'https://drive.google.com'
+            "
             target="_blank"
             rel="noopener noreferrer"
             class="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-900/15 dark:text-blue-400 dark:hover:bg-blue-900/30"
@@ -839,10 +856,23 @@ function handleBack() {
             </svg>
           </a>
 
-          <!-- Sharing hint -->
-          <p class="text-center text-xs leading-relaxed text-gray-400 dark:text-gray-500">
-            {{ t('googleDrive.shareHint') }}
-          </p>
+          <!-- Sharing hint — prominent callout -->
+          <div
+            class="rounded-xl border border-[#F15D22]/25 bg-[#F15D22]/[0.06] p-3 dark:border-[#F15D22]/15 dark:bg-[#F15D22]/[0.08]"
+          >
+            <div class="flex gap-2.5">
+              <img
+                src="/brand/beanies_impact_bullet_transparent_192x192.png"
+                alt=""
+                class="mt-0.5 h-5 w-5 flex-shrink-0"
+              />
+              <p
+                class="text-[0.78rem] leading-relaxed font-medium text-[#2C3E50] dark:text-gray-200"
+              >
+                {{ t('googleDrive.shareHint') }}
+              </p>
+            </div>
+          </div>
         </div>
 
         <BaseButton class="mt-4 w-full" @click="showDriveResultModal = false">
