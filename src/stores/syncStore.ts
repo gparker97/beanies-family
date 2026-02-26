@@ -15,6 +15,7 @@ import { saveSettings } from '@/services/indexeddb/repositories/settingsReposito
 import { invalidatePasskeysForPasswordChange } from '@/services/auth/passkeyService';
 import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
 import { exportToFile, importFromFile } from '@/services/sync/fileSync';
+import { readSettingsWAL, clearSettingsWAL, isWALStale } from '@/services/sync/settingsWAL';
 import * as registry from '@/services/registry/registryService';
 import * as syncService from '@/services/sync/syncService';
 import type { SyncFileData } from '@/types/models';
@@ -488,6 +489,7 @@ export const useSyncStore = defineStore('sync', () => {
     // Fire-and-forget: remove family from cloud registry before clearing state
     const ctx = useFamilyContextStore();
     if (ctx.activeFamilyId) {
+      clearSettingsWAL(ctx.activeFamilyId);
       registry.removeFamily(ctx.activeFamilyId).catch(() => {});
     }
 
@@ -533,29 +535,88 @@ export const useSyncStore = defineStore('sync', () => {
     return result;
   }
 
+  // Guard: suppress auto-sync watcher triggers during store reloads.
+  // Without this, each store's loadX() fires the deep watcher → triggerDebouncedSave(),
+  // which can capture a half-loaded snapshot (empty arrays) and write it to file.
+  let isReloading = false;
+
   /**
    * Reload all stores after data import
    */
   async function reloadAllStores(): Promise<void> {
-    const familyStore = useFamilyStore();
-    const accountsStore = useAccountsStore();
-    const transactionsStore = useTransactionsStore();
-    const assetsStore = useAssetsStore();
-    const goalsStore = useGoalsStore();
-    const settingsStore = useSettingsStore();
-    const recurringStore = useRecurringStore();
-    const todoStore = useTodoStore();
+    isReloading = true;
+    syncService.cancelPendingSave();
 
-    await Promise.all([
-      familyStore.loadMembers(),
-      accountsStore.loadAccounts(),
-      transactionsStore.loadTransactions(),
-      assetsStore.loadAssets(),
-      goalsStore.loadGoals(),
-      settingsStore.loadSettings(),
-      recurringStore.loadRecurringItems(),
-      todoStore.loadTodos(),
-    ]);
+    try {
+      const familyStore = useFamilyStore();
+      const accountsStore = useAccountsStore();
+      const transactionsStore = useTransactionsStore();
+      const assetsStore = useAssetsStore();
+      const goalsStore = useGoalsStore();
+      const settingsStore = useSettingsStore();
+      const recurringStore = useRecurringStore();
+      const todoStore = useTodoStore();
+
+      await Promise.all([
+        familyStore.loadMembers(),
+        accountsStore.loadAccounts(),
+        transactionsStore.loadTransactions(),
+        assetsStore.loadAssets(),
+        goalsStore.loadGoals(),
+        settingsStore.loadSettings(),
+        recurringStore.loadRecurringItems(),
+        todoStore.loadTodos(),
+      ]);
+
+      // WAL recovery: if there's a WAL entry newer than what the file had,
+      // apply it so preferred currencies (etc.) survive refresh.
+      await applySettingsWAL();
+    } finally {
+      isReloading = false;
+    }
+  }
+
+  /**
+   * Apply settings from the WAL if available and valid.
+   * Called after reloadAllStores to recover settings that were lost
+   * because the async file write didn't complete before unload.
+   */
+  async function applySettingsWAL(): Promise<void> {
+    const ctx = useFamilyContextStore();
+    const familyId = ctx.activeFamilyId;
+    if (!familyId) return;
+
+    const walEntry = readSettingsWAL(familyId);
+    if (!walEntry) return;
+
+    // Reject stale entries (>24h) to avoid overriding file changes from another device
+    if (isWALStale(walEntry)) {
+      clearSettingsWAL(familyId);
+      return;
+    }
+
+    // Compare WAL timestamp with the file's exportedAt.
+    // Only apply WAL if it's newer than the file's last save.
+    const fileTimestamp = await syncService.getFileTimestamp();
+    if (fileTimestamp) {
+      const fileTime = new Date(fileTimestamp).getTime();
+      if (walEntry.timestamp <= fileTime) {
+        // File is newer or equal — WAL is outdated, clear it
+        clearSettingsWAL(familyId);
+        return;
+      }
+    }
+
+    // Apply WAL settings to IndexedDB
+    try {
+      await saveSettings(walEntry.settings);
+      const settingsStore = useSettingsStore();
+      await settingsStore.loadSettings();
+      // Trigger a save so the recovery is persisted to the file
+      syncService.triggerDebouncedSave();
+    } catch (e) {
+      console.warn('[syncStore] Failed to apply settings WAL:', e);
+    }
   }
 
   // Track the stop handle so we never register duplicate watchers
@@ -585,6 +646,9 @@ export const useSyncStore = defineStore('sync', () => {
         useSettingsStore().settings,
       ],
       () => {
+        // Skip auto-save while stores are being reloaded from file import
+        // to prevent capturing half-loaded snapshots
+        if (isReloading) return;
         // Auto-save whenever file is configured and accessible
         if (isConfigured.value && !needsPermission.value) {
           syncService.triggerDebouncedSave();
@@ -598,6 +662,12 @@ export const useSyncStore = defineStore('sync', () => {
    * Reset all sync state (used on sign-out)
    */
   function resetState() {
+    // Clear WAL for the current family before tearing down
+    const ctx = useFamilyContextStore();
+    if (ctx.activeFamilyId) {
+      clearSettingsWAL(ctx.activeFamilyId);
+    }
+
     // Tear down auto-sync watcher so it can be re-armed for the next session/family
     if (autoSyncStopHandle) {
       autoSyncStopHandle();

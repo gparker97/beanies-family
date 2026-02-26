@@ -2,6 +2,8 @@ import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
+import { writeSettingsWAL } from '@/services/sync/settingsWAL';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 import type {
   Settings,
   GlobalSettings,
@@ -73,6 +75,19 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     },
     { immediate: true }
+  );
+
+  // Write-ahead log: persist settings to localStorage on every mutation
+  // so they survive page refresh even if the async file write hasn't completed.
+  watch(
+    settings,
+    (newSettings) => {
+      const familyId = getActiveFamilyId();
+      if (familyId) {
+        writeSettingsWAL(familyId, newSettings);
+      }
+    },
+    { deep: true }
   );
 
   // Actions

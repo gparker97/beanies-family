@@ -166,6 +166,7 @@ describe('Password Cache - syncStore integration', () => {
     setSessionPassword: vi.fn(),
     setSessionDEK: vi.fn(),
     triggerDebouncedSave: vi.fn(),
+    cancelPendingSave: vi.fn(),
     flushPendingSave: vi.fn(async () => {}),
     reset: vi.fn(),
   }));
