@@ -10,11 +10,11 @@ vi.mock('@/services/google/googleAuth', () => ({
   loadGIS: vi.fn(async () => {}),
 }));
 
-const mockUpdateFile = vi.fn(async () => {});
-const mockReadFile = vi.fn(async () => '{"version":"2.0"}');
-const mockGetFileModifiedTime = vi.fn(async () => '2026-02-26T12:00:00Z');
-const mockGetOrCreateAppFolder = vi.fn(async () => 'folder-id');
-const mockCreateFile = vi.fn(async () => ({ fileId: 'new-file-id', name: 'test.beanpod' }));
+const mockUpdateFile = vi.fn();
+const mockReadFile = vi.fn().mockResolvedValue('{"version":"2.0"}');
+const mockGetFileModifiedTime = vi.fn().mockResolvedValue('2026-02-26T12:00:00Z');
+const mockGetOrCreateAppFolder = vi.fn().mockResolvedValue('folder-id');
+const mockCreateFile = vi.fn().mockResolvedValue({ fileId: 'new-file-id', name: 'test.beanpod' });
 const mockClearFolderCache = vi.fn();
 
 vi.mock('@/services/google/driveService', () => ({
