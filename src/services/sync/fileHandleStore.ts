@@ -98,6 +98,16 @@ export async function clearFileHandle(): Promise<void> {
 }
 
 /**
+ * Clear the stored file handle for a specific family by ID.
+ * Used when switching providers (e.g. local → Google Drive) to prevent
+ * stale local handles from being restored on page refresh.
+ */
+export async function clearFileHandleForFamily(familyId: string): Promise<void> {
+  const db = await getHandleDatabase();
+  await db.delete(HANDLE_STORE, `syncFile-${familyId}`);
+}
+
+/**
  * Check if we have permission to read/write the file
  */
 export async function verifyPermission(

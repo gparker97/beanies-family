@@ -55,6 +55,8 @@ export const useSyncStore = defineStore('sync', () => {
   const pendingEncryptedFile = ref<{
     fileHandle: FileSystemFileHandle;
     rawSyncData: SyncFileData;
+    driveFileId?: string;
+    driveFileName?: string;
   } | null>(null);
 
   // Google Drive state
@@ -370,10 +372,40 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: false, error: 'No pending encrypted file' };
     }
 
-    const { fileHandle, rawSyncData } = pendingEncryptedFile.value;
+    const { fileHandle, rawSyncData, driveFileId, driveFileName } = pendingEncryptedFile.value;
     const result = await syncService.decryptAndImport(fileHandle, rawSyncData, password);
 
     if (result.success) {
+      // decryptAndImport may have adopted a new family identity at the DB level
+      // (via createFamilyWithId) without updating the Pinia store. Sync them now
+      // so that authStore.signIn() later captures the correct familyId in the session.
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      const activeFamilyId = getActiveFamilyId();
+      const familyCtx = useFamilyContextStore();
+      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+        await familyCtx.switchFamily(activeFamilyId);
+      }
+
+      // If loaded from Google Drive, persist the config directly here.
+      // We do this explicitly because the provider reference doesn't survive
+      // Vue's reactive Proxy or LoginPage re-mounts that reset syncService.
+      if (driveFileId && driveFileName) {
+        const { storeProviderConfig, clearFileHandleForFamily } =
+          await import('@/services/sync/fileHandleStore');
+        if (activeFamilyId) {
+          await clearFileHandleForFamily(activeFamilyId);
+          await storeProviderConfig(activeFamilyId, {
+            type: 'google_drive',
+            driveFileId,
+            driveFileName,
+          });
+          console.warn('[syncStore] Persisted Google Drive config for family', activeFamilyId);
+        }
+        // Re-establish the Google Drive provider in syncService
+        const provider = GoogleDriveProvider.fromExisting(driveFileId, driveFileName);
+        syncService.setProvider(provider);
+      }
+
       // Clear pending file
       pendingEncryptedFile.value = null;
       needsPermission.value = false;
@@ -419,10 +451,34 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: false, error: 'No pending encrypted file' };
     }
 
-    const { fileHandle, rawSyncData } = pendingEncryptedFile.value;
+    const { fileHandle, rawSyncData, driveFileId, driveFileName } = pendingEncryptedFile.value;
     const result = await syncService.decryptAndImportWithKey(fileHandle, rawSyncData, dek);
 
     if (result.success) {
+      // Sync Pinia family context with DB-level family identity (see decryptPendingFile)
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      const activeFamilyId = getActiveFamilyId();
+      const familyCtx = useFamilyContextStore();
+      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+        await familyCtx.switchFamily(activeFamilyId);
+      }
+
+      // If loaded from Google Drive, persist the config directly
+      if (driveFileId && driveFileName) {
+        const { storeProviderConfig, clearFileHandleForFamily } =
+          await import('@/services/sync/fileHandleStore');
+        if (activeFamilyId) {
+          await clearFileHandleForFamily(activeFamilyId);
+          await storeProviderConfig(activeFamilyId, {
+            type: 'google_drive',
+            driveFileId,
+            driveFileName,
+          });
+        }
+        const provider = GoogleDriveProvider.fromExisting(driveFileId, driveFileName);
+        syncService.setProvider(provider);
+      }
+
       pendingEncryptedFile.value = null;
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
@@ -952,9 +1008,9 @@ export const useSyncStore = defineStore('sync', () => {
         pendingEncryptedFile.value = {
           fileHandle: {} as FileSystemFileHandle, // Placeholder — not used for Drive
           rawSyncData: data as SyncFileData,
+          driveFileId: fileId,
+          driveFileName,
         };
-        // Set provider so decryptPendingFile can use it
-        syncService.setProvider(provider);
         storageProviderType.value = 'google_drive';
         return { success: false, needsPassword: true };
       }
