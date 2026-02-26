@@ -13,6 +13,7 @@ import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
+import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
@@ -130,6 +131,7 @@ const showLayout = computed(() => {
  * 3. No file handle → load from IndexedDB if available
  */
 
+/* eslint-disable no-console -- debug logging for sync diagnostics */
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
@@ -208,6 +210,7 @@ async function loadFamilyData() {
     }
   }
 }
+/* eslint-enable no-console */
 
 /**
  * Fallback: load from IndexedDB cache when file permission is not yet granted.
@@ -425,6 +428,10 @@ watch(
     <OfflineBanner />
     <UpdatePrompt />
     <InstallPrompt />
+    <GoogleReconnectToast
+      v-if="syncStore.showGoogleReconnect"
+      @reconnected="syncStore.showGoogleReconnect = false"
+    />
 
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />

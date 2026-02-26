@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-26
-> **Updated by:** Claude (Status update — #99 To-Do page and #100 sidebar accordion marked done)
+> **Updated by:** Claude (Google Drive cloud storage integration #78 complete)
 
 ## Current Phase
 
@@ -20,6 +20,7 @@
 - Unit test infrastructure (Vitest with happy-dom)
 - Linting (ESLint + Prettier + Stylelint + Husky pre-commit hooks)
 - File-based sync via File System Access API (with encryption support)
+- Google Drive cloud storage integration (StorageProvider abstraction, OAuth via GIS, Drive REST API, offline queue, file picker, reconnect toast) — ADR-016
 - Exchange rate auto-fetching from free currency API
 - Recurring transaction processor (daily/monthly/yearly)
 - Multilingual support (English + Chinese) via MyMemory API with IndexedDB caching
@@ -633,7 +634,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 - [ ] Data import/export (CSV, etc.)
 - [x] PWA offline support / install prompt / SW update prompt (#6) ✓
 - [ ] Cloud relay for near-instant cross-device sync (#104)
-- [ ] Google Drive sync (OAuth integration)
+- [x] Google Drive sync (OAuth integration) — #78, ADR-016
 - [ ] Skip/modify individual recurring occurrences
 - [ ] Landing/marketing page (#72)
 

@@ -39,6 +39,7 @@ const storageSaved = ref(false);
 const isSavingStorage = ref(false);
 const podPassword = ref('');
 const confirmPodPassword = ref('');
+const storageType = ref<'local' | 'google_drive' | null>(null);
 
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
@@ -49,6 +50,7 @@ const totalSteps = 3;
 
 // Expose step navigation for E2E tests (dev mode only)
 if (import.meta.env.DEV) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__e2eCreatePod = { setStep: (s: number) => (currentStep.value = s) };
 }
 
@@ -99,11 +101,34 @@ async function handleChooseLocalStorage() {
     const success = await syncStore.configureSyncFile();
     if (success) {
       storageSaved.value = true;
+      storageType.value = 'local';
     } else {
       formError.value = t('setup.fileCreateFailed');
     }
   } catch {
     formError.value = t('setup.fileCreateFailed');
+  } finally {
+    isSavingStorage.value = false;
+  }
+}
+
+async function handleChooseGoogleDriveStorage() {
+  if (!syncStore.isGoogleDriveAvailable) return;
+
+  isSavingStorage.value = true;
+  formError.value = null;
+
+  try {
+    const podFileName = `${familyName.value || 'my-family'}.beanpod`;
+    const success = await syncStore.configureSyncFileGoogleDrive(podFileName);
+    if (success) {
+      storageSaved.value = true;
+      storageType.value = 'google_drive';
+    } else {
+      formError.value = syncStore.error || t('googleDrive.authFailed');
+    }
+  } catch (e) {
+    formError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
     isSavingStorage.value = false;
   }
@@ -385,8 +410,49 @@ function handleBack() {
 
         <!-- Storage options row -->
         <div class="flex gap-2">
-          <!-- Google Drive (coming soon) -->
+          <!-- Google Drive -->
+          <button
+            v-if="syncStore.isGoogleDriveAvailable"
+            class="flex flex-1 flex-col items-center rounded-[14px] border-2 px-2.5 py-3.5 transition-all"
+            :class="
+              storageType === 'google_drive'
+                ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
+                : 'border-transparent bg-[#AED6F1]/15 hover:border-blue-300 hover:bg-blue-50 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
+            "
+            :disabled="isSavingStorage"
+            @click="handleChooseGoogleDriveStorage"
+          >
+            <svg
+              v-if="storageType === 'google_drive'"
+              class="mb-1.5 h-6 w-6 text-green-600 dark:text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            <svg v-else class="mb-1.5 h-6 w-6 opacity-60" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+              />
+            </svg>
+            <span
+              class="font-outfit text-[0.68rem] font-semibold"
+              :class="
+                storageType === 'google_drive'
+                  ? 'text-green-700 dark:text-green-400'
+                  : 'text-gray-900 dark:text-gray-100'
+              "
+              >Google Drive</span
+            >
+          </button>
           <div
+            v-else
             class="flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent bg-[#AED6F1]/15 px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
           >
             <svg

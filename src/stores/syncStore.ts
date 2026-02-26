@@ -13,12 +13,25 @@ import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
 import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import { invalidatePasskeysForPasswordChange } from '@/services/auth/passkeyService';
-import { getSyncCapabilities, canAutoSync } from '@/services/sync/capabilities';
+import {
+  getSyncCapabilities,
+  canAutoSync,
+  supportsGoogleDrive,
+} from '@/services/sync/capabilities';
 import { exportToFile, importFromFile } from '@/services/sync/fileSync';
 import { readSettingsWAL, clearSettingsWAL, isWALStale } from '@/services/sync/settingsWAL';
 import * as registry from '@/services/registry/registryService';
 import * as syncService from '@/services/sync/syncService';
+import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
+import { loadGIS, requestAccessToken, onTokenExpired } from '@/services/google/googleAuth';
+import {
+  getOrCreateAppFolder,
+  listBeanpodFiles,
+  clearFolderCache,
+} from '@/services/google/driveService';
+import { clearQueue } from '@/services/sync/offlineQueue';
 import type { SyncFileData } from '@/types/models';
+import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 
 export const useSyncStore = defineStore('sync', () => {
@@ -38,9 +51,15 @@ export const useSyncStore = defineStore('sync', () => {
     rawSyncData: SyncFileData;
   } | null>(null);
 
+  // Google Drive state
+  const storageProviderType = ref<StorageProviderType | null>(null);
+  const isGoogleDriveConnected = computed(() => storageProviderType.value === 'google_drive');
+  const showGoogleReconnect = ref(false);
+
   // Capabilities
   const capabilities = computed(() => getSyncCapabilities());
   const supportsAutoSync = computed(() => canAutoSync());
+  const isGoogleDriveAvailable = computed(() => supportsGoogleDrive());
 
   // Encryption computed
   const isEncryptionEnabled = computed(() => {
@@ -71,6 +90,7 @@ export const useSyncStore = defineStore('sync', () => {
     isConfigured.value = state.isConfigured;
     fileName.value = state.fileName;
     isSyncing.value = state.isSyncing;
+    storageProviderType.value = syncService.getProviderType();
     error.value = state.lastError;
   });
 
@@ -495,11 +515,19 @@ export const useSyncStore = defineStore('sync', () => {
       registry.removeFamily(ctx.activeFamilyId).catch(() => {});
     }
 
+    // Clear offline queue if disconnecting from Google Drive
+    if (storageProviderType.value === 'google_drive') {
+      clearQueue();
+      clearFolderCache();
+    }
+
     await syncService.disconnect();
     needsPermission.value = false;
     lastSync.value = null;
     sessionPassword.value = null;
     sessionDEK.value = null;
+    storageProviderType.value = null;
+    showGoogleReconnect.value = false;
     syncService.setSessionPassword(null);
     syncService.setSessionDEK(null);
 
@@ -771,7 +799,10 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = false;
     sessionPassword.value = null;
     sessionDEK.value = null;
+    storageProviderType.value = null;
+    showGoogleReconnect.value = false;
     pendingEncryptedFile.value = null;
+    clearQueue();
   }
 
   /**
@@ -779,6 +810,200 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function clearError(): void {
     error.value = null;
+  }
+
+  // --- Google Drive actions ---
+
+  /**
+   * Configure Google Drive as the storage backend for a new pod.
+   * Creates a new .beanpod file on Google Drive.
+   */
+  async function configureSyncFileGoogleDrive(podFileName: string): Promise<boolean> {
+    try {
+      const provider = await GoogleDriveProvider.createNew(podFileName);
+      syncService.setProvider(provider);
+
+      // Persist provider config
+      const ctx = useFamilyContextStore();
+      if (ctx.activeFamilyId) {
+        await provider.persist(ctx.activeFamilyId);
+      }
+
+      needsPermission.value = false;
+      storageProviderType.value = 'google_drive';
+
+      // Save initial data
+      await syncNow();
+
+      // Update settings
+      await saveSettings({
+        syncEnabled: true,
+        syncFilePath: provider.getDisplayName(),
+        lastSyncTimestamp: toISODateString(new Date()),
+      });
+
+      // Arm auto-sync
+      setupAutoSync();
+
+      // Register with cloud registry
+      if (ctx.activeFamilyId) {
+        registry
+          .registerFamily(ctx.activeFamilyId, {
+            provider: 'google_drive',
+            fileId: provider.getFileId(),
+            displayPath: provider.getDisplayName(),
+            familyName: ctx.activeFamilyName,
+          })
+          .catch(() => {});
+      }
+
+      // Subscribe to token expiry
+      setupTokenExpiryHandler();
+
+      return true;
+    } catch (e) {
+      error.value = (e as Error).message;
+      return false;
+    }
+  }
+
+  /**
+   * Load an existing .beanpod file from Google Drive.
+   */
+  async function loadFromGoogleDrive(
+    fileId: string,
+    driveFileName: string
+  ): Promise<{ success: boolean; needsPassword?: boolean }> {
+    try {
+      const provider = GoogleDriveProvider.fromExisting(fileId, driveFileName);
+
+      // Authenticate if needed
+      await loadGIS();
+      await requestAccessToken();
+
+      // Read file content
+      const text = await provider.read();
+      if (!text) {
+        error.value = 'File is empty';
+        return { success: false };
+      }
+
+      // Parse and validate
+      let data: unknown;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        error.value = 'Invalid JSON file';
+        return { success: false };
+      }
+
+      const obj = data as Record<string, unknown>;
+      if (
+        typeof obj.version !== 'string' ||
+        typeof obj.exportedAt !== 'string' ||
+        typeof obj.encrypted !== 'boolean'
+      ) {
+        error.value = 'Invalid sync file format';
+        return { success: false };
+      }
+
+      // If encrypted, store for later decryption
+      if (obj.encrypted === true) {
+        pendingEncryptedFile.value = {
+          fileHandle: {} as FileSystemFileHandle, // Placeholder — not used for Drive
+          rawSyncData: data as SyncFileData,
+        };
+        // Set provider so decryptPendingFile can use it
+        syncService.setProvider(provider);
+        storageProviderType.value = 'google_drive';
+        return { success: false, needsPassword: true };
+      }
+
+      // Import unencrypted data
+      const { importSyncFileData, validateSyncFileData } = await import('@/services/sync/fileSync');
+      if (!validateSyncFileData(data)) {
+        error.value = 'Invalid sync file format';
+        return { success: false };
+      }
+
+      const syncData = data as SyncFileData;
+
+      // Adopt family identity
+      const { createFamilyWithId } = await import('@/services/familyContext');
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      let activeFamilyId = getActiveFamilyId();
+      if (syncData.familyId) {
+        if (syncData.familyId !== activeFamilyId) {
+          await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
+          activeFamilyId = syncData.familyId;
+        }
+      }
+
+      await importSyncFileData(syncData);
+
+      // Set as current provider
+      syncService.setProvider(provider);
+      storageProviderType.value = 'google_drive';
+      if (activeFamilyId) {
+        await provider.persist(activeFamilyId);
+      }
+
+      needsPermission.value = false;
+      lastSync.value = toISODateString(new Date());
+
+      // Reload stores and setup auto-sync
+      await reloadAllStores();
+      await saveSettings({
+        syncEnabled: true,
+        syncFilePath: provider.getDisplayName(),
+        lastSyncTimestamp: lastSync.value,
+      });
+      setupAutoSync();
+      setupTokenExpiryHandler();
+
+      // Register with cloud registry
+      if (activeFamilyId) {
+        registry
+          .registerFamily(activeFamilyId, {
+            provider: 'google_drive',
+            fileId,
+            displayPath: driveFileName,
+            familyName: syncData.familyName,
+          })
+          .catch(() => {});
+      }
+
+      return { success: true };
+    } catch (e) {
+      error.value = (e as Error).message;
+      return { success: false };
+    }
+  }
+
+  /**
+   * List .beanpod files available on Google Drive.
+   */
+  async function listGoogleDriveFiles(): Promise<
+    Array<{ fileId: string; name: string; modifiedTime: string }>
+  > {
+    await loadGIS();
+    const token = await requestAccessToken();
+    const folderId = await getOrCreateAppFolder(token);
+    return listBeanpodFiles(token, folderId);
+  }
+
+  /**
+   * Subscribe to Google OAuth token expiry notifications.
+   */
+  let tokenExpiryUnsub: (() => void) | null = null;
+
+  function setupTokenExpiryHandler(): void {
+    if (tokenExpiryUnsub) return;
+    tokenExpiryUnsub = onTokenExpired(() => {
+      if (storageProviderType.value === 'google_drive') {
+        showGoogleReconnect.value = true;
+      }
+    });
   }
 
   return {
@@ -800,16 +1025,23 @@ export const useSyncStore = defineStore('sync', () => {
     currentSessionPassword,
     sessionDEK,
     hasPendingEncryptedFile,
+    storageProviderType,
+    isGoogleDriveConnected,
+    isGoogleDriveAvailable,
+    showGoogleReconnect,
     // Actions
     initialize,
     requestPermission,
     configureSyncFile,
+    configureSyncFileGoogleDrive,
     syncNow,
     forceSyncNow,
     checkForConflicts,
     loadFromFile,
     loadFromNewFile,
     loadFromDroppedFile,
+    loadFromGoogleDrive,
+    listGoogleDriveFiles,
     decryptPendingFile,
     decryptPendingFileWithDEK,
     clearPendingEncryptedFile,

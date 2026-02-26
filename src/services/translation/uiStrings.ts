@@ -1260,6 +1260,23 @@ const STRING_DEFS = {
   'mobile.navigation': { en: 'Navigation' },
   'mobile.controls': { en: 'Controls' },
   'mobile.viewingAll': { en: 'Viewing: All Members' },
+
+  // Google Drive integration
+  'googleDrive.connecting': { en: 'Connecting to Google Drive...' },
+  'googleDrive.connected': { en: 'Connected to Google Drive' },
+  'googleDrive.disconnect': { en: 'Disconnect Google Drive' },
+  'googleDrive.selectFile': { en: 'Select a pod from Google Drive' },
+  'googleDrive.noFilesFound': { en: 'No pod files found on Google Drive' },
+  'googleDrive.reconnect': { en: 'Reconnect' },
+  'googleDrive.sessionExpired': { en: 'Google session expired. Reconnect to keep saving.' },
+  'googleDrive.authFailed': { en: 'Google sign-in failed. Please try again.' },
+  'googleDrive.notConfigured': { en: 'Google Drive is not configured.' },
+  'googleDrive.offlineQueued': { en: 'Offline. Changes will save when you reconnect.' },
+  'googleDrive.loadError': { en: 'Failed to load from Google Drive' },
+  'googleDrive.filePickerTitle': { en: 'Your pods on Google Drive' },
+  'googleDrive.lastModified': { en: 'Last modified' },
+  'googleDrive.refresh': { en: 'Refresh' },
+  'googleDrive.storageLabel': { en: 'Google Drive' },
 } satisfies Record<string, StringEntry>;
 
 /**

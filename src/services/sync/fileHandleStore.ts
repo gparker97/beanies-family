@@ -1,10 +1,18 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
+import type { StorageProviderType } from './storageProvider';
 
 const HANDLE_DB_NAME = 'gp-finance-file-handles';
 const HANDLE_DB_VERSION = 1;
 const HANDLE_STORE = 'handles';
 const LEGACY_SYNC_FILE_KEY = 'syncFile';
+
+// Provider config persistence — stores which backend a family uses
+export interface PersistedProviderConfig {
+  type: StorageProviderType;
+  driveFileId?: string;
+  driveFileName?: string;
+}
 
 interface HandleDB {
   handles: {
@@ -127,4 +135,45 @@ export async function hasValidFileHandle(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// --- Provider config persistence ---
+
+/**
+ * Store provider config for a family (e.g. google_drive with fileId)
+ */
+export async function storeProviderConfig(
+  familyId: string,
+  config: PersistedProviderConfig
+): Promise<void> {
+  const db = await getHandleDatabase();
+  await db.put(
+    HANDLE_STORE,
+    config as unknown as FileSystemFileHandle,
+    `providerConfig-${familyId}`
+  );
+}
+
+/**
+ * Retrieve the stored provider config for a family
+ */
+export async function getProviderConfig(familyId: string): Promise<PersistedProviderConfig | null> {
+  try {
+    const db = await getHandleDatabase();
+    const config = await db.get(HANDLE_STORE, `providerConfig-${familyId}`);
+    if (config && typeof config === 'object' && 'type' in config) {
+      return config as unknown as PersistedProviderConfig;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear the stored provider config for a family
+ */
+export async function clearProviderConfig(familyId: string): Promise<void> {
+  const db = await getHandleDatabase();
+  await db.delete(HANDLE_STORE, `providerConfig-${familyId}`);
 }
