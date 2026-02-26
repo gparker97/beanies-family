@@ -372,9 +372,17 @@ onUnmounted(() => {
 // Show passkey or trust device prompt after fresh sign-in.
 // Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
-// Watches both freshSignIn and route.path so it re-fires after Create/Join navigates to /nook.
+// Watches freshSignIn, route.path, isEncryptionEnabled, and isConfigured so the prompt
+// re-evaluates when any of these reactive values change (avoids race conditions where
+// encryption/config state settles after the route change).
 watch(
-  () => [authStore.freshSignIn, route.path] as const,
+  () =>
+    [
+      authStore.freshSignIn,
+      route.path,
+      syncStore.isEncryptionEnabled,
+      syncStore.isConfigured,
+    ] as const,
   async ([isFresh, path], oldVal) => {
     if (
       !isFresh ||
@@ -392,6 +400,11 @@ watch(
     // Reset dismiss flag on new sign-in (freshSignIn transitioned from false to true)
     if (oldVal && !oldVal[0] && isFresh) {
       passkeyPromptDismissed.value = false;
+    }
+
+    // Don't re-prompt if already showing or dismissed
+    if (showPasskeyPrompt.value || showTrustPrompt.value) {
+      return;
     }
 
     // Try passkey prompt first (per-family check, encryption must be enabled)
