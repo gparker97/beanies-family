@@ -404,11 +404,30 @@ function formatLastSync(timestamp: string | null): string {
               <div
                 class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
               >
-                <div>
+                <div class="min-w-0 flex-1">
                   <p class="font-medium text-gray-900 dark:text-gray-100">
                     {{ t('settings.myFamilyData') }}
                   </p>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">{{ syncStore.fileName }}</p>
+                  <div class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                    <!-- Google Drive icon when connected to Drive -->
+                    <svg
+                      v-if="syncStore.isGoogleDriveConnected"
+                      class="h-3.5 w-3.5 flex-shrink-0 text-blue-500"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path
+                        d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+                      />
+                    </svg>
+                    <span class="truncate">{{ syncStore.fileName }}</span>
+                  </div>
+                  <p
+                    v-if="syncStore.isGoogleDriveConnected"
+                    class="mt-0.5 text-xs text-gray-400 dark:text-gray-500"
+                  >
+                    {{ t('googleDrive.savedTo') }}
+                  </p>
                 </div>
                 <div class="flex items-center gap-2">
                   <span
@@ -431,6 +450,34 @@ function formatLastSync(timestamp: string | null): string {
                     }}
                   </span>
                 </div>
+              </div>
+
+              <!-- Google Drive info row -->
+              <div
+                v-if="syncStore.isGoogleDriveConnected"
+                class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+              >
+                <div>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t('googleDrive.fileLocation') }}
+                  </p>
+                </div>
+                <a
+                  href="https://drive.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  {{ t('googleDrive.openInDrive') }}
+                  <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </a>
               </div>
 
               <!-- Row 2: Last Saved (read-only, no sync button) -->

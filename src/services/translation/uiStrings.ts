@@ -1277,6 +1277,13 @@ const STRING_DEFS = {
   'googleDrive.lastModified': { en: 'Last modified' },
   'googleDrive.refresh': { en: 'Refresh' },
   'googleDrive.storageLabel': { en: 'Google Drive' },
+  'googleDrive.fileCreated': { en: 'Your pod has been created on Google Drive.' },
+  'googleDrive.fileLocation': { en: 'Location: beanies.family folder' },
+  'googleDrive.shareHint': {
+    en: 'To share with family members, open this file in Google Drive and share it with read & write access.',
+  },
+  'googleDrive.openInDrive': { en: 'Open in Google Drive' },
+  'googleDrive.savedTo': { en: 'Saved to Google Drive' },
 } satisfies Record<string, StringEntry>;
 
 /**
