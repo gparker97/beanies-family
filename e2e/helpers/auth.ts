@@ -52,11 +52,11 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     // Wait for step 3 to render
     await page.getByRole('button', { name: 'Finish' }).waitFor({ state: 'visible', timeout: 5000 });
 
-    // Step 3: Add family members — finish (goes to /dashboard)
+    // Step 3: Add family members — finish (goes to /nook)
     await page.getByRole('button', { name: 'Finish' }).click();
   }
 
-  await page.waitForURL('/dashboard');
+  await page.waitForURL('/nook');
 
   // Dismiss TrustDeviceModal if it appears (triggered by freshSignIn).
   // The modal races with navigation, so give it a short window to show up.
