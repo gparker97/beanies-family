@@ -139,6 +139,7 @@ function handleSignedIn(destination: string) {
         :family-name="biometricFamilyName"
         @signed-in="handleSignedIn"
         @use-password="handleBiometricFallback"
+        @switch-family="handleSwitchFamily"
       />
 
       <WelcomeGate v-else-if="activeView === 'welcome'" @navigate="handleNavigate" />

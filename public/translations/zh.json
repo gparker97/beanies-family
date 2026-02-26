@@ -2697,14 +2697,14 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.badgeSecurity": {
-      "translation": "银行级证券",
+      "translation": "银行级安全",
       "hash": "msym9m",
-      "lastUpdated": "2026-02-24"
+      "lastUpdated": "2026-02-26"
     },
     "loginV6.badgeLove": {
-      "translation": " Built with",
+      "translation": "用心构建",
       "hash": "ni5cie",
-      "lastUpdated": "2026-02-24"
+      "lastUpdated": "2026-02-26"
     },
     "loginV6.badgeZeroServers": {
       "translation": "服务器上的零数据",

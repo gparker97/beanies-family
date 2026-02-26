@@ -1,13 +1,73 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useTranslationStore } from '@/stores/translationStore';
+import { LANGUAGES } from '@/constants/languages';
+import type { LanguageCode } from '@/types/models';
 
 const { t } = useTranslation();
+const settingsStore = useSettingsStore();
+const translationStore = useTranslationStore();
+const showLangMenu = ref(false);
+
+const currentLanguageInfo = computed(() =>
+  LANGUAGES.find((l) => l.code === settingsStore.language)
+);
+
+async function selectLanguage(code: LanguageCode) {
+  showLangMenu.value = false;
+  if (code === settingsStore.language) return;
+  await settingsStore.setLanguage(code);
+  await translationStore.loadTranslations(code);
+}
 </script>
 
 <template>
   <div
-    class="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#F8F9FA] via-[#FEF0E8] to-[#EBF5FD] p-4 dark:from-[#1a252f] dark:via-[#2C3E50] dark:to-[#1a252f]"
+    class="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-[#F8F9FA] via-[#FEF0E8] to-[#EBF5FD] p-4 dark:from-[#1a252f] dark:via-[#2C3E50] dark:to-[#1a252f]"
   >
+    <!-- Language switcher -->
+    <div class="absolute top-4 right-4 z-10">
+      <button
+        class="flex items-center gap-1 rounded-full bg-white/80 px-3 py-1.5 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+        @click="showLangMenu = !showLangMenu"
+        @blur="showLangMenu = false"
+      >
+        <img
+          v-if="currentLanguageInfo?.flagIcon"
+          :src="currentLanguageInfo.flagIcon"
+          :alt="currentLanguageInfo.name"
+          class="h-4 w-5"
+        />
+        <span v-else class="text-sm">{{ currentLanguageInfo?.flag || '🌐' }}</span>
+        <span class="text-xs text-gray-600 dark:text-gray-300">{{
+          currentLanguageInfo?.nativeName
+        }}</span>
+        <span class="text-[0.5rem] text-gray-400">▼</span>
+      </button>
+      <div
+        v-if="showLangMenu"
+        class="absolute right-0 mt-1 w-40 rounded-xl bg-white p-1 shadow-lg dark:bg-slate-800"
+      >
+        <button
+          v-for="lang in LANGUAGES"
+          :key="lang.code"
+          class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
+          :class="
+            lang.code === settingsStore.language
+              ? 'bg-[#F15D22]/10 text-[#F15D22]'
+              : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700'
+          "
+          @mousedown.prevent="selectLanguage(lang.code)"
+        >
+          <img v-if="lang.flagIcon" :src="lang.flagIcon" :alt="lang.name" class="h-4 w-5" />
+          <span v-else>{{ lang.flag }}</span>
+          <span>{{ lang.nativeName }}</span>
+        </button>
+      </div>
+    </div>
+
     <div class="w-full max-w-[580px]">
       <div class="mb-8 text-center">
         <img
