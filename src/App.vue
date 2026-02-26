@@ -325,10 +325,20 @@ onMounted(async () => {
   }
 });
 
-// Flush pending debounced saves before the page unloads (prevents data loss on refresh)
+// Save data when going hidden; check for external file changes when becoming visible
 function handleVisibilityChange() {
   if (document.visibilityState === 'hidden') {
+    // Flush any queued debounced save
     flushPendingSave();
+    // Force an immediate save to capture changes not yet queued by the watcher
+    // (Vue watchers fire asynchronously, so a reload right after a store mutation
+    // would miss the change if only relying on the debounced save)
+    if (syncStore.isConfigured && !syncStore.needsPermission) {
+      syncStore.syncNow(true).catch(console.warn);
+    }
+  } else if (document.visibilityState === 'visible') {
+    // Check for external file changes (cross-device sync)
+    syncStore.reloadIfFileChanged().catch(console.warn);
   }
 }
 
