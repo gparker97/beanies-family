@@ -54,8 +54,9 @@ const totalSteps = 3;
 
 // Expose step navigation for E2E tests (dev mode only)
 if (import.meta.env.DEV) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (window as any).__e2eCreatePod = { setStep: (s: number) => (currentStep.value = s) };
+  (window as unknown as Record<string, unknown>).__e2eCreatePod = {
+    setStep: (s: number) => (currentStep.value = s),
+  };
 }
 
 const stepLabels = [
