@@ -35,7 +35,7 @@ export interface GlobalSettings {
   soundEnabled?: boolean;
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
-  cachedEncryptionPassword?: string | null;
+  cachedEncryptionPasswords?: Record<string, string>;
   passkeyPromptShown?: boolean;
 }
 
@@ -47,10 +47,7 @@ export interface PasskeyRegistration {
   publicKey: string; // base64 public key
   transports?: string[]; // AuthenticatorTransport hints
   prfSupported: boolean; // PRF available during registration?
-  wrappedDEK?: string; // base64 AES-KW wrapped DEK (PRF path)
-  wrappedDEKSalt?: string; // base64 HKDF salt (PRF path)
-  encryptionSalt?: string; // base64 PBKDF2 salt from file (PRF path)
-  cachedPassword?: string; // Cached encryption password (non-PRF path)
+  cachedPassword?: string; // Cached encryption password for file decryption
   label: string; // e.g. "MacBook Touch ID"
   createdAt: ISODateString;
   lastUsedAt?: ISODateString;
