@@ -119,6 +119,7 @@ async function handleChooseLocalStorage() {
 async function handleChooseGoogleDriveStorage() {
   if (!syncStore.isGoogleDriveAvailable) return;
   if (storageType.value === 'google_drive') return; // Already connected
+  if (isSavingStorage.value) return; // Already in progress
 
   isSavingStorage.value = true;
   formError.value = null;
@@ -424,9 +425,10 @@ function handleBack() {
             :class="
               storageType === 'google_drive'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
-                : 'border-transparent bg-[#AED6F1]/15 hover:border-blue-300 hover:bg-blue-50 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
+                : isSavingStorage
+                  ? 'border-blue-300 bg-blue-50/50 dark:border-blue-600/50 dark:bg-blue-900/15'
+                  : 'border-transparent bg-[#AED6F1]/15 hover:border-blue-300 hover:bg-blue-50 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
             "
-            :disabled="isSavingStorage"
             @click="handleChooseGoogleDriveStorage"
           >
             <!-- Spinner while connecting -->
@@ -450,10 +452,36 @@ function handleBack() {
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            <!-- Default Drive icon -->
-            <svg v-else class="mb-1.5 h-6 w-6 opacity-60" viewBox="0 0 24 24" fill="currentColor">
+            <!-- Full-color Google Drive logo -->
+            <svg
+              v-else
+              class="mb-1.5 h-6 w-6"
+              viewBox="0 0 87.3 78"
+              xmlns="http://www.w3.org/2000/svg"
+            >
               <path
-                d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+                d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+                fill="#0066da"
+              />
+              <path
+                d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-20.4 35.3c-.8 1.4-1.2 2.95-1.2 4.5h27.5z"
+                fill="#00ac47"
+              />
+              <path
+                d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.5l5.85 13.15z"
+                fill="#ea4335"
+              />
+              <path
+                d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+                fill="#00832d"
+              />
+              <path
+                d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+                fill="#2684fc"
+              />
+              <path
+                d="m73.4 26.5-10.1-17.5c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 23.8h27.45c0-1.55-.4-3.1-1.2-4.5z"
+                fill="#ffba00"
               />
             </svg>
             <span
