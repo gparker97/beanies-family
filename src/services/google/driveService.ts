@@ -28,7 +28,7 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
 
   if (searchData.files?.length > 0) {
     cachedFolderId = searchData.files[0].id;
-    return cachedFolderId;
+    return cachedFolderId!;
   }
 
   // Create the folder
@@ -43,7 +43,7 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
 
   const createData = await createRes.json();
   cachedFolderId = createData.id;
-  return cachedFolderId;
+  return cachedFolderId!;
 }
 
 /**
@@ -197,11 +197,10 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
  * Includes the HTTP status code for retry logic.
  */
 export class DriveApiError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number
-  ) {
+  readonly status: number;
+  constructor(message: string, status: number) {
     super(message);
     this.name = 'DriveApiError';
+    this.status = status;
   }
 }
