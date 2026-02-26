@@ -1,5 +1,6 @@
 import { supportsFileSystemAccess } from './capabilities';
-import { getFileHandle, verifyPermission } from './fileHandleStore';
+import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
+import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import {
   createSyncFileData,
   validateSyncFileData,
@@ -160,6 +161,30 @@ export async function initialize(): Promise<boolean> {
       lastError: null,
     });
     return false;
+  }
+
+  // Check for persisted provider config (Google Drive or local)
+  const familyId = getActiveFamilyId();
+  if (familyId) {
+    try {
+      const config = await getProviderConfig(familyId);
+      if (config?.type === 'google_drive' && config.driveFileId && config.driveFileName) {
+        currentProvider = GoogleDriveProvider.fromExisting(
+          config.driveFileId,
+          config.driveFileName
+        );
+        currentProviderFamilyId = familyId;
+        updateState({
+          isInitialized: true,
+          isConfigured: true,
+          fileName: config.driveFileName,
+          lastError: null,
+        });
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to restore provider config:', e);
+    }
   }
 
   // Try to restore a local file handle (File System Access API)
