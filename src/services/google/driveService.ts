@@ -149,6 +149,13 @@ export async function deleteFile(token: string, fileId: string): Promise<void> {
 }
 
 /**
+ * Get the cached app folder ID (null if not yet resolved).
+ */
+export function getAppFolderId(): string | null {
+  return cachedFolderId;
+}
+
+/**
  * Clear the cached folder ID (used on disconnect).
  */
 export function clearFolderCache(): void {
