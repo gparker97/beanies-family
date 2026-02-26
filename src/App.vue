@@ -347,7 +347,7 @@ onUnmounted(() => {
 // Show passkey or trust device prompt after fresh sign-in.
 // Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
-// Watches both freshSignIn and route.path so it re-fires after Create/Join navigates to /dashboard.
+// Watches both freshSignIn and route.path so it re-fires after Create/Join navigates to /nook.
 watch(
   () => [authStore.freshSignIn, route.path] as const,
   async ([isFresh, path], oldVal) => {

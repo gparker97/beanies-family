@@ -366,7 +366,7 @@ async function handleCreatePassword() {
     if (result.success) {
       // Persist password hash to file before handing off to LoginPage
       await syncStore.syncNow(true);
-      emit('signed-in', '/dashboard');
+      emit('signed-in', '/nook');
     } else {
       formError.value = result.error ?? t('auth.signInFailed');
     }
