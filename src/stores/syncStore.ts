@@ -23,7 +23,12 @@ import { readSettingsWAL, clearSettingsWAL, isWALStale } from '@/services/sync/s
 import * as registry from '@/services/registry/registryService';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
-import { loadGIS, requestAccessToken, onTokenExpired } from '@/services/google/googleAuth';
+import {
+  loadGIS,
+  requestAccessToken,
+  onTokenExpired,
+  isTokenValid,
+} from '@/services/google/googleAuth';
 import {
   getOrCreateAppFolder,
   listBeanpodFiles,
@@ -101,15 +106,44 @@ export const useSyncStore = defineStore('sync', () => {
   syncService.setEncryptionRequiredCallback(() => isEncryptionEnabled.value);
 
   /**
-   * Initialize sync - restore file handle if available
+   * Initialize sync - restore file handle if available.
+   *
+   * For local files: checks File System Access API permission (needs user gesture).
+   * For Google Drive: attempts silent token re-acquisition. The `needsPermission`
+   * flag is NOT set for Google Drive because token refresh happens automatically
+   * inside read()/write() via getValidToken(). Setting it would cause loadFamilyData()
+   * to skip the file-load path and fall to an IndexedDB cache fallback, potentially
+   * loading stale or wrong-family data.
    */
   async function initialize(): Promise<void> {
     const restored = await syncService.initialize();
 
     if (restored) {
-      // Check if we have permission
-      const hasPermission = await syncService.hasPermission();
-      needsPermission.value = !hasPermission;
+      const providerType = syncService.getProviderType();
+
+      if (providerType === 'google_drive') {
+        // Google Drive: don't set needsPermission — that flag is only for
+        // local File System Access API permission grants (user gesture required).
+        needsPermission.value = false;
+
+        // Try to pre-load GIS and acquire token silently so Path 1 in
+        // loadFamilyData() can read from Google Drive immediately.
+        try {
+          await loadGIS();
+          if (!isTokenValid()) {
+            await requestAccessToken();
+          }
+        } catch {
+          // Silent auth failed — show reconnect toast.
+          // loadFamilyData() will fall through to IndexedDB cache as fallback.
+          showGoogleReconnect.value = true;
+        }
+        setupTokenExpiryHandler();
+      } else {
+        // Local file: check if we have File System Access API permission
+        const hasPermission = await syncService.hasPermission();
+        needsPermission.value = !hasPermission;
+      }
     }
   }
 
