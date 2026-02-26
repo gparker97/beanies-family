@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-26
-> **Updated by:** Claude (Cross-device sync #103 closed, cloud relay #104 planned)
+> **Updated by:** Claude (Status update — #99 To-Do page and #100 sidebar accordion marked done)
 
 ## Current Phase
 
@@ -604,8 +604,8 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | ----- | --------------------------------------------------------------- | -------- | ------- |
 | #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     | ✅ Done |
 | #98   | Family Planner 📅: calendar and scheduling hub                  | High     |
-| #99   | Family To-Do ✅: standalone task management page                | High     |
-| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     |
+| #99   | Family To-Do ✅: standalone task management page                | High     | ✅ Done |
+| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     | ✅ Done |
 | #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   |
 
 ### Existing Issues Updated
