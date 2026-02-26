@@ -2,7 +2,9 @@
  * Google OAuth 2.0 via Google Identity Services (GIS).
  *
  * Uses the implicit grant flow to obtain an access token with `drive.file` scope.
- * Token is stored in memory only (never persisted — security requirement).
+ * Token is cached in sessionStorage so it survives page refreshes within the same
+ * tab (cleared on tab close). This prevents the "session expired" toast on every
+ * refresh — the token is typically valid for ~1 hour.
  * Dynamically loads the GIS library on first use (zero bundle impact).
  */
 
@@ -40,11 +42,31 @@ declare global {
 
 const GIS_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const SESSION_TOKEN_KEY = 'gis_token';
 
-// In-memory token state
+// In-memory token state (hydrated from sessionStorage on load)
 let accessToken: string | null = null;
 let expiresAt: number = 0;
 let tokenClient: TokenClient | null = null;
+
+// Restore token from sessionStorage on module load
+try {
+  const cached = sessionStorage.getItem(SESSION_TOKEN_KEY);
+  if (cached) {
+    const { token, expires } = JSON.parse(cached) as { token: string; expires: number };
+    if (token && expires > Date.now()) {
+      accessToken = token;
+      expiresAt = expires;
+      // Schedule expiry warning for remaining lifetime
+      const remainingSec = Math.floor((expires - Date.now()) / 1000);
+      scheduleExpiryWarning(remainingSec);
+    } else {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  }
+} catch {
+  // Ignore parse errors — start fresh
+}
 
 // Expiry callbacks
 type ExpiryCallback = () => void;
@@ -127,6 +149,9 @@ export async function requestAccessToken(): Promise<string> {
         accessToken = response.access_token;
         expiresAt = Date.now() + response.expires_in * 1000;
 
+        // Cache in sessionStorage so it survives page refreshes
+        persistToken();
+
         // Schedule expiry warning (5 min before expiry)
         scheduleExpiryWarning(response.expires_in);
 
@@ -195,9 +220,26 @@ function clearTokenState(): void {
   accessToken = null;
   expiresAt = 0;
   tokenClient = null;
+  try {
+    sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // Ignore — sessionStorage may not be available
+  }
   if (expiryTimer) {
     clearTimeout(expiryTimer);
     expiryTimer = null;
+  }
+}
+
+function persistToken(): void {
+  if (!accessToken || !expiresAt) return;
+  try {
+    sessionStorage.setItem(
+      SESSION_TOKEN_KEY,
+      JSON.stringify({ token: accessToken, expires: expiresAt })
+    );
+  } catch {
+    // Ignore — sessionStorage may not be available (private browsing, etc.)
   }
 }
 
