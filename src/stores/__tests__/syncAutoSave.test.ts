@@ -173,14 +173,14 @@ vi.mock('@/services/sync/syncService', () => ({
       isSyncing: false,
       lastError: null,
     });
-    return mockSelectSyncFile(...args);
+    return (mockSelectSyncFile as (...a: unknown[]) => unknown)(...args);
   },
   loadAndImport: vi.fn(async () => ({ success: true })),
   openAndLoadFile: vi.fn(async () => ({ success: true })),
   loadDroppedFile: vi.fn(async () => ({ success: true })),
   decryptAndImport: vi.fn(async () => ({ success: true })),
   decryptAndImportWithKey: vi.fn(async () => ({ success: true })),
-  save: (...args: unknown[]) => mockSave(...args),
+  save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
   getFileTimestamp: vi.fn(async () => null),
   triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
   cancelPendingSave: vi.fn(),
