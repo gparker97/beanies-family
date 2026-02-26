@@ -30,7 +30,7 @@ describe('driveService', () => {
 
   describe('getOrCreateAppFolder', () => {
     it('returns existing folder ID if found', async () => {
-      global.fetch = mockFetch({
+      globalThis.fetch = mockFetch({
         files: [{ id: 'folder-123', name: 'beanies.family' }],
       });
 
@@ -41,7 +41,7 @@ describe('driveService', () => {
 
     it('creates folder if not found', async () => {
       let callCount = 0;
-      global.fetch = vi.fn().mockImplementation(async (_url: string, _init?: RequestInit) => {
+      globalThis.fetch = vi.fn().mockImplementation(async (_url: string, _init?: RequestInit) => {
         callCount++;
         if (callCount === 1) {
           // Search returns empty
@@ -69,7 +69,7 @@ describe('driveService', () => {
     });
 
     it('caches folder ID across calls', async () => {
-      global.fetch = mockFetch({
+      globalThis.fetch = mockFetch({
         files: [{ id: 'folder-cached', name: 'beanies.family' }],
       });
 
@@ -81,7 +81,7 @@ describe('driveService', () => {
 
   describe('createFile', () => {
     it('sends multipart upload with metadata and content', async () => {
-      global.fetch = mockFetch({ id: 'file-new', name: 'test.beanpod' });
+      globalThis.fetch = mockFetch({ id: 'file-new', name: 'test.beanpod' });
 
       const result = await createFile(mockToken, 'folder-1', 'test.beanpod', '{"data":"test"}');
       expect(result).toEqual({ fileId: 'file-new', name: 'test.beanpod' });
@@ -96,7 +96,7 @@ describe('driveService', () => {
 
   describe('updateFile', () => {
     it('patches file content', async () => {
-      global.fetch = mockFetch({});
+      globalThis.fetch = mockFetch({});
 
       await updateFile(mockToken, 'file-1', '{"updated":"data"}');
 
@@ -110,7 +110,7 @@ describe('driveService', () => {
 
   describe('readFile', () => {
     it('returns file content', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         text: async () => '{"version":"2.0","data":{}}',
@@ -124,7 +124,7 @@ describe('driveService', () => {
     });
 
     it('returns null for empty file', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         text: async () => '',
@@ -137,7 +137,7 @@ describe('driveService', () => {
 
   describe('getFileModifiedTime', () => {
     it('returns modifiedTime from metadata', async () => {
-      global.fetch = mockFetch({ modifiedTime: '2026-02-26T12:00:00Z' });
+      globalThis.fetch = mockFetch({ modifiedTime: '2026-02-26T12:00:00Z' });
 
       const time = await getFileModifiedTime(mockToken, 'file-1');
       expect(time).toBe('2026-02-26T12:00:00Z');
@@ -147,7 +147,7 @@ describe('driveService', () => {
     });
 
     it('returns null on error', async () => {
-      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
       const time = await getFileModifiedTime(mockToken, 'file-1');
       expect(time).toBeNull();
@@ -160,7 +160,7 @@ describe('driveService', () => {
         { id: 'f1', name: 'family.beanpod', modifiedTime: '2026-02-26T12:00:00Z' },
         { id: 'f2', name: 'backup.beanpod', modifiedTime: '2026-02-25T12:00:00Z' },
       ];
-      global.fetch = mockFetch({ files });
+      globalThis.fetch = mockFetch({ files });
 
       const result = await listBeanpodFiles(mockToken, 'folder-1');
       expect(result).toHaveLength(2);
@@ -172,7 +172,7 @@ describe('driveService', () => {
     });
 
     it('returns empty array when no files exist', async () => {
-      global.fetch = mockFetch({ files: [] });
+      globalThis.fetch = mockFetch({ files: [] });
 
       const result = await listBeanpodFiles(mockToken, 'folder-1');
       expect(result).toHaveLength(0);
@@ -181,7 +181,7 @@ describe('driveService', () => {
 
   describe('deleteFile', () => {
     it('sends DELETE request', async () => {
-      global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204 });
+      globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204 });
 
       await deleteFile(mockToken, 'file-to-delete');
 
@@ -193,7 +193,7 @@ describe('driveService', () => {
 
   describe('error handling', () => {
     it('throws DriveApiError on non-2xx response', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 403,
         json: async () => ({ error: { message: 'Forbidden' } }),
@@ -204,7 +204,7 @@ describe('driveService', () => {
     });
 
     it('DriveApiError includes status code', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
+      globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 401,
         json: async () => ({ error: { message: 'Unauthorized' } }),
@@ -219,7 +219,7 @@ describe('driveService', () => {
     });
 
     it('includes Authorization header in requests', async () => {
-      global.fetch = mockFetch({ files: [] });
+      globalThis.fetch = mockFetch({ files: [] });
 
       await listBeanpodFiles(mockToken, 'folder-1');
 

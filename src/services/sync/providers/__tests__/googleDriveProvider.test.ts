@@ -25,12 +25,11 @@ vi.mock('@/services/google/driveService', () => ({
   createFile: (...args: unknown[]) => mockCreateFile(...args),
   clearFolderCache: () => mockClearFolderCache(),
   DriveApiError: class DriveApiError extends Error {
-    constructor(
-      message: string,
-      public readonly status: number
-    ) {
+    readonly status: number;
+    constructor(message: string, status: number) {
       super(message);
       this.name = 'DriveApiError';
+      this.status = status;
     }
   },
 }));
