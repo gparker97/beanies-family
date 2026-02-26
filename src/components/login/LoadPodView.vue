@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -311,6 +312,74 @@ async function handleDrop(e: DragEvent) {
   }
 }
 
+// Google Drive state
+const showDrivePicker = ref(false);
+const driveFiles = ref<Array<{ fileId: string; name: string; modifiedTime: string }>>([]);
+const isDriveLoading = ref(false);
+
+async function handleLoadFromGoogleDrive() {
+  if (!syncStore.isGoogleDriveAvailable) return;
+
+  isDriveLoading.value = true;
+  formError.value = null;
+
+  try {
+    driveFiles.value = await syncStore.listGoogleDriveFiles();
+    if (driveFiles.value.length === 0) {
+      formError.value = t('googleDrive.noFilesFound');
+    } else {
+      showDrivePicker.value = true;
+    }
+  } catch (e) {
+    formError.value = (e as Error).message || t('googleDrive.authFailed');
+  } finally {
+    isDriveLoading.value = false;
+  }
+}
+
+async function handleDriveFileSelected(payload: { fileId: string; fileName: string }) {
+  showDrivePicker.value = false;
+  isLoadingFile.value = true;
+  formError.value = null;
+
+  try {
+    const result = await syncStore.loadFromGoogleDrive(payload.fileId, payload.fileName);
+    if (result.success) {
+      emit('file-loaded');
+    } else if (result.needsPassword) {
+      // Try auto-decrypt first
+      if (!(await tryAutoDecrypt())) {
+        const { familyId, familyName } = getPendingFamilyInfo();
+        if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+          // Biometric flow will handle decryption
+        } else {
+          loadedFileName.value = payload.fileName;
+          showDecryptModal.value = true;
+        }
+      } else {
+        emit('file-loaded');
+      }
+    } else if (syncStore.error) {
+      formError.value = syncStore.error;
+    }
+  } catch {
+    formError.value = syncStore.error || t('googleDrive.loadError');
+  } finally {
+    isLoadingFile.value = false;
+  }
+}
+
+async function handleDriveRefresh() {
+  isDriveLoading.value = true;
+  try {
+    driveFiles.value = await syncStore.listGoogleDriveFiles();
+  } catch {
+    // Keep existing list
+  } finally {
+    isDriveLoading.value = false;
+  }
+}
+
 function handleSwitchFamily() {
   formError.value = null;
   decryptPassword.value = '';
@@ -445,9 +514,44 @@ function handleSwitchFamily() {
         </p>
       </div>
 
-      <!-- Cloud connectors (future) -->
+      <!-- Cloud connectors -->
       <div class="mt-4 flex gap-3">
+        <!-- Google Drive (functional when configured) -->
+        <button
+          v-if="syncStore.isGoogleDriveAvailable"
+          class="flex flex-1 items-center justify-center gap-2 rounded-xl border border-gray-200 p-3 transition-colors hover:border-[#F15D22]/40 hover:bg-[#F15D22]/5 dark:border-slate-600 dark:hover:border-[#F15D22]/30 dark:hover:bg-[#F15D22]/10"
+          :disabled="isDriveLoading"
+          @click="handleLoadFromGoogleDrive"
+        >
+          <svg
+            v-if="isDriveLoading"
+            class="h-5 w-5 animate-spin text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+          <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+            />
+          </svg>
+          <span class="text-xs">Google Drive</span>
+        </button>
         <div
+          v-else
           class="flex flex-1 cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-gray-200 p-3 opacity-40 dark:border-slate-600"
           :title="t('loginV6.cloudComingSoon')"
         >
@@ -481,6 +585,16 @@ function handleSwitchFamily() {
           <span class="text-xs">iCloud</span>
         </div>
       </div>
+
+      <!-- Google Drive File Picker Modal -->
+      <GoogleDriveFilePicker
+        :open="showDrivePicker"
+        :files="driveFiles"
+        :is-loading="isDriveLoading"
+        @close="showDrivePicker = false"
+        @select="handleDriveFileSelected"
+        @refresh="handleDriveRefresh"
+      />
 
       <!-- Security messaging -->
       <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
