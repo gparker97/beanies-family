@@ -104,6 +104,16 @@ function handleDeclinePasskey() {
 }
 
 /**
+ * After Google Drive token re-acquisition via the reconnect toast,
+ * reload data from Drive and arm auto-sync.
+ */
+async function handleGoogleReconnected() {
+  syncStore.showGoogleReconnect = false;
+  await syncStore.reloadIfFileChanged();
+  syncStore.setupAutoSync();
+}
+
+/**
  * Read the current encrypted file to get the raw blob for passkey registration.
  * Works with any storage provider (local file or Google Drive).
  */
@@ -458,7 +468,7 @@ watch(
     >
       <GoogleReconnectToast
         v-if="syncStore.showGoogleReconnect"
-        @reconnected="syncStore.showGoogleReconnect = false"
+        @reconnected="handleGoogleReconnected"
       />
       <UpdatePrompt />
       <InstallPrompt />
