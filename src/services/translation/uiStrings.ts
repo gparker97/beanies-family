@@ -1183,6 +1183,10 @@ const STRING_DEFS = {
   'todo.noDueDate': { en: 'No due date' },
   'todo.overdue': { en: 'Overdue', beanie: 'Past the beanie deadline!' },
   'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'Remove Task' },
+  'confirm.deleteLocalFamilyTitle': { en: 'Delete Local Family Data' },
+  'confirm.deleteLocalFamily': {
+    en: 'This will permanently remove all data, passkeys, and settings for this family from this device. The original file is not affected. This cannot be undone.',
+  },
 
   // Celebrations
   'celebration.setupComplete': {

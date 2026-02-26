@@ -139,7 +139,6 @@ const mockGlobalSettings: GlobalSettings = {
   exchangeRateLastFetch: null,
   isTrustedDevice: false,
   trustedDevicePromptShown: false,
-  cachedEncryptionPassword: null,
 };
 
 vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
@@ -179,7 +178,6 @@ vi.mock('@/services/sync/syncService', () => ({
   openAndLoadFile: vi.fn(async () => ({ success: true })),
   loadDroppedFile: vi.fn(async () => ({ success: true })),
   decryptAndImport: vi.fn(async () => ({ success: true })),
-  decryptAndImportWithKey: vi.fn(async () => ({ success: true })),
   save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
   getFileTimestamp: vi.fn(async () => null),
   triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
@@ -196,7 +194,6 @@ vi.mock('@/services/sync/syncService', () => ({
   }),
   disconnect: vi.fn(async () => {}),
   setSessionPassword: vi.fn(),
-  setSessionDEK: vi.fn(),
   getSessionFileHandle: vi.fn(() => null),
   getProviderType: vi.fn(() => null),
   getProvider: vi.fn(() => null),

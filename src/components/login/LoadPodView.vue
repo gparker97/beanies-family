@@ -46,10 +46,13 @@ let dragCounter = 0;
  * Returns true if decryption succeeded.
  */
 async function tryAutoDecrypt(): Promise<boolean> {
+  // Use familyId from pending encrypted file's raw data for per-family cache lookup
+  const pendingFamilyId = syncStore.pendingEncryptedFile?.rawSyncData?.familyId;
+
   // Try sessionStorage first (current session), then trusted device cache (persistent)
   const passwords = [
     sessionStorage.getItem(SESSION_PASSWORD_KEY),
-    settingsStore.getCachedEncryptionPassword(),
+    pendingFamilyId ? settingsStore.getCachedEncryptionPassword(pendingFamilyId) : null,
   ].filter(Boolean) as string[];
 
   for (const pw of passwords) {
@@ -63,7 +66,9 @@ async function tryAutoDecrypt(): Promise<boolean> {
 
   // All attempts failed — clear stale caches
   sessionStorage.removeItem(SESSION_PASSWORD_KEY);
-  await settingsStore.clearCachedEncryptionPassword();
+  if (pendingFamilyId) {
+    await settingsStore.clearCachedEncryptionPassword(pendingFamilyId);
+  }
   return false;
 }
 

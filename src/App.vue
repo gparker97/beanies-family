@@ -61,8 +61,9 @@ const passkeyPromptDismissed = ref(false);
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
   // If there's already a session password, cache it for the newly trusted device
-  if (syncStore.currentSessionPassword) {
-    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword);
+  const familyId = familyContextStore.activeFamilyId;
+  if (syncStore.currentSessionPassword && familyId) {
+    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword, familyId);
   }
   showTrustPrompt.value = false;
 }
@@ -83,13 +84,7 @@ async function handleEnablePasskey() {
   }
 
   try {
-    const encryptedBlob = await getEncryptedFileBlob();
-    if (!encryptedBlob) {
-      console.warn('[passkey] Could not read encrypted file blob for passkey registration');
-      return;
-    }
-
-    const result = await authStore.registerPasskeyForCurrentUser(password, encryptedBlob);
+    const result = await authStore.registerPasskeyForCurrentUser(password);
     if (!result.success) {
       console.warn('[passkey] Registration failed:', result.error);
     }
@@ -117,23 +112,6 @@ async function handleGoogleReconnected() {
  * Read the current encrypted file to get the raw blob for passkey registration.
  * Works with any storage provider (local file or Google Drive).
  */
-async function getEncryptedFileBlob(): Promise<string | null> {
-  try {
-    const { getProvider } = await import('@/services/sync/syncService');
-    const provider = getProvider();
-    if (!provider) return null;
-    const text = await provider.read();
-    if (!text) return null;
-    const parsed = JSON.parse(text);
-    if (parsed.encrypted && typeof parsed.data === 'string') {
-      return parsed.data;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 const showLayout = computed(() => {
   // Don't show sidebar/header on login, welcome, or 404 pages
   return (
@@ -186,7 +164,10 @@ async function loadFamilyData() {
 
     // File needs password — try cached password from trusted device
     if (loadResult.needsPassword) {
-      const cachedPw = settingsStore.getCachedEncryptionPassword();
+      const activeFamilyId = familyContextStore.activeFamilyId;
+      const cachedPw = activeFamilyId
+        ? settingsStore.getCachedEncryptionPassword(activeFamilyId)
+        : null;
       if (cachedPw) {
         const decryptResult = await syncStore.decryptPendingFile(cachedPw);
         if (decryptResult.success) {
@@ -198,7 +179,9 @@ async function loadFamilyData() {
           return;
         }
         // Cached password was wrong — clear it
-        await settingsStore.clearCachedEncryptionPassword();
+        if (activeFamilyId) {
+          await settingsStore.clearCachedEncryptionPassword(activeFamilyId);
+        }
       }
     }
   }
