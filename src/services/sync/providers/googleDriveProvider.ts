@@ -6,7 +6,11 @@
  * On 401, attempts token refresh and retries once.
  */
 import type { StorageProvider } from '../storageProvider';
-import { storeProviderConfig, clearProviderConfig } from '../fileHandleStore';
+import {
+  storeProviderConfig,
+  clearProviderConfig,
+  clearFileHandleForFamily,
+} from '../fileHandleStore';
 import {
   getValidToken,
   isTokenValid,
@@ -112,8 +116,11 @@ export class GoogleDriveProvider implements StorageProvider {
 
   /**
    * Persist provider config to IndexedDB.
+   * Also clears any stale local file handle for this family so that
+   * syncService.initialize() won't fall back to a previous local file.
    */
   async persist(familyId: string): Promise<void> {
+    await clearFileHandleForFamily(familyId);
     await storeProviderConfig(familyId, {
       type: 'google_drive',
       driveFileId: this.fileId,

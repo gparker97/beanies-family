@@ -5,7 +5,12 @@
  * engine can work with any StorageProvider implementation.
  */
 import type { StorageProvider } from '../storageProvider';
-import { storeFileHandle, clearFileHandle, verifyPermission } from '../fileHandleStore';
+import {
+  storeFileHandle,
+  clearFileHandle,
+  clearProviderConfig,
+  verifyPermission,
+} from '../fileHandleStore';
 
 export class LocalStorageProvider implements StorageProvider {
   readonly type = 'local' as const;
@@ -85,11 +90,11 @@ export class LocalStorageProvider implements StorageProvider {
 
   /**
    * Store the file handle in IndexedDB for session restore.
+   * Also clears any stale Google Drive provider config for this family
+   * so that syncService.initialize() won't restore the wrong provider.
    */
   async persist(familyId: string): Promise<void> {
-    // storeFileHandle uses getActiveFamilyId() internally for the key,
-    // but we call it here since the family context should already be set
-    void familyId;
+    await clearProviderConfig(familyId);
     await storeFileHandle(this.handle);
   }
 

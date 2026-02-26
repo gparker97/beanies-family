@@ -168,6 +168,7 @@ export async function initialize(): Promise<boolean> {
   if (familyId) {
     try {
       const config = await getProviderConfig(familyId);
+      console.warn('[syncService] Provider config for', familyId, ':', config?.type ?? 'none');
       if (config?.type === 'google_drive' && config.driveFileId && config.driveFileName) {
         currentProvider = GoogleDriveProvider.fromExisting(
           config.driveFileId,
@@ -191,6 +192,12 @@ export async function initialize(): Promise<boolean> {
   if (supportsFileSystemAccess()) {
     try {
       const handle = await getFileHandle();
+      console.warn(
+        '[syncService] Local file handle for',
+        familyId,
+        ':',
+        handle ? handle.name : 'none'
+      );
       if (handle) {
         currentProvider = LocalStorageProvider.fromHandle(handle);
         currentProviderFamilyId = getActiveFamilyId();
