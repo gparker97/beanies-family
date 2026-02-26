@@ -119,7 +119,7 @@ test.describe('Trusted Device Password Cache', () => {
 
     // Reload page — IndexedDB persists
     await page.reload();
-    await page.waitForURL('/dashboard');
+    await page.waitForURL('/nook');
 
     // Verify password survived reload
     settings = await getGlobalSettings(page);

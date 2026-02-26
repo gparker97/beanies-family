@@ -102,6 +102,25 @@ async function autoLoadFile() {
   formError.value = null;
 
   try {
+    // If there's already a pending encrypted file (e.g. from loadFromNewFile() before
+    // a biometric fallback), go straight to decrypt flow instead of re-reading from
+    // the configured handle — which may still point to the previous family's file.
+    if (syncStore.hasPendingEncryptedFile) {
+      if (!(await tryAutoDecrypt())) {
+        const { familyId, familyName } = getPendingFamilyInfo();
+        if (familyId && (await checkBiometricForFamily(familyId, familyName))) {
+          // Biometric flow will handle decryption — don't show password modal
+        } else {
+          loadedFileName.value = syncStore.fileName;
+          showDecryptModal.value = true;
+        }
+      } else {
+        emit('file-loaded');
+      }
+      isLoadingFile.value = false;
+      return;
+    }
+
     const loadResult = await syncStore.loadFromFile();
     if (!loadResult.success && loadResult.needsPassword) {
       // File is encrypted — try cached password before showing modal

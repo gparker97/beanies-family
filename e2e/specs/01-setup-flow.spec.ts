@@ -12,7 +12,7 @@ test.describe('Setup Flow', () => {
     await page.goto('/');
     await bypassLoginIfNeeded(page);
 
-    await expect(page).toHaveURL('/dashboard');
+    await expect(page).toHaveURL('/nook');
 
     const data = await dbHelper.exportData();
     expect(data.familyMembers).toHaveLength(1);
