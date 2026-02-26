@@ -1017,6 +1017,11 @@ const STRING_DEFS = {
   'loginV6.wantYourOwn': { en: 'Want your own?' },
   'loginV6.createLink': { en: 'Create a new pod' },
   'loginV6.acceptsBeanpod': { en: 'Accepts .beanpod files' },
+  'loginV6.recommended': { en: 'Recommended' },
+  'loginV6.googleDriveCardDesc': { en: 'Load from your cloud storage' },
+  'loginV6.dropboxCardDesc': { en: 'Sync with Dropbox' },
+  'loginV6.iCloudCardDesc': { en: 'Sync with iCloud' },
+  'loginV6.localFileCardDesc': { en: 'Open a .beanpod from your device' },
   'loginV6.securityYourDataDesc': {
     en: 'Your pod file lives in your cloud storage. We never see it.',
   },
