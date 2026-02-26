@@ -188,7 +188,7 @@ async function handleFinish() {
     syncStore.setupAutoSync();
     await syncStore.syncNow(true);
   }
-  emit('signed-in', '/dashboard');
+  emit('signed-in', '/nook');
 }
 
 function handleBack() {

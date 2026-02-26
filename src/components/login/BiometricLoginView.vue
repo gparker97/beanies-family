@@ -90,7 +90,7 @@ async function handleBiometricLogin() {
 
       syncStore.setupAutoSync();
       await syncStore.syncNow(true);
-      emit('signed-in', '/dashboard');
+      emit('signed-in', '/nook');
     }
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : t('passkey.signInError');

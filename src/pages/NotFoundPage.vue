@@ -9,7 +9,7 @@ const { t } = useTranslation();
 const prefersReducedMotion = useReducedMotion();
 
 function goHome() {
-  router.push('/dashboard');
+  router.push('/nook');
 }
 </script>
 

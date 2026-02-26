@@ -88,7 +88,7 @@ async function handleSignIn() {
     if (result.success) {
       syncStore.setupAutoSync();
       await syncStore.syncNow(true);
-      emit('signed-in', '/dashboard');
+      emit('signed-in', '/nook');
     } else {
       formError.value = result.error ?? t('auth.signInFailed');
     }
@@ -98,7 +98,7 @@ async function handleSignIn() {
   // Normal sign-in with existing password
   const result = await authStore.signIn(selectedMember.value.id, password.value);
   if (result.success) {
-    emit('signed-in', '/dashboard');
+    emit('signed-in', '/nook');
   } else {
     formError.value = result.error ?? t('auth.signInFailed');
   }
