@@ -144,3 +144,42 @@ Then verify each match includes the new export in its mock factory.
 3. **Explicit `keepExistingData: false`:** Pass it explicitly to `createWritable()` to guarantee the temp file starts empty across all browser implementations.
 
 **Rule:** Any async function that writes to a shared file via the File System Access API MUST be serialized with a mutex. Debouncing alone is insufficient — it prevents rapid re-triggering but does not prevent overlapping async operations.
+
+## 10. Pinia store vs service-level state: keep them in sync after identity changes
+
+**Date:** 2026-02-26
+**Context:** Google Drive file reverts to local file on page refresh
+
+**Pattern:** `syncService.decryptAndImport()` calls `familyContext.createFamilyWithId(FAMILY-B)` directly, which updates the **database module's** `currentFamilyId` to FAMILY-B. But the Pinia `familyContextStore.activeFamily` ref still points to FAMILY-A — it was never updated. Later, `authStore.signIn()` reads `familyContextStore.activeFamilyId` (FAMILY-A) and persists it in the session. On refresh, the app restores FAMILY-A and looks up its provider config — finding the local file handle instead of the Google Drive config that was correctly stored under FAMILY-B.
+
+**Symptom:** After loading from Google Drive and refreshing, the app silently reverts to a previously loaded local file. Console shows `Provider config for <FAMILY-A>: none` — because the Google Drive config was stored for FAMILY-B, which the session never references.
+
+**Root cause chain:**
+
+1. `decryptAndImport()` adopts FAMILY-B at DB level but not Pinia level
+2. `authStore.signIn()` captures stale FAMILY-A from Pinia into the session
+3. On refresh, session says FAMILY-A → provider config lookup finds local file, not Google Drive
+
+**Additional contributing factors:**
+
+- `pendingEncryptedFile` stored `{} as FileSystemFileHandle` as a placeholder for Google Drive files — this couldn't be normalized back to a provider in `decryptAndImport`, so `persist()` was never called through that path either
+- No mutual exclusion between local file handles and Google Drive configs in IndexedDB — both could coexist for the same family
+
+**Rule:** When any service-level function changes the active family identity (via `createFamilyWithId`, `setActiveFamilyDB`, etc.), the Pinia `familyContextStore` MUST be synced immediately afterward:
+
+```typescript
+const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+const activeFamilyId = getActiveFamilyId();
+const familyCtx = useFamilyContextStore();
+if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+  await familyCtx.switchFamily(activeFamilyId);
+}
+```
+
+**Broader principle:** When state is duplicated across layers (DB module, Pinia store, session storage), any operation that changes one layer must propagate to all others. Silent divergence between layers causes bugs that are extremely hard to trace because each layer looks correct in isolation.
+
+**Defense in depth:**
+
+- Each storage provider's `persist()` should clear the other provider's stale config (mutual exclusion)
+- Store provider identity as plain strings (not class instances) in Vue refs to avoid Proxy issues
+- Add diagnostic logging to `syncService.initialize()` showing which provider was found

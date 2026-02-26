@@ -37,6 +37,7 @@ vi.mock('@/services/google/driveService', () => ({
 vi.mock('../../fileHandleStore', () => ({
   storeProviderConfig: vi.fn(async () => {}),
   clearProviderConfig: vi.fn(async () => {}),
+  clearFileHandleForFamily: vi.fn(async () => {}),
 }));
 
 vi.mock('../../offlineQueue', () => ({
