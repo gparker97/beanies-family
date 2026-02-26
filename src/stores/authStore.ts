@@ -185,8 +185,9 @@ export const useAuthStore = defineStore('auth', () => {
       // Hash the password
       const passwordHashValue = await hashPassword(params.password);
 
-      // Create the owner member with password hash
+      // Clear stale state from any previous cancelled setup attempt
       const familyStore = useFamilyStore();
+      familyStore.resetState();
       const member = await familyStore.createMember({
         name: params.memberName,
         email: params.email,
