@@ -29,15 +29,15 @@ jobs:
 
           echo "Waiting for Main Branch CI to pass for commit $SHA..."
 
+          # Require a CI run to exist — fail immediately if none found
+          result=$(gh run list --repo ${{ github.repository }} --workflow=$WORKFLOW --branch=main --commit=$SHA --limit=1 --json conclusion,status -q '.[0]')
+          if [ -z "$result" ] || [ "$result" = "null" ]; then
+            echo "::error::No Main Branch CI run found for commit $SHA. CI must run before deploying."
+            exit 1
+          fi
+
           while [ $ELAPSED -lt $TIMEOUT ]; do
             result=$(gh run list --repo ${{ github.repository }} --workflow=$WORKFLOW --branch=main --commit=$SHA --limit=1 --json conclusion,status -q '.[0]')
-
-            if [ -z "$result" ] || [ "$result" = "null" ]; then
-              echo "No run found yet, waiting ${INTERVAL}s... (${ELAPSED}s elapsed)"
-              sleep $INTERVAL
-              ELAPSED=$((ELAPSED + INTERVAL))
-              continue
-            fi
 
             status=$(echo "$result" | jq -r '.status')
             conclusion=$(echo "$result" | jq -r '.conclusion')
@@ -74,15 +74,15 @@ jobs:
 
           echo "Waiting for Security Scanning to pass for commit $SHA..."
 
+          # Require a security run to exist — fail immediately if none found
+          result=$(gh run list --repo ${{ github.repository }} --workflow=$WORKFLOW --branch=main --commit=$SHA --limit=1 --json conclusion,status -q '.[0]')
+          if [ -z "$result" ] || [ "$result" = "null" ]; then
+            echo "::error::No Security Scanning run found for commit $SHA. Security checks must run before deploying."
+            exit 1
+          fi
+
           while [ $ELAPSED -lt $TIMEOUT ]; do
             result=$(gh run list --repo ${{ github.repository }} --workflow=$WORKFLOW --branch=main --commit=$SHA --limit=1 --json conclusion,status -q '.[0]')
-
-            if [ -z "$result" ] || [ "$result" = "null" ]; then
-              echo "No run found yet, waiting ${INTERVAL}s... (${ELAPSED}s elapsed)"
-              sleep $INTERVAL
-              ELAPSED=$((ELAPSED + INTERVAL))
-              continue
-            fi
 
             status=$(echo "$result" | jq -r '.status')
             conclusion=$(echo "$result" | jq -r '.conclusion')
