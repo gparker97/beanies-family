@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -40,6 +41,8 @@ const isSavingStorage = ref(false);
 const podPassword = ref('');
 const confirmPodPassword = ref('');
 const storageType = ref<'local' | 'google_drive' | null>(null);
+const showDriveResultModal = ref(false);
+const driveResultError = ref<string | null>(null);
 
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
@@ -118,6 +121,7 @@ async function handleChooseGoogleDriveStorage() {
 
   isSavingStorage.value = true;
   formError.value = null;
+  driveResultError.value = null;
 
   try {
     const podFileName = `${familyName.value || 'my-family'}.beanpod`;
@@ -126,12 +130,13 @@ async function handleChooseGoogleDriveStorage() {
       storageSaved.value = true;
       storageType.value = 'google_drive';
     } else {
-      formError.value = syncStore.error || t('googleDrive.authFailed');
+      driveResultError.value = syncStore.error || t('googleDrive.authFailed');
     }
   } catch (e) {
-    formError.value = (e as Error).message || t('googleDrive.authFailed');
+    driveResultError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
     isSavingStorage.value = false;
+    showDriveResultModal.value = true;
   }
 }
 
@@ -575,35 +580,6 @@ function handleBack() {
         </div>
       </div>
 
-      <!-- Google Drive success info -->
-      <div
-        v-if="storageType === 'google_drive'"
-        class="mt-3 rounded-xl border border-green-200 bg-green-50/80 p-3 dark:border-green-800/40 dark:bg-green-900/15"
-      >
-        <div class="flex items-start gap-2.5">
-          <svg
-            class="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600 dark:text-green-400"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path
-              d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
-            />
-          </svg>
-          <div class="min-w-0 text-[0.72rem] leading-relaxed">
-            <p class="font-semibold text-green-800 dark:text-green-300">
-              {{ t('googleDrive.fileCreated') }}
-            </p>
-            <p class="mt-0.5 text-green-700/80 dark:text-green-400/70">
-              {{ syncStore.fileName }} &middot; {{ t('googleDrive.fileLocation') }}
-            </p>
-            <p class="mt-1.5 text-green-700/60 dark:text-green-400/50">
-              {{ t('googleDrive.shareHint') }}
-            </p>
-          </div>
-        </div>
-      </div>
-
       <!-- Pod file encryption password (below storage box) -->
       <div class="mt-5 space-y-3">
         <div>
@@ -792,5 +768,120 @@ function handleBack() {
         {{ t('loginV6.loadItLink') }}
       </button>
     </div>
+
+    <!-- Google Drive result modal (success or failure) -->
+    <BaseModal :open="showDriveResultModal" @close="showDriveResultModal = false">
+      <!-- Success -->
+      <template v-if="!driveResultError">
+        <div class="text-center">
+          <div
+            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
+          >
+            <svg
+              class="h-6 w-6 text-green-600 dark:text-green-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+          <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+            {{ t('googleDrive.fileCreated') }}
+          </h3>
+        </div>
+
+        <div class="mt-4 space-y-3">
+          <!-- File details -->
+          <div class="rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50">
+            <div class="flex items-center gap-2.5">
+              <svg
+                class="h-5 w-5 flex-shrink-0 text-blue-500"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path
+                  d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+                />
+              </svg>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {{ syncStore.fileName }}
+                </p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('googleDrive.fileLocation') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Open in Drive link -->
+          <a
+            v-if="syncStore.driveFileId"
+            :href="`https://drive.google.com/file/d/${syncStore.driveFileId}/view`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-900/15 dark:text-blue-400 dark:hover:bg-blue-900/30"
+          >
+            {{ t('googleDrive.openInDrive') }}
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </a>
+
+          <!-- Sharing hint -->
+          <p class="text-center text-xs leading-relaxed text-gray-400 dark:text-gray-500">
+            {{ t('googleDrive.shareHint') }}
+          </p>
+        </div>
+
+        <BaseButton class="mt-4 w-full" @click="showDriveResultModal = false">
+          {{ t('action.ok') }}
+        </BaseButton>
+      </template>
+
+      <!-- Failure -->
+      <template v-else>
+        <div class="text-center">
+          <div
+            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
+          >
+            <svg
+              class="h-6 w-6 text-red-600 dark:text-red-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </div>
+          <h3 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
+            {{ t('googleDrive.authFailed') }}
+          </h3>
+          <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            {{ driveResultError }}
+          </p>
+        </div>
+
+        <BaseButton class="mt-4 w-full" @click="showDriveResultModal = false">
+          {{ t('action.ok') }}
+        </BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
