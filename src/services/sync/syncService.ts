@@ -20,6 +20,7 @@ import {
 } from '@/services/crypto/encryption';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
+import { clearSettingsWAL } from '@/services/sync/settingsWAL';
 import type { SyncFileData } from '@/types/models';
 import { generateUUID } from '@/utils/id';
 
@@ -306,6 +307,7 @@ async function doSave(password?: string): Promise<boolean> {
     // Verify we have permission
     const permissionGranted = await verifyPermission(currentFileHandle, 'readwrite');
     if (!permissionGranted) {
+      console.warn('[syncService] doSave: file permission denied — save skipped');
       updateState({ isSyncing: false, lastError: 'Permission denied' });
       return false;
     }
@@ -367,6 +369,12 @@ async function doSave(password?: string): Promise<boolean> {
     await writable.write(contentBytes);
     await writable.truncate(contentBytes.byteLength);
     await writable.close();
+
+    // File write succeeded — clear the WAL so it doesn't override on next reload
+    const savedFamilyId = getActiveFamilyId();
+    if (savedFamilyId) {
+      clearSettingsWAL(savedFamilyId);
+    }
 
     updateState({ isSyncing: false, lastError: null });
     return true;
@@ -592,7 +600,9 @@ export function triggerDebouncedSave(): void {
       );
       return;
     }
-    save(sessionPassword ?? undefined).catch(console.error);
+    save(sessionPassword ?? undefined).catch((err) =>
+      console.warn('[syncService] Auto-save failed:', err)
+    );
   }, DEBOUNCE_MS);
 }
 
