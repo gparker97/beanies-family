@@ -14,6 +14,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'signed-in': [destination: string];
   'use-password': [];
+  'switch-family': [];
 }>();
 
 const { t } = useTranslation();
@@ -159,6 +160,14 @@ async function handleBiometricLogin() {
         @click="emit('use-password')"
       >
         {{ t('passkey.usePassword') }}
+      </button>
+
+      <!-- Switch family -->
+      <button
+        class="w-full text-center text-sm text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        @click="emit('switch-family')"
+      >
+        {{ t('loginV6.switchFamily') }}
       </button>
     </div>
   </div>
