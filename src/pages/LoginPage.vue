@@ -63,17 +63,17 @@ onMounted(async () => {
 
     // Single-family fast login: skip WelcomeGate + FamilyPicker
     const allFamilies = familyContextStore.allFamilies;
-    if (allFamilies.length === 1) {
-      const family = allFamilies[0];
+    const singleFamily = allFamilies.length === 1 ? allFamilies[0] : undefined;
+    if (singleFamily) {
       const [hasPasskeys, providerConfig] = await Promise.all([
-        authStore.checkHasRegisteredPasskeys(family.id),
-        getProviderConfig(family.id),
+        authStore.checkHasRegisteredPasskeys(singleFamily.id),
+        getProviderConfig(singleFamily.id),
       ]);
       isSingleFamilyAutoSelect.value = true;
       isInitializing.value = false;
       await handleFamilySelected({
-        id: family.id,
-        name: family.name ?? 'My Family',
+        id: singleFamily.id,
+        name: singleFamily.name ?? 'My Family',
         hasPasskeys,
         providerConfig,
       });
