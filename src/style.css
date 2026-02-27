@@ -244,6 +244,57 @@
   animation: beanie-spring-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
+/* ─── Cross-device sync highlight animations ─────────────────────────── */
+@keyframes beanie-sync-in {
+  0% {
+    box-shadow: 0 0 0 0 transparent;
+    filter: blur(4px);
+    opacity: 0.3;
+    transform: scale(0.97);
+  }
+
+  40% {
+    box-shadow: 0 0 0 2px rgb(241 93 34 / 40%);
+    filter: blur(0);
+    opacity: 1;
+    transform: scale(1.01);
+  }
+
+  70% {
+    box-shadow: 0 0 12px 2px rgb(241 93 34 / 25%);
+    transform: scale(1);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    filter: blur(0);
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes beanie-sync-pulse {
+  0% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+
+  30% {
+    box-shadow: 0 0 0 2px rgb(241 93 34 / 30%);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.beanie-sync-in {
+  animation: beanie-sync-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.beanie-sync-pulse {
+  animation: beanie-sync-pulse 1.5s ease-out both;
+}
+
 @utility nook-section-label {
   font-family: Outfit, sans-serif;
   font-size: 0.75rem;
@@ -273,7 +324,9 @@
   .animate-beanie-float,
   .animate-beanie-rotate-in,
   .animate-beanie-blink,
-  .animate-beanie-spring-in {
+  .animate-beanie-spring-in,
+  .beanie-sync-in,
+  .beanie-sync-pulse {
     animation: none !important;
   }
 

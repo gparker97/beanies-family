@@ -5,6 +5,7 @@ import { BaseCard, BaseButton, BaseInput, BaseModal, BaseSelect } from '@/compon
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -26,6 +27,7 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -369,7 +371,12 @@ function cancelEditFamilyName() {
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <BaseCard v-for="member in familyStore.members" :key="member.id" :hoverable="true">
+      <BaseCard
+        v-for="member in familyStore.members"
+        :key="member.id"
+        :hoverable="true"
+        :class="syncHighlightClass(member.id)"
+      >
         <div class="flex items-start gap-4">
           <BeanieAvatar
             :variant="getMemberAvatarVariant(member)"
