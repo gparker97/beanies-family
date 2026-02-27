@@ -78,8 +78,14 @@ async function activateFamilyForBiometric(familyId: string, familyName: string) 
   }
 
   // Pre-load the encrypted file so biometric login can decrypt it
-  if (syncStore.isConfigured && !syncStore.needsPermission) {
-    await syncStore.loadFromFile();
+  if (syncStore.isConfigured) {
+    // After PWA restart, local file handle permissions are revoked by the browser.
+    // Request permission first (safe — this runs during a user gesture).
+    if (syncStore.needsPermission) {
+      await syncStore.requestPermission();
+    } else {
+      await syncStore.loadFromFile();
+    }
   }
 
   biometricFamilyId.value = familyId;
