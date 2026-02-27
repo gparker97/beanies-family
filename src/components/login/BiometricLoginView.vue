@@ -9,6 +9,7 @@ import { useTranslation } from '@/composables/useTranslation';
 const props = defineProps<{
   familyId: string;
   familyName?: string;
+  showNotYouLink?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -95,7 +96,7 @@ async function handleBiometricLogin() {
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
-      {{ t('action.back') }}
+      {{ showNotYouLink ? t('fastLogin.notYou') : t('action.back') }}
     </button>
 
     <!-- Family name -->
@@ -105,6 +106,9 @@ async function handleBiometricLogin() {
         alt=""
         class="mx-auto mb-3 h-16 w-16"
       />
+      <p v-if="showNotYouLink" class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+        {{ t('fastLogin.welcomeBack') }}
+      </p>
       <h2 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
         {{ familyName || t('passkey.welcomeBack') }}
       </h2>
