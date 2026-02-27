@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useSettingsStore } from './settingsStore';
+import { useTombstoneStore } from './tombstoneStore';
 import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
 import type {
   Asset,
@@ -183,6 +184,7 @@ export const useAssetsStore = defineStore('assets', () => {
     try {
       const success = await assetRepo.deleteAsset(id);
       if (success) {
+        useTombstoneStore().recordDeletion('asset', id);
         assets.value = assets.value.filter((a) => a.id !== id);
       }
       return success;

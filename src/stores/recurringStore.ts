@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useAccountsStore } from './accountsStore';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useSettingsStore } from './settingsStore';
+import { useTombstoneStore } from './tombstoneStore';
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import type {
   RecurringItem,
@@ -217,6 +218,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     try {
       const success = await recurringRepo.deleteRecurringItem(id);
       if (success) {
+        useTombstoneStore().recordDeletion('recurringItem', id);
         recurringItems.value = recurringItems.value.filter((item) => item.id !== id);
       }
       return success;

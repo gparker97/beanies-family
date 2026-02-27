@@ -50,6 +50,10 @@ Shift from IndexedDB-primary to **file-primary** architecture:
 | Auto-sync toggle     | _(removed — always on)_      |
 | Disconnect           | _(removed from UI)_          |
 
+### Cross-device sync (updated 2026-02-27)
+
+When the file is modified externally (another device), the app detects the change via polling and performs a **record-level merge** (see [ADR-017](017-record-level-merge-sync.md)) instead of full-replace import. This preserves unique records from both local and remote. Initial loads (empty local) still use full replace. The file format is v3.0 with a `data.deletions` tombstone array to propagate deletions across devices.
+
 ## Consequences
 
 ### Positive
@@ -58,6 +62,7 @@ Shift from IndexedDB-primary to **file-primary** architecture:
 - **Simpler UX:** Fewer toggles and settings to manage
 - **Clean sessions:** No stale data across sign-outs or family switches
 - **Cloud backup by composition:** Users can place their data file in Google Drive, Dropbox, etc.
+- **True multi-device sync:** Record-level merge prevents data loss from concurrent edits
 
 ### Negative
 

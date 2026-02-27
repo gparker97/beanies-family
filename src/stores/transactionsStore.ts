@@ -5,6 +5,7 @@ import * as transactionRepo from '@/services/indexeddb/repositories/transactionR
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useTombstoneStore } from '@/stores/tombstoneStore';
 import type {
   Transaction,
   CreateTransactionInput,
@@ -316,6 +317,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
       const success = await transactionRepo.deleteTransaction(id);
       if (success) {
+        useTombstoneStore().recordDeletion('transaction', id);
         transactions.value = transactions.value.filter((t) => t.id !== id);
 
         // Reverse the transaction's effect on account balance

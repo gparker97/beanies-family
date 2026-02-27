@@ -23,6 +23,8 @@ function createMockHandle(
 
   const mockFile = {
     text: vi.fn().mockResolvedValue(fileText),
+    lastModified: new Date('2026-01-01T00:00:00Z').getTime(),
+    size: fileText.length,
   };
 
   const mockWritable = {
@@ -85,16 +87,20 @@ describe('LocalStorageProvider', () => {
   });
 
   describe('getLastModified', () => {
-    it('returns exportedAt from file JSON', async () => {
+    it('returns file lastModified as ISO string', async () => {
       const timestamp = await provider.getLastModified();
-      expect(timestamp).toBe('2026-01-01T00:00:00Z');
+      // File mock has lastModified set to 2026-01-01T00:00:00Z
+      expect(timestamp).toBe(new Date('2026-01-01T00:00:00Z').toISOString());
     });
 
-    it('returns null for invalid JSON', async () => {
-      const badHandle = createMockHandle({ fileText: 'not json' });
-      const badProvider = new LocalStorageProvider(badHandle);
+    it('returns null for empty file', async () => {
+      const emptyHandle = createMockHandle({ fileText: '' });
+      // Override size to 0 for empty file
+      const mockFile = { text: vi.fn(), lastModified: 0, size: 0 };
+      (emptyHandle.getFile as ReturnType<typeof vi.fn>).mockResolvedValue(mockFile);
+      const emptyProvider = new LocalStorageProvider(emptyHandle);
 
-      const timestamp = await badProvider.getLastModified();
+      const timestamp = await emptyProvider.getLastModified();
       expect(timestamp).toBeNull();
     });
   });

@@ -52,6 +52,10 @@ let currentProviderFamilyId: string | null = null;
 type StateCallback = (state: SyncServiceState) => void;
 const stateCallbacks: StateCallback[] = [];
 
+// Callbacks for save completion (timestamp updates)
+type SaveCompleteCallback = (timestamp: string) => void;
+const saveCompleteCallbacks: SaveCompleteCallback[] = [];
+
 // Current state
 let state: SyncServiceState = {
   isInitialized: false,
@@ -85,6 +89,18 @@ export function onStateChange(callback: StateCallback): () => void {
  */
 export function getState(): SyncServiceState {
   return { ...state };
+}
+
+/**
+ * Register a callback invoked after every successful save with the file's exportedAt timestamp.
+ * Used by syncStore to keep lastSync in sync without manual updates scattered throughout.
+ */
+export function onSaveComplete(callback: SaveCompleteCallback): () => void {
+  saveCompleteCallbacks.push(callback);
+  return () => {
+    const index = saveCompleteCallbacks.indexOf(callback);
+    if (index > -1) saveCompleteCallbacks.splice(index, 1);
+  };
 }
 
 /**
@@ -391,6 +407,10 @@ async function doSave(password?: string): Promise<boolean> {
     }
 
     updateState({ isSyncing: false, lastError: null });
+
+    // Notify subscribers (syncStore) of the save timestamp
+    saveCompleteCallbacks.forEach((cb) => cb(syncData.exportedAt));
+
     return true;
   } catch (e) {
     updateState({ isSyncing: false, lastError: (e as Error).message });
@@ -465,8 +485,9 @@ export async function load(): Promise<SyncFileData | null> {
  * Load data from sync file and import into database.
  * Checks that the sync file's familyId matches the active family to prevent
  * cross-family data leakage (e.g., loading one family's sync file into another's DB).
+ * @param options.merge - If true, merge file data with local data instead of full replace.
  */
-export async function loadAndImport(): Promise<{
+export async function loadAndImport(options: { merge?: boolean } = {}): Promise<{
   success: boolean;
   needsPassword?: boolean;
   fileHandle?: FileSystemFileHandle;
@@ -511,7 +532,7 @@ export async function loadAndImport(): Promise<{
   }
 
   try {
-    await importSyncFileData(syncData);
+    await importSyncFileData(syncData, { merge: options.merge });
     return { success: true };
   } catch (e) {
     updateState({ lastError: (e as Error).message });
@@ -581,6 +602,20 @@ export function triggerDebouncedSave(): void {
       console.warn('[syncService] Auto-save failed:', err)
     );
   }, DEBOUNCE_MS);
+}
+
+/**
+ * Cancel any pending debounced save and perform an immediate save.
+ * Combines flushPendingSave + save in a single call.
+ * Intended for visibilitychange → hidden and beforeunload handlers.
+ */
+export async function saveNow(): Promise<boolean> {
+  cancelPendingSave();
+  if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
+    console.warn('[syncService] saveNow skipped: encryption enabled but no session password');
+    return false;
+  }
+  return save(sessionPassword ?? undefined);
 }
 
 /**

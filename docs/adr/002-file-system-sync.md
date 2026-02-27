@@ -1,6 +1,6 @@
 # ADR-002: File-Based Sync via File System Access API
 
-**Status:** Accepted
+**Status:** Accepted (merge strategy superseded by [ADR-017](017-record-level-merge-sync.md))
 **Date:** Early development (see commit "Fix auto-sync bug and add conflict detection")
 
 ## Context

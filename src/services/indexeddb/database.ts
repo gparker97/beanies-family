@@ -10,6 +10,7 @@ import type {
   RecurringItem,
   TodoItem,
   TranslationCacheEntry,
+  DeletionTombstone,
 } from '@/types/models';
 
 const LEGACY_DB_NAME = 'gp-family-finance';
@@ -284,6 +285,7 @@ export interface ExportedData {
   goals: Goal[];
   recurringItems: RecurringItem[];
   todos?: TodoItem[];
+  deletions: DeletionTombstone[];
   settings: Settings | null;
 }
 
@@ -310,6 +312,7 @@ export async function exportAllData(): Promise<ExportedData> {
     goals,
     recurringItems,
     todos,
+    deletions: [], // Tombstones injected by createSyncFileData from the tombstone store
     settings: settings ?? null,
   };
 }

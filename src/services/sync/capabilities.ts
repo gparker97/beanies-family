@@ -63,10 +63,12 @@ export function getSyncCapabilities(): SyncCapabilities {
 }
 
 /**
- * Check if auto-sync is available (requires File System Access API)
+ * Check if auto-sync is available.
+ * Auto-sync (watcher + debounced save) works with any StorageProvider,
+ * not just File System Access API. Returns true unconditionally.
  */
 export function canAutoSync(): boolean {
-  return supportsFileSystemAccess();
+  return true;
 }
 
 /**

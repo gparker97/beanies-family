@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-26
-> **Updated by:** Claude (Google Drive cloud storage integration #78 complete)
+> **Last updated:** 2026-02-27
+> **Updated by:** Claude (cross-device sync hardening — record-level merge)
 
 ## Current Phase
 
@@ -21,6 +21,7 @@
 - Linting (ESLint + Prettier + Stylelint + Husky pre-commit hooks)
 - File-based sync via File System Access API (with encryption support)
 - Google Drive cloud storage integration (StorageProvider abstraction, OAuth via GIS, Drive REST API, offline queue, file picker, reconnect toast) — ADR-016
+- Cross-device sync hardening: record-level merge (v3.0 file format), deletion tombstones, 6 sync bug fixes — ADR-017
 - Exchange rate auto-fetching from free currency API
 - Recurring transaction processor (daily/monthly/yearly)
 - Multilingual support (English + Chinese) via MyMemory API with IndexedDB caching

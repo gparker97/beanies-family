@@ -159,6 +159,7 @@ vi.mock('@/services/sync/syncService', () => ({
   onStateChange: vi.fn((cb: (state: Record<string, unknown>) => void) => {
     stateChangeCallbackHolder.callback = cb;
   }),
+  onSaveComplete: vi.fn(() => () => {}),
   setEncryptionRequiredCallback: vi.fn(),
   initialize: vi.fn(async () => false),
   hasPermission: vi.fn(async () => true),
@@ -182,6 +183,7 @@ vi.mock('@/services/sync/syncService', () => ({
   getFileTimestamp: vi.fn(async () => null),
   triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
   cancelPendingSave: vi.fn(),
+  saveNow: vi.fn(async () => true),
   flushPendingSave: vi.fn(async () => {}),
   reset: vi.fn(() => {
     stateChangeCallbackHolder.callback?.({

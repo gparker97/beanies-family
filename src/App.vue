@@ -33,7 +33,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
-import { flushPendingSave } from '@/services/sync/syncService';
+import { saveNow } from '@/services/sync/syncService';
 
 const route = useRoute();
 const router = useRouter();
@@ -333,25 +333,25 @@ onMounted(async () => {
   }
 });
 
-// Save data when going hidden; check for external file changes when becoming visible
+// Save data when going hidden; check for external file changes when becoming visible.
+// visibilitychange → hidden is the primary save point (fires reliably on tab close,
+// app switch, etc.). beforeunload is best-effort only — browsers may terminate
+// the async save before it completes.
 function handleVisibilityChange() {
   if (document.visibilityState === 'hidden') {
-    // Flush any queued debounced save
-    flushPendingSave();
-    // Force an immediate save to capture changes not yet queued by the watcher
-    // (Vue watchers fire asynchronously, so a reload right after a store mutation
-    // would miss the change if only relying on the debounced save)
-    if (syncStore.isConfigured && !syncStore.needsPermission) {
-      syncStore.syncNow(true).catch(console.warn);
-    }
+    syncStore.pauseFilePolling();
+    // Single immediate save — replaces the old flush + syncNow double-save
+    saveNow().catch(console.warn);
   } else if (document.visibilityState === 'visible') {
+    syncStore.resumeFilePolling();
     // Check for external file changes (cross-device sync)
     syncStore.reloadIfFileChanged().catch(console.warn);
   }
 }
 
 function handleBeforeUnload() {
-  flushPendingSave();
+  // Best-effort save — browser may terminate the async save
+  saveNow().catch(console.warn);
 }
 
 document.addEventListener('visibilitychange', handleVisibilityChange);
