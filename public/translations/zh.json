@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-02-26",
-    "translationCount": 801
+    "lastUpdated": "2026-02-27",
+    "translationCount": 810
   },
   "translations": {
     "app.name": {
@@ -2811,11 +2811,6 @@
       "hash": "ef1524",
       "lastUpdated": "2026-02-24"
     },
-    "loginV6.switchFamily": {
-      "translation": "切换到其他家庭",
-      "hash": "oxzb7",
-      "lastUpdated": "2026-02-24"
-    },
     "loginV6.pickBeanTitle": {
       "translation": "谁在登录？",
       "hash": "oyxgll",
@@ -4010,6 +4005,56 @@
       "translation": "iCloud",
       "hash": "k8k71w",
       "lastUpdated": "2026-02-26"
+    },
+    "familyPicker.title": {
+      "translation": "哪家",
+      "hash": "m44fyg",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.subtitle": {
+      "translation": "选择要登录的家庭",
+      "hash": "2ky4ia",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.loadDifferent": {
+      "translation": "加载其他文件",
+      "hash": "18eoak",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.noFamilies": {
+      "translation": "在此设备上未找到家庭",
+      "hash": "74d82c",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.loadFile": {
+      "translation": "加载家庭数据文件",
+      "hash": "9xp4y9",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.providerLocal": {
+      "translation": "本地文件",
+      "hash": "hgy21b",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.providerDrive": {
+      "translation": "Google Drive",
+      "hash": "dnein7",
+      "lastUpdated": "2026-02-27"
+    },
+    "familyPicker.loadError": {
+      "translation": "无法加载您的文件—请重新找到它",
+      "hash": "4ndare",
+      "lastUpdated": "2026-02-27"
+    },
+    "confirm.deleteLocalFamilyTitle": {
+      "translation": "删除本地家庭数据",
+      "hash": "te5858",
+      "lastUpdated": "2026-02-27"
+    },
+    "confirm.deleteLocalFamily": {
+      "translation": "这将从此设备中永久删除此系列的所有数据、密钥和设置。原始文件不受影响。此操作无法撤消。",
+      "hash": "y7b1vm",
+      "lastUpdated": "2026-02-27"
     }
   }
 }
