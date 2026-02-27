@@ -50,7 +50,13 @@ async function handleBiometricLogin() {
       const pwResult = await syncStore.decryptPendingFile(result.cachedPassword);
       decryptSuccess = pwResult.success;
       if (!decryptSuccess) {
-        errorMessage.value = t('passkey.passwordChanged');
+        console.warn('[BiometricLoginView] decryptPendingFile failed:', pwResult.error);
+        // Distinguish: file never loaded vs wrong password
+        if (pwResult.error?.includes('No pending')) {
+          errorMessage.value = t('passkey.fileLoadError');
+        } else {
+          errorMessage.value = t('passkey.passwordChanged');
+        }
       }
     } else {
       errorMessage.value = t('passkey.signInError');
