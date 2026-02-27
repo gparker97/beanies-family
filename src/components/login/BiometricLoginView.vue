@@ -33,8 +33,8 @@ async function handleBiometricLogin() {
     const result = await authStore.signInWithPasskey(props.familyId);
 
     if (!result.success) {
-      if (result.error === 'CROSS_DEVICE_CREDENTIAL') {
-        errorMessage.value = t('passkey.crossDeviceError');
+      if (result.error === 'CROSS_DEVICE_NO_CACHE') {
+        errorMessage.value = t('passkey.crossDeviceNoCache');
       } else if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
         errorMessage.value = t('passkey.wrongFamilyError');
       } else {

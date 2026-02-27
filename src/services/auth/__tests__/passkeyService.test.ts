@@ -20,6 +20,13 @@ vi.mock('../passkeyCrypto', () => ({
   buildPRFExtension: vi.fn(() => ({ prf: { eval: { first: new Uint8Array(32) } } })),
 }));
 
+// --- Mock globalSettingsRepository ---
+let mockGlobalSettings: Record<string, unknown> = {};
+
+vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
+  getGlobalSettings: vi.fn(async () => mockGlobalSettings),
+}));
+
 // Imports must come after vi.mock calls
 import {
   bufferToBase64url,
@@ -153,6 +160,7 @@ describe('authenticateWithPasskey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRegistrations.length = 0;
+    mockGlobalSettings = {};
 
     vi.stubGlobal('PublicKeyCredential', {
       isUserVerifyingPlatformAuthenticatorAvailable: async () => true,
@@ -204,7 +212,7 @@ describe('authenticateWithPasskey', () => {
     expect(result.cachedPassword).toBe('pw-123');
   });
 
-  it('returns CROSS_DEVICE_CREDENTIAL when userHandle matches a member but credential ID does not', async () => {
+  it('returns CROSS_DEVICE_NO_CACHE when userHandle matches but no cached password exists', async () => {
     mockRegistrations.push(
       makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
     );
@@ -226,7 +234,47 @@ describe('authenticateWithPasskey', () => {
 
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
     expect(result.success).toBe(false);
-    expect(result.error).toBe('CROSS_DEVICE_CREDENTIAL');
+    expect(result.error).toBe('CROSS_DEVICE_NO_CACHE');
+  });
+
+  it('auto-registers synced credential when cached password exists for family', async () => {
+    mockRegistrations.push(
+      makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
+    );
+    mockGlobalSettings = {
+      cachedEncryptionPasswords: { 'family-1': 'cached-pw' },
+    };
+
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        get: vi.fn(async () =>
+          makeFakeAssertion({
+            rawId: new TextEncoder().encode('synced-cred').buffer,
+            userHandle: new TextEncoder().encode('member-1').buffer,
+          })
+        ),
+        create: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(result.success).toBe(true);
+    expect(result.memberId).toBe('member-1');
+    expect(result.cachedPassword).toBe('cached-pw');
+
+    // Verify the synced credential was saved to the local registry
+    expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentialId: bufferToBase64url(
+          new TextEncoder().encode('synced-cred').buffer as ArrayBuffer
+        ),
+        memberId: 'member-1',
+        familyId: 'family-1',
+        cachedPassword: 'cached-pw',
+      })
+    );
   });
 
   it('returns WRONG_FAMILY_CREDENTIAL when neither credential ID nor userHandle matches', async () => {

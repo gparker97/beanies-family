@@ -63,6 +63,20 @@ When the encryption password changes:
 - PRF-path registrations have their wrapped DEK invalidated (user must re-register)
 - Non-PRF registrations get their cached password updated automatically
 
+### Cross-device passkey sync (added 2026-02-27)
+
+Modern platform authenticators (iCloud Keychain, Google Password Manager, Windows Hello Sync) automatically sync passkeys across devices. When a user registers a passkey on Device A and Device B, Device A's browser may present Device B's synced credential during authentication. Since the synced credential's ID doesn't exist in Device A's local registry, special handling is needed.
+
+**Approach:** When a credential's `userHandle` identifies a known member but the `credentialId` is not in the local registry:
+
+1. Look up the family's cached encryption password from global settings (`cachedEncryptionPasswords[familyId]`)
+2. If found: auto-register the synced credential locally and return the cached password for file decryption
+3. If not found: return `CROSS_DEVICE_NO_CACHE` error — user must enter their password once to populate the cache
+
+**Trust model:** The platform authenticator has already verified the user biometrically. The `userHandle` confirms the credential belongs to a known family member. The cached password is already stored locally (trusted device model). No additional signature verification is performed — challenge generation is client-side, making server-style signature verification unnecessary.
+
+**Limitation:** On a fresh device with no cached password, the user must sign in with their password at least once before synced passkeys work. This is consistent with the existing trusted device model.
+
 ## Consequences
 
 ### Positive
@@ -79,3 +93,4 @@ When the encryption password changes:
 - Cached password path stores the encryption password in IndexedDB (mitigated by requiring biometric to access)
 - Password changes require PRF users to re-register their passkey
 - Increased complexity in the authentication flow
+- Cross-device passkeys require a cached password on the device (first sign-in must use password)

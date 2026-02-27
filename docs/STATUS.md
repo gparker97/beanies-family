@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-27
-> **Updated by:** Claude (cross-device sync hardening — record-level merge)
+> **Updated by:** Claude (fix cross-device passkey authentication)
 
 ## Current Phase
 
@@ -426,6 +426,13 @@
 - `FamilyBeanRow.vue` `getRoleLabel` now checks `member.ageGroup` (adult/child) instead of only `member.role`
 - Adults with 'member' role correctly show "Parent"/"Big Bean" instead of "Little Bean"
 
+### Cross-Device Passkey Authentication Fix
+
+- **passkeyService.ts** — When a synced passkey (iCloud Keychain, Google Password Manager, Windows Hello) is used on a device where it wasn't originally registered, the system now auto-registers the credential locally using the family's cached encryption password instead of returning an error
+- **BiometricLoginView.vue** — New `CROSS_DEVICE_NO_CACHE` error handling with user-friendly message directing to password entry
+- **uiStrings.ts** — Updated cross-device error message to explain synced passkey behavior
+- **ADR-015** — Updated with cross-device passkey sync section documenting the auto-registration approach and trust model
+
 ### Biometric Login After Family Switching (Issue #16 follow-up)
 
 - **LoadPodView.vue** — Added biometric detection before password modal: checks `isPlatformAuthenticatorAvailable()` + `hasRegisteredPasskeys()` when encrypted file is loaded, emits `biometric-available` event to switch to BiometricLoginView
@@ -703,3 +710,4 @@ _(None currently tracked)_
 | 2026-02-24 | Issue #16 implemented: passkey/biometric login             | PRF + cached password dual-path, BiometricLoginView, PasskeyPromptModal, PasskeySettings rewrite, registry DB v3 with passkeys store (ADR-015)          |
 | 2026-02-26 | Cross-device sync via file polling (#103)                  | 10s file polling + visibility-change reload + force save on hidden; near-instant relay planned as #104                                                  |
 | 2026-02-26 | Cloud relay plan created (#104)                            | AWS API Gateway WebSocket + Lambda + DynamoDB for near-instant cross-device notifications; plan at `docs/plans/2026-02-26-cloud-relay-sync.md`          |
+| 2026-02-27 | Fix cross-device passkey authentication                    | Synced passkeys (iCloud/Google/Windows) auto-register locally using cached password; no more "registered on another device" error (ADR-015 updated)     |
