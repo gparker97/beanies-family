@@ -48,22 +48,20 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   /**
-   * Get the exportedAt timestamp from the file (lightweight polling check).
-   * Reads and parses the JSON envelope without importing data.
+   * Get the file's last-modified timestamp (lightweight polling check).
+   * Uses File.lastModified (OS metadata, no I/O) instead of reading
+   * and parsing the full JSON content on every poll cycle.
    */
   async getLastModified(): Promise<string | null> {
     try {
       const hasPermission = await this.isReady();
       if (!hasPermission) return null;
 
-      const text = await this.read();
-      if (!text) return null;
+      const file = await this.handle.getFile();
+      if (file.size === 0) return null;
 
-      const data = JSON.parse(text);
-      if (data && typeof data.exportedAt === 'string') {
-        return data.exportedAt;
-      }
-      return null;
+      // file.lastModified is a Unix timestamp in milliseconds (OS metadata)
+      return new Date(file.lastModified).toISOString();
     } catch {
       return null;
     }
