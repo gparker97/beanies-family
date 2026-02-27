@@ -271,16 +271,22 @@ export async function removeAllPasskeysForMember(memberId: string): Promise<void
 export async function signalCredentialsRemoved(credentialIds: string[]): Promise<void> {
   if (
     typeof PublicKeyCredential === 'undefined' ||
-    typeof PublicKeyCredential.signalUnknownCredential !== 'function'
+    typeof (PublicKeyCredential as unknown as Record<string, unknown>).signalUnknownCredential !==
+      'function'
   ) {
     return;
   }
 
   const rpId = window.location.hostname;
+  const signal = (
+    PublicKeyCredential as unknown as {
+      signalUnknownCredential: (opts: { rpId: string; credentialId: string }) => Promise<void>;
+    }
+  ).signalUnknownCredential;
 
   for (const credentialId of credentialIds) {
     try {
-      await PublicKeyCredential.signalUnknownCredential({ rpId, credentialId });
+      await signal({ rpId, credentialId });
     } catch {
       // Signal is best-effort — ignore errors
     }

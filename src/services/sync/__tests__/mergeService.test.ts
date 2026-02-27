@@ -5,7 +5,7 @@ import type { ExportedData } from '@/services/indexeddb/database';
 
 // Helper to create a timestamped record
 function record(id: string, updatedAt: string, extra: Record<string, unknown> = {}) {
-  return { id, updatedAt, ...extra };
+  return { id, updatedAt, ...extra } as { id: string; updatedAt: string; [key: string]: unknown };
 }
 
 function tombstone(id: string, entityType: string, deletedAt: string): DeletionTombstone {
@@ -26,7 +26,7 @@ describe('mergeRecords', () => {
     const file = [record('a', '2026-01-02T00:00:00Z', { name: 'new' })];
     const result = mergeRecords(local, file, new Map());
     expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('new');
+    expect(result[0]!.name).toBe('new');
   });
 
   it('keeps local when timestamps are equal', () => {
@@ -34,7 +34,7 @@ describe('mergeRecords', () => {
     const file = [record('a', '2026-01-01T00:00:00Z', { source: 'file' })];
     const result = mergeRecords(local, file, new Map());
     expect(result).toHaveLength(1);
-    expect(result[0].source).toBe('local');
+    expect(result[0]!.source).toBe('local');
   });
 
   it('removes records with a newer tombstone', () => {
@@ -51,7 +51,7 @@ describe('mergeRecords', () => {
     const tsMap = new Map([['a', tombstone('a', 'todo', '2026-01-02T00:00:00Z')]]);
     const result = mergeRecords(local, file, tsMap);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('a');
+    expect(result[0]!.id).toBe('a');
   });
 
   it('handles empty arrays', () => {
@@ -122,7 +122,7 @@ describe('mergeTombstones', () => {
     const file = [tombstone('a', 'todo', recentDate1)];
     const result = mergeTombstones(local, file);
     expect(result).toHaveLength(1);
-    expect(result[0].deletedAt).toBe(recentDate1);
+    expect(result[0]!.deletedAt).toBe(recentDate1);
   });
 
   it('prunes tombstones older than 30 days', () => {
@@ -131,7 +131,7 @@ describe('mergeTombstones', () => {
     const local = [tombstone('old', 'todo', oldDate), tombstone('recent', 'todo', recentDate)];
     const result = mergeTombstones(local, []);
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('recent');
+    expect(result[0]!.id).toBe('recent');
   });
 });
 

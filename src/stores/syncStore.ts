@@ -263,7 +263,7 @@ export const useSyncStore = defineStore('sync', () => {
     const success = await syncService.save(password);
     if (success) {
       // lastSync is updated by the onSaveComplete callback
-      await saveSettings({ lastSyncTimestamp: lastSync.value });
+      await saveSettings({ lastSyncTimestamp: lastSync.value ?? undefined });
     }
     return success;
   }
@@ -334,7 +334,7 @@ export const useSyncStore = defineStore('sync', () => {
       await saveSettings({
         syncEnabled: true,
         syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value,
+        lastSyncTimestamp: lastSync.value ?? undefined,
       });
 
       // Arm auto-sync so future changes are saved to the file
@@ -367,7 +367,7 @@ export const useSyncStore = defineStore('sync', () => {
       await saveSettings({
         syncEnabled: true,
         syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value,
+        lastSyncTimestamp: lastSync.value ?? undefined,
       });
       // Arm auto-sync so future changes are saved to the file
       setupAutoSync();
@@ -436,7 +436,7 @@ export const useSyncStore = defineStore('sync', () => {
         syncEnabled: true,
         encryptionEnabled: true,
         syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value,
+        lastSyncTimestamp: lastSync.value ?? undefined,
       });
 
       // Cache password on trusted devices so it survives page refresh
@@ -482,7 +482,7 @@ export const useSyncStore = defineStore('sync', () => {
     const success = await syncService.save(password);
     if (success) {
       // lastSync is updated by the onSaveComplete callback
-      await saveSettings({ lastSyncTimestamp: lastSync.value });
+      await saveSettings({ lastSyncTimestamp: lastSync.value ?? undefined });
       // Cache password on trusted devices
       const familyContextStore = useFamilyContextStore();
       if (familyContextStore.activeFamilyId) {
@@ -523,7 +523,7 @@ export const useSyncStore = defineStore('sync', () => {
     const success = await syncService.save(undefined);
     if (success) {
       // lastSync is updated by the onSaveComplete callback
-      await saveSettings({ lastSyncTimestamp: lastSync.value });
+      await saveSettings({ lastSyncTimestamp: lastSync.value ?? undefined });
     }
     // Note: We don't rollback here - the setting is disabled even if save fails
     // User can manually sync later
@@ -1015,7 +1015,7 @@ export const useSyncStore = defineStore('sync', () => {
       await saveSettings({
         syncEnabled: true,
         syncFilePath: provider.getDisplayName(),
-        lastSyncTimestamp: lastSync.value,
+        lastSyncTimestamp: lastSync.value ?? undefined,
       });
       setupAutoSync();
       setupTokenExpiryHandler();
