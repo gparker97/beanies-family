@@ -316,7 +316,11 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       if (result.success) {
-        lastSync.value = toISODateString(new Date());
+        // Use the file's exportedAt (not new Date()) so that checkForConflicts
+        // compares against the file's own timestamp. Using new Date() inflates
+        // lastSync beyond the file timestamp, causing the 2-second tolerance
+        // to mask subsequent saves from the other browser.
+        lastSync.value = result.fileExportedAt ?? toISODateString(new Date());
         // Reload all stores after import (sets isReloading=true again, then false at end)
         await reloadAllStores();
         // Only save-back if merge produced data the file doesn't have.
