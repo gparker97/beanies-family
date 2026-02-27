@@ -12,7 +12,6 @@ import type { DeletionTombstone, Settings } from '@/types/models';
 interface MergeableRecord {
   id: string;
   updatedAt: string;
-  [key: string]: unknown;
 }
 
 /**
