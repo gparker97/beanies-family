@@ -118,8 +118,12 @@ export async function loadGIS(): Promise<void> {
  * Request an OAuth access token. Shows Google sign-in prompt if needed.
  * Must be called after loadGIS().
  * Returns the access token or throws on error/cancel.
+ *
+ * @param options.forceConsent - When true, clears cached token and forces the
+ *   Google account chooser (prompt: 'consent'). Use when loading a different
+ *   file to let the user pick a different Google account.
  */
-export async function requestAccessToken(): Promise<string> {
+export async function requestAccessToken(options?: { forceConsent?: boolean }): Promise<string> {
   const clientId = getClientId();
   if (!clientId) {
     throw new Error(
@@ -129,6 +133,11 @@ export async function requestAccessToken(): Promise<string> {
 
   if (!window.google?.accounts?.oauth2) {
     throw new Error('Google Identity Services not loaded. Call loadGIS() first.');
+  }
+
+  // If forcing consent, clear existing token so we don't short-circuit
+  if (options?.forceConsent) {
+    clearTokenState();
   }
 
   // If we have a valid token, return it
@@ -162,8 +171,9 @@ export async function requestAccessToken(): Promise<string> {
       },
     });
 
-    // Try silent auth first, fall back to consent prompt
-    tokenClient.requestAccessToken({ prompt: '' });
+    // Force consent prompt to show account chooser, or try silent auth
+    const prompt = options?.forceConsent ? 'consent' : '';
+    tokenClient.requestAccessToken({ prompt });
   });
 }
 

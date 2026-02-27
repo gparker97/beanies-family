@@ -120,20 +120,47 @@ async function handleSignIn() {
 
     <!-- Header -->
     <div class="mb-6 text-center">
-      <!-- Pod name chip -->
-      <div
-        v-if="podName"
-        class="mx-auto mb-3 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-400"
-      >
-        <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-          />
-        </svg>
-        {{ podName }}
+      <!-- Pod name chip with provider context -->
+      <div v-if="podName" class="mx-auto mb-3 flex flex-col items-center gap-1">
+        <div
+          class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-400"
+        >
+          <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+            />
+          </svg>
+          {{ podName }}
+        </div>
+        <span
+          v-if="syncStore.fileName"
+          class="inline-flex items-center gap-1 text-[0.65rem] text-gray-400 dark:text-gray-500"
+        >
+          <!-- Google Drive icon -->
+          <svg
+            v-if="syncStore.storageProviderType === 'google_drive'"
+            class="h-3 w-3"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path
+              d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+            />
+          </svg>
+          <!-- Folder icon for local -->
+          <svg v-else class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+            />
+          </svg>
+          {{ syncStore.fileName }}
+        </span>
       </div>
 
       <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
@@ -307,14 +334,5 @@ async function handleSignIn() {
         }}
       </BaseButton>
     </form>
-
-    <!-- Switch family button -->
-    <button
-      type="button"
-      class="mt-6 w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-gray-400 dark:hover:bg-slate-700"
-      @click="$emit('back')"
-    >
-      {{ t('loginV6.switchFamily') }}
-    </button>
   </div>
 </template>

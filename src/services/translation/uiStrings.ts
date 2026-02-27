@@ -979,7 +979,14 @@ const STRING_DEFS = {
   'loginV6.unlockFooter': {
     en: "This password decrypts your local data. We don't store or recover it.",
   },
-  'loginV6.switchFamily': { en: 'Switch to a different family' },
+  // Family picker view
+  'familyPicker.title': { en: 'Which family?', beanie: 'Which beanies?' },
+  'familyPicker.subtitle': { en: 'Choose a family to sign into', beanie: 'Pick your pod of beans' },
+  'familyPicker.loadDifferent': { en: 'Load a different file' },
+  'familyPicker.noFamilies': { en: 'No families found on this device' },
+  'familyPicker.loadFile': { en: 'Load a family data file' },
+  'familyPicker.providerLocal': { en: 'Local file' },
+  'familyPicker.providerDrive': { en: 'Google Drive' },
   'loginV6.pickBeanTitle': { en: "Who's signing in?", beanie: 'Which beanie are you?' },
   'loginV6.pickBeanSubtitle': { en: 'Pick your bean' },
   'loginV6.parentBean': { en: 'Parent / Adult', beanie: 'Big Beanie' },
