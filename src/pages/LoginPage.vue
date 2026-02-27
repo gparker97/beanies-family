@@ -15,6 +15,8 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAuthStore } from '@/stores/authStore';
+import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 
 const router = useRouter();
@@ -23,6 +25,7 @@ const syncStore = useSyncStore();
 const settingsStore = useSettingsStore();
 const familyContextStore = useFamilyContextStore();
 const familyStore = useFamilyStore();
+const authStore = useAuthStore();
 
 const SESSION_PASSWORD_KEY = 'beanies-file-password';
 
@@ -51,12 +54,31 @@ const biometricDeclined = ref(false);
 const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
+const isSingleFamilyAutoSelect = ref(false);
 
 onMounted(async () => {
-  // Initialize stores but always show the Welcome Gate first — never skip
   if (familyStore.members.length === 0) {
     await familyContextStore.initialize();
     await syncStore.initialize();
+
+    // Single-family fast login: skip WelcomeGate + FamilyPicker
+    const allFamilies = familyContextStore.allFamilies;
+    if (allFamilies.length === 1) {
+      const family = allFamilies[0];
+      const [hasPasskeys, providerConfig] = await Promise.all([
+        authStore.checkHasRegisteredPasskeys(family.id),
+        getProviderConfig(family.id),
+      ]);
+      isSingleFamilyAutoSelect.value = true;
+      isInitializing.value = false;
+      await handleFamilySelected({
+        id: family.id,
+        name: family.name ?? 'My Family',
+        hasPasskeys,
+        providerConfig,
+      });
+      return;
+    }
   } else {
     // Members already loaded (e.g. navigated back) — go to pick-bean
     activeView.value = 'pick-bean';
@@ -124,6 +146,12 @@ function toProviderHint(
   return config.type === 'google_drive' ? 'google_drive' : 'local';
 }
 
+function providerErrorMessage(hint: 'local' | 'google_drive' | undefined): string {
+  if (hint === 'local') return t('fastLogin.loadErrorLocal');
+  if (hint === 'google_drive') return t('fastLogin.loadErrorDrive');
+  return t('familyPicker.loadError');
+}
+
 /**
  * Handle family selection from FamilyPickerView.
  * Routes to biometric (if passkeys), attempts auto-load, or falls back to load-pod.
@@ -172,8 +200,9 @@ async function handleFamilySelected(payload: {
         }
       } else {
         // Load failed for other reasons — fall back with error
-        loadError.value = t('familyPicker.loadError');
-        loadErrorProviderHint.value = toProviderHint(payload.providerConfig);
+        const hint = toProviderHint(payload.providerConfig);
+        loadError.value = providerErrorMessage(hint);
+        loadErrorProviderHint.value = hint;
         autoLoadPod.value = false;
         needsPermissionGrant.value = false;
         biometricDeclined.value = false;
@@ -181,8 +210,9 @@ async function handleFamilySelected(payload: {
       }
     } catch {
       // File moved/deleted/corrupt — fall back with error
-      loadError.value = t('familyPicker.loadError');
-      loadErrorProviderHint.value = toProviderHint(payload.providerConfig);
+      const hint = toProviderHint(payload.providerConfig);
+      loadError.value = providerErrorMessage(hint);
+      loadErrorProviderHint.value = hint;
       autoLoadPod.value = false;
       needsPermissionGrant.value = false;
       biometricDeclined.value = false;
@@ -226,9 +256,10 @@ function handleNavigate(view: 'load-pod' | 'create' | 'join') {
       activeView.value = 'family-picker';
       return;
     }
-    // No families — fall through to load-pod
+    // No families — fall through to load-pod with account chooser
     autoLoadPod.value = false;
     needsPermissionGrant.value = false;
+    forceNewGoogleAccount.value = true;
   } else {
     autoLoadPod.value = false;
     needsPermissionGrant.value = false;
@@ -283,9 +314,10 @@ function handleSignedIn(destination: string) {
         v-else-if="activeView === 'biometric'"
         :family-id="biometricFamilyId"
         :family-name="biometricFamilyName"
+        :show-not-you-link="isSingleFamilyAutoSelect"
         @signed-in="handleSignedIn"
         @use-password="handleBiometricFallback"
-        @back="activeView = 'family-picker'"
+        @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
       />
 
       <WelcomeGate v-else-if="activeView === 'welcome'" @navigate="handleNavigate" />
@@ -316,7 +348,7 @@ function handleSignedIn(destination: string) {
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"
-        @back="activeView = 'family-picker'"
+        @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"
         @biometric-available="handleBiometricAvailable"
       />
@@ -324,7 +356,7 @@ function handleSignedIn(destination: string) {
       <PickBeanView
         v-else-if="activeView === 'pick-bean'"
         :file-unencrypted="fileUnencrypted"
-        @back="activeView = 'family-picker'"
+        @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @signed-in="handleSignedIn"
       />
 

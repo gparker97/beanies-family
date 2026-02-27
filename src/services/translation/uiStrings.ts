@@ -991,6 +991,16 @@ const STRING_DEFS = {
   'familyPicker.providerLocal': { en: 'Local file' },
   'familyPicker.providerDrive': { en: 'Google Drive' },
   'familyPicker.loadError': { en: "Couldn't load your file — please locate it again" },
+
+  // Fast login (single-family auto-select)
+  'fastLogin.notYou': { en: 'Not you? Switch account' },
+  'fastLogin.welcomeBack': { en: 'Welcome back' },
+  'fastLogin.loadErrorLocal': {
+    en: "We looked everywhere but can't find your file — please select it again",
+  },
+  'fastLogin.loadErrorDrive': {
+    en: 'Your Google Drive credentials may have expired — please sign in again',
+  },
   'loginV6.pickBeanTitle': { en: "Who's signing in?", beanie: 'Which beanie are you?' },
   'loginV6.pickBeanSubtitle': { en: 'Pick your bean' },
   'loginV6.parentBean': { en: 'Parent / Adult', beanie: 'Big Beanie' },
