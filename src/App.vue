@@ -450,7 +450,7 @@ watch(
       class="fixed right-4 bottom-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
     >
       <GoogleReconnectToast
-        v-if="syncStore.showGoogleReconnect"
+        v-if="syncStore.showGoogleReconnect && !authStore.needsAuth"
         @reconnected="handleGoogleReconnected"
       />
       <UpdatePrompt />
