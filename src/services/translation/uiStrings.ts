@@ -987,6 +987,7 @@ const STRING_DEFS = {
   'familyPicker.loadFile': { en: 'Load a family data file' },
   'familyPicker.providerLocal': { en: 'Local file' },
   'familyPicker.providerDrive': { en: 'Google Drive' },
+  'familyPicker.loadError': { en: "Couldn't load your file — please locate it again" },
   'loginV6.pickBeanTitle': { en: "Who's signing in?", beanie: 'Which beanie are you?' },
   'loginV6.pickBeanSubtitle': { en: 'Pick your bean' },
   'loginV6.parentBean': { en: 'Parent / Adult', beanie: 'Big Beanie' },
