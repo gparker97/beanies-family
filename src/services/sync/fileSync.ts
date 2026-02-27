@@ -51,7 +51,11 @@ function detectMergeChanges(
 
   if (mergedTombstones.length !== fileTombstones.length) return true;
 
-  if (mergedData.settings?.updatedAt !== fileData.settings?.updatedAt) return true;
+  // Settings are intentionally excluded — settings differences (e.g. from
+  // saveSettings calls or WAL recovery) should NOT trigger a save-back.
+  // Settings-triggered save-backs create a near-permanent echo loop where
+  // each browser's save updates lastSync, masking the other browser's edits
+  // within the checkForConflicts tolerance window.
 
   return false;
 }

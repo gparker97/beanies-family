@@ -493,6 +493,7 @@ export async function loadAndImport(options: { merge?: boolean } = {}): Promise<
   fileHandle?: FileSystemFileHandle;
   rawSyncData?: SyncFileData;
   hasLocalChanges?: boolean;
+  fileExportedAt?: string;
 }> {
   const syncData = await load();
   if (!syncData) {
@@ -534,7 +535,11 @@ export async function loadAndImport(options: { merge?: boolean } = {}): Promise<
 
   try {
     const importResult = await importSyncFileData(syncData, { merge: options.merge });
-    return { success: true, hasLocalChanges: importResult.hasLocalChanges };
+    return {
+      success: true,
+      hasLocalChanges: importResult.hasLocalChanges,
+      fileExportedAt: syncData.exportedAt,
+    };
   } catch (e) {
     updateState({ lastError: (e as Error).message });
     return { success: false };
