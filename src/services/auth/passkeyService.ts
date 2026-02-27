@@ -11,6 +11,7 @@ import { isPRFSupported, buildPRFExtension } from './passkeyCrypto';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 import type { PasskeyRegistration } from '@/types/models';
 import { toISODateString } from '@/utils/date';
+import { getGlobalSettings } from '@/services/indexeddb/repositories/globalSettingsRepository';
 
 const RP_NAME = 'beanies.family';
 
@@ -199,18 +200,43 @@ export async function authenticateWithPasskey(
   const registration = registrations.find((r) => r.credentialId === credentialId);
 
   if (!registration) {
-    // Credential ID not found locally — check userHandle for diagnostics.
-    // During registration, user.id = TextEncoder.encode(memberId), so the
-    // assertion's userHandle tells us which member the passkey belongs to.
+    // Credential ID not found locally — this is likely a synced passkey from
+    // another device (iCloud Keychain, Google Password Manager, Windows Hello).
+    // Check userHandle to identify the member and attempt auto-registration.
     const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
     const userHandle = assertionResponse.userHandle;
     if (userHandle && userHandle.byteLength > 0) {
       const memberIdFromHandle = new TextDecoder().decode(userHandle);
       const memberMatch = registrations.find((r) => r.memberId === memberIdFromHandle);
       if (memberMatch) {
-        // The user's member is known but this credential was registered on
-        // another device — we don't have the local decryption materials.
-        return { success: false, error: 'CROSS_DEVICE_CREDENTIAL' };
+        // Member is known — try to auto-register the synced credential locally
+        // using the family's cached encryption password.
+        const cachedPassword = await getCachedPasswordForFamily(params.familyId);
+        if (cachedPassword) {
+          // Auto-register: create a local registration for the synced credential
+          const syncedRegistration: PasskeyRegistration = {
+            credentialId,
+            memberId: memberMatch.memberId,
+            familyId: memberMatch.familyId,
+            publicKey: memberMatch.publicKey,
+            transports: memberMatch.transports,
+            prfSupported: memberMatch.prfSupported,
+            cachedPassword,
+            label: memberMatch.label + ' (synced)',
+            createdAt: memberMatch.createdAt,
+            lastUsedAt: toISODateString(new Date()),
+          };
+          await passkeyRepo.savePasskeyRegistration(syncedRegistration);
+
+          return {
+            success: true,
+            memberId: memberMatch.memberId,
+            cachedPassword,
+          };
+        }
+
+        // No cached password available — user must enter password manually
+        return { success: false, error: 'CROSS_DEVICE_NO_CACHE' };
       }
     }
     // Neither credential ID nor userHandle matches this family's registrations
@@ -312,6 +338,21 @@ export async function invalidatePasskeysForPasswordChange(
 
 export async function renamePasskey(credentialId: string, label: string): Promise<void> {
   await passkeyRepo.updatePasskey(credentialId, { label });
+}
+
+// --- Helpers ---
+
+/**
+ * Look up the cached encryption password for a family from global settings.
+ * This is stored per-family in the registry DB and survives sign-out.
+ */
+async function getCachedPasswordForFamily(familyId: string): Promise<string | null> {
+  try {
+    const gs = await getGlobalSettings();
+    return gs.cachedEncryptionPasswords?.[familyId] ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // --- Utility ---
