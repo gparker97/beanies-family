@@ -13,7 +13,14 @@ const authStore = useAuthStore();
 
 const emit = defineEmits<{
   back: [];
-  'family-selected': [payload: { id: string; name: string; hasPasskeys: boolean }];
+  'family-selected': [
+    payload: {
+      id: string;
+      name: string;
+      hasPasskeys: boolean;
+      providerConfig: PersistedProviderConfig | null;
+    },
+  ];
   'load-different-file': [];
 }>();
 
@@ -69,6 +76,7 @@ function selectFamily(family: FamilyEntry) {
     id: family.id,
     name: family.name,
     hasPasskeys: family.hasPasskeys,
+    providerConfig: family.providerConfig,
   });
 }
 

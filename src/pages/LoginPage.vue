@@ -10,17 +10,25 @@ import PickBeanView from '@/components/login/PickBeanView.vue';
 import CreatePodView from '@/components/login/CreatePodView.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
 import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 
 const router = useRouter();
+const { t } = useTranslation();
 const syncStore = useSyncStore();
+const settingsStore = useSettingsStore();
 const familyContextStore = useFamilyContextStore();
 const familyStore = useFamilyStore();
 
+const SESSION_PASSWORD_KEY = 'beanies-file-password';
+
 type LoginView =
   | 'welcome'
+  | 'loading'
   | 'load-pod'
   | 'pick-bean'
   | 'create'
@@ -41,6 +49,8 @@ const biometricFamilyId = ref('');
 const biometricFamilyName = ref<string | undefined>();
 const biometricDeclined = ref(false);
 const forceNewGoogleAccount = ref(false);
+const loadError = ref<string | undefined>();
+const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 
 onMounted(async () => {
   // Initialize stores but always show the Welcome Gate first — never skip
@@ -78,10 +88,46 @@ async function activateFamilyForBiometric(familyId: string, familyName: string) 
 }
 
 /**
- * Handle family selection from FamilyPickerView.
- * Routes to biometric (if passkeys) or load-pod (auto-load configured file).
+ * Try to auto-decrypt using cached passwords (sessionStorage, then per-family cache).
+ * Returns true if decryption succeeded.
  */
-async function handleFamilySelected(payload: { id: string; name: string; hasPasskeys: boolean }) {
+async function tryAutoDecrypt(familyId: string): Promise<boolean> {
+  const passwords = [
+    sessionStorage.getItem(SESSION_PASSWORD_KEY),
+    settingsStore.getCachedEncryptionPassword(familyId),
+  ].filter(Boolean) as string[];
+
+  for (const pw of passwords) {
+    try {
+      const result = await syncStore.decryptPendingFile(pw);
+      if (result.success) return true;
+    } catch {
+      // Try next password
+    }
+  }
+  return false;
+}
+
+/**
+ * Derive a provider hint from a PersistedProviderConfig for LoadPodView.
+ */
+function toProviderHint(
+  config: PersistedProviderConfig | null
+): 'local' | 'google_drive' | undefined {
+  if (!config) return undefined;
+  return config.type === 'google_drive' ? 'google_drive' : 'local';
+}
+
+/**
+ * Handle family selection from FamilyPickerView.
+ * Routes to biometric (if passkeys), attempts auto-load, or falls back to load-pod.
+ */
+async function handleFamilySelected(payload: {
+  id: string;
+  name: string;
+  hasPasskeys: boolean;
+  providerConfig: PersistedProviderConfig | null;
+}) {
   // Switch to selected family
   if (familyContextStore.activeFamilyId !== payload.id) {
     await familyContextStore.switchFamily(payload.id);
@@ -89,13 +135,57 @@ async function handleFamilySelected(payload: { id: string; name: string; hasPass
     await syncStore.initialize();
   }
 
+  // Reset error state
+  loadError.value = undefined;
+  loadErrorProviderHint.value = undefined;
+
   if (payload.hasPasskeys) {
     // Go to biometric login (pre-load file)
     await activateFamilyForBiometric(payload.id, payload.name);
-  } else if (syncStore.isConfigured) {
-    // File configured — go to load-pod with auto-load
-    autoLoadPod.value = !syncStore.needsPermission;
-    needsPermissionGrant.value = syncStore.needsPermission;
+  } else if (syncStore.isConfigured && !syncStore.needsPermission) {
+    // File configured and accessible — try auto-load
+    activeView.value = 'loading';
+    try {
+      const loadResult = await syncStore.loadFromFile();
+      if (loadResult.success) {
+        // Loaded successfully — go to pick-bean
+        fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+        activeView.value = 'pick-bean';
+      } else if (loadResult.needsPassword) {
+        // Encrypted — try auto-decrypt
+        if (await tryAutoDecrypt(payload.id)) {
+          fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+          activeView.value = 'pick-bean';
+        } else {
+          // Can't auto-decrypt — fall back to LoadPodView with decrypt modal
+          autoLoadPod.value = true;
+          needsPermissionGrant.value = false;
+          biometricDeclined.value = false;
+          loadErrorProviderHint.value = toProviderHint(payload.providerConfig);
+          activeView.value = 'load-pod';
+        }
+      } else {
+        // Load failed for other reasons — fall back with error
+        loadError.value = t('familyPicker.loadError');
+        loadErrorProviderHint.value = toProviderHint(payload.providerConfig);
+        autoLoadPod.value = false;
+        needsPermissionGrant.value = false;
+        biometricDeclined.value = false;
+        activeView.value = 'load-pod';
+      }
+    } catch {
+      // File moved/deleted/corrupt — fall back with error
+      loadError.value = t('familyPicker.loadError');
+      loadErrorProviderHint.value = toProviderHint(payload.providerConfig);
+      autoLoadPod.value = false;
+      needsPermissionGrant.value = false;
+      biometricDeclined.value = false;
+      activeView.value = 'load-pod';
+    }
+  } else if (syncStore.isConfigured && syncStore.needsPermission) {
+    // File configured but needs permission — go to load-pod with permission grant UI
+    autoLoadPod.value = false;
+    needsPermissionGrant.value = true;
     biometricDeclined.value = false;
     activeView.value = 'load-pod';
   } else {
@@ -194,12 +284,32 @@ function handleSignedIn(destination: string) {
 
       <WelcomeGate v-else-if="activeView === 'welcome'" @navigate="handleNavigate" />
 
+      <!-- Branded loading spinner during auto-load -->
+      <div
+        v-else-if="activeView === 'loading'"
+        class="mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800"
+      >
+        <div class="py-12 text-center">
+          <img
+            src="/brand/beanies_family_icon_transparent_384x384.png"
+            alt=""
+            class="mx-auto mb-4 h-16 w-16"
+          />
+          <div
+            class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
+          ></div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+        </div>
+      </div>
+
       <LoadPodView
         v-else-if="activeView === 'load-pod'"
         :needs-permission-grant="needsPermissionGrant"
         :auto-load="autoLoadPod"
         :skip-biometric="biometricDeclined"
         :force-new-google-account="forceNewGoogleAccount"
+        :load-error="loadError"
+        :provider-hint="loadErrorProviderHint"
         @back="activeView = 'family-picker'"
         @file-loaded="handleFileLoaded"
         @biometric-available="handleBiometricAvailable"

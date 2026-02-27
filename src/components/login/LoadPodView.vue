@@ -24,6 +24,8 @@ const props = defineProps<{
   autoLoad?: boolean;
   skipBiometric?: boolean;
   forceNewGoogleAccount?: boolean;
+  loadError?: string;
+  providerHint?: 'local' | 'google_drive';
 }>();
 
 const emit = defineEmits<{
@@ -99,6 +101,12 @@ function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
 }
 
 onMounted(async () => {
+  if (props.loadError) {
+    formError.value = props.loadError;
+  }
+  if (props.providerHint === 'local') {
+    selectedSource.value = 'local';
+  }
   if (props.autoLoad) {
     await autoLoadFile();
   }
