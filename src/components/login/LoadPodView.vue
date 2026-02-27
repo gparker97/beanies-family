@@ -23,12 +23,12 @@ const props = defineProps<{
   needsPermissionGrant?: boolean;
   autoLoad?: boolean;
   skipBiometric?: boolean;
+  forceNewGoogleAccount?: boolean;
 }>();
 
 const emit = defineEmits<{
   back: [];
   'file-loaded': [];
-  'switch-family': [];
   'biometric-available': [payload: { familyId: string; familyName?: string }];
 }>();
 
@@ -330,7 +330,9 @@ async function handleLoadFromGoogleDrive() {
   formError.value = null;
 
   try {
-    driveFiles.value = await syncStore.listGoogleDriveFiles();
+    driveFiles.value = await syncStore.listGoogleDriveFiles({
+      forceNewAccount: props.forceNewGoogleAccount,
+    });
     if (driveFiles.value.length === 0) {
       formError.value = t('googleDrive.noFilesFound');
     } else {
@@ -384,13 +386,6 @@ async function handleDriveRefresh() {
   } finally {
     isDriveLoading.value = false;
   }
-}
-
-function handleSwitchFamily() {
-  formError.value = null;
-  decryptPassword.value = '';
-  showDecryptModal.value = false;
-  emit('switch-family');
 }
 </script>
 
@@ -772,15 +767,6 @@ function handleSwitchFamily() {
         </div>
       </div>
     </template>
-
-    <!-- Switch family link -->
-    <button
-      type="button"
-      class="mt-6 w-full text-center text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-      @click="handleSwitchFamily"
-    >
-      {{ t('loginV6.switchFamily') }}
-    </button>
 
     <!-- Decrypt Modal -->
     <BaseModal :open="showDecryptModal" @close="showDecryptModal = false">
