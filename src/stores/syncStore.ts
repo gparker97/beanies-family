@@ -131,19 +131,21 @@ export const useSyncStore = defineStore('sync', () => {
         // local File System Access API permission grants (user gesture required).
         needsPermission.value = false;
 
-        // Try to pre-load GIS and acquire token silently so Path 1 in
-        // loadFamilyData() can read from Google Drive immediately.
+        // Pre-load GIS library (non-interactive script load).
+        // Do NOT call requestAccessToken() here — after a PWA force-close
+        // sessionStorage is cleared and requestAccessToken() would trigger
+        // Google's account chooser popup before the login screen renders.
+        // Token acquisition happens on-demand in provider.read()/write().
         try {
           await loadGIS();
-          if (!isTokenValid()) {
-            await requestAccessToken();
-          }
         } catch {
-          // Silent auth failed — show reconnect toast.
-          // loadFamilyData() will fall through to IndexedDB cache as fallback.
-          showGoogleReconnect.value = true;
+          console.warn('[syncStore] Failed to pre-load Google Identity Services');
         }
-        setupTokenExpiryHandler();
+        // Only set up expiry handler if a valid token already exists
+        // (e.g., normal page refresh within the same tab session)
+        if (isTokenValid()) {
+          setupTokenExpiryHandler();
+        }
       } else {
         // Local file: check if we have File System Access API permission
         const hasPermission = await syncService.hasPermission();
@@ -309,6 +311,14 @@ export const useSyncStore = defineStore('sync', () => {
       if (options.merge) {
         syncService.triggerDebouncedSave();
       }
+      // For Google Drive: set up token expiry handler now that we have a valid token
+      if (syncService.getProviderType() === 'google_drive') {
+        setupTokenExpiryHandler();
+      }
+    } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
+      // Google Drive read failed (e.g., expired token after force-close) —
+      // show reconnect toast so user can re-authenticate when ready.
+      showGoogleReconnect.value = true;
     }
     return { success: result.success };
   }
