@@ -248,26 +248,44 @@ Vue automatically escapes HTML content to prevent XSS:
 <div v-html="sanitize(userInput)"></div>
 ```
 
-## Authentication & Authorization (Future)
+## Authentication — Passkey / Biometric (ADR-015)
 
-### AWS Cognito Integration
+### Architecture
 
-**Best Practices:**
+The app uses WebAuthn passkeys for biometric login. Passkey registrations are stored in a device-level registry IndexedDB (not the per-family database) so they survive sign-out.
 
-- Enable MFA (multi-factor authentication)
-- Use short-lived JWT tokens (1 hour)
-- Implement token refresh rotation
-- Validate tokens on every API call
-- Use HTTPS only
+**Two paths:**
+
+- **PRF path** (Chrome, Edge): Derives encryption key from biometric via HKDF — true passwordless
+- **Cached password path** (Firefox, fallback): Passkey authenticates the member; encryption password is cached locally
+
+### Cross-Device Passkey Sync
+
+Modern platform authenticators (iCloud Keychain, Google Password Manager, Windows Hello) sync passkeys across devices. When a user registers on Device A and Device B, either credential may be presented on either device.
+
+**How it works:**
+
+1. Browser returns a synced credential whose ID isn't in the local registry
+2. The `userHandle` identifies the member (set during registration as `TextEncoder.encode(memberId)`)
+3. If a cached encryption password exists for the family, the synced credential is auto-registered locally
+4. If no cached password exists, user is prompted to enter their password once
+
+**Trust model:**
+
+- Platform authenticator verifies the user biometrically before returning an assertion
+- `userHandle` confirms the credential belongs to a known family member
+- Cached password is already present on trusted devices
+- No server-side signature verification (challenge is client-generated for local-first architecture)
+
+**Limitation:** First sign-in on a new device always requires a password. Synced passkeys only work after the password has been cached at least once (trusted device model).
 
 ### Session Management
 
 **Requirements:**
 
-- Auto-logout after 15 minutes of inactivity
-- Re-authentication for sensitive operations
-- Secure cookie flags (HttpOnly, Secure, SameSite)
-- CSRF protection for state-changing operations
+- Session stored in `sessionStorage` (cleared on tab close)
+- Re-authentication required after sign-out
+- IndexedDB cache deleted on sign-out (unless trusted device)
 
 ## Secrets Management
 
