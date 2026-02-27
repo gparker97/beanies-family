@@ -8,6 +8,7 @@ import { useFamilyStore } from './familyStore';
 import { useGoalsStore } from './goalsStore';
 import { useRecurringStore } from './recurringStore';
 import { useTodoStore } from './todoStore';
+import { useTombstoneStore } from './tombstoneStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
@@ -99,6 +100,11 @@ export const useSyncStore = defineStore('sync', () => {
     isSyncing.value = state.isSyncing;
     storageProviderType.value = syncService.getProviderType();
     error.value = state.lastError;
+  });
+
+  // Subscribe to save-complete to keep lastSync accurate without manual updates
+  syncService.onSaveComplete((timestamp) => {
+    lastSync.value = timestamp;
   });
 
   // Register encryption check callback so syncService can guard against plaintext writes
@@ -230,8 +236,11 @@ export const useSyncStore = defineStore('sync', () => {
       return { hasConflict: true, fileTimestamp, localTimestamp: null };
     }
 
-    // Compare timestamps - if file is newer, there's a conflict
-    const hasConflict = new Date(fileTimestamp) > new Date(localTimestamp);
+    // Compare timestamps with 2-second tolerance to avoid false positives
+    // from upload latency (file timestamp may lag slightly behind local save)
+    const TOLERANCE_MS = 2000;
+    const hasConflict =
+      new Date(fileTimestamp).getTime() > new Date(localTimestamp).getTime() + TOLERANCE_MS;
     return { hasConflict, fileTimestamp, localTimestamp };
   }
 
@@ -253,7 +262,7 @@ export const useSyncStore = defineStore('sync', () => {
     const password = isEncryptionEnabled.value ? (sessionPassword.value ?? undefined) : undefined;
     const success = await syncService.save(password);
     if (success) {
-      lastSync.value = toISODateString(new Date());
+      // lastSync is updated by the onSaveComplete callback
       await saveSettings({ lastSyncTimestamp: lastSync.value });
     }
     return success;
@@ -267,10 +276,13 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Load data from the currently configured sync file
+   * Load data from the currently configured sync file.
+   * @param options.merge - If true, merge with local data instead of full replace.
    */
-  async function loadFromFile(): Promise<{ success: boolean; needsPassword?: boolean }> {
-    const result = await syncService.loadAndImport();
+  async function loadFromFile(
+    options: { merge?: boolean } = {}
+  ): Promise<{ success: boolean; needsPassword?: boolean }> {
+    const result = await syncService.loadAndImport({ merge: options.merge });
 
     // If file needs password, store it for later decryption
     if (result.needsPassword && result.fileHandle && result.rawSyncData) {
@@ -285,6 +297,10 @@ export const useSyncStore = defineStore('sync', () => {
       lastSync.value = toISODateString(new Date());
       // Reload all stores after import
       await reloadAllStores();
+      // After a merge reload, trigger a save so the merged result is persisted to file
+      if (options.merge) {
+        syncService.triggerDebouncedSave();
+      }
     }
     return { success: result.success };
   }
@@ -465,7 +481,7 @@ export const useSyncStore = defineStore('sync', () => {
     // Re-save the file encrypted - pass password directly to ensure encryption happens
     const success = await syncService.save(password);
     if (success) {
-      lastSync.value = toISODateString(new Date());
+      // lastSync is updated by the onSaveComplete callback
       await saveSettings({ lastSyncTimestamp: lastSync.value });
       // Cache password on trusted devices
       const familyContextStore = useFamilyContextStore();
@@ -506,7 +522,7 @@ export const useSyncStore = defineStore('sync', () => {
     // Re-save the file unencrypted (no password = unencrypted)
     const success = await syncService.save(undefined);
     if (success) {
-      lastSync.value = toISODateString(new Date());
+      // lastSync is updated by the onSaveComplete callback
       await saveSettings({ lastSyncTimestamp: lastSync.value });
     }
     // Note: We don't rollback here - the setting is disabled even if save fails
@@ -697,10 +713,11 @@ export const useSyncStore = defineStore('sync', () => {
       const { hasConflict } = await checkForConflicts();
       if (!hasConflict) return false;
 
-      // File is newer — flush any pending local save first, then reload
-      await syncService.flushPendingSave();
+      // File is newer — cancel any pending local save to avoid overwriting
+      // the newer remote data. Merge preserves unique records from both sides.
+      syncService.cancelPendingSave();
 
-      const loadResult = await loadFromFile();
+      const loadResult = await loadFromFile({ merge: true });
       if (loadResult.success) return true;
 
       // Handle encrypted file — try session password, then cached password
@@ -757,6 +774,22 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Pause file polling while the tab is hidden to avoid wasted API calls.
+   */
+  function pauseFilePolling(): void {
+    stopFilePolling();
+  }
+
+  /**
+   * Resume file polling when the tab becomes visible again.
+   */
+  function resumeFilePolling(): void {
+    if (isConfigured.value && !needsPermission.value && autoSyncStopHandle) {
+      startFilePolling();
+    }
+  }
+
+  /**
    * Setup auto-sync watchers for all data stores.
    * Auto-sync is always on when file is configured + has permission.
    * Safe to call multiple times — duplicate watchers are prevented.
@@ -767,7 +800,7 @@ export const useSyncStore = defineStore('sync', () => {
     // Guard: don't register a second watcher if one is already active
     if (autoSyncStopHandle) return;
 
-    // Watch for changes in all data stores
+    // Watch for changes in all data stores (including tombstones)
     autoSyncStopHandle = watch(
       () => [
         useFamilyStore().members,
@@ -777,6 +810,7 @@ export const useSyncStore = defineStore('sync', () => {
         useGoalsStore().goals,
         useRecurringStore().recurringItems,
         useTodoStore().todos,
+        useTombstoneStore().tombstones,
         useSettingsStore().settings,
       ],
       () => {
@@ -812,6 +846,7 @@ export const useSyncStore = defineStore('sync', () => {
     }
     stopFilePolling();
     syncService.reset();
+    useTombstoneStore().resetState();
     isInitialized.value = false;
     isConfigured.value = false;
     fileName.value = null;
@@ -1079,6 +1114,8 @@ export const useSyncStore = defineStore('sync', () => {
     reloadAllStores,
     setupAutoSync,
     reloadIfFileChanged,
+    pauseFilePolling,
+    resumeFilePolling,
     resetState,
     clearError,
   };

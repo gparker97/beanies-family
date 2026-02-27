@@ -351,8 +351,15 @@ export type UpdateRecurringItemInput = Partial<
   Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
+// Deletion tombstone for merge-based sync
+export interface DeletionTombstone {
+  id: UUID;
+  entityType: EntityType;
+  deletedAt: ISODateString;
+}
+
 // Sync file format
-export const SYNC_FILE_VERSION = '2.0';
+export const SYNC_FILE_VERSION = '3.0';
 
 export interface SyncFileData {
   version: string;
@@ -368,6 +375,7 @@ export interface SyncFileData {
     goals: Goal[];
     recurringItems: RecurringItem[];
     todos?: TodoItem[];
+    deletions: DeletionTombstone[];
     settings: Settings | null;
   };
 }

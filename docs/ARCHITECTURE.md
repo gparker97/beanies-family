@@ -166,8 +166,10 @@ FamilyMember (0..1) ───▶ (N) Goal
 
 - **Encrypted local file is the source of truth** — IndexedDB is an ephemeral cache deleted on sign-out
 - File handle persisted in a per-family IndexedDB database across sessions
-- Sync file format v2.0: versioned JSON with `familyId`, optional AES-GCM encryption
-- **Full replace strategy**: file always wins on import (not merge-based)
+- Sync file format v3.0: versioned JSON with `familyId`, optional AES-GCM encryption, `data.deletions` tombstone array
+- **Record-level merge** for cross-device reload: merges by record ID + `updatedAt` timestamps (see [ADR-017](adr/017-record-level-merge-sync.md))
+- **Full replace** for initial load (empty local → load from file)
+- Deletion tombstones (`DeletionTombstone`) propagate deletions across devices, pruned after 30 days
 - Auto-sync uses debounced saves (2-second delay) after data changes
 - Manual export/import fallback for browsers without File System Access API
 - Sync guards validate `familyId` on save, load, and decrypt to prevent cross-family data leakage

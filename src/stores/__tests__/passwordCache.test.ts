@@ -190,12 +190,14 @@ describe('Password Cache - syncStore integration', () => {
   // Mock sync service at module level
   vi.mock('@/services/sync/syncService', () => ({
     onStateChange: vi.fn(),
+    onSaveComplete: vi.fn(() => () => {}),
     setEncryptionRequiredCallback: vi.fn(),
     initialize: vi.fn(async () => false),
     hasPermission: vi.fn(async () => true),
     loadAndImport: vi.fn(async () => ({ success: true })),
     decryptAndImport: vi.fn(async () => ({ success: true })),
     save: vi.fn(async () => true),
+    saveNow: vi.fn(async () => true),
     selectSyncFile: vi.fn(async () => false),
     disconnect: vi.fn(async () => {}),
     requestPermission: vi.fn(async () => false),

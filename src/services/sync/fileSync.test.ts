@@ -196,7 +196,7 @@ describe('fileSync persistence (export → import)', () => {
     const fileCurrencies: CurrencyCode[] = ['CHF', 'SEK'];
     const exported = await exportAllData();
     const syncFile = {
-      version: '2.0',
+      version: '3.0',
       exportedAt: '2024-01-01',
       encrypted: false as const,
       data: {
