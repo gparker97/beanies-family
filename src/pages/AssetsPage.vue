@@ -8,6 +8,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -31,6 +32,7 @@ const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
@@ -441,6 +443,7 @@ function getAppreciationPercent(asset: Asset): number {
             :key="asset.id"
             data-testid="asset-card"
             class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            :class="syncHighlightClass(asset.id)"
           >
             <!-- Card Header -->
             <div class="mb-4 flex items-start justify-between">

@@ -492,6 +492,7 @@ export async function loadAndImport(options: { merge?: boolean } = {}): Promise<
   needsPassword?: boolean;
   fileHandle?: FileSystemFileHandle;
   rawSyncData?: SyncFileData;
+  hasLocalChanges?: boolean;
 }> {
   const syncData = await load();
   if (!syncData) {
@@ -532,8 +533,8 @@ export async function loadAndImport(options: { merge?: boolean } = {}): Promise<
   }
 
   try {
-    await importSyncFileData(syncData, { merge: options.merge });
-    return { success: true };
+    const importResult = await importSyncFileData(syncData, { merge: options.merge });
+    return { success: true, hasLocalChanges: importResult.hasLocalChanges };
   } catch (e) {
     updateState({ lastError: (e as Error).message });
     return { success: false };

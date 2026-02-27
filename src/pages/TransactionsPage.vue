@@ -10,6 +10,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useSounds } from '@/composables/useSounds';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { EXPENSE_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
@@ -45,6 +46,7 @@ const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
 // Tab state - recurring first by default
@@ -638,6 +640,7 @@ function applyCustomDateRange() {
             :key="transaction.id"
             data-testid="transaction-item"
             class="flex items-center justify-between py-4"
+            :class="syncHighlightClass(transaction.id)"
           >
             <div class="flex items-center gap-4">
               <div
@@ -791,7 +794,7 @@ function applyCustomDateRange() {
             v-for="item in recurringItems"
             :key="item.id"
             class="py-4"
-            :class="{ 'opacity-50': !item.isActive }"
+            :class="[{ 'opacity-50': !item.isActive }, syncHighlightClass(item.id)]"
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">

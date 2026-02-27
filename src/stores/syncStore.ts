@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 
 // Import other stores for auto-sync watching
 import { useAccountsStore } from './accountsStore';
@@ -12,6 +12,7 @@ import { useTombstoneStore } from './tombstoneStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
+import { useSyncHighlightStore } from './syncHighlightStore';
 import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import { invalidatePasskeysForPasswordChange } from '@/services/auth/passkeyService';
 import {
@@ -288,39 +289,58 @@ export const useSyncStore = defineStore('sync', () => {
   async function loadFromFile(
     options: { merge?: boolean } = {}
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
-    const result = await syncService.loadAndImport({ merge: options.merge });
+    const merging = !!options.merge;
 
-    // If file needs password, store it for later decryption
-    // fileHandle may be undefined for Google Drive — use placeholder (consistent with loadFromNewFile)
-    if (result.needsPassword && result.rawSyncData) {
-      const provider = syncService.getProvider();
-      pendingEncryptedFile.value = {
-        fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
-        rawSyncData: result.rawSyncData,
-        driveFileId: provider?.getFileId() ?? undefined,
-        driveFileName: provider?.getDisplayName(),
-      };
-      return { success: false, needsPassword: true };
+    // When merging, suppress the auto-sync watcher BEFORE loadAndImport
+    // so that tombstone mutations inside importSyncFileData don't trigger
+    // a save with half-loaded state.
+    if (merging) {
+      isReloading = true;
+      syncService.cancelPendingSave();
     }
 
-    if (result.success) {
-      lastSync.value = toISODateString(new Date());
-      // Reload all stores after import
-      await reloadAllStores();
-      // After a merge reload, trigger a save so the merged result is persisted to file
-      if (options.merge) {
-        syncService.triggerDebouncedSave();
+    try {
+      const result = await syncService.loadAndImport({ merge: options.merge });
+
+      // If file needs password, store it for later decryption
+      // fileHandle may be undefined for Google Drive — use placeholder (consistent with loadFromNewFile)
+      if (result.needsPassword && result.rawSyncData) {
+        const provider = syncService.getProvider();
+        pendingEncryptedFile.value = {
+          fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
+          rawSyncData: result.rawSyncData,
+          driveFileId: provider?.getFileId() ?? undefined,
+          driveFileName: provider?.getDisplayName(),
+        };
+        return { success: false, needsPassword: true };
       }
-      // For Google Drive: set up token expiry handler now that we have a valid token
-      if (syncService.getProviderType() === 'google_drive') {
-        setupTokenExpiryHandler();
+
+      if (result.success) {
+        lastSync.value = toISODateString(new Date());
+        // Reload all stores after import (sets isReloading=true again, then false at end)
+        await reloadAllStores();
+        // Only save-back if merge produced data the file doesn't have.
+        // This prevents the ping-pong echo loop where two devices each
+        // create a "newer" timestamp that triggers the other to merge again.
+        if (merging && result.hasLocalChanges) {
+          syncService.triggerDebouncedSave();
+        }
+        // For Google Drive: set up token expiry handler now that we have a valid token
+        if (syncService.getProviderType() === 'google_drive') {
+          setupTokenExpiryHandler();
+        }
+      } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
+        // Google Drive read failed (e.g., expired token after force-close) —
+        // show reconnect toast so user can re-authenticate when ready.
+        showGoogleReconnect.value = true;
       }
-    } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
-      // Google Drive read failed (e.g., expired token after force-close) —
-      // show reconnect toast so user can re-authenticate when ready.
-      showGoogleReconnect.value = true;
+      return { success: result.success };
+    } finally {
+      // Safety reset for failure paths where reloadAllStores() wasn't called
+      if (merging && isReloading) {
+        isReloading = false;
+      }
     }
-    return { success: result.success };
   }
 
   /**
@@ -637,6 +657,12 @@ export const useSyncStore = defineStore('sync', () => {
     isReloading = true;
     syncService.cancelPendingSave();
 
+    // Snapshot current IDs before reload so we can detect new/modified items
+    const highlightStore = useSyncHighlightStore();
+    if (isCrossDeviceReload) {
+      highlightStore.snapshotBeforeReload();
+    }
+
     try {
       const familyStore = useFamilyStore();
       const accountsStore = useAccountsStore();
@@ -662,7 +688,15 @@ export const useSyncStore = defineStore('sync', () => {
       // apply it so preferred currencies (etc.) survive refresh.
       await applySettingsWAL();
     } finally {
+      // Flush deferred watcher callbacks while isReloading is still true,
+      // so the auto-sync watcher sees the guard and no-ops.
+      await nextTick();
       isReloading = false;
+    }
+
+    // Detect which items are new/modified after stores have reloaded
+    if (isCrossDeviceReload) {
+      highlightStore.detectChanges();
     }
   }
 
@@ -716,6 +750,7 @@ export const useSyncStore = defineStore('sync', () => {
   const FILE_POLL_INTERVAL = 10_000; // 10 seconds
   let filePollingTimer: ReturnType<typeof setInterval> | null = null;
   let isCheckingFile = false;
+  let isCrossDeviceReload = false;
 
   /**
    * Check if the sync file has been modified externally and reload if so.
@@ -735,32 +770,39 @@ export const useSyncStore = defineStore('sync', () => {
       // the newer remote data. Merge preserves unique records from both sides.
       syncService.cancelPendingSave();
 
-      const loadResult = await loadFromFile({ merge: true });
-      if (loadResult.success) return true;
+      isCrossDeviceReload = true;
+      try {
+        const loadResult = await loadFromFile({ merge: true });
+        if (loadResult.success) return true;
 
-      // Handle encrypted file — try session password, then cached password
-      if (loadResult.needsPassword) {
-        // Try session password (set during initial sign-in)
-        if (sessionPassword.value) {
-          const result = await decryptPendingFile(sessionPassword.value);
-          return result.success;
+        // Handle encrypted file — try session password, then cached password.
+        // Keep isCrossDeviceReload true so decryptPendingFile → reloadAllStores
+        // correctly triggers sync highlight detection.
+        if (loadResult.needsPassword) {
+          // Try session password (set during initial sign-in)
+          if (sessionPassword.value) {
+            const result = await decryptPendingFile(sessionPassword.value);
+            return result.success;
+          }
+
+          // Try cached password from trusted device
+          const familyCtx = useFamilyContextStore();
+          const settingsStore = useSettingsStore();
+          const familyId = familyCtx.activeFamilyId;
+          const cachedPw = familyId ? settingsStore.getCachedEncryptionPassword(familyId) : null;
+          if (cachedPw) {
+            const result = await decryptPendingFile(cachedPw);
+            return result.success;
+          }
+
+          // Can't auto-decrypt — clear the pending file to avoid stale state
+          pendingEncryptedFile.value = null;
         }
 
-        // Try cached password from trusted device
-        const familyCtx = useFamilyContextStore();
-        const settingsStore = useSettingsStore();
-        const familyId = familyCtx.activeFamilyId;
-        const cachedPw = familyId ? settingsStore.getCachedEncryptionPassword(familyId) : null;
-        if (cachedPw) {
-          const result = await decryptPendingFile(cachedPw);
-          return result.success;
-        }
-
-        // Can't auto-decrypt — clear the pending file to avoid stale state
-        pendingEncryptedFile.value = null;
+        return false;
+      } finally {
+        isCrossDeviceReload = false;
       }
-
-      return false;
     } catch (e) {
       console.warn('[syncStore] reloadIfFileChanged failed:', e);
       return false;
@@ -865,6 +907,7 @@ export const useSyncStore = defineStore('sync', () => {
     stopFilePolling();
     syncService.reset();
     useTombstoneStore().resetState();
+    useSyncHighlightStore().clearHighlights();
     isInitialized.value = false;
     isConfigured.value = false;
     fileName.value = null;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
@@ -21,6 +22,7 @@ import type { TodoItem } from '@/types/models';
 
 const route = useRoute();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const todoStore = useTodoStore();
 const familyStore = useFamilyStore();
@@ -297,15 +299,19 @@ async function handleDelete(id: string) {
         </div>
 
         <div class="space-y-2">
-          <TodoItemCard
+          <div
             v-for="todo in displayedOpenTodos"
             :key="todo.id"
-            :todo="todo"
-            @toggle="handleToggle"
-            @view="openViewModal"
-            @edit="openEditModal"
-            @delete="handleDelete"
-          />
+            :class="syncHighlightClass(todo.id)"
+          >
+            <TodoItemCard
+              :todo="todo"
+              @toggle="handleToggle"
+              @view="openViewModal"
+              @edit="openEditModal"
+              @delete="handleDelete"
+            />
+          </div>
         </div>
       </div>
 
@@ -329,15 +335,19 @@ async function handleDelete(id: string) {
           >
             {{ t('todo.section.completed') }} ({{ displayedCompletedTodos.length }})
           </p>
-          <TodoItemCard
+          <div
             v-for="todo in displayedCompletedTodos"
             :key="todo.id"
-            :todo="todo"
-            @toggle="handleToggle"
-            @view="openViewModal"
-            @edit="openEditModal"
-            @delete="handleDelete"
-          />
+            :class="syncHighlightClass(todo.id)"
+          >
+            <TodoItemCard
+              :todo="todo"
+              @toggle="handleToggle"
+              @view="openViewModal"
+              @edit="openEditModal"
+              @delete="handleDelete"
+            />
+          </div>
         </div>
       </div>
     </template>
