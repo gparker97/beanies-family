@@ -8,9 +8,53 @@ import { getFamilyById } from '@/services/familyContext';
 import { getSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import { mergeData } from '@/services/sync/mergeService';
 import { useTombstoneStore } from '@/stores/tombstoneStore';
-import type { SyncFileData } from '@/types/models';
+import type { SyncFileData, DeletionTombstone } from '@/types/models';
 import { SYNC_FILE_VERSION } from '@/types/models';
 import { toISODateString } from '@/utils/date';
+
+interface MergeableRecord {
+  id: string;
+  updatedAt: string;
+}
+
+/**
+ * Compares the merged result against the file data to determine if the merge
+ * incorporated any local data that the file doesn't already have.
+ * Used to decide whether a save-back is needed after merge (avoids echo loops).
+ */
+function detectMergeChanges(
+  mergedData: ExportedData,
+  fileData: ExportedData,
+  mergedTombstones: DeletionTombstone[],
+  fileTombstones: DeletionTombstone[]
+): boolean {
+  const collections = [
+    'familyMembers',
+    'accounts',
+    'transactions',
+    'assets',
+    'goals',
+    'recurringItems',
+    'todos',
+  ] as const;
+
+  for (const key of collections) {
+    const merged = (mergedData[key] ?? []) as unknown as MergeableRecord[];
+    const file = (fileData[key] ?? []) as unknown as MergeableRecord[];
+    if (merged.length !== file.length) return true;
+
+    const fileMap = new Map(file.map((r) => [r.id, r.updatedAt]));
+    for (const r of merged) {
+      if (fileMap.get(r.id) !== r.updatedAt) return true;
+    }
+  }
+
+  if (mergedTombstones.length !== fileTombstones.length) return true;
+
+  if (mergedData.settings?.updatedAt !== fileData.settings?.updatedAt) return true;
+
+  return false;
+}
 
 /**
  * Creates a SyncFileData object from current database state
@@ -142,7 +186,7 @@ export async function readFileAsJson(file: File): Promise<unknown> {
 export async function importSyncFileData(
   syncFile: SyncFileData,
   options: { merge?: boolean } = {}
-): Promise<void> {
+): Promise<{ hasLocalChanges: boolean }> {
   if (!validateSyncFileData(syncFile)) {
     throw new Error('Invalid sync file format');
   }
@@ -187,8 +231,17 @@ export async function importSyncFileData(
       mergedData.settings.encryptionEnabled = localSettings.encryptionEnabled;
     }
 
+    // Check if the merge incorporated any local data the file doesn't have
+    const hasLocalChanges = detectMergeChanges(
+      mergedData,
+      cleanedFileData,
+      mergedTombstones,
+      fileTombstones
+    );
+
     await importAllData(mergedData);
     tombstoneStore.setTombstones(mergedTombstones);
+    return { hasLocalChanges };
   } else {
     // Full replace: initial load path
     await importAllData(cleanedFileData);
@@ -196,6 +249,7 @@ export async function importSyncFileData(
     // Hydrate tombstone store from file
     const tombstoneStore = useTombstoneStore();
     tombstoneStore.setTombstones(syncFile.data.deletions ?? []);
+    return { hasLocalChanges: false };
   }
 }
 

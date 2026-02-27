@@ -7,6 +7,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useSounds } from '@/composables/useSounds';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -22,6 +23,7 @@ const accountsStore = useAccountsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
@@ -364,7 +366,7 @@ async function deleteAccount(id: string) {
             :key="account.id"
             data-testid="account-card"
             class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-            :class="{ 'opacity-60': !account.isActive }"
+            :class="[{ 'opacity-60': !account.isActive }, syncHighlightClass(account.id)]"
           >
             <!-- Card Header -->
             <div class="mb-4 flex items-start justify-between">

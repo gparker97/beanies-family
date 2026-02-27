@@ -12,6 +12,7 @@ import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useNetWorthHistory } from '@/composables/useNetWorthHistory';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -30,6 +31,7 @@ const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 
 // ── Net worth history ───────────────────────────────────────────────────────
 const { selectedPeriod, chartData, periodComparison, incomeChange, expenseChange, cashFlowChange } =
@@ -208,6 +210,7 @@ function getGoalIcon(type: string): string {
           <GoalProgressItem
             v-for="(goal, idx) in activeGoals"
             :key="goal.id"
+            :class="syncHighlightClass(goal.id)"
             :icon="getGoalIcon(goal.type)"
             :icon-tint="getGoalTint(idx)"
             :name="goal.name"
@@ -243,6 +246,7 @@ function getGoalIcon(type: string): string {
           <ActivityItem
             v-for="{ item, nextDate } in upcomingTransactions"
             :key="item.id"
+            :class="syncHighlightClass(item.id)"
             :name="item.description"
             :subtitle="`${getDaysUntil(nextDate!)}, ${item.frequency}`"
             :amount="item.amount"
@@ -283,6 +287,7 @@ function getGoalIcon(type: string): string {
             v-for="transaction in recentTransactions"
             :key="transaction.id"
             class="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            :class="syncHighlightClass(transaction.id)"
           >
             <div class="flex-shrink-0">
               <CategoryIcon :category="transaction.category" size="md" />

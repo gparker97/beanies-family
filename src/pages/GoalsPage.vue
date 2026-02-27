@@ -8,6 +8,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
@@ -25,6 +26,7 @@ import type {
 
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
 const progressMounted = ref(false);
@@ -310,6 +312,7 @@ async function deleteCompletedGoal(id: string) {
           v-for="goal in filteredGoalsByPriority"
           :key="goal.id"
           class="rounded-[var(--sq)] bg-white p-4 shadow-[var(--card-shadow)] dark:bg-slate-800"
+          :class="syncHighlightClass(goal.id)"
         >
           <div class="mb-2 flex items-center justify-between">
             <div>
@@ -390,6 +393,7 @@ async function deleteCompletedGoal(id: string) {
           v-for="goal in filteredCompletedGoalsSorted"
           :key="goal.id"
           class="rounded-[var(--sq)] bg-gray-50/50 p-4 shadow-[var(--card-shadow)] dark:bg-slate-800/50"
+          :class="syncHighlightClass(goal.id)"
         >
           <div class="mb-2 flex items-center justify-between">
             <div>
