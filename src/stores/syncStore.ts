@@ -1041,12 +1041,15 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * List .beanpod files available on Google Drive.
+   * @param options.forceNewAccount - When true, forces Google's account chooser
    */
-  async function listGoogleDriveFiles(): Promise<
-    Array<{ fileId: string; name: string; modifiedTime: string }>
-  > {
+  async function listGoogleDriveFiles(options?: {
+    forceNewAccount?: boolean;
+  }): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
     await loadGIS();
-    const token = await requestAccessToken();
+    const token = await requestAccessToken({
+      forceConsent: options?.forceNewAccount,
+    });
     const folderId = await getOrCreateAppFolder(token);
     return listBeanpodFiles(token, folderId);
   }
