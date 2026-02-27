@@ -871,6 +871,9 @@ const STRING_DEFS = {
   'passkey.passwordChanged': {
     en: 'Your encryption password has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
   },
+  'passkey.fileLoadError': {
+    en: 'Could not load your data file. Please sign in with your password.',
+  },
   'passkey.prfFull': { en: 'Full unlock' },
   'passkey.prfCached': { en: 'Cached password' },
   'passkey.lastUsed': { en: 'Last used' },

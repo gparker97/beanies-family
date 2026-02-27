@@ -168,13 +168,17 @@ export const useSyncStore = defineStore('sync', () => {
         await reloadAllStores();
         // Only set up auto-sync after data is fully loaded (password not needed)
         setupAutoSync();
-      } else if (loadResult.needsPassword && loadResult.fileHandle && loadResult.rawSyncData) {
+      } else if (loadResult.needsPassword && loadResult.rawSyncData) {
         // File is encrypted — store for later decryption.
         // Do NOT set up auto-sync yet — we don't have the password,
         // and any store changes would trigger a plaintext write.
+        // fileHandle may be undefined for Google Drive — use placeholder
+        const provider = syncService.getProvider();
         pendingEncryptedFile.value = {
-          fileHandle: loadResult.fileHandle,
+          fileHandle: loadResult.fileHandle ?? ({} as FileSystemFileHandle),
           rawSyncData: loadResult.rawSyncData,
+          driveFileId: provider?.getFileId() ?? undefined,
+          driveFileName: provider?.getDisplayName(),
         };
       }
     }
@@ -285,10 +289,14 @@ export const useSyncStore = defineStore('sync', () => {
     const result = await syncService.loadAndImport({ merge: options.merge });
 
     // If file needs password, store it for later decryption
-    if (result.needsPassword && result.fileHandle && result.rawSyncData) {
+    // fileHandle may be undefined for Google Drive — use placeholder (consistent with loadFromNewFile)
+    if (result.needsPassword && result.rawSyncData) {
+      const provider = syncService.getProvider();
       pendingEncryptedFile.value = {
-        fileHandle: result.fileHandle,
+        fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
         rawSyncData: result.rawSyncData,
+        driveFileId: provider?.getFileId() ?? undefined,
+        driveFileName: provider?.getDisplayName(),
       };
       return { success: false, needsPassword: true };
     }
