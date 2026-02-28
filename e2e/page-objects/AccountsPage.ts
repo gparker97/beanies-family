@@ -17,12 +17,18 @@ export class AccountsPage {
   }
 
   /**
-   * Account type values map to FrequencyChips button labels in the new modal.
-   * The modal uses emoji-prefixed chip labels (e.g., "🏦 Checking").
+   * Account type values map to FrequencyChips button labels in the modal.
+   * Must match exact chip text to avoid ambiguity with icon picker chips.
    */
   private typeToChipLabel(type: string): string {
-    // Return the type text for matching (chips contain emoji + text)
-    return type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ');
+    const labels: Record<string, string> = {
+      checking: '🏦 Checking Account',
+      savings: '🐷 Savings Account',
+      investment: '📈 Investment Account',
+      credit_card: '💳 Credit Card',
+      cash: '💵 Cash',
+    };
+    return labels[type] || type;
   }
 
   async addAccount(data: { name: string; type: string; balance: number; currency?: string }) {
@@ -33,9 +39,9 @@ export class AccountsPage {
     // Name — raw input with placeholder "Account Name"
     await this.page.getByPlaceholder('Account Name').fill(data.name);
 
-    // Type — FrequencyChips component, click the matching chip button
+    // Type — FrequencyChips component, click the matching chip button (exact to avoid icon picker ambiguity)
     const chipLabel = this.typeToChipLabel(data.type);
-    await this.page.getByRole('button', { name: chipLabel }).click();
+    await this.page.getByRole('button', { name: chipLabel, exact: true }).click();
 
     // Balance — AmountInput with type="number", use the number input
     const balanceInput = this.page.locator('input[type="number"]').first();
@@ -75,17 +81,15 @@ export class AccountsPage {
     // Name
     await this.page.getByPlaceholder('Account Name').fill(data.name);
 
-    // Type — chip button
+    // Type — chip button (exact to avoid icon picker ambiguity)
     const chipLabel = this.typeToChipLabel(data.type);
-    await this.page.getByRole('button', { name: chipLabel }).click();
+    await this.page.getByRole('button', { name: chipLabel, exact: true }).click();
 
     // Balance
     const balanceInput = this.page.locator('input[type="number"]').first();
     await balanceInput.fill(data.balance.toString());
 
-    // Expand "More Details" to access institution/country fields
-    await this.page.getByRole('button', { name: 'More Details' }).click();
-
+    // Institution/country fields are now inline (no "More Details" expansion needed)
     if (data.institution) {
       const instCombobox = this.getInstitutionCombobox();
       if (data.institutionSearch) {
