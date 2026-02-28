@@ -89,18 +89,22 @@ export const useActivityStore = defineStore('activities', () => {
     }
 
     if (activity.recurrence === 'weekly') {
-      const targetDay = activity.dayOfWeek ?? startDate.getDay();
-      // Find first occurrence of targetDay in the month
-      const cursor = new Date(monthStart);
-      while (cursor.getDay() !== targetDay) {
-        cursor.setDate(cursor.getDate() + 1);
-      }
-      // Only include if activity has started by this date
-      while (cursor <= monthEnd) {
-        if (cursor >= startDate) {
-          results.push({ activity, date: formatDate(cursor) });
+      // Multi-day support: use daysOfWeek array, fall back to single day from start date
+      const targetDays = activity.daysOfWeek?.length ? activity.daysOfWeek : [startDate.getDay()];
+
+      for (const targetDay of targetDays) {
+        // Find first occurrence of targetDay in the month
+        const cursor = new Date(monthStart);
+        while (cursor.getDay() !== targetDay) {
+          cursor.setDate(cursor.getDate() + 1);
         }
-        cursor.setDate(cursor.getDate() + 7);
+        // Only include if activity has started by this date
+        while (cursor <= monthEnd) {
+          if (cursor >= startDate) {
+            results.push({ activity, date: formatDate(cursor) });
+          }
+          cursor.setDate(cursor.getDate() + 7);
+        }
       }
       return results;
     }
