@@ -56,7 +56,8 @@ const STRING_DEFS = {
   'common.family': { en: 'Family', beanie: 'The Pod' },
 
   // Modal shared labels
-  'modal.pickIcon': { en: 'Pick an Icon' },
+  'modal.selectCategory': { en: 'Select a category' },
+  'modal.selectTime': { en: 'Select a time' },
   'modal.schedule': { en: 'Schedule' },
   'modal.recurring': { en: 'Recurring' },
   'modal.oneOff': { en: 'One-off' },
