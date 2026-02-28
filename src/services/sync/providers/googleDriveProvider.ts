@@ -17,6 +17,9 @@ import {
   revokeToken,
   loadGIS,
   requestAccessToken,
+  fetchGoogleUserEmail,
+  getGoogleAccountEmail,
+  setGoogleAccountEmail,
 } from '@/services/google/googleAuth';
 import {
   readFile,
@@ -33,10 +36,12 @@ export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google_drive' as const;
   private fileId: string;
   private fileName: string;
+  private accountEmail: string | null;
 
-  constructor(fileId: string, fileName: string) {
+  constructor(fileId: string, fileName: string, accountEmail?: string | null) {
     this.fileId = fileId;
     this.fileName = fileName;
+    this.accountEmail = accountEmail ?? null;
   }
 
   /**
@@ -125,6 +130,7 @@ export class GoogleDriveProvider implements StorageProvider {
       type: 'google_drive',
       driveFileId: this.fileId,
       driveFileName: this.fileName,
+      driveAccountEmail: this.accountEmail ?? undefined,
     });
   }
 
@@ -151,6 +157,10 @@ export class GoogleDriveProvider implements StorageProvider {
     return this.fileId;
   }
 
+  getAccountEmail(): string | null {
+    return this.accountEmail;
+  }
+
   /**
    * Create a new .beanpod file on Google Drive.
    * Authenticates, creates/finds the app folder, and creates the file.
@@ -158,9 +168,13 @@ export class GoogleDriveProvider implements StorageProvider {
   static async createNew(fileName: string): Promise<GoogleDriveProvider> {
     await loadGIS();
     const token = await requestAccessToken();
+
+    // Capture account email (best-effort, non-blocking for provider creation)
+    const email = await fetchGoogleUserEmail(token);
+
     const folderId = await getOrCreateAppFolder(token);
     const { fileId, name } = await createFile(token, folderId, fileName, '{}');
-    const provider = new GoogleDriveProvider(fileId, name);
+    const provider = new GoogleDriveProvider(fileId, name, email);
 
     // Register as flush target for offline queue
     setFlushProvider(provider);
@@ -172,8 +186,15 @@ export class GoogleDriveProvider implements StorageProvider {
    * Create a provider for an existing Drive file (e.g. restored from config or file picker).
    * Token is acquired on demand when read/write are called.
    */
-  static fromExisting(fileId: string, fileName: string): GoogleDriveProvider {
-    const provider = new GoogleDriveProvider(fileId, fileName);
+  static fromExisting(
+    fileId: string,
+    fileName: string,
+    accountEmail?: string | null
+  ): GoogleDriveProvider {
+    // Use persisted email, or fall back to in-memory cache from current session
+    const email = accountEmail ?? getGoogleAccountEmail();
+    if (email) setGoogleAccountEmail(email);
+    const provider = new GoogleDriveProvider(fileId, fileName, email);
     setFlushProvider(provider);
     return provider;
   }

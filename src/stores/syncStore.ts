@@ -31,6 +31,7 @@ import {
   requestAccessToken,
   onTokenExpired,
   isTokenValid,
+  fetchGoogleUserEmail,
 } from '@/services/google/googleAuth';
 import {
   getOrCreateAppFolder,
@@ -60,10 +61,12 @@ export const useSyncStore = defineStore('sync', () => {
     rawSyncData: SyncFileData;
     driveFileId?: string;
     driveFileName?: string;
+    driveAccountEmail?: string;
   } | null>(null);
 
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
+  const providerAccountEmail = ref<string | null>(null);
   const isGoogleDriveConnected = computed(() => storageProviderType.value === 'google_drive');
   const driveFileId = computed(() => syncService.getProvider()?.getFileId() ?? null);
   const driveFolderId = computed(() => getAppFolderId());
@@ -101,6 +104,7 @@ export const useSyncStore = defineStore('sync', () => {
     fileName.value = state.fileName;
     isSyncing.value = state.isSyncing;
     storageProviderType.value = syncService.getProviderType();
+    providerAccountEmail.value = syncService.getProvider()?.getAccountEmail() ?? null;
     error.value = state.lastError;
   });
 
@@ -183,6 +187,7 @@ export const useSyncStore = defineStore('sync', () => {
           rawSyncData: loadResult.rawSyncData,
           driveFileId: provider?.getFileId() ?? undefined,
           driveFileName: provider?.getDisplayName(),
+          driveAccountEmail: provider?.getAccountEmail() ?? undefined,
         };
       }
     }
@@ -312,6 +317,7 @@ export const useSyncStore = defineStore('sync', () => {
           rawSyncData: result.rawSyncData,
           driveFileId: provider?.getFileId() ?? undefined,
           driveFileName: provider?.getDisplayName(),
+          driveAccountEmail: provider?.getAccountEmail() ?? undefined,
         };
         return { success: false, needsPassword: true };
       }
@@ -428,7 +434,8 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: false, error: 'No pending encrypted file' };
     }
 
-    const { fileHandle, rawSyncData, driveFileId, driveFileName } = pendingEncryptedFile.value;
+    const { fileHandle, rawSyncData, driveFileId, driveFileName, driveAccountEmail } =
+      pendingEncryptedFile.value;
     const result = await syncService.decryptAndImport(fileHandle, rawSyncData, password);
 
     if (result.success) {
@@ -454,11 +461,16 @@ export const useSyncStore = defineStore('sync', () => {
             type: 'google_drive',
             driveFileId,
             driveFileName,
+            driveAccountEmail,
           });
           console.warn('[syncStore] Persisted Google Drive config for family', activeFamilyId);
         }
         // Re-establish the Google Drive provider in syncService
-        const provider = GoogleDriveProvider.fromExisting(driveFileId, driveFileName);
+        const provider = GoogleDriveProvider.fromExisting(
+          driveFileId,
+          driveFileName,
+          driveAccountEmail
+        );
         syncService.setProvider(provider);
       }
 
@@ -613,6 +625,7 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync.value = null;
     sessionPassword.value = null;
     storageProviderType.value = null;
+    providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
     syncService.setSessionPassword(null);
 
@@ -925,6 +938,7 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = false;
     sessionPassword.value = null;
     storageProviderType.value = null;
+    providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
     pendingEncryptedFile.value = null;
     clearQueue();
@@ -1003,11 +1017,14 @@ export const useSyncStore = defineStore('sync', () => {
     driveFileName: string
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
     try {
-      const provider = GoogleDriveProvider.fromExisting(fileId, driveFileName);
-
       // Authenticate if needed
       await loadGIS();
-      await requestAccessToken();
+      const token = await requestAccessToken();
+
+      // Fetch account email before creating provider so it's available immediately
+      await fetchGoogleUserEmail(token);
+
+      const provider = GoogleDriveProvider.fromExisting(fileId, driveFileName);
 
       // Read file content
       const text = await provider.read();
@@ -1042,6 +1059,7 @@ export const useSyncStore = defineStore('sync', () => {
           rawSyncData: data as SyncFileData,
           driveFileId: fileId,
           driveFileName,
+          driveAccountEmail: provider.getAccountEmail() ?? undefined,
         };
         storageProviderType.value = 'google_drive';
         return { success: false, needsPassword: true };
@@ -1156,6 +1174,7 @@ export const useSyncStore = defineStore('sync', () => {
     currentSessionPassword,
     hasPendingEncryptedFile,
     storageProviderType,
+    providerAccountEmail,
     isGoogleDriveConnected,
     driveFileId,
     driveFolderId,

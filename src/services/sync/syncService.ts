@@ -180,7 +180,8 @@ export async function initialize(): Promise<boolean> {
       if (config?.type === 'google_drive' && config.driveFileId && config.driveFileName) {
         currentProvider = GoogleDriveProvider.fromExisting(
           config.driveFileId,
-          config.driveFileName
+          config.driveFileName,
+          config.driveAccountEmail
         );
         currentProviderFamilyId = familyId;
         updateState({

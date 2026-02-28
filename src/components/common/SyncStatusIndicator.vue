@@ -28,13 +28,17 @@ const statusConfig = computed(() => {
         animate: true,
         pulse: true,
       };
-    case 'ready':
+    case 'ready': {
+      const emailSuffix = syncStore.providerAccountEmail
+        ? ` (${syncStore.providerAccountEmail})`
+        : '';
       return {
         icon: 'check',
         color: 'text-green-500',
-        title: `Data saved to ${syncStore.fileName}`,
+        title: `Data saved to ${syncStore.fileName}${emailSuffix}`,
         animate: false,
       };
+    }
     default:
       return null;
   }

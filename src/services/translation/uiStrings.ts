@@ -1384,6 +1384,7 @@ const STRING_DEFS = {
   },
   'googleDrive.openInDrive': { en: 'Open in Google Drive' },
   'googleDrive.savedTo': { en: 'Saved to Google Drive' },
+  'googleDrive.connectedAs': { en: 'Connected as {email}' },
   'storage.localFile': { en: 'Local File' },
   'storage.dropbox': { en: 'Dropbox' },
   'storage.iCloud': { en: 'iCloud' },

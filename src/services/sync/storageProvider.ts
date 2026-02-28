@@ -37,6 +37,9 @@ export interface StorageProvider {
 
   /** Google Drive file ID, or null for local provider */
   getFileId(): string | null;
+
+  /** Cloud account email (e.g. Google account), or null for local/unknown */
+  getAccountEmail(): string | null;
 }
 
 export type StorageProviderType = StorageProvider['type'];

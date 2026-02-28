@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
@@ -202,23 +203,14 @@ const sections = computed(() =>
     <!-- Security Indicators -->
     <div class="mt-3 space-y-1 px-1">
       <!-- File name -->
-      <div v-if="syncStore.isConfigured && syncStore.fileName" class="flex items-center gap-1.5">
-        <svg
-          class="h-3 w-3 flex-shrink-0 text-white/30"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-        <p class="truncate text-[0.6rem] text-white/30" :title="syncStore.fileName">
-          {{ syncStore.fileName }}
-        </p>
-      </div>
+      <CloudProviderBadge
+        v-if="syncStore.isConfigured && syncStore.fileName"
+        :provider-type="syncStore.storageProviderType"
+        :file-name="syncStore.fileName"
+        :account-email="syncStore.providerAccountEmail"
+        size="xs"
+        variant="dark"
+      />
 
       <!-- Encryption status -->
       <div class="flex items-center gap-1.5" :title="encryptionTitle">

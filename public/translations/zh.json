@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-02-28",
-    "translationCount": 891
+    "translationCount": 957
   },
   "translations": {
     "app.name": {
@@ -4459,6 +4459,336 @@
     "planner.day.sat": {
       "translation": "星期6",
       "hash": "1rye",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.saving": {
+      "translation": "正在保存…",
+      "hash": "wq7jzg",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.shared": {
+      "translation": "共享",
+      "hash": "u3egsb",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.none": {
+      "translation": "无",
+      "hash": "1g5zs",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.family": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.pickIcon": {
+      "translation": "选择图标",
+      "hash": "me09wz",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.schedule": {
+      "translation": "计划",
+      "hash": "ah1bgp",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.recurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.oneOff": {
+      "translation": "一次性",
+      "hash": "5ns8ko",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.oneTime": {
+      "translation": "一次性",
+      "hash": "xf6j90",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.whichDays": {
+      "translation": "哪天",
+      "hash": "w91bgb",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.howOften": {
+      "translation": "有多经常？",
+      "hash": "vguko9",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.customTime": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.willShowOnCalendar": {
+      "translation": "将显示在您的日历上",
+      "hash": "kc4g69",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.moneyIn": {
+      "translation": "收钱",
+      "hash": "4ffdx7",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.moneyOut": {
+      "translation": "取钱",
+      "hash": "4rz92m",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.direction": {
+      "translation": "方向",
+      "hash": "h80bq7",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.includeInNetWorth": {
+      "translation": "计入净值",
+      "hash": "r0qemw",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.includeInNetWorthDesc": {
+      "translation": "将其计入您的家庭净资产",
+      "hash": "xtz9lz",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.linkToActivity": {
+      "translation": "活动链接",
+      "hash": "5h87ce",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.selectActivity": {
+      "translation": "选择一个活动",
+      "hash": "h6v5sg",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.noMoreActivities": {
+      "translation": "还没有活动。",
+      "hash": "99zxyk",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.parentBean": {
+      "translation": "Parent Bean",
+      "hash": "rn7fru",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.littleBean": {
+      "translation": "Little Bean",
+      "hash": "ourpt2",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.bigBean": {
+      "translation": "大豆",
+      "hash": "c8t6og",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addToPod": {
+      "translation": "新增至家庭",
+      "hash": "t8xc7q",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.welcomeToPod": {
+      "translation": "欢迎加入我们的大家庭！",
+      "hash": "svqc5j",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.moreDetails": {
+      "translation": "更多详情",
+      "hash": "7wjf61",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.whatsTheActivity": {
+      "translation": "有什么活动？",
+      "hash": "eo77qn",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.whatNeedsDoing": {
+      "translation": "需要做什么？",
+      "hash": "uhav95",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.costPerSession": {
+      "translation": "每学期",
+      "hash": "8okbwg",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.whosGoing": {
+      "translation": "谁要去？",
+      "hash": "rgaqm3",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.startTime": {
+      "translation": "开始时间",
+      "hash": "5z1fkb",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.endTime": {
+      "translation": "结束时间",
+      "hash": "smmmuq",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addActivity": {
+      "translation": "添加项目门票",
+      "hash": "l4t8gi",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.saveActivity": {
+      "translation": "保存活动",
+      "hash": "tnntxu",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addTask": {
+      "translation": "添加任务",
+      "hash": "kci3h8",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addToCalendar": {
+      "translation": "增加至記事簿",
+      "hash": "4znex0",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.saveTask": {
+      "translation": "保存任务",
+      "hash": "z7j0w8",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addAccount": {
+      "translation": "添加账户",
+      "hash": "he46su",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.saveAccount": {
+      "translation": "保存账户",
+      "hash": "7kntsa",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addTransaction": {
+      "translation": "添加交易",
+      "hash": "4dkmu7",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.saveTransaction": {
+      "translation": "保持交易",
+      "hash": "h3bc1n",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addGoal": {
+      "translation": "添加目标",
+      "hash": "kcq4cu",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.saveGoal": {
+      "translation": "保存目标",
+      "hash": "z7b00m",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.addMember": {
+      "translation": "添加成员",
+      "hash": "nibw07",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.saveMember": {
+      "translation": "保存会员",
+      "hash": "m00nfh",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.accountName": {
+      "translation": "账户名",
+      "hash": "jsbizi",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.accountType": {
+      "translation": "Account Type",
+      "hash": "jsfurx",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.balance": {
+      "translation": "本期还款总额",
+      "hash": "ugv4ln",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.owner": {
+      "translation": "所有者",
+      "hash": "19m2dv",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.goalName": {
+      "translation": "目标名称",
+      "hash": "4pawlk",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.targetAmount": {
+      "translation": "目标金额",
+      "hash": "sr3vlz",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.currentAmount": {
+      "translation": "当前数",
+      "hash": "5lp3xb",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.priority": {
+      "translation": "优先级",
+      "hash": "i7ebss",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.deadline": {
+      "translation": "截止日期",
+      "hash": "9ec6m0",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.memberName": {
+      "translation": "姓名",
+      "hash": "1fvl7",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.role": {
+      "translation": "角色",
+      "hash": "1ipw6",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.birthday": {
+      "translation": "生日",
+      "hash": "ir5zml",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.profileColor": {
+      "translation": "简介颜色",
+      "hash": "t63504",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.permissions": {
+      "translation": "权限管理",
+      "hash": "op4mfw",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.canViewFinances": {
+      "translation": "可以查看财务状况",
+      "hash": "doidtw",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.canEditActivities": {
+      "translation": "可以编辑活动",
+      "hash": "hjitzn",
+      "lastUpdated": "2026-02-28"
+    },
+    "modal.canManagePod": {
+      "translation": "可以管理pod",
+      "hash": "122kxy",
+      "lastUpdated": "2026-02-28"
+    },
+    "family.email": {
+      "translation": "电子邮箱",
+      "hash": "13xh18",
+      "lastUpdated": "2026-02-28"
+    },
+    "googleDrive.connectedAs": {
+      "translation": "已连接为{email}",
+      "hash": "gka0r",
       "lastUpdated": "2026-02-28"
     }
   }
