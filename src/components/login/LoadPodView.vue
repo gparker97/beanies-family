@@ -802,6 +802,13 @@ async function handleDriveRefresh() {
             />
           </svg>
         </div>
+        <!-- Cloud account email -->
+        <p
+          v-if="syncStore.providerAccountEmail"
+          class="mb-2 text-[0.65rem] text-gray-400 dark:text-gray-500"
+        >
+          {{ syncStore.providerAccountEmail }}
+        </p>
 
         <!-- Heading -->
         <h3 class="font-outfit text-[1.2rem] font-bold text-gray-900 dark:text-gray-100">

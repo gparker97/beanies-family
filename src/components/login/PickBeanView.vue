@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { isTemporaryEmail } from '@/utils/email';
@@ -135,32 +136,13 @@ async function handleSignIn() {
           </svg>
           {{ podName }}
         </div>
-        <span
+        <CloudProviderBadge
           v-if="syncStore.fileName"
-          class="inline-flex items-center gap-1 text-[0.65rem] text-gray-400 dark:text-gray-500"
-        >
-          <!-- Google Drive icon -->
-          <svg
-            v-if="syncStore.storageProviderType === 'google_drive'"
-            class="h-3 w-3"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path
-              d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
-            />
-          </svg>
-          <!-- Folder icon for local -->
-          <svg v-else class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-            />
-          </svg>
-          {{ syncStore.fileName }}
-        </span>
+          :provider-type="syncStore.storageProviderType"
+          :file-name="syncStore.fileName"
+          :account-email="syncStore.providerAccountEmail"
+          size="sm"
+        />
       </div>
 
       <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">

@@ -12,6 +12,7 @@ export interface PersistedProviderConfig {
   type: StorageProviderType;
   driveFileId?: string;
   driveFileName?: string;
+  driveAccountEmail?: string;
 }
 
 interface HandleDB {

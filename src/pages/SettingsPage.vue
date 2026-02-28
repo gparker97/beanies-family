@@ -5,6 +5,7 @@ import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 
 import { useTranslation } from '@/composables/useTranslation';
 import { usePWA } from '@/composables/usePWA';
@@ -408,20 +409,12 @@ function formatLastSync(timestamp: string | null): string {
                   <p class="font-medium text-gray-900 dark:text-gray-100">
                     {{ t('settings.myFamilyData') }}
                   </p>
-                  <div class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                    <!-- Google Drive icon when connected to Drive -->
-                    <svg
-                      v-if="syncStore.isGoogleDriveConnected"
-                      class="h-3.5 w-3.5 flex-shrink-0 text-blue-500"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path
-                        d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
-                      />
-                    </svg>
-                    <span class="truncate">{{ syncStore.fileName }}</span>
-                  </div>
+                  <CloudProviderBadge
+                    :provider-type="syncStore.storageProviderType"
+                    :file-name="syncStore.fileName"
+                    :account-email="syncStore.providerAccountEmail"
+                    size="md"
+                  />
                   <p
                     v-if="syncStore.isGoogleDriveConnected"
                     class="mt-0.5 text-xs text-gray-400 dark:text-gray-500"
