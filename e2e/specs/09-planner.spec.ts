@@ -86,12 +86,13 @@ test.describe('Family Planner', () => {
     await page.getByPlaceholder("What's the activity?").fill('Piano Lesson');
     await page.locator('input[type="date"]').fill('2026-03-04');
 
-    // Select start time preset (3:00 PM = 15:00) — use .first() since end time picker is also in DOM
-    await page.getByRole('button', { name: '3:00 PM' }).first().click();
+    // Open start time dropdown (trigger shows "9:00 AM" by default) then select 3:00 PM
+    await page.getByRole('button', { name: '9:00 AM' }).first().click();
+    await page.getByRole('button', { name: '3:00 PM' }).click();
 
-    // End time section appears after start time is set
-    // Select end time preset (4:00 PM = 16:00) — use .last() to target end time picker
-    await page.getByRole('button', { name: '4:00 PM' }).last().click();
+    // Open end time dropdown (trigger shows "Select a time") then select 4:00 PM
+    await page.getByRole('button', { name: 'Select a time' }).click();
+    await page.getByRole('button', { name: '4:00 PM' }).click();
 
     // Recurrence stays at default (Recurring + Weekly)
 
@@ -319,20 +320,18 @@ test.describe('Family Planner', () => {
     await page.getByPlaceholder("What's the activity?").fill('Soccer Practice');
     await page.locator('input[type="date"]').fill('2026-03-02');
 
-    // Select start time (9:00 AM) — use .first() since end time picker is also in DOM
-    await page.getByRole('button', { name: '9:00 AM' }).first().click();
-    // Select end time (10:30 AM) — use .last() to target end time picker
-    await page.getByRole('button', { name: '10:30 AM' }).last().click();
+    // Start time defaults to 9:00 AM — already correct, no action needed
+
+    // Open end time dropdown (trigger shows "Select a time") then select 10:30 AM
+    await page.getByRole('button', { name: 'Select a time' }).click();
+    await page.getByRole('button', { name: '10:30 AM' }).click();
 
     // Recurrence defaults to Recurring + Weekly
 
     // Location and instructor fields are now inline
-    // Fill location (BaseInput wrapped in FormFieldGroup — use placeholder)
     await page.getByPlaceholder('Location').fill('City Sports Park');
-
-    // Fill instructor (BaseInput with label prop — getByLabel works)
-    await page.getByLabel('Instructor / Coach').fill('Coach Johnson');
-    await page.getByLabel('Contact').fill('coach@sports.com');
+    await page.getByPlaceholder('Instructor / Coach').fill('Coach Johnson');
+    await page.getByPlaceholder('Contact').fill('coach@sports.com');
 
     // Save — use exact match to avoid conflict with "+ Add Activity" header button
     await page.getByRole('button', { name: 'Add Activity', exact: true }).click();
