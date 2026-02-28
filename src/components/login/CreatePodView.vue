@@ -5,6 +5,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
@@ -843,24 +844,16 @@ function handleBack() {
           <!-- File details -->
           <div class="rounded-xl bg-gray-50 p-3 dark:bg-slate-700/50">
             <div class="flex items-center gap-2.5">
-              <svg
-                class="h-5 w-5 flex-shrink-0 text-blue-500"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path
-                  d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
-                />
-              </svg>
-              <div class="min-w-0">
-                <p class="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {{ syncStore.fileName }}
-                </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('googleDrive.fileLocation') }}
-                </p>
-              </div>
+              <CloudProviderBadge
+                provider-type="google_drive"
+                :file-name="syncStore.fileName"
+                :account-email="syncStore.providerAccountEmail"
+                size="md"
+              />
             </div>
+            <p class="mt-1 pl-5 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('googleDrive.fileLocation') }}
+            </p>
           </div>
 
           <!-- Open folder in Drive link -->

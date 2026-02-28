@@ -42,12 +42,17 @@ declare global {
 
 const GIS_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
+const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const SESSION_TOKEN_KEY = 'gis_token';
 
 // In-memory token state (hydrated from sessionStorage on load)
 let accessToken: string | null = null;
 let expiresAt: number = 0;
 let tokenClient: TokenClient | null = null;
+
+// Cached Google account email (fetched after OAuth, cleared on revoke)
+let cachedEmail: string | null = null;
 
 // Restore token from sessionStorage on module load
 try {
@@ -148,7 +153,7 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
   return new Promise((resolve, reject) => {
     tokenClient = window.google!.accounts!.oauth2!.initTokenClient({
       client_id: clientId,
-      scope: DRIVE_FILE_SCOPE,
+      scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
       callback: (response: TokenResponse) => {
         if (response.error) {
           reject(new Error(response.error_description ?? response.error));
@@ -163,6 +168,9 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
 
         // Schedule expiry warning (5 min before expiry)
         scheduleExpiryWarning(response.expires_in);
+
+        // Fire-and-forget: fetch account email for display purposes
+        fetchGoogleUserEmail(response.access_token).catch(() => {});
 
         resolve(response.access_token);
       },
@@ -230,6 +238,7 @@ function clearTokenState(): void {
   accessToken = null;
   expiresAt = 0;
   tokenClient = null;
+  cachedEmail = null;
   try {
     sessionStorage.removeItem(SESSION_TOKEN_KEY);
   } catch {
@@ -270,4 +279,38 @@ function scheduleExpiryWarning(expiresInSeconds: number): void {
       }
     });
   }, warningMs);
+}
+
+/**
+ * Fetch the Google account email for the authenticated user.
+ * Caches the result in-memory so subsequent calls don't hit the network.
+ */
+export async function fetchGoogleUserEmail(token: string): Promise<string | null> {
+  if (cachedEmail) return cachedEmail;
+
+  try {
+    const res = await fetch(USERINFO_ENDPOINT, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { email?: string };
+    cachedEmail = data.email ?? null;
+    return cachedEmail;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get the cached Google account email. Returns null if not yet fetched.
+ */
+export function getGoogleAccountEmail(): string | null {
+  return cachedEmail;
+}
+
+/**
+ * Set the cached Google account email (used when restoring from persisted config).
+ */
+export function setGoogleAccountEmail(email: string | null): void {
+  cachedEmail = email;
 }

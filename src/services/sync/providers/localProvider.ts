@@ -125,6 +125,13 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   /**
+   * Local files don't have an associated cloud account email.
+   */
+  getAccountEmail(): string | null {
+    return null;
+  }
+
+  /**
    * Get the underlying FileSystemFileHandle.
    * Needed for passkey PRF flow (reads encrypted blob from file).
    */
