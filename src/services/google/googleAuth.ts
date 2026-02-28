@@ -200,11 +200,64 @@ export function getAccessToken(): string | null {
 }
 
 /**
+ * Attempt a silent token refresh (no popup).
+ * Uses GIS `requestAccessToken({ prompt: '' })` which succeeds when the
+ * Google session is still active (cookie alive). Returns the new token
+ * on success, or `null` if interactive auth is required.
+ *
+ * Wrapped in a 5-second timeout — silent auth that hangs is treated as failure.
+ */
+export async function attemptSilentRefresh(): Promise<string | null> {
+  const clientId = getClientId();
+  if (!clientId || !window.google?.accounts?.oauth2) return null;
+
+  try {
+    const token = await Promise.race([
+      new Promise<string>((resolve, reject) => {
+        const client = window.google!.accounts!.oauth2!.initTokenClient({
+          client_id: clientId,
+          scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
+          callback: (response: TokenResponse) => {
+            if (response.error) {
+              reject(new Error(response.error_description ?? response.error));
+              return;
+            }
+            // Update in-memory state
+            accessToken = response.access_token;
+            expiresAt = Date.now() + response.expires_in * 1000;
+            persistToken();
+            scheduleExpiryWarning(response.expires_in);
+            fetchGoogleUserEmail(response.access_token).catch(() => {});
+            resolve(response.access_token);
+          },
+          error_callback: (error) => {
+            reject(new Error(error.message ?? 'Silent refresh failed'));
+          },
+        });
+        client.requestAccessToken({ prompt: '' });
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Silent refresh timeout')), 5000)
+      ),
+    ]);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Get a valid access token, refreshing if needed.
- * Use this for API calls that need a guaranteed-valid token.
+ * Attempts silent refresh first; falls back to interactive auth.
  */
 export async function getValidToken(): Promise<string> {
   if (isTokenValid()) return accessToken!;
+
+  // Try silent refresh first (no popup)
+  const silentToken = await attemptSilentRefresh();
+  if (silentToken) return silentToken;
+
+  // Fall back to interactive auth
   return requestAccessToken();
 }
 
@@ -270,7 +323,15 @@ function scheduleExpiryWarning(expiresInSeconds: number): void {
   // Fire 5 minutes before expiry, or immediately if less than 5 min remaining
   const warningMs = Math.max(0, (expiresInSeconds - 300) * 1000);
 
-  expiryTimer = setTimeout(() => {
+  expiryTimer = setTimeout(async () => {
+    // Try silent refresh before notifying subscribers
+    const refreshed = await attemptSilentRefresh();
+    if (refreshed) {
+      // Silent refresh succeeded — no need to bother the user
+      return;
+    }
+
+    // Silent refresh failed — fire expiry callbacks (e.g., show reconnect toast)
     expiryCallbacks.forEach((cb) => {
       try {
         cb();
