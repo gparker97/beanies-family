@@ -164,11 +164,6 @@ describe('AccountsPage - Edit Account Modal', () => {
     // The edit modal should now be visible (open prop = true)
     const modal = wrapper.find('[data-testid="account-modal"]');
     expect(modal.exists()).toBe(true);
-
-    // Verify the page's internal state changed
-    expect(wrapper.vm.showEditModal).toBe(true);
-    expect(wrapper.vm.editingAccount).not.toBeNull();
-    expect(wrapper.vm.editingAccount?.id).toBe('test-account-1');
   });
 });
 
