@@ -9,6 +9,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import type { TodoItem } from '@/types/models';
 
 const props = defineProps<{
@@ -167,103 +168,102 @@ async function handleDelete() {
     @save="switchToEdit"
     @delete="handleDelete"
   >
-    <!-- Task title -->
-    <div>
-      <span
-        class="font-outfit text-[1.2rem] font-bold text-[var(--color-text)] dark:text-gray-100"
-        :class="{ 'line-through opacity-50': todo.completed }"
-      >
-        {{ todo.title }}
-      </span>
-    </div>
-
-    <!-- Status -->
-    <FormFieldGroup :label="t('todo.status')">
-      <span
-        v-if="todo.completed"
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold text-green-700"
-        style="background: var(--tint-success-10)"
-      >
-        ✓ {{ t('todo.status.completed') }}
-      </span>
-      <span
-        v-else
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold text-purple-700"
-        style="background: var(--tint-purple-15)"
-      >
-        {{ t('todo.status.open') }}
-      </span>
-    </FormFieldGroup>
-
-    <!-- Due date -->
-    <FormFieldGroup :label="t('todo.dueDate')">
-      <span
-        v-if="viewFormattedDate && viewIsOverdue"
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-3 py-1.5 text-[0.65rem] font-semibold text-white"
-      >
-        {{ viewFormattedDate }}
-        <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
-        <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.55rem] font-bold uppercase">
-          {{ t('todo.overdue') }}
-        </span>
-      </span>
-      <span
-        v-else-if="viewFormattedDate"
-        class="font-outfit text-primary-500 text-[0.8rem] font-semibold"
-      >
-        {{ viewFormattedDate }}
-        <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
-      </span>
-      <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">
-        {{ t('todo.noDueDate') }}
-      </span>
-    </FormFieldGroup>
-
-    <!-- Assignee -->
-    <FormFieldGroup :label="t('todo.assignTo')">
-      <span
-        v-if="viewAssignee"
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.65rem] font-semibold text-white"
-        :style="{
-          background: `linear-gradient(135deg, ${viewAssignee.color}, ${viewAssignee.color}cc)`,
-        }"
-      >
-        {{ viewAssignee.name }}
-      </span>
-      <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">
-        {{ t('todo.unassigned') }}
-      </span>
-    </FormFieldGroup>
-
-    <!-- Description -->
-    <FormFieldGroup :label="t('todo.description')">
-      <p
-        v-if="todo.description"
-        class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
-      >
-        {{ todo.description }}
-      </p>
-      <p v-else class="text-[0.75rem] text-[var(--color-text-muted)] italic">
-        {{ t('todo.noDescription') }}
-      </p>
-    </FormFieldGroup>
-
-    <!-- Created by / Completed by -->
-    <div class="grid grid-cols-2 gap-4">
-      <FormFieldGroup :label="t('todo.createdBy')">
+    <div class="space-y-3">
+      <!-- Task title -->
+      <div>
         <span
-          v-if="viewCreatedBy"
-          class="text-[0.75rem] text-[var(--color-text)] dark:text-gray-300"
+          class="font-outfit text-[1.2rem] font-bold text-[var(--color-text)] dark:text-gray-100"
+          :class="{ 'line-through opacity-50': todo.completed }"
         >
-          {{ viewCreatedBy.name }}
+          {{ todo.title }}
         </span>
-        <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">&mdash;</span>
-      </FormFieldGroup>
-      <FormFieldGroup v-if="todo.completed && viewCompletedBy" :label="t('todo.doneBy')">
-        <span class="text-[0.75rem] text-[var(--color-text)] dark:text-gray-300">
-          {{ viewCompletedBy.name }}
+      </div>
+
+      <!-- Status -->
+      <FormFieldGroup :label="t('todo.status')">
+        <span
+          v-if="todo.completed"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-green-700"
+          style="background: var(--tint-success-10)"
+        >
+          ✓ {{ t('todo.status.completed') }}
+        </span>
+        <span
+          v-else
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700"
+          style="background: var(--tint-purple-15)"
+        >
+          {{ t('todo.status.open') }}
         </span>
       </FormFieldGroup>
+
+      <!-- Due date -->
+      <FormFieldGroup :label="t('todo.dueDate')">
+        <span
+          v-if="viewFormattedDate && viewIsOverdue"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-3 py-1.5 text-xs font-semibold text-white"
+        >
+          {{ viewFormattedDate }}
+          <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
+          <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.6rem] font-bold uppercase">
+            {{ t('todo.overdue') }}
+          </span>
+        </span>
+        <span
+          v-else-if="viewFormattedDate"
+          class="font-outfit text-primary-500 text-sm font-semibold"
+        >
+          {{ viewFormattedDate }}
+          <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
+        </span>
+        <span v-else class="text-sm text-[var(--color-text-muted)]">
+          {{ t('todo.noDueDate') }}
+        </span>
+      </FormFieldGroup>
+
+      <!-- Assignee -->
+      <FormFieldGroup :label="t('todo.assignTo')">
+        <span
+          v-if="viewAssignee"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white"
+          :style="{
+            background: `linear-gradient(135deg, ${viewAssignee.color}, ${viewAssignee.color}cc)`,
+          }"
+        >
+          {{ viewAssignee.name }}
+        </span>
+        <span v-else class="text-sm text-[var(--color-text-muted)]">
+          {{ t('todo.unassigned') }}
+        </span>
+      </FormFieldGroup>
+
+      <!-- Description -->
+      <FormFieldGroup :label="t('todo.description')">
+        <p
+          v-if="todo.description"
+          class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
+        >
+          {{ todo.description }}
+        </p>
+        <p v-else class="text-sm text-[var(--color-text-muted)] italic">
+          {{ t('todo.noDescription') }}
+        </p>
+      </FormFieldGroup>
+
+      <!-- Created by / Completed by -->
+      <div class="grid grid-cols-2 gap-4">
+        <FormFieldGroup :label="t('todo.createdBy')">
+          <span v-if="viewCreatedBy" class="text-sm text-[var(--color-text)] dark:text-gray-300">
+            {{ viewCreatedBy.name }}
+          </span>
+          <span v-else class="text-sm text-[var(--color-text-muted)]">&mdash;</span>
+        </FormFieldGroup>
+        <FormFieldGroup v-if="todo.completed && viewCompletedBy" :label="t('todo.doneBy')">
+          <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+            {{ viewCompletedBy.name }}
+          </span>
+        </FormFieldGroup>
+      </div>
     </div>
   </BeanieFormModal>
 
@@ -294,19 +294,26 @@ async function handleDelete() {
       />
     </div>
 
-    <!-- 2. Date input -->
-    <FormFieldGroup :label="t('todo.dueDate')" optional>
-      <BaseInput v-model="editForm.dueDate" type="date" />
+    <!-- 2. Date + Time -->
+    <div>
+      <div class="grid grid-cols-2 gap-4">
+        <FormFieldGroup :label="t('todo.dueDate')" optional>
+          <BaseInput v-model="editForm.dueDate" type="date" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('modal.startTime')" optional>
+          <TimePresetPicker v-model="editForm.dueTime" />
+        </FormFieldGroup>
+      </div>
       <!-- Calendar hint badge -->
       <div
         v-if="editForm.dueDate"
-        class="font-outfit text-sky-silk-300 mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[0.65rem] font-semibold"
+        class="font-outfit text-sky-silk-300 mt-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold"
         style="background: var(--tint-silk-20)"
       >
         <span>📅</span>
         {{ t('modal.willShowOnCalendar') }}
       </div>
-    </FormFieldGroup>
+    </div>
 
     <!-- 3. Family chip picker (multi-select, compact) -->
     <FormFieldGroup :label="t('todo.assignTo')">
