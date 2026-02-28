@@ -20,6 +20,8 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useTodoStore } from '@/stores/todoStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -132,6 +134,8 @@ function resetAllStores() {
   useRecurringStore().resetState();
   useSettingsStore().resetState();
   useMemberFilterStore().resetState();
+  useTodoStore().resetState();
+  useActivityStore().resetState();
 }
 
 async function handleSignOut() {
