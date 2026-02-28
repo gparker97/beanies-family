@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-type InputType = 'text' | 'email' | 'password' | 'number' | 'date' | 'tel' | 'url';
+type InputType = 'text' | 'email' | 'password' | 'number' | 'date' | 'time' | 'tel' | 'url';
 
 interface Props {
   modelValue: string | number | undefined;
