@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beanies.family — Modal & Form Proposals</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-slate: #2C3E50;
+  --heritage-orange: #F15D22;
+  --sky-silk: #AED6F1;
+  --terracotta: #E67E22;
+  --cloud-white: #F8F9FA;
+  --sq: 24px;
+  --fh: 'Outfit', sans-serif;
+  --fb: 'Inter', sans-serif;
+  --silk20: rgba(174,214,241,0.20);
+  --or10: rgba(241,93,34,0.08);
+  --s05: rgba(44,62,80,0.05);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: var(--fb); background: #EAEDF0; color: var(--deep-slate); -webkit-font-smoothing: antialiased; }
+
+/* ═══ PAGE LAYOUT ═══ */
+.page-header {
+  text-align: center; padding: 60px 20px 40px;
+}
+.page-header h1 {
+  font-family: var(--fh); font-size: 2.2rem; font-weight: 800;
+}
+.page-header h1 span { color: var(--heritage-orange); }
+.page-header p { font-size: 0.85rem; opacity: 0.4; margin-top: 8px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+
+.proposals {
+  max-width: 1100px; margin: 0 auto; padding: 0 20px 80px;
+  display: flex; flex-direction: column; gap: 48px;
+}
+
+.proposal-card {
+  background: white; border-radius: 28px; padding: 40px;
+  box-shadow: 0 4px 30px rgba(44,62,80,0.06);
+}
+.proposal-label {
+  font-family: var(--fh); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--heritage-orange); opacity: 0.6; margin-bottom: 8px;
+}
+.proposal-title {
+  font-family: var(--fh); font-size: 1.4rem; font-weight: 700;
+  margin-bottom: 6px;
+}
+.proposal-desc {
+  font-size: 0.8rem; opacity: 0.4; margin-bottom: 28px; line-height: 1.6;
+}
+.open-btn {
+  font-family: var(--fh); font-size: 0.8rem; font-weight: 600;
+  color: white; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  border: none; padding: 12px 28px; border-radius: 30px; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(241,93,34,0.2);
+  transition: all 0.2s;
+}
+.open-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(241,93,34,0.3); }
+
+/* ═══ MODAL OVERLAY ═══ */
+.overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(44,62,80,0.4); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+  padding: 20px;
+}
+.overlay.open { opacity: 1; pointer-events: auto; }
+.overlay.open .modal {
+  transform: translateY(0) scale(1); opacity: 1;
+}
+
+/* ═══ MODAL BASE ═══ */
+.modal {
+  background: var(--cloud-white); border-radius: 28px;
+  width: 100%; max-width: 580px; max-height: 90vh;
+  overflow-y: auto; overflow-x: hidden;
+  box-shadow: 0 30px 100px rgba(44,62,80,0.25);
+  transform: translateY(30px) scale(0.97); opacity: 0;
+  transition: all 0.4s cubic-bezier(0.2, 0.9, 0.3, 1);
+  position: relative;
+}
+.modal::-webkit-scrollbar { width: 0; }
+
+/* ═══ MODAL HEADER ═══ */
+.m-head {
+  display: flex; align-items: center; gap: 14px;
+  padding: 24px 28px 0;
+  position: sticky; top: 0; z-index: 10;
+  background: var(--cloud-white);
+}
+.m-icon {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+}
+.m-title {
+  font-family: var(--fh); font-size: 1.1rem; font-weight: 700;
+  flex: 1;
+}
+.m-close {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--s05); border: none; cursor: pointer;
+  font-size: 0.8rem; display: flex; align-items: center; justify-content: center;
+  color: var(--deep-slate); opacity: 0.3;
+  transition: all 0.15s;
+}
+.m-close:hover { opacity: 0.7; background: rgba(44,62,80,0.1); }
+
+/* ═══ MODAL BODY ═══ */
+.m-body { padding: 24px 28px; }
+
+/* ═══ FORM ELEMENTS ═══ */
+
+/* Field group */
+.fg { margin-bottom: 20px; }
+.fg-label {
+  font-family: var(--fh); font-size: 0.6rem; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  opacity: 0.35; margin-bottom: 8px; display: block;
+}
+
+/* Text input — squircle */
+.fi {
+  width: 100%; font-family: var(--fb); font-size: 0.88rem;
+  color: var(--deep-slate); background: white;
+  border: 2px solid rgba(44,62,80,0.06);
+  border-radius: 16px; padding: 14px 16px;
+  outline: none; transition: all 0.2s;
+}
+.fi:focus { border-color: var(--heritage-orange); box-shadow: 0 0 0 4px rgba(241,93,34,0.08); }
+.fi::placeholder { opacity: 0.25; }
+.fi-lg { font-size: 1.2rem; font-weight: 600; font-family: var(--fh); padding: 16px 18px; }
+
+/* Inline row */
+.fi-row { display: flex; gap: 10px; }
+.fi-row > * { flex: 1; }
+
+/* Emoji picker grid */
+.emoji-pick {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.emoji-opt {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: white; border: 2px solid rgba(44,62,80,0.04);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; cursor: pointer;
+  transition: all 0.15s;
+}
+.emoji-opt:hover { transform: scale(1.12); border-color: rgba(44,62,80,0.1); }
+.emoji-opt.sel {
+  border-color: var(--heritage-orange);
+  background: var(--or10);
+  transform: scale(1.1);
+  box-shadow: 0 4px 16px rgba(241,93,34,0.12);
+}
+
+/* Emoji category label */
+.emoji-cat-label {
+  font-family: var(--fh); font-size: 0.6rem; font-weight: 600;
+  color: var(--heritage-orange); opacity: 0.45;
+  margin-top: 8px; height: 16px;
+  transition: all 0.25s;
+}
+
+/* Custom activity dropdown */
+.act-dropdown {
+  position: relative;
+}
+.act-trigger {
+  width: 100%; font-family: var(--fb); font-size: 0.88rem;
+  color: var(--deep-slate); background: white;
+  border: 2px solid rgba(44,62,80,0.06);
+  border-radius: 16px; padding: 14px 40px 14px 16px;
+  cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; gap: 10px;
+  user-select: none;
+}
+.act-trigger:hover { border-color: rgba(44,62,80,0.12); }
+.act-trigger.open { border-color: var(--heritage-orange); box-shadow: 0 0 0 4px rgba(241,93,34,0.08); border-radius: 16px 16px 0 0; }
+.act-trigger .act-placeholder { opacity: 0.25; }
+.act-trigger::after {
+  content: '▾'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  font-size: 0.7rem; opacity: 0.25; transition: transform 0.2s;
+}
+.act-trigger.open::after { transform: translateY(-50%) rotate(180deg); }
+.act-list {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+  background: white; border: 2px solid var(--heritage-orange);
+  border-top: none; border-radius: 0 0 16px 16px;
+  box-shadow: 0 12px 32px rgba(44,62,80,0.12);
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.act-list.open { max-height: 300px; overflow-y: auto; }
+.act-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; cursor: pointer;
+  transition: background 0.1s;
+}
+.act-item:hover { background: var(--or10); }
+.act-item.sel { background: var(--or10); }
+.act-item-icon {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; flex-shrink: 0;
+}
+.act-item-name { font-family: var(--fh); font-size: 0.78rem; font-weight: 600; }
+.act-item-meta { font-size: 0.6rem; opacity: 0.35; }
+.act-none {
+  padding: 12px 16px; text-align: center;
+  font-family: var(--fh); font-size: 0.72rem;
+  opacity: 0.3; font-style: italic;
+}
+
+/* Toggle pill group */
+.tog-group {
+  display: flex; background: white; border-radius: 14px;
+  padding: 4px; border: 2px solid rgba(44,62,80,0.04);
+}
+.tog-opt {
+  flex: 1; text-align: center;
+  font-family: var(--fh); font-size: 0.72rem; font-weight: 600;
+  padding: 10px 14px; border-radius: 11px; cursor: pointer;
+  color: var(--deep-slate); opacity: 0.3;
+  transition: all 0.2s;
+}
+.tog-opt.sel {
+  background: var(--deep-slate); color: white; opacity: 1;
+  box-shadow: 0 2px 12px rgba(44,62,80,0.15);
+}
+.tog-opt.sel-or {
+  background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  color: white; opacity: 1;
+  box-shadow: 0 2px 12px rgba(241,93,34,0.2);
+}
+
+/* Family member chips */
+.fam-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.fam-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px 8px 8px; border-radius: 24px;
+  background: white; border: 2px solid rgba(44,62,80,0.04);
+  cursor: pointer; transition: all 0.2s;
+}
+.fam-chip:hover { border-color: rgba(44,62,80,0.1); }
+.fam-chip.sel { border-color: var(--heritage-orange); background: var(--or10); }
+.fam-av {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55rem; font-weight: 700; color: white;
+}
+.fam-name { font-family: var(--fh); font-size: 0.72rem; font-weight: 600; }
+
+/* Day selector (for recurring) */
+.day-sel { display: flex; gap: 4px; }
+.day-opt {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: white; border: 2px solid rgba(44,62,80,0.04);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--fh); font-size: 0.6rem; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; opacity: 0.35;
+}
+.day-opt:hover { opacity: 0.6; border-color: rgba(44,62,80,0.1); }
+.day-opt.sel {
+  background: var(--deep-slate); color: white; opacity: 1;
+  border-color: var(--deep-slate);
+}
+
+/* Color selector */
+.color-sel { display: flex; gap: 8px; }
+.color-opt {
+  width: 32px; height: 32px; border-radius: 50%;
+  cursor: pointer; transition: all 0.15s;
+  border: 3px solid transparent;
+}
+.color-opt:hover { transform: scale(1.15); }
+.color-opt.sel { border-color: var(--deep-slate); box-shadow: 0 0 0 2px white, 0 0 0 4px var(--deep-slate); }
+
+/* Amount input with currency */
+.amt-wrap {
+  display: flex; align-items: center; background: white;
+  border: 2px solid rgba(44,62,80,0.06); border-radius: 16px;
+  overflow: hidden; transition: all 0.2s;
+}
+.amt-wrap:focus-within { border-color: var(--heritage-orange); box-shadow: 0 0 0 4px rgba(241,93,34,0.08); }
+.amt-cur {
+  font-family: var(--fh); font-size: 1rem; font-weight: 700;
+  padding: 14px 4px 14px 16px; opacity: 0.25;
+}
+.amt-input {
+  flex: 1; font-family: var(--fh); font-size: 1.4rem; font-weight: 700;
+  border: none; outline: none; padding: 14px 16px 14px 4px;
+  background: transparent; color: var(--deep-slate);
+}
+.amt-input::placeholder { opacity: 0.15; font-weight: 500; }
+
+/* Frequency select chips */
+.freq-chips { display: flex; gap: 6px; }
+.freq-chip {
+  font-family: var(--fh); font-size: 0.65rem; font-weight: 600;
+  padding: 8px 16px; border-radius: 12px;
+  background: white; border: 2px solid rgba(44,62,80,0.04);
+  cursor: pointer; transition: all 0.15s; opacity: 0.35;
+}
+.freq-chip:hover { opacity: 0.6; }
+.freq-chip.sel {
+  border-color: var(--heritage-orange); background: var(--or10);
+  color: var(--heritage-orange); opacity: 1;
+}
+
+/* Conditional section — slides in */
+.cond-section {
+  overflow: hidden; max-height: 0;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.cond-section.show { max-height: 400px; }
+.cond-inner {
+  padding-top: 16px; border-top: 2px dashed rgba(241,93,34,0.1);
+  margin-top: 16px;
+}
+
+/* ═══ MODAL FOOTER ═══ */
+.m-foot {
+  padding: 0 28px 24px;
+  display: flex; gap: 10px; align-items: center;
+}
+.m-save {
+  flex: 1; font-family: var(--fh); font-size: 0.88rem; font-weight: 700;
+  color: white; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  border: none; padding: 16px; border-radius: 16px; cursor: pointer;
+  box-shadow: 0 6px 24px rgba(241,93,34,0.2);
+  transition: all 0.2s;
+}
+.m-save:hover { transform: translateY(-1px); box-shadow: 0 10px 32px rgba(241,93,34,0.3); }
+.m-delete {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: rgba(231,76,60,0.06); border: none; cursor: pointer;
+  font-size: 1rem; display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.m-delete:hover { background: rgba(231,76,60,0.12); }
+
+/* ═══ SUCCESS STATE ═══ */
+.m-success {
+  display: none; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 28px;
+  text-align: center;
+}
+.m-success.show { display: flex; }
+.m-success-icon { font-size: 3rem; margin-bottom: 16px; }
+.m-success-text { font-family: var(--fh); font-size: 1rem; font-weight: 600; opacity: 0.6; }
+.m-form.hide { display: none; }
+
+/* ═══ DESIGN NOTE ═══ */
+.dn {
+  margin-top: 24px; padding: 20px 24px;
+  background: rgba(241,93,34,0.04); border-radius: 16px;
+  border-left: 3px solid var(--heritage-orange);
+}
+.dn-title {
+  font-family: var(--fh); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--heritage-orange); opacity: 0.5; margin-bottom: 6px;
+}
+.dn-text { font-size: 0.72rem; line-height: 1.7; opacity: 0.4; }
+</style>
+</head>
+<body>
+
+<!-- ═══ PAGE HEADER ═══ -->
+<div class="page-header">
+  <h1>🫘 Add & Edit <span>Modals</span></h1>
+  <p>Proposals for the core input modals that let users add, edit, and manage everything in beanies.family. Click each button to open the interactive modal.</p>
+</div>
+
+<div class="proposals">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PROPOSAL 1: ADD ACTIVITY -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="proposal-card">
+  <div class="proposal-label">Modal 01</div>
+  <div class="proposal-title">Add / Edit Activity ⚽</div>
+  <div class="proposal-desc">For lessons, sports, classes, appointments — anything the family does on a schedule. Supports one-off and recurring, with family member assignment and day selection.</div>
+  <button class="open-btn" onclick="openModal('activity')">Open Activity Modal</button>
+
+  <div class="dn">
+    <div class="dn-title">Design Notes</div>
+    <div class="dn-text">The activity modal leads with an emoji picker — the user picks a visual identity for the activity before anything else, making the process feel playful rather than administrative. The name field is large and prominent ("What's the activity?"). Below, a toggle group switches between One-off and Recurring with a smooth transition — selecting Recurring reveals a day-of-week selector and frequency chips (Weekly/Biweekly/Monthly). Family member assignment uses avatar chips rather than a dropdown, making it visual and tappable. The time input is a simple text field (no native time picker) for maximum flexibility ("4:30 PM", "After school", "Morning"). The optional cost field has a currency prefix. Save button uses the Heritage Orange gradient, delete (for edit mode) is a small icon button. On success, a brief celebration state (✅ + confirmation) appears before auto-closing.</div>
+  </div>
+</div>
+
+<!-- Activity Overlay -->
+<div class="overlay" id="overlay-activity" onclick="if(event.target===this)closeModal('activity')">
+  <div class="modal">
+    <div class="m-form" id="form-activity">
+      <div class="m-head">
+        <div class="m-icon" style="background:var(--or10);" id="activity-icon-preview">⚽</div>
+        <div class="m-title">New Activity</div>
+        <button class="m-close" onclick="closeModal('activity')">✕</button>
+      </div>
+      <div class="m-body">
+        <!-- Emoji picker -->
+        <div class="fg">
+          <label class="fg-label">Pick an icon</label>
+          <div class="emoji-pick" id="activity-emojis">
+            <div class="emoji-opt sel" data-label="Sports" onclick="pickEmoji(this,'activity')">⚽</div>
+            <div class="emoji-opt" data-label="Music" onclick="pickEmoji(this,'activity')">🎹</div>
+            <div class="emoji-opt" data-label="Swimming" onclick="pickEmoji(this,'activity')">🏊</div>
+            <div class="emoji-opt" data-label="Martial Arts" onclick="pickEmoji(this,'activity')">🥋</div>
+            <div class="emoji-opt" data-label="Gymnastics" onclick="pickEmoji(this,'activity')">🤸</div>
+            <div class="emoji-opt" data-label="Tutoring" onclick="pickEmoji(this,'activity')">📐</div>
+            <div class="emoji-opt" data-label="Art & Craft" onclick="pickEmoji(this,'activity')">🎨</div>
+            <div class="emoji-opt" data-label="Medical" onclick="pickEmoji(this,'activity')">🏥</div>
+            <div class="emoji-opt" data-label="Education" onclick="pickEmoji(this,'activity')">📚</div>
+            <div class="emoji-opt" data-label="Music" onclick="pickEmoji(this,'activity')">🎸</div>
+            <div class="emoji-opt" data-label="Science" onclick="pickEmoji(this,'activity')">🧪</div>
+            <div class="emoji-opt" data-label="Travel" onclick="pickEmoji(this,'activity')">✈️</div>
+          </div>
+          <div class="emoji-cat-label" id="activity-cat-label">Sports</div>
+        </div>
+
+        <!-- Name -->
+        <div class="fg">
+          <label class="fg-label">What's the activity?</label>
+          <input class="fi fi-lg" placeholder="e.g. Swimming Lesson" />
+        </div>
+
+        <!-- One-off / Recurring toggle -->
+        <div class="fg">
+          <label class="fg-label">Schedule</label>
+          <div class="tog-group" id="activity-sched">
+            <div class="tog-opt sel" onclick="togSel(this);toggleCond('activity-recur',true)">Recurring</div>
+            <div class="tog-opt" onclick="togSel(this);toggleCond('activity-recur',false)">One-off</div>
+          </div>
+        </div>
+
+        <!-- Recurring options (conditional) -->
+        <div class="cond-section show" id="activity-recur">
+          <div class="cond-inner">
+            <div class="fg">
+              <label class="fg-label">Which days?</label>
+              <div class="day-sel">
+                <div class="day-opt" onclick="this.classList.toggle('sel')">M</div>
+                <div class="day-opt" onclick="this.classList.toggle('sel')">T</div>
+                <div class="day-opt sel" onclick="this.classList.toggle('sel')">W</div>
+                <div class="day-opt" onclick="this.classList.toggle('sel')">T</div>
+                <div class="day-opt" onclick="this.classList.toggle('sel')">F</div>
+                <div class="day-opt" onclick="this.classList.toggle('sel')">S</div>
+                <div class="day-opt" onclick="this.classList.toggle('sel')">S</div>
+              </div>
+            </div>
+            <div class="fg">
+              <label class="fg-label">How often?</label>
+              <div class="freq-chips">
+                <div class="freq-chip sel" onclick="freqSel(this)">Weekly</div>
+                <div class="freq-chip" onclick="freqSel(this)">Biweekly</div>
+                <div class="freq-chip" onclick="freqSel(this)">Monthly</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date + Time row -->
+        <div class="fg">
+          <div class="fi-row">
+            <div>
+              <label class="fg-label">Date</label>
+              <input class="fi" type="date" />
+            </div>
+            <div>
+              <label class="fg-label">Time</label>
+              <input class="fi" placeholder="e.g. 4:30 PM" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Location -->
+        <div class="fg">
+          <label class="fg-label">Where? <span style="opacity:0.5;">(optional)</span></label>
+          <input class="fi" placeholder="e.g. Bedok Swimming Complex" />
+        </div>
+
+        <!-- Family member -->
+        <div class="fg">
+          <label class="fg-label">Who's going?</label>
+          <div class="fam-chips">
+            <div class="fam-chip" onclick="this.classList.toggle('sel')">
+              <div class="fam-av" style="background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);">G</div>
+              <span class="fam-name">Greg</span>
+            </div>
+            <div class="fam-chip" onclick="this.classList.toggle('sel')">
+              <div class="fam-av" style="background:linear-gradient(135deg,#F9D5C2,#F2A07B);">P</div>
+              <span class="fam-name">Partner</span>
+            </div>
+            <div class="fam-chip sel" onclick="this.classList.toggle('sel')">
+              <div class="fam-av" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));">B</div>
+              <span class="fam-name">Beanie</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cost -->
+        <div class="fg">
+          <label class="fg-label">Cost per session <span style="opacity:0.5;">(optional)</span></label>
+          <div class="amt-wrap">
+            <span class="amt-cur">$</span>
+            <input class="amt-input" placeholder="0.00" />
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="fg">
+          <label class="fg-label">Notes <span style="opacity:0.5;">(optional)</span></label>
+          <input class="fi" placeholder="Anything to remember..." />
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="m-save" onclick="showSuccess('activity','Activity saved! ⚽')">Save Activity</button>
+      </div>
+    </div>
+    <div class="m-success" id="success-activity">
+      <div class="m-success-icon">✅</div>
+      <div class="m-success-text" id="success-activity-text"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PROPOSAL 2: ADD TRANSACTION -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="proposal-card">
+  <div class="proposal-label">Modal 02</div>
+  <div class="proposal-title">Add / Edit Transaction 💰</div>
+  <div class="proposal-desc">For income, expenses, transfers — one-time or recurring. The direction toggle (In/Out) changes the colour accent. Recurring reveals frequency and end-date options.</div>
+  <button class="open-btn" onclick="openModal('txn')">Open Transaction Modal</button>
+
+  <div class="dn">
+    <div class="dn-title">Design Notes</div>
+    <div class="dn-text">The transaction modal leads with direction: In (income, green accent) or Out (expense, Heritage Orange accent). This sets the emotional tone immediately — money coming in feels different from money going out. The amount field is oversized and centre-stage with a currency prefix. Category uses an emoji grid (same pattern as activities but with finance-relevant emoji). The One-time / Recurring toggle reveals frequency options (Weekly/Monthly/Yearly), start date, and optional end date when Recurring is selected. Family member chips indicate who the transaction belongs to. The "Link to activity" optional field lets users tie a payment to an existing activity (e.g. "Piano Lesson" expense links to the Piano activity), creating automatic cross-referencing between the Piggy Bank and Treehouse sections.</div>
+  </div>
+</div>
+
+<!-- Transaction Overlay -->
+<div class="overlay" id="overlay-txn" onclick="if(event.target===this)closeModal('txn')">
+  <div class="modal">
+    <div class="m-form" id="form-txn">
+      <div class="m-head">
+        <div class="m-icon" style="background:var(--or10);" id="txn-icon-preview">💸</div>
+        <div class="m-title">New Transaction</div>
+        <button class="m-close" onclick="closeModal('txn')">✕</button>
+      </div>
+      <div class="m-body">
+
+        <!-- Direction toggle -->
+        <div class="fg">
+          <label class="fg-label">Direction</label>
+          <div class="tog-group" id="txn-dir">
+            <div class="tog-opt" onclick="togSelColor(this,'#27AE60')">💚 Money In</div>
+            <div class="tog-opt sel-or" onclick="togSelColor(this,'or')">🧡 Money Out</div>
+          </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="fg">
+          <label class="fg-label">Amount</label>
+          <div class="amt-wrap">
+            <span class="amt-cur">$</span>
+            <input class="amt-input" placeholder="0.00" style="font-size:1.8rem;" />
+          </div>
+        </div>
+
+        <!-- Name -->
+        <div class="fg">
+          <label class="fg-label">What is it?</label>
+          <input class="fi" placeholder="e.g. Rent, Piano Lesson, Salary" />
+        </div>
+
+        <!-- Category emoji -->
+        <div class="fg">
+          <label class="fg-label">Category</label>
+          <div class="emoji-pick" id="txn-emojis">
+            <div class="emoji-opt" data-label="Housing" onclick="pickEmoji(this,'txn')">🏠</div>
+            <div class="emoji-opt sel" data-label="General Expense" onclick="pickEmoji(this,'txn')">💸</div>
+            <div class="emoji-opt" data-label="Education" onclick="pickEmoji(this,'txn')">🎓</div>
+            <div class="emoji-opt" data-label="Food & Dining" onclick="pickEmoji(this,'txn')">🍽️</div>
+            <div class="emoji-opt" data-label="Transport" onclick="pickEmoji(this,'txn')">🚗</div>
+            <div class="emoji-opt" data-label="Healthcare" onclick="pickEmoji(this,'txn')">🏥</div>
+            <div class="emoji-opt" data-label="Groceries" onclick="pickEmoji(this,'txn')">🛒</div>
+            <div class="emoji-opt" data-label="Lessons & Classes" onclick="pickEmoji(this,'txn')">🎹</div>
+            <div class="emoji-opt" data-label="Savings" onclick="pickEmoji(this,'txn')">💰</div>
+            <div class="emoji-opt" data-label="Insurance" onclick="pickEmoji(this,'txn')">🔒</div>
+            <div class="emoji-opt" data-label="Subscriptions" onclick="pickEmoji(this,'txn')">📱</div>
+            <div class="emoji-opt" data-label="Gifts" onclick="pickEmoji(this,'txn')">🎁</div>
+          </div>
+          <div class="emoji-cat-label" id="txn-cat-label">General Expense</div>
+        </div>
+
+        <!-- One-time / Recurring -->
+        <div class="fg">
+          <label class="fg-label">Type</label>
+          <div class="tog-group" id="txn-type">
+            <div class="tog-opt sel" onclick="togSel(this);toggleCond('txn-recur',true)">Recurring</div>
+            <div class="tog-opt" onclick="togSel(this);toggleCond('txn-recur',false)">One-time</div>
+          </div>
+        </div>
+
+        <!-- Recurring options -->
+        <div class="cond-section show" id="txn-recur">
+          <div class="cond-inner">
+            <div class="fg">
+              <label class="fg-label">Frequency</label>
+              <div class="freq-chips">
+                <div class="freq-chip" onclick="freqSel(this)">Weekly</div>
+                <div class="freq-chip sel" onclick="freqSel(this)">Monthly</div>
+                <div class="freq-chip" onclick="freqSel(this)">Yearly</div>
+              </div>
+            </div>
+            <div class="fi-row" style="margin-bottom:20px;">
+              <div>
+                <label class="fg-label">Starts</label>
+                <input class="fi" type="date" />
+              </div>
+              <div>
+                <label class="fg-label">Ends <span style="opacity:0.5;">(optional)</span></label>
+                <input class="fi" type="date" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date (for one-time) -->
+        <div class="fg">
+          <label class="fg-label">Date</label>
+          <input class="fi" type="date" />
+        </div>
+
+        <!-- Family member -->
+        <div class="fg">
+          <label class="fg-label">Family member</label>
+          <div class="fam-chips">
+            <div class="fam-chip sel" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);">G</div>
+              <span class="fam-name">Greg</span>
+            </div>
+            <div class="fam-chip" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,#F9D5C2,#F2A07B);">P</div>
+              <span class="fam-name">Partner</span>
+            </div>
+            <div class="fam-chip" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));">B</div>
+              <span class="fam-name">Beanie</span>
+            </div>
+            <div class="fam-chip" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,#2C3E50,#4A6274);">👨‍👩‍👦</div>
+              <span class="fam-name">Shared</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Link to activity -->
+        <div class="fg">
+          <label class="fg-label">Link to activity <span style="opacity:0.5;">(optional)</span></label>
+          <div class="act-dropdown" id="act-dropdown">
+            <div class="act-trigger" onclick="toggleActDropdown()">
+              <span class="act-placeholder" id="act-trigger-text">Select an activity...</span>
+            </div>
+            <div class="act-list" id="act-list">
+              <div class="act-item" onclick="selectActivity(this, '⚽', 'Soccer Practice', 'Beanie · Wednesdays')">
+                <div class="act-item-icon" style="background:var(--or10);">⚽</div>
+                <div><div class="act-item-name">Soccer Practice</div><div class="act-item-meta">Beanie · Wednesdays</div></div>
+              </div>
+              <div class="act-item" onclick="selectActivity(this, '🎹', 'Piano Lesson', 'Beanie · Tuesdays')">
+                <div class="act-item-icon" style="background:var(--silk20);">🎹</div>
+                <div><div class="act-item-name">Piano Lesson</div><div class="act-item-meta">Beanie · Tuesdays</div></div>
+              </div>
+              <div class="act-item" onclick="selectActivity(this, '🏊', 'Swimming Class', 'Beanie · Saturdays')">
+                <div class="act-item-icon" style="background:rgba(46,204,113,0.1);">🏊</div>
+                <div><div class="act-item-name">Swimming Class</div><div class="act-item-meta">Beanie · Saturdays</div></div>
+              </div>
+              <div class="act-item" onclick="selectActivity(this, '📐', 'Math Tutor', 'Beanie · Mon & Thurs')">
+                <div class="act-item-icon" style="background:var(--s05);">📐</div>
+                <div><div class="act-item-name">Math Tutor</div><div class="act-item-meta">Beanie · Mon &amp; Thurs</div></div>
+              </div>
+              <div class="act-item" onclick="selectActivity(this, '🥋', 'Taekwondo', 'Beanie · Fridays')">
+                <div class="act-item-icon" style="background:var(--or10);">🥋</div>
+                <div><div class="act-item-name">Taekwondo</div><div class="act-item-meta">Beanie · Fridays</div></div>
+              </div>
+              <div class="act-none">No more activities</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="m-save" onclick="showSuccess('txn','Transaction added! 💰')">Save Transaction</button>
+      </div>
+    </div>
+    <div class="m-success" id="success-txn">
+      <div class="m-success-icon">✅</div>
+      <div class="m-success-text" id="success-txn-text"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PROPOSAL 3: ADD TO-DO -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="proposal-card">
+  <div class="proposal-label">Modal 03</div>
+  <div class="proposal-title">Add / Edit To-Do ✅</div>
+  <div class="proposal-desc">Quick and minimal — designed for speed. Most tasks should be addable in under 5 seconds. Optional date and assignment. The lightest-weight modal of the bunch.</div>
+  <button class="open-btn" onclick="openModal('todo')">Open To-Do Modal</button>
+
+  <div class="dn">
+    <div class="dn-title">Design Notes</div>
+    <div class="dn-text">The to-do modal is intentionally the simplest in the system — it should feel as fast as typing a text message. The task name field is front and centre and oversized, encouraging quick entry. Below it, Date and Assign are optional one-tap actions rather than required fields. If a date is set, a small "📆 Will show on calendar" confirmation appears, reinforcing the Planner integration. Assign uses the same family avatar chips but in compact form. The Save button label dynamically updates: "Add Task" if no date, "Add to Calendar" if dated — giving the user feedback on what will happen. For edit mode, a delete button appears in the footer and the title changes to the task name.</div>
+  </div>
+</div>
+
+<!-- To-Do Overlay -->
+<div class="overlay" id="overlay-todo" onclick="if(event.target===this)closeModal('todo')">
+  <div class="modal" style="max-width:520px;">
+    <div class="m-form" id="form-todo">
+      <div class="m-head">
+        <div class="m-icon" style="background:rgba(155,89,182,0.1);">✅</div>
+        <div class="m-title">New Task</div>
+        <button class="m-close" onclick="closeModal('todo')">✕</button>
+      </div>
+      <div class="m-body">
+        <!-- Task name — BIG -->
+        <div class="fg">
+          <input class="fi fi-lg" placeholder="What needs doing?" style="font-size:1.3rem;" />
+        </div>
+
+        <!-- Date (optional, with calendar hint) -->
+        <div class="fg">
+          <label class="fg-label">When? <span style="opacity:0.5;">(optional — adds to calendar)</span></label>
+          <input class="fi" type="date" id="todo-date" onchange="todoDateChange()" />
+          <div id="todo-cal-hint" style="display:none;margin-top:8px;font-family:var(--fh);font-size:0.65rem;font-weight:600;color:#3A7BAD;background:rgba(174,214,241,0.15);padding:6px 12px;border-radius:10px;display:inline-flex;align-items:center;gap:6px;">
+            📆 Will show on your calendar
+          </div>
+        </div>
+
+        <!-- Assign -->
+        <div class="fg">
+          <label class="fg-label">Assign to <span style="opacity:0.5;">(optional)</span></label>
+          <div class="fam-chips">
+            <div class="fam-chip" onclick="this.classList.toggle('sel')" style="padding:6px 12px 6px 6px;">
+              <div class="fam-av" style="background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);width:24px;height:24px;font-size:0.5rem;">G</div>
+              <span class="fam-name" style="font-size:0.65rem;">Greg</span>
+            </div>
+            <div class="fam-chip" onclick="this.classList.toggle('sel')" style="padding:6px 12px 6px 6px;">
+              <div class="fam-av" style="background:linear-gradient(135deg,#F9D5C2,#F2A07B);width:24px;height:24px;font-size:0.5rem;">P</div>
+              <span class="fam-name" style="font-size:0.65rem;">Partner</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="fg">
+          <label class="fg-label">Notes <span style="opacity:0.5;">(optional)</span></label>
+          <input class="fi" placeholder="Any details..." />
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="m-save" id="todo-save-btn" onclick="showSuccess('todo','Task added! ✅')" style="background:linear-gradient(135deg,#9B59B6,#8E44AD);box-shadow:0 6px 24px rgba(155,89,182,0.2);">Add Task</button>
+      </div>
+    </div>
+    <div class="m-success" id="success-todo">
+      <div class="m-success-icon">✅</div>
+      <div class="m-success-text" id="success-todo-text"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PROPOSAL 4: ADD ACCOUNT -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="proposal-card">
+  <div class="proposal-label">Modal 04</div>
+  <div class="proposal-title">Add / Edit Account 🏦</div>
+  <div class="proposal-desc">For bank accounts, savings, investments, credit cards, cash wallets — any "pot" of money the family tracks. Includes a colour picker so accounts are visually distinct on the dashboard.</div>
+  <button class="open-btn" onclick="openModal('account')">Open Account Modal</button>
+
+  <div class="dn">
+    <div class="dn-title">Design Notes</div>
+    <div class="dn-text">The account modal uses the same emoji-first pattern but with finance-relevant icons (bank, piggy bank, credit card, chart, etc). The account type toggle (Bank / Savings / Investment / Credit Card / Cash) uses pill chips rather than a dropdown — all options visible at once for quick selection. Balance is the hero field: oversized with currency prefix, since this is the most important piece of information. The colour picker (8 preset colours from the brand palette) determines how this account appears on the dashboard chart and cards. Owner uses the family chips pattern. The "Include in net worth" toggle lets users exclude certain accounts (like a business account) from the family overview. Delete (for edit mode) includes a confirmation since this is more destructive than other deletes.</div>
+  </div>
+</div>
+
+<!-- Account Overlay -->
+<div class="overlay" id="overlay-account" onclick="if(event.target===this)closeModal('account')">
+  <div class="modal">
+    <div class="m-form" id="form-account">
+      <div class="m-head">
+        <div class="m-icon" style="background:var(--silk20);" id="account-icon-preview">🏦</div>
+        <div class="m-title">New Account</div>
+        <button class="m-close" onclick="closeModal('account')">✕</button>
+      </div>
+      <div class="m-body">
+        <!-- Emoji -->
+        <div class="fg">
+          <label class="fg-label">Icon</label>
+          <div class="emoji-pick" id="account-emojis">
+            <div class="emoji-opt sel" data-label="Bank Account" onclick="pickEmoji(this,'account')">🏦</div>
+            <div class="emoji-opt" data-label="Savings Account" onclick="pickEmoji(this,'account')">🐷</div>
+            <div class="emoji-opt" data-label="Credit Card" onclick="pickEmoji(this,'account')">💳</div>
+            <div class="emoji-opt" data-label="Investment Account" onclick="pickEmoji(this,'account')">📈</div>
+            <div class="emoji-opt" data-label="Cash" onclick="pickEmoji(this,'account')">💵</div>
+            <div class="emoji-opt" data-label="Property" onclick="pickEmoji(this,'account')">🏠</div>
+            <div class="emoji-opt" data-label="Education Fund" onclick="pickEmoji(this,'account')">🎓</div>
+            <div class="emoji-opt" data-label="Retirement" onclick="pickEmoji(this,'account')">🔒</div>
+          </div>
+          <div class="emoji-cat-label" id="account-cat-label">Bank Account</div>
+        </div>
+
+        <!-- Name -->
+        <div class="fg">
+          <label class="fg-label">Account name</label>
+          <input class="fi fi-lg" placeholder="e.g. DBS Savings" />
+        </div>
+
+        <!-- Type -->
+        <div class="fg">
+          <label class="fg-label">Type</label>
+          <div class="freq-chips" style="flex-wrap:wrap;">
+            <div class="freq-chip sel" onclick="freqSel(this)">🏦 Bank</div>
+            <div class="freq-chip" onclick="freqSel(this)">🐷 Savings</div>
+            <div class="freq-chip" onclick="freqSel(this)">📈 Investment</div>
+            <div class="freq-chip" onclick="freqSel(this)">💳 Credit Card</div>
+            <div class="freq-chip" onclick="freqSel(this)">💵 Cash</div>
+          </div>
+        </div>
+
+        <!-- Balance -->
+        <div class="fg">
+          <label class="fg-label">Current balance</label>
+          <div class="amt-wrap">
+            <span class="amt-cur">$</span>
+            <input class="amt-input" placeholder="0.00" style="font-size:1.6rem;" />
+          </div>
+        </div>
+
+        <!-- Colour -->
+        <div class="fg">
+          <label class="fg-label">Dashboard colour</label>
+          <div class="color-sel">
+            <div class="color-opt sel" style="background:var(--heritage-orange);" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:var(--sky-silk);" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:var(--terracotta);" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:#2ECC71;" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:#9B59B6;" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:#E74C3C;" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:var(--deep-slate);" onclick="colorSel(this)"></div>
+            <div class="color-opt" style="background:#F39C12;" onclick="colorSel(this)"></div>
+          </div>
+        </div>
+
+        <!-- Owner -->
+        <div class="fg">
+          <label class="fg-label">Owner</label>
+          <div class="fam-chips">
+            <div class="fam-chip sel" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);">G</div>
+              <span class="fam-name">Greg</span>
+            </div>
+            <div class="fam-chip" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,#F9D5C2,#F2A07B);">P</div>
+              <span class="fam-name">Partner</span>
+            </div>
+            <div class="fam-chip" onclick="famChipSel(this)">
+              <div class="fam-av" style="background:linear-gradient(135deg,#2C3E50,#4A6274);">👨‍👩‍👦</div>
+              <span class="fam-name">Joint</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Include in net worth toggle -->
+        <div class="fg" style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-family:var(--fh);font-size:0.78rem;font-weight:600;">Include in net worth</div>
+            <div style="font-size:0.65rem;opacity:0.3;">Show this account in your family total</div>
+          </div>
+          <div style="width:44px;height:26px;border-radius:13px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));padding:3px;cursor:pointer;" onclick="this.classList.toggle('off');this.style.background=this.classList.contains('off')?'rgba(44,62,80,0.12)':'linear-gradient(135deg,var(--heritage-orange),var(--terracotta))'">
+            <div style="width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 2px 6px rgba(0,0,0,0.1);transition:all 0.2s;margin-left:auto;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="m-save" onclick="showSuccess('account','Account added! 🏦')">Save Account</button>
+      </div>
+    </div>
+    <div class="m-success" id="success-account">
+      <div class="m-success-icon">✅</div>
+      <div class="m-success-text" id="success-account-text"></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- PROPOSAL 5: ADD FAMILY MEMBER -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="proposal-card">
+  <div class="proposal-label">Modal 05</div>
+  <div class="proposal-title">Add / Edit Family Member 🫘</div>
+  <div class="proposal-desc">For adding new beans to the pod. Pick an avatar colour, set a role, and optionally set permissions for finance access. The most "feel-good" modal — adding a new family member should feel warm.</div>
+  <button class="open-btn" onclick="openModal('member')">Open Family Member Modal</button>
+
+  <div class="dn">
+    <div class="dn-title">Design Notes</div>
+    <div class="dn-text">This modal leads with the avatar — a large, colourful circle that the user customises with a colour pick and initial. It feels like creating a character in a game. Name is a single large field. Role uses fun, on-brand labels: "Parent Bean 🫘", "Little Bean 🌱", "Big Bean 🫛" rather than sterile "Adult" / "Child" labels. The avatar colour picker is prominent since this colour will represent the member everywhere in the app. The permissions section uses simple toggle switches: "Can view finances" (Piggy Bank access), "Can edit activities" (Treehouse edit rights), "Can manage the pod" (admin). For children, finance toggles default to off. The optional birthday field enables the milestones feature (auto-generated birthday countdown on the Nook). This is the most emotionally warm modal — adding a family member should feel like welcoming someone.</div>
+  </div>
+</div>
+
+<!-- Family Member Overlay -->
+<div class="overlay" id="overlay-member" onclick="if(event.target===this)closeModal('member')">
+  <div class="modal" style="max-width:520px;">
+    <div class="m-form" id="form-member">
+      <div class="m-head">
+        <div class="m-icon" style="background:var(--or10);">🫘</div>
+        <div class="m-title">New Bean</div>
+        <button class="m-close" onclick="closeModal('member')">✕</button>
+      </div>
+      <div class="m-body">
+
+        <!-- Avatar preview -->
+        <div class="fg" style="text-align:center;">
+          <div id="member-avatar" style="width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:2rem;color:white;font-family:var(--fh);font-weight:800;box-shadow:0 8px 32px rgba(241,93,34,0.2);transition:all 0.3s;">?</div>
+          <div style="font-family:var(--fh);font-size:0.6rem;font-weight:600;opacity:0.25;">PICK A COLOUR BELOW</div>
+        </div>
+
+        <!-- Colour picker -->
+        <div class="fg" style="display:flex;justify-content:center;">
+          <div class="color-sel" id="member-colors">
+            <div class="color-opt sel" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));" onclick="memberColor(this,'var(--heritage-orange)','var(--terracotta)')"></div>
+            <div class="color-opt" style="background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);" onclick="memberColor(this,'var(--sky-silk)','#7FB8E0')"></div>
+            <div class="color-opt" style="background:linear-gradient(135deg,#F9D5C2,#F2A07B);" onclick="memberColor(this,'#F9D5C2','#F2A07B')"></div>
+            <div class="color-opt" style="background:linear-gradient(135deg,#2ECC71,#27AE60);" onclick="memberColor(this,'#2ECC71','#27AE60')"></div>
+            <div class="color-opt" style="background:linear-gradient(135deg,#9B59B6,#8E44AD);" onclick="memberColor(this,'#9B59B6','#8E44AD')"></div>
+            <div class="color-opt" style="background:linear-gradient(135deg,var(--deep-slate),#4A6274);" onclick="memberColor(this,'var(--deep-slate)','#4A6274')"></div>
+          </div>
+        </div>
+
+        <!-- Name -->
+        <div class="fg">
+          <label class="fg-label">Name</label>
+          <input class="fi fi-lg" placeholder="e.g. Beanie" id="member-name" oninput="updateMemberAvatar()" />
+        </div>
+
+        <!-- Role -->
+        <div class="fg">
+          <label class="fg-label">Role</label>
+          <div class="freq-chips" style="flex-wrap:wrap;">
+            <div class="freq-chip sel" onclick="freqSel(this)">🫘 Parent Bean</div>
+            <div class="freq-chip" onclick="freqSel(this)">🌱 Little Bean</div>
+            <div class="freq-chip" onclick="freqSel(this)">🫛 Big Bean</div>
+          </div>
+        </div>
+
+        <!-- Birthday -->
+        <div class="fg">
+          <label class="fg-label">Birthday <span style="opacity:0.5;">(optional — enables milestones)</span></label>
+          <input class="fi" type="date" />
+        </div>
+
+        <!-- Permissions -->
+        <div class="fg">
+          <label class="fg-label">Permissions</label>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px;">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:0.9rem;">🐷</span>
+                <div>
+                  <div style="font-family:var(--fh);font-size:0.75rem;font-weight:600;">Can view finances</div>
+                  <div style="font-size:0.6rem;opacity:0.25;">Access to The Piggy Bank</div>
+                </div>
+              </div>
+              <div class="toggle-sw on" onclick="toggleSw(this)" style="width:40px;height:24px;border-radius:12px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));padding:3px;cursor:pointer;transition:all 0.2s;">
+                <div style="width:18px;height:18px;border-radius:50%;background:white;box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all 0.2s;margin-left:auto;"></div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:0.9rem;">🌳</span>
+                <div>
+                  <div style="font-family:var(--fh);font-size:0.75rem;font-weight:600;">Can edit activities</div>
+                  <div style="font-size:0.6rem;opacity:0.25;">Edit in The Treehouse</div>
+                </div>
+              </div>
+              <div class="toggle-sw on" onclick="toggleSw(this)" style="width:40px;height:24px;border-radius:12px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));padding:3px;cursor:pointer;transition:all 0.2s;">
+                <div style="width:18px;height:18px;border-radius:50%;background:white;box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all 0.2s;margin-left:auto;"></div>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <span style="font-size:0.9rem;">⚙️</span>
+                <div>
+                  <div style="font-family:var(--fh);font-size:0.75rem;font-weight:600;">Can manage the pod</div>
+                  <div style="font-size:0.6rem;opacity:0.25;">Admin access</div>
+                </div>
+              </div>
+              <div class="toggle-sw on" onclick="toggleSw(this)" style="width:40px;height:24px;border-radius:12px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));padding:3px;cursor:pointer;transition:all 0.2s;">
+                <div style="width:18px;height:18px;border-radius:50%;background:white;box-shadow:0 1px 4px rgba(0,0,0,0.1);transition:all 0.2s;margin-left:auto;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="m-foot">
+        <button class="m-save" onclick="showSuccess('member','Welcome to the pod! 🫘')">Add to Pod</button>
+      </div>
+    </div>
+    <div class="m-success" id="success-member">
+      <div class="m-success-icon">🎉</div>
+      <div class="m-success-text" id="success-member-text"></div>
+    </div>
+  </div>
+</div>
+
+
+</div><!-- /proposals -->
+
+
+<!-- ═══ JAVASCRIPT ═══ -->
+<script>
+// Open/close modals
+function openModal(id) {
+  document.getElementById('overlay-' + id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById('overlay-' + id).classList.remove('open');
+  document.body.style.overflow = '';
+  // Reset success state
+  setTimeout(() => {
+    const form = document.getElementById('form-' + id);
+    const success = document.getElementById('success-' + id);
+    if (form) form.classList.remove('hide');
+    if (success) success.classList.remove('show');
+  }, 300);
+}
+
+// Emoji picker
+function pickEmoji(el, modalId) {
+  const container = document.getElementById(modalId + '-emojis');
+  container.querySelectorAll('.emoji-opt').forEach(e => e.classList.remove('sel'));
+  el.classList.add('sel');
+  const preview = document.getElementById(modalId + '-icon-preview');
+  if (preview) preview.textContent = el.textContent;
+  // Update category label
+  const catLabel = document.getElementById(modalId + '-cat-label');
+  if (catLabel && el.dataset.label) catLabel.textContent = el.dataset.label;
+}
+
+// Toggle selector (single)
+function togSel(el) {
+  el.parentElement.querySelectorAll('.tog-opt').forEach(t => t.classList.remove('sel', 'sel-or'));
+  el.classList.add('sel');
+}
+
+// Toggle selector with colour variant
+function togSelColor(el, color) {
+  el.parentElement.querySelectorAll('.tog-opt').forEach(t => t.classList.remove('sel', 'sel-or'));
+  if (color === 'or') {
+    el.classList.add('sel-or');
+  } else {
+    el.classList.add('sel');
+    el.style.background = color;
+    el.style.color = 'white';
+  }
+}
+
+// Frequency chip select
+function freqSel(el) {
+  el.parentElement.querySelectorAll('.freq-chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// Colour select
+function colorSel(el) {
+  el.parentElement.querySelectorAll('.color-opt').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// Family chip single select
+function famChipSel(el) {
+  el.parentElement.querySelectorAll('.fam-chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// Conditional section toggle
+function toggleCond(id, show) {
+  const el = document.getElementById(id);
+  if (show) el.classList.add('show');
+  else el.classList.remove('show');
+}
+
+// Toggle switch
+function toggleSw(el) {
+  const isOn = el.classList.contains('on');
+  el.classList.toggle('on');
+  const ball = el.querySelector('div');
+  if (isOn) {
+    el.style.background = 'rgba(44,62,80,0.12)';
+    ball.style.marginLeft = '0';
+    ball.style.marginRight = 'auto';
+  } else {
+    el.style.background = 'linear-gradient(135deg,var(--heritage-orange),var(--terracotta))';
+    ball.style.marginLeft = 'auto';
+    ball.style.marginRight = '0';
+  }
+}
+
+// To-do date change
+function todoDateChange() {
+  const hint = document.getElementById('todo-cal-hint');
+  const val = document.getElementById('todo-date').value;
+  const btn = document.getElementById('todo-save-btn');
+  if (val) {
+    hint.style.display = 'inline-flex';
+    btn.textContent = 'Add to Calendar';
+  } else {
+    hint.style.display = 'none';
+    btn.textContent = 'Add Task';
+  }
+}
+
+// Member avatar update
+function updateMemberAvatar() {
+  const name = document.getElementById('member-name').value;
+  const av = document.getElementById('member-avatar');
+  av.textContent = name ? name.charAt(0).toUpperCase() : '?';
+}
+
+// Member colour
+function memberColor(el, c1, c2) {
+  document.getElementById('member-colors').querySelectorAll('.color-opt').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+  const av = document.getElementById('member-avatar');
+  av.style.background = `linear-gradient(135deg, ${c1}, ${c2})`;
+}
+
+// Success state
+function showSuccess(id, msg) {
+  const form = document.getElementById('form-' + id);
+  const success = document.getElementById('success-' + id);
+  const text = document.getElementById('success-' + id + '-text');
+  form.classList.add('hide');
+  success.classList.add('show');
+  text.textContent = msg;
+  setTimeout(() => closeModal(id), 1400);
+}
+
+// Activity dropdown
+function toggleActDropdown() {
+  const trigger = document.querySelector('#act-dropdown .act-trigger');
+  const list = document.getElementById('act-list');
+  const isOpen = trigger.classList.contains('open');
+  trigger.classList.toggle('open');
+  list.classList.toggle('open');
+}
+
+function selectActivity(el, emoji, name, meta) {
+  // Update trigger text
+  const triggerText = document.getElementById('act-trigger-text');
+  triggerText.innerHTML = '<span style="font-size:1rem;margin-right:2px;">' + emoji + '</span> ' + name;
+  triggerText.classList.remove('act-placeholder');
+  triggerText.style.opacity = '1';
+  triggerText.style.fontFamily = 'var(--fh)';
+  triggerText.style.fontWeight = '600';
+  triggerText.style.fontSize = '0.85rem';
+  // Highlight selected
+  document.querySelectorAll('#act-list .act-item').forEach(i => i.classList.remove('sel'));
+  el.classList.add('sel');
+  // Close dropdown
+  toggleActDropdown();
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('act-dropdown');
+  if (dd && !dd.contains(e.target)) {
+    dd.querySelector('.act-trigger').classList.remove('open');
+    document.getElementById('act-list').classList.remove('open');
+  }
+});
+
+// Close on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.overlay.open').forEach(o => {
+      const id = o.id.replace('overlay-', '');
+      closeModal(id);
+    });
+  }
+});
+</script>
+</body>
+</html>
