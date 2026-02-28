@@ -97,6 +97,7 @@ export interface Account {
   id: UUID;
   memberId: UUID;
   name: string;
+  icon?: string; // Emoji icon (e.g. "🏦")
   type: AccountType;
   currency: CurrencyCode;
   balance: number;
@@ -123,6 +124,7 @@ export interface Transaction {
   id: UUID;
   accountId: UUID;
   toAccountId?: UUID; // For transfers
+  activityId?: UUID; // Link transaction to an activity
   type: TransactionType;
   amount: number;
   currency: CurrencyCode;
@@ -248,13 +250,14 @@ export interface FamilyActivity {
   id: UUID;
   title: string;
   description?: string;
+  icon?: string; // Emoji icon (e.g. "⚽")
 
   // Schedule
   date: ISODateString; // Start date / next occurrence
   startTime?: string; // HH:mm
   endTime?: string; // HH:mm
   recurrence: ActivityRecurrence;
-  dayOfWeek?: number; // 0=Sun..6=Sat (for weekly recurrence)
+  daysOfWeek?: number[]; // Multi-day weekly recurrence (0=Sun..6=Sat)
 
   // Category
   category: ActivityCategory;

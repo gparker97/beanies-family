@@ -7,8 +7,9 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import type { TodoItem } from '@/types/models';
 
 const props = defineProps<{
@@ -28,7 +29,13 @@ const todoStore = useTodoStore();
 const familyStore = useFamilyStore();
 
 const mode = ref<'view' | 'edit'>('view');
-const editForm = ref({ title: '', description: '', assigneeId: '', dueDate: '', dueTime: '' });
+const editForm = ref({
+  title: '',
+  description: '',
+  assigneeIds: [] as string[],
+  dueDate: '',
+  dueTime: '',
+});
 const isSubmitting = ref(false);
 
 // Reset mode when todo prop changes
@@ -39,7 +46,7 @@ watch(
       editForm.value = {
         title: newTodo.title,
         description: newTodo.description ?? '',
-        assigneeId: newTodo.assigneeId ?? '',
+        assigneeIds: newTodo.assigneeId ? [newTodo.assigneeId] : [],
         dueDate: newTodo.dueDate?.split('T')[0] ?? '',
         dueTime: newTodo.dueTime ?? '',
       };
@@ -48,10 +55,6 @@ watch(
       mode.value = 'view';
     }
   }
-);
-
-const memberOptions = computed(() =>
-  familyStore.members.map((m) => ({ value: m.id, label: m.name }))
 );
 
 const viewAssignee = computed(() => {
@@ -88,12 +91,21 @@ const viewFormattedDate = computed(() => {
   return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
 });
 
+const hasDate = computed(() => !!editForm.value.dueDate);
+
+const saveLabel = computed(() => {
+  if (props.startInEditMode && !props.todo?.id) {
+    return hasDate.value ? t('modal.addToCalendar') : t('modal.addTask');
+  }
+  return t('modal.saveTask');
+});
+
 function switchToEdit() {
   if (!props.todo) return;
   editForm.value = {
     title: props.todo.title,
     description: props.todo.description ?? '',
-    assigneeId: props.todo.assigneeId ?? '',
+    assigneeIds: props.todo.assigneeId ? [props.todo.assigneeId] : [],
     dueDate: props.todo.dueDate?.split('T')[0] ?? '',
     dueTime: props.todo.dueTime ?? '',
   };
@@ -111,7 +123,7 @@ async function saveEdit() {
     await todoStore.updateTodo(props.todo.id, {
       title: editForm.value.title.trim(),
       description: editForm.value.description.trim() || undefined,
-      assigneeId: editForm.value.assigneeId || undefined,
+      assigneeId: editForm.value.assigneeIds[0] || undefined,
       dueDate: editForm.value.dueDate || undefined,
       dueTime: editForm.value.dueTime || undefined,
     });
@@ -141,14 +153,15 @@ async function handleDelete() {
 </script>
 
 <template>
+  <!-- View mode — keep existing BaseModal layout -->
   <BaseModal
-    :open="!!todo"
-    :title="mode === 'edit' ? t('todo.editTask') : t('todo.viewTask')"
+    v-if="todo && mode === 'view'"
+    :open="true"
+    :title="t('todo.viewTask')"
     size="2xl"
     @close="emit('close')"
   >
-    <!-- View mode -->
-    <div v-if="todo && mode === 'view'" class="space-y-5">
+    <div class="space-y-5">
       <h3
         class="font-outfit text-lg font-bold text-[var(--color-text)]"
         :class="{ 'line-through opacity-50': todo.completed }"
@@ -264,59 +277,70 @@ async function handleDelete() {
       </div>
     </div>
 
-    <!-- Edit mode -->
-    <form v-if="todo && mode === 'edit'" class="space-y-4" @submit.prevent="saveEdit">
-      <BaseInput v-model="editForm.title" :label="t('todo.taskTitle')" required />
-
-      <div class="space-y-1">
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          {{ t('todo.description') }}
-        </label>
-        <textarea v-model="editForm.description" rows="5" class="beanies-input w-full" />
-      </div>
-
-      <BaseSelect
-        :model-value="editForm.assigneeId"
-        :options="memberOptions"
-        :label="t('todo.assignTo')"
-        :placeholder="t('todo.unassigned')"
-        @update:model-value="editForm.assigneeId = String($event)"
-      />
-
-      <div class="grid grid-cols-2 gap-3">
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('todo.dueDate') }}
-          </label>
-          <input v-model="editForm.dueDate" type="date" class="beanies-input w-full" />
-        </div>
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('todo.dueTime') }}
-          </label>
-          <input v-model="editForm.dueTime" type="time" class="beanies-input w-full" />
-        </div>
-      </div>
-    </form>
-
     <template #footer>
-      <!-- View mode footer -->
-      <div v-if="mode === 'view'" class="flex justify-between">
+      <div class="flex justify-between">
         <BaseButton @click="switchToEdit"> {{ t('action.edit') }} </BaseButton>
         <BaseButton variant="secondary" class="text-red-500" @click="handleDelete">
           {{ t('action.delete') }}
         </BaseButton>
       </div>
-
-      <!-- Edit mode footer -->
-      <div v-else class="flex justify-end gap-2">
-        <BaseButton variant="secondary" @click="cancelEdit">
-          {{ t('action.cancel') }}
-        </BaseButton>
-        <BaseButton :disabled="!editForm.title.trim() || isSubmitting" @click="saveEdit">
-          {{ t('action.save') }}
-        </BaseButton>
-      </div>
     </template>
   </BaseModal>
+
+  <!-- Edit mode — BeanieFormModal with purple accent -->
+  <BeanieFormModal
+    v-if="todo && mode === 'edit'"
+    :open="true"
+    :title="t('todo.editTask')"
+    icon="✅"
+    icon-bg="var(--tint-purple-12)"
+    size="narrow"
+    :save-label="saveLabel"
+    save-gradient="purple"
+    :save-disabled="!editForm.title.trim()"
+    :is-submitting="isSubmitting"
+    :show-delete="!!todo.id"
+    @close="cancelEdit"
+    @save="saveEdit"
+    @delete="handleDelete"
+  >
+    <!-- 1. Task name — extra large -->
+    <div>
+      <input
+        v-model="editForm.title"
+        type="text"
+        class="font-outfit w-full border-none bg-transparent text-[1.3rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        :placeholder="t('modal.whatNeedsDoing')"
+      />
+    </div>
+
+    <!-- 2. Date input with calendar hint -->
+    <FormFieldGroup :label="t('todo.dueDate')" optional>
+      <input v-model="editForm.dueDate" type="date" class="beanies-input w-full" />
+      <!-- Calendar hint badge -->
+      <div
+        v-if="editForm.dueDate"
+        class="font-outfit text-sky-silk-300 mt-1.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[0.65rem] font-semibold"
+        style="background: var(--tint-silk-20)"
+      >
+        <span>📅</span>
+        {{ t('modal.willShowOnCalendar') }}
+      </div>
+    </FormFieldGroup>
+
+    <!-- 3. Family chip picker (multi-select, compact) -->
+    <FormFieldGroup :label="t('todo.assignTo')">
+      <FamilyChipPicker v-model="editForm.assigneeIds" mode="multi" compact />
+    </FormFieldGroup>
+
+    <!-- 4. Notes (optional) -->
+    <FormFieldGroup :label="t('todo.description')" optional>
+      <textarea
+        v-model="editForm.description"
+        rows="3"
+        class="w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:border-purple-500 focus:shadow-[0_0_0_3px_rgba(155,89,182,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+        :placeholder="t('todo.description')"
+      />
+    </FormFieldGroup>
+  </BeanieFormModal>
 </template>

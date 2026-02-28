@@ -82,7 +82,7 @@ export class TestDataFactory {
       title: 'Test Activity',
       date: todayStr,
       recurrence: 'weekly',
-      dayOfWeek: new Date().getDay(),
+      daysOfWeek: [new Date().getDay()],
       category: 'lesson',
       feeSchedule: 'none',
       reminderMinutes: 0,

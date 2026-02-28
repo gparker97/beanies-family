@@ -198,23 +198,8 @@ function openTodoViewModal(todo: TodoItem) {
         defaultStartTime = undefined;
       "
       @save="handleSave"
+      @delete="handleDelete"
     />
-
-    <!-- Delete button (shown when editing) -->
-    <Teleport to="body">
-      <div
-        v-if="showModal && editingActivity"
-        class="fixed bottom-8 left-1/2 z-[110] -translate-x-1/2"
-      >
-        <button
-          type="button"
-          class="cursor-pointer rounded-2xl bg-red-500 px-6 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-red-600"
-          @click="handleDelete"
-        >
-          {{ t('planner.deleteActivity') }}
-        </button>
-      </div>
-    </Teleport>
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
   </div>
