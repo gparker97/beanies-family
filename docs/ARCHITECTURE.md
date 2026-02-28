@@ -220,4 +220,22 @@ The app follows the **Nook UI** design system (v5 proposal: `docs/brand/beanies-
 - **Shadows**: Diffused and subtle (`--card-shadow`, `--card-hover-shadow`)
 - **Typography**: Outfit for headings/amounts, Inter for body/data
 - **Brand colors**: Heritage Orange (CTAs), Deep Slate (anchor), Sky Silk (calm), Terracotta (warmth), Cloud White (space)
-- **Theme skill**: `.claude/skills/beanies-theme.md` — comprehensive design reference
+- **Theme skill**: `.claude/skills/beanies-theme.md` — comprehensive design reference (always consult before any UI work)
+
+### Modal System (Three-Tier)
+
+All modals must use the established three-tier architecture. See `.claude/skills/beanies-theme.md` for full specs.
+
+| Tier | Component             | Use Case                                  |
+| ---- | --------------------- | ----------------------------------------- |
+| 1    | `BaseModal.vue`       | View-only content, custom layouts         |
+| 2    | `BeanieFormModal.vue` | All create/edit forms (extends BaseModal) |
+| 3    | `ConfirmModal.vue`    | Confirmation dialogs (via `useConfirm()`) |
+
+**Key conventions:**
+
+- Form modals use `BeanieFormModal` with emoji icon box (44×44), Cloud White body, gradient save button
+- View/Edit dual-mode: read-only in BaseModal, edit in BeanieFormModal (see `TodoViewEditModal.vue`)
+- Shared form components: `FormFieldGroup`, `FamilyChipPicker`, `EmojiPicker`, `AmountInput`, `ConditionalSection`
+- Delete confirmations: always via `useConfirm()` composable with `variant: 'danger'`
+- Orange gradient for finance forms, purple gradient for to-do forms
