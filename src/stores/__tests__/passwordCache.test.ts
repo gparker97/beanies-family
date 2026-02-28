@@ -187,27 +187,8 @@ describe('Password Cache - syncStore integration', () => {
     savedGlobalSettings = { ...mockGlobalSettings };
   });
 
-  // Mock sync service at module level
-  vi.mock('@/services/sync/syncService', () => ({
-    onStateChange: vi.fn(),
-    onSaveComplete: vi.fn(() => () => {}),
-    setEncryptionRequiredCallback: vi.fn(),
-    initialize: vi.fn(async () => false),
-    hasPermission: vi.fn(async () => true),
-    loadAndImport: vi.fn(async () => ({ success: true })),
-    decryptAndImport: vi.fn(async () => ({ success: true })),
-    save: vi.fn(async () => true),
-    saveNow: vi.fn(async () => true),
-    selectSyncFile: vi.fn(async () => false),
-    disconnect: vi.fn(async () => {}),
-    requestPermission: vi.fn(async () => false),
-    getFileTimestamp: vi.fn(async () => null),
-    setSessionPassword: vi.fn(),
-    triggerDebouncedSave: vi.fn(),
-    cancelPendingSave: vi.fn(),
-    flushPendingSave: vi.fn(async () => {}),
-    reset: vi.fn(),
-  }));
+  // Sync service — uses shared auto-mock from __mocks__/syncService.ts
+  vi.mock('@/services/sync/syncService');
 
   vi.mock('@/services/sync/capabilities', () => ({
     getSyncCapabilities: () => ({ hasFileSystemAccess: true }),

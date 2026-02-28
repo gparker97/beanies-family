@@ -117,14 +117,25 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout:
 
 **Symptom:** Tests that previously passed start failing with `[vitest] No "setSessionDEK" export is defined on the "@/services/sync/syncService" mock. Did you forget to return it from "vi.mock"?` — even though the test file wasn't changed.
 
-**Rule:** When adding a new export to a module, grep the test suite for `vi.mock('...<that module>')` and add the new export to every mock factory. Quick check:
+**Rule:** Use Vitest's `__mocks__/` auto-mock convention for heavily-mocked modules. Place the shared mock at `<module>/__mocks__/<module>.ts` and use `vi.mock('<path>')` (no factory) in test files. Tests that need custom behaviour spread the defaults and override:
 
-```bash
-# After adding exports to src/services/sync/syncService.ts:
-grep -r "vi.mock.*syncService" src/ --include='*.test.ts' -l
+```typescript
+// Simple tests — auto-mock has all exports covered:
+vi.mock('@/services/sync/syncService');
+
+// Tests with custom behaviour — spread defaults, override what's needed:
+vi.mock('@/services/sync/syncService', async () => {
+  const defaults = await import('../../services/sync/__mocks__/syncService');
+  return {
+    ...defaults,
+    onStateChange: vi.fn((cb) => {
+      /* custom */
+    }),
+  };
+});
 ```
 
-Then verify each match includes the new export in its mock factory.
+When adding a new export to the module, only the `__mocks__/` file needs updating. All test files benefit immediately.
 
 ## 9. File System Access API: concurrent writes corrupt files
 
