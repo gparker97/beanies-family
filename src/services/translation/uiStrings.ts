@@ -1227,7 +1227,7 @@ const STRING_DEFS = {
   'settings.appInstalled': { en: 'App is installed', beanie: 'your beanies are installed!' },
 
   // Family To-Do
-  'todo.title': { en: 'To-Do List', beanie: 'Our To-do List' },
+  'todo.title': { en: 'To-Do List', beanie: 'our to-do list' },
   'todo.subtitle': {
     en: 'Keep track of tasks for the whole family',
     beanie: 'What are your beanies busy with today?',
@@ -1400,11 +1400,11 @@ const STRING_DEFS = {
   'storage.iCloud': { en: 'iCloud' },
 
   // Family Planner
-  'planner.title': { en: 'Family Planner', beanie: 'Bean Planner' },
+  'planner.title': { en: 'Family Planner', beanie: 'beanie planner' },
   'planner.subtitle': { en: '{month} — {count} activities' },
-  'planner.addActivity': { en: '+ Add Activity', beanie: '+ New Bean Run' },
+  'planner.addActivity': { en: '+ Add Activity', beanie: '+ new activity' },
   'planner.editActivity': { en: 'Edit Activity' },
-  'planner.newActivity': { en: 'New Activity', beanie: 'New Bean Run' },
+  'planner.newActivity': { en: 'New Activity', beanie: 'new beanie activity' },
   'planner.deleteActivity': { en: 'Delete Activity' },
   'planner.deleteConfirm': { en: 'Are you sure you want to delete this activity?' },
   'planner.noActivities': { en: 'No activities yet' },
