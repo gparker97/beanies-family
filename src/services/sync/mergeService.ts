@@ -150,6 +150,7 @@ export function mergeData(
       tombstoneMap
     ),
     todos: mergeRecords(localData.todos ?? [], fileData.todos ?? [], tombstoneMap),
+    activities: mergeRecords(localData.activities ?? [], fileData.activities ?? [], tombstoneMap),
     deletions: mergedTombstones,
     settings: mergeSettings(localData.settings, fileData.settings),
   };

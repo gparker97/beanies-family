@@ -1,4 +1,11 @@
-import type { FamilyMember, Account, Transaction, Asset, Settings } from '@/types/models';
+import type {
+  FamilyMember,
+  Account,
+  Transaction,
+  Asset,
+  Settings,
+  FamilyActivity,
+} from '@/types/models';
 
 export class TestDataFactory {
   static createFamilyMember(overrides?: Partial<FamilyMember>): FamilyMember {
@@ -61,6 +68,26 @@ export class TestDataFactory {
       currentValue: 550000,
       currency: 'USD',
       includeInNetWorth: true,
+      createdAt: now,
+      updatedAt: now,
+      ...overrides,
+    };
+  }
+
+  static createActivity(createdBy: string, overrides?: Partial<FamilyActivity>): FamilyActivity {
+    const now = new Date().toISOString();
+    const todayStr = now.split('T')[0];
+    return {
+      id: `activity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      title: 'Test Activity',
+      date: todayStr,
+      recurrence: 'weekly',
+      dayOfWeek: new Date().getDay(),
+      category: 'lesson',
+      feeSchedule: 'none',
+      reminderMinutes: 0,
+      isActive: true,
+      createdBy,
       createdAt: now,
       updatedAt: now,
       ...overrides,

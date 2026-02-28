@@ -28,6 +28,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -44,6 +45,7 @@ const transactionsStore = useTransactionsStore();
 const assetsStore = useAssetsStore();
 const goalsStore = useGoalsStore();
 const todoStore = useTodoStore();
+const activityStore = useActivityStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
@@ -207,6 +209,7 @@ async function loadFamilyData() {
       goalsStore.loadGoals(),
       recurringStore.loadRecurringItems(),
       todoStore.loadTodos(),
+      activityStore.loadActivities(),
     ]);
 
     const result = await processRecurringItems();
@@ -233,6 +236,7 @@ async function loadFromIndexedDBCache() {
       goalsStore.loadGoals(),
       recurringStore.loadRecurringItems(),
       todoStore.loadTodos(),
+      activityStore.loadActivities(),
     ]);
 
     const result = await processRecurringItems();

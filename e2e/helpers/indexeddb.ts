@@ -106,7 +106,7 @@ export class IndexedDBHelper {
         return new Promise<void>((resolve, reject) => {
           // Use the per-family DB name, or fall back to legacy name for migration
           const targetDb = familyDbName || 'gp-family-finance';
-          const request = indexedDB.open(targetDb, 4);
+          const request = indexedDB.open(targetDb, 5);
 
           request.onsuccess = () => {
             const db = request.result;
@@ -120,6 +120,7 @@ export class IndexedDBHelper {
               if (testData.goals) storeNames.push('goals');
               if (testData.recurringItems) storeNames.push('recurringItems');
               if (testData.todos) storeNames.push('todos');
+              if (testData.activities) storeNames.push('activities');
               if (testData.settings) storeNames.push('settings');
 
               const tx = db.transaction(storeNames, 'readwrite');
@@ -151,6 +152,10 @@ export class IndexedDBHelper {
               if (testData.todos) {
                 const store = tx.objectStore('todos');
                 testData.todos.forEach((item: unknown) => store.add(item));
+              }
+              if (testData.activities) {
+                const store = tx.objectStore('activities');
+                testData.activities.forEach((item: unknown) => store.add(item));
               }
               if (testData.settings) {
                 const store = tx.objectStore('settings');
@@ -189,7 +194,7 @@ export class IndexedDBHelper {
     return await this.page.evaluate((familyDbName) => {
       return new Promise<ExportedData>((resolve, reject) => {
         const targetDb = familyDbName || 'gp-family-finance';
-        const request = indexedDB.open(targetDb, 4);
+        const request = indexedDB.open(targetDb, 5);
 
         request.onsuccess = () => {
           const db = request.result;
@@ -204,6 +209,7 @@ export class IndexedDBHelper {
                 'goals',
                 'recurringItems',
                 'todos',
+                'activities',
                 'settings',
               ],
               'readonly'
@@ -217,6 +223,7 @@ export class IndexedDBHelper {
               goals: [],
               recurringItems: [],
               todos: [],
+              activities: [],
               settings: undefined,
             };
 
@@ -228,6 +235,7 @@ export class IndexedDBHelper {
               tx.objectStore('goals').getAll(),
               tx.objectStore('recurringItems').getAll(),
               tx.objectStore('todos').getAll(),
+              tx.objectStore('activities').getAll(),
               tx.objectStore('settings').get('app_settings'),
             ];
 
@@ -259,6 +267,9 @@ export class IndexedDBHelper {
                     data.todos = req.result || [];
                     break;
                   case 7:
+                    data.activities = req.result || [];
+                    break;
+                  case 8:
                     data.settings = req.result || undefined;
                     break;
                 }

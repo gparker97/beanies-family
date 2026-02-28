@@ -35,7 +35,6 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/planner',
     emoji: '\u{1F4C5}',
     section: 'treehouse',
-    comingSoon: true,
   },
   { labelKey: 'nav.todo', path: '/todo', emoji: '\u2705', section: 'treehouse' },
   {

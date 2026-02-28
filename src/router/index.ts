@@ -81,7 +81,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/planner',
     name: 'Planner',
-    component: () => import('@/pages/DashboardPage.vue'),
+    component: () => import('@/pages/FamilyPlannerPage.vue'),
     meta: { title: 'Family Planner', requiresAuth: true },
   },
   {

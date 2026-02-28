@@ -36,6 +36,7 @@ function detectMergeChanges(
     'goals',
     'recurringItems',
     'todos',
+    'activities',
   ] as const;
 
   for (const key of collections) {
@@ -138,6 +139,8 @@ export function validateSyncFileData(data: unknown): data is SyncFileData {
     return false;
   // todos is optional for backward compatibility with older sync files
   if (innerData.todos !== undefined && !Array.isArray(innerData.todos)) return false;
+  // activities is optional for backward compatibility with older sync files
+  if (innerData.activities !== undefined && !Array.isArray(innerData.activities)) return false;
 
   return true;
 }
