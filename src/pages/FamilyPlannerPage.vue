@@ -11,6 +11,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm } from '@/composables/useConfirm';
 import type {
+  FamilyActivity,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
   TodoItem,
@@ -22,9 +23,7 @@ const activityStore = useActivityStore();
 const activeView = ref('month');
 const showInactive = ref(false);
 const showModal = ref(false);
-const editingActivity = ref<
-  ReturnType<typeof activityStore.activeActivities>['value'][number] | null
->(null);
+const editingActivity = ref<FamilyActivity | null>(null);
 const selectedDate = ref<string | undefined>(undefined);
 
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
@@ -55,7 +54,7 @@ function handleCalendarDateClick(date: string) {
   const occurrences = activityStore.monthActivities(year, month).filter((o) => o.date === date);
 
   if (occurrences.length === 1) {
-    openEditModal(occurrences[0].activity.id);
+    openEditModal(occurrences[0]!.activity.id);
   } else {
     openAddModal(date);
   }

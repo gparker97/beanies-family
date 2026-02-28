@@ -56,8 +56,8 @@ export const useActivityStore = defineStore('activities', () => {
    * Mixing the two causes off-by-one bugs in non-UTC timezones.
    */
   function parseLocalDate(dateStr: string): Date {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    const parts = dateStr.split('-').map(Number);
+    return new Date(parts[0]!, parts[1]! - 1, parts[2]!);
   }
 
   function expandRecurring(

@@ -66,7 +66,7 @@ function goToTodos() {
     </div>
 
     <div v-if="previewTodos.length === 0" class="py-2 text-center">
-      <p class="text-sm text-[#2C3E50]/40 dark:text-gray-500">{{ t('todo.empty') }}</p>
+      <p class="text-sm text-[#2C3E50]/40 dark:text-gray-500">{{ t('todo.noTodos') }}</p>
     </div>
 
     <div v-else class="space-y-1.5">
