@@ -2,18 +2,15 @@
 import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
-import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import { BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
+import AccountModal from '@/components/accounts/AccountModal.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
-import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
-import { COUNTRIES } from '@/constants/countries';
-import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
-import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -25,34 +22,10 @@ const settingsStore = useSettingsStore();
 const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
-const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
-const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
-const isSubmitting = ref(false);
-
-// Editing state
-const editingAccountId = ref<string | null>(null);
-const editingAccount = ref<
-  UpdateAccountInput & {
-    name: string;
-    balance: number;
-    memberId: string;
-    type: AccountType;
-    currency: string;
-  }
->({
-  name: '',
-  balance: 0,
-  memberId: '',
-  type: 'checking',
-  currency: 'USD',
-  institution: '',
-  institutionCountry: '',
-  isActive: true,
-  includeInNetWorth: true,
-});
+const editingAccount = ref<Account | null>(null);
 
 const accountTypes = computed(() => [
   { value: 'checking' as AccountType, label: t('accounts.type.checking') },
@@ -64,28 +37,6 @@ const accountTypes = computed(() => [
   { value: 'loan' as AccountType, label: t('accounts.type.loan') },
   { value: 'other' as AccountType, label: t('accounts.type.other') },
 ]);
-
-const { currencyOptions } = useCurrencyOptions();
-
-// Family member options for the owner selector
-const memberOptions = computed(() =>
-  familyStore.members.map((m) => ({
-    value: m.id,
-    label: m.name,
-  }))
-);
-
-const newAccount = ref<CreateAccountInput>({
-  memberId: familyStore.currentMemberId || '',
-  name: '',
-  type: 'checking',
-  currency: settingsStore.displayCurrency,
-  balance: 0,
-  institution: '',
-  institutionCountry: '',
-  isActive: true,
-  includeInNetWorth: true,
-});
 
 // Uses filtered data based on global member filter
 const accounts = computed(() => accountsStore.filteredAccounts);
@@ -189,77 +140,39 @@ function getAccountTypeConfig(type: AccountType): {
 }
 
 function openAddModal() {
-  newAccount.value = {
-    memberId: familyStore.currentMemberId || '',
-    name: '',
-    type: 'checking',
-    currency: settingsStore.displayCurrency,
-    balance: 0,
-    institution: '',
-    institutionCountry: '',
-    isActive: true,
-    includeInNetWorth: true,
-  };
+  editingAccount.value = null;
   showAddModal.value = true;
 }
 
 function openEditModal(account: Account) {
-  editingAccountId.value = account.id;
-  editingAccount.value = {
-    name: account.name,
-    balance: account.balance,
-    memberId: account.memberId,
-    type: account.type,
-    currency: account.currency,
-    institution: account.institution || '',
-    institutionCountry: account.institutionCountry || '',
-    isActive: account.isActive,
-    includeInNetWorth: account.includeInNetWorth,
-  };
+  editingAccount.value = account;
   showEditModal.value = true;
 }
 
 function closeEditModal() {
   showEditModal.value = false;
-  editingAccountId.value = null;
+  editingAccount.value = null;
 }
 
-async function persistCustomInstitutionIfNeeded(name: string | undefined) {
-  if (!name?.trim()) return;
-  const isKnown =
-    INSTITUTIONS.some((i) => i.name === name) || settingsStore.customInstitutions.includes(name);
-  if (!isKnown) {
-    await settingsStore.addCustomInstitution(name.trim());
-  }
-}
-
-async function handleRemoveCustomInstitution(name: string) {
-  await removeCustomInstitution(name);
-}
-
-async function createAccount() {
-  if (!newAccount.value.name.trim()) return;
-
-  isSubmitting.value = true;
-  try {
-    await accountsStore.createAccount(newAccount.value);
-    await persistCustomInstitutionIfNeeded(newAccount.value.institution);
-    showAddModal.value = false;
-  } finally {
-    isSubmitting.value = false;
-  }
-}
-
-async function saveEdit() {
-  if (!editingAccountId.value || !editingAccount.value.name.trim()) return;
-
-  isSubmitting.value = true;
-  try {
-    await accountsStore.updateAccount(editingAccountId.value, editingAccount.value);
-    await persistCustomInstitutionIfNeeded(editingAccount.value.institution);
+async function handleAccountSave(
+  data: CreateAccountInput | { id: string; data: UpdateAccountInput }
+) {
+  if ('id' in data) {
+    await accountsStore.updateAccount(data.id, data.data);
     closeEditModal();
-  } finally {
-    isSubmitting.value = false;
+  } else {
+    await accountsStore.createAccount(data);
+    showAddModal.value = false;
+  }
+}
+
+async function handleAccountDelete(id: string) {
+  closeEditModal();
+  if (
+    await showConfirm({ title: 'confirm.deleteAccountTitle', message: 'accounts.deleteConfirm' })
+  ) {
+    await accountsStore.deleteAccount(id);
+    playWhoosh();
   }
 }
 
@@ -473,173 +386,20 @@ async function deleteAccount(id: string) {
     </div>
 
     <!-- Add Account Modal -->
-    <BaseModal
+    <AccountModal
       :open="showAddModal"
-      :title="t('accounts.addAccount')"
-      size="xl"
       @close="showAddModal = false"
-    >
-      <form class="space-y-4" @submit.prevent="createAccount">
-        <BaseInput
-          v-model="newAccount.name"
-          :label="t('accounts.accountName')"
-          placeholder="e.g., Main Checking"
-          required
-        />
-
-        <BaseSelect
-          v-model="newAccount.type"
-          :options="accountTypes"
-          :label="t('accounts.accountType')"
-        />
-
-        <BaseSelect
-          v-model="newAccount.memberId"
-          :options="memberOptions"
-          :label="t('form.owner')"
-        />
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseCombobox
-            v-model="newAccount.institution"
-            :options="institutionOptions"
-            :label="t('form.institution')"
-            :placeholder="t('form.searchInstitutions')"
-            :search-placeholder="t('form.searchInstitutions')"
-            :other-value="OTHER_INSTITUTION_VALUE"
-            :other-label="t('form.other')"
-            :other-placeholder="t('form.enterCustomName')"
-            @custom-removed="handleRemoveCustomInstitution"
-          />
-          <BaseCombobox
-            v-model="newAccount.institutionCountry"
-            :options="countryOptions"
-            :label="t('form.country')"
-            :placeholder="t('form.searchCountries')"
-            :search-placeholder="t('form.searchCountries')"
-          />
-        </div>
-
-        <BaseSelect
-          v-model="newAccount.currency"
-          :options="currencyOptions"
-          :label="t('form.currency')"
-        />
-
-        <BaseInput
-          v-model="newAccount.balance"
-          type="number"
-          :label="t('accounts.currentBalance')"
-          placeholder="0.00"
-        />
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="showAddModal = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="createAccount">
-            {{ t('accounts.addAccount') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleAccountSave"
+      @delete="handleAccountDelete"
+    />
 
     <!-- Edit Account Modal -->
-    <BaseModal
+    <AccountModal
       :open="showEditModal"
-      :title="t('accounts.editAccount')"
-      size="xl"
+      :account="editingAccount"
       @close="closeEditModal"
-    >
-      <form class="space-y-4" @submit.prevent="saveEdit">
-        <BaseInput
-          v-model="editingAccount.name"
-          :label="t('accounts.accountName')"
-          placeholder="e.g., Main Checking"
-          required
-        />
-
-        <BaseSelect
-          v-model="editingAccount.type"
-          :options="accountTypes"
-          :label="t('accounts.accountType')"
-        />
-
-        <BaseSelect
-          v-model="editingAccount.memberId"
-          :options="memberOptions"
-          :label="t('form.owner')"
-        />
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseCombobox
-            v-model="editingAccount.institution"
-            :options="institutionOptions"
-            :label="t('form.institution')"
-            :placeholder="t('form.searchInstitutions')"
-            :search-placeholder="t('form.searchInstitutions')"
-            :other-value="OTHER_INSTITUTION_VALUE"
-            :other-label="t('form.other')"
-            :other-placeholder="t('form.enterCustomName')"
-            @custom-removed="handleRemoveCustomInstitution"
-          />
-          <BaseCombobox
-            v-model="editingAccount.institutionCountry"
-            :options="countryOptions"
-            :label="t('form.country')"
-            :placeholder="t('form.searchCountries')"
-            :search-placeholder="t('form.searchCountries')"
-          />
-        </div>
-
-        <BaseSelect
-          v-model="editingAccount.currency"
-          :options="currencyOptions"
-          :label="t('form.currency')"
-        />
-
-        <BaseInput
-          v-model="editingAccount.balance"
-          type="number"
-          :label="t('accounts.currentBalance')"
-          placeholder="0.00"
-          step="0.01"
-        />
-
-        <div class="flex items-center gap-4">
-          <label class="flex cursor-pointer items-center gap-2">
-            <input
-              v-model="editingAccount.isActive"
-              type="checkbox"
-              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-            />
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('form.isActive') }}</span>
-          </label>
-          <label class="flex cursor-pointer items-center gap-2">
-            <input
-              v-model="editingAccount.includeInNetWorth"
-              type="checkbox"
-              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-            />
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{
-              t('form.includeInNetWorth')
-            }}</span>
-          </label>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="closeEditModal">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton data-testid="save-edit-btn" :loading="isSubmitting" @click="saveEdit">
-            {{ t('action.saveChanges') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleAccountSave"
+      @delete="handleAccountDelete"
+    />
   </div>
 </template>

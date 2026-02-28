@@ -27,7 +27,7 @@ function makeActivity(overrides?: Partial<FamilyActivity>): FamilyActivity {
     startTime: '15:00',
     endTime: '16:00',
     recurrence: 'weekly',
-    dayOfWeek: 3, // Wednesday
+    daysOfWeek: [3], // Wednesday
     category: 'lesson',
     assigneeId: 'member-child-1',
     dropoffMemberId: 'member-parent-1',
@@ -117,7 +117,7 @@ describe('activityStore', () => {
         startTime: '09:00',
         endTime: '10:30',
         recurrence: 'weekly' as const,
-        dayOfWeek: 1, // Monday
+        daysOfWeek: [1], // Monday
         category: 'sport' as const,
         assigneeId: 'member-child-1',
         feeSchedule: 'per_session' as const,
@@ -134,7 +134,7 @@ describe('activityStore', () => {
 
       expect(result).not.toBeNull();
       expect(result!.recurrence).toBe('weekly');
-      expect(result!.dayOfWeek).toBe(1);
+      expect(result!.daysOfWeek).toEqual([1]);
       expect(store.activities).toHaveLength(1);
     });
 
@@ -247,7 +247,7 @@ describe('activityStore', () => {
       const store = useActivityStore();
       // Activity starts Wed March 4, repeats weekly
       store.activities.push(
-        makeActivity({ id: '1', date: '2026-03-04', recurrence: 'weekly', dayOfWeek: 3 })
+        makeActivity({ id: '1', date: '2026-03-04', recurrence: 'weekly', daysOfWeek: [3] })
       );
 
       const occurrences = store.monthActivities(2026, 2); // March (0-indexed)
@@ -261,11 +261,104 @@ describe('activityStore', () => {
       ]);
     });
 
+    it('should expand a multi-day weekly activity on all specified days', () => {
+      const store = useActivityStore();
+      // Activity on Mon + Wed, starts March 2 (Monday)
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-03-02', recurrence: 'weekly', daysOfWeek: [1, 3] })
+      );
+
+      const occurrences = store.monthActivities(2026, 2); // March
+      // March 2026: Mon 2,9,16,23,30 and Wed 4,11,18,25 = 9 total
+      expect(occurrences).toHaveLength(9);
+      const dates = occurrences.map((o) => o.date).sort();
+      expect(dates).toEqual([
+        '2026-03-02',
+        '2026-03-04',
+        '2026-03-09',
+        '2026-03-11',
+        '2026-03-16',
+        '2026-03-18',
+        '2026-03-23',
+        '2026-03-25',
+        '2026-03-30',
+      ]);
+    });
+
+    it('should expand a three-day weekly activity (Mon/Wed/Fri)', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-03-02',
+          recurrence: 'weekly',
+          daysOfWeek: [1, 3, 5],
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2); // March
+      // Mon: 2,9,16,23,30 (5) + Wed: 4,11,18,25 (4) + Fri: 6,13,20,27 (4) = 13 total
+      expect(occurrences).toHaveLength(13);
+      // Verify all dates are Mon, Wed, or Fri
+      for (const occ of occurrences) {
+        const day = new Date(occ.date).getDay();
+        expect([1, 3, 5]).toContain(day);
+      }
+    });
+
+    it('should fall back to start date day when daysOfWeek is empty', () => {
+      const store = useActivityStore();
+      // March 4 is a Wednesday, daysOfWeek empty → should use day 3 (Wed)
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-03-04', recurrence: 'weekly', daysOfWeek: [] })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      expect(occurrences).toHaveLength(4); // 4 Wednesdays in March
+      expect(occurrences.map((o) => o.date)).toEqual([
+        '2026-03-04',
+        '2026-03-11',
+        '2026-03-18',
+        '2026-03-25',
+      ]);
+    });
+
+    it('should fall back to start date day when daysOfWeek is undefined', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: undefined,
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      expect(occurrences).toHaveLength(4);
+    });
+
+    it('should respect start date for multi-day recurrence', () => {
+      const store = useActivityStore();
+      // Starts March 10 (Tuesday), recurs Mon+Tue
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-03-10', recurrence: 'weekly', daysOfWeek: [1, 2] })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      // Tue: 10,17,24,31 (4) + Mon: 16,23,30 (3, Mon 2 and 9 are before start date) = 7
+      expect(occurrences).toHaveLength(7);
+      // No dates before March 10
+      for (const occ of occurrences) {
+        expect(new Date(occ.date) >= new Date('2026-03-10')).toBe(true);
+      }
+    });
+
     it('should not expand a weekly activity before its start date', () => {
       const store = useActivityStore();
       // Activity starts Wed March 18
       store.activities.push(
-        makeActivity({ id: '1', date: '2026-03-18', recurrence: 'weekly', dayOfWeek: 3 })
+        makeActivity({ id: '1', date: '2026-03-18', recurrence: 'weekly', daysOfWeek: [3] })
       );
 
       const occurrences = store.monthActivities(2026, 2); // March

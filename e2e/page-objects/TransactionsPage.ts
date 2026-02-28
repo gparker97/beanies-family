@@ -29,13 +29,31 @@ export class TransactionsPage {
     // Switch to transactions tab if not already there (default is recurring tab)
     await this.page.getByRole('button', { name: 'One Time Transactions' }).click();
     await this.page.getByRole('button', { name: 'Add Transaction' }).click();
-    await this.page.getByLabel('Type').selectOption(data.type);
-    await this.page.getByLabel('Account').selectOption(data.account);
-    await this.page.getByLabel('Description').fill(data.description);
-    await this.page.getByLabel('Amount').fill(data.amount.toString());
-    if (data.category) {
-      await this.page.getByLabel('Category').selectOption(data.category);
+
+    // Direction toggle (TogglePillGroup) — default is "out" (expense)
+    if (data.type === 'income') {
+      await this.page.getByRole('button', { name: /Money In/ }).click();
     }
+
+    // Amount (AmountInput — number input)
+    await this.page.locator('input[type="number"]').fill(data.amount.toString());
+
+    // Description (raw input with placeholder)
+    await this.page.getByPlaceholder('Description').fill(data.description);
+
+    // Category (BaseSelect with grouped options)
+    if (data.category) {
+      // Category is the first <select> in the dialog
+      await this.page.locator('[role="dialog"] select').first().selectOption(data.category);
+    }
+
+    // Account — BaseSelect with "Select an account" placeholder option
+    await this.page
+      .locator('select')
+      .filter({ has: this.page.locator('option', { hasText: 'Select an account' }) })
+      .selectOption({ label: data.account });
+
+    // Save
     await this.page.getByRole('button', { name: 'Add Transaction' }).last().click();
     await expect(this.page.locator('[role="dialog"]')).toHaveCount(0);
   }

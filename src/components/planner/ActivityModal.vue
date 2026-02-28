@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import BaseModal from '@/components/ui/BaseModal.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import EmojiPicker from '@/components/ui/EmojiPicker.vue';
+import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
+import FrequencyChips from '@/components/ui/FrequencyChips.vue';
+import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import AmountInput from '@/components/ui/AmountInput.vue';
+import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -28,6 +36,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   save: [data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }];
+  delete: [];
 }>();
 
 const { t } = useTranslation();
@@ -37,16 +46,34 @@ const settingsStore = useSettingsStore();
 const showMoreDetails = ref(false);
 const isEditing = computed(() => !!props.activity);
 
+// Activity emoji options — emoji→category mapping
+const ACTIVITY_EMOJIS = [
+  { emoji: '⚽', label: 'Sport', category: 'sport' as ActivityCategory },
+  { emoji: '🎹', label: 'Music', category: 'lesson' as ActivityCategory },
+  { emoji: '🏊', label: 'Swimming', category: 'sport' as ActivityCategory },
+  { emoji: '🥋', label: 'Martial Arts', category: 'sport' as ActivityCategory },
+  { emoji: '🤸', label: 'Gymnastics', category: 'sport' as ActivityCategory },
+  { emoji: '📚', label: 'Tutoring', category: 'lesson' as ActivityCategory },
+  { emoji: '🎨', label: 'Art', category: 'lesson' as ActivityCategory },
+  { emoji: '🏥', label: 'Medical', category: 'appointment' as ActivityCategory },
+  { emoji: '🎓', label: 'Education', category: 'lesson' as ActivityCategory },
+  { emoji: '🎸', label: 'Guitar', category: 'lesson' as ActivityCategory },
+  { emoji: '🔬', label: 'Science', category: 'lesson' as ActivityCategory },
+  { emoji: '✈️', label: 'Travel', category: 'other' as ActivityCategory },
+];
+
 // Form state
+const icon = ref('');
 const title = ref('');
 const description = ref('');
 const date = ref('');
 const startTime = ref('');
 const endTime = ref('');
-const recurrence = ref<ActivityRecurrence>('weekly');
-const dayOfWeek = ref<number | undefined>(undefined);
+const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
+const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
+const daysOfWeek = ref<number[]>([]);
 const category = ref<ActivityCategory>('lesson');
-const assigneeId = ref<string>('');
+const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
 const pickupMemberId = ref<string>('');
 const location = ref('');
@@ -60,16 +87,12 @@ const reminderMinutes = ref<ReminderMinutes>(0);
 const notes = ref('');
 const isActive = ref(true);
 const color = ref('');
-const colorManuallySet = ref(false);
 
-/** Available color swatches: category defaults + extras */
-const COLOR_SWATCHES = [
-  ...Object.values(CATEGORY_COLORS),
-  '#3498DB', // Bright blue
-  '#1ABC9C', // Teal
-  '#E74C3C', // Red
-  '#F39C12', // Amber
-];
+// Map recurrence mode + frequency to ActivityRecurrence
+const effectiveRecurrence = computed<ActivityRecurrence>(() => {
+  if (recurrenceMode.value === 'one-off') return 'none';
+  return recurrenceFrequency.value === 'biweekly' ? 'weekly' : recurrenceFrequency.value;
+});
 
 // Reset form when modal opens
 watch(
@@ -77,17 +100,19 @@ watch(
   (isOpen) => {
     if (!isOpen) return;
     if (props.activity) {
-      // Edit mode — populate from existing activity
       const a = props.activity;
+      icon.value = a.icon ?? '';
       title.value = a.title;
       description.value = a.description ?? '';
       date.value = a.date;
       startTime.value = a.startTime ?? '';
       endTime.value = a.endTime ?? '';
-      recurrence.value = a.recurrence;
-      dayOfWeek.value = a.dayOfWeek;
+      recurrenceMode.value = a.recurrence === 'none' ? 'one-off' : 'recurring';
+      recurrenceFrequency.value =
+        a.recurrence === 'monthly' ? 'monthly' : a.recurrence === 'weekly' ? 'weekly' : 'weekly';
+      daysOfWeek.value = a.daysOfWeek ?? [];
       category.value = a.category;
-      assigneeId.value = a.assigneeId ?? '';
+      assigneeIds.value = a.assigneeId ? [a.assigneeId] : [];
       dropoffMemberId.value = a.dropoffMemberId ?? '';
       pickupMemberId.value = a.pickupMemberId ?? '';
       location.value = a.location ?? '';
@@ -101,26 +126,25 @@ watch(
       notes.value = a.notes ?? '';
       isActive.value = a.isActive;
       color.value = a.color ?? CATEGORY_COLORS[a.category];
-      colorManuallySet.value = !!a.color;
-      // Auto-expand if any advanced fields are populated
       showMoreDetails.value = !!(
-        a.location ||
-        a.feeSchedule !== 'none' ||
+        a.dropoffMemberId ||
+        a.pickupMemberId ||
         a.instructorName ||
         a.reminderMinutes > 0 ||
-        a.notes
+        (a.feeSchedule !== 'none' && a.feeSchedule !== 'per_session')
       );
     } else {
-      // Create mode — reset to defaults
+      icon.value = '';
       title.value = '';
       description.value = '';
       date.value = props.defaultDate ?? todayStr();
       startTime.value = props.defaultStartTime ?? '';
       endTime.value = '';
-      recurrence.value = 'weekly';
-      dayOfWeek.value = undefined;
+      recurrenceMode.value = 'recurring';
+      recurrenceFrequency.value = 'weekly';
+      daysOfWeek.value = [];
       category.value = 'lesson';
-      assigneeId.value = '';
+      assigneeIds.value = [];
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
       location.value = '';
@@ -133,25 +157,27 @@ watch(
       reminderMinutes.value = 0;
       notes.value = '';
       isActive.value = true;
-      color.value = CATEGORY_COLORS['lesson'];
-      colorManuallySet.value = false;
+      color.value = '';
       showMoreDetails.value = false;
     }
   }
 );
 
-// Auto-update color when category changes (unless user manually picked a color)
-watch(category, (newCat) => {
-  if (!colorManuallySet.value) {
-    color.value = CATEGORY_COLORS[newCat];
+// When emoji changes, derive category
+watch(icon, (newIcon) => {
+  if (!newIcon) return;
+  const match = ACTIVITY_EMOJIS.find((e) => e.emoji === newIcon);
+  if (match) {
+    category.value = match.category;
+    color.value = CATEGORY_COLORS[match.category];
   }
 });
 
-// Auto-set dayOfWeek when date changes
+// Auto-set daysOfWeek from date if empty
 watch(date, (newDate) => {
-  if (newDate && recurrence.value === 'weekly') {
+  if (newDate && daysOfWeek.value.length === 0 && recurrenceMode.value === 'recurring') {
     const d = new Date(newDate + 'T00:00:00');
-    dayOfWeek.value = d.getDay();
+    daysOfWeek.value = [d.getDay()];
   }
 });
 
@@ -165,35 +191,12 @@ const memberOptions = computed(() => [
   ...familyStore.members.map((m) => ({ value: m.id, label: m.name })),
 ]);
 
-const categoryOptions = computed(() =>
-  (['lesson', 'sport', 'appointment', 'social', 'pickup', 'other'] as ActivityCategory[]).map(
-    (c) => ({ value: c, label: t(`planner.category.${c}` as const) })
-  )
-);
-
-const recurrenceOptions = computed(() =>
-  (['weekly', 'daily', 'monthly', 'yearly', 'none'] as ActivityRecurrence[]).map((r) => ({
-    value: r,
-    label: t(`planner.recurrence.${r}` as const),
-  }))
-);
-
 const feeScheduleOptions = computed(() =>
   (['none', 'per_session', 'weekly', 'monthly', 'termly', 'yearly'] as FeeSchedule[]).map((f) => ({
     value: f,
     label: t(`planner.fee.${f}` as const),
   }))
 );
-
-const dayOfWeekOptions = [
-  { value: 0, label: 'Sunday' },
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-];
 
 const reminderOptions: { value: ReminderMinutes; label: string }[] = [
   { value: 0, label: 'None' },
@@ -206,36 +209,55 @@ const reminderOptions: { value: ReminderMinutes; label: string }[] = [
   { value: 1440, label: '1 day' },
 ];
 
+const frequencyOptions = [
+  { value: 'weekly', label: t('planner.recurrence.weekly') },
+  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'monthly', label: t('planner.recurrence.monthly') },
+];
+
 const canSave = computed(() => title.value.trim().length > 0 && date.value.length > 0);
+
+const modalTitle = computed(() =>
+  isEditing.value ? t('planner.editActivity') : t('planner.newActivity')
+);
+
+const saveLabel = computed(() =>
+  isEditing.value ? t('modal.saveActivity') : t('modal.addActivity')
+);
 
 function handleSave() {
   if (!canSave.value) return;
 
   const currentMember = familyStore.currentMember ?? familyStore.owner;
+  const primaryAssignee = assigneeIds.value[0] || undefined;
 
   const baseData = {
     title: title.value.trim(),
+    icon: icon.value || undefined,
     description: description.value.trim() || undefined,
     date: date.value,
     startTime: startTime.value || undefined,
     endTime: endTime.value || undefined,
-    recurrence: recurrence.value,
-    dayOfWeek: recurrence.value === 'weekly' ? dayOfWeek.value : undefined,
+    recurrence: effectiveRecurrence.value,
+    daysOfWeek:
+      recurrenceMode.value === 'recurring' && effectiveRecurrence.value === 'weekly'
+        ? [...daysOfWeek.value]
+        : undefined,
     category: category.value,
-    assigneeId: assigneeId.value || undefined,
+    assigneeId: primaryAssignee,
     dropoffMemberId: dropoffMemberId.value || undefined,
     pickupMemberId: pickupMemberId.value || undefined,
     location: location.value.trim() || undefined,
-    feeSchedule: feeSchedule.value,
-    feeAmount: feeSchedule.value !== 'none' ? feeAmount.value : undefined,
-    feeCurrency: feeSchedule.value !== 'none' ? feeCurrency.value : undefined,
+    feeSchedule: feeAmount.value ? ('per_session' as FeeSchedule) : feeSchedule.value,
+    feeAmount: feeAmount.value || (feeSchedule.value !== 'none' ? feeAmount.value : undefined),
+    feeCurrency: feeAmount.value || feeSchedule.value !== 'none' ? feeCurrency.value : undefined,
     feePayerId: feeSchedule.value !== 'none' ? feePayerId.value || undefined : undefined,
     instructorName: instructorName.value.trim() || undefined,
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,
     notes: notes.value.trim() || undefined,
     isActive: isActive.value,
-    color: color.value !== CATEGORY_COLORS[category.value] ? color.value : undefined,
+    color: color.value || undefined,
   };
 
   if (isEditing.value && props.activity) {
@@ -250,142 +272,135 @@ function handleSave() {
 </script>
 
 <template>
-  <BaseModal
+  <BeanieFormModal
     :open="open"
-    :title="isEditing ? t('planner.editActivity') : t('planner.newActivity')"
-    size="lg"
+    :title="modalTitle"
+    :icon="icon || '📋'"
+    icon-bg="var(--tint-orange-8)"
+    :save-label="saveLabel"
+    :save-disabled="!canSave"
+    :show-delete="isEditing"
     @close="emit('close')"
+    @save="handleSave"
+    @delete="emit('delete')"
   >
-    <form class="space-y-4" @submit.prevent="handleSave">
-      <!-- Title -->
-      <BaseInput
+    <!-- 1. Emoji Picker -->
+    <FormFieldGroup :label="t('modal.pickIcon')">
+      <EmojiPicker v-model="icon" :options="ACTIVITY_EMOJIS" />
+    </FormFieldGroup>
+
+    <!-- 2. Title -->
+    <div>
+      <input
         v-model="title"
-        :label="t('planner.field.title')"
-        :placeholder="t('planner.field.title')"
-        required
+        type="text"
+        class="font-outfit w-full border-none bg-transparent text-[1.2rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        :placeholder="t('modal.whatsTheActivity')"
       />
+    </div>
 
-      <!-- Date + Time row -->
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <BaseInput v-model="date" :label="t('planner.field.date')" type="date" required />
-        <BaseInput v-model="startTime" :label="t('planner.field.startTime')" type="time" />
-        <BaseInput v-model="endTime" :label="t('planner.field.endTime')" type="time" />
+    <!-- 3. Recurring / One-off toggle -->
+    <FormFieldGroup :label="t('modal.schedule')">
+      <TogglePillGroup
+        v-model="recurrenceMode"
+        :options="[
+          { value: 'recurring', label: t('modal.recurring') },
+          { value: 'one-off', label: t('modal.oneOff') },
+        ]"
+      />
+    </FormFieldGroup>
+
+    <!-- 4. Recurring details -->
+    <ConditionalSection :show="recurrenceMode === 'recurring'">
+      <div class="space-y-4">
+        <FormFieldGroup :label="t('modal.whichDays')">
+          <DayOfWeekSelector v-model="daysOfWeek" />
+        </FormFieldGroup>
+
+        <FormFieldGroup :label="t('modal.howOften')">
+          <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
+        </FormFieldGroup>
       </div>
+    </ConditionalSection>
 
-      <!-- Category + Recurrence row -->
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <BaseSelect
-          v-model="category"
-          :label="t('planner.field.category')"
-          :options="categoryOptions"
-        />
-        <BaseSelect
-          v-model="recurrence"
-          :label="t('planner.field.recurrence')"
-          :options="recurrenceOptions"
-        />
-      </div>
+    <!-- 5. Date + Start time -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <FormFieldGroup :label="t('planner.field.date')">
+        <BaseInput v-model="date" type="date" required />
+      </FormFieldGroup>
 
-      <!-- Highlight color -->
-      <div>
-        <label class="mb-1 block text-sm font-medium text-[#2C3E50] dark:text-gray-300">
-          {{ t('planner.field.color') }}
-        </label>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="swatch in COLOR_SWATCHES"
-            :key="swatch"
-            type="button"
-            class="h-7 w-7 cursor-pointer rounded-full border-2 transition-all"
-            :class="
-              color === swatch
-                ? 'scale-110 border-gray-900 dark:border-white'
-                : 'border-transparent'
-            "
-            :style="{ backgroundColor: swatch }"
-            @click="
-              color = swatch;
-              colorManuallySet = true;
-            "
-          />
-        </div>
-      </div>
+      <FormFieldGroup :label="t('modal.startTime')">
+        <TimePresetPicker v-model="startTime" />
+      </FormFieldGroup>
+    </div>
 
-      <!-- Day of week (only for weekly recurrence) -->
-      <div v-if="recurrence === 'weekly'">
-        <BaseSelect
-          :model-value="String(dayOfWeek ?? '')"
-          :label="t('planner.field.dayOfWeek')"
-          :options="dayOfWeekOptions.map((d) => ({ value: String(d.value), label: d.label }))"
-          @update:model-value="dayOfWeek = Number($event)"
-        />
-      </div>
+    <!-- 6. End time (after start time is set) -->
+    <ConditionalSection :show="!!startTime">
+      <FormFieldGroup :label="t('modal.endTime')">
+        <TimePresetPicker v-model="endTime" />
+      </FormFieldGroup>
+    </ConditionalSection>
 
-      <!-- People row -->
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <BaseSelect
-          v-model="assigneeId"
-          :label="t('planner.field.assignee')"
-          :options="memberOptions"
-        />
-        <BaseSelect
-          v-model="dropoffMemberId"
-          :label="t('planner.field.dropoff')"
-          :options="memberOptions"
-        />
-        <BaseSelect
-          v-model="pickupMemberId"
-          :label="t('planner.field.pickup')"
-          :options="memberOptions"
-        />
-      </div>
+    <!-- 7. Location (optional) -->
+    <FormFieldGroup :label="t('planner.field.location')" optional>
+      <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
+    </FormFieldGroup>
 
-      <!-- More details toggle -->
-      <button
-        type="button"
-        class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl py-2 text-sm font-semibold text-[#F15D22] transition-colors hover:text-[#E67E22]"
-        @click="showMoreDetails = !showMoreDetails"
+    <!-- 8. Who's going? -->
+    <FormFieldGroup :label="t('modal.whosGoing')">
+      <FamilyChipPicker v-model="assigneeIds" mode="multi" />
+    </FormFieldGroup>
+
+    <!-- 9. Cost per session (optional) -->
+    <AmountInput
+      v-model="feeAmount"
+      :currency-symbol="settingsStore.baseCurrency"
+      font-size="1.1rem"
+      :label="t('modal.costPerSession')"
+    />
+
+    <!-- 10. Notes (optional) -->
+    <FormFieldGroup :label="t('planner.field.notes')" optional>
+      <textarea
+        v-model="notes"
+        rows="2"
+        class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+        :placeholder="t('planner.field.notes')"
+      />
+    </FormFieldGroup>
+
+    <!-- More details toggle -->
+    <button
+      type="button"
+      class="font-outfit text-primary-500 hover:text-terracotta-400 flex w-full cursor-pointer items-center gap-2 rounded-xl py-2 text-sm font-semibold transition-colors"
+      @click="showMoreDetails = !showMoreDetails"
+    >
+      <svg
+        class="h-4 w-4 transition-transform"
+        :class="{ 'rotate-180': showMoreDetails }"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        stroke-width="2"
       >
-        <svg
-          class="h-4 w-4 transition-transform"
-          :class="{ 'rotate-180': showMoreDetails }"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          stroke-width="2"
-        >
-          <path d="M19 9l-7 7-7-7" />
-        </svg>
-        {{ t('planner.field.moreDetails') }}
-      </button>
+        <path d="M19 9l-7 7-7-7" />
+      </svg>
+      {{ t('modal.moreDetails') }}
+    </button>
 
-      <!-- Collapsible advanced fields -->
-      <div v-if="showMoreDetails" class="space-y-4">
-        <!-- Location -->
-        <BaseInput
-          v-model="location"
-          :label="t('planner.field.location')"
-          :placeholder="t('planner.field.location')"
-        />
-
-        <!-- Fees row -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <!-- Expandable "More details" -->
+    <ConditionalSection :show="showMoreDetails">
+      <div class="space-y-4">
+        <!-- Dropoff / Pickup members -->
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <BaseSelect
-            v-model="feeSchedule"
-            :label="t('planner.field.feeSchedule')"
-            :options="feeScheduleOptions"
-          />
-          <BaseInput
-            v-if="feeSchedule !== 'none'"
-            :model-value="feeAmount !== undefined ? String(feeAmount) : ''"
-            :label="t('planner.field.feeAmount')"
-            type="number"
-            @update:model-value="feeAmount = $event ? Number($event) : undefined"
+            v-model="dropoffMemberId"
+            :label="t('planner.field.dropoff')"
+            :options="memberOptions"
           />
           <BaseSelect
-            v-if="feeSchedule !== 'none'"
-            v-model="feePayerId"
-            :label="t('planner.field.feePayer')"
+            v-model="pickupMemberId"
+            :label="t('planner.field.pickup')"
             :options="memberOptions"
           />
         </div>
@@ -404,6 +419,21 @@ function handleSave() {
           />
         </div>
 
+        <!-- Fee schedule -->
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <BaseSelect
+            v-model="feeSchedule"
+            :label="t('planner.field.feeSchedule')"
+            :options="feeScheduleOptions"
+          />
+          <BaseSelect
+            v-if="feeSchedule !== 'none'"
+            v-model="feePayerId"
+            :label="t('planner.field.feePayer')"
+            :options="memberOptions"
+          />
+        </div>
+
         <!-- Reminder -->
         <BaseSelect
           :model-value="String(reminderMinutes)"
@@ -412,37 +442,14 @@ function handleSave() {
           @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
         />
 
-        <!-- Notes -->
-        <div>
-          <label class="mb-1 block text-sm font-medium text-[#2C3E50] dark:text-gray-300">
-            {{ t('planner.field.notes') }}
-          </label>
-          <textarea
-            v-model="notes"
-            rows="3"
-            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#2C3E50] transition-colors focus:border-[#F15D22] focus:ring-1 focus:ring-[#F15D22] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-gray-200"
-            :placeholder="t('planner.field.notes')"
-          />
-        </div>
-
         <!-- Active toggle -->
         <label class="flex cursor-pointer items-center gap-2">
-          <input v-model="isActive" type="checkbox" class="h-4 w-4 rounded accent-[#F15D22]" />
-          <span class="text-sm text-[#2C3E50] dark:text-gray-300">
+          <input v-model="isActive" type="checkbox" class="accent-primary-500 h-4 w-4 rounded" />
+          <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
             {{ t('planner.field.active') }}
           </span>
         </label>
       </div>
-
-      <!-- Actions -->
-      <div class="flex justify-end gap-2 pt-2">
-        <BaseButton variant="secondary" type="button" @click="emit('close')">
-          {{ t('common.cancel') }}
-        </BaseButton>
-        <BaseButton variant="primary" type="submit" :disabled="!canSave">
-          {{ t('common.save') }}
-        </BaseButton>
-      </div>
-    </form>
-  </BaseModal>
+    </ConditionalSection>
+  </BeanieFormModal>
 </template>

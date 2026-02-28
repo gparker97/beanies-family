@@ -61,7 +61,6 @@ export interface FinanceDB extends DBSchema {
       'by-date': string;
       'by-assigneeId': string;
       'by-category': string;
-      'by-dayOfWeek': number;
     };
   };
   settings: {
@@ -142,7 +141,6 @@ function createFinanceDB(dbName: string): Promise<IDBPDatabase<FinanceDB>> {
         activitiesStore.createIndex('by-date', 'date', { unique: false });
         activitiesStore.createIndex('by-assigneeId', 'assigneeId', { unique: false });
         activitiesStore.createIndex('by-category', 'category', { unique: false });
-        activitiesStore.createIndex('by-dayOfWeek', 'dayOfWeek', { unique: false });
       }
 
       // Settings store
