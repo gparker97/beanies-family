@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import EmojiPicker from '@/components/ui/EmojiPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
+import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityLinkDropdown from '@/components/ui/ActivityLinkDropdown.vue';
@@ -14,7 +14,6 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
-import { getCategoriesGrouped } from '@/constants/categories';
 import type {
   Transaction,
   TransactionType,
@@ -41,27 +40,10 @@ const { currencyOptions } = useCurrencyOptions();
 const isEditing = computed(() => !!props.transaction);
 const isSubmitting = ref(false);
 
-// Category emoji mapping
-const CATEGORY_EMOJIS = [
-  { emoji: '🏠', label: 'Housing' },
-  { emoji: '💸', label: 'General' },
-  { emoji: '🎓', label: 'Education' },
-  { emoji: '🍽️', label: 'Dining' },
-  { emoji: '🚗', label: 'Transport' },
-  { emoji: '🏥', label: 'Healthcare' },
-  { emoji: '🛒', label: 'Groceries' },
-  { emoji: '🎹', label: 'Lessons' },
-  { emoji: '💰', label: 'Savings' },
-  { emoji: '🔒', label: 'Insurance' },
-  { emoji: '📱', label: 'Subscriptions' },
-  { emoji: '🎁', label: 'Gifts' },
-];
-
 // Form state
 const direction = ref<'in' | 'out'>('out');
 const amount = ref<number | undefined>(undefined);
 const description = ref('');
-const categoryEmoji = ref('');
 const category = ref('');
 const recurrenceMode = ref<'one-time' | 'recurring'>('one-time');
 const recurrenceFrequency = ref('monthly');
@@ -88,7 +70,6 @@ watch(
       amount.value = tx.amount;
       description.value = tx.description;
       category.value = tx.category;
-      categoryEmoji.value = '';
       recurrenceMode.value = tx.recurring ? 'recurring' : 'one-time';
       date.value = tx.date;
       accountId.value = tx.accountId;
@@ -99,7 +80,6 @@ watch(
       amount.value = undefined;
       description.value = '';
       category.value = '';
-      categoryEmoji.value = '';
       recurrenceMode.value = 'one-time';
       date.value = todayStr();
       startDate.value = todayStr();
@@ -115,14 +95,7 @@ const accountOptions = computed(() =>
   accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))
 );
 
-const categoryOptions = computed(() => {
-  const type = direction.value === 'in' ? 'income' : 'expense';
-  const groups = getCategoriesGrouped(type);
-  return groups.map((g) => ({
-    label: g.name,
-    options: g.categories.map((c) => ({ value: c.id, label: c.name })),
-  }));
-});
+const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
 
 const frequencyOptions = [
   { value: 'weekly', label: 'Weekly' },
@@ -205,14 +178,7 @@ function handleDelete() {
       />
     </FormFieldGroup>
 
-    <!-- 2. Amount (hero) -->
-    <AmountInput
-      v-model="amount"
-      :currency-symbol="currency || settingsStore.displayCurrency"
-      font-size="1.8rem"
-    />
-
-    <!-- 3. Description -->
+    <!-- 2. Description -->
     <div>
       <input
         v-model="description"
@@ -222,11 +188,16 @@ function handleDelete() {
       />
     </div>
 
-    <!-- 4. Category emoji picker -->
+    <!-- 3. Amount (hero) -->
+    <AmountInput
+      v-model="amount"
+      :currency-symbol="currency || settingsStore.displayCurrency"
+      font-size="1.8rem"
+    />
+
+    <!-- 4. Category chips (two-level drill-down) -->
     <FormFieldGroup :label="t('form.category')">
-      <EmojiPicker v-model="categoryEmoji" :options="CATEGORY_EMOJIS" />
-      <!-- Also keep grouped category dropdown for precise selection -->
-      <BaseSelect v-model="category" :grouped-options="categoryOptions" class="mt-2" />
+      <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
     </FormFieldGroup>
 
     <!-- 5. Recurring / One-time toggle -->

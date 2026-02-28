@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import EmojiPicker from '@/components/ui/EmojiPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
@@ -46,20 +45,21 @@ const settingsStore = useSettingsStore();
 const showMoreDetails = ref(false);
 const isEditing = computed(() => !!props.activity);
 
-// Activity emoji options — emoji→category mapping
-const ACTIVITY_EMOJIS = [
-  { emoji: '⚽', label: 'Sport', category: 'sport' as ActivityCategory },
-  { emoji: '🎹', label: 'Music', category: 'lesson' as ActivityCategory },
-  { emoji: '🏊', label: 'Swimming', category: 'sport' as ActivityCategory },
-  { emoji: '🥋', label: 'Martial Arts', category: 'sport' as ActivityCategory },
-  { emoji: '🤸', label: 'Gymnastics', category: 'sport' as ActivityCategory },
-  { emoji: '📚', label: 'Tutoring', category: 'lesson' as ActivityCategory },
-  { emoji: '🎨', label: 'Art', category: 'lesson' as ActivityCategory },
-  { emoji: '🏥', label: 'Medical', category: 'appointment' as ActivityCategory },
-  { emoji: '🎓', label: 'Education', category: 'lesson' as ActivityCategory },
-  { emoji: '🎸', label: 'Guitar', category: 'lesson' as ActivityCategory },
-  { emoji: '🔬', label: 'Science', category: 'lesson' as ActivityCategory },
-  { emoji: '✈️', label: 'Travel', category: 'other' as ActivityCategory },
+// Activity icon chip options — emoji→category mapping
+const ACTIVITY_ICON_OPTIONS = [
+  { value: '⚽', label: 'Sport', icon: '⚽', category: 'sport' as ActivityCategory },
+  { value: '🎹', label: 'Music', icon: '🎹', category: 'lesson' as ActivityCategory },
+  { value: '🏊', label: 'Swimming', icon: '🏊', category: 'sport' as ActivityCategory },
+  { value: '🥋', label: 'Martial Arts', icon: '🥋', category: 'sport' as ActivityCategory },
+  { value: '🤸', label: 'Gymnastics', icon: '🤸', category: 'sport' as ActivityCategory },
+  { value: '📚', label: 'Tutoring', icon: '📚', category: 'lesson' as ActivityCategory },
+  { value: '🎨', label: 'Art', icon: '🎨', category: 'lesson' as ActivityCategory },
+  { value: '🏥', label: 'Medical', icon: '🏥', category: 'appointment' as ActivityCategory },
+  { value: '🎓', label: 'Education', icon: '🎓', category: 'lesson' as ActivityCategory },
+  { value: '🎸', label: 'Guitar', icon: '🎸', category: 'lesson' as ActivityCategory },
+  { value: '🔬', label: 'Science', icon: '🔬', category: 'lesson' as ActivityCategory },
+  { value: '✈️', label: 'Travel', icon: '✈️', category: 'other' as ActivityCategory },
+  { value: '📦', label: 'Other', icon: '📦', category: 'other' as ActivityCategory },
 ];
 
 // Form state
@@ -138,7 +138,7 @@ watch(
       title.value = '';
       description.value = '';
       date.value = props.defaultDate ?? todayStr();
-      startTime.value = props.defaultStartTime ?? '';
+      startTime.value = props.defaultStartTime ?? '09:00';
       endTime.value = '';
       recurrenceMode.value = 'recurring';
       recurrenceFrequency.value = 'weekly';
@@ -163,10 +163,10 @@ watch(
   }
 );
 
-// When emoji changes, derive category
+// When icon changes, derive category
 watch(icon, (newIcon) => {
   if (!newIcon) return;
-  const match = ACTIVITY_EMOJIS.find((e) => e.emoji === newIcon);
+  const match = ACTIVITY_ICON_OPTIONS.find((e) => e.value === newIcon);
   if (match) {
     category.value = match.category;
     color.value = CATEGORY_COLORS[match.category];
@@ -284,9 +284,9 @@ function handleSave() {
     @save="handleSave"
     @delete="emit('delete')"
   >
-    <!-- 1. Emoji Picker -->
-    <FormFieldGroup :label="t('modal.pickIcon')">
-      <EmojiPicker v-model="icon" :options="ACTIVITY_EMOJIS" />
+    <!-- 1. Icon Picker -->
+    <FormFieldGroup :label="t('modal.selectCategory')">
+      <FrequencyChips v-model="icon" :options="ACTIVITY_ICON_OPTIONS" />
     </FormFieldGroup>
 
     <!-- 2. Title -->

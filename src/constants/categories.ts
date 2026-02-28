@@ -300,6 +300,63 @@ export const EXPENSE_CATEGORIES: Category[] = [
 
 export const ALL_CATEGORIES = [...INCOME_CATEGORIES, ...EXPENSE_CATEGORIES];
 
+// Category ID → emoji mapping
+export const CATEGORY_EMOJI_MAP: Record<string, string> = {
+  // Expense
+  rent: '🏠',
+  groceries: '🛒',
+  dining_out: '🍽️',
+  gas: '⛽',
+  utilities: '⚡',
+  healthcare: '🏥',
+  education: '🎓',
+  subscriptions: '📱',
+  entertainment: '🎬',
+  clothing: '👕',
+  insurance: '🔒',
+  coffee: '☕',
+  childcare: '👶',
+  pets: '🐾',
+  car_payment: '🚗',
+  car_maintenance: '🔧',
+  public_transit: '🚌',
+  home_maintenance: '🔨',
+  debt_payment: '💳',
+  taxes: '📄',
+  donations: '💝',
+  gifts_given: '🎁',
+  hobbies: '🎨',
+  personal_care: '💅',
+  flights: '✈️',
+  hotel: '🏨',
+  other_expense: '📦',
+  // Income
+  salary: '💼',
+  freelance: '💻',
+  dividends: '💰',
+  investments: '📈',
+  gifts: '🎁',
+  rental: '🏠',
+  refunds: '🔄',
+  other_income: '📦',
+};
+
+// Group name → emoji mapping
+export const GROUP_EMOJI_MAP: Record<string, string> = {
+  Entertainment: '🎬',
+  Family: '👶',
+  Financial: '💳',
+  Food: '🍽️',
+  Housing: '🏠',
+  Other: '📦',
+  Personal: '💅',
+  Transportation: '🚗',
+  Travel: '✈️',
+  Employment: '💼',
+  Investments: '📈',
+  Property: '🏡',
+};
+
 export function getCategoryById(id: string): Category | undefined {
   return ALL_CATEGORIES.find((cat) => cat.id === id);
 }

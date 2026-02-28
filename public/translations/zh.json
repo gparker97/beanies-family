@@ -4486,9 +4486,9 @@
       "hash": "yohf9g",
       "lastUpdated": "2026-02-28"
     },
-    "modal.pickIcon": {
-      "translation": "选择图标",
-      "hash": "me09wz",
+    "modal.selectCategory": {
+      "translation": "选择类别",
+      "hash": "",
       "lastUpdated": "2026-02-28"
     },
     "modal.schedule": {

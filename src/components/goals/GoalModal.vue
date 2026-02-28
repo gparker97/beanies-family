@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import EmojiPicker from '@/components/ui/EmojiPicker.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
@@ -37,12 +36,13 @@ const { currencyOptions } = useCurrencyOptions();
 const isEditing = computed(() => !!props.goal);
 const isSubmitting = ref(false);
 
-// Goal type emoji options
-const GOAL_EMOJIS = [
-  { emoji: '🐷', label: 'Savings' },
-  { emoji: '🎯', label: 'Debt Payoff' },
-  { emoji: '📈', label: 'Investment' },
-  { emoji: '🛍️', label: 'Purchase' },
+// Goal type icon chip options
+const GOAL_ICON_OPTIONS = [
+  { value: '🐷', label: 'Savings', icon: '🐷' },
+  { value: '🎯', label: 'Debt Payoff', icon: '🎯' },
+  { value: '📈', label: 'Investment', icon: '📈' },
+  { value: '🛍️', label: 'Purchase', icon: '🛍️' },
+  { value: '📦', label: 'Other', icon: '📦' },
 ];
 
 const emojiToType: Record<string, GoalType> = {
@@ -50,6 +50,7 @@ const emojiToType: Record<string, GoalType> = {
   '🎯': 'debt_payoff',
   '📈': 'investment',
   '🛍️': 'purchase',
+  '📦': 'savings', // "Other" defaults to savings
 };
 
 const typeToEmoji: Record<GoalType, string> = {
@@ -169,9 +170,9 @@ function handleDelete() {
     @save="handleSave"
     @delete="handleDelete"
   >
-    <!-- 1. Goal type emoji picker -->
-    <FormFieldGroup :label="t('modal.pickIcon')">
-      <EmojiPicker v-model="goalEmoji" :options="GOAL_EMOJIS" />
+    <!-- 1. Goal type picker -->
+    <FormFieldGroup :label="t('modal.selectCategory')">
+      <FrequencyChips v-model="goalEmoji" :options="GOAL_ICON_OPTIONS" />
     </FormFieldGroup>
 
     <!-- 2. Goal name -->
