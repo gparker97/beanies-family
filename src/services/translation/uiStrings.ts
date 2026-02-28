@@ -1065,6 +1065,7 @@ const STRING_DEFS = {
   // Fast login (single-family auto-select)
   'fastLogin.notYou': { en: 'Not you? Switch account' },
   'fastLogin.welcomeBack': { en: 'Welcome back' },
+  'fastLogin.welcomeBackName': { en: 'Welcome back, {name}!' },
   'fastLogin.loadErrorLocal': {
     en: "We looked everywhere but can't find your file — please select it again",
   },

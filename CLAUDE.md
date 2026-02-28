@@ -18,6 +18,9 @@
 >
 > - `docs/brand/beanies-cig-v2.html` — Corporate Identity Guidelines v2 (colors, typography, logo rules, voice, UI system, navigation, mobile)
 > - `.claude/skills/beanies-theme.md` — Brand theme skill (use for all UI copy, component design, and image generation)
+>
+> **IMPORTANT — UI Work:**
+> Always consult `.claude/skills/beanies-theme.md` before any UI work (components, modals, styling, copy). It contains the complete design system, modal conventions, color rules, and component patterns. All modals must use the three-tier modal system (BaseModal → BeanieFormModal → ConfirmModal).
 
 ## Project Overview
 
@@ -344,6 +347,7 @@ Implementation plans created during plan mode must be saved to `docs/plans/` **b
 - This is a Phase 1 MVP - prioritize core functionality
 - All data operations go through Pinia stores -> IndexedDB repositories
 - Use existing UI components from `src/components/ui/`
+- **UI theme**: Always read `.claude/skills/beanies-theme.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color.
 - Follow Vue 3 Composition API patterns
 - Maintain TypeScript type safety
 - Use Tailwind CSS for styling

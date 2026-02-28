@@ -355,6 +355,8 @@ export const useSyncStore = defineStore('sync', () => {
         // For Google Drive: set up token expiry handler now that we have a valid token
         if (syncService.getProviderType() === 'google_drive') {
           setupTokenExpiryHandler();
+          // Update account email after fire-and-forget fetchGoogleUserEmail completes
+          updateProviderEmailAfterLoad();
         }
       } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
         // Google Drive read failed (e.g., expired token after force-close) —
@@ -1184,6 +1186,28 @@ export const useSyncStore = defineStore('sync', () => {
    * Subscribe to Google OAuth token expiry notifications.
    */
   let tokenExpiryUnsub: (() => void) | null = null;
+
+  /**
+   * After a Google Drive load, the email fetch is fire-and-forget.
+   * Poll briefly for the email to become available, then update refs and re-persist.
+   */
+  function updateProviderEmailAfterLoad(): void {
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts++;
+      const provider = syncService.getProvider();
+      if (provider instanceof GoogleDriveProvider && provider.updateAccountEmailIfAvailable()) {
+        providerAccountEmail.value = provider.getAccountEmail();
+        const ctx = useFamilyContextStore();
+        if (ctx.activeFamilyId) {
+          await provider.persist(ctx.activeFamilyId);
+        }
+        clearInterval(interval);
+      } else if (attempts >= 10) {
+        clearInterval(interval);
+      }
+    }, 500);
+  }
 
   function setupTokenExpiryHandler(): void {
     if (tokenExpiryUnsub) return;

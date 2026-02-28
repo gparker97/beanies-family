@@ -249,6 +249,118 @@ Active nav item:       orange gradient bg + 4px Heritage Orange left bar
 Progress bars:         Heritage Orange → Terracotta gradient, 10px radius
 ```
 
+### Modal System — Three-Tier Architecture
+
+The app uses a three-tier modal system. **Always use the appropriate tier** — never build modals from scratch.
+
+#### Tier 1: `BaseModal.vue` — Foundation
+
+The raw modal shell. Use directly only for non-form content (view-only displays, confirmations, custom layouts).
+
+| Prop | Type | Default | Purpose |
+|------|------|---------|---------|
+| `open` | boolean | required | Show/hide |
+| `title` | string | — | Header text |
+| `size` | `'sm'`\|`'md'`\|`'lg'`\|`'xl'`\|`'2xl'` | `'md'` | Max width |
+| `closable` | boolean | `true` | Show X button, allow Escape key |
+| `fullscreenMobile` | boolean | `false` | Full viewport on mobile |
+
+**Slots:** `default` (body), `#header` (custom header), `#footer` (action area)
+
+**Built-in behavior:** Teleport to body, backdrop click to close, Escape key, body scroll lock, fade+scale transitions (200ms).
+
+```
+Backdrop:  bg-black/50
+Shape:     rounded-3xl (desktop), rounded-none (fullscreen mobile)
+Header:    px-6 py-4, border-b
+Body:      p-6, overflow-y-auto
+Footer:    px-6 py-4, border-t, bg-gray-50 dark:bg-slate-900, rounded-b-3xl
+```
+
+#### Tier 2: `BeanieFormModal.vue` — Branded Form Wrapper
+
+Extends BaseModal with the standard form layout. **Use this for ALL create/edit forms.**
+
+| Prop | Type | Default | Purpose |
+|------|------|---------|---------|
+| `open` | boolean | required | Show/hide |
+| `title` | string | required | Header text (Outfit 1.1rem bold) |
+| `icon` | string | — | Emoji displayed in icon box |
+| `iconBg` | string | `var(--tint-orange-8)` | Icon box background |
+| `size` | `'default'`\|`'narrow'` | `'default'` | Maps to BaseModal `xl`/`lg` |
+| `saveLabel` | string | `t('action.save')` | Save button text |
+| `saveGradient` | `'orange'`\|`'purple'` | `'orange'` | Save button gradient |
+| `saveDisabled` | boolean | `false` | Disable save button |
+| `isSubmitting` | boolean | `false` | Show spinner in save button |
+| `showDelete` | boolean | `false` | Show 🗑️ delete button |
+
+**Emits:** `@close`, `@save`, `@delete`
+
+**Layout anatomy:**
+```
+┌─────────────────────────────────────┐
+│  Header: [Icon Box 44×44] Title     │  px-6 py-4, border-b
+├─────────────────────────────────────┤
+│  Body: Cloud White bg (#F8F9FA)     │  -mx-6 -my-6, px-6 py-5
+│  (negative margin extends to edges) │  dark: bg-slate-800/50
+│  └─ space-y-5 for form fields      │
+├─────────────────────────────────────┤
+│  Footer: [🗑️ Delete] [Gradient Save]│  gap-3
+└─────────────────────────────────────┘
+```
+
+**Icon box:** 44×44px, rounded-[14px] (squircle), tinted background. Use `var(--tint-orange-8)` for finance forms, `var(--tint-purple-12)` for to-do forms, `var(--tint-silk-20)` for family forms.
+
+**Save button:** Full-width flex-1, rounded-[16px], py-3.5, Outfit 0.88rem bold. Gradient: `from-primary-500 to-terracotta-400` (orange) or `from-purple-500 to-purple-400` (purple). Spinner on submit.
+
+**Delete button:** 48×48px, rounded-[14px], red tint bg (8%), 🗑️ emoji.
+
+#### Tier 3: `ConfirmModal.vue` — Confirmation Dialogs
+
+Triggered via `useConfirm()` composable. Never instantiate directly — use the composable pattern.
+
+**Variants:** `danger` (red icon, for destructive actions) and `info` (orange icon, for informational confirms).
+
+```typescript
+const { confirm } = useConfirm();
+const ok = await confirm({
+  title: 'confirm.deleteTitle',
+  message: 'confirm.deleteMessage',
+  variant: 'danger',
+});
+```
+
+### Modal Conventions — Rules
+
+1. **Always use `fullscreenMobile`** on form modals (BeanieFormModal enables this automatically)
+2. **View/Edit dual-mode pattern:** Read-only content uses BaseModal (Tier 1), edit mode uses BeanieFormModal (Tier 2). See `TodoViewEditModal.vue` as reference
+3. **Form field spacing:** `space-y-5` inside modal body, `space-y-4` for grouped sub-sections
+4. **Form grid:** `grid grid-cols-1 gap-4 sm:grid-cols-2` for side-by-side fields on desktop
+5. **Form field labels:** Use `FormFieldGroup` component (label + optional badge + input wrapper)
+6. **Conditional sections:** Use `ConditionalSection` component for show/hide sections
+7. **Save button label:** Computed based on context (e.g., "Add to calendar", "Save changes", "Create task")
+8. **Delete confirmation:** Always use `useConfirm()` with `variant: 'danger'` before deletion
+9. **Sound effects:** Play `useSounds().playWhoosh()` on successful delete
+10. **Watch for prop changes:** Reset form state when the edit target changes (watch `props.item` or similar)
+11. **Emoji pickers:** Use `EmojiPicker` component for icon/type selection in forms
+12. **Expandable details:** Use a "More details" toggle for advanced/optional fields
+
+### Shared Form Components
+
+These components are used inside BeanieFormModal forms. **Prefer these over building custom inputs.**
+
+| Component | Purpose |
+|-----------|---------|
+| `FormFieldGroup` | Label + optional badge + input wrapper |
+| `FamilyChipPicker` | Multi/single member select with avatars |
+| `EmojiPicker` | Grid of emoji options for type/icon |
+| `FrequencyChips` | Chip selector for recurring patterns |
+| `DayOfWeekSelector` | Day-of-week multi-select |
+| `TimePresetPicker` | Time input with common presets |
+| `AmountInput` | Currency-aware number input |
+| `TogglePillGroup` | Toggle between 2-3 options |
+| `ConditionalSection` | Animated show/hide wrapper |
+
 ---
 
 ## Navigation
