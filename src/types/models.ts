@@ -238,6 +238,64 @@ export interface TodoItem {
 export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
 
+// Family Activity — The Treehouse planner's central entity
+export type ActivityCategory = 'lesson' | 'sport' | 'appointment' | 'social' | 'pickup' | 'other';
+export type ActivityRecurrence = 'weekly' | 'daily' | 'monthly' | 'yearly' | 'none';
+export type FeeSchedule = 'none' | 'per_session' | 'weekly' | 'monthly' | 'termly' | 'yearly';
+export type ReminderMinutes = 0 | 5 | 10 | 15 | 30 | 60 | 120 | 1440;
+
+export interface FamilyActivity {
+  id: UUID;
+  title: string;
+  description?: string;
+
+  // Schedule
+  date: ISODateString; // Start date / next occurrence
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  recurrence: ActivityRecurrence;
+  dayOfWeek?: number; // 0=Sun..6=Sat (for weekly recurrence)
+
+  // Category
+  category: ActivityCategory;
+  color?: string; // Per-activity highlight color override (falls back to category color)
+
+  // People
+  assigneeId?: UUID; // The child/member doing the activity
+  dropoffMemberId?: UUID; // Who drops off
+  pickupMemberId?: UUID; // Who picks up
+
+  // Location
+  location?: string;
+
+  // Fees
+  feeSchedule: FeeSchedule;
+  feeAmount?: number;
+  feeCurrency?: CurrencyCode;
+  feePayerId?: UUID;
+
+  // Instructor / Coach
+  instructorName?: string;
+  instructorContact?: string;
+
+  // Reminders
+  reminderMinutes: ReminderMinutes;
+
+  // Notes
+  notes?: string;
+
+  // Metadata
+  isActive: boolean;
+  createdBy: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateFamilyActivityInput = Omit<FamilyActivity, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateFamilyActivityInput = Partial<
+  Omit<FamilyActivity, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
 // Exchange rate for currency conversion
 export interface ExchangeRate {
   from: CurrencyCode;
@@ -299,6 +357,7 @@ export type EntityType =
   | 'goal'
   | 'recurringItem'
   | 'todo'
+  | 'familyActivity'
   | 'settings';
 
 export interface SyncQueueItem {
@@ -375,6 +434,7 @@ export interface SyncFileData {
     goals: Goal[];
     recurringItems: RecurringItem[];
     todos?: TodoItem[];
+    activities?: FamilyActivity[];
     deletions: DeletionTombstone[];
     settings: Settings | null;
   };

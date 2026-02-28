@@ -46,6 +46,9 @@ const STRING_DEFS = {
   'common.purchaseValue': { en: 'Purchase Value', beanie: 'What You Paid' },
   'common.currentValue': { en: 'Current Value', beanie: 'Worth Today' },
   'common.purchased': { en: 'Purchased' },
+  'common.save': { en: 'Save' },
+  'common.cancel': { en: 'Cancel' },
+  'common.delete': { en: 'Delete' },
 
   // Status labels
   'status.active': { en: 'Active' },
@@ -1236,7 +1239,7 @@ const STRING_DEFS = {
   },
 
   // Family Nook
-  'nook.welcomeHome': { en: 'Welcome Home, {name}', beanie: 'Welcome to your Nook, {name}' },
+  'nook.welcomeHome': { en: 'Welcome Home, {name}', beanie: 'welcome to your nook, {name}' },
   'nook.familyAtAGlance': {
     en: 'Your family at a glance',
     beanie: 'Your bean pod at a glance',
@@ -1317,6 +1320,92 @@ const STRING_DEFS = {
   'storage.localFile': { en: 'Local File' },
   'storage.dropbox': { en: 'Dropbox' },
   'storage.iCloud': { en: 'iCloud' },
+
+  // Family Planner
+  'planner.title': { en: 'Family Planner', beanie: 'Bean Planner' },
+  'planner.subtitle': { en: '{month} — {count} activities' },
+  'planner.addActivity': { en: '+ Add Activity', beanie: '+ New Bean Run' },
+  'planner.editActivity': { en: 'Edit Activity' },
+  'planner.newActivity': { en: 'New Activity', beanie: 'New Bean Run' },
+  'planner.deleteActivity': { en: 'Delete Activity' },
+  'planner.deleteConfirm': { en: 'Are you sure you want to delete this activity?' },
+  'planner.noActivities': { en: 'No activities yet' },
+  'planner.noActivitiesHint': { en: 'Add your first family activity to get started!' },
+  'planner.today': { en: 'Today' },
+  'planner.upcoming': { en: 'Upcoming Activities' },
+  'planner.noUpcoming': { en: 'No upcoming activities' },
+  'planner.todoPreview': { en: 'Family To-Do' },
+  'planner.viewAllTodos': { en: 'View all →' },
+  'planner.onCalendar': { en: 'On calendar' },
+  'planner.viewMore': { en: 'View more' },
+  'planner.inactiveActivities': { en: 'Inactive Activities' },
+  'planner.noInactive': { en: 'No inactive activities' },
+  'planner.showInactive': { en: 'Show inactive' },
+  'planner.comingSoon': { en: 'Coming soon' },
+
+  // Planner — View toggle
+  'planner.view.month': { en: 'Month' },
+  'planner.view.week': { en: 'Week' },
+  'planner.view.day': { en: 'Day' },
+  'planner.view.agenda': { en: 'Agenda' },
+
+  // Planner — Categories
+  'planner.category.lesson': { en: 'Lesson', beanie: 'Learning Beans' },
+  'planner.category.sport': { en: 'Sport', beanie: 'Active Beans' },
+  'planner.category.appointment': { en: 'Appointment' },
+  'planner.category.social': { en: 'Social', beanie: 'Social Beans' },
+  'planner.category.pickup': { en: 'Pickup' },
+  'planner.category.other': { en: 'Other' },
+
+  // Planner — Recurrence labels
+  'planner.recurrence.weekly': { en: 'Weekly' },
+  'planner.recurrence.daily': { en: 'Daily' },
+  'planner.recurrence.monthly': { en: 'Monthly' },
+  'planner.recurrence.yearly': { en: 'Yearly' },
+  'planner.recurrence.none': { en: 'One-time' },
+
+  // Planner — Fee schedule labels
+  'planner.fee.none': { en: 'No fees' },
+  'planner.fee.per_session': { en: 'Per session' },
+  'planner.fee.weekly': { en: 'Weekly' },
+  'planner.fee.monthly': { en: 'Monthly' },
+  'planner.fee.termly': { en: 'Per term' },
+  'planner.fee.yearly': { en: 'Yearly' },
+
+  // Planner — Form fields
+  'planner.field.title': { en: 'Activity Title' },
+  'planner.field.date': { en: 'Start Date' },
+  'planner.field.startTime': { en: 'Start Time' },
+  'planner.field.endTime': { en: 'End Time' },
+  'planner.field.category': { en: 'Category' },
+  'planner.field.recurrence': { en: 'Repeats' },
+  'planner.field.dayOfWeek': { en: 'Day of Week' },
+  'planner.field.assignee': { en: 'Who' },
+  'planner.field.dropoff': { en: 'Drop-off' },
+  'planner.field.pickup': { en: 'Pick-up' },
+  'planner.field.location': { en: 'Location' },
+  'planner.field.feeSchedule': { en: 'Fee Schedule' },
+  'planner.field.feeAmount': { en: 'Fee Amount' },
+  'planner.field.feePayer': { en: 'Paid by' },
+  'planner.field.instructor': { en: 'Instructor / Coach' },
+  'planner.field.instructorContact': { en: 'Contact' },
+  'planner.field.reminder': { en: 'Reminder' },
+  'planner.field.notes': { en: 'Notes' },
+  'planner.field.moreDetails': { en: 'More details' },
+  'planner.field.color': { en: 'Highlight Color' },
+  'planner.field.active': { en: 'Active' },
+
+  // Planner — Legend
+  'planner.legend': { en: 'Legend' },
+
+  // Planner — Days of week (short)
+  'planner.day.sun': { en: 'Sun' },
+  'planner.day.mon': { en: 'Mon' },
+  'planner.day.tue': { en: 'Tue' },
+  'planner.day.wed': { en: 'Wed' },
+  'planner.day.thu': { en: 'Thu' },
+  'planner.day.fri': { en: 'Fri' },
+  'planner.day.sat': { en: 'Sat' },
 } satisfies Record<string, StringEntry>;
 
 /**

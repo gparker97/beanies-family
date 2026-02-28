@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-27
-> **Updated by:** Claude (fix cross-device passkey authentication)
+> **Last updated:** 2026-02-28
+> **Updated by:** Claude (single-family fast login, close #97 and #78)
 
 ## Current Phase
 

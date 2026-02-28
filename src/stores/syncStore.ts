@@ -8,6 +8,7 @@ import { useFamilyStore } from './familyStore';
 import { useGoalsStore } from './goalsStore';
 import { useRecurringStore } from './recurringStore';
 import { useTodoStore } from './todoStore';
+import { useActivityStore } from './activityStore';
 import { useTombstoneStore } from './tombstoneStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
@@ -676,6 +677,7 @@ export const useSyncStore = defineStore('sync', () => {
       const settingsStore = useSettingsStore();
       const recurringStore = useRecurringStore();
       const todoStore = useTodoStore();
+      const activityStore = useActivityStore();
 
       await Promise.all([
         familyStore.loadMembers(),
@@ -686,6 +688,7 @@ export const useSyncStore = defineStore('sync', () => {
         settingsStore.loadSettings(),
         recurringStore.loadRecurringItems(),
         todoStore.loadTodos(),
+        activityStore.loadActivities(),
       ]);
 
       // WAL recovery: if there's a WAL entry newer than what the file had,
@@ -874,6 +877,7 @@ export const useSyncStore = defineStore('sync', () => {
         useGoalsStore().goals,
         useRecurringStore().recurringItems,
         useTodoStore().todos,
+        useActivityStore().activities,
         useTombstoneStore().tombstones,
         useSettingsStore().settings,
       ],

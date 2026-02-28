@@ -9,13 +9,14 @@ import type {
   SyncQueueItem,
   RecurringItem,
   TodoItem,
+  FamilyActivity,
   TranslationCacheEntry,
   DeletionTombstone,
 } from '@/types/models';
 
 const LEGACY_DB_NAME = 'gp-family-finance';
 const DB_NAME_PREFIX = 'gp-family-finance-';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export interface FinanceDB extends DBSchema {
   familyMembers: {
@@ -52,6 +53,16 @@ export interface FinanceDB extends DBSchema {
     key: string;
     value: TodoItem;
     indexes: { 'by-assigneeId': string; 'by-completed': number; 'by-dueDate': string };
+  };
+  activities: {
+    key: string;
+    value: FamilyActivity;
+    indexes: {
+      'by-date': string;
+      'by-assigneeId': string;
+      'by-category': string;
+      'by-dayOfWeek': number;
+    };
   };
   settings: {
     key: string;
@@ -123,6 +134,15 @@ function createFinanceDB(dbName: string): Promise<IDBPDatabase<FinanceDB>> {
         todosStore.createIndex('by-assigneeId', 'assigneeId', { unique: false });
         todosStore.createIndex('by-completed', 'completed', { unique: false });
         todosStore.createIndex('by-dueDate', 'dueDate', { unique: false });
+      }
+
+      // Activities store
+      if (!db.objectStoreNames.contains('activities')) {
+        const activitiesStore = db.createObjectStore('activities', { keyPath: 'id' });
+        activitiesStore.createIndex('by-date', 'date', { unique: false });
+        activitiesStore.createIndex('by-assigneeId', 'assigneeId', { unique: false });
+        activitiesStore.createIndex('by-category', 'category', { unique: false });
+        activitiesStore.createIndex('by-dayOfWeek', 'dayOfWeek', { unique: false });
       }
 
       // Settings store
@@ -257,6 +277,7 @@ export async function clearAllData(): Promise<void> {
       'goals',
       'recurringItems',
       'todos',
+      'activities',
       'settings',
       'syncQueue',
     ],
@@ -271,6 +292,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('goals').clear(),
     tx.objectStore('recurringItems').clear(),
     tx.objectStore('todos').clear(),
+    tx.objectStore('activities').clear(),
     tx.objectStore('settings').clear(),
     tx.objectStore('syncQueue').clear(),
     tx.done,
@@ -285,6 +307,7 @@ export interface ExportedData {
   goals: Goal[];
   recurringItems: RecurringItem[];
   todos?: TodoItem[];
+  activities?: FamilyActivity[];
   deletions: DeletionTombstone[];
   settings: Settings | null;
 }
@@ -292,17 +315,27 @@ export interface ExportedData {
 export async function exportAllData(): Promise<ExportedData> {
   const db = await getDatabase();
 
-  const [familyMembers, accounts, transactions, assets, goals, recurringItems, todos, settings] =
-    await Promise.all([
-      db.getAll('familyMembers'),
-      db.getAll('accounts'),
-      db.getAll('transactions'),
-      db.getAll('assets'),
-      db.getAll('goals'),
-      db.getAll('recurringItems'),
-      db.getAll('todos'),
-      db.get('settings', 'app_settings'),
-    ]);
+  const [
+    familyMembers,
+    accounts,
+    transactions,
+    assets,
+    goals,
+    recurringItems,
+    todos,
+    activities,
+    settings,
+  ] = await Promise.all([
+    db.getAll('familyMembers'),
+    db.getAll('accounts'),
+    db.getAll('transactions'),
+    db.getAll('assets'),
+    db.getAll('goals'),
+    db.getAll('recurringItems'),
+    db.getAll('todos'),
+    db.getAll('activities'),
+    db.get('settings', 'app_settings'),
+  ]);
 
   return {
     familyMembers,
@@ -312,6 +345,7 @@ export async function exportAllData(): Promise<ExportedData> {
     goals,
     recurringItems,
     todos,
+    activities,
     deletions: [], // Tombstones injected by createSyncFileData from the tombstone store
     settings: settings ?? null,
   };
@@ -330,6 +364,7 @@ export async function importAllData(data: ExportedData): Promise<void> {
       'goals',
       'recurringItems',
       'todos',
+      'activities',
       'settings',
     ],
     'readwrite'
@@ -343,6 +378,7 @@ export async function importAllData(data: ExportedData): Promise<void> {
     clearTx.objectStore('goals').clear(),
     clearTx.objectStore('recurringItems').clear(),
     clearTx.objectStore('todos').clear(),
+    clearTx.objectStore('activities').clear(),
     clearTx.objectStore('settings').clear(),
     clearTx.done,
   ]);
@@ -357,6 +393,7 @@ export async function importAllData(data: ExportedData): Promise<void> {
       'goals',
       'recurringItems',
       'todos',
+      'activities',
       'settings',
     ],
     'readwrite'
@@ -400,6 +437,13 @@ export async function importAllData(data: ExportedData): Promise<void> {
   if (data.todos) {
     for (const todo of data.todos) {
       promises.push(importTx.objectStore('todos').add(todo));
+    }
+  }
+
+  // Import activities (if present - handle legacy files without this field)
+  if (data.activities) {
+    for (const activity of data.activities) {
+      promises.push(importTx.objectStore('activities').add(activity));
     }
   }
 
