@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-02-28
-> **Updated by:** Claude (single-family fast login, close #97 and #78)
+> **Updated by:** Claude (revert HTML reformatting, fix E2E tests, merge rollup security bump, deploy to prod)
 
 ## Current Phase
 
@@ -711,3 +711,7 @@ _(None currently tracked)_
 | 2026-02-26 | Cross-device sync via file polling (#103)                  | 10s file polling + visibility-change reload + force save on hidden; near-instant relay planned as #104                                                  |
 | 2026-02-26 | Cloud relay plan created (#104)                            | AWS API Gateway WebSocket + Lambda + DynamoDB for near-instant cross-device notifications; plan at `docs/plans/2026-02-26-cloud-relay-sync.md`          |
 | 2026-02-27 | Fix cross-device passkey authentication                    | Synced passkeys (iCloud/Google/Windows) auto-register locally using cached password; no more "registered on another device" error (ADR-015 updated)     |
+| 2026-02-28 | Reverted Prettier reformatting of brand HTML files         | Commit 46e33c0 accidentally reformatted 6 docs/brand HTML files (60k+ lines). Reverted and added `docs/brand` to `.prettierignore`                      |
+| 2026-02-28 | Fixed beanie-avatars E2E test for redesigned modal         | Test referenced old test IDs from pre-modal-redesign; updated to use role chips, "More Details" toggle, placeholder input                               |
+| 2026-02-28 | Merged rollup security bump (4.57.1 → 4.59.0)              | Dependabot PR #102; minor version bump with security label, no breaking changes                                                                         |
+| 2026-02-28 | Strengthened DRY principle in CLAUDE.md                    | Expanded code conventions with explicit rules for shared components, helper functions, constants, and duplicate elimination                             |

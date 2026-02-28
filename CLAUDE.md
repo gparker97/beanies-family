@@ -242,7 +242,13 @@ npm run lint
 - **UI Text / i18n**: All user-visible text **must** go through the translation system — never hardcode English strings in templates. Define strings in `src/services/translation/uiStrings.ts` and use `{{ t('key') }}` in templates via `useTranslation()`. This enables Chinese translation, beanie mode overrides, and future languages. See ADR-008 for details.
 - **Translation script sync**: When modifying the structure of `uiStrings.ts` (renaming objects, changing export patterns, etc.), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm parsing still works. The script parses TypeScript at the text level and will silently break if the format changes. See `docs/TRANSLATION.md` for full pipeline docs.
 - **Plans**: When plan mode is used, save the accepted plan to `docs/plans/` before implementation begins (see Plans Archive below).
-- **DRY / shared components**: When the same UI pattern (modal, form, card) appears in 2+ locations, extract it into a shared component. Use prop-driven visibility and self-contained internal state. See `TodoViewEditModal.vue` and `ActivityModal.vue` as reference patterns.
+- **DRY (Don't Repeat Yourself)**: This is a **core principle** — enforce it rigorously across all code:
+  - **Shared components**: When the same UI pattern (modal, form, card) appears in 2+ locations, extract it into a shared component. Use prop-driven visibility and self-contained internal state. See `TodoViewEditModal.vue` and `ActivityModal.vue` as reference patterns.
+  - **Helper functions**: Extract repeated logic into composables (`src/composables/`) or utility functions (`src/utils/`). Never copy-paste logic between files.
+  - **Reduce duplication**: Actively look for and consolidate duplicate code during every change. If you see the same pattern in multiple places, refactor it.
+  - **Simplify flows**: Remove overly complicated or redundant code paths. Prefer a single clear implementation over multiple partial ones.
+  - **Constants and config**: Shared values (colors, options, validation rules) belong in constants files, not scattered across components.
+  - **When unsure**: If it's unclear whether to extract or inline, ask the user before proceeding.
 
 ## Current Status (MVP - Phase 1)
 
@@ -342,5 +348,7 @@ Implementation plans created during plan mode must be saved to `docs/plans/` **b
 - Maintain TypeScript type safety
 - Use Tailwind CSS for styling
 - Test changes with `npm run dev`
+- **DRY is mandatory**: Before writing new code, check for existing components, composables, and utilities that already solve the problem. Consolidate duplicates on sight. If unsure whether to extract shared logic, ask.
 - **i18n**: Never hardcode user-visible English text in Vue templates. Always add strings to `src/services/translation/uiStrings.ts` and use `t('key')` via `useTranslation()`.
 - **Plans**: When exiting plan mode, save the accepted plan to `docs/plans/` before writing any code.
+- **Prettier**: `docs/brand/` HTML files are excluded from Prettier formatting (see `.prettierignore`). Do not reformat them.
