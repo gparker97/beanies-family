@@ -6,6 +6,7 @@ import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
+import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -25,6 +26,8 @@ const showInactive = ref(false);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const selectedDate = ref<string | undefined>(undefined);
+const sidebarDate = ref<string | null>(null);
+const defaultStartTime = ref<string | undefined>(undefined);
 
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
 
@@ -49,15 +52,19 @@ function openEditModal(id: string) {
 }
 
 function handleCalendarDateClick(date: string) {
-  const year = calendarGridRef.value?.currentYear ?? new Date().getFullYear();
-  const month = calendarGridRef.value?.currentMonth ?? new Date().getMonth();
-  const occurrences = activityStore.monthActivities(year, month).filter((o) => o.date === date);
+  sidebarDate.value = date;
+}
 
-  if (occurrences.length === 1) {
-    openEditModal(occurrences[0]!.activity.id);
-  } else {
-    openAddModal(date);
-  }
+function handleSidebarAdd() {
+  const date = sidebarDate.value ?? undefined;
+  sidebarDate.value = null;
+  defaultStartTime.value = '09:00';
+  openAddModal(date);
+}
+
+function handleSidebarEdit(id: string) {
+  sidebarDate.value = null;
+  openEditModal(id);
 }
 
 async function handleSave(
@@ -123,7 +130,11 @@ function openTodoViewModal(todo: TodoItem) {
     </div>
 
     <!-- Calendar grid -->
-    <CalendarGrid ref="calendarGridRef" @select-date="handleCalendarDateClick" />
+    <CalendarGrid
+      ref="calendarGridRef"
+      :selected-date="sidebarDate ?? undefined"
+      @select-date="handleCalendarDateClick"
+    />
 
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -167,12 +178,25 @@ function openTodoViewModal(todo: TodoItem) {
       </div>
     </div>
 
+    <!-- Day agenda sidebar -->
+    <DayAgendaSidebar
+      :date="sidebarDate ?? ''"
+      :open="sidebarDate !== null"
+      @close="sidebarDate = null"
+      @add-activity="handleSidebarAdd"
+      @edit-activity="handleSidebarEdit"
+    />
+
     <!-- Activity modal -->
     <ActivityModal
       :open="showModal"
       :activity="editingActivity"
       :default-date="selectedDate"
-      @close="showModal = false"
+      :default-start-time="defaultStartTime"
+      @close="
+        showModal = false;
+        defaultStartTime = undefined;
+      "
       @save="handleSave"
     />
 
