@@ -1,6 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { GlobalSettings } from '@/types/models';
+import { flushPendingSave } from '@/services/sync/syncService';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing stores
@@ -87,36 +88,8 @@ vi.mock('@/services/indexeddb/database', () => ({
   initializeDatabase: vi.fn(async () => ({})),
 }));
 
-// Sync service
-const mockFlushPendingSave = vi.fn(async () => {});
-
-vi.mock('@/services/sync/syncService', () => ({
-  onStateChange: vi.fn(),
-  onSaveComplete: vi.fn(() => () => {}),
-  setEncryptionRequiredCallback: vi.fn(),
-  initialize: vi.fn(async () => false),
-  hasPermission: vi.fn(async () => true),
-  loadAndImport: vi.fn(async () => ({ success: true })),
-  decryptAndImport: vi.fn(async () => ({ success: true })),
-  save: vi.fn(async () => true),
-  saveNow: vi.fn(async () => true),
-  selectSyncFile: vi.fn(async () => false),
-  disconnect: vi.fn(async () => {}),
-  requestPermission: vi.fn(async () => false),
-  getFileTimestamp: vi.fn(async () => null),
-  setSessionPassword: vi.fn(),
-  triggerDebouncedSave: vi.fn(),
-  flushPendingSave: () => mockFlushPendingSave(),
-  cancelPendingSave: vi.fn(),
-  reset: vi.fn(),
-  getState: vi.fn(() => ({
-    isInitialized: false,
-    hasFileHandle: false,
-    hasPermission: false,
-  })),
-  openAndLoadFile: vi.fn(async () => ({ success: true })),
-  loadDroppedFile: vi.fn(async () => ({ success: true })),
-}));
+// Sync service — uses shared auto-mock from __mocks__/syncService.ts
+vi.mock('@/services/sync/syncService');
 
 vi.mock('@/services/sync/capabilities', () => ({
   getSyncCapabilities: () => ({ hasFileSystemAccess: true }),
@@ -475,9 +448,9 @@ describe('Sensitive Data Clearing Security', () => {
 
       await auth.signOutAndClearData();
 
-      expect(mockFlushPendingSave).toHaveBeenCalled();
+      expect(vi.mocked(flushPendingSave)).toHaveBeenCalled();
       // flush should be called before deleteFamilyDatabase
-      const flushOrder = mockFlushPendingSave.mock.invocationCallOrder[0]!;
+      const flushOrder = vi.mocked(flushPendingSave).mock.invocationCallOrder[0]!;
       const deleteOrder = mockDeleteFamilyDatabase.mock.invocationCallOrder[0]!;
       expect(flushOrder).toBeLessThan(deleteOrder);
     });
@@ -521,7 +494,7 @@ describe('Sensitive Data Clearing Security', () => {
 
       await auth.signOut();
 
-      expect(mockFlushPendingSave).toHaveBeenCalled();
+      expect(vi.mocked(flushPendingSave)).toHaveBeenCalled();
     });
   });
 
