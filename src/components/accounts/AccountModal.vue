@@ -5,7 +5,6 @@ import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
-import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { BaseCombobox } from '@/components/ui';
@@ -37,7 +36,6 @@ const { options: institutionOptions, removeCustomInstitution } = useInstitutionO
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
 const isEditing = computed(() => !!props.account);
-const showMoreDetails = ref(false);
 const isSubmitting = ref(false);
 
 // Icon chip options for account types
@@ -91,7 +89,6 @@ watch(
       institutionCountry.value = a.institutionCountry ?? '';
       isActive.value = a.isActive;
       includeInNetWorth.value = a.includeInNetWorth;
-      showMoreDetails.value = !!(a.institution || a.institutionCountry);
     } else {
       icon.value = '';
       name.value = '';
@@ -103,7 +100,6 @@ watch(
       institutionCountry.value = '';
       isActive.value = true;
       includeInNetWorth.value = true;
-      showMoreDetails.value = false;
     }
   }
 );
@@ -210,17 +206,39 @@ function handleDelete() {
       :label="t('modal.balance')"
     />
 
-    <!-- 5. Currency -->
+    <!-- 5. Institution + Country -->
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <BaseCombobox
+        v-model="institution"
+        :options="institutionOptions"
+        :label="t('form.institution')"
+        :placeholder="t('form.searchInstitutions')"
+        :search-placeholder="t('form.searchInstitutions')"
+        :other-value="OTHER_INSTITUTION_VALUE"
+        :other-label="t('form.other')"
+        :other-placeholder="t('form.enterCustomName')"
+        @custom-removed="handleRemoveCustomInstitution"
+      />
+      <BaseCombobox
+        v-model="institutionCountry"
+        :options="countryOptions"
+        :label="t('form.country')"
+        :placeholder="t('form.searchCountries')"
+        :search-placeholder="t('form.searchCountries')"
+      />
+    </div>
+
+    <!-- 6. Currency -->
     <FormFieldGroup :label="t('form.currency')">
       <BaseSelect v-model="currency" :options="currencyOptions" />
     </FormFieldGroup>
 
-    <!-- 6. Owner -->
+    <!-- 7. Owner -->
     <FormFieldGroup :label="t('modal.owner')">
       <FamilyChipPicker v-model="memberId" mode="single" show-shared />
     </FormFieldGroup>
 
-    <!-- 7. Include in net worth toggle -->
+    <!-- 8. Include in net worth toggle -->
     <div
       class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
@@ -237,60 +255,16 @@ function handleDelete() {
       <ToggleSwitch v-model="includeInNetWorth" />
     </div>
 
-    <!-- More details toggle -->
-    <button
-      type="button"
-      class="font-outfit text-primary-500 hover:text-terracotta-400 flex w-full cursor-pointer items-center gap-2 rounded-xl py-2 text-sm font-semibold transition-colors"
-      @click="showMoreDetails = !showMoreDetails"
+    <!-- 9. Active toggle -->
+    <div
+      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
-      <svg
-        class="h-4 w-4 transition-transform"
-        :class="{ 'rotate-180': showMoreDetails }"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        stroke-width="2"
+      <span
+        class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
       >
-        <path d="M19 9l-7 7-7-7" />
-      </svg>
-      {{ t('modal.moreDetails') }}
-    </button>
-
-    <ConditionalSection :show="showMoreDetails">
-      <div class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseCombobox
-            v-model="institution"
-            :options="institutionOptions"
-            :label="t('form.institution')"
-            :placeholder="t('form.searchInstitutions')"
-            :search-placeholder="t('form.searchInstitutions')"
-            :other-value="OTHER_INSTITUTION_VALUE"
-            :other-label="t('form.other')"
-            :other-placeholder="t('form.enterCustomName')"
-            @custom-removed="handleRemoveCustomInstitution"
-          />
-          <BaseCombobox
-            v-model="institutionCountry"
-            :options="countryOptions"
-            :label="t('form.country')"
-            :placeholder="t('form.searchCountries')"
-            :search-placeholder="t('form.searchCountries')"
-          />
-        </div>
-
-        <!-- Active toggle -->
-        <div
-          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
-        >
-          <div
-            class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-          >
-            {{ t('form.isActive') }}
-          </div>
-          <ToggleSwitch v-model="isActive" />
-        </div>
-      </div>
-    </ConditionalSection>
+        {{ t('form.isActive') }}
+      </span>
+      <ToggleSwitch v-model="isActive" />
+    </div>
   </BeanieFormModal>
 </template>

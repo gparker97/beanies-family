@@ -10,7 +10,7 @@ import AmountInput from '@/components/ui/AmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -42,7 +42,6 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 
-const showMoreDetails = ref(false);
 const isEditing = computed(() => !!props.activity);
 
 // Activity icon chip options — emoji→category mapping
@@ -126,13 +125,6 @@ watch(
       notes.value = a.notes ?? '';
       isActive.value = a.isActive;
       color.value = a.color ?? CATEGORY_COLORS[a.category];
-      showMoreDetails.value = !!(
-        a.dropoffMemberId ||
-        a.pickupMemberId ||
-        a.instructorName ||
-        a.reminderMinutes > 0 ||
-        (a.feeSchedule !== 'none' && a.feeSchedule !== 'per_session')
-      );
     } else {
       icon.value = '';
       title.value = '';
@@ -158,7 +150,6 @@ watch(
       notes.value = '';
       isActive.value = true;
       color.value = '';
-      showMoreDetails.value = false;
     }
   }
 );
@@ -186,27 +177,19 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const memberOptions = computed(() => [
-  { value: '', label: '—' },
-  ...familyStore.members.map((m) => ({ value: m.id, label: m.name })),
-]);
-
-const feeScheduleOptions = computed(() =>
+const feeScheduleChipOptions = computed(() =>
   (['none', 'per_session', 'weekly', 'monthly', 'termly', 'yearly'] as FeeSchedule[]).map((f) => ({
     value: f,
     label: t(`planner.fee.${f}` as const),
   }))
 );
 
-const reminderOptions: { value: ReminderMinutes; label: string }[] = [
-  { value: 0, label: 'None' },
-  { value: 5, label: '5 min' },
-  { value: 10, label: '10 min' },
-  { value: 15, label: '15 min' },
-  { value: 30, label: '30 min' },
-  { value: 60, label: '1 hour' },
-  { value: 120, label: '2 hours' },
-  { value: 1440, label: '1 day' },
+const reminderChipOptions = [
+  { value: '0', label: 'None' },
+  { value: '15', label: '15 min' },
+  { value: '30', label: '30 min' },
+  { value: '60', label: '1 hour' },
+  { value: '1440', label: '1 day' },
 ];
 
 const frequencyOptions = [
@@ -323,8 +306,8 @@ function handleSave() {
       </div>
     </ConditionalSection>
 
-    <!-- 5. Date + Start time -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <!-- 5. Date + Start / End time -->
+    <div class="grid grid-cols-3 gap-4">
       <FormFieldGroup :label="t('planner.field.date')">
         <BaseInput v-model="date" type="date" required />
       </FormFieldGroup>
@@ -332,14 +315,11 @@ function handleSave() {
       <FormFieldGroup :label="t('modal.startTime')">
         <TimePresetPicker v-model="startTime" />
       </FormFieldGroup>
-    </div>
 
-    <!-- 6. End time (after start time is set) -->
-    <ConditionalSection :show="!!startTime">
       <FormFieldGroup :label="t('modal.endTime')">
         <TimePresetPicker v-model="endTime" />
       </FormFieldGroup>
-    </ConditionalSection>
+    </div>
 
     <!-- 7. Location (optional) -->
     <FormFieldGroup :label="t('planner.field.location')" optional>
@@ -351,7 +331,30 @@ function handleSave() {
       <FamilyChipPicker v-model="assigneeIds" mode="multi" />
     </FormFieldGroup>
 
-    <!-- 9. Cost per session (optional) -->
+    <!-- 9. Dropoff / Pickup -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <FormFieldGroup :label="t('planner.field.dropoff')" optional>
+        <FamilyChipPicker v-model="dropoffMemberId" mode="single" compact />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('planner.field.pickup')" optional>
+        <FamilyChipPicker v-model="pickupMemberId" mode="single" compact />
+      </FormFieldGroup>
+    </div>
+
+    <!-- 10. Instructor -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <FormFieldGroup :label="t('planner.field.instructor')" optional>
+        <BaseInput v-model="instructorName" :placeholder="t('planner.field.instructor')" />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('planner.field.instructorContact')" optional>
+        <BaseInput
+          v-model="instructorContact"
+          :placeholder="t('planner.field.instructorContact')"
+        />
+      </FormFieldGroup>
+    </div>
+
+    <!-- 11. Cost per session -->
     <AmountInput
       v-model="feeAmount"
       :currency-symbol="settingsStore.baseCurrency"
@@ -359,7 +362,28 @@ function handleSave() {
       :label="t('modal.costPerSession')"
     />
 
-    <!-- 10. Notes (optional) -->
+    <!-- 12. Fee schedule chips -->
+    <FormFieldGroup :label="t('planner.field.feeSchedule')" optional>
+      <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+    </FormFieldGroup>
+
+    <!-- 13. Fee payer (when fee is set) -->
+    <ConditionalSection :show="feeSchedule !== 'none'">
+      <FormFieldGroup :label="t('planner.field.feePayer')" optional>
+        <FamilyChipPicker v-model="feePayerId" mode="single" compact />
+      </FormFieldGroup>
+    </ConditionalSection>
+
+    <!-- 14. Reminder chips -->
+    <FormFieldGroup :label="t('planner.field.reminder')" optional>
+      <FrequencyChips
+        :model-value="String(reminderMinutes)"
+        :options="reminderChipOptions"
+        @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
+      />
+    </FormFieldGroup>
+
+    <!-- 15. Notes (optional) -->
     <FormFieldGroup :label="t('planner.field.notes')" optional>
       <textarea
         v-model="notes"
@@ -369,87 +393,16 @@ function handleSave() {
       />
     </FormFieldGroup>
 
-    <!-- More details toggle -->
-    <button
-      type="button"
-      class="font-outfit text-primary-500 hover:text-terracotta-400 flex w-full cursor-pointer items-center gap-2 rounded-xl py-2 text-sm font-semibold transition-colors"
-      @click="showMoreDetails = !showMoreDetails"
+    <!-- 16. Active toggle -->
+    <div
+      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
-      <svg
-        class="h-4 w-4 transition-transform"
-        :class="{ 'rotate-180': showMoreDetails }"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        stroke-width="2"
+      <span
+        class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
       >
-        <path d="M19 9l-7 7-7-7" />
-      </svg>
-      {{ t('modal.moreDetails') }}
-    </button>
-
-    <!-- Expandable "More details" -->
-    <ConditionalSection :show="showMoreDetails">
-      <div class="space-y-4">
-        <!-- Dropoff / Pickup members -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <BaseSelect
-            v-model="dropoffMemberId"
-            :label="t('planner.field.dropoff')"
-            :options="memberOptions"
-          />
-          <BaseSelect
-            v-model="pickupMemberId"
-            :label="t('planner.field.pickup')"
-            :options="memberOptions"
-          />
-        </div>
-
-        <!-- Instructor -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <BaseInput
-            v-model="instructorName"
-            :label="t('planner.field.instructor')"
-            :placeholder="t('planner.field.instructor')"
-          />
-          <BaseInput
-            v-model="instructorContact"
-            :label="t('planner.field.instructorContact')"
-            :placeholder="t('planner.field.instructorContact')"
-          />
-        </div>
-
-        <!-- Fee schedule -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <BaseSelect
-            v-model="feeSchedule"
-            :label="t('planner.field.feeSchedule')"
-            :options="feeScheduleOptions"
-          />
-          <BaseSelect
-            v-if="feeSchedule !== 'none'"
-            v-model="feePayerId"
-            :label="t('planner.field.feePayer')"
-            :options="memberOptions"
-          />
-        </div>
-
-        <!-- Reminder -->
-        <BaseSelect
-          :model-value="String(reminderMinutes)"
-          :label="t('planner.field.reminder')"
-          :options="reminderOptions.map((r) => ({ value: String(r.value), label: r.label }))"
-          @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
-        />
-
-        <!-- Active toggle -->
-        <label class="flex cursor-pointer items-center gap-2">
-          <input v-model="isActive" type="checkbox" class="accent-primary-500 h-4 w-4 rounded" />
-          <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-            {{ t('planner.field.active') }}
-          </span>
-        </label>
-      </div>
-    </ConditionalSection>
+        {{ t('planner.field.active') }}
+      </span>
+      <ToggleSwitch v-model="isActive" size="sm" />
+    </div>
   </BeanieFormModal>
 </template>

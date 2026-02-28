@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ColorCircleSelector from '@/components/ui/ColorCircleSelector.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
-import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { isTemporaryEmail } from '@/utils/email';
+import { getAvatarVariant } from '@/composables/useMemberAvatar';
 import type {
   FamilyMember,
   Gender,
@@ -33,7 +34,6 @@ const { t } = useTranslation();
 
 const isEditing = computed(() => !!props.member);
 const isSubmitting = ref(false);
-const showMoreDetails = ref(false);
 
 // Color options with gradients
 const MEMBER_COLORS = [
@@ -45,17 +45,16 @@ const MEMBER_COLORS = [
   { value: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #f472b6)' },
 ];
 
-// Role chips
+// Role chips — parent and child only (admin/permissions handled later)
 const roleOptions = computed(() => [
   { value: 'parent', label: t('modal.parentBean'), icon: '🫘' },
   { value: 'child', label: t('modal.littleBean'), icon: '🌱' },
-  { value: 'teen', label: t('modal.bigBean'), icon: '🫛' },
 ]);
 
-const genderOptions = computed(() => [
-  { value: 'male', label: t('family.gender.male') },
-  { value: 'female', label: t('family.gender.female') },
-  { value: 'other', label: t('family.gender.other') },
+const genderChipOptions = computed(() => [
+  { value: 'male', label: t('family.gender.male'), icon: '♂️' },
+  { value: 'female', label: t('family.gender.female'), icon: '♀️' },
+  { value: 'other', label: t('family.gender.other'), icon: '⚧️' },
 ]);
 
 const MONTH_KEYS = [
@@ -89,7 +88,7 @@ const dayOptions = Array.from({ length: 31 }, (_, i) => ({
 const name = ref('');
 const email = ref('');
 const gender = ref<Gender>('male');
-const beanRole = ref('parent'); // parent/child/teen
+const beanRole = ref('parent'); // parent/child
 const color = ref('#3b82f6');
 const dobMonth = ref('1');
 const dobDay = ref('1');
@@ -101,6 +100,9 @@ const canManagePod = ref(false);
 // Derived ageGroup from beanRole
 const ageGroup = computed<AgeGroup>(() => (beanRole.value === 'child' ? 'child' : 'adult'));
 
+// Avatar variant derived from gender + ageGroup
+const avatarVariant = computed(() => getAvatarVariant(gender.value, ageGroup.value));
+
 // Reset form
 watch(
   () => props.open,
@@ -111,12 +113,11 @@ watch(
       name.value = m.name;
       email.value = isTemporaryEmail(m.email) ? '' : m.email;
       gender.value = m.gender || 'other';
-      beanRole.value = m.ageGroup === 'child' ? 'child' : m.role === 'owner' ? 'parent' : 'parent';
+      beanRole.value = m.ageGroup === 'child' ? 'child' : 'parent';
       color.value = m.color;
       dobMonth.value = m.dateOfBirth?.month?.toString() ?? '1';
       dobDay.value = m.dateOfBirth?.day?.toString() ?? '1';
       dobYear.value = m.dateOfBirth?.year?.toString() ?? '';
-      showMoreDetails.value = !!(m.email && !isTemporaryEmail(m.email)) || !!m.gender;
     } else {
       const randomColor =
         MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)]?.value ?? '#3b82f6';
@@ -131,12 +132,9 @@ watch(
       canViewFinances.value = true;
       canEditActivities.value = true;
       canManagePod.value = false;
-      showMoreDetails.value = false;
     }
   }
 );
-
-const avatarInitial = computed(() => (name.value ? name.value.charAt(0).toUpperCase() : '?'));
 
 const canSave = computed(() => name.value.trim().length > 0);
 
@@ -202,14 +200,9 @@ function handleDelete() {
     @save="handleSave"
     @delete="handleDelete"
   >
-    <!-- 1. Avatar preview -->
+    <!-- 1. Bean avatar preview -->
     <div class="flex justify-center">
-      <div
-        class="font-outfit flex h-[88px] w-[88px] items-center justify-center rounded-full text-3xl font-bold text-white"
-        :style="{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }"
-      >
-        {{ avatarInitial }}
-      </div>
+      <BeanieAvatar :variant="avatarVariant" :color="color" size="xl" />
     </div>
 
     <!-- 2. Color selector -->
@@ -227,12 +220,22 @@ function handleDelete() {
       />
     </div>
 
-    <!-- 4. Role chips -->
+    <!-- 4. Role chips (parent/child only) -->
     <FormFieldGroup :label="t('modal.role')">
       <FrequencyChips v-model="beanRole" :options="roleOptions" />
     </FormFieldGroup>
 
-    <!-- 5. Birthday -->
+    <!-- 5. Gender chips -->
+    <FormFieldGroup :label="t('family.gender')">
+      <FrequencyChips v-model="gender" :options="genderChipOptions" />
+    </FormFieldGroup>
+
+    <!-- 6. Email -->
+    <FormFieldGroup :label="t('family.email')" optional>
+      <BaseInput v-model="email" type="email" placeholder="bean@example.com" />
+    </FormFieldGroup>
+
+    <!-- 7. Birthday -->
     <FormFieldGroup :label="t('modal.birthday')" optional>
       <div class="grid grid-cols-3 gap-2">
         <BaseSelect v-model="dobMonth" :options="monthOptions" />
@@ -241,7 +244,7 @@ function handleDelete() {
       </div>
     </FormFieldGroup>
 
-    <!-- 6. Permission toggles (display-only MVP) -->
+    <!-- 8. Permissions (at bottom) -->
     <FormFieldGroup :label="t('modal.permissions')">
       <div class="space-y-3">
         <div
@@ -276,36 +279,5 @@ function handleDelete() {
         </div>
       </div>
     </FormFieldGroup>
-
-    <!-- More details toggle -->
-    <button
-      type="button"
-      class="font-outfit text-primary-500 hover:text-terracotta-400 flex w-full cursor-pointer items-center gap-2 rounded-xl py-2 text-sm font-semibold transition-colors"
-      @click="showMoreDetails = !showMoreDetails"
-    >
-      <svg
-        class="h-4 w-4 transition-transform"
-        :class="{ 'rotate-180': showMoreDetails }"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        stroke-width="2"
-      >
-        <path d="M19 9l-7 7-7-7" />
-      </svg>
-      {{ t('modal.moreDetails') }}
-    </button>
-
-    <ConditionalSection :show="showMoreDetails">
-      <div class="space-y-4">
-        <BaseInput
-          v-model="email"
-          :label="t('family.email')"
-          type="email"
-          placeholder="bean@example.com"
-        />
-        <BaseSelect v-model="gender" :options="genderOptions" :label="t('family.gender')" />
-      </div>
-    </ConditionalSection>
   </BeanieFormModal>
 </template>
