@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-02-27",
-    "translationCount": 810
+    "lastUpdated": "2026-02-28",
+    "translationCount": 891
   },
   "translations": {
     "app.name": {
@@ -3621,11 +3621,6 @@
       "hash": "81w15m",
       "lastUpdated": "2026-02-25"
     },
-    "passkey.crossDeviceError": {
-      "translation": "此生物识别已在其他设备上注册。使用您的密码登录，并在“设置”中在此设备上注册生物识别。",
-      "hash": "qkn3am",
-      "lastUpdated": "2026-02-26"
-    },
     "passkey.wrongFamilyError": {
       "translation": "此生物识别不属于当前家庭。请重试。",
       "hash": "4tynm9",
@@ -4055,6 +4050,416 @@
       "translation": "这将从此设备中永久删除此系列的所有数据、密钥和设置。原始文件不受影响。此操作无法撤消。",
       "hash": "y7b1vm",
       "lastUpdated": "2026-02-27"
+    },
+    "common.save": {
+      "translation": "确认保存",
+      "hash": "1j2ql",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.cancel": {
+      "translation": "取消",
+      "hash": "x9d2fu",
+      "lastUpdated": "2026-02-28"
+    },
+    "common.delete": {
+      "translation": "删除",
+      "hash": "xskn2j",
+      "lastUpdated": "2026-02-28"
+    },
+    "passkey.crossDeviceNoCache": {
+      "translation": "此生物识别已从另一台设备同步。使用您的密码登录一次，即可在此处启用密码。",
+      "hash": "etsrvg",
+      "lastUpdated": "2026-02-28"
+    },
+    "passkey.fileLoadError": {
+      "translation": "无法加载您的数据文件。请使用您的密码登录。",
+      "hash": "9t9th3",
+      "lastUpdated": "2026-02-28"
+    },
+    "fastLogin.notYou": {
+      "translation": "不是您本人？切换账号",
+      "hash": "farlgs",
+      "lastUpdated": "2026-02-28"
+    },
+    "fastLogin.welcomeBack": {
+      "translation": "欢迎回来 ",
+      "hash": "oat",
+      "lastUpdated": "2026-02-28"
+    },
+    "fastLogin.loadErrorLocal": {
+      "translation": "我们到处查找，但找不到您的文件—请重新选择",
+      "hash": "f86xp9",
+      "lastUpdated": "2026-02-28"
+    },
+    "fastLogin.loadErrorDrive": {
+      "translation": "您的Google云端硬盘凭据可能已过期—请重新登录",
+      "hash": "90t3tu",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.title": {
+      "translation": "家庭计划员",
+      "hash": "8vqdpm",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.subtitle": {
+      "translation": "{month} — {count}个活动",
+      "hash": "cnwmg8",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.addActivity": {
+      "translation": "添加活动",
+      "hash": "wbbwsj",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.editActivity": {
+      "translation": "编辑活动",
+      "hash": "feausl",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.newActivity": {
+      "translation": "添加新的",
+      "hash": "dtggtt",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.deleteActivity": {
+      "translation": "删除活动",
+      "hash": "p4f9jw",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.deleteConfirm": {
+      "translation": "你确定要删除这个活动吗？",
+      "hash": "o43hyp",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.noActivities": {
+      "translation": "还没有活动。",
+      "hash": "99zxyk",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.noActivitiesHint": {
+      "translation": "添加您的第一个家庭活动以开始！",
+      "hash": "hfwuos",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.upcoming": {
+      "translation": "最新活动：",
+      "hash": "mr74hd",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.noUpcoming": {
+      "translation": "最新活动：",
+      "hash": "2a15ce",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.todoPreview": {
+      "translation": "家庭待办事项",
+      "hash": "ssz2wx",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.viewAllTodos": {
+      "translation": "查看全部",
+      "hash": "m9neiw",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.onCalendar": {
+      "translation": "在日历上查看",
+      "hash": "sveben",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.viewMore": {
+      "translation": "查看更多",
+      "hash": "65tfbk",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.inactiveActivities": {
+      "translation": "未激活的活动",
+      "hash": "ev4aim",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.noInactive": {
+      "translation": "没有未激活的活动",
+      "hash": "v4rhmr",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.showInactive": {
+      "translation": "显示非活动项",
+      "hash": "7rfnym",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.comingSoon": {
+      "translation": "即将推出",
+      "hash": "3kerkq",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.view.month": {
+      "translation": "月",
+      "hash": "18ddnk",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.view.week": {
+      "translation": "星期",
+      "hash": "1lp90",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.view.day": {
+      "translation": "白天",
+      "hash": "1gu4",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.view.agenda": {
+      "translation": "议程 (Agenda) ",
+      "hash": "wef2gc",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.category.lesson": {
+      "translation": "课程",
+      "hash": "xg1oko",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.category.sport": {
+      "translation": "運動項目",
+      "hash": "1boswk",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.category.appointment": {
+      "translation": "预约",
+      "hash": "36ty0v",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.category.social": {
+      "translation": "社交媒体",
+      "hash": "tzitf7",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.category.pickup": {
+      "translation": "取货",
+      "hash": "vhye78",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.category.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.recurrence.weekly": {
+      "translation": "每週",
+      "hash": "s8sy1r",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.recurrence.daily": {
+      "translation": "每天发布一次",
+      "hash": "1366m1",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.recurrence.monthly": {
+      "translation": "每月",
+      "hash": "n1rd3n",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.recurrence.yearly": {
+      "translation": "每年",
+      "hash": "ras40m",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.recurrence.none": {
+      "translation": "一次性",
+      "hash": "xf6j90",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.fee.none": {
+      "translation": "无费用",
+      "hash": "9ki1dg",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.fee.per_session": {
+      "translation": "每个会话",
+      "hash": "r0ox9v",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.fee.weekly": {
+      "translation": "每週",
+      "hash": "s8sy1r",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.fee.monthly": {
+      "translation": "每月",
+      "hash": "n1rd3n",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.fee.termly": {
+      "translation": "每学期",
+      "hash": "74s6un",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.fee.yearly": {
+      "translation": "每年",
+      "hash": "ras40m",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.title": {
+      "translation": "动态标题",
+      "hash": "9uto8p",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.date": {
+      "translation": "开始日期",
+      "hash": "5yr20c",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.startTime": {
+      "translation": "开始时间",
+      "hash": "5z1fkb",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.endTime": {
+      "translation": "结束时间",
+      "hash": "smmmuq",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.category": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.recurrence": {
+      "translation": "重复",
+      "hash": "peiciw",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.dayOfWeek": {
+      "translation": "星期几",
+      "hash": "e6p147",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.assignee": {
+      "translation": "对象",
+      "hash": "1v32",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.dropoff": {
+      "translation": "还车",
+      "hash": "63q5ov",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.pickup": {
+      "translation": "提车",
+      "hash": "hyx293",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.location": {
+      "translation": "位置",
+      "hash": "wibidx",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.feeSchedule": {
+      "translation": "费用表",
+      "hash": "rl0edr",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.feeAmount": {
+      "translation": "收费金额",
+      "hash": "on7cky",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.feePayer": {
+      "translation": "通过付费",
+      "hash": "e9q3nv",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.instructor": {
+      "translation": "讲师/教练",
+      "hash": "nxl256",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.instructorContact": {
+      "translation": "联系方式",
+      "hash": "rri8sg",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.reminder": {
+      "translation": "余量",
+      "hash": "7i9wmm",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.moreDetails": {
+      "translation": "更多详细信息",
+      "hash": "zfmpux",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.color": {
+      "translation": "高亮色彩",
+      "hash": "4ptgaf",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.field.active": {
+      "translation": "状态",
+      "hash": "wchdly",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.dayAgenda": {
+      "translation": "全天议程",
+      "hash": "grizww",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.noActivitiesForDay": {
+      "translation": "未安排任何活动",
+      "hash": "rhtqmx",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.upcomingAfterDay": {
+      "translation": "即將播出",
+      "hash": "6nm2ca",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.legend": {
+      "translation": "图例",
+      "hash": "xg9mtv",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.sun": {
+      "translation": "Sun",
+      "hash": "1sfg",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.mon": {
+      "translation": "星期一",
+      "hash": "1nu4",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.tue": {
+      "translation": "週二",
+      "hash": "1t5w",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.wed": {
+      "translation": "周三",
+      "hash": "1v06",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.thu": {
+      "translation": "週四",
+      "hash": "1sv5",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.fri": {
+      "translation": "週五",
+      "hash": "1ipp",
+      "lastUpdated": "2026-02-28"
+    },
+    "planner.day.sat": {
+      "translation": "星期6",
+      "hash": "1rye",
+      "lastUpdated": "2026-02-28"
     }
   }
 }
