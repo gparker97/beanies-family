@@ -90,8 +90,14 @@ onMounted(async () => {
 
 /**
  * Activate a family and prepare for biometric login.
+ * Pre-loads the encrypted file so BiometricLoginView can decrypt it with a passkey.
+ * Falls back to load-pod if file loading fails or file turns out to be unencrypted.
  */
-async function activateFamilyForBiometric(familyId: string, familyName: string) {
+async function activateFamilyForBiometric(
+  familyId: string,
+  familyName: string,
+  providerConfig?: PersistedProviderConfig | null
+) {
   // Switch to the selected family
   if (familyContextStore.activeFamilyId !== familyId) {
     await familyContextStore.switchFamily(familyId);
@@ -101,15 +107,68 @@ async function activateFamilyForBiometric(familyId: string, familyName: string) 
 
   // Pre-load the encrypted file so biometric login can decrypt it
   if (syncStore.isConfigured) {
-    // After PWA restart, local file handle permissions are revoked by the browser.
-    // Request permission first (safe — this runs during a user gesture).
-    if (syncStore.needsPermission) {
-      await syncStore.requestPermission();
-    } else {
-      await syncStore.loadFromFile();
+    try {
+      if (syncStore.needsPermission) {
+        // After PWA restart, local file handle permissions are revoked by the browser.
+        // Request permission first (safe — this runs during a user gesture).
+        const granted = await syncStore.requestPermission();
+        if (!granted) {
+          // Permission denied — fall back to load-pod with permission grant UI
+          autoLoadPod.value = false;
+          needsPermissionGrant.value = true;
+          biometricDeclined.value = false;
+          activeView.value = 'load-pod';
+          return;
+        }
+        // Permission granted — requestPermission() internally loaded the file.
+        // If file was unencrypted, it auto-decrypted (no pending file).
+      } else {
+        const loadResult = await syncStore.loadFromFile();
+        if (!loadResult.success && !loadResult.needsPassword) {
+          // Load failed for non-password reasons — fall back with error
+          const hint = toProviderHint(providerConfig ?? null);
+          loadError.value = providerErrorMessage(hint);
+          loadErrorProviderHint.value = hint;
+          autoLoadPod.value = false;
+          needsPermissionGrant.value = false;
+          biometricDeclined.value = false;
+          activeView.value = 'load-pod';
+          return;
+        }
+        // success: true → file loaded (unencrypted, auto-decrypted)
+        // needsPassword: true → file encrypted, pending for biometric decrypt
+      }
+    } catch {
+      // File moved/deleted/network error — fall back with error
+      const hint = toProviderHint(providerConfig ?? null);
+      loadError.value = providerErrorMessage(hint);
+      loadErrorProviderHint.value = hint;
+      autoLoadPod.value = false;
+      needsPermissionGrant.value = false;
+      biometricDeclined.value = false;
+      activeView.value = 'load-pod';
+      return;
     }
   }
 
+  // If the file was unencrypted or auto-decrypted, there's no pending encrypted file.
+  // Biometric decrypt would fail, so skip biometric and go straight to pick-bean.
+  if (syncStore.isConfigured && !syncStore.hasPendingEncryptedFile) {
+    // Last resort: try auto-decrypt with cached passwords in case pending file was set
+    // but hasPendingEncryptedFile is somehow false (defensive)
+    if (!(await tryAutoDecrypt(familyId))) {
+      // File was genuinely unencrypted or already decrypted — go to pick-bean
+      fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+      activeView.value = 'pick-bean';
+      return;
+    }
+    // Auto-decrypt succeeded — go to pick-bean
+    fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+    activeView.value = 'pick-bean';
+    return;
+  }
+
+  // Happy path: encrypted file is pending, show biometric login
   biometricFamilyId.value = familyId;
   biometricFamilyName.value = familyName;
   activeView.value = 'biometric';
@@ -175,7 +234,7 @@ async function handleFamilySelected(payload: {
 
   if (payload.hasPasskeys) {
     // Go to biometric login (pre-load file)
-    await activateFamilyForBiometric(payload.id, payload.name);
+    await activateFamilyForBiometric(payload.id, payload.name, payload.providerConfig);
   } else if (syncStore.isConfigured && !syncStore.needsPermission) {
     // File configured and accessible — try auto-load
     activeView.value = 'loading';
