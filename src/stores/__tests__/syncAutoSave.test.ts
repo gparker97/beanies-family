@@ -155,52 +155,37 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   updateGlobalExchangeRates: vi.fn(),
 }));
 
-vi.mock('@/services/sync/syncService', () => ({
-  onStateChange: vi.fn((cb: (state: Record<string, unknown>) => void) => {
-    stateChangeCallbackHolder.callback = cb;
-  }),
-  onSaveComplete: vi.fn(() => () => {}),
-  setEncryptionRequiredCallback: vi.fn(),
-  initialize: vi.fn(async () => false),
-  hasPermission: vi.fn(async () => true),
-  requestPermission: vi.fn(async () => true),
-  selectSyncFile: (...args: unknown[]) => {
-    // Simulate syncService internal state update when a file is selected
-    stateChangeCallbackHolder.callback?.({
-      isInitialized: true,
-      isConfigured: true,
-      fileName: 'test.beanpod',
-      isSyncing: false,
-      lastError: null,
-    });
-    return (mockSelectSyncFile as (...a: unknown[]) => unknown)(...args);
-  },
-  loadAndImport: vi.fn(async () => ({ success: true })),
-  openAndLoadFile: vi.fn(async () => ({ success: true })),
-  loadDroppedFile: vi.fn(async () => ({ success: true })),
-  decryptAndImport: vi.fn(async () => ({ success: true })),
-  save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
-  getFileTimestamp: vi.fn(async () => null),
-  triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
-  cancelPendingSave: vi.fn(),
-  saveNow: vi.fn(async () => true),
-  flushPendingSave: vi.fn(async () => {}),
-  reset: vi.fn(() => {
-    stateChangeCallbackHolder.callback?.({
-      isInitialized: false,
-      isConfigured: false,
-      fileName: null,
-      isSyncing: false,
-      lastError: null,
-    });
-  }),
-  disconnect: vi.fn(async () => {}),
-  setSessionPassword: vi.fn(),
-  getSessionFileHandle: vi.fn(() => null),
-  getProviderType: vi.fn(() => null),
-  getProvider: vi.fn(() => null),
-  setProvider: vi.fn(),
-}));
+// Sync service — spreads shared auto-mock defaults, overrides what this test needs
+vi.mock('@/services/sync/syncService', async () => {
+  const defaults = await import('../../services/sync/__mocks__/syncService');
+  return {
+    ...defaults,
+    onStateChange: vi.fn((cb: (state: Record<string, unknown>) => void) => {
+      stateChangeCallbackHolder.callback = cb;
+    }),
+    selectSyncFile: (...args: unknown[]) => {
+      stateChangeCallbackHolder.callback?.({
+        isInitialized: true,
+        isConfigured: true,
+        fileName: 'test.beanpod',
+        isSyncing: false,
+        lastError: null,
+      });
+      return (mockSelectSyncFile as (...a: unknown[]) => unknown)(...args);
+    },
+    save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
+    triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
+    reset: vi.fn(() => {
+      stateChangeCallbackHolder.callback?.({
+        isInitialized: false,
+        isConfigured: false,
+        fileName: null,
+        isSyncing: false,
+        lastError: null,
+      });
+    }),
+  };
+});
 
 // Capabilities — must return true so setupAutoSync is not short-circuited
 vi.mock('@/services/sync/capabilities', () => ({
