@@ -183,3 +183,14 @@ if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
 - Each storage provider's `persist()` should clear the other provider's stale config (mutual exclusion)
 - Store provider identity as plain strings (not class instances) in Vue refs to avoid Proxy issues
 - Add diagnostic logging to `syncService.initialize()` showing which provider was found
+
+## 11. Extract shared components early — duplicated UI code diverges silently
+
+**Date:** 2026-02-28
+**Context:** Todo view/edit modal duplicated across 3 files (~600 lines total)
+
+**Pattern:** When the same UI pattern (modal, form, card) is copy-pasted across multiple files, the copies inevitably diverge in small ways (missing emojis, inconsistent trim() calls, different entity names). Each bug fix or feature change must be applied N times, and some copies get missed.
+
+**Symptom:** The planner's todo modal was missing emojis that the todo page and nook widget had. The nook widget wasn't calling `.trim()` on description. These inconsistencies were invisible until a side-by-side comparison.
+
+**Rule:** When a UI pattern appears in 2+ locations with identical structure, extract it into a shared component immediately. Use prop-driven visibility (`todo: Item | null` where non-null = open) and self-contained internal state. Follow the `ActivityModal.vue` pattern: props for data in, emits for actions out, all logic encapsulated.
