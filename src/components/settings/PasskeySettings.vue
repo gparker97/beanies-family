@@ -10,7 +10,6 @@ import {
   removePasskey,
   renamePasskey,
 } from '@/services/auth/passkeyService';
-import { getSessionFileHandle } from '@/services/sync/syncService';
 import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -62,17 +61,7 @@ async function handleRegister() {
   statusMessage.value = null;
 
   try {
-    // Get the encrypted file blob
-    const encryptedBlob = await getEncryptedFileBlob();
-    if (!encryptedBlob) {
-      statusMessage.value = { text: t('passkey.registerError'), type: 'error' };
-      return;
-    }
-
-    const result = await authStore.registerPasskeyForCurrentUser(
-      registrationPassword.value,
-      encryptedBlob
-    );
+    const result = await authStore.registerPasskeyForCurrentUser(registrationPassword.value);
 
     if (result.success) {
       statusMessage.value = { text: t('passkey.registerSuccess'), type: 'success' };
@@ -115,23 +104,6 @@ async function saveLabel(credentialId: string) {
   editingId.value = null;
   editLabel.value = '';
   await loadPasskeys();
-}
-
-async function getEncryptedFileBlob(): Promise<string | null> {
-  try {
-    // First try to get from session password — use it to read the file
-    const handle = getSessionFileHandle();
-    if (!handle) return null;
-    const file = await handle.getFile();
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    if (parsed.encrypted && typeof parsed.data === 'string') {
-      return parsed.data;
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function formatDate(dateStr: string): string {
@@ -262,18 +234,9 @@ function formatDate(dateStr: string): string {
                 </button>
               </template>
               <span
-                class="shrink-0 rounded-full px-2 py-0.5 text-xs"
-                :class="
-                  passkey.prfSupported && passkey.wrappedDEK
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                "
+                class="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700 dark:bg-green-900/30 dark:text-green-400"
               >
-                {{
-                  passkey.prfSupported && passkey.wrappedDEK
-                    ? t('passkey.prfFull')
-                    : t('passkey.prfCached')
-                }}
+                {{ t('passkey.prfCached') }}
               </span>
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400">

@@ -44,7 +44,7 @@ function handleDismiss() {
   >
     <div
       v-if="showPrompt"
-      class="fixed right-4 bottom-20 left-4 z-[150] mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg md:right-6 md:bottom-6 md:left-auto dark:border-slate-700 dark:bg-slate-800"
+      class="w-[calc(100vw-2rem)] max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-lg md:w-auto dark:border-slate-700 dark:bg-slate-800"
       role="alert"
     >
       <div class="flex items-start gap-3">

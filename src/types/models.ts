@@ -35,7 +35,7 @@ export interface GlobalSettings {
   soundEnabled?: boolean;
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
-  cachedEncryptionPassword?: string | null;
+  cachedEncryptionPasswords?: Record<string, string>;
   passkeyPromptShown?: boolean;
 }
 
@@ -47,10 +47,7 @@ export interface PasskeyRegistration {
   publicKey: string; // base64 public key
   transports?: string[]; // AuthenticatorTransport hints
   prfSupported: boolean; // PRF available during registration?
-  wrappedDEK?: string; // base64 AES-KW wrapped DEK (PRF path)
-  wrappedDEKSalt?: string; // base64 HKDF salt (PRF path)
-  encryptionSalt?: string; // base64 PBKDF2 salt from file (PRF path)
-  cachedPassword?: string; // Cached encryption password (non-PRF path)
+  cachedPassword?: string; // Cached encryption password for file decryption
   label: string; // e.g. "MacBook Touch ID"
   createdAt: ISODateString;
   lastUsedAt?: ISODateString;
@@ -100,6 +97,7 @@ export interface Account {
   id: UUID;
   memberId: UUID;
   name: string;
+  icon?: string; // Emoji icon (e.g. "🏦")
   type: AccountType;
   currency: CurrencyCode;
   balance: number;
@@ -126,6 +124,7 @@ export interface Transaction {
   id: UUID;
   accountId: UUID;
   toAccountId?: UUID; // For transfers
+  activityId?: UUID; // Link transaction to an activity
   type: TransactionType;
   amount: number;
   currency: CurrencyCode;
@@ -241,6 +240,65 @@ export interface TodoItem {
 export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
 
+// Family Activity — The Treehouse planner's central entity
+export type ActivityCategory = 'lesson' | 'sport' | 'appointment' | 'social' | 'pickup' | 'other';
+export type ActivityRecurrence = 'weekly' | 'daily' | 'monthly' | 'yearly' | 'none';
+export type FeeSchedule = 'none' | 'per_session' | 'weekly' | 'monthly' | 'termly' | 'yearly';
+export type ReminderMinutes = 0 | 5 | 10 | 15 | 30 | 60 | 120 | 1440;
+
+export interface FamilyActivity {
+  id: UUID;
+  title: string;
+  description?: string;
+  icon?: string; // Emoji icon (e.g. "⚽")
+
+  // Schedule
+  date: ISODateString; // Start date / next occurrence
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  recurrence: ActivityRecurrence;
+  daysOfWeek?: number[]; // Multi-day weekly recurrence (0=Sun..6=Sat)
+
+  // Category
+  category: ActivityCategory;
+  color?: string; // Per-activity highlight color override (falls back to category color)
+
+  // People
+  assigneeId?: UUID; // The child/member doing the activity
+  dropoffMemberId?: UUID; // Who drops off
+  pickupMemberId?: UUID; // Who picks up
+
+  // Location
+  location?: string;
+
+  // Fees
+  feeSchedule: FeeSchedule;
+  feeAmount?: number;
+  feeCurrency?: CurrencyCode;
+  feePayerId?: UUID;
+
+  // Instructor / Coach
+  instructorName?: string;
+  instructorContact?: string;
+
+  // Reminders
+  reminderMinutes: ReminderMinutes;
+
+  // Notes
+  notes?: string;
+
+  // Metadata
+  isActive: boolean;
+  createdBy: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateFamilyActivityInput = Omit<FamilyActivity, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateFamilyActivityInput = Partial<
+  Omit<FamilyActivity, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
 // Exchange rate for currency conversion
 export interface ExchangeRate {
   from: CurrencyCode;
@@ -302,6 +360,7 @@ export type EntityType =
   | 'goal'
   | 'recurringItem'
   | 'todo'
+  | 'familyActivity'
   | 'settings';
 
 export interface SyncQueueItem {
@@ -354,8 +413,15 @@ export type UpdateRecurringItemInput = Partial<
   Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
+// Deletion tombstone for merge-based sync
+export interface DeletionTombstone {
+  id: UUID;
+  entityType: EntityType;
+  deletedAt: ISODateString;
+}
+
 // Sync file format
-export const SYNC_FILE_VERSION = '2.0';
+export const SYNC_FILE_VERSION = '3.0';
 
 export interface SyncFileData {
   version: string;
@@ -371,6 +437,8 @@ export interface SyncFileData {
     goals: Goal[];
     recurringItems: RecurringItem[];
     todos?: TodoItem[];
+    activities?: FamilyActivity[];
+    deletions: DeletionTombstone[];
     settings: Settings | null;
   };
 }

@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-25
-> **Updated by:** Claude (Family Nook complete — #97 done, deployed to prod)
+> **Last updated:** 2026-02-28
+> **Updated by:** Claude (single-family fast login, close #97 and #78)
 
 ## Current Phase
 
@@ -20,6 +20,8 @@
 - Unit test infrastructure (Vitest with happy-dom)
 - Linting (ESLint + Prettier + Stylelint + Husky pre-commit hooks)
 - File-based sync via File System Access API (with encryption support)
+- Google Drive cloud storage integration (StorageProvider abstraction, OAuth via GIS, Drive REST API, offline queue, file picker, reconnect toast) — ADR-016
+- Cross-device sync hardening: record-level merge (v3.0 file format), deletion tombstones, 6 sync bug fixes — ADR-017
 - Exchange rate auto-fetching from free currency API
 - Recurring transaction processor (daily/monthly/yearly)
 - Multilingual support (English + Chinese) via MyMemory API with IndexedDB caching
@@ -424,12 +426,48 @@
 - `FamilyBeanRow.vue` `getRoleLabel` now checks `member.ageGroup` (adult/child) instead of only `member.role`
 - Adults with 'member' role correctly show "Parent"/"Big Bean" instead of "Little Bean"
 
+### Cross-Device Passkey Authentication Fix
+
+- **passkeyService.ts** — When a synced passkey (iCloud Keychain, Google Password Manager, Windows Hello) is used on a device where it wasn't originally registered, the system now auto-registers the credential locally using the family's cached encryption password instead of returning an error
+- **BiometricLoginView.vue** — New `CROSS_DEVICE_NO_CACHE` error handling with user-friendly message directing to password entry
+- **uiStrings.ts** — Updated cross-device error message to explain synced passkey behavior
+- **ADR-015** — Updated with cross-device passkey sync section documenting the auto-registration approach and trust model
+
 ### Biometric Login After Family Switching (Issue #16 follow-up)
 
 - **LoadPodView.vue** — Added biometric detection before password modal: checks `isPlatformAuthenticatorAvailable()` + `hasRegisteredPasskeys()` when encrypted file is loaded, emits `biometric-available` event to switch to BiometricLoginView
 - **LoginPage.vue** — Handles `biometric-available` event from LoadPodView, `biometricDeclined` flag prevents loops when user clicks "Use password instead", resets on family switch/navigation
 - **authStore.ts** — Fixed `signInWithPasskey()` using stale `familyContextStore.activeFamilyId` instead of the authoritative `familyId` parameter during family switching
 - **passwordCache.test.ts** — Added missing `setSessionDEK` and `flushPendingSave` to syncService mock (pre-existing CI failure)
+
+### Cross-Device Sync (Issue #103) — Closed
+
+- **`syncStore.ts` — `reloadIfFileChanged()`**: Lightweight `getFileTimestamp()` check, full reload only when file is newer. Handles encrypted files via session password → session DEK → cached password fallback chain
+- **`syncStore.ts` — `startFilePolling()` / `stopFilePolling()`**: 10-second interval polling for external file changes, auto-started by `setupAutoSync()`, stopped on sign-out/disconnect
+- **`App.vue` — visibility change handling**: `reloadIfFileChanged()` on tab/app resume; `syncStore.syncNow(true)` force save on `hidden` to prevent data loss on quick reload
+- **Data loss fix**: `flushPendingSave()` + `syncNow(true)` on `visibilityState: hidden` ensures debounced saves are flushed before page reload
+- Cloud relay for near-instant sync planned as follow-up (#104, `docs/plans/2026-02-26-cloud-relay-sync.md`)
+
+### Family Nook Landing Page Fix
+
+- All 5 login components (PickBeanView, BiometricLoginView, JoinPodView, CreatePodView, LoadPodView) now redirect to `/nook` instead of `/dashboard` after sign-in
+- NotFoundPage "Go Home" button navigates to `/nook`
+- E2E tests updated to expect `/nook` after authentication
+
+### Biometric Login Fallback Fix (LoadPodView)
+
+- Fixed bug where "use password instead" after biometric prompt showed old family members instead of decrypt modal
+- Root cause: `autoLoadFile()` called `syncStore.loadFromFile()` reading from old configured file handle instead of pending encrypted file
+- Fix: check `syncStore.hasPendingEncryptedFile` before re-reading
+
+### Deploy Workflow CI Gating
+
+- Updated `.github/workflows/deploy.yml` to poll for CI/security check completion (15s interval, 10min timeout) instead of failing immediately
+- Fails immediately if no CI run exists for the latest commit (prevents bypassing CI)
+
+### NookGreeting UI Cleanup
+
+- Removed duplicate notification bell and privacy mask icons from `NookGreeting.vue` (already present in header)
 
 ### Recent Fixes
 
@@ -575,8 +613,8 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | ----- | --------------------------------------------------------------- | -------- | ------- |
 | #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     | ✅ Done |
 | #98   | Family Planner 📅: calendar and scheduling hub                  | High     |
-| #99   | Family To-Do ✅: standalone task management page                | High     |
-| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     |
+| #99   | Family To-Do ✅: standalone task management page                | High     | ✅ Done |
+| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     | ✅ Done |
 | #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   |
 
 ### Existing Issues Updated
@@ -603,7 +641,8 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 - [ ] Budget page with category budgets and spending vs planned (#68)
 - [ ] Data import/export (CSV, etc.)
 - [x] PWA offline support / install prompt / SW update prompt (#6) ✓
-- [ ] Google Drive sync (OAuth integration)
+- [ ] Cloud relay for near-instant cross-device sync (#104)
+- [x] Google Drive sync (OAuth integration) — #78, ADR-016
 - [ ] Skip/modify individual recurring occurrences
 - [ ] Landing/marketing page (#72)
 
@@ -669,3 +708,6 @@ _(None currently tracked)_
 | 2026-02-24 | Mobile privacy toggle in header                            | Show/hide figures icon always visible on mobile/tablet (not buried in hamburger menu) for better UX                                                     |
 | 2026-02-24 | Issue #16 updated: unified passkey login + data unlock     | Single biometric gesture replaces both member password and encryption password; password fallback preserved                                             |
 | 2026-02-24 | Issue #16 implemented: passkey/biometric login             | PRF + cached password dual-path, BiometricLoginView, PasskeyPromptModal, PasskeySettings rewrite, registry DB v3 with passkeys store (ADR-015)          |
+| 2026-02-26 | Cross-device sync via file polling (#103)                  | 10s file polling + visibility-change reload + force save on hidden; near-instant relay planned as #104                                                  |
+| 2026-02-26 | Cloud relay plan created (#104)                            | AWS API Gateway WebSocket + Lambda + DynamoDB for near-instant cross-device notifications; plan at `docs/plans/2026-02-26-cloud-relay-sync.md`          |
+| 2026-02-27 | Fix cross-device passkey authentication                    | Synced passkeys (iCloud/Google/Windows) auto-register locally using cached password; no more "registered on another device" error (ADR-015 updated)     |

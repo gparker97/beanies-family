@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import * as familyRepo from '@/services/indexeddb/repositories/familyMemberRepository';
+import { useTombstoneStore } from './tombstoneStore';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
@@ -84,6 +85,7 @@ export const useFamilyStore = defineStore('family', () => {
     try {
       const success = await familyRepo.deleteFamilyMember(id);
       if (success) {
+        useTombstoneStore().recordDeletion('familyMember', id);
         members.value = members.value.filter((m) => m.id !== id);
         if (currentMemberId.value === id) {
           currentMemberId.value = owner.value?.id ?? null;

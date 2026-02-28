@@ -5,15 +5,16 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
-import { BaseCard, BaseButton, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import TransactionModal from '@/components/transactions/TransactionModal.vue';
+import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useSounds } from '@/composables/useSounds';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
-import { EXPENSE_CATEGORIES, getCategoryById, getCategoriesGrouped } from '@/constants/categories';
-import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
+import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -24,7 +25,6 @@ import type {
   Transaction,
   CreateTransactionInput,
   UpdateTransactionInput,
-  TransactionType,
   RecurringItem,
   CreateRecurringItemInput,
 } from '@/types/models';
@@ -45,6 +45,7 @@ const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
 // Tab state - recurring first by default
@@ -61,79 +62,11 @@ const showCustomDatePicker = ref(false);
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
-const isSubmitting = ref(false);
 
 // Recurring modal state
 const showRecurringModal = ref(false);
 const editingRecurringItem = ref<RecurringItem | undefined>(undefined);
 const isSubmittingRecurring = ref(false);
-
-const transactionTypes = computed(() => [
-  { value: 'expense' as TransactionType, label: t('transactions.type.expense') },
-  { value: 'income' as TransactionType, label: t('transactions.type.income') },
-  { value: 'transfer' as TransactionType, label: t('transactions.type.transfer') },
-]);
-
-const accountOptions = computed(() =>
-  accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))
-);
-
-const categoryOptions = computed(() => {
-  const type = newTransaction.value.type === 'income' ? 'income' : 'expense';
-  const groups = getCategoriesGrouped(type);
-  return groups.map((g) => ({
-    label: g.name,
-    options: g.categories.map((c) => ({ value: c.id, label: c.name })),
-  }));
-});
-
-const editCategoryOptions = computed(() => {
-  const type = editTransaction.value.type === 'income' ? 'income' : 'expense';
-  const groups = getCategoriesGrouped(type);
-  return groups.map((g) => ({
-    label: g.name,
-    options: g.categories.map((c) => ({ value: c.id, label: c.name })),
-  }));
-});
-
-const { currencyOptions } = useCurrencyOptions();
-
-const newTransaction = ref<CreateTransactionInput>({
-  accountId: '',
-  type: 'expense',
-  amount: 0,
-  currency: settingsStore.displayCurrency,
-  category: '',
-  date: toISODateString(new Date()),
-  description: '',
-  isReconciled: false,
-});
-
-// Form data for editing - all fields are required with defaults
-interface EditTransactionForm {
-  id: string;
-  accountId: string;
-  toAccountId?: string;
-  type: TransactionType;
-  amount: number;
-  currency: string;
-  category: string;
-  date: string;
-  description: string;
-  isReconciled: boolean;
-}
-
-const editTransaction = ref<EditTransactionForm>({
-  id: '',
-  accountId: '',
-  type: 'expense',
-  amount: 0,
-  currency: settingsStore.displayCurrency,
-  category: '',
-  date: toISODateString(new Date()),
-  description: '',
-  isReconciled: false,
-});
 
 // Date range based on filter type
 const dateRange = computed(() => {
@@ -284,45 +217,12 @@ function getAccountTypeByAccountId(accountId: string) {
 
 // Transaction functions
 function openAddModal() {
-  newTransaction.value = {
-    accountId: accountsStore.accounts[0]?.id || '',
-    type: 'expense',
-    amount: 0,
-    currency: settingsStore.displayCurrency,
-    category: EXPENSE_CATEGORIES[0]?.id || '',
-    date: toISODateString(new Date()),
-    description: '',
-    isReconciled: false,
-  };
+  editingTransaction.value = null;
   showAddModal.value = true;
-}
-
-async function createTransaction() {
-  if (!newTransaction.value.description.trim() || !newTransaction.value.accountId) return;
-
-  isSubmitting.value = true;
-  try {
-    await transactionsStore.createTransaction(newTransaction.value);
-    showAddModal.value = false;
-  } finally {
-    isSubmitting.value = false;
-  }
 }
 
 function openEditModal(transaction: Transaction) {
   editingTransaction.value = transaction;
-  editTransaction.value = {
-    id: transaction.id,
-    accountId: transaction.accountId,
-    toAccountId: transaction.toAccountId,
-    type: transaction.type,
-    amount: transaction.amount,
-    currency: transaction.currency,
-    category: transaction.category,
-    date: transaction.date.split('T')[0] || transaction.date,
-    description: transaction.description,
-    isReconciled: transaction.isReconciled,
-  };
   showEditModal.value = true;
 }
 
@@ -331,16 +231,28 @@ function closeEditModal() {
   editingTransaction.value = null;
 }
 
-async function updateTransaction() {
-  if (!editTransaction.value.description?.trim() || !editTransaction.value.accountId) return;
-
-  isSubmitting.value = true;
-  try {
-    const { id, ...input } = editTransaction.value;
-    await transactionsStore.updateTransaction(id, input as UpdateTransactionInput);
+async function handleTransactionSave(
+  data: CreateTransactionInput | { id: string; data: UpdateTransactionInput }
+) {
+  if ('id' in data) {
+    await transactionsStore.updateTransaction(data.id, data.data);
     closeEditModal();
-  } finally {
-    isSubmitting.value = false;
+  } else {
+    await transactionsStore.createTransaction(data);
+    showAddModal.value = false;
+  }
+}
+
+async function handleTransactionDelete(id: string) {
+  closeEditModal();
+  if (
+    await showConfirm({
+      title: 'confirm.deleteTransactionTitle',
+      message: 'transactions.deleteConfirm',
+    })
+  ) {
+    await transactionsStore.deleteTransaction(id);
+    playWhoosh();
   }
 }
 
@@ -638,6 +550,7 @@ function applyCustomDateRange() {
             :key="transaction.id"
             data-testid="transaction-item"
             class="flex items-center justify-between py-4"
+            :class="syncHighlightClass(transaction.id)"
           >
             <div class="flex items-center gap-4">
               <div
@@ -791,7 +704,7 @@ function applyCustomDateRange() {
             v-for="item in recurringItems"
             :key="item.id"
             class="py-4"
-            :class="{ 'opacity-50': !item.isActive }"
+            :class="[{ 'opacity-50': !item.isActive }, syncHighlightClass(item.id)]"
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-4">
@@ -885,130 +798,21 @@ function applyCustomDateRange() {
     </template>
 
     <!-- Add Transaction Modal -->
-    <BaseModal
+    <TransactionModal
       :open="showAddModal"
-      :title="t('transactions.addTransaction')"
       @close="showAddModal = false"
-    >
-      <form class="space-y-4" @submit.prevent="createTransaction">
-        <BaseSelect
-          v-model="newTransaction.type"
-          :options="transactionTypes"
-          :label="t('form.type')"
-        />
-
-        <BaseSelect
-          v-model="newTransaction.accountId"
-          :options="accountOptions"
-          :label="t('form.account')"
-          :placeholder="t('form.selectAccount')"
-        />
-
-        <BaseInput
-          v-model="newTransaction.description"
-          :label="t('form.description')"
-          :placeholder="t('transactions.descriptionPlaceholder')"
-          required
-        />
-
-        <BaseSelect
-          v-model="newTransaction.category"
-          :grouped-options="categoryOptions"
-          :label="t('form.category')"
-        />
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="newTransaction.amount"
-            type="number"
-            :label="t('form.amount')"
-            placeholder="0.00"
-          />
-
-          <BaseSelect
-            v-model="newTransaction.currency"
-            :options="currencyOptions"
-            :label="t('form.currency')"
-          />
-        </div>
-
-        <BaseInput v-model="newTransaction.date" type="date" :label="t('form.date')" />
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="showAddModal = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="createTransaction">
-            {{ t('transactions.addTransaction') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleTransactionSave"
+      @delete="handleTransactionDelete"
+    />
 
     <!-- Edit Transaction Modal -->
-    <BaseModal
+    <TransactionModal
       :open="showEditModal"
-      :title="t('transactions.editTransaction')"
+      :transaction="editingTransaction"
       @close="closeEditModal"
-    >
-      <form class="space-y-4" @submit.prevent="updateTransaction">
-        <BaseSelect
-          v-model="editTransaction.type"
-          :options="transactionTypes"
-          :label="t('form.type')"
-        />
-
-        <BaseSelect
-          v-model="editTransaction.accountId"
-          :options="accountOptions"
-          :label="t('form.account')"
-          :placeholder="t('form.selectAccount')"
-        />
-
-        <BaseInput
-          v-model="editTransaction.description"
-          :label="t('form.description')"
-          :placeholder="t('transactions.descriptionPlaceholder')"
-          required
-        />
-
-        <BaseSelect
-          v-model="editTransaction.category"
-          :grouped-options="editCategoryOptions"
-          :label="t('form.category')"
-        />
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="editTransaction.amount"
-            type="number"
-            :label="t('form.amount')"
-            placeholder="0.00"
-          />
-
-          <BaseSelect
-            v-model="editTransaction.currency"
-            :options="currencyOptions"
-            :label="t('form.currency')"
-          />
-        </div>
-
-        <BaseInput v-model="editTransaction.date" type="date" :label="t('form.date')" />
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="closeEditModal">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="updateTransaction">
-            {{ t('action.saveChanges') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleTransactionSave"
+      @delete="handleTransactionDelete"
+    />
 
     <!-- Add/Edit Recurring Modal -->
     <BaseModal

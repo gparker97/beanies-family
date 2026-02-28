@@ -185,8 +185,9 @@ export const useAuthStore = defineStore('auth', () => {
       // Hash the password
       const passwordHashValue = await hashPassword(params.password);
 
-      // Create the owner member with password hash
+      // Clear stale state from any previous cancelled setup attempt
       const familyStore = useFamilyStore();
+      familyStore.resetState();
       const member = await familyStore.createMember({
         name: params.memberName,
         email: params.email,
@@ -325,11 +326,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Sign in using a registered passkey (biometric).
-   * Returns dek (PRF path) or cachedPassword (non-PRF path) for file decryption.
+   * Returns cachedPassword for file decryption.
    */
   async function signInWithPasskey(familyId: string): Promise<{
     success: boolean;
-    dek?: CryptoKey;
     cachedPassword?: string;
     error?: string;
   }> {
@@ -359,7 +359,6 @@ export const useAuthStore = defineStore('auth', () => {
 
       return {
         success: true,
-        dek: result.dek,
         cachedPassword: result.cachedPassword,
       };
     } catch (e) {
@@ -395,12 +394,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Register a passkey for the current user.
-   * If PRF succeeds, switches the sync session to DEK-based encryption
-   * so the wrapped DEK stays valid across saves.
    */
   async function registerPasskeyForCurrentUser(
     encryptionPassword: string,
-    encryptedFileBlob: string,
     label?: string
   ): Promise<{ success: boolean; error?: string; prfSupported?: boolean }> {
     if (!currentUser.value) {
@@ -413,34 +409,14 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: 'Member not found' };
     }
 
-    const result = await registerPasskeyForMember({
+    return registerPasskeyForMember({
       memberId: member.id,
       memberName: member.name,
       memberEmail: member.email,
       familyId: currentUser.value.familyId ?? '',
       encryptionPassword,
-      encryptedFileBlob,
       label,
     });
-
-    // If PRF succeeded and we got a DEK, switch the sync session to use it.
-    // This ensures future saves (including sign-out flush) use encryptDataWithKey
-    // with a stable salt, keeping the wrapped DEK valid.
-    if (result.success && result.dek && result.dekSalt) {
-      const { useSyncStore } = await import('./syncStore');
-      const syncStore = useSyncStore();
-      const { setSessionDEK } = await import('@/services/sync/syncService');
-      syncStore.sessionDEK = result.dek;
-      setSessionDEK(result.dek, result.dekSalt);
-
-      // Force an immediate save so the file is encrypted with the DEK's stable salt.
-      // This closes a race condition where a debounced auto-save (password-based)
-      // could fire during the biometric prompt, re-encrypting with a new random salt
-      // and making the just-wrapped DEK stale.
-      await syncStore.syncNow(true);
-    }
-
-    return result;
   }
 
   /**

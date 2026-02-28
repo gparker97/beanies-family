@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { BaseCard, BaseButton, BaseInput, BaseModal, BaseSelect } from '@/components/ui';
+import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
+import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
+import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -17,8 +19,6 @@ import type {
   CreateFamilyMemberInput,
   FamilyMember,
   UpdateFamilyMemberInput,
-  Gender,
-  AgeGroup,
 } from '@/types/models';
 
 const route = useRoute();
@@ -26,11 +26,11 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const { t } = useTranslation();
+const { syncHighlightClass } = useSyncHighlight();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
-const editingMemberId = ref<string | null>(null);
-const isSubmitting = ref(false);
+const editingMember = ref<FamilyMember | null>(null);
 const isEditingFamilyName = ref(false);
 const editFamilyName = ref('');
 const showInviteModal = ref(false);
@@ -91,148 +91,19 @@ async function copyMemberInviteLink(memberId: string) {
   }
 }
 
-const colors: string[] = [
-  '#3b82f6',
-  '#ef4444',
-  '#22c55e',
-  '#f59e0b',
-  '#8b5cf6',
-  '#ec4899',
-  '#06b6d4',
-  '#f97316',
-];
-
-const genderOptions = [
-  { value: 'male', label: t('family.gender.male') },
-  { value: 'female', label: t('family.gender.female') },
-  { value: 'other', label: t('family.gender.other') },
-];
-
-const ageGroupOptions = [
-  { value: 'adult', label: t('family.ageGroup.adult') },
-  { value: 'child', label: t('family.ageGroup.child') },
-];
-
-const monthOptions = computed(() => [
-  { value: '1', label: t('month.january') },
-  { value: '2', label: t('month.february') },
-  { value: '3', label: t('month.march') },
-  { value: '4', label: t('month.april') },
-  { value: '5', label: t('month.may') },
-  { value: '6', label: t('month.june') },
-  { value: '7', label: t('month.july') },
-  { value: '8', label: t('month.august') },
-  { value: '9', label: t('month.september') },
-  { value: '10', label: t('month.october') },
-  { value: '11', label: t('month.november') },
-  { value: '12', label: t('month.december') },
-]);
-
-const dayOptions = Array.from({ length: 31 }, (_, i) => ({
-  value: String(i + 1),
-  label: String(i + 1),
-}));
-
-const newMember = ref<CreateFamilyMemberInput>({
-  name: '',
-  email: '',
-  gender: 'male' as Gender,
-  ageGroup: 'adult' as AgeGroup,
-  role: 'member',
-  color: colors[0] ?? '#3b82f6',
-  requiresPassword: true,
-});
-
-const dobMonth = ref('1');
-const dobDay = ref('1');
-const dobYear = ref('');
-
 function openAddModal() {
-  const randomColor = colors[Math.floor(Math.random() * colors.length)] ?? '#3b82f6';
-  newMember.value = {
-    name: '',
-    email: '',
-    gender: 'male' as Gender,
-    ageGroup: 'adult' as AgeGroup,
-    role: 'member',
-    color: randomColor,
-    requiresPassword: true,
-  };
-  dobMonth.value = '1';
-  dobDay.value = '1';
-  dobYear.value = '';
+  editingMember.value = null;
   showAddModal.value = true;
 }
 
-async function createMember() {
-  if (!newMember.value.name.trim() || !newMember.value.email.trim()) return;
-
-  isSubmitting.value = true;
-  try {
-    const input = { ...newMember.value };
-    // Attach date of birth if month and day are filled
-    if (dobMonth.value && dobDay.value) {
-      input.dateOfBirth = {
-        month: parseInt(dobMonth.value, 10),
-        day: parseInt(dobDay.value, 10),
-        ...(dobYear.value ? { year: parseInt(dobYear.value, 10) } : {}),
-      };
-    }
-    await familyStore.createMember(input);
-    showAddModal.value = false;
-  } finally {
-    isSubmitting.value = false;
-  }
-}
-
-// Edit member state
-const editMember = ref({
-  name: '',
-  email: '',
-  gender: 'male' as Gender,
-  ageGroup: 'adult' as AgeGroup,
-  color: '#3b82f6',
-});
-const editDobMonth = ref('1');
-const editDobDay = ref('1');
-const editDobYear = ref('');
-const editModalCopied = ref(false);
-
-const editingMemberFull = computed(() =>
-  editingMemberId.value ? familyStore.members.find((m) => m.id === editingMemberId.value) : null
-);
-
-async function copyEditModalInviteLink() {
-  try {
-    await navigator.clipboard.writeText(inviteLink.value);
-    editModalCopied.value = true;
-    setTimeout(() => {
-      editModalCopied.value = false;
-    }, 2000);
-  } catch {
-    // ignore
-  }
-}
-
 function openEditModal(member: FamilyMember) {
-  editModalCopied.value = false;
-  editingMemberId.value = member.id;
-  editMember.value = {
-    name: member.name,
-    email: isTemporaryEmail(member.email) ? '' : member.email,
-    gender: member.gender || 'other',
-    ageGroup: member.ageGroup || 'adult',
-    color: member.color,
-  };
-  editDobMonth.value = member.dateOfBirth?.month?.toString() ?? '1';
-  editDobDay.value = member.dateOfBirth?.day?.toString() ?? '1';
-  editDobYear.value = member.dateOfBirth?.year?.toString() ?? '';
+  editingMember.value = member;
   showEditModal.value = true;
 }
 
 function closeEditModal() {
   showEditModal.value = false;
-  editingMemberId.value = null;
+  editingMember.value = null;
 }
 
 // Open modals from query params (e.g. navigated from Family Nook)
@@ -246,37 +117,21 @@ onMounted(() => {
   }
 });
 
-async function saveEditMember() {
-  if (!editMember.value.name.trim()) return;
-  if (!editingMemberId.value) return;
-
-  // If the user entered a real email, use it; otherwise keep whatever the member already has
-  const originalMember = familyStore.members.find((m) => m.id === editingMemberId.value);
-  const emailToSave = editMember.value.email.trim() || originalMember?.email || '';
-
-  isSubmitting.value = true;
-  try {
-    const input: UpdateFamilyMemberInput = {
-      name: editMember.value.name,
-      email: emailToSave,
-      gender: editMember.value.gender,
-      ageGroup: editMember.value.ageGroup,
-      color: editMember.value.color,
-    };
-    if (editDobMonth.value && editDobDay.value) {
-      input.dateOfBirth = {
-        month: parseInt(editDobMonth.value, 10),
-        day: parseInt(editDobDay.value, 10),
-        ...(editDobYear.value ? { year: parseInt(editDobYear.value, 10) } : {}),
-      };
-    } else {
-      input.dateOfBirth = undefined;
-    }
-    await familyStore.updateMember(editingMemberId.value, input);
+async function handleMemberSave(
+  data: CreateFamilyMemberInput | { id: string; data: UpdateFamilyMemberInput }
+) {
+  if ('id' in data) {
+    await familyStore.updateMember(data.id, data.data);
     closeEditModal();
-  } finally {
-    isSubmitting.value = false;
+  } else {
+    await familyStore.createMember(data);
+    showAddModal.value = false;
   }
+}
+
+async function handleMemberDelete(id: string) {
+  closeEditModal();
+  await deleteMember(id);
 }
 
 async function deleteMember(id: string) {
@@ -369,7 +224,12 @@ function cancelEditFamilyName() {
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <BaseCard v-for="member in familyStore.members" :key="member.id" :hoverable="true">
+      <BaseCard
+        v-for="member in familyStore.members"
+        :key="member.id"
+        :hoverable="true"
+        :class="syncHighlightClass(member.id)"
+      >
         <div class="flex items-start gap-4">
           <BeanieAvatar
             :variant="getMemberAvatarVariant(member)"
@@ -453,248 +313,21 @@ function cancelEditFamilyName() {
     </div>
 
     <!-- Add Member Modal -->
-    <BaseModal :open="showAddModal" :title="t('family.addMember')" @close="showAddModal = false">
-      <form class="space-y-4" @submit.prevent="createMember">
-        <BaseInput
-          v-model="newMember.name"
-          :label="t('form.name')"
-          :placeholder="t('family.enterName')"
-          required
-        />
-
-        <BaseInput
-          v-model="newMember.email"
-          type="email"
-          :label="t('form.email')"
-          :placeholder="t('family.enterEmail')"
-          required
-        />
-
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <BaseSelect
-            v-model="newMember.gender"
-            :options="genderOptions"
-            :label="t('family.gender')"
-            data-testid="gender-select"
-          />
-          <BaseSelect
-            v-model="newMember.ageGroup"
-            :options="ageGroupOptions"
-            :label="t('family.ageGroup')"
-            data-testid="age-group-select"
-          />
-        </div>
-
-        <!-- Date of Birth (optional) -->
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('family.dateOfBirth') }}
-          </label>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <BaseSelect
-              v-model="dobMonth"
-              :options="monthOptions"
-              :label="t('family.dateOfBirth.month')"
-            />
-            <BaseSelect
-              v-model="dobDay"
-              :options="dayOptions"
-              :label="t('family.dateOfBirth.day')"
-            />
-            <BaseInput
-              v-model="dobYear"
-              type="number"
-              :label="t('family.dateOfBirth.year')"
-              :placeholder="t('family.year')"
-            />
-          </div>
-        </div>
-
-        <!-- Avatar Preview -->
-        <div class="flex items-center gap-3">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('family.avatarPreview') }}
-          </span>
-          <BeanieAvatar
-            :variant="getMemberAvatarVariant(newMember)"
-            :color="newMember.color"
-            size="xl"
-            data-testid="avatar-preview"
-          />
-        </div>
-
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('family.profileColor') }}
-          </label>
-          <div class="flex gap-2">
-            <button
-              v-for="color in colors"
-              :key="color"
-              type="button"
-              class="h-8 w-8 rounded-full border-2 transition-all"
-              :class="
-                newMember.color === color
-                  ? 'scale-110 border-gray-900 dark:border-white'
-                  : 'border-transparent'
-              "
-              :style="{ backgroundColor: color }"
-              @click="newMember.color = color"
-            />
-          </div>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="showAddModal = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="createMember">
-            {{ t('family.addMember') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+    <FamilyMemberModal
+      :open="showAddModal"
+      @close="showAddModal = false"
+      @save="handleMemberSave"
+      @delete="handleMemberDelete"
+    />
 
     <!-- Edit Member Modal -->
-    <BaseModal
+    <FamilyMemberModal
       :open="showEditModal"
-      :title="t('family.editMember')"
-      size="xl"
+      :member="editingMember"
       @close="closeEditModal"
-    >
-      <form class="space-y-4" @submit.prevent="saveEditMember">
-        <BaseInput
-          v-model="editMember.name"
-          :label="t('form.name')"
-          :placeholder="t('family.enterName')"
-          required
-        />
-
-        <BaseInput
-          v-model="editMember.email"
-          type="email"
-          :label="t('form.email')"
-          :placeholder="t('family.enterEmail')"
-          :required="!!editMember.email"
-        />
-
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <BaseSelect
-            v-model="editMember.gender"
-            :options="genderOptions"
-            :label="t('family.gender')"
-            data-testid="edit-gender-select"
-          />
-          <BaseSelect
-            v-model="editMember.ageGroup"
-            :options="ageGroupOptions"
-            :label="t('family.ageGroup')"
-            data-testid="edit-age-group-select"
-          />
-        </div>
-
-        <!-- Date of Birth (optional) -->
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('family.dateOfBirth') }}
-          </label>
-          <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <BaseSelect
-              v-model="editDobMonth"
-              :options="monthOptions"
-              :label="t('family.dateOfBirth.month')"
-            />
-            <BaseSelect
-              v-model="editDobDay"
-              :options="dayOptions"
-              :label="t('family.dateOfBirth.day')"
-            />
-            <BaseInput
-              v-model="editDobYear"
-              type="number"
-              :label="t('family.dateOfBirth.year')"
-              :placeholder="t('family.year')"
-            />
-          </div>
-        </div>
-
-        <!-- Avatar Preview -->
-        <div class="flex items-center gap-3">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('family.avatarPreview') }}
-          </span>
-          <BeanieAvatar
-            :variant="getMemberAvatarVariant(editMember)"
-            :color="editMember.color"
-            size="xl"
-          />
-        </div>
-
-        <div>
-          <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('family.profileColor') }}
-          </label>
-          <div class="flex gap-2">
-            <button
-              v-for="color in colors"
-              :key="color"
-              type="button"
-              class="h-8 w-8 rounded-full border-2 transition-all"
-              :class="
-                editMember.color === color
-                  ? 'scale-110 border-gray-900 dark:border-white'
-                  : 'border-transparent'
-              "
-              :style="{ backgroundColor: color }"
-              @click="editMember.color = color"
-            />
-          </div>
-        </div>
-
-        <!-- Invite section (only for unclaimed members) -->
-        <div
-          v-if="editingMemberFull?.requiresPassword"
-          class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-900/20"
-        >
-          <h4 class="mb-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
-            {{ t('family.inviteSection.title') }}
-          </h4>
-          <p class="mb-3 text-sm text-amber-800 dark:text-amber-300">
-            {{ t('family.inviteSection.desc') }}
-          </p>
-          <ol
-            class="mb-4 list-inside list-decimal space-y-1 text-sm text-amber-700 dark:text-amber-300/90"
-          >
-            <li>{{ t('family.inviteSection.step1') }}</li>
-            <li>{{ t('family.inviteSection.step2') }}</li>
-            <li>{{ t('family.inviteSection.step3') }}</li>
-          </ol>
-          <div class="flex items-center gap-2">
-            <code
-              class="flex-1 truncate rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs text-gray-900 select-all dark:border-amber-700 dark:bg-slate-800 dark:text-gray-100"
-            >
-              {{ inviteLink }}
-            </code>
-            <BaseButton variant="secondary" @click="copyEditModalInviteLink">
-              {{ editModalCopied ? t('login.copied') : t('login.copyLink') }}
-            </BaseButton>
-          </div>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="closeEditModal">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="saveEditMember">
-            {{ t('action.saveChanges') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleMemberSave"
+      @delete="handleMemberDelete"
+    />
 
     <!-- Invite Family Member Modal -->
     <BaseModal

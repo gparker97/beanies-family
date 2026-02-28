@@ -42,27 +42,23 @@ test.describe('Beanie Avatars', () => {
     // Click Add Member
     await page.getByRole('button', { name: /add member|add a beanie/i }).click();
 
-    // Fill name and email
-    await page.getByLabel(/name/i).first().fill('Luna');
+    // Fill name via the centered placeholder input
+    await page.getByPlaceholder(/name/i).fill('Luna');
+
+    // Select "Little Bean" role chip (maps to child age group)
+    await page.getByRole('button', { name: /little bean/i }).click();
+
+    // Expand "More Details" to access email and gender
+    await page.getByRole('button', { name: /more details/i }).click();
+
+    // Fill email
     await page.getByLabel(/email/i).fill('luna@example.com');
 
     // Select Female gender
-    const genderSelect = page.getByTestId('gender-select').locator('select');
-    await genderSelect.selectOption('female');
+    await page.getByLabel(/gender/i).selectOption('female');
 
-    // Select Child age group
-    const ageGroupSelect = page.getByTestId('age-group-select').locator('select');
-    await ageGroupSelect.selectOption('child');
-
-    // Verify avatar preview shows child-female variant
-    const preview = page.getByTestId('avatar-preview');
-    await expect(preview).toHaveAttribute('data-variant', 'child-female');
-
-    // Submit
-    await page
-      .getByRole('button', { name: /add member|add a beanie/i })
-      .last()
-      .click();
+    // Submit via the save/add button inside the modal
+    await page.getByRole('button', { name: /add to family|add to pod/i }).click();
 
     // Wait for modal to close and verify the new card has the correct avatar
     await page.waitForTimeout(500);

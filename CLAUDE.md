@@ -242,6 +242,7 @@ npm run lint
 - **UI Text / i18n**: All user-visible text **must** go through the translation system — never hardcode English strings in templates. Define strings in `src/services/translation/uiStrings.ts` and use `{{ t('key') }}` in templates via `useTranslation()`. This enables Chinese translation, beanie mode overrides, and future languages. See ADR-008 for details.
 - **Translation script sync**: When modifying the structure of `uiStrings.ts` (renaming objects, changing export patterns, etc.), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm parsing still works. The script parses TypeScript at the text level and will silently break if the format changes. See `docs/TRANSLATION.md` for full pipeline docs.
 - **Plans**: When plan mode is used, save the accepted plan to `docs/plans/` before implementation begins (see Plans Archive below).
+- **DRY / shared components**: When the same UI pattern (modal, form, card) appears in 2+ locations, extract it into a shared component. Use prop-driven visibility and self-contained internal state. See `TodoViewEditModal.vue` and `ActivityModal.vue` as reference patterns.
 
 ## Current Status (MVP - Phase 1)
 

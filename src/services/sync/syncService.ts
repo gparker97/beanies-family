@@ -1,26 +1,18 @@
 import { supportsFileSystemAccess } from './capabilities';
-import {
-  storeFileHandle,
-  getFileHandle,
-  clearFileHandle,
-  verifyPermission,
-} from './fileHandleStore';
+import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
+import { GoogleDriveProvider } from './providers/googleDriveProvider';
 import {
   createSyncFileData,
   validateSyncFileData,
   importSyncFileData,
   openFilePicker,
 } from './fileSync';
-import {
-  encryptSyncData,
-  decryptSyncData,
-  encryptDataWithKey,
-  decryptDataWithKey,
-  extractSaltFromEncrypted,
-} from '@/services/crypto/encryption';
+import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import { clearSettingsWAL } from '@/services/sync/settingsWAL';
+import type { StorageProvider, StorageProviderType } from './storageProvider';
+import { LocalStorageProvider } from './providers/localProvider';
 import type { SyncFileData } from '@/types/models';
 import { generateUUID } from '@/utils/id';
 
@@ -30,6 +22,7 @@ export interface OpenFileResult {
   data?: SyncFileData;
   needsPassword?: boolean;
   fileHandle?: FileSystemFileHandle;
+  provider?: StorageProvider;
   rawSyncData?: SyncFileData; // The unprocessed sync data (with encrypted flag)
 }
 
@@ -51,13 +44,17 @@ const DEBOUNCE_MS = 2000;
 // (e.g. a shorter familyName leaves stale JSON after the closing brace).
 let saveInProgress: Promise<boolean> | null = null;
 
-// Current file handle (in-memory for session) and the family it belongs to
-let currentFileHandle: FileSystemFileHandle | null = null;
-let currentFileHandleFamilyId: string | null = null;
+// Current storage provider (in-memory for session) and the family it belongs to
+let currentProvider: StorageProvider | null = null;
+let currentProviderFamilyId: string | null = null;
 
 // Callbacks for state changes
 type StateCallback = (state: SyncServiceState) => void;
 const stateCallbacks: StateCallback[] = [];
+
+// Callbacks for save completion (timestamp updates)
+type SaveCompleteCallback = (timestamp: string) => void;
+const saveCompleteCallbacks: SaveCompleteCallback[] = [];
 
 // Current state
 let state: SyncServiceState = {
@@ -95,17 +92,54 @@ export function getState(): SyncServiceState {
 }
 
 /**
+ * Register a callback invoked after every successful save with the file's exportedAt timestamp.
+ * Used by syncStore to keep lastSync in sync without manual updates scattered throughout.
+ */
+export function onSaveComplete(callback: SaveCompleteCallback): () => void {
+  saveCompleteCallbacks.push(callback);
+  return () => {
+    const index = saveCompleteCallbacks.indexOf(callback);
+    if (index > -1) saveCompleteCallbacks.splice(index, 1);
+  };
+}
+
+/**
+ * Get the current storage provider type, or null if none configured
+ */
+export function getProviderType(): StorageProviderType | null {
+  return currentProvider?.type ?? null;
+}
+
+/**
+ * Get the current storage provider (for external use, e.g. Google Drive file ID)
+ */
+export function getProvider(): StorageProvider | null {
+  return currentProvider;
+}
+
+/**
+ * Set the storage provider directly (used by Google Drive flow)
+ */
+export function setProvider(provider: StorageProvider): void {
+  currentProvider = provider;
+  currentProviderFamilyId = getActiveFamilyId();
+  updateState({
+    isConfigured: true,
+    fileName: provider.getDisplayName(),
+    lastError: null,
+  });
+}
+
+/**
  * Reset the sync service state.
  * Must be called before re-initializing for a different family to prevent
  * stale file handles or auto-sync state from the previous family carrying over.
  */
 export function reset(): void {
   cancelPendingSave();
-  currentFileHandle = null;
-  currentFileHandleFamilyId = null;
+  currentProvider = null;
+  currentProviderFamilyId = null;
   sessionPassword = null;
-  sessionDEK = null;
-  sessionDEKSalt = null;
   updateState({
     isInitialized: false,
     isConfigured: false,
@@ -125,15 +159,6 @@ export async function initialize(): Promise<boolean> {
   // family's session from being reused (critical for multi-family isolation)
   reset();
 
-  if (!supportsFileSystemAccess()) {
-    updateState({
-      isInitialized: true,
-      isConfigured: false,
-      lastError: null,
-    });
-    return false;
-  }
-
   // Guard: don't initialize sync without an active family
   // (prevents getSyncFileKey from falling back to legacy key)
   if (!getActiveFamilyId()) {
@@ -146,21 +171,55 @@ export async function initialize(): Promise<boolean> {
     return false;
   }
 
-  try {
-    const handle = await getFileHandle();
-    if (handle) {
-      currentFileHandle = handle;
-      currentFileHandleFamilyId = getActiveFamilyId();
-      updateState({
-        isInitialized: true,
-        isConfigured: true,
-        fileName: handle.name,
-        lastError: null,
-      });
-      return true;
+  // Check for persisted provider config (Google Drive or local)
+  const familyId = getActiveFamilyId();
+  if (familyId) {
+    try {
+      const config = await getProviderConfig(familyId);
+      console.warn('[syncService] Provider config for', familyId, ':', config?.type ?? 'none');
+      if (config?.type === 'google_drive' && config.driveFileId && config.driveFileName) {
+        currentProvider = GoogleDriveProvider.fromExisting(
+          config.driveFileId,
+          config.driveFileName
+        );
+        currentProviderFamilyId = familyId;
+        updateState({
+          isInitialized: true,
+          isConfigured: true,
+          fileName: config.driveFileName,
+          lastError: null,
+        });
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to restore provider config:', e);
     }
-  } catch (e) {
-    console.warn('Failed to restore file handle:', e);
+  }
+
+  // Try to restore a local file handle (File System Access API)
+  if (supportsFileSystemAccess()) {
+    try {
+      const handle = await getFileHandle();
+      console.warn(
+        '[syncService] Local file handle for',
+        familyId,
+        ':',
+        handle ? handle.name : 'none'
+      );
+      if (handle) {
+        currentProvider = LocalStorageProvider.fromHandle(handle);
+        currentProviderFamilyId = getActiveFamilyId();
+        updateState({
+          isInitialized: true,
+          isConfigured: true,
+          fileName: handle.name,
+          lastError: null,
+        });
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to restore file handle:', e);
+    }
   }
 
   updateState({
@@ -176,13 +235,13 @@ export async function initialize(): Promise<boolean> {
  * Must be called from a user gesture (click handler)
  */
 export async function requestPermission(): Promise<boolean> {
-  if (!currentFileHandle) {
+  if (!currentProvider) {
     updateState({ lastError: 'No file configured' });
     return false;
   }
 
   try {
-    const granted = await verifyPermission(currentFileHandle, 'readwrite');
+    const granted = await currentProvider.requestAccess();
     if (!granted) {
       updateState({ lastError: 'Permission denied' });
       return false;
@@ -206,25 +265,20 @@ export async function selectSyncFile(): Promise<boolean> {
   }
 
   try {
-    // Show save file picker (allows creating new or selecting existing)
-    const handle = await window.showSaveFilePicker({
-      suggestedName: 'my-family.beanpod',
-      types: [
-        {
-          description: 'beanies.family Data File',
-          accept: { 'application/json': ['.beanpod', '.json'] },
-        },
-      ],
-    });
+    const provider = await LocalStorageProvider.fromSavePicker();
+    if (!provider) return false;
 
     // Store handle for persistence
-    await storeFileHandle(handle);
-    currentFileHandle = handle;
-    currentFileHandleFamilyId = getActiveFamilyId();
+    const familyId = getActiveFamilyId();
+    if (familyId) {
+      await provider.persist(familyId);
+    }
+    currentProvider = provider;
+    currentProviderFamilyId = familyId;
 
     updateState({
       isConfigured: true,
-      fileName: handle.name,
+      fileName: provider.getDisplayName(),
       lastError: null,
     });
 
@@ -276,63 +330,49 @@ export async function save(password?: string): Promise<boolean> {
  * serializes access via the write mutex.
  */
 async function doSave(password?: string): Promise<boolean> {
-  if (!currentFileHandle) {
+  if (!currentProvider) {
     updateState({ lastError: 'No file configured' });
     return false;
   }
 
-  // Guard: ensure the file handle belongs to the currently active family.
+  // Guard: ensure the provider belongs to the currently active family.
   // This prevents auto-sync from writing to a different family's sync file
   // after a family switch within the same SPA session.
   const activeFamilyId = getActiveFamilyId();
-  if (currentFileHandleFamilyId && activeFamilyId && currentFileHandleFamilyId !== activeFamilyId) {
+  if (currentProviderFamilyId && activeFamilyId && currentProviderFamilyId !== activeFamilyId) {
     console.warn(
-      `[syncService] save() blocked: handle belongs to family ${currentFileHandleFamilyId} but active family is ${activeFamilyId}`
+      `[syncService] save() blocked: provider belongs to family ${currentProviderFamilyId} but active family is ${activeFamilyId}`
     );
     return false;
   }
 
-  // Guard: if encryption is required but no password/DEK provided, refuse to write
-  // plaintext. This is the last line of defense against all encryption bypass bugs.
-  if (!password && !sessionDEK && isEncryptionRequiredFn && isEncryptionRequiredFn()) {
-    console.warn(
-      '[syncService] save() blocked: encryption is enabled but no password or DEK provided'
-    );
+  // Guard: if encryption is required but no password provided, refuse to write plaintext.
+  if (!password && isEncryptionRequiredFn && isEncryptionRequiredFn()) {
+    console.warn('[syncService] save() blocked: encryption is enabled but no password provided');
     return false;
   }
 
   updateState({ isSyncing: true, lastError: null });
 
   try {
-    // Verify we have permission
-    const permissionGranted = await verifyPermission(currentFileHandle, 'readwrite');
-    if (!permissionGranted) {
-      console.warn('[syncService] doSave: file permission denied — save skipped');
-      updateState({ isSyncing: false, lastError: 'Permission denied' });
-      return false;
+    // For local provider, verify we have permission before writing
+    if (currentProvider.type === 'local') {
+      const localProvider = currentProvider as LocalStorageProvider;
+      const permissionGranted = await verifyPermission(localProvider.getHandle(), 'readwrite');
+      if (!permissionGranted) {
+        console.warn('[syncService] doSave: file permission denied — save skipped');
+        updateState({ isSyncing: false, lastError: 'Permission denied' });
+        return false;
+      }
     }
 
-    // Create sync data — mark as encrypted if password or DEK is provided
-    const needsEncryption = !!(password || sessionDEK);
+    // Create sync data — mark as encrypted if password is provided
+    const needsEncryption = !!password;
     const syncData = await createSyncFileData(needsEncryption);
 
     let fileContent: string;
 
-    if (sessionDEK && sessionDEKSalt) {
-      // DEK-based encryption (passkey PRF path)
-      const dataJson = JSON.stringify(syncData.data);
-      const encryptedData = await encryptDataWithKey(dataJson, sessionDEK, sessionDEKSalt);
-
-      const encryptedSyncData: Record<string, unknown> = {
-        version: syncData.version,
-        exportedAt: syncData.exportedAt,
-        encrypted: true,
-        data: encryptedData,
-      };
-      if (syncData.familyId) encryptedSyncData.familyId = syncData.familyId;
-      if (syncData.familyName) encryptedSyncData.familyName = syncData.familyName;
-      fileContent = JSON.stringify(encryptedSyncData, null, 2);
-    } else if (password) {
+    if (password) {
       // Password-based encryption (standard path)
       const dataJson = JSON.stringify(syncData.data);
       const encryptedData = await encryptSyncData(dataJson, password);
@@ -357,18 +397,8 @@ async function doSave(password?: string): Promise<boolean> {
       fileContent = JSON.stringify(syncData, null, 2);
     }
 
-    // Write to file atomically:
-    // 1. Seek to position 0 to ensure we write from the start
-    // 2. Write the full content
-    // 3. Truncate to the exact content length to remove any stale trailing bytes
-    //    (safer than truncate-first, which is vulnerable to interleaving if the
-    //    mutex is ever bypassed or the browser allows multiple writable streams)
-    const writable = await currentFileHandle.createWritable({ keepExistingData: false });
-    const contentBytes = new TextEncoder().encode(fileContent);
-    await writable.write({ type: 'seek', position: 0 });
-    await writable.write(contentBytes);
-    await writable.truncate(contentBytes.byteLength);
-    await writable.close();
+    // Write via the storage provider abstraction
+    await currentProvider.write(fileContent);
 
     // File write succeeded — clear the WAL so it doesn't override on next reload
     const savedFamilyId = getActiveFamilyId();
@@ -377,6 +407,10 @@ async function doSave(password?: string): Promise<boolean> {
     }
 
     updateState({ isSyncing: false, lastError: null });
+
+    // Notify subscribers (syncStore) of the save timestamp
+    saveCompleteCallbacks.forEach((cb) => cb(syncData.exportedAt));
+
     return true;
   } catch (e) {
     updateState({ isSyncing: false, lastError: (e as Error).message });
@@ -389,44 +423,18 @@ async function doSave(password?: string): Promise<boolean> {
  * Returns null if file doesn't exist or is empty/invalid
  */
 export async function getFileTimestamp(): Promise<string | null> {
-  if (!currentFileHandle) {
+  if (!currentProvider) {
     return null;
   }
 
-  try {
-    // Verify we have permission
-    const hasPermission = await verifyPermission(currentFileHandle, 'read');
-    if (!hasPermission) {
-      return null;
-    }
-
-    // Read file
-    const file = await currentFileHandle.getFile();
-    const text = await file.text();
-
-    // Handle empty file
-    if (!text.trim()) {
-      return null;
-    }
-
-    const data = JSON.parse(text);
-
-    // Return the exportedAt timestamp
-    if (data && typeof data.exportedAt === 'string') {
-      return data.exportedAt;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
+  return currentProvider.getLastModified();
 }
 
 /**
  * Load data from the sync file
  */
 export async function load(): Promise<SyncFileData | null> {
-  if (!currentFileHandle) {
+  if (!currentProvider) {
     updateState({ lastError: 'No file configured' });
     return null;
   }
@@ -434,19 +442,21 @@ export async function load(): Promise<SyncFileData | null> {
   updateState({ isSyncing: true, lastError: null });
 
   try {
-    // Verify we have permission
-    const hasPermission = await verifyPermission(currentFileHandle, 'read');
-    if (!hasPermission) {
-      updateState({ isSyncing: false, lastError: 'Permission denied' });
-      return null;
+    // For local provider, verify permission before reading
+    if (currentProvider.type === 'local') {
+      const localProvider = currentProvider as LocalStorageProvider;
+      const hasPermission = await verifyPermission(localProvider.getHandle(), 'read');
+      if (!hasPermission) {
+        updateState({ isSyncing: false, lastError: 'Permission denied' });
+        return null;
+      }
     }
 
-    // Read file
-    const file = await currentFileHandle.getFile();
-    const text = await file.text();
+    // Read file via provider
+    const text = await currentProvider.read();
 
     // Handle empty file (new sync file)
-    if (!text.trim()) {
+    if (!text) {
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
@@ -475,12 +485,15 @@ export async function load(): Promise<SyncFileData | null> {
  * Load data from sync file and import into database.
  * Checks that the sync file's familyId matches the active family to prevent
  * cross-family data leakage (e.g., loading one family's sync file into another's DB).
+ * @param options.merge - If true, merge file data with local data instead of full replace.
  */
-export async function loadAndImport(): Promise<{
+export async function loadAndImport(options: { merge?: boolean } = {}): Promise<{
   success: boolean;
   needsPassword?: boolean;
   fileHandle?: FileSystemFileHandle;
   rawSyncData?: SyncFileData;
+  hasLocalChanges?: boolean;
+  fileExportedAt?: string;
 }> {
   const syncData = await load();
   if (!syncData) {
@@ -490,10 +503,13 @@ export async function loadAndImport(): Promise<{
 
   if (syncData.encrypted) {
     updateState({ lastError: 'Encrypted file - password required' });
+    // Return the local file handle if available (for backward compat with syncStore)
+    const localHandle =
+      currentProvider instanceof LocalStorageProvider ? currentProvider.getHandle() : undefined;
     return {
       success: false,
       needsPassword: true,
-      fileHandle: currentFileHandle ?? undefined,
+      fileHandle: localHandle,
       rawSyncData: syncData,
     };
   }
@@ -518,8 +534,12 @@ export async function loadAndImport(): Promise<{
   }
 
   try {
-    await importSyncFileData(syncData);
-    return { success: true };
+    const importResult = await importSyncFileData(syncData, { merge: options.merge });
+    return {
+      success: true,
+      hasLocalChanges: importResult.hasLocalChanges,
+      fileExportedAt: syncData.exportedAt,
+    };
   } catch (e) {
     updateState({ lastError: (e as Error).message });
     return { success: false };
@@ -556,29 +576,13 @@ export function getSessionPassword(): string | null {
 
 /**
  * Get the current session file handle (for reading encrypted blob during passkey registration).
+ * Returns null if the current provider is not a local filesystem provider.
  */
 export function getSessionFileHandle(): FileSystemFileHandle | null {
-  return currentFileHandle;
-}
-
-// Session DEK for PRF-based passkey sessions (CryptoKey instead of password)
-let sessionDEK: CryptoKey | null = null;
-let sessionDEKSalt: Uint8Array | null = null;
-
-/**
- * Set the session DEK for PRF-based passkey sessions.
- * When set, save() will use this key for encryption instead of the password.
- */
-export function setSessionDEK(dek: CryptoKey | null, salt?: Uint8Array | null): void {
-  sessionDEK = dek;
-  sessionDEKSalt = salt ?? null;
-}
-
-/**
- * Get the current session DEK
- */
-export function getSessionDEK(): CryptoKey | null {
-  return sessionDEK;
+  if (currentProvider instanceof LocalStorageProvider) {
+    return currentProvider.getHandle();
+  }
+  return null;
 }
 
 /**
@@ -594,9 +598,9 @@ export function triggerDebouncedSave(): void {
   saveDebounceTimer = setTimeout(() => {
     saveDebounceTimer = null;
     // Check encryption requirement via callback before saving
-    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword && !sessionDEK) {
+    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
       console.warn(
-        '[syncService] Auto-save skipped: encryption is enabled but no session password or DEK available'
+        '[syncService] Auto-save skipped: encryption is enabled but no session password available'
       );
       return;
     }
@@ -604,6 +608,20 @@ export function triggerDebouncedSave(): void {
       console.warn('[syncService] Auto-save failed:', err)
     );
   }, DEBOUNCE_MS);
+}
+
+/**
+ * Cancel any pending debounced save and perform an immediate save.
+ * Combines flushPendingSave + save in a single call.
+ * Intended for visibilitychange → hidden and beforeunload handlers.
+ */
+export async function saveNow(): Promise<boolean> {
+  cancelPendingSave();
+  if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
+    console.warn('[syncService] saveNow skipped: encryption enabled but no session password');
+    return false;
+  }
+  return save(sessionPassword ?? undefined);
 }
 
 /**
@@ -627,9 +645,9 @@ export async function flushPendingSave(): Promise<void> {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
     // Guard: never write plaintext when encryption is required
-    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword && !sessionDEK) {
+    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
       console.warn(
-        '[syncService] Flush skipped: encryption is enabled but no session password or DEK available'
+        '[syncService] Flush skipped: encryption is enabled but no session password available'
       );
       return;
     }
@@ -642,9 +660,15 @@ export async function flushPendingSave(): Promise<void> {
  */
 export async function disconnect(): Promise<void> {
   cancelPendingSave();
-  await clearFileHandle();
-  currentFileHandle = null;
-  currentFileHandleFamilyId = null;
+  if (currentProvider) {
+    const familyId = getActiveFamilyId();
+    if (familyId) {
+      await currentProvider.clearPersisted(familyId);
+    }
+    await currentProvider.disconnect();
+  }
+  currentProvider = null;
+  currentProviderFamilyId = null;
   updateState({
     isConfigured: false,
     fileName: null,
@@ -656,16 +680,11 @@ export async function disconnect(): Promise<void> {
  * Check if sync is configured and has permission
  */
 export async function hasPermission(): Promise<boolean> {
-  if (!currentFileHandle) {
+  if (!currentProvider) {
     return false;
   }
 
-  try {
-    const permission = await currentFileHandle.queryPermission({ mode: 'readwrite' });
-    return permission === 'granted';
-  } catch {
-    return false;
-  }
+  return currentProvider.isReady();
 }
 
 /**
@@ -675,6 +694,7 @@ export async function hasPermission(): Promise<boolean> {
  * - success: true if file was loaded and imported successfully
  * - needsPassword: true if file is encrypted and requires password
  * - fileHandle: the file handle (needed for decryption flow)
+ * - provider: the storage provider (preferred over fileHandle)
  * - rawSyncData: the raw sync data structure (for encrypted files, data is a string)
  */
 export async function openAndLoadFile(): Promise<OpenFileResult> {
@@ -701,13 +721,14 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
       return { success: false };
     }
 
+    const provider = LocalStorageProvider.fromHandle(handle);
+
     updateState({ isSyncing: true, lastError: null });
 
     // Read and validate the file
-    const file = await handle.getFile();
-    const text = await file.text();
+    const text = await provider.read();
 
-    if (!text.trim()) {
+    if (!text) {
       updateState({ isSyncing: false, lastError: 'File is empty' });
       return { success: false };
     }
@@ -738,6 +759,7 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
         success: false,
         needsPassword: true,
         fileHandle: handle,
+        provider,
         rawSyncData: data as SyncFileData,
       };
     }
@@ -767,14 +789,16 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
     // Import the data
     await importSyncFileData(syncData);
 
-    // Store handle for persistence and set as sync target
-    await storeFileHandle(handle);
-    currentFileHandle = handle;
-    currentFileHandleFamilyId = activeFamilyId;
+    // Store provider for persistence and set as sync target
+    if (activeFamilyId) {
+      await provider.persist(activeFamilyId);
+    }
+    currentProvider = provider;
+    currentProviderFamilyId = activeFamilyId;
 
     updateState({
       isConfigured: true,
-      fileName: handle.name,
+      fileName: provider.getDisplayName(),
       isSyncing: false,
       lastError: null,
     });
@@ -928,10 +952,12 @@ export async function loadDroppedFile(
     // If encrypted, return early with needsPassword flag
     if (obj.encrypted === true) {
       updateState({ isSyncing: false, lastError: null });
+      const provider = fileHandle ? LocalStorageProvider.fromHandle(fileHandle) : undefined;
       return {
         success: false,
         needsPassword: true,
         fileHandle,
+        provider,
         rawSyncData: data as SyncFileData,
       };
     }
@@ -960,11 +986,14 @@ export async function loadDroppedFile(
     // Import the data
     await importSyncFileData(syncData);
 
-    // If we have a file handle, store it for persistent sync
+    // If we have a file handle, create a provider and persist it
     if (fileHandle) {
-      await storeFileHandle(fileHandle);
-      currentFileHandle = fileHandle;
-      currentFileHandleFamilyId = activeFamilyId;
+      const provider = LocalStorageProvider.fromHandle(fileHandle);
+      if (activeFamilyId) {
+        await provider.persist(activeFamilyId);
+      }
+      currentProvider = provider;
+      currentProviderFamilyId = activeFamilyId;
     }
 
     updateState({
@@ -983,15 +1012,26 @@ export async function loadDroppedFile(
 
 /**
  * Decrypt and import data from an encrypted file.
- * Call this after openAndLoadFile returns needsPassword: true
+ * Call this after openAndLoadFile returns needsPassword: true.
+ * Accepts either a StorageProvider or a FileSystemFileHandle for backward compat.
  */
 export async function decryptAndImport(
-  fileHandle: FileSystemFileHandle,
+  handleOrProvider: FileSystemFileHandle | StorageProvider,
   rawSyncData: SyncFileData,
   password: string
 ): Promise<{ success: boolean; error?: string }> {
   cancelPendingSave();
   updateState({ isSyncing: true, lastError: null });
+
+  // Normalize to a StorageProvider
+  const provider =
+    handleOrProvider &&
+    'type' in handleOrProvider &&
+    (handleOrProvider.type === 'local' || handleOrProvider.type === 'google_drive')
+      ? (handleOrProvider as StorageProvider)
+      : handleOrProvider instanceof FileSystemFileHandle
+        ? LocalStorageProvider.fromHandle(handleOrProvider)
+        : null;
 
   try {
     // The data field is actually a base64 encrypted string for encrypted files
@@ -1035,17 +1075,28 @@ export async function decryptAndImport(
     // Import the data
     await importSyncFileData(syncData);
 
-    // Store handle for persistence and set as sync target
-    await storeFileHandle(fileHandle);
-    currentFileHandle = fileHandle;
-    currentFileHandleFamilyId = activeFamilyId;
+    // Set provider as sync target
+    if (provider) {
+      if (activeFamilyId) {
+        await provider.persist(activeFamilyId);
+      }
+      currentProvider = provider;
+      currentProviderFamilyId = activeFamilyId;
 
-    updateState({
-      isConfigured: true,
-      fileName: fileHandle.name,
-      isSyncing: false,
-      lastError: null,
-    });
+      updateState({
+        isConfigured: true,
+        fileName: provider.getDisplayName(),
+        isSyncing: false,
+        lastError: null,
+      });
+    } else {
+      // No provider (mobile fallback) — mark configured but no auto-sync
+      updateState({
+        isConfigured: true,
+        isSyncing: false,
+        lastError: null,
+      });
+    }
 
     return { success: true };
   } catch (e) {
@@ -1054,79 +1105,6 @@ export async function decryptAndImport(
     if (errorMessage.includes('Incorrect password') || errorMessage.includes('corrupted')) {
       updateState({ isSyncing: false, lastError: 'Incorrect password' });
       return { success: false, error: 'Incorrect password' };
-    }
-    updateState({ isSyncing: false, lastError: errorMessage });
-    return { success: false, error: errorMessage };
-  }
-}
-
-/**
- * Decrypt and import using a CryptoKey (passkey PRF path).
- * Same as decryptAndImport but uses a pre-derived DEK instead of a password.
- */
-export async function decryptAndImportWithKey(
-  fileHandle: FileSystemFileHandle,
-  rawSyncData: SyncFileData,
-  dek: CryptoKey
-): Promise<{ success: boolean; error?: string; salt?: Uint8Array }> {
-  cancelPendingSave();
-  updateState({ isSyncing: true, lastError: null });
-
-  try {
-    const encryptedData = rawSyncData.data as unknown as string;
-
-    // Decrypt using the DEK directly
-    const decryptedJson = await decryptDataWithKey(encryptedData, dek);
-    const decryptedData = JSON.parse(decryptedJson);
-
-    // Extract salt for future saves with the same key
-    const salt = extractSaltFromEncrypted(encryptedData);
-
-    const syncData: SyncFileData = {
-      version: rawSyncData.version,
-      exportedAt: rawSyncData.exportedAt,
-      encrypted: false,
-      data: decryptedData,
-      familyId: rawSyncData.familyId,
-      familyName: rawSyncData.familyName,
-    };
-
-    if (!validateSyncFileData(syncData)) {
-      updateState({ isSyncing: false, lastError: 'Invalid data structure after decryption' });
-      return { success: false, error: 'Invalid data structure after decryption' };
-    }
-
-    let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId) {
-      if (syncData.familyId !== activeFamilyId) {
-        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-        activeFamilyId = syncData.familyId;
-      }
-    } else if (!activeFamilyId) {
-      const newFamilyId = generateUUID();
-      await createFamilyWithId(newFamilyId, 'My Family');
-      activeFamilyId = newFamilyId;
-    }
-
-    await importSyncFileData(syncData);
-
-    await storeFileHandle(fileHandle);
-    currentFileHandle = fileHandle;
-    currentFileHandleFamilyId = activeFamilyId;
-
-    updateState({
-      isConfigured: true,
-      fileName: fileHandle.name,
-      isSyncing: false,
-      lastError: null,
-    });
-
-    return { success: true, salt };
-  } catch (e) {
-    const errorMessage = (e as Error).message;
-    if (errorMessage.includes('Incorrect key') || errorMessage.includes('corrupted')) {
-      updateState({ isSyncing: false, lastError: 'Incorrect key' });
-      return { success: false, error: 'Incorrect key' };
     }
     updateState({ isSyncing: false, lastError: errorMessage });
     return { success: false, error: errorMessage };

@@ -139,7 +139,6 @@ const mockGlobalSettings: GlobalSettings = {
   exchangeRateLastFetch: null,
   isTrustedDevice: false,
   trustedDevicePromptShown: false,
-  cachedEncryptionPassword: null,
 };
 
 vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
@@ -160,6 +159,7 @@ vi.mock('@/services/sync/syncService', () => ({
   onStateChange: vi.fn((cb: (state: Record<string, unknown>) => void) => {
     stateChangeCallbackHolder.callback = cb;
   }),
+  onSaveComplete: vi.fn(() => () => {}),
   setEncryptionRequiredCallback: vi.fn(),
   initialize: vi.fn(async () => false),
   hasPermission: vi.fn(async () => true),
@@ -179,11 +179,11 @@ vi.mock('@/services/sync/syncService', () => ({
   openAndLoadFile: vi.fn(async () => ({ success: true })),
   loadDroppedFile: vi.fn(async () => ({ success: true })),
   decryptAndImport: vi.fn(async () => ({ success: true })),
-  decryptAndImportWithKey: vi.fn(async () => ({ success: true })),
   save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
   getFileTimestamp: vi.fn(async () => null),
   triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
   cancelPendingSave: vi.fn(),
+  saveNow: vi.fn(async () => true),
   flushPendingSave: vi.fn(async () => {}),
   reset: vi.fn(() => {
     stateChangeCallbackHolder.callback?.({
@@ -196,8 +196,10 @@ vi.mock('@/services/sync/syncService', () => ({
   }),
   disconnect: vi.fn(async () => {}),
   setSessionPassword: vi.fn(),
-  setSessionDEK: vi.fn(),
   getSessionFileHandle: vi.fn(() => null),
+  getProviderType: vi.fn(() => null),
+  getProvider: vi.fn(() => null),
+  setProvider: vi.fn(),
 }));
 
 // Capabilities — must return true so setupAutoSync is not short-circuited
@@ -207,8 +209,10 @@ vi.mock('@/services/sync/capabilities', () => ({
     showSaveFilePicker: true,
     showOpenFilePicker: true,
     webCrypto: true,
+    googleDrive: false,
     manualSync: true,
   }),
+  supportsGoogleDrive: () => false,
   canAutoSync: () => true,
 }));
 
@@ -216,6 +220,35 @@ vi.mock('@/services/sync/capabilities', () => ({
 vi.mock('@/services/sync/fileSync', () => ({
   exportToFile: vi.fn(async () => {}),
   importFromFile: vi.fn(async () => ({ success: true })),
+}));
+
+// Google Drive dependencies (imported by syncStore)
+vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
+  GoogleDriveProvider: vi.fn(),
+}));
+vi.mock('@/services/sync/fileHandleStore', () => ({
+  storeFileHandle: vi.fn(async () => {}),
+  getFileHandle: vi.fn(async () => null),
+  clearFileHandle: vi.fn(async () => {}),
+  verifyPermission: vi.fn(async () => true),
+  hasValidFileHandle: vi.fn(async () => false),
+  getProviderConfig: vi.fn(async () => null),
+  storeProviderConfig: vi.fn(async () => {}),
+  clearProviderConfig: vi.fn(async () => {}),
+}));
+vi.mock('@/services/google/googleAuth', () => ({
+  loadGIS: vi.fn(async () => {}),
+  requestAccessToken: vi.fn(async () => 'mock-token'),
+  onTokenExpired: vi.fn(() => () => {}),
+  revokeToken: vi.fn(),
+}));
+vi.mock('@/services/google/driveService', () => ({
+  getOrCreateAppFolder: vi.fn(async () => 'folder-id'),
+  listBeanpodFiles: vi.fn(async () => []),
+  clearFolderCache: vi.fn(),
+}));
+vi.mock('@/services/sync/offlineQueue', () => ({
+  clearQueue: vi.fn(),
 }));
 
 // Database

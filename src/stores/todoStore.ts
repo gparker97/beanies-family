@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { useMemberFilterStore } from './memberFilterStore';
+import { useTombstoneStore } from './tombstoneStore';
 import * as todoRepo from '@/services/indexeddb/repositories/todoRepository';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
 import { toISODateString } from '@/utils/date';
@@ -113,6 +114,7 @@ export const useTodoStore = defineStore('todos', () => {
     try {
       const success = await todoRepo.deleteTodo(id);
       if (success) {
+        useTombstoneStore().recordDeletion('todo', id);
         todos.value = todos.value.filter((t) => t.id !== id);
       }
       return success;

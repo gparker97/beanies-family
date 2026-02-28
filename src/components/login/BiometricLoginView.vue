@@ -9,11 +9,13 @@ import { useTranslation } from '@/composables/useTranslation';
 const props = defineProps<{
   familyId: string;
   familyName?: string;
+  showNotYouLink?: boolean;
 }>();
 
 const emit = defineEmits<{
   'signed-in': [destination: string];
   'use-password': [];
+  back: [];
 }>();
 
 const { t } = useTranslation();
@@ -32,8 +34,8 @@ async function handleBiometricLogin() {
     const result = await authStore.signInWithPasskey(props.familyId);
 
     if (!result.success) {
-      if (result.error === 'CROSS_DEVICE_CREDENTIAL') {
-        errorMessage.value = t('passkey.crossDeviceError');
+      if (result.error === 'CROSS_DEVICE_NO_CACHE') {
+        errorMessage.value = t('passkey.crossDeviceNoCache');
       } else if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
         errorMessage.value = t('passkey.wrongFamilyError');
       } else {
@@ -42,36 +44,20 @@ async function handleBiometricLogin() {
       return;
     }
 
-    // Try decryption: DEK first (PRF path), then cached password as fallback.
-    // The DEK can become stale if the file was re-encrypted with a new PBKDF2 salt
-    // (e.g. by auto-sync or sign-out flush). Cached password always works.
+    // Decrypt with cached password
     let decryptSuccess = false;
 
-    if (result.dek) {
-      const dekResult = await syncStore.decryptPendingFileWithDEK(result.dek);
-      if (dekResult.success) {
-        decryptSuccess = true;
-      } else if (result.cachedPassword) {
-        // DEK stale — fall back to cached password
-        console.warn('[BiometricLogin] DEK decrypt failed, trying cached password');
-        // Need to reload the pending file since decryptPendingFileWithDEK may have cleared it
-        if (!syncStore.hasPendingEncryptedFile) {
-          await syncStore.loadFromFile();
-        }
-        const pwResult = await syncStore.decryptPendingFile(result.cachedPassword);
-        decryptSuccess = pwResult.success;
-        if (!decryptSuccess) {
-          errorMessage.value = t('passkey.dekAndPasswordFailed');
-        }
-      } else {
-        errorMessage.value = t('passkey.dekStale');
-      }
-    } else if (result.cachedPassword) {
-      // Non-PRF path: decrypt with cached password
+    if (result.cachedPassword) {
       const pwResult = await syncStore.decryptPendingFile(result.cachedPassword);
       decryptSuccess = pwResult.success;
       if (!decryptSuccess) {
-        errorMessage.value = t('passkey.passwordChanged');
+        console.warn('[BiometricLoginView] decryptPendingFile failed:', pwResult.error);
+        // Distinguish: file never loaded vs wrong password
+        if (pwResult.error?.includes('No pending')) {
+          errorMessage.value = t('passkey.fileLoadError');
+        } else {
+          errorMessage.value = t('passkey.passwordChanged');
+        }
       }
     } else {
       errorMessage.value = t('passkey.signInError');
@@ -102,6 +88,17 @@ async function handleBiometricLogin() {
 
 <template>
   <div class="flex flex-col items-center">
+    <!-- Back button -->
+    <button
+      class="mb-4 flex w-full items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+      @click="emit('back')"
+    >
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      {{ showNotYouLink ? t('fastLogin.notYou') : t('action.back') }}
+    </button>
+
     <!-- Family name -->
     <div class="mb-6 text-center">
       <img
@@ -109,9 +106,39 @@ async function handleBiometricLogin() {
         alt=""
         class="mx-auto mb-3 h-16 w-16"
       />
+      <p v-if="showNotYouLink" class="mb-1 text-sm text-gray-500 dark:text-gray-400">
+        {{ t('fastLogin.welcomeBack') }}
+      </p>
       <h2 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
         {{ familyName || t('passkey.welcomeBack') }}
       </h2>
+      <!-- File/provider context -->
+      <span
+        v-if="syncStore.fileName"
+        class="mt-1 inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500"
+      >
+        <!-- Google Drive icon -->
+        <svg
+          v-if="syncStore.storageProviderType === 'google_drive'"
+          class="h-3 w-3"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path
+            d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+          />
+        </svg>
+        <!-- Folder icon for local -->
+        <svg v-else class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+          />
+        </svg>
+        {{ syncStore.fileName }}
+      </span>
     </div>
 
     <!-- Biometric button -->

@@ -375,30 +375,40 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
-   * Cache the encryption password on trusted devices so it survives page refresh.
+   * Cache the encryption password for a specific family on trusted devices.
    * Only stores when isTrustedDevice is true.
    */
-  async function cacheEncryptionPassword(password: string): Promise<void> {
+  async function cacheEncryptionPassword(password: string, familyId: string): Promise<void> {
     if (!isTrustedDevice.value) return;
+    const existing = globalSettings.value.cachedEncryptionPasswords ?? {};
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-      cachedEncryptionPassword: password,
+      cachedEncryptionPasswords: { ...existing, [familyId]: password },
     });
   }
 
   /**
-   * Retrieve the cached encryption password (returns null if not cached).
+   * Retrieve the cached encryption password for a specific family.
    */
-  function getCachedEncryptionPassword(): string | null {
-    return globalSettings.value.cachedEncryptionPassword ?? null;
+  function getCachedEncryptionPassword(familyId: string): string | null {
+    return globalSettings.value.cachedEncryptionPasswords?.[familyId] ?? null;
   }
 
   /**
    * Clear the cached encryption password.
+   * With familyId: clear one entry. Without: clear all.
    */
-  async function clearCachedEncryptionPassword(): Promise<void> {
-    globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-      cachedEncryptionPassword: null,
-    });
+  async function clearCachedEncryptionPassword(familyId?: string): Promise<void> {
+    if (familyId) {
+      const existing = { ...(globalSettings.value.cachedEncryptionPasswords ?? {}) };
+      delete existing[familyId];
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+        cachedEncryptionPasswords: existing,
+      });
+    } else {
+      globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
+        cachedEncryptionPasswords: {},
+      });
+    }
   }
 
   function resetState() {

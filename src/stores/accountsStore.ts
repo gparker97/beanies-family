@@ -4,6 +4,7 @@ import { celebrate } from '@/composables/useCelebration';
 import { useAssetsStore } from './assetsStore';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useSettingsStore } from './settingsStore';
+import { useTombstoneStore } from './tombstoneStore';
 import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
 import type {
   Account,
@@ -215,6 +216,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     try {
       const success = await accountRepo.deleteAccount(id);
       if (success) {
+        useTombstoneStore().recordDeletion('account', id);
         accounts.value = accounts.value.filter((a) => a.id !== id);
       }
       return success;

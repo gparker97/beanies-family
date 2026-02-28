@@ -15,7 +15,6 @@ const mockGlobalSettings: GlobalSettings = {
   exchangeRateLastFetch: null,
   isTrustedDevice: false,
   trustedDevicePromptShown: false,
-  cachedEncryptionPassword: null,
 };
 
 let savedGlobalSettings = { ...mockGlobalSettings };
@@ -86,10 +85,10 @@ describe('Password Cache - settingsStore', () => {
     // Device is not trusted by default
     expect(store.isTrustedDevice).toBe(false);
 
-    await store.cacheEncryptionPassword('my-secret-password');
+    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
 
     // Password should NOT be cached
-    expect(store.getCachedEncryptionPassword()).toBeNull();
+    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
   });
 
   it('should cache password when device is trusted', async () => {
@@ -100,28 +99,44 @@ describe('Password Cache - settingsStore', () => {
     expect(store.isTrustedDevice).toBe(true);
 
     // Now cache a password
-    await store.cacheEncryptionPassword('my-secret-password');
+    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
 
     // Password should be cached
-    expect(store.getCachedEncryptionPassword()).toBe('my-secret-password');
+    expect(store.getCachedEncryptionPassword('family-123')).toBe('my-secret-password');
   });
 
   it('should return null when no password is cached', () => {
     const store = useSettingsStore();
-    expect(store.getCachedEncryptionPassword()).toBeNull();
+    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
   });
 
-  it('should clear cached password', async () => {
+  it('should clear cached password for specific family', async () => {
     const store = useSettingsStore();
 
     // Trust and cache
     await store.setTrustedDevice(true);
-    await store.cacheEncryptionPassword('my-secret-password');
-    expect(store.getCachedEncryptionPassword()).toBe('my-secret-password');
+    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
+    expect(store.getCachedEncryptionPassword('family-123')).toBe('my-secret-password');
 
-    // Clear
+    // Clear specific family
+    await store.clearCachedEncryptionPassword('family-123');
+    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
+  });
+
+  it('should clear all cached passwords when no familyId given', async () => {
+    const store = useSettingsStore();
+
+    // Trust and cache for two families
+    await store.setTrustedDevice(true);
+    await store.cacheEncryptionPassword('pw-a', 'family-a');
+    await store.cacheEncryptionPassword('pw-b', 'family-b');
+    expect(store.getCachedEncryptionPassword('family-a')).toBe('pw-a');
+    expect(store.getCachedEncryptionPassword('family-b')).toBe('pw-b');
+
+    // Clear all
     await store.clearCachedEncryptionPassword();
-    expect(store.getCachedEncryptionPassword()).toBeNull();
+    expect(store.getCachedEncryptionPassword('family-a')).toBeNull();
+    expect(store.getCachedEncryptionPassword('family-b')).toBeNull();
   });
 
   it('should clear cached password when untrusting device', async () => {
@@ -129,19 +144,41 @@ describe('Password Cache - settingsStore', () => {
 
     // Trust and cache
     await store.setTrustedDevice(true);
-    await store.cacheEncryptionPassword('my-secret-password');
+    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
 
     // Untrust — setTrustedDevice(false) does not auto-clear password,
     // but signOutAndClearData does both
     await store.setTrustedDevice(false);
     // Password is still cached until explicitly cleared
-    expect(store.getCachedEncryptionPassword()).toBe('my-secret-password');
+    expect(store.getCachedEncryptionPassword('family-123')).toBe('my-secret-password');
 
     // Explicit clear
-    await store.clearCachedEncryptionPassword();
-    expect(store.getCachedEncryptionPassword()).toBeNull();
+    await store.clearCachedEncryptionPassword('family-123');
+    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
   });
 });
+
+vi.mock('@/stores/familyContextStore', () => ({
+  useFamilyContextStore: () => ({
+    activeFamilyId: 'family-123',
+    activeFamilyName: 'Test Family',
+  }),
+}));
+
+vi.mock('@/services/indexeddb/database', () => ({
+  getActiveFamilyId: vi.fn(() => 'family-123'),
+  getDatabase: vi.fn(async () => ({})),
+  closeDatabase: vi.fn(async () => {}),
+}));
+
+vi.mock('@/services/registry/registryService', () => ({
+  registerFamily: vi.fn(async () => {}),
+  removeFamily: vi.fn(async () => {}),
+}));
+
+vi.mock('@/services/auth/passkeyService', () => ({
+  invalidatePasskeysForPasswordChange: vi.fn(async () => {}),
+}));
 
 describe('Password Cache - syncStore integration', () => {
   beforeEach(() => {
@@ -153,18 +190,19 @@ describe('Password Cache - syncStore integration', () => {
   // Mock sync service at module level
   vi.mock('@/services/sync/syncService', () => ({
     onStateChange: vi.fn(),
+    onSaveComplete: vi.fn(() => () => {}),
     setEncryptionRequiredCallback: vi.fn(),
     initialize: vi.fn(async () => false),
     hasPermission: vi.fn(async () => true),
     loadAndImport: vi.fn(async () => ({ success: true })),
     decryptAndImport: vi.fn(async () => ({ success: true })),
     save: vi.fn(async () => true),
+    saveNow: vi.fn(async () => true),
     selectSyncFile: vi.fn(async () => false),
     disconnect: vi.fn(async () => {}),
     requestPermission: vi.fn(async () => false),
     getFileTimestamp: vi.fn(async () => null),
     setSessionPassword: vi.fn(),
-    setSessionDEK: vi.fn(),
     triggerDebouncedSave: vi.fn(),
     cancelPendingSave: vi.fn(),
     flushPendingSave: vi.fn(async () => {}),
@@ -202,8 +240,8 @@ describe('Password Cache - syncStore integration', () => {
     // Decrypt with password
     await syncStore.decryptPendingFile('test-password-123');
 
-    // Password should be cached in global settings
-    expect(settingsStore.getCachedEncryptionPassword()).toBe('test-password-123');
+    // Password should be cached in global settings for the active family
+    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBe('test-password-123');
   });
 
   it('should NOT cache password after decryption on untrusted device', async () => {
@@ -223,7 +261,7 @@ describe('Password Cache - syncStore integration', () => {
     await syncStore.decryptPendingFile('test-password-123');
 
     // Password should NOT be cached
-    expect(settingsStore.getCachedEncryptionPassword()).toBeNull();
+    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBeNull();
   });
 
   it('should expose currentSessionPassword after decryption', async () => {
@@ -249,14 +287,14 @@ describe('Password Cache - syncStore integration', () => {
 
     // Trust and cache a password
     await settingsStore.setTrustedDevice(true);
-    await settingsStore.cacheEncryptionPassword('cached-pw');
-    expect(settingsStore.getCachedEncryptionPassword()).toBe('cached-pw');
+    await settingsStore.cacheEncryptionPassword('cached-pw', 'family-123');
+    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBe('cached-pw');
 
     // Disconnect
     await syncStore.disconnect();
 
-    // Cached password should be cleared
-    expect(settingsStore.getCachedEncryptionPassword()).toBeNull();
+    // Cached password should be cleared for the active family
+    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBeNull();
   });
 
   it('should cache password when enabling encryption on trusted device', async () => {
@@ -269,7 +307,7 @@ describe('Password Cache - syncStore integration', () => {
     // Enable encryption
     await syncStore.enableEncryption('new-encryption-pw');
 
-    // Password should be cached
-    expect(settingsStore.getCachedEncryptionPassword()).toBe('new-encryption-pw');
+    // Password should be cached for the active family
+    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBe('new-encryption-pw');
   });
 });

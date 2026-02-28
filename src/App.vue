@@ -13,6 +13,7 @@ import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
+import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
@@ -27,12 +28,13 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
-import { flushPendingSave } from '@/services/sync/syncService';
+import { saveNow } from '@/services/sync/syncService';
 
 const route = useRoute();
 const router = useRouter();
@@ -43,6 +45,7 @@ const transactionsStore = useTransactionsStore();
 const assetsStore = useAssetsStore();
 const goalsStore = useGoalsStore();
 const todoStore = useTodoStore();
+const activityStore = useActivityStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
@@ -60,8 +63,9 @@ const passkeyPromptDismissed = ref(false);
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
   // If there's already a session password, cache it for the newly trusted device
-  if (syncStore.currentSessionPassword) {
-    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword);
+  const familyId = familyContextStore.activeFamilyId;
+  if (syncStore.currentSessionPassword && familyId) {
+    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword, familyId);
   }
   showTrustPrompt.value = false;
 }
@@ -76,14 +80,19 @@ async function handleEnablePasskey() {
   passkeyPromptDismissed.value = true;
 
   const password = syncStore.currentSessionPassword;
-  if (!password) return;
+  if (!password) {
+    console.warn('[passkey] No session password available for passkey registration');
+    return;
+  }
 
-  // Get the encrypted file blob for the registration
-  // We need the raw encrypted data to extract the PBKDF2 salt
-  const encryptedBlob = await getEncryptedFileBlob();
-  if (!encryptedBlob) return;
-
-  await authStore.registerPasskeyForCurrentUser(password, encryptedBlob);
+  try {
+    const result = await authStore.registerPasskeyForCurrentUser(password);
+    if (!result.success) {
+      console.warn('[passkey] Registration failed:', result.error);
+    }
+  } catch (e) {
+    console.warn('[passkey] Unexpected error during passkey registration:', e);
+  }
 }
 
 function handleDeclinePasskey() {
@@ -92,25 +101,19 @@ function handleDeclinePasskey() {
 }
 
 /**
- * Read the current encrypted file to get the raw blob for passkey registration.
+ * After Google Drive token re-acquisition via the reconnect toast,
+ * reload data from Drive and arm auto-sync.
  */
-async function getEncryptedFileBlob(): Promise<string | null> {
-  try {
-    const { getSessionFileHandle } = await import('@/services/sync/syncService');
-    const handle = getSessionFileHandle();
-    if (!handle) return null;
-    const file = await handle.getFile();
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    if (parsed.encrypted && typeof parsed.data === 'string') {
-      return parsed.data;
-    }
-    return null;
-  } catch {
-    return null;
-  }
+async function handleGoogleReconnected() {
+  syncStore.showGoogleReconnect = false;
+  await syncStore.reloadIfFileChanged();
+  syncStore.setupAutoSync();
 }
 
+/**
+ * Read the current encrypted file to get the raw blob for passkey registration.
+ * Works with any storage provider (local file or Google Drive).
+ */
 const showLayout = computed(() => {
   // Don't show sidebar/header on login, welcome, or 404 pages
   return (
@@ -130,6 +133,7 @@ const showLayout = computed(() => {
  * 3. No file handle → load from IndexedDB if available
  */
 
+/* eslint-disable no-console -- debug logging for sync diagnostics */
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
@@ -162,7 +166,10 @@ async function loadFamilyData() {
 
     // File needs password — try cached password from trusted device
     if (loadResult.needsPassword) {
-      const cachedPw = settingsStore.getCachedEncryptionPassword();
+      const activeFamilyId = familyContextStore.activeFamilyId;
+      const cachedPw = activeFamilyId
+        ? settingsStore.getCachedEncryptionPassword(activeFamilyId)
+        : null;
       if (cachedPw) {
         const decryptResult = await syncStore.decryptPendingFile(cachedPw);
         if (decryptResult.success) {
@@ -174,7 +181,9 @@ async function loadFamilyData() {
           return;
         }
         // Cached password was wrong — clear it
-        await settingsStore.clearCachedEncryptionPassword();
+        if (activeFamilyId) {
+          await settingsStore.clearCachedEncryptionPassword(activeFamilyId);
+        }
       }
     }
   }
@@ -200,6 +209,7 @@ async function loadFamilyData() {
       goalsStore.loadGoals(),
       recurringStore.loadRecurringItems(),
       todoStore.loadTodos(),
+      activityStore.loadActivities(),
     ]);
 
     const result = await processRecurringItems();
@@ -208,6 +218,7 @@ async function loadFamilyData() {
     }
   }
 }
+/* eslint-enable no-console */
 
 /**
  * Fallback: load from IndexedDB cache when file permission is not yet granted.
@@ -225,6 +236,7 @@ async function loadFromIndexedDBCache() {
       goalsStore.loadGoals(),
       recurringStore.loadRecurringItems(),
       todoStore.loadTodos(),
+      activityStore.loadActivities(),
     ]);
 
     const result = await processRecurringItems();
@@ -325,15 +337,25 @@ onMounted(async () => {
   }
 });
 
-// Flush pending debounced saves before the page unloads (prevents data loss on refresh)
+// Save data when going hidden; check for external file changes when becoming visible.
+// visibilitychange → hidden is the primary save point (fires reliably on tab close,
+// app switch, etc.). beforeunload is best-effort only — browsers may terminate
+// the async save before it completes.
 function handleVisibilityChange() {
   if (document.visibilityState === 'hidden') {
-    flushPendingSave();
+    syncStore.pauseFilePolling();
+    // Single immediate save — replaces the old flush + syncNow double-save
+    saveNow().catch(console.warn);
+  } else if (document.visibilityState === 'visible') {
+    syncStore.resumeFilePolling();
+    // Check for external file changes (cross-device sync)
+    syncStore.reloadIfFileChanged().catch(console.warn);
   }
 }
 
 function handleBeforeUnload() {
-  flushPendingSave();
+  // Best-effort save — browser may terminate the async save
+  saveNow().catch(console.warn);
 }
 
 document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -347,9 +369,17 @@ onUnmounted(() => {
 // Show passkey or trust device prompt after fresh sign-in.
 // Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
-// Watches both freshSignIn and route.path so it re-fires after Create/Join navigates to /nook.
+// Watches freshSignIn, route.path, isEncryptionEnabled, and isConfigured so the prompt
+// re-evaluates when any of these reactive values change (avoids race conditions where
+// encryption/config state settles after the route change).
 watch(
-  () => [authStore.freshSignIn, route.path] as const,
+  () =>
+    [
+      authStore.freshSignIn,
+      route.path,
+      syncStore.isEncryptionEnabled,
+      syncStore.isConfigured,
+    ] as const,
   async ([isFresh, path], oldVal) => {
     if (
       !isFresh ||
@@ -367,6 +397,11 @@ watch(
     // Reset dismiss flag on new sign-in (freshSignIn transitioned from false to true)
     if (oldVal && !oldVal[0] && isFresh) {
       passkeyPromptDismissed.value = false;
+    }
+
+    // Don't re-prompt if already showing or dismissed
+    if (showPasskeyPrompt.value || showTrustPrompt.value) {
+      return;
     }
 
     // Try passkey prompt first (per-family check, encryption must be enabled)
@@ -413,8 +448,18 @@ watch(
 
     <!-- PWA banners -->
     <OfflineBanner />
-    <UpdatePrompt />
-    <InstallPrompt />
+
+    <!-- Bottom-right toast stack -->
+    <div
+      class="fixed right-4 bottom-4 z-[200] flex flex-col items-end gap-3 md:right-6 md:bottom-6"
+    >
+      <GoogleReconnectToast
+        v-if="syncStore.showGoogleReconnect && !authStore.needsAuth"
+        @reconnected="handleGoogleReconnected"
+      />
+      <UpdatePrompt />
+      <InstallPrompt />
+    </div>
 
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />

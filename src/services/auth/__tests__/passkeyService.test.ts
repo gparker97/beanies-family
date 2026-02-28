@@ -17,18 +17,14 @@ vi.mock('@/services/indexeddb/repositories/passkeyRepository', () => ({
 // --- Mock passkeyCrypto ---
 vi.mock('../passkeyCrypto', () => ({
   isPRFSupported: vi.fn(() => false),
-  getPRFOutput: vi.fn(() => null),
-  generateHKDFSalt: vi.fn(() => new Uint8Array(32)),
-  deriveWrappingKey: vi.fn(async () => ({}) as CryptoKey),
-  wrapDEK: vi.fn(async () => 'wrapped-dek-base64'),
-  unwrapDEK: vi.fn(async () => ({}) as CryptoKey),
   buildPRFExtension: vi.fn(() => ({ prf: { eval: { first: new Uint8Array(32) } } })),
 }));
 
-// --- Mock crypto/encryption ---
-vi.mock('@/services/crypto/encryption', () => ({
-  deriveExtractableKey: vi.fn(async () => ({}) as CryptoKey),
-  extractSaltFromEncrypted: vi.fn(() => new Uint8Array(16)),
+// --- Mock globalSettingsRepository ---
+let mockGlobalSettings: Record<string, unknown> = {};
+
+vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
+  getGlobalSettings: vi.fn(async () => mockGlobalSettings),
 }));
 
 // Imports must come after vi.mock calls
@@ -43,7 +39,6 @@ import {
   invalidatePasskeysForPasswordChange,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
-import { getPRFOutput, unwrapDEK } from '../passkeyCrypto';
 
 // --- Helpers ---
 
@@ -145,7 +140,6 @@ describe('registerPasskeyForMember', () => {
       memberEmail: 'test@example.com',
       familyId: 'family-1',
       encryptionPassword: 'secret-pw',
-      encryptedFileBlob: 'base64-encrypted-data',
       label: 'My Device',
     });
 
@@ -166,6 +160,7 @@ describe('authenticateWithPasskey', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRegistrations.length = 0;
+    mockGlobalSettings = {};
 
     vi.stubGlobal('PublicKeyCredential', {
       isUserVerifyingPlatformAuthenticatorAvailable: async () => true,
@@ -217,7 +212,7 @@ describe('authenticateWithPasskey', () => {
     expect(result.cachedPassword).toBe('pw-123');
   });
 
-  it('returns CROSS_DEVICE_CREDENTIAL when userHandle matches a member but credential ID does not', async () => {
+  it('returns CROSS_DEVICE_NO_CACHE when userHandle matches but no cached password exists', async () => {
     mockRegistrations.push(
       makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
     );
@@ -239,7 +234,47 @@ describe('authenticateWithPasskey', () => {
 
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
     expect(result.success).toBe(false);
-    expect(result.error).toBe('CROSS_DEVICE_CREDENTIAL');
+    expect(result.error).toBe('CROSS_DEVICE_NO_CACHE');
+  });
+
+  it('auto-registers synced credential when cached password exists for family', async () => {
+    mockRegistrations.push(
+      makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
+    );
+    mockGlobalSettings = {
+      cachedEncryptionPasswords: { 'family-1': 'cached-pw' },
+    };
+
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        get: vi.fn(async () =>
+          makeFakeAssertion({
+            rawId: new TextEncoder().encode('synced-cred').buffer,
+            userHandle: new TextEncoder().encode('member-1').buffer,
+          })
+        ),
+        create: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(result.success).toBe(true);
+    expect(result.memberId).toBe('member-1');
+    expect(result.cachedPassword).toBe('cached-pw');
+
+    // Verify the synced credential was saved to the local registry
+    expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentialId: bufferToBase64url(
+          new TextEncoder().encode('synced-cred').buffer as ArrayBuffer
+        ),
+        memberId: 'member-1',
+        familyId: 'family-1',
+        cachedPassword: 'cached-pw',
+      })
+    );
   });
 
   it('returns WRONG_FAMILY_CREDENTIAL when neither credential ID nor userHandle matches', async () => {
@@ -286,41 +321,7 @@ describe('authenticateWithPasskey', () => {
     expect(result.error).toBe('WRONG_FAMILY_CREDENTIAL');
   });
 
-  it('PRF path: unwraps DEK successfully', async () => {
-    const fakeDEK = { type: 'secret' } as unknown as CryptoKey;
-    vi.mocked(getPRFOutput).mockReturnValueOnce(new ArrayBuffer(32));
-    vi.mocked(unwrapDEK).mockResolvedValueOnce(fakeDEK);
-
-    mockRegistrations.push(
-      makeRegistration({
-        prfSupported: true,
-        wrappedDEK: 'wrapped-dek',
-        wrappedDEKSalt: btoa('salt-bytes-here!'),
-        cachedPassword: 'backup-pw',
-      })
-    );
-
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      credentials: {
-        get: vi.fn(async () =>
-          makeFakeAssertion({
-            rawId: base64urlToBuffer('dGVzdC1jcmVkZW50aWFs'),
-            extensionResults: { prf: { results: { first: new ArrayBuffer(32) } } },
-          })
-        ),
-        create: vi.fn(),
-      },
-      userAgent: navigator.userAgent,
-    });
-
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
-    expect(result.success).toBe(true);
-    expect(result.dek).toBe(fakeDEK);
-    expect(result.cachedPassword).toBe('backup-pw');
-  });
-
-  it('cached password fallback when PRF not supported', async () => {
+  it('returns cachedPassword when PRF not supported', async () => {
     mockRegistrations.push(
       makeRegistration({
         prfSupported: false,
@@ -343,40 +344,7 @@ describe('authenticateWithPasskey', () => {
 
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
     expect(result.success).toBe(true);
-    expect(result.dek).toBeUndefined();
     expect(result.cachedPassword).toBe('my-cached-pw');
-  });
-
-  it('cached password fallback when PRF unwrap fails', async () => {
-    vi.mocked(getPRFOutput).mockReturnValueOnce(new ArrayBuffer(32));
-    vi.mocked(unwrapDEK).mockRejectedValueOnce(new Error('unwrap failed'));
-
-    mockRegistrations.push(
-      makeRegistration({
-        prfSupported: true,
-        wrappedDEK: 'wrapped-dek',
-        wrappedDEKSalt: btoa('salt'),
-        cachedPassword: 'fallback-pw',
-      })
-    );
-
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      credentials: {
-        get: vi.fn(async () =>
-          makeFakeAssertion({
-            rawId: base64urlToBuffer('dGVzdC1jcmVkZW50aWFs'),
-          })
-        ),
-        create: vi.fn(),
-      },
-      userAgent: navigator.userAgent,
-    });
-
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
-    expect(result.success).toBe(true);
-    expect(result.cachedPassword).toBe('fallback-pw');
-    expect(result.dek).toBeUndefined();
   });
 
   it('no decryption materials returns descriptive error', async () => {
@@ -412,17 +380,15 @@ describe('invalidatePasskeysForPasswordChange', () => {
     mockRegistrations.length = 0;
   });
 
-  it('clears PRF DEKs and updates cached passwords', async () => {
+  it('updates cachedPassword for all registrations', async () => {
     mockRegistrations.push(
       makeRegistration({
-        credentialId: 'prf-cred',
+        credentialId: 'cred-1',
         prfSupported: true,
-        wrappedDEK: 'wrapped',
-        wrappedDEKSalt: 'salt',
         cachedPassword: 'old-pw',
       }),
       makeRegistration({
-        credentialId: 'non-prf-cred',
+        credentialId: 'cred-2',
         prfSupported: false,
         cachedPassword: 'old-pw',
       })
@@ -432,16 +398,14 @@ describe('invalidatePasskeysForPasswordChange', () => {
 
     const updateCalls = vi.mocked(passkeyRepo.updatePasskey).mock.calls;
 
-    // PRF registration: DEK fields cleared
-    const prfUpdate = updateCalls.find((c) => c[0] === 'prf-cred');
-    expect(prfUpdate).toBeTruthy();
-    expect(prfUpdate![1].wrappedDEK).toBeUndefined();
-    expect(prfUpdate![1].wrappedDEKSalt).toBeUndefined();
+    // Both registrations get cachedPassword updated
+    const cred1Update = updateCalls.find((c) => c[0] === 'cred-1');
+    expect(cred1Update).toBeTruthy();
+    expect(cred1Update![1].cachedPassword).toBe('new-pw');
 
-    // Non-PRF registration: password updated
-    const nonPrfUpdate = updateCalls.find((c) => c[0] === 'non-prf-cred');
-    expect(nonPrfUpdate).toBeTruthy();
-    expect(nonPrfUpdate![1].cachedPassword).toBe('new-pw');
+    const cred2Update = updateCalls.find((c) => c[0] === 'cred-2');
+    expect(cred2Update).toBeTruthy();
+    expect(cred2Update![1].cachedPassword).toBe('new-pw');
   });
 });
 
