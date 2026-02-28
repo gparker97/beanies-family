@@ -16,7 +16,11 @@ function toggleAll() {
 }
 
 function toggleMember(id: string) {
-  memberFilter.toggleMember(id);
+  if (memberFilter.isAllSelected) {
+    memberFilter.selectOnly(id);
+  } else {
+    memberFilter.toggleMember(id);
+  }
 }
 </script>
 

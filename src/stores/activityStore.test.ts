@@ -1,7 +1,9 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useActivityStore } from './activityStore';
-import type { FamilyActivity } from '@/types/models';
+import { useFamilyStore } from './familyStore';
+import { useMemberFilterStore } from './memberFilterStore';
+import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 // Mock the activity repository
 vi.mock('@/services/indexeddb/repositories/activityRepository', () => ({
@@ -436,6 +438,145 @@ describe('activityStore', () => {
       expect(store.activities).toHaveLength(0);
       expect(store.isLoading).toBe(false);
       expect(store.error).toBeNull();
+    });
+  });
+
+  // ── filteredActivities (member filter integration) ──
+
+  describe('filteredActivities', () => {
+    function makeFamilyMember(overrides?: Partial<FamilyMember>): FamilyMember {
+      return {
+        id: 'member-1',
+        name: 'Parent',
+        email: 'parent@test.com',
+        role: 'member',
+        gender: 'male',
+        ageGroup: 'adult',
+        color: '#3b82f6',
+        requiresPassword: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+        ...overrides,
+      };
+    }
+
+    function setupFilterWithMembers() {
+      const familyStore = useFamilyStore();
+      familyStore.members.push(
+        makeFamilyMember({ id: 'parent-1', name: 'Dad' }),
+        makeFamilyMember({ id: 'parent-2', name: 'Mom', gender: 'female' }),
+        makeFamilyMember({ id: 'child-1', name: 'Kid', ageGroup: 'child' })
+      );
+      const memberFilter = useMemberFilterStore();
+      memberFilter.initialize();
+      return { familyStore, memberFilter };
+    }
+
+    it('should return all active activities when filter is not initialized', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: '1', assigneeId: 'parent-1' }),
+        makeActivity({ id: '2', assigneeId: 'child-1' })
+      );
+
+      expect(store.filteredActivities).toHaveLength(2);
+    });
+
+    it('should return all active activities when all members are selected', () => {
+      const store = useActivityStore();
+      setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeId: 'parent-1' }),
+        makeActivity({ id: '2', assigneeId: 'parent-2' }),
+        makeActivity({ id: '3', assigneeId: 'child-1' })
+      );
+
+      expect(store.filteredActivities).toHaveLength(3);
+    });
+
+    it('should filter activities by selected member', () => {
+      const store = useActivityStore();
+      const { memberFilter } = setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeId: 'parent-1' }),
+        makeActivity({ id: '2', assigneeId: 'parent-2' }),
+        makeActivity({ id: '3', assigneeId: 'child-1' })
+      );
+
+      // Deselect parent-2 and child-1 → only parent-1 activities
+      memberFilter.toggleMember('parent-2');
+      memberFilter.toggleMember('child-1');
+
+      expect(store.filteredActivities).toHaveLength(1);
+      expect(store.filteredActivities[0]!.id).toBe('1');
+    });
+
+    it('should show unassigned activities regardless of filter', () => {
+      const store = useActivityStore();
+      const { memberFilter } = setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeId: 'parent-1' }),
+        makeActivity({ id: '2', assigneeId: undefined }),
+        makeActivity({ id: '3', assigneeId: 'child-1' })
+      );
+
+      // Filter to only parent-1
+      memberFilter.toggleMember('parent-2');
+      memberFilter.toggleMember('child-1');
+
+      // Should show parent-1's activity + unassigned activity
+      expect(store.filteredActivities).toHaveLength(2);
+      expect(store.filteredActivities.map((a) => a.id).sort()).toEqual(['1', '2']);
+    });
+
+    it('should exclude inactive activities even if member is selected', () => {
+      const store = useActivityStore();
+      setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeId: 'parent-1', isActive: true }),
+        makeActivity({ id: '2', assigneeId: 'parent-1', isActive: false })
+      );
+
+      expect(store.filteredActivities).toHaveLength(1);
+      expect(store.filteredActivities[0]!.id).toBe('1');
+    });
+
+    it('should filter monthActivities by selected members', () => {
+      const store = useActivityStore();
+      const { memberFilter } = setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          assigneeId: 'parent-1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+        }),
+        makeActivity({
+          id: '2',
+          assigneeId: 'child-1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+        })
+      );
+
+      // All selected → both activities expand across month
+      const allOccurrences = store.monthActivities(2026, 2);
+      expect(allOccurrences).toHaveLength(8); // 4 Wednesdays * 2 activities
+
+      // Filter to only parent-1
+      memberFilter.toggleMember('parent-2');
+      memberFilter.toggleMember('child-1');
+
+      const filtered = store.monthActivities(2026, 2);
+      expect(filtered).toHaveLength(4); // 4 Wednesdays * 1 activity
+      expect(filtered.every((o) => o.activity.assigneeId === 'parent-1')).toBe(true);
     });
   });
 });

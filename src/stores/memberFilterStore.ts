@@ -101,6 +101,13 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
   }
 
   /**
+   * Select only one member (deselect all others).
+   */
+  function selectOnly(memberId: string) {
+    selectedMemberIds.value = new Set([memberId]);
+  }
+
+  /**
    * Check if a specific member is selected.
    */
   function isMemberSelected(memberId: string): boolean {
@@ -138,6 +145,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
     syncWithMembers,
     toggleMember,
     selectAll,
+    selectOnly,
     isMemberSelected,
     getSelectedMemberAccountIds,
     resetState,
