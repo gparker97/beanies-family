@@ -12,6 +12,7 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { COUNTRIES } from '@/constants/countries';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
@@ -32,6 +33,7 @@ const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
@@ -157,16 +159,6 @@ const assetsByType = computed(() => {
 
 function getAssetTypeLabel(type: AssetType): string {
   return assetTypes.value.find((t) => t.value === type)?.label || type;
-}
-
-function getMemberName(memberId: string): string {
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.name || 'Unknown';
-}
-
-function getMemberColor(memberId: string): string {
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.color || '#6b7280';
 }
 
 // Get icon and color config for each asset type

@@ -4,15 +4,13 @@ import { celebrate } from '@/composables/useCelebration';
 import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useTombstoneStore } from '@/stores/tombstoneStore';
+import { convertToBaseCurrency } from '@/utils/currency';
 import type {
   Transaction,
   CreateTransactionInput,
   UpdateTransactionInput,
   ISODateString,
-  CurrencyCode,
-  ExchangeRate,
 } from '@/types/models';
 import { getStartOfMonth, getEndOfMonth, toISODateString, isDateBetween } from '@/utils/date';
 
@@ -21,36 +19,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
   const transactions = ref<Transaction[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
-
-  // Helper to get exchange rate
-  function getRate(
-    rates: ExchangeRate[],
-    from: CurrencyCode,
-    to: CurrencyCode
-  ): number | undefined {
-    if (from === to) return 1;
-
-    // Direct rate
-    const direct = rates.find((r) => r.from === from && r.to === to);
-    if (direct) return direct.rate;
-
-    // Inverse rate
-    const inverse = rates.find((r) => r.from === to && r.to === from);
-    if (inverse) return 1 / inverse.rate;
-
-    return undefined;
-  }
-
-  // Helper to convert amount to base currency
-  function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): number {
-    const settingsStore = useSettingsStore();
-    const baseCurrency = settingsStore.baseCurrency;
-
-    if (fromCurrency === baseCurrency) return amount;
-
-    const rate = getRate(settingsStore.exchangeRates, fromCurrency, baseCurrency);
-    return rate !== undefined ? amount * rate : amount;
-  }
 
   // Getters
   const sortedTransactions = computed(() =>

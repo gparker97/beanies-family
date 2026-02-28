@@ -10,16 +10,16 @@ import AccountModal from '@/components/accounts/AccountModal.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useAccountsStore } from '@/stores/accountsStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 const accountsStore = useAccountsStore();
-const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { t } = useTranslation();
+const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
@@ -79,16 +79,6 @@ const totalBalance = computed(() => accountsStore.filteredTotalBalance);
 
 function getAccountTypeLabel(type: AccountType): string {
   return accountTypes.value.find((t) => t.value === type)?.label || type;
-}
-
-function getMemberName(memberId: string): string {
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.name || 'Unknown';
-}
-
-function getMemberColor(memberId: string): string {
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.color || '#6b7280';
 }
 
 // Get icon and color config for each account type

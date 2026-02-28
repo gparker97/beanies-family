@@ -2,15 +2,15 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTodoStore } from '@/stores/todoStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import type { TodoItem } from '@/types/models';
 
 const router = useRouter();
 const todoStore = useTodoStore();
-const familyStore = useFamilyStore();
 const authStore = useAuthStore();
+const { getMemberName, getMemberColor } = useMemberInfo();
 const { t } = useTranslation();
 
 const emit = defineEmits<{ view: [todo: TodoItem] }>();
@@ -25,16 +25,6 @@ const hasMore = computed(() => todoStore.filteredOpenTodos.length > visibleCount
 
 function showMore() {
   visibleCount.value += PAGE_SIZE;
-}
-
-function getMemberColor(id?: string) {
-  if (!id) return '#95A5A6';
-  return familyStore.members.find((m) => m.id === id)?.color ?? '#95A5A6';
-}
-
-function getMemberName(id?: string) {
-  if (!id) return null;
-  return familyStore.members.find((m) => m.id === id)?.name ?? null;
 }
 
 async function handleToggle(e: Event, id: string) {
@@ -94,7 +84,7 @@ function goToTodos() {
 
         <!-- Assignee chip -->
         <span
-          v-if="getMemberName(todo.assigneeId)"
+          v-if="todo.assigneeId"
           class="flex-shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
           :style="{ backgroundColor: getMemberColor(todo.assigneeId) }"
         >

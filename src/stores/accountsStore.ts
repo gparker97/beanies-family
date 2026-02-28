@@ -3,52 +3,16 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { useAssetsStore } from './assetsStore';
 import { useMemberFilterStore } from './memberFilterStore';
-import { useSettingsStore } from './settingsStore';
 import { useTombstoneStore } from './tombstoneStore';
+import { convertToBaseCurrency } from '@/utils/currency';
 import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
-import type {
-  Account,
-  CreateAccountInput,
-  UpdateAccountInput,
-  CurrencyCode,
-  ExchangeRate,
-} from '@/types/models';
+import type { Account, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 export const useAccountsStore = defineStore('accounts', () => {
   // State
   const accounts = ref<Account[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
-
-  // Helper to get exchange rate
-  function getRate(
-    rates: ExchangeRate[],
-    from: CurrencyCode,
-    to: CurrencyCode
-  ): number | undefined {
-    if (from === to) return 1;
-
-    // Direct rate
-    const direct = rates.find((r) => r.from === from && r.to === to);
-    if (direct) return direct.rate;
-
-    // Inverse rate
-    const inverse = rates.find((r) => r.from === to && r.to === from);
-    if (inverse) return 1 / inverse.rate;
-
-    return undefined;
-  }
-
-  // Helper to convert amount to base currency
-  function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): number {
-    const settingsStore = useSettingsStore();
-    const baseCurrency = settingsStore.baseCurrency;
-
-    if (fromCurrency === baseCurrency) return amount;
-
-    const rate = getRate(settingsStore.exchangeRates, fromCurrency, baseCurrency);
-    return rate !== undefined ? amount * rate : amount;
-  }
 
   // Getters
   const activeAccounts = computed(() => accounts.value.filter((a) => a.isActive));

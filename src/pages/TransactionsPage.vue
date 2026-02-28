@@ -14,10 +14,10 @@ import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -43,7 +43,7 @@ const transactionsStore = useTransactionsStore();
 const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
-const familyStore = useFamilyStore();
+const { getMemberNameByAccountId, getMemberColorByAccountId } = useMemberInfo();
 const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
@@ -194,20 +194,6 @@ function getAccountName(accountId: string): string {
 function getCategoryName(categoryId: string): string {
   const category = getCategoryById(categoryId);
   return category?.name || categoryId;
-}
-
-function getMemberNameByAccountId(accountId: string): string {
-  const account = accountsStore.accounts.find((a) => a.id === accountId);
-  if (!account) return 'Unknown';
-  const member = familyStore.members.find((m) => m.id === account.memberId);
-  return member?.name || 'Unknown';
-}
-
-function getMemberColorByAccountId(accountId: string): string {
-  const account = accountsStore.accounts.find((a) => a.id === accountId);
-  if (!account) return '#6b7280';
-  const member = familyStore.members.find((m) => m.id === account.memberId);
-  return member?.color || '#6b7280';
 }
 
 function getAccountTypeByAccountId(accountId: string) {

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useTombstoneStore } from './tombstoneStore';
 import * as activityRepo from '@/services/indexeddb/repositories/activityRepository';
+import { toDateInputValue } from '@/utils/date';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -131,9 +132,7 @@ export const useActivityStore = defineStore('activities', () => {
     return results;
   }
 
-  function formatDate(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  }
+  const formatDate = toDateInputValue;
 
   /**
    * Get all occurrences (direct + recurring expanded) for a given month.

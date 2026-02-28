@@ -2,8 +2,9 @@
 import { computed } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { toDateInputValue as formatDate } from '@/utils/date';
 import type { ActivityRecurrence } from '@/types/models';
 
 const props = defineProps<{
@@ -18,8 +19,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { getMemberName, getMemberColor } = useMemberInfo();
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
 
 /** Format the selected date as a readable header (e.g. "Saturday, March 15") */
 const dateHeader = computed(() => {
@@ -82,23 +83,9 @@ const upcomingActivities = computed(() => {
     .slice(0, 10);
 });
 
-function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 function formatDisplayDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function getMemberName(id?: string) {
-  if (!id) return null;
-  return familyStore.members.find((m) => m.id === id)?.name ?? null;
-}
-
-function getMemberColor(id?: string) {
-  if (!id) return '#95A5A6';
-  return familyStore.members.find((m) => m.id === id)?.color ?? '#95A5A6';
 }
 
 function recurrenceLabel(recurrence: ActivityRecurrence) {
@@ -153,7 +140,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
             </span>
             <span class="flex-1" />
             <span
-              v-if="getMemberName(occ.activity.assigneeId)"
+              v-if="occ.activity.assigneeId"
               class="inline-flex items-center rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
               :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
             >
@@ -224,7 +211,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
               </span>
               <span class="flex-1" />
               <span
-                v-if="getMemberName(occ.activity.assigneeId)"
+                v-if="occ.activity.assigneeId"
                 class="inline-flex items-center rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
                 :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
               >
