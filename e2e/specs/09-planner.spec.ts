@@ -91,8 +91,9 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: '3:00 PM' }).click();
 
     // Open end time dropdown (trigger shows "Select a time") then select 4:00 PM
+    // Use .last() to avoid overlap with start time dropdown's leave transition
     await page.getByRole('button', { name: 'Select a time' }).click();
-    await page.getByRole('button', { name: '4:00 PM' }).click();
+    await page.getByRole('button', { name: '4:00 PM' }).last().click();
 
     // Recurrence stays at default (Recurring + Weekly)
 
