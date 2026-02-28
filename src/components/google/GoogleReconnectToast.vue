@@ -5,7 +5,6 @@ import { requestAccessToken, loadGIS } from '@/services/google/googleAuth';
 
 const { t } = useTranslation();
 const isReconnecting = ref(false);
-const dismissed = ref(false);
 
 const emit = defineEmits<{
   reconnected: [];
@@ -16,7 +15,6 @@ async function handleReconnect() {
   try {
     await loadGIS();
     await requestAccessToken();
-    dismissed.value = true;
     emit('reconnected');
   } catch {
     // Will retry on next click
@@ -28,7 +26,6 @@ async function handleReconnect() {
 
 <template>
   <div
-    v-if="!dismissed"
     class="flex items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 shadow-lg ring-1 ring-amber-200 dark:bg-amber-900/80 dark:ring-amber-700"
   >
     <svg
@@ -53,16 +50,6 @@ async function handleReconnect() {
       @click="handleReconnect"
     >
       {{ isReconnecting ? '...' : t('googleDrive.reconnect') }}
-    </button>
-    <button class="ml-1 text-amber-400 hover:text-amber-600" @click="dismissed = true">
-      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M6 18L18 6M6 6l12 12"
-        />
-      </svg>
     </button>
   </div>
 </template>

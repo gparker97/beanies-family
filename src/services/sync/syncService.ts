@@ -56,6 +56,67 @@ const stateCallbacks: StateCallback[] = [];
 type SaveCompleteCallback = (timestamp: string) => void;
 const saveCompleteCallbacks: SaveCompleteCallback[] = [];
 
+// --- Save failure tracking ---
+export type SaveFailureLevel = 'none' | 'warning' | 'critical';
+type SaveFailureCallback = (level: SaveFailureLevel, error: string | null) => void;
+const saveFailureCallbacks: SaveFailureCallback[] = [];
+
+let consecutiveFailures = 0;
+let lastSaveError: string | null = null;
+let saveFailureLevel: SaveFailureLevel = 'none';
+
+function updateSaveFailureLevel(): void {
+  const prev = saveFailureLevel;
+  if (consecutiveFailures === 0) {
+    saveFailureLevel = 'none';
+  } else if (consecutiveFailures < 3) {
+    saveFailureLevel = 'warning';
+  } else {
+    saveFailureLevel = 'critical';
+  }
+  if (saveFailureLevel !== prev) {
+    saveFailureCallbacks.forEach((cb) => cb(saveFailureLevel, lastSaveError));
+  }
+}
+
+function recordSaveSuccess(): void {
+  consecutiveFailures = 0;
+  lastSaveError = null;
+  updateSaveFailureLevel();
+}
+
+function recordSaveFailure(error: string): void {
+  consecutiveFailures++;
+  lastSaveError = error;
+  updateSaveFailureLevel();
+}
+
+/** Get the current save failure level. */
+export function getSaveFailureLevel(): SaveFailureLevel {
+  return saveFailureLevel;
+}
+
+/** Get the last save error message. */
+export function getLastSaveError(): string | null {
+  return lastSaveError;
+}
+
+/** Reset save failure state (call after successful reconnect). */
+export function resetSaveFailures(): void {
+  consecutiveFailures = 0;
+  lastSaveError = null;
+  updateSaveFailureLevel();
+}
+
+/** Subscribe to save failure level changes. Returns unsubscribe function. */
+export function onSaveFailureChange(callback: SaveFailureCallback): () => void {
+  saveFailureCallbacks.push(callback);
+  return () => {
+    const index = saveFailureCallbacks.indexOf(callback);
+    if (index > -1) saveFailureCallbacks.splice(index, 1);
+  };
+}
+
 // Current state
 let state: SyncServiceState = {
   isInitialized: false,
@@ -140,6 +201,7 @@ export function reset(): void {
   currentProvider = null;
   currentProviderFamilyId = null;
   sessionPassword = null;
+  resetSaveFailures();
   updateState({
     isInitialized: false,
     isConfigured: false,
@@ -409,12 +471,20 @@ async function doSave(password?: string): Promise<boolean> {
 
     updateState({ isSyncing: false, lastError: null });
 
+    // Track save success
+    recordSaveSuccess();
+
     // Notify subscribers (syncStore) of the save timestamp
     saveCompleteCallbacks.forEach((cb) => cb(syncData.exportedAt));
 
     return true;
   } catch (e) {
-    updateState({ isSyncing: false, lastError: (e as Error).message });
+    const errorMsg = (e as Error).message;
+    updateState({ isSyncing: false, lastError: errorMsg });
+
+    // Track save failure
+    recordSaveFailure(errorMsg);
+
     return false;
   }
 }
@@ -605,9 +675,11 @@ export function triggerDebouncedSave(): void {
       );
       return;
     }
-    save(sessionPassword ?? undefined).catch((err) =>
-      console.warn('[syncService] Auto-save failed:', err)
-    );
+    save(sessionPassword ?? undefined).catch((err) => {
+      // Don't throw (debounced auto-save), but record failure for UI escalation
+      console.warn('[syncService] Auto-save failed:', err);
+      recordSaveFailure((err as Error).message ?? 'Auto-save failed');
+    });
   }, DEBOUNCE_MS);
 }
 

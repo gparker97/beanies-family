@@ -4,13 +4,29 @@
  * When a Drive write() fails due to network error, the content is queued here.
  * Only the latest save is kept (each is a full file replacement).
  * On reconnect, the queued content is flushed via the provider.
+ *
+ * Persists to sessionStorage so queued saves survive page refreshes
+ * (but not full browser restarts — session-scoped is appropriate).
  */
 import type { StorageProvider } from './storageProvider';
+
+const SESSION_STORAGE_KEY = 'beanies_offline_queue';
 
 // In-memory queue (only keeps latest)
 let pendingContent: string | null = null;
 let flushProvider: StorageProvider | null = null;
 let isListening = false;
+
+// Restore from sessionStorage on module load
+try {
+  const cached = sessionStorage.getItem(SESSION_STORAGE_KEY);
+  if (cached) {
+    pendingContent = cached;
+    startListening();
+  }
+} catch {
+  // Ignore — sessionStorage may not be available
+}
 
 /**
  * Enqueue content for offline save.
@@ -18,6 +34,7 @@ let isListening = false;
  */
 export function enqueueOfflineSave(content: string): void {
   pendingContent = content;
+  persistToSession();
   startListening();
   console.warn('[offlineQueue] Save queued for when connection resumes');
 }
@@ -49,6 +66,7 @@ export async function flushQueue(): Promise<boolean> {
     // (a newer save may have been queued during the flush)
     if (pendingContent === content) {
       pendingContent = null;
+      clearFromSession();
     }
     console.log('[offlineQueue] Queued save flushed successfully');
     return true;
@@ -63,7 +81,27 @@ export async function flushQueue(): Promise<boolean> {
  */
 export function clearQueue(): void {
   pendingContent = null;
+  clearFromSession();
   stopListening();
+}
+
+// --- sessionStorage helpers ---
+
+function persistToSession(): void {
+  if (!pendingContent) return;
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, pendingContent);
+  } catch {
+    // Ignore — sessionStorage may not be available or quota exceeded
+  }
+}
+
+function clearFromSession(): void {
+  try {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
 }
 
 // --- Event listeners ---

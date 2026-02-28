@@ -72,6 +72,11 @@ export const useSyncStore = defineStore('sync', () => {
   const driveFolderId = computed(() => getAppFolderId());
   const showGoogleReconnect = ref(false);
 
+  // Save failure state (mirrors syncService failure tracking)
+  const saveFailureLevel = ref<'none' | 'warning' | 'critical'>('none');
+  const lastSaveError = ref<string | null>(null);
+  const showSaveFailureBanner = ref(false);
+
   // Capabilities
   const capabilities = computed(() => getSyncCapabilities());
   const supportsAutoSync = computed(() => canAutoSync());
@@ -111,6 +116,17 @@ export const useSyncStore = defineStore('sync', () => {
   // Subscribe to save-complete to keep lastSync accurate without manual updates
   syncService.onSaveComplete((timestamp) => {
     lastSync.value = timestamp;
+  });
+
+  // Subscribe to save failure level changes for UI escalation
+  syncService.onSaveFailureChange((level, failError) => {
+    saveFailureLevel.value = level;
+    lastSaveError.value = failError;
+    if (level === 'critical') {
+      showSaveFailureBanner.value = true;
+    } else if (level === 'none') {
+      showSaveFailureBanner.value = false;
+    }
   });
 
   // Register encryption check callback so syncService can guard against plaintext writes
@@ -940,6 +956,9 @@ export const useSyncStore = defineStore('sync', () => {
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
+    saveFailureLevel.value = 'none';
+    lastSaveError.value = null;
+    showSaveFailureBanner.value = false;
     pendingEncryptedFile.value = null;
     clearQueue();
   }
@@ -949,6 +968,26 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function clearError(): void {
     error.value = null;
+  }
+
+  /**
+   * Handle successful Google Drive reconnection.
+   * Resets failure state, triggers an immediate save to flush pending data,
+   * and reloads data from Drive.
+   */
+  async function handleGoogleReconnected(): Promise<void> {
+    showGoogleReconnect.value = false;
+    showSaveFailureBanner.value = false;
+    syncService.resetSaveFailures();
+    saveFailureLevel.value = 'none';
+    lastSaveError.value = null;
+
+    // Reload data from Drive and re-arm auto-sync
+    await reloadIfFileChanged();
+    setupAutoSync();
+
+    // Flush any pending data to Drive immediately
+    syncService.triggerDebouncedSave();
   }
 
   // --- Google Drive actions ---
@@ -1180,6 +1219,9 @@ export const useSyncStore = defineStore('sync', () => {
     driveFolderId,
     isGoogleDriveAvailable,
     showGoogleReconnect,
+    saveFailureLevel,
+    lastSaveError,
+    showSaveFailureBanner,
     // Actions
     initialize,
     requestPermission,
@@ -1205,6 +1247,7 @@ export const useSyncStore = defineStore('sync', () => {
     reloadAllStores,
     setupAutoSync,
     reloadIfFileChanged,
+    handleGoogleReconnected,
     pauseFilePolling,
     resumeFilePolling,
     resetState,

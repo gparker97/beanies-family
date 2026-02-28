@@ -1,10 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useSyncStore } from '@/stores/syncStore';
+import { useTranslation } from '@/composables/useTranslation';
 
 const syncStore = useSyncStore();
+const { t } = useTranslation();
 
 const statusConfig = computed(() => {
+  // Save failure warning takes priority over normal ready state
+  if (syncStore.saveFailureLevel === 'warning' || syncStore.saveFailureLevel === 'critical') {
+    return {
+      icon: 'save-warning',
+      color: 'text-amber-500',
+      title: t('googleDrive.saveRetrying'),
+      animate: true,
+    };
+  }
+
   switch (syncStore.syncStatus) {
     case 'syncing':
       return {
@@ -101,6 +113,24 @@ async function handleClick() {
         alt="Needs permission"
         class="relative h-5 w-5"
       />
+    </div>
+
+    <!-- Save warning icon (pulsing amber) -->
+    <div v-else-if="statusConfig.icon === 'save-warning'" class="relative">
+      <span class="absolute inset-0 animate-ping rounded-full bg-amber-400 opacity-30" />
+      <svg
+        class="relative h-5 w-5 text-amber-500"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.072 16.5c-.77.833.192 2.5 1.732 2.5z"
+        />
+      </svg>
     </div>
 
     <!-- Error icon -->

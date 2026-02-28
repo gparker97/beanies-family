@@ -17,6 +17,7 @@ import {
   revokeToken,
   loadGIS,
   requestAccessToken,
+  attemptSilentRefresh,
   fetchGoogleUserEmail,
   getGoogleAccountEmail,
   setGoogleAccountEmail,
@@ -46,7 +47,7 @@ export class GoogleDriveProvider implements StorageProvider {
 
   /**
    * Write content to Google Drive.
-   * On 401: refresh token and retry once.
+   * On 401: try silent refresh first, then interactive auth, then throw.
    * On network error: queue for offline flush.
    */
   async write(content: string): Promise<void> {
@@ -54,8 +55,14 @@ export class GoogleDriveProvider implements StorageProvider {
       const token = await getValidToken();
       await updateFile(token, this.fileId, content);
     } catch (e) {
-      // 401 — token expired, refresh and retry
+      // 401 — token expired, try silent refresh first to avoid popup during auto-save
       if (e instanceof DriveApiError && e.status === 401) {
+        const silentToken = await attemptSilentRefresh();
+        if (silentToken) {
+          await updateFile(silentToken, this.fileId, content);
+          return;
+        }
+        // Silent refresh failed — fall back to interactive auth
         const newToken = await requestAccessToken();
         await updateFile(newToken, this.fileId, content);
         return;
@@ -89,12 +96,19 @@ export class GoogleDriveProvider implements StorageProvider {
 
   /**
    * Get last modified time from Drive metadata (lightweight polling check).
+   * Re-throws 401 errors so callers can detect auth failures.
+   * Swallows network errors (offline is expected) and other non-critical failures.
    */
   async getLastModified(): Promise<string | null> {
     try {
       const token = await getValidToken();
       return await getFileModifiedTime(token, this.fileId);
-    } catch {
+    } catch (e) {
+      // 401 — auth failure, let caller handle (e.g., show reconnect prompt)
+      if (e instanceof DriveApiError && e.status === 401) {
+        throw e;
+      }
+      // Network errors and other failures — non-critical for a metadata check
       return null;
     }
   }

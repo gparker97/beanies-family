@@ -14,6 +14,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
+import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
@@ -101,13 +102,11 @@ function handleDeclinePasskey() {
 }
 
 /**
- * After Google Drive token re-acquisition via the reconnect toast,
- * reload data from Drive and arm auto-sync.
+ * After Google Drive token re-acquisition via the reconnect toast or save failure banner,
+ * reset failure state, reload data from Drive, and re-arm auto-sync.
  */
 async function handleGoogleReconnected() {
-  syncStore.showGoogleReconnect = false;
-  await syncStore.reloadIfFileChanged();
-  syncStore.setupAutoSync();
+  await syncStore.handleGoogleReconnected();
 }
 
 /**
@@ -448,6 +447,12 @@ watch(
 
     <!-- PWA banners -->
     <OfflineBanner />
+
+    <!-- Save failure banner (non-dismissable, shows when 3+ saves fail) -->
+    <SaveFailureBanner
+      :show="syncStore.showSaveFailureBanner && !authStore.needsAuth"
+      @reconnected="handleGoogleReconnected"
+    />
 
     <!-- Bottom-right toast stack -->
     <div

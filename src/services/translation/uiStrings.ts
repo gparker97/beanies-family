@@ -1385,6 +1385,13 @@ const STRING_DEFS = {
   'googleDrive.openInDrive': { en: 'Open in Google Drive' },
   'googleDrive.savedTo': { en: 'Saved to Google Drive' },
   'googleDrive.connectedAs': { en: 'Connected as {email}' },
+  'googleDrive.saveFailureTitle': { en: "Your data isn't being saved" },
+  'googleDrive.saveFailureBody': {
+    en: "Recent changes haven't been saved to Google Drive. Reconnect to prevent data loss.",
+  },
+  'googleDrive.saveFailureReconnect': { en: 'Reconnect to Google Drive' },
+  'googleDrive.downloadBackup': { en: 'Download backup' },
+  'googleDrive.saveRetrying': { en: 'Save failed — retrying...' },
   'storage.localFile': { en: 'Local File' },
   'storage.dropbox': { en: 'Dropbox' },
   'storage.iCloud': { en: 'iCloud' },
