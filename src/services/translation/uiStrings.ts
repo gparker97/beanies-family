@@ -367,6 +367,7 @@ const STRING_DEFS = {
   'family.role.owner': { en: 'Owner', beanie: 'head beanie' },
   'family.role.admin': { en: 'Admin', beanie: 'admin beanie' },
   'family.role.member': { en: 'Member', beanie: 'beanie' },
+  'family.email': { en: 'Email' },
   'family.gender': { en: 'Gender' },
   'family.gender.male': { en: 'Male', beanie: 'Boy Beanie' },
   'family.gender.female': { en: 'Female', beanie: 'Girl Beanie' },

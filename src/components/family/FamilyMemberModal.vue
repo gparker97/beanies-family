@@ -58,12 +58,25 @@ const genderOptions = computed(() => [
   { value: 'other', label: t('family.gender.other') },
 ]);
 
+const MONTH_KEYS = [
+  'month.january',
+  'month.february',
+  'month.march',
+  'month.april',
+  'month.may',
+  'month.june',
+  'month.july',
+  'month.august',
+  'month.september',
+  'month.october',
+  'month.november',
+  'month.december',
+] as const;
+
 const monthOptions = computed(() =>
-  Array.from({ length: 12 }, (_, i) => ({
+  MONTH_KEYS.map((key, i) => ({
     value: String(i + 1),
-    label: t(
-      `month.${['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'][i]}` as const
-    ),
+    label: t(key),
   }))
 );
 
