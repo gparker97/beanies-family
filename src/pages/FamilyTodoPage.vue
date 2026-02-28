@@ -8,11 +8,8 @@ import { useSounds } from '@/composables/useSounds';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
-import BaseModal from '@/components/ui/BaseModal.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
 import FilterBar from '@/components/todo/FilterBar.vue';
@@ -30,31 +27,15 @@ const authStore = useAuthStore();
 
 const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 
-const memberOptions = computed(() =>
-  familyStore.members.map((m) => ({ value: m.id, label: m.name }))
-);
-
 // Local filter state
 const activeFilter = ref<TodoFilter>('all');
 const sortBy = ref<TodoSort>('newest');
 const memberFilter = ref('all');
 const showCompletedSection = ref(false);
 
-// View modal state
-const showViewModal = ref(false);
-const viewingTodo = ref<TodoItem | null>(null);
-
-// Edit modal state
-const showEditModal = ref(false);
-const editingTodo = ref<TodoItem | null>(null);
-const editForm = ref({
-  title: '',
-  description: '',
-  assigneeId: '',
-  dueDate: '',
-  dueTime: '',
-});
-const isSubmitting = ref(false);
+// View/edit modal
+const selectedTodo = ref<TodoItem | null>(null);
+const startInEditMode = ref(false);
 
 // Computed: filtered + sorted todos
 const displayedOpenTodos = computed(() => {
@@ -133,44 +114,14 @@ async function handleToggle(id: string) {
   await todoStore.toggleComplete(id, currentMemberId.value);
 }
 
-// View modal helpers
-const viewAssignee = computed(() => {
-  if (!viewingTodo.value?.assigneeId) return null;
-  return familyStore.members.find((m) => m.id === viewingTodo.value!.assigneeId);
-});
-
-const viewCompletedBy = computed(() => {
-  if (!viewingTodo.value?.completedBy) return null;
-  return familyStore.members.find((m) => m.id === viewingTodo.value!.completedBy);
-});
-
-const viewCreatedBy = computed(() => {
-  if (!viewingTodo.value?.createdBy) return null;
-  return familyStore.members.find((m) => m.id === viewingTodo.value!.createdBy);
-});
-
-const viewIsOverdue = computed(() => {
-  if (!viewingTodo.value || viewingTodo.value.completed || !viewingTodo.value.dueDate) return false;
-  const now = new Date();
-  const dueDate = new Date(viewingTodo.value.dueDate);
-  if (viewingTodo.value.dueTime) {
-    const parts = viewingTodo.value.dueTime.split(':').map(Number);
-    dueDate.setHours(parts[0] ?? 23, parts[1] ?? 59, 0, 0);
-  } else {
-    dueDate.setHours(23, 59, 59, 999);
-  }
-  return now > dueDate;
-});
-
-const viewFormattedDate = computed(() => {
-  if (!viewingTodo.value?.dueDate) return null;
-  const date = new Date(viewingTodo.value.dueDate);
-  return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-});
-
 function openViewModal(todo: TodoItem) {
-  viewingTodo.value = todo;
-  showViewModal.value = true;
+  startInEditMode.value = false;
+  selectedTodo.value = todo;
+}
+
+function openEditModal(todo: TodoItem) {
+  startInEditMode.value = true;
+  selectedTodo.value = todo;
 }
 
 // Open view modal from query param (e.g. navigated from Family Nook)
@@ -181,59 +132,6 @@ onMounted(() => {
     if (todo) openViewModal(todo);
   }
 });
-
-function closeViewModal() {
-  showViewModal.value = false;
-  viewingTodo.value = null;
-}
-
-function viewToDelete() {
-  if (!viewingTodo.value) return;
-  const id = viewingTodo.value.id;
-  closeViewModal();
-  handleDelete(id);
-}
-
-function viewToEdit() {
-  if (!viewingTodo.value) return;
-  const todo = viewingTodo.value;
-  closeViewModal();
-  openEditModal(todo);
-}
-
-function openEditModal(todo: TodoItem) {
-  editingTodo.value = todo;
-  editForm.value = {
-    title: todo.title,
-    description: todo.description ?? '',
-    assigneeId: todo.assigneeId ?? '',
-    dueDate: todo.dueDate?.split('T')[0] ?? '',
-    dueTime: todo.dueTime ?? '',
-  };
-  showEditModal.value = true;
-}
-
-function closeEditModal() {
-  showEditModal.value = false;
-  editingTodo.value = null;
-}
-
-async function saveEdit() {
-  if (!editingTodo.value || !editForm.value.title.trim()) return;
-  isSubmitting.value = true;
-  try {
-    await todoStore.updateTodo(editingTodo.value.id, {
-      title: editForm.value.title.trim(),
-      description: editForm.value.description.trim() || undefined,
-      assigneeId: editForm.value.assigneeId || undefined,
-      dueDate: editForm.value.dueDate || undefined,
-      dueTime: editForm.value.dueTime || undefined,
-    });
-    closeEditModal();
-  } finally {
-    isSubmitting.value = false;
-  }
-}
 
 async function handleDelete(id: string) {
   if (
@@ -352,192 +250,10 @@ async function handleDelete(id: string) {
       </div>
     </template>
 
-    <!-- View Modal -->
-    <BaseModal :open="showViewModal" :title="t('todo.viewTask')" size="2xl" @close="closeViewModal">
-      <div v-if="viewingTodo" class="space-y-5">
-        <!-- Title -->
-        <h3
-          class="font-outfit text-lg font-bold text-[var(--color-text)]"
-          :class="{ 'line-through opacity-50': viewingTodo.completed }"
-        >
-          {{ viewingTodo.title }}
-        </h3>
-
-        <!-- Description -->
-        <div>
-          <p
-            class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
-          >
-            {{ t('todo.description') }}
-          </p>
-          <p
-            v-if="viewingTodo.description"
-            class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)]"
-          >
-            {{ viewingTodo.description }}
-          </p>
-          <p v-else class="text-sm text-[var(--color-text-muted)] italic">
-            {{ t('todo.noDescription') }}
-          </p>
-        </div>
-
-        <!-- Details grid -->
-        <div class="grid grid-cols-2 gap-4">
-          <!-- Status -->
-          <div>
-            <p
-              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
-            >
-              {{ t('todo.status') }}
-            </p>
-            <span
-              v-if="viewingTodo.completed"
-              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-green-700"
-              style="background: var(--tint-success-10)"
-            >
-              ✅ {{ t('todo.status.completed') }}
-            </span>
-            <span
-              v-else
-              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-purple-700"
-              style="background: var(--tint-purple-15)"
-            >
-              {{ t('todo.status.open') }}
-            </span>
-          </div>
-
-          <!-- Assignee -->
-          <div>
-            <p
-              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
-            >
-              {{ t('todo.assignTo') }}
-            </p>
-            <span
-              v-if="viewAssignee"
-              class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-white"
-              :style="{
-                background: `linear-gradient(135deg, ${viewAssignee.color}, ${viewAssignee.color}cc)`,
-              }"
-            >
-              {{ viewAssignee.name }}
-            </span>
-            <span v-else class="text-sm text-[var(--color-text-muted)]">
-              {{ t('todo.unassigned') }}
-            </span>
-          </div>
-
-          <!-- Due date -->
-          <div>
-            <p
-              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
-            >
-              {{ t('todo.dueDate') }}
-            </p>
-            <span
-              v-if="viewFormattedDate && viewIsOverdue"
-              class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-1 text-sm font-semibold text-white"
-            >
-              ⏰ {{ viewFormattedDate }}
-              <template v-if="viewingTodo.dueTime"> &middot; {{ viewingTodo.dueTime }}</template>
-              <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.6rem] font-bold uppercase">
-                {{ t('todo.overdue') }}
-              </span>
-            </span>
-            <span
-              v-else-if="viewFormattedDate"
-              class="text-sm font-semibold"
-              style="color: var(--color-primary)"
-            >
-              📅 {{ viewFormattedDate }}
-              <template v-if="viewingTodo.dueTime"> &middot; {{ viewingTodo.dueTime }}</template>
-            </span>
-            <span v-else class="text-sm text-[var(--color-text-muted)]">
-              {{ t('todo.noDueDate') }}
-            </span>
-          </div>
-
-          <!-- Created by -->
-          <div>
-            <p
-              class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
-            >
-              {{ t('todo.createdBy') }}
-            </p>
-            <span v-if="viewCreatedBy" class="text-sm text-[var(--color-text)]">
-              {{ viewCreatedBy.name }}
-            </span>
-            <span v-else class="text-sm text-[var(--color-text-muted)]">—</span>
-          </div>
-        </div>
-
-        <!-- Completed by (if done) -->
-        <div v-if="viewingTodo.completed && viewCompletedBy">
-          <p
-            class="mb-1 text-xs font-medium tracking-wide text-[var(--color-text-muted)] uppercase"
-          >
-            {{ t('todo.doneBy') }}
-          </p>
-          <span class="text-sm text-[var(--color-text)]"> ✅ {{ viewCompletedBy.name }} </span>
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="flex justify-between">
-          <BaseButton @click="viewToEdit"> ✏️ {{ t('action.edit') }} </BaseButton>
-          <BaseButton variant="secondary" class="text-red-500" @click="viewToDelete">
-            🗑️ {{ t('action.delete') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
-
-    <!-- Edit Modal -->
-    <BaseModal :open="showEditModal" :title="t('todo.editTask')" size="2xl" @close="closeEditModal">
-      <form class="space-y-4" @submit.prevent="saveEdit">
-        <BaseInput v-model="editForm.title" :label="t('todo.taskTitle')" required />
-
-        <div class="space-y-1">
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('todo.description') }}
-          </label>
-          <textarea v-model="editForm.description" rows="5" class="beanies-input w-full" />
-        </div>
-
-        <BaseSelect
-          :model-value="editForm.assigneeId"
-          :options="memberOptions"
-          :label="t('todo.assignTo')"
-          :placeholder="t('todo.unassigned')"
-          @update:model-value="editForm.assigneeId = String($event)"
-        />
-
-        <div class="grid grid-cols-2 gap-3">
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('todo.dueDate') }}
-            </label>
-            <input v-model="editForm.dueDate" type="date" class="beanies-input w-full" />
-          </div>
-          <div class="space-y-1">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('todo.dueTime') }}
-            </label>
-            <input v-model="editForm.dueTime" type="time" class="beanies-input w-full" />
-          </div>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-2">
-          <BaseButton variant="secondary" @click="closeEditModal">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :disabled="!editForm.title.trim() || isSubmitting" @click="saveEdit">
-            {{ t('action.save') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+    <TodoViewEditModal
+      :todo="selectedTodo"
+      :start-in-edit-mode="startInEditMode"
+      @close="selectedTodo = null"
+    />
   </div>
 </template>
