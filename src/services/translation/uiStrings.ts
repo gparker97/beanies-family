@@ -57,6 +57,7 @@ const STRING_DEFS = {
 
   // Modal shared labels
   'modal.selectCategory': { en: 'Select a category' },
+  'modal.selectSubcategory': { en: 'Select a type' },
   'modal.selectTime': { en: 'Select a time' },
   'modal.schedule': { en: 'Schedule' },
   'modal.recurring': { en: 'Recurring' },
