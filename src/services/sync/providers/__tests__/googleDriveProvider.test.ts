@@ -6,8 +6,12 @@ vi.mock('@/services/google/googleAuth', () => ({
   getValidToken: vi.fn(async () => 'mock-token'),
   isTokenValid: vi.fn(() => true),
   requestAccessToken: vi.fn(async () => 'refreshed-token'),
+  attemptSilentRefresh: vi.fn(async () => null),
   revokeToken: vi.fn(),
   loadGIS: vi.fn(async () => {}),
+  fetchGoogleUserEmail: vi.fn(async () => 'test@example.com'),
+  getGoogleAccountEmail: vi.fn(() => null),
+  setGoogleAccountEmail: vi.fn(),
 }));
 
 const mockUpdateFile = vi.fn();
@@ -152,6 +156,86 @@ describe('GoogleDriveProvider', () => {
       expect(p.getDisplayName()).toBe('test.beanpod'); // returned by mockCreateFile
       expect(mockGetOrCreateAppFolder).toHaveBeenCalled();
       expect(mockCreateFile).toHaveBeenCalled();
+    });
+  });
+
+  describe('write — 401 retry with silent refresh', () => {
+    it('tries silent refresh before interactive auth on 401', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { attemptSilentRefresh, requestAccessToken } =
+        await import('@/services/google/googleAuth');
+
+      // First write fails with 401
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+
+      // Silent refresh succeeds
+      (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce('silent-token');
+
+      await provider.write('{"data":"test"}');
+
+      // Should have tried silent refresh
+      expect(attemptSilentRefresh).toHaveBeenCalled();
+      // Should NOT have called interactive requestAccessToken
+      expect(requestAccessToken).not.toHaveBeenCalled();
+      // Should have retried with the silent token
+      expect(mockUpdateFile).toHaveBeenCalledWith('silent-token', 'file-123', '{"data":"test"}');
+    });
+
+    it('falls back to interactive auth when silent refresh fails', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { attemptSilentRefresh, requestAccessToken } =
+        await import('@/services/google/googleAuth');
+
+      // First write fails with 401
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+
+      // Silent refresh fails
+      (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+
+      await provider.write('{"data":"test"}');
+
+      // Should have tried silent refresh
+      expect(attemptSilentRefresh).toHaveBeenCalled();
+      // Should have fallen back to interactive auth
+      expect(requestAccessToken).toHaveBeenCalled();
+      // Should have retried with the interactive token
+      expect(mockUpdateFile).toHaveBeenCalledWith('refreshed-token', 'file-123', '{"data":"test"}');
+    });
+
+    it('queues for offline on network error', async () => {
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+
+      mockUpdateFile.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await provider.write('{"data":"offline"}');
+
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"offline"}');
+    });
+  });
+
+  describe('getLastModified — 401 handling', () => {
+    it('re-throws 401 errors', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+
+      mockGetFileModifiedTime.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+
+      await expect(provider.getLastModified()).rejects.toThrow('Unauthorized');
+    });
+
+    it('returns null for network errors (not 401)', async () => {
+      mockGetFileModifiedTime.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      const time = await provider.getLastModified();
+      expect(time).toBeNull();
+    });
+
+    it('returns null for non-401 API errors', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+
+      mockGetFileModifiedTime.mockRejectedValueOnce(new MockDriveApiError('Rate limited', 429));
+
+      const time = await provider.getLastModified();
+      expect(time).toBeNull();
     });
   });
 });
