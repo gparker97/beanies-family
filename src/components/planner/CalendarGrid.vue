@@ -4,6 +4,10 @@ import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import type { ActivityCategory } from '@/types/models';
 
+const props = defineProps<{
+  selectedDate?: string;
+}>();
+
 const emit = defineEmits<{ selectDate: [date: string] }>();
 
 const { t } = useTranslation();
@@ -233,6 +237,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           cell.weekRow === todayWeekRow && cell.isCurrentMonth
             ? 'bg-[rgba(241,93,34,0.04)]'
             : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
+          props.selectedDate === cell.date ? 'ring-2 ring-[#F15D22] ring-inset' : '',
         ]"
         @click="handleDayClick(cell.date)"
       >

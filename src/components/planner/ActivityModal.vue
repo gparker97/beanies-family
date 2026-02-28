@@ -22,6 +22,7 @@ const props = defineProps<{
   open: boolean;
   activity?: FamilyActivity | null;
   defaultDate?: string;
+  defaultStartTime?: string;
 }>();
 
 const emit = defineEmits<{
@@ -114,7 +115,7 @@ watch(
       title.value = '';
       description.value = '';
       date.value = props.defaultDate ?? todayStr();
-      startTime.value = '';
+      startTime.value = props.defaultStartTime ?? '';
       endTime.value = '';
       recurrence.value = 'weekly';
       dayOfWeek.value = undefined;

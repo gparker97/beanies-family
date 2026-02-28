@@ -1395,6 +1395,11 @@ const STRING_DEFS = {
   'planner.field.color': { en: 'Highlight Color' },
   'planner.field.active': { en: 'Active' },
 
+  // Planner — Day Agenda Sidebar
+  'planner.dayAgenda': { en: 'Day Agenda' },
+  'planner.noActivitiesForDay': { en: 'No activities scheduled' },
+  'planner.upcomingAfterDay': { en: 'Coming Up' },
+
   // Planner — Legend
   'planner.legend': { en: 'Legend' },
 
