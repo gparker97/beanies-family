@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { useMemberFilterStore } from './memberFilterStore';
+import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/indexeddb/repositories/activityRepository';
 import { toDateInputValue } from '@/utils/date';
 import type {
@@ -37,16 +38,7 @@ export const useActivityStore = defineStore('activities', () => {
   const inactiveActivities = computed(() => activities.value.filter((a) => !a.isActive));
 
   // Filtered getters (by global member filter)
-  const filteredActivities = computed(() => {
-    const memberFilter = useMemberFilterStore();
-    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
-      return activeActivities.value;
-    }
-    return activeActivities.value.filter((a) => {
-      if (!a.assigneeId) return true;
-      return memberFilter.isMemberSelected(a.assigneeId);
-    });
-  });
+  const filteredActivities = createMemberFiltered(activeActivities, (a) => a.assigneeId);
 
   /**
    * Expand a single recurring activity into occurrences for a given month.
@@ -178,39 +170,25 @@ export const useActivityStore = defineStore('activities', () => {
 
   // Actions
   async function loadActivities() {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       activities.value = await activityRepo.getAllActivities();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load activities';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createActivity(input: CreateFamilyActivityInput): Promise<FamilyActivity | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const activity = await activityRepo.createActivity(input);
       activities.value.push(activity);
       return activity;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create activity';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateActivity(
     id: string,
     input: UpdateFamilyActivityInput
   ): Promise<FamilyActivity | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const updated = await activityRepo.updateActivity(id, input);
       if (updated) {
         const index = activities.value.findIndex((a) => a.id === id);
@@ -218,31 +196,21 @@ export const useActivityStore = defineStore('activities', () => {
           activities.value[index] = updated;
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update activity';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteActivity(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await activityRepo.deleteActivity(id);
       if (success) {
         useTombstoneStore().recordDeletion('familyActivity', id);
         activities.value = activities.value.filter((a) => a.id !== id);
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete activity';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   function resetState() {

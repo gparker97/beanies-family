@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useAccountsStore } from './accountsStore';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import type {
@@ -129,41 +130,27 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   // Actions
   async function loadRecurringItems(): Promise<void> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       recurringItems.value = await recurringRepo.getAllRecurringItems();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load recurring items';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createRecurringItem(
     input: CreateRecurringItemInput
   ): Promise<RecurringItem | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const item = await recurringRepo.createRecurringItem(input);
       recurringItems.value.push(item);
       return item;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create recurring item';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateRecurringItem(
     id: string,
     input: UpdateRecurringItemInput
   ): Promise<RecurringItem | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const updated = await recurringRepo.updateRecurringItem(id, input);
       if (updated) {
         const index = recurringItems.value.findIndex((item) => item.id === id);
@@ -171,31 +158,21 @@ export const useRecurringStore = defineStore('recurring', () => {
           recurringItems.value[index] = updated;
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update recurring item';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteRecurringItem(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await recurringRepo.deleteRecurringItem(id);
       if (success) {
         useTombstoneStore().recordDeletion('recurringItem', id);
         recurringItems.value = recurringItems.value.filter((item) => item.id !== id);
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete recurring item';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   async function toggleActive(id: string): Promise<boolean> {

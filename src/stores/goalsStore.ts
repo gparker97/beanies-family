@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
-import { useMemberFilterStore } from './memberFilterStore';
+import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
 import * as goalRepo from '@/services/indexeddb/repositories/goalRepository';
 import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
 
@@ -46,17 +47,7 @@ export const useGoalsStore = defineStore('goals', () => {
 
   // Goals filtered by global member filter
   // Family-wide goals (memberId is null/undefined) are always included
-  const filteredGoals = computed(() => {
-    const memberFilter = useMemberFilterStore();
-    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
-      return goals.value;
-    }
-    return goals.value.filter((g) => {
-      // Family-wide goals always show
-      if (!g.memberId) return true;
-      return memberFilter.isMemberSelected(g.memberId);
-    });
-  });
+  const filteredGoals = createMemberFiltered(goals, (g) => g.memberId);
 
   const filteredActiveGoals = computed(() => filteredGoals.value.filter((g) => !g.isCompleted));
 
@@ -64,36 +55,22 @@ export const useGoalsStore = defineStore('goals', () => {
 
   // Actions
   async function loadGoals() {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       goals.value = await goalRepo.getAllGoals();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load goals';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createGoal(input: CreateGoalInput): Promise<Goal | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const goal = await goalRepo.createGoal(input);
       goals.value.push(goal);
       return goal;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create goal';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateGoal(id: string, input: UpdateGoalInput): Promise<Goal | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const existing = goals.value.find((g) => g.id === id);
       const wasCompleted = existing?.isCompleted ?? false;
 
@@ -116,31 +93,21 @@ export const useGoalsStore = defineStore('goals', () => {
           celebrate(updated.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update goal';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteGoal(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await goalRepo.deleteGoal(id);
       if (success) {
         useTombstoneStore().recordDeletion('goal', id);
         goals.value = goals.value.filter((g) => g.id !== id);
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete goal';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   async function updateProgress(id: string, currentAmount: number): Promise<Goal | null> {

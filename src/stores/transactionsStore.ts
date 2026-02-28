@@ -5,6 +5,7 @@ import * as transactionRepo from '@/services/indexeddb/repositories/transactionR
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useTombstoneStore } from '@/stores/tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import type {
   Transaction,
@@ -173,21 +174,13 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   // Actions
   async function loadTransactions() {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       transactions.value = await transactionRepo.getAllTransactions();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load transactions';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createTransaction(input: CreateTransactionInput): Promise<Transaction | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const transaction = await transactionRepo.createTransaction(input);
       const isFirst = transactions.value.length === 0;
       transactions.value.push(transaction);
@@ -206,21 +199,15 @@ export const useTransactionsStore = defineStore('transactions', () => {
       }
 
       return transaction;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create transaction';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateTransaction(
     id: string,
     input: UpdateTransactionInput
   ): Promise<Transaction | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       // Get the original transaction to calculate balance adjustments
       const original = transactions.value.find((t) => t.id === id);
 
@@ -267,19 +254,13 @@ export const useTransactionsStore = defineStore('transactions', () => {
           }
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update transaction';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteTransaction(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       // Get the transaction before deleting to reverse balance
       const transaction = transactions.value.find((t) => t.id === id);
 
@@ -305,12 +286,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
         }
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete transaction';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   function getTransactionById(id: string): Transaction | undefined {
