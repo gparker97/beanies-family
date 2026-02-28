@@ -130,16 +130,18 @@ vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
   setAIApiKey: vi.fn(),
   setExchangeRateAutoUpdate: vi.fn(),
   setExchangeRateLastFetch: vi.fn(),
-  updateExchangeRates: vi.fn(async (rates: Array<{ from: string; to: string; rate: number }>) => {
-    // Mimics real behavior: merges rates but preserves timestamp
-    mockSettingsStateHolder.state = {
-      ...mockSettingsStateHolder.state,
-      exchangeRates: rates,
-      exchangeRateLastFetch: new Date().toISOString(),
-      // updatedAt intentionally NOT bumped (preserveTimestamp: true in real code)
-    };
-    return { ...mockSettingsStateHolder.state };
-  }),
+  updateExchangeRates: vi.fn(
+    async (rates: Array<{ from: string; to: string; rate: number; updatedAt: string }>) => {
+      // Mimics real behavior: merges rates but preserves timestamp
+      mockSettingsStateHolder.state = {
+        ...mockSettingsStateHolder.state,
+        exchangeRates: rates,
+        exchangeRateLastFetch: new Date().toISOString(),
+        // updatedAt intentionally NOT bumped (preserveTimestamp: true in real code)
+      };
+      return { ...mockSettingsStateHolder.state };
+    }
+  ),
   addExchangeRate: vi.fn(),
   removeExchangeRate: vi.fn(),
   addCustomInstitution: vi.fn(),
@@ -491,7 +493,7 @@ describe('preferred currency persistence', () => {
 
     // Update exchange rates — should preserve timestamp
     await settingsStore.updateExchangeRates([
-      { from: 'USD', to: 'EUR', rate: 0.85, date: '2024-06-01' },
+      { from: 'USD', to: 'EUR', rate: 0.85, updatedAt: '2024-06-01' },
     ]);
 
     expect(settingsStore.settings.updatedAt).toBe(originalUpdatedAt);
