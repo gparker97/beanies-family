@@ -1,5 +1,19 @@
 import { Page, expect } from '@playwright/test';
 
+/**
+ * Maps category IDs to their group name for the two-level CategoryChipPicker.
+ * Only categories used in E2E tests need to be listed here.
+ */
+const CATEGORY_GROUP_MAP: Record<string, string> = {
+  groceries: 'Food',
+  dining_out: 'Food',
+  coffee_snacks: 'Food',
+  rent: 'Housing',
+  utilities: 'Housing',
+  salary: 'Employment',
+  freelance: 'Employment',
+};
+
 export class TransactionsPage {
   constructor(private page: Page) {}
 
@@ -41,10 +55,21 @@ export class TransactionsPage {
     // Description (raw input with placeholder)
     await this.page.getByPlaceholder('Description').fill(data.description);
 
-    // Category (BaseSelect with grouped options)
+    // Category — two-level CategoryChipPicker: click group chip, then sub-category chip
     if (data.category) {
-      // Category is the first <select> in the dialog
-      await this.page.locator('[role="dialog"] select').first().selectOption(data.category);
+      const group = CATEGORY_GROUP_MAP[data.category];
+      if (group) {
+        // Click the group chip to expand it
+        await this.page.locator('[role="dialog"]').getByRole('button', { name: group }).click();
+      }
+      // Click the sub-category chip (capitalize first letter to match display name)
+      const categoryName = data.category
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      await this.page
+        .locator('[role="dialog"]')
+        .getByRole('button', { name: categoryName })
+        .click();
     }
 
     // Account — BaseSelect with "Select an account" placeholder option

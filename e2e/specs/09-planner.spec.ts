@@ -326,9 +326,7 @@ test.describe('Family Planner', () => {
 
     // Recurrence defaults to Recurring + Weekly
 
-    // Expand advanced fields
-    await page.getByText('More Details').click();
-
+    // Location and instructor fields are now inline
     // Fill location (BaseInput wrapped in FormFieldGroup — use placeholder)
     await page.getByPlaceholder('Location').fill('City Sports Park');
 

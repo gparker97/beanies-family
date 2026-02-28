@@ -48,14 +48,11 @@ test.describe('Beanie Avatars', () => {
     // Select "Little Bean" role chip (maps to child age group)
     await page.getByRole('button', { name: /little bean/i }).click();
 
-    // Expand "More Details" to access email and gender
-    await page.getByRole('button', { name: /more details/i }).click();
+    // Email and gender are now inline (no "More Details" section)
+    await page.getByPlaceholder('bean@example.com').fill('luna@example.com');
 
-    // Fill email
-    await page.getByLabel(/email/i).fill('luna@example.com');
-
-    // Select Female gender
-    await page.getByLabel(/gender/i).selectOption('female');
+    // Select Female gender chip
+    await page.getByRole('button', { name: /Female/ }).click();
 
     // Submit via the save/add button inside the modal
     await page.getByRole('button', { name: /add to family|add to pod/i }).click();

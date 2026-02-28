@@ -33,9 +33,8 @@ test.describe('Account Institution Combobox', () => {
     const accountsPage = new AccountsPage(page);
     await accountsPage.goto();
 
-    // Open the add modal and expand More Details to access institution combobox
+    // Open the add modal — institution fields are now inline
     await page.getByRole('button', { name: 'Add Account' }).first().click();
-    await page.getByText('More Details').click();
 
     const instCombobox = accountsPage.getInstitutionCombobox();
     await instCombobox.open();
@@ -48,7 +47,7 @@ test.describe('Account Institution Combobox', () => {
 
     // Fill remaining required fields and save
     await page.getByPlaceholder('Account Name').fill('HSBC Account');
-    await page.getByRole('button', { name: /Checking/ }).click();
+    await page.getByRole('button', { name: '🏦 Checking Account', exact: true }).click();
     await page.locator('input[type="number"]').first().fill('5000');
     await page.getByRole('button', { name: 'Add Account' }).last().click();
 
@@ -83,7 +82,6 @@ test.describe('Account Institution Combobox', () => {
 
     // Verify custom institution is persisted: open add account again and check dropdown
     await page.getByRole('button', { name: 'Add Account' }).first().click();
-    await page.getByText('More Details').click();
     const instCombobox = accountsPage.getInstitutionCombobox();
     await instCombobox.open();
     await instCombobox.expectDropdownContains('My Local Bank');
