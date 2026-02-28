@@ -176,6 +176,19 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   /**
+   * Check if Google account email has become available (e.g. after token acquisition)
+   * and update the in-memory state. Returns true if email changed.
+   */
+  updateAccountEmailIfAvailable(): boolean {
+    const email = getGoogleAccountEmail();
+    if (email && email !== this.accountEmail) {
+      this.accountEmail = email;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Create a new .beanpod file on Google Drive.
    * Authenticates, creates/finds the app folder, and creates the file.
    */

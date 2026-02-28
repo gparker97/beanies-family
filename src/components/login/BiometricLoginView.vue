@@ -107,11 +107,12 @@ async function handleBiometricLogin() {
         alt=""
         class="mx-auto mb-3 h-16 w-16"
       />
-      <p v-if="showNotYouLink" class="mb-1 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('fastLogin.welcomeBack') }}
-      </p>
-      <h2 class="font-outfit text-lg font-bold text-gray-900 dark:text-gray-100">
-        {{ familyName || t('passkey.welcomeBack') }}
+      <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+        {{
+          showNotYouLink && familyName
+            ? t('fastLogin.welcomeBackName').replace('{name}', familyName)
+            : familyName || t('passkey.welcomeBack')
+        }}
       </h2>
       <!-- File/provider context -->
       <CloudProviderBadge
