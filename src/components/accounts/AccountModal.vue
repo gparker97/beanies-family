@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import EmojiPicker from '@/components/ui/EmojiPicker.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
@@ -41,16 +40,17 @@ const isEditing = computed(() => !!props.account);
 const showMoreDetails = ref(false);
 const isSubmitting = ref(false);
 
-// Emoji options for account types
-const ACCOUNT_EMOJIS = [
-  { emoji: '🏦', label: 'Bank' },
-  { emoji: '🐷', label: 'Savings' },
-  { emoji: '💳', label: 'Credit Card' },
-  { emoji: '📈', label: 'Investment' },
-  { emoji: '💵', label: 'Cash' },
-  { emoji: '🏠', label: 'Property' },
-  { emoji: '🎓', label: 'Education' },
-  { emoji: '🔒', label: 'Locked' },
+// Icon chip options for account types
+const ACCOUNT_ICON_OPTIONS = [
+  { value: '🏦', label: 'Bank', icon: '🏦' },
+  { value: '🐷', label: 'Savings', icon: '🐷' },
+  { value: '💳', label: 'Credit Card', icon: '💳' },
+  { value: '📈', label: 'Investment', icon: '📈' },
+  { value: '💵', label: 'Cash', icon: '💵' },
+  { value: '🏠', label: 'Property', icon: '🏠' },
+  { value: '🎓', label: 'Education', icon: '🎓' },
+  { value: '🔒', label: 'Locked', icon: '🔒' },
+  { value: '📦', label: 'Other', icon: '📦' },
 ];
 
 // Account type chips
@@ -182,9 +182,9 @@ function handleDelete() {
     @save="handleSave"
     @delete="handleDelete"
   >
-    <!-- 1. Emoji Picker -->
-    <FormFieldGroup :label="t('modal.pickIcon')">
-      <EmojiPicker v-model="icon" :options="ACCOUNT_EMOJIS" />
+    <!-- 1. Icon Picker -->
+    <FormFieldGroup :label="t('modal.selectCategory')">
+      <FrequencyChips v-model="icon" :options="ACCOUNT_ICON_OPTIONS" />
     </FormFieldGroup>
 
     <!-- 2. Account name -->
