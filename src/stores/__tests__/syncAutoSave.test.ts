@@ -23,6 +23,8 @@ const {
   mockSave,
   mockSettingsStateHolder,
   stateChangeCallbackHolder,
+  mockWriteSettingsWAL,
+  mockLoadAndImport,
 } = vi.hoisted(() => ({
   mockTriggerDebouncedSave: vi.fn(),
   mockSelectSyncFile: vi.fn(async () => true),
@@ -35,6 +37,8 @@ const {
   stateChangeCallbackHolder: {
     callback: null as ((state: Record<string, unknown>) => void) | null,
   },
+  mockWriteSettingsWAL: vi.fn(),
+  mockLoadAndImport: vi.fn(async () => ({ success: true })),
 }));
 
 const defaultSettings: Settings = {
@@ -83,14 +87,19 @@ vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
     updatedAt: '2024-01-01',
   }),
   getSettings: vi.fn(async () => ({ ...mockSettingsStateHolder.state })),
-  saveSettings: vi.fn(async (partial: Partial<Settings>) => {
-    mockSettingsStateHolder.state = {
-      ...mockSettingsStateHolder.state,
-      ...partial,
-      id: 'app_settings',
-    };
-    return { ...mockSettingsStateHolder.state };
-  }),
+  saveSettings: vi.fn(
+    async (partial: Partial<Settings>, options?: { preserveTimestamp?: boolean }) => {
+      mockSettingsStateHolder.state = {
+        ...mockSettingsStateHolder.state,
+        ...partial,
+        id: 'app_settings',
+        updatedAt: options?.preserveTimestamp
+          ? mockSettingsStateHolder.state.updatedAt
+          : new Date().toISOString(),
+      };
+      return { ...mockSettingsStateHolder.state };
+    }
+  ),
   setBaseCurrency: vi.fn(async (c: string) => {
     mockSettingsStateHolder.state = {
       ...mockSettingsStateHolder.state,
@@ -109,6 +118,7 @@ vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
     mockSettingsStateHolder.state = {
       ...mockSettingsStateHolder.state,
       preferredCurrencies: currencies as Settings['preferredCurrencies'],
+      updatedAt: new Date().toISOString(),
     };
     return { ...mockSettingsStateHolder.state };
   }),
@@ -120,7 +130,16 @@ vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
   setAIApiKey: vi.fn(),
   setExchangeRateAutoUpdate: vi.fn(),
   setExchangeRateLastFetch: vi.fn(),
-  updateExchangeRates: vi.fn(),
+  updateExchangeRates: vi.fn(async (rates: Array<{ from: string; to: string; rate: number }>) => {
+    // Mimics real behavior: merges rates but preserves timestamp
+    mockSettingsStateHolder.state = {
+      ...mockSettingsStateHolder.state,
+      exchangeRates: rates,
+      exchangeRateLastFetch: new Date().toISOString(),
+      // updatedAt intentionally NOT bumped (preserveTimestamp: true in real code)
+    };
+    return { ...mockSettingsStateHolder.state };
+  }),
   addExchangeRate: vi.fn(),
   removeExchangeRate: vi.fn(),
   addCustomInstitution: vi.fn(),
@@ -152,7 +171,16 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   setGlobalTheme: vi.fn(),
   setGlobalLanguage: vi.fn(),
   setLastActiveFamilyId: vi.fn(),
-  updateGlobalExchangeRates: vi.fn(),
+  updateGlobalExchangeRates: vi.fn(async () => ({ ...mockGlobalSettings })),
+}));
+
+// Settings WAL
+vi.mock('@/services/sync/settingsWAL', () => ({
+  writeSettingsWAL: mockWriteSettingsWAL,
+  readSettingsWAL: vi.fn(() => null),
+  clearSettingsWAL: vi.fn(),
+  clearAllSettingsWAL: vi.fn(),
+  isWALStale: vi.fn(() => true),
 }));
 
 // Sync service — spreads shared auto-mock defaults, overrides what this test needs
@@ -175,6 +203,8 @@ vi.mock('@/services/sync/syncService', async () => {
     },
     save: (...args: unknown[]) => (mockSave as (...a: unknown[]) => unknown)(...args),
     triggerDebouncedSave: (...args: unknown[]) => mockTriggerDebouncedSave(...args),
+    loadAndImport: (...args: unknown[]) =>
+      (mockLoadAndImport as (...a: unknown[]) => unknown)(...args),
     reset: vi.fn(() => {
       stateChangeCallbackHolder.callback?.({
         isInitialized: false,
@@ -275,6 +305,19 @@ vi.mock('@/stores/recurringStore', () => ({
 }));
 vi.mock('@/stores/todoStore', () => ({
   useTodoStore: () => ({ todos: [], loadTodos: vi.fn(async () => {}) }),
+}));
+vi.mock('@/stores/activityStore', () => ({
+  useActivityStore: () => ({ activities: [], loadActivities: vi.fn(async () => {}) }),
+}));
+vi.mock('@/stores/tombstoneStore', () => ({
+  useTombstoneStore: () => ({ tombstones: [], resetState: vi.fn() }),
+}));
+vi.mock('@/stores/syncHighlightStore', () => ({
+  useSyncHighlightStore: () => ({
+    snapshotBeforeReload: vi.fn(),
+    detectChanges: vi.fn(),
+    clearHighlights: vi.fn(),
+  }),
 }));
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({
@@ -425,5 +468,94 @@ describe('syncStore auto-save arming', () => {
     await nextTick();
     await nextTick();
     expect(mockTriggerDebouncedSave).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('preferred currency persistence', () => {
+  let pinia: Pinia;
+
+  beforeEach(() => {
+    pinia = createPinia();
+    setActivePinia(pinia);
+    mockSettingsStateHolder.state = { ...defaultSettings, updatedAt: '2024-01-01T00:00:00.000Z' };
+    mockTriggerDebouncedSave.mockClear();
+    mockWriteSettingsWAL.mockClear();
+    mockLoadAndImport.mockClear();
+  });
+
+  it('exchange rate update does NOT change Settings.updatedAt', async () => {
+    const settingsStore = useSettingsStore();
+    await settingsStore.loadSettings();
+
+    const originalUpdatedAt = settingsStore.settings.updatedAt;
+
+    // Update exchange rates — should preserve timestamp
+    await settingsStore.updateExchangeRates([
+      { from: 'USD', to: 'EUR', rate: 0.85, date: '2024-06-01' },
+    ]);
+
+    expect(settingsStore.settings.updatedAt).toBe(originalUpdatedAt);
+  });
+
+  it('setPreferredCurrencies DOES change Settings.updatedAt', async () => {
+    const settingsStore = useSettingsStore();
+    await settingsStore.loadSettings();
+
+    const originalUpdatedAt = settingsStore.settings.updatedAt;
+
+    // Set preferred currencies — should bump timestamp
+    await settingsStore.setPreferredCurrencies(['GBP', 'EUR']);
+
+    expect(settingsStore.settings.updatedAt).not.toBe(originalUpdatedAt);
+  });
+
+  it('WAL is not written during reloadAllStores', async () => {
+    const syncStore = useSyncStore();
+    const settingsStore = useSettingsStore();
+    await settingsStore.loadSettings();
+
+    // Simulate file being configured so loadFromFile works
+    stateChangeCallbackHolder.callback?.({
+      isInitialized: true,
+      isConfigured: true,
+      fileName: 'test.beanpod',
+      isSyncing: false,
+      lastError: null,
+    });
+
+    mockWriteSettingsWAL.mockClear();
+
+    // loadFromFile calls reloadAllStores internally
+    await syncStore.loadFromFile();
+
+    // WAL should not have been written during the reload
+    // (settings.value mutation during loadSettings would normally trigger WAL)
+    expect(mockWriteSettingsWAL).not.toHaveBeenCalled();
+  });
+
+  it('loadFromFile arms auto-sync so settings changes trigger file save', async () => {
+    const syncStore = useSyncStore();
+    const settingsStore = useSettingsStore();
+    await settingsStore.loadSettings();
+
+    // Simulate file being configured
+    stateChangeCallbackHolder.callback?.({
+      isInitialized: true,
+      isConfigured: true,
+      fileName: 'test.beanpod',
+      isSyncing: false,
+      lastError: null,
+    });
+
+    // loadFromFile should arm auto-sync internally
+    await syncStore.loadFromFile();
+    mockTriggerDebouncedSave.mockClear();
+
+    // Change preferred currencies — should trigger file save
+    await settingsStore.setPreferredCurrencies(['GBP', 'EUR']);
+    await nextTick();
+    await nextTick();
+
+    expect(mockTriggerDebouncedSave).toHaveBeenCalled();
   });
 });

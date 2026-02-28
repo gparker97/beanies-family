@@ -13,6 +13,18 @@ import type {
   LanguageCode,
 } from '@/types/models';
 
+// WAL suppression: prevents spurious WAL writes during store reloads
+// (e.g. reloadAllStores importing data that mutates settings.value).
+let _suppressWAL = false;
+
+export function suppressSettingsWAL(): void {
+  _suppressWAL = true;
+}
+
+export function resumeSettingsWAL(): void {
+  _suppressWAL = false;
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   // State
   const settings = ref<Settings>(settingsRepo.getDefaultSettings());
@@ -79,9 +91,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Write-ahead log: persist settings to localStorage on every mutation
   // so they survive page refresh even if the async file write hasn't completed.
+  // Suppressed during reloadAllStores() to avoid capturing imported data as WAL entries.
   watch(
     settings,
     (newSettings) => {
+      if (_suppressWAL) return;
       const familyId = getActiveFamilyId();
       if (familyId) {
         writeSettingsWAL(familyId, newSettings);

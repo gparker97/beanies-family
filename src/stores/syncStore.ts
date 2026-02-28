@@ -10,7 +10,7 @@ import { useRecurringStore } from './recurringStore';
 import { useTodoStore } from './todoStore';
 import { useActivityStore } from './activityStore';
 import { useTombstoneStore } from './tombstoneStore';
-import { useSettingsStore } from './settingsStore';
+import { useSettingsStore, suppressSettingsWAL, resumeSettingsWAL } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
@@ -358,6 +358,9 @@ export const useSyncStore = defineStore('sync', () => {
           // Update account email after fire-and-forget fetchGoogleUserEmail completes
           updateProviderEmailAfterLoad();
         }
+        // Ensure auto-sync is armed after loading from file, regardless of caller.
+        // setupAutoSync guards against double-setup internally.
+        setupAutoSync();
       } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
         // Google Drive read failed (e.g., expired token after force-close) —
         // show reconnect toast so user can re-authenticate when ready.
@@ -397,12 +400,15 @@ export const useSyncStore = defineStore('sync', () => {
       // Reload all stores after import
       await reloadAllStores();
 
-      // Update settings — preserve encryption state from the loaded file
-      await saveSettings({
-        syncEnabled: true,
-        syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value ?? undefined,
-      });
+      // Update sync metadata — housekeeping only, don't bump updatedAt
+      await saveSettings(
+        {
+          syncEnabled: true,
+          syncFilePath: fileName.value ?? undefined,
+          lastSyncTimestamp: lastSync.value ?? undefined,
+        },
+        { preserveTimestamp: true }
+      );
 
       // Arm auto-sync so future changes are saved to the file
       setupAutoSync();
@@ -431,11 +437,15 @@ export const useSyncStore = defineStore('sync', () => {
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
       await reloadAllStores();
-      await saveSettings({
-        syncEnabled: true,
-        syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value ?? undefined,
-      });
+      // Update sync metadata — housekeeping only, don't bump updatedAt
+      await saveSettings(
+        {
+          syncEnabled: true,
+          syncFilePath: fileName.value ?? undefined,
+          lastSyncTimestamp: lastSync.value ?? undefined,
+        },
+        { preserveTimestamp: true }
+      );
       // Arm auto-sync so future changes are saved to the file
       setupAutoSync();
     }
@@ -504,13 +514,16 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Update settings to reflect sync is enabled with encryption
       // Do this BEFORE reloading stores to ensure encryptionEnabled is true
-      // before any auto-sync watcher fires
-      await saveSettings({
-        syncEnabled: true,
-        encryptionEnabled: true,
-        syncFilePath: fileName.value ?? undefined,
-        lastSyncTimestamp: lastSync.value ?? undefined,
-      });
+      // before any auto-sync watcher fires. Housekeeping — don't bump updatedAt.
+      await saveSettings(
+        {
+          syncEnabled: true,
+          encryptionEnabled: true,
+          syncFilePath: fileName.value ?? undefined,
+          lastSyncTimestamp: lastSync.value ?? undefined,
+        },
+        { preserveTimestamp: true }
+      );
 
       // Cache password on trusted devices so it survives page refresh
       const settingsStore = useSettingsStore();
@@ -691,6 +704,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function reloadAllStores(): Promise<void> {
     isReloading = true;
+    suppressSettingsWAL();
     syncService.cancelPendingSave();
 
     // Snapshot current IDs before reload so we can detect new/modified items
@@ -726,6 +740,7 @@ export const useSyncStore = defineStore('sync', () => {
       // apply it so preferred currencies (etc.) survive refresh.
       await applySettingsWAL();
     } finally {
+      resumeSettingsWAL();
       // Flush deferred watcher callbacks while isReloading is still true,
       // so the auto-sync watcher sees the guard and no-ops.
       await nextTick();
