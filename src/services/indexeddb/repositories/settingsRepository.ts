@@ -42,7 +42,10 @@ export async function getSettings(): Promise<Settings> {
   return settings ?? getDefaultSettings();
 }
 
-export async function saveSettings(settings: Partial<Settings>): Promise<Settings> {
+export async function saveSettings(
+  settings: Partial<Settings>,
+  options?: { preserveTimestamp?: boolean }
+): Promise<Settings> {
   const db = await getDatabase();
   const existing = await getSettings();
 
@@ -50,7 +53,7 @@ export async function saveSettings(settings: Partial<Settings>): Promise<Setting
     ...existing,
     ...settings,
     id: SETTINGS_ID,
-    updatedAt: toISODateString(new Date()),
+    updatedAt: options?.preserveTimestamp ? existing.updatedAt : toISODateString(new Date()),
   };
 
   await db.put('settings', updated);
@@ -119,10 +122,15 @@ export async function updateExchangeRates(rates: ExchangeRate[]): Promise<Settin
     rateMap.set(`${rate.from}-${rate.to}`, rate);
   }
 
-  return saveSettings({
-    exchangeRates: Array.from(rateMap.values()),
-    exchangeRateLastFetch: now,
-  });
+  // Exchange rate updates are housekeeping — don't bump updatedAt so they
+  // don't win cross-device merges and overwrite user settings like preferredCurrencies.
+  return saveSettings(
+    {
+      exchangeRates: Array.from(rateMap.values()),
+      exchangeRateLastFetch: now,
+    },
+    { preserveTimestamp: true }
+  );
 }
 
 export async function addExchangeRate(rate: ExchangeRate): Promise<Settings> {
