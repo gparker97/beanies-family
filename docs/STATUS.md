@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-02-28
-> **Updated by:** Claude (revert HTML reformatting, fix E2E tests, merge rollup security bump, deploy to prod)
+> **Last updated:** 2026-03-01
+> **Updated by:** Claude (codebase dedup & cleanup, Node 24 upgrade)
 
 ## Current Phase
 
@@ -26,6 +26,10 @@
 - Recurring transaction processor (daily/monthly/yearly)
 - Multilingual support (English + Chinese) via MyMemory API with IndexedDB caching
 - Project documentation: `docs/ARCHITECTURE.md`, `docs/adr/` (10 ADRs)
+- Generic IndexedDB repository factory (`createRepository.ts`) — shared CRUD for 8 entity stores
+- Toast notification system (`useToast.ts` + `ToastContainer.vue`) — error/success/warning/info toasts
+- Store action helper (`wrapAsync()`) — centralized try/catch/finally for all store CRUD operations
+- Node.js 24 across all CI/CD workflows and local development
 
 ### UI Components
 
@@ -468,6 +472,28 @@
 ### NookGreeting UI Cleanup
 
 - Removed duplicate notification bell and privacy mask icons from `NookGreeting.vue` (already present in header)
+
+### Codebase Deduplication & Cleanup (PR #107) — Closed
+
+Comprehensive review of 243 source files (~49,700 lines) identified and consolidated ~2,000+ lines of duplicated or redundant code across 6 phases (84 files changed, net reduction of 544 lines):
+
+- **Shared utilities:** Extracted `currency.ts` (currency conversion, 6 consumers), `useMemberInfo.ts` (member lookup, 5 pages), `toDateInputValue()` (date formatting, 4 files)
+- **Generic repository factory:** `createRepository.ts` eliminates identical CRUD boilerplate across 8 IndexedDB repositories (~474 lines)
+- **Toast notification system:** `useToast.ts` + `ToastContainer.vue` — module-level singleton for user-visible error/success/warning/info notifications. Error toasts are sticky. Replaces silent `console.error` calls
+- **Store action helper:** `wrapAsync()` in `useStoreActions.ts` replaces 23 identical try/catch/finally blocks across 8 stores (~484 lines). CRUD failures automatically show sticky error toasts
+- **Member filter factory:** `useMemberFiltered.ts` consolidates 20+ filtered getter patterns across 5 stores
+- **Component consolidation:** Unified `MemberChipFilter.vue` (replaced 2 near-identical components), `useFormModal.ts` composable (5 modals), `ActionButtons.vue` (4 pages)
+- **CSS cleanup:** 172 hardcoded hex colors replaced with Tailwind semantic tokens, `nook-section-label` utility applied to 8 inline duplicates, shared `nook-card-dark` class for 4 nook widgets
+- **Dead code removal:** 6 unused date utility functions removed
+- 10 new shared modules created. 462/462 unit tests passed, 54/57 E2E tests passed (1 pre-existing flaky)
+- Full plan: `docs/plans/2026-03-01-codebase-dedup-cleanup.md`
+
+### Node.js 24 Upgrade
+
+- Upgraded all CI/CD workflows and `.nvmrc` from Node 20 to Node 24
+- Eliminated recurring TypeScript strictness mismatches between local dev (Node 24) and CI (Node 20)
+- Removed Node version matrix from `main-ci.yml` (was `[20.x, 24.x]`, now single `24`)
+- Fixed `createRepository.ts` TS2352 error exposed by Node 24's stricter TypeScript
 
 ### Recent Fixes
 
