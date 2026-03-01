@@ -3,7 +3,8 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
-import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
+import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { useCountUp } from '@/composables/useCountUp';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -12,7 +13,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 const router = useRouter();
 const { t } = useTranslation();
 const { isUnlocked, MASK } = usePrivacyMode();
-const { formatInDisplayCurrency } = useCurrencyDisplay();
+const { convertToDisplay } = useCurrencyDisplay();
 const accountsStore = useAccountsStore();
 const transactionsStore = useTransactionsStore();
 const recurringStore = useRecurringStore();
@@ -40,20 +41,33 @@ const budgetProgress = computed(() => {
   return Math.min((monthlyExpenses.value / monthlyIncome.value) * 100, 100);
 });
 
+// Animated net worth (800ms, matching dashboard hero card)
+const nwConverted = computed(() => convertToDisplay(netWorth.value, baseCurrency.value));
+const nwTarget = computed(() => (isUnlocked.value ? nwConverted.value.displayAmount : 0));
+const { displayValue: animatedNW } = useCountUp(nwTarget, 0, 800);
 const formattedNetWorth = computed(() => {
   if (!isUnlocked.value) return MASK;
-  return formatInDisplayCurrency(netWorth.value, baseCurrency.value);
+  return formatCurrencyWithCode(animatedNW.value, nwConverted.value.displayCurrency);
 });
 
+// Animated monthly change (200ms delay)
+const changeConverted = computed(() =>
+  convertToDisplay(Math.abs(monthlyChange.value), baseCurrency.value)
+);
+const changeTarget = computed(() => (isUnlocked.value ? changeConverted.value.displayAmount : 0));
+const { displayValue: animatedChange } = useCountUp(changeTarget, 200);
 const formattedMonthlyChange = computed(() => {
   if (!isUnlocked.value) return MASK;
-  const abs = Math.abs(monthlyChange.value);
-  return formatInDisplayCurrency(abs, baseCurrency.value);
+  return formatCurrencyWithCode(animatedChange.value, changeConverted.value.displayCurrency);
 });
 
+// Animated monthly expenses (400ms delay)
+const expConverted = computed(() => convertToDisplay(monthlyExpenses.value, baseCurrency.value));
+const expTarget = computed(() => (isUnlocked.value ? expConverted.value.displayAmount : 0));
+const { displayValue: animatedExp } = useCountUp(expTarget, 400);
 const formattedMonthlyExpenses = computed(() => {
   if (!isUnlocked.value) return MASK;
-  return formatInDisplayCurrency(monthlyExpenses.value, baseCurrency.value);
+  return formatCurrencyWithCode(animatedExp.value, expConverted.value.displayCurrency);
 });
 
 const isPositiveChange = computed(() => monthlyChange.value >= 0);
