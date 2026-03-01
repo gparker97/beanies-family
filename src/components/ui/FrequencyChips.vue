@@ -23,7 +23,7 @@ const emit = defineEmits<{
       v-for="opt in options"
       :key="opt.value"
       type="button"
-      class="font-outfit rounded-full px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all duration-150"
+      class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
       :class="
         modelValue === opt.value
           ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'

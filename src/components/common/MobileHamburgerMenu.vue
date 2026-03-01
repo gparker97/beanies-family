@@ -256,7 +256,7 @@ const encryptionLabel = computed(() => {
 
             <!-- Controls section -->
             <div class="mx-4 mt-3 space-y-2 rounded-2xl bg-white/[0.04] p-3">
-              <p class="text-[0.6rem] font-semibold tracking-wider text-white/30 uppercase">
+              <p class="text-xs font-semibold tracking-wider text-white/30 uppercase">
                 {{ t('mobile.controls') }}
               </p>
 
@@ -271,7 +271,7 @@ const encryptionLabel = computed(() => {
                     size="xs"
                   />
                 </div>
-                <span class="text-[0.75rem] text-white/60">{{ memberFilterLabel }}</span>
+                <span class="text-xs text-white/60">{{ memberFilterLabel }}</span>
               </div>
 
               <!-- Privacy toggle -->
@@ -292,7 +292,7 @@ const encryptionLabel = computed(() => {
                   :alt="t('header.financialFiguresHidden')"
                   class="h-6 w-6"
                 />
-                <span class="text-[0.75rem] text-white/60">
+                <span class="text-xs text-white/60">
                   {{
                     isUnlocked ? t('header.showFinancialFigures') : t('header.hideFinancialFigures')
                   }}
@@ -306,7 +306,7 @@ const encryptionLabel = computed(() => {
                   v-for="lang in LANGUAGES"
                   :key="lang.code"
                   type="button"
-                  class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[0.75rem] transition-colors"
+                  class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors"
                   :class="[
                     lang.code === settingsStore.language
                       ? 'bg-primary-500/20 text-white'
@@ -356,7 +356,7 @@ const encryptionLabel = computed(() => {
                   v-for="code in settingsStore.effectiveDisplayCurrencies"
                   :key="code"
                   type="button"
-                  class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-all"
+                  class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-all"
                   :class="
                     code === settingsStore.displayCurrency
                       ? 'bg-primary-500 text-white'
@@ -378,7 +378,7 @@ const encryptionLabel = computed(() => {
                 <!-- Section Header -->
                 <button
                   type="button"
-                  class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[0.85rem] font-bold tracking-wide uppercase transition-colors"
+                  class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold tracking-wide uppercase transition-colors"
                   :class="section.color"
                   @click="toggleSection(section.id as 'treehouse' | 'piggyBank')"
                 >
@@ -398,7 +398,7 @@ const encryptionLabel = computed(() => {
                     v-for="item in section.items"
                     :key="item.path"
                     type="button"
-                    class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1rem] font-medium transition-all duration-150"
+                    class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-base font-medium transition-all duration-150"
                     :class="[
                       item.active
                         ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -415,7 +415,7 @@ const encryptionLabel = computed(() => {
                     <span class="flex-1">{{ item.label }}</span>
                     <span
                       v-if="item.badge > 0"
-                      class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-[0.6rem] font-semibold text-white"
+                      class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
                     >
                       {{ item.badge }}
                     </span>
@@ -437,7 +437,7 @@ const encryptionLabel = computed(() => {
                 v-for="item in pinnedItems"
                 :key="item.path"
                 type="button"
-                class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1rem] font-medium transition-all duration-150"
+                class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-base font-medium transition-all duration-150"
                 :class="
                   item.active
                     ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -459,10 +459,10 @@ const encryptionLabel = computed(() => {
               >
                 <BeanieAvatar :variant="ownerVariant" :color="ownerColor" size="md" />
                 <div class="min-w-0">
-                  <p class="font-outfit truncate text-[0.9rem] font-semibold text-white">
+                  <p class="font-outfit truncate text-sm font-semibold text-white">
                     {{ familyStore.owner.name }}
                   </p>
-                  <p class="truncate text-[0.75rem] text-white/35">
+                  <p class="truncate text-xs text-white/35">
                     {{
                       familyStore.owner.role === 'owner'
                         ? t('family.role.owner')
@@ -493,7 +493,7 @@ const encryptionLabel = computed(() => {
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                <span class="text-[0.6rem] text-white/30">{{ encryptionLabel }}</span>
+                <span class="text-xs text-white/30">{{ encryptionLabel }}</span>
               </div>
 
               <!-- File name -->
@@ -510,7 +510,7 @@ const encryptionLabel = computed(() => {
               <div class="space-y-1">
                 <button
                   type="button"
-                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-[0.8rem] text-red-400 transition-colors hover:bg-white/[0.05]"
+                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm text-red-400 transition-colors hover:bg-white/[0.05]"
                   @click="handleSignOut"
                 >
                   {{ t('auth.signOut') }}
@@ -518,7 +518,7 @@ const encryptionLabel = computed(() => {
                 <button
                   v-if="settingsStore.isTrustedDevice"
                   type="button"
-                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-[0.75rem] text-white/40 transition-colors hover:bg-white/[0.05]"
+                  class="flex w-full cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-xs text-white/40 transition-colors hover:bg-white/[0.05]"
                   @click="handleSignOutAndClearData"
                 >
                   {{ t('auth.signOutClearData') }}
@@ -526,7 +526,7 @@ const encryptionLabel = computed(() => {
               </div>
 
               <!-- Version -->
-              <p class="text-[0.6rem] text-white/20">{{ t('app.version') }}</p>
+              <p class="text-xs text-white/20">{{ t('app.version') }}</p>
             </div>
           </div>
         </Transition>

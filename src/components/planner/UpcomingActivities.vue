@@ -101,13 +101,13 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
             </span>
             <span
               v-if="occ.activity.recurrence !== 'none'"
-              class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-[0.6rem] font-semibold dark:text-gray-400"
+              class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"
             >
               {{ recurrenceLabel(occ.activity.recurrence) }}
             </span>
             <span
               v-if="occ.activity.reminderMinutes > 0"
-              class="text-secondary-500/30 text-[0.6rem] dark:text-gray-500"
+              class="text-secondary-500/30 text-xs dark:text-gray-500"
               title="Reminder set"
             >
               &#x1F514;
@@ -115,7 +115,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
             <span class="flex-1" />
             <span
               v-if="getMemberName(occ.activity.assigneeId)"
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
               :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
             >
               {{ getMemberName(occ.activity.assigneeId) }}

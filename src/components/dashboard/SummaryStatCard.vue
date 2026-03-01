@@ -131,7 +131,7 @@ const changeColor = computed(() => {
         </slot>
       </div>
       <div
-        class="font-outfit text-[0.75rem] font-semibold tracking-[0.08em] uppercase"
+        class="font-outfit text-xs font-semibold tracking-[0.08em] uppercase"
         :class="dark ? 'opacity-50' : 'text-secondary-500 opacity-45 dark:text-gray-300'"
       >
         {{ label }}
@@ -149,12 +149,12 @@ const changeColor = computed(() => {
 
     <!-- Change indicator -->
     <div v-if="isUnlocked && changeAmount !== 0" class="mt-1 flex items-center gap-1">
-      <span class="font-outfit text-[0.65rem] font-semibold" :class="changeColor">
+      <span class="font-outfit text-xs font-semibold" :class="changeColor">
         {{ isPositiveChange ? '↑' : '↓' }}
         {{ isPositiveChange ? '+' : '-' }}{{ changeConverted.displayFormatted }}
       </span>
       <span
-        class="text-[0.6rem]"
+        class="text-xs"
         :class="dark ? 'opacity-35' : 'text-secondary-500 opacity-30 dark:text-gray-400'"
       >
         {{ changeLabel }}

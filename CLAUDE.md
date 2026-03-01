@@ -39,6 +39,7 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **Golden rule:** The beanies hold hands and are never separated; never rotate the arrow.
 - **Full guidelines:** `docs/brand/beanies-cig-v2.html`
 - **Theme skill:** `.claude/skills/beanies-theme.md` — consult for all UI copy and component design
+- **Typography standard:** Six-level scale from Display (`text-3xl`/`text-4xl`) to Caption (`text-xs`). Minimum 12px. Standard Tailwind classes only — no custom `text-[X.Xrem]`. See theme skill for full spec.
 
 ## Technology Stack
 
@@ -242,6 +243,7 @@ npm run lint
 - **Stores**: Use Pinia composition API style
 - **Types**: Centralized in `src/types/models.ts`
 - **CSS**: Tailwind utility classes, custom CSS variables for theming
+- **Typography**: Follow the six-level scale (Display/Page Title/Section Title/Item Title/Body/Caption). Use only standard Tailwind text classes (`text-xs` through `text-4xl`). Never use custom `text-[X.Xrem]` for font sizes. Minimum font size is `text-xs` (12px). See `.claude/skills/beanies-theme.md` for the full standard.
 - **UI Text / i18n**: All user-visible text **must** go through the translation system — never hardcode English strings in templates. Define strings in `src/services/translation/uiStrings.ts` and use `{{ t('key') }}` in templates via `useTranslation()`. This enables Chinese translation, beanie mode overrides, and future languages. See ADR-008 for details.
 - **Translation script sync**: When modifying the structure of `uiStrings.ts` (renaming objects, changing export patterns, etc.), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm parsing still works. The script parses TypeScript at the text level and will silently break if the format changes. See `docs/TRANSLATION.md` for full pipeline docs.
 - **Plans**: When plan mode is used, save the accepted plan to `docs/plans/` before implementation begins (see Plans Archive below).
@@ -347,7 +349,7 @@ Implementation plans created during plan mode must be saved to `docs/plans/` **b
 - This is a Phase 1 MVP - prioritize core functionality
 - All data operations go through Pinia stores -> IndexedDB repositories
 - Use existing UI components from `src/components/ui/`
-- **UI theme**: Always read `.claude/skills/beanies-theme.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color.
+- **UI theme**: Always read `.claude/skills/beanies-theme.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
 - Follow Vue 3 Composition API patterns
 - Maintain TypeScript type safety
 - Use Tailwind CSS for styling

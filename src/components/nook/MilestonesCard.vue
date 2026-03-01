@@ -126,7 +126,7 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
       </div>
       <span
         v-if="upcomingCount > 0"
-        class="text-primary-500 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.65rem] font-semibold"
+        class="text-primary-500 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
       >
         {{ upcomingCount }} {{ t('nook.upcoming') }}
       </span>
@@ -153,15 +153,13 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
 
         <!-- Content -->
         <div class="min-w-0 flex-1">
-          <div
-            class="font-outfit text-secondary-500 text-[0.85rem] font-semibold dark:text-gray-100"
-          >
+          <div class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-100">
             {{ milestone.name }}
           </div>
-          <div v-if="milestone.type === 'completed'" class="text-[0.7rem] text-[#27AE60]">
+          <div v-if="milestone.type === 'completed'" class="text-xs text-[#27AE60]">
             {{ t('nook.completedRecently') }}
           </div>
-          <div v-else class="text-[0.7rem] opacity-40 dark:text-gray-500">
+          <div v-else class="text-xs opacity-40 dark:text-gray-500">
             {{ t('nook.daysAway').replace('{days}', String(milestone.daysAway)) }}
           </div>
         </div>
@@ -169,7 +167,7 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
     </div>
 
     <!-- Empty state -->
-    <div v-else class="text-secondary-500/40 py-6 text-center text-[0.8rem] dark:text-gray-500">
+    <div v-else class="text-secondary-500/40 py-6 text-center text-sm dark:text-gray-500">
       {{ '🏆' }} {{ t('nook.noMilestones') }}
     </div>
   </div>

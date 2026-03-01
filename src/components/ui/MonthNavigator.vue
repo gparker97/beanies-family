@@ -32,7 +32,7 @@ function next() {
       <BeanieIcon name="chevron-left" size="sm" />
     </button>
     <span
-      class="font-outfit min-w-[100px] text-center text-[0.7rem] font-semibold text-[var(--color-text)]"
+      class="font-outfit min-w-[100px] text-center text-xs font-semibold text-[var(--color-text)]"
     >
       {{ formatMonthYearShort(modelValue) }}
     </span>

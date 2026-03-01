@@ -171,10 +171,10 @@ function getGoalIcon(type: string): string {
         test-id="stat-net-cash-flow"
       >
         <div v-if="isUnlocked && netCashFlow > 0" class="mt-1 flex items-center gap-1">
-          <span class="font-outfit text-[0.65rem] font-semibold text-emerald-300">
+          <span class="font-outfit text-xs font-semibold text-emerald-300">
             {{ t('dashboard.healthy') }} 🌱
           </span>
-          <span class="text-[0.6rem] opacity-35"
+          <span class="text-xs opacity-35"
             >{{ savingsRate }}% {{ t('dashboard.savingsRate') }}</span
           >
         </div>
@@ -194,7 +194,7 @@ function getGoalIcon(type: string): string {
           </div>
           <router-link
             to="/goals"
-            class="text-primary-500 hover:text-primary-600 text-[0.75rem] font-medium"
+            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>
@@ -228,7 +228,7 @@ function getGoalIcon(type: string): string {
           </div>
           <router-link
             to="/transactions"
-            class="text-primary-500 hover:text-primary-600 text-[0.75rem] font-medium"
+            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>
@@ -264,7 +264,7 @@ function getGoalIcon(type: string): string {
           </div>
           <router-link
             to="/transactions"
-            class="text-primary-500 hover:text-primary-600 text-[0.75rem] font-medium"
+            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
           >
             {{ t('dashboard.seeAll') }}
           </router-link>
@@ -287,10 +287,10 @@ function getGoalIcon(type: string): string {
               <CategoryIcon :category="transaction.category" size="md" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-secondary-500 truncate text-[0.8rem] font-semibold dark:text-gray-100">
+              <p class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
                 {{ transaction.description }}
               </p>
-              <p class="text-secondary-500/35 text-[0.65rem] dark:text-gray-500">
+              <p class="text-secondary-500/35 text-xs dark:text-gray-500">
                 {{ formatDate(transaction.date) }} · {{ transaction.category }}
               </p>
             </div>

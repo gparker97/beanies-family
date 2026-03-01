@@ -48,7 +48,7 @@ function handleBlur() {
   <div>
     <button
       type="button"
-      class="font-outfit flex w-full items-center gap-2 rounded-[14px] border-2 bg-[var(--tint-slate-5)] px-4 py-2.5 text-left text-[0.8rem] transition-all duration-150 dark:bg-slate-700"
+      class="font-outfit flex w-full items-center gap-2 rounded-[14px] border-2 bg-[var(--tint-slate-5)] px-4 py-2.5 text-left text-sm transition-all duration-150 dark:bg-slate-700"
       :class="
         isOpen
           ? 'border-primary-500 shadow-[0_0_0_3px_rgba(241,93,34,0.1)]'
@@ -96,7 +96,7 @@ function handleBlur() {
         <!-- None option -->
         <button
           type="button"
-          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-[0.75rem] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-xs text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
           @mousedown.prevent="select(undefined)"
         >
           {{ t('common.none') }}
@@ -106,20 +106,20 @@ function handleBlur() {
           v-for="activity in activities"
           :key="activity.id"
           type="button"
-          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-[0.75rem] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-xs hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
           @mousedown.prevent="select(activity.id)"
         >
           <span class="text-sm">{{ activity.icon || '📋' }}</span>
           <span class="flex-1 truncate text-left text-[var(--color-text)] dark:text-gray-200">{{
             activity.title
           }}</span>
-          <span v-if="activity.assigneeId" class="text-[0.6rem] text-[var(--color-text-muted)]">
+          <span v-if="activity.assigneeId" class="text-xs text-[var(--color-text-muted)]">
             {{ getMemberName(activity.assigneeId) }}
           </span>
         </button>
         <div
           v-if="activities.length === 0"
-          class="font-outfit px-4 py-2 text-left text-[0.7rem] text-[var(--color-text-muted)]"
+          class="font-outfit px-4 py-2 text-left text-xs text-[var(--color-text-muted)]"
         >
           {{ t('modal.noMoreActivities') }}
         </div>

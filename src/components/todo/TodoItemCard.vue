@@ -85,7 +85,7 @@ const timeAgo = computed(() => {
       </p>
       <p
         v-if="todo.description"
-        class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[var(--color-text-muted)]"
+        class="mt-0.5 line-clamp-2 text-sm leading-relaxed text-[var(--color-text-muted)]"
       >
         {{ todo.description }}
       </p>
@@ -136,7 +136,7 @@ const timeAgo = computed(() => {
       </p>
       <p
         v-if="todo.description"
-        class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[var(--color-text-muted)]"
+        class="mt-0.5 line-clamp-2 text-sm leading-relaxed text-[var(--color-text-muted)]"
       >
         {{ todo.description }}
       </p>
@@ -147,7 +147,7 @@ const timeAgo = computed(() => {
           class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
         >
           ⏰{{ formattedDate }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
-          <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.55rem] font-bold uppercase">
+          <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
             {{ t('todo.overdue') }}
           </span>
         </span>
@@ -165,7 +165,7 @@ const timeAgo = computed(() => {
         <!-- Assignee chip (gradient background with member color) -->
         <span
           v-if="assignee"
-          class="rounded-md px-2.5 py-0.5 text-[0.7rem] font-medium text-white"
+          class="rounded-md px-2.5 py-0.5 text-xs font-medium text-white"
           :style="{
             background: `linear-gradient(135deg, ${assignee.color}, ${assignee.color}cc)`,
           }"
@@ -174,7 +174,7 @@ const timeAgo = computed(() => {
         </span>
 
         <!-- Time ago -->
-        <span class="text-[0.65rem] opacity-35">{{ timeAgo }}</span>
+        <span class="text-xs opacity-35">{{ timeAgo }}</span>
       </div>
     </div>
 

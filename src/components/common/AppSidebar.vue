@@ -107,7 +107,7 @@ const sections = computed(() =>
       <div v-for="section in sections" :key="section.id">
         <!-- Section Header -->
         <button
-          class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-[0.85rem] font-bold tracking-wide uppercase transition-colors"
+          class="font-outfit flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold tracking-wide uppercase transition-colors"
           :class="section.color"
           @click="toggle(section.id as 'treehouse' | 'piggyBank')"
         >
@@ -126,7 +126,7 @@ const sections = computed(() =>
           <button
             v-for="item in section.items"
             :key="item.path"
-            class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
+            class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-lg font-medium transition-all duration-150"
             :class="[
               isActive(item.path)
                 ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -144,7 +144,7 @@ const sections = computed(() =>
             <!-- Badge (e.g. active goals count) -->
             <span
               v-if="item.badge > 0"
-              class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-[0.6rem] font-semibold text-white"
+              class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
             >
               {{ item.badge }}
             </span>
@@ -166,7 +166,7 @@ const sections = computed(() =>
       <button
         v-for="item in pinnedItems"
         :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
+        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-lg font-medium transition-all duration-150"
         :class="
           isActive(item.path)
             ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -184,10 +184,10 @@ const sections = computed(() =>
       <div class="flex items-center gap-2.5">
         <BeanieAvatar :variant="memberVariant" :color="memberColor" size="md" />
         <div class="min-w-0">
-          <p class="font-outfit truncate text-[1rem] font-semibold text-white">
+          <p class="font-outfit truncate text-base font-semibold text-white">
             {{ currentMemberRef.name }}
           </p>
-          <p class="truncate text-[0.85rem] text-white/35">
+          <p class="truncate text-sm text-white/35">
             {{
               currentMemberRef.role === 'owner'
                 ? t('family.role.owner')
@@ -256,7 +256,7 @@ const sections = computed(() =>
           <line x1="16" y1="17" x2="8" y2="17" />
         </svg>
         <span
-          class="text-[0.6rem]"
+          class="text-xs"
           :class="
             !syncStore.isConfigured
               ? 'text-white/30'
@@ -276,7 +276,7 @@ const sections = computed(() =>
       </div>
 
       <!-- Version -->
-      <p class="text-[0.6rem] text-white/20">{{ t('app.version') }}</p>
+      <p class="text-xs text-white/20">{{ t('app.version') }}</p>
     </div>
   </aside>
 </template>

@@ -50,13 +50,13 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
         <div class="flex items-center gap-2">
           <span class="text-base">📆</span>
           <span
-            class="font-outfit text-secondary-500 text-[0.8rem] font-semibold tracking-[0.06em] uppercase dark:text-gray-200"
+            class="font-outfit text-secondary-500 text-sm font-semibold tracking-[0.06em] uppercase dark:text-gray-200"
           >
             {{ t('nook.todaySchedule') }}
           </span>
         </div>
         <span
-          class="rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-[0.65rem] font-semibold text-[#3A7BAD]"
+          class="rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[#3A7BAD]"
         >
           {{ todayFormatted }}
         </span>
@@ -72,17 +72,17 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
           </div>
           <div class="min-w-0">
             <div
-              class="text-secondary-500 truncate text-[0.8rem] leading-tight font-semibold dark:text-gray-200"
+              class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
             >
               {{ todo.title }}
             </div>
-            <div class="text-[0.65rem] opacity-35">
+            <div class="text-xs opacity-35">
               {{ formatTodoTime(todo.dueDate!, todo.dueTime) }}
             </div>
           </div>
         </div>
       </div>
-      <div v-else class="text-secondary-500/40 py-4 text-center text-[0.8rem] dark:text-gray-500">
+      <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
         {{ t('nook.noEvents') }}
       </div>
     </div>
@@ -96,15 +96,12 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
         <div class="flex items-center gap-2">
           <span class="text-base">🗓️</span>
           <span
-            class="font-outfit text-secondary-500 text-[0.8rem] font-semibold tracking-[0.06em] uppercase dark:text-gray-200"
+            class="font-outfit text-secondary-500 text-sm font-semibold tracking-[0.06em] uppercase dark:text-gray-200"
           >
             {{ t('nook.thisWeek') }}
           </span>
         </div>
-        <router-link
-          to="/planner"
-          class="text-primary-500 text-[0.75rem] font-semibold hover:underline"
-        >
+        <router-link to="/planner" class="text-primary-500 text-xs font-semibold hover:underline">
           {{ t('nook.fullCalendar') }} &rarr;
         </router-link>
       </div>
@@ -119,17 +116,17 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
           </div>
           <div class="min-w-0">
             <div
-              class="text-secondary-500 truncate text-[0.8rem] leading-tight font-semibold dark:text-gray-200"
+              class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
             >
               {{ todo.title }}
             </div>
-            <div class="text-[0.65rem] opacity-35">
+            <div class="text-xs opacity-35">
               {{ formatTodoTime(todo.dueDate!, todo.dueTime) }}
             </div>
           </div>
         </div>
       </div>
-      <div v-else class="text-secondary-500/40 py-4 text-center text-[0.8rem] dark:text-gray-500">
+      <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
         {{ t('nook.comingSoon') }}
       </div>
     </div>

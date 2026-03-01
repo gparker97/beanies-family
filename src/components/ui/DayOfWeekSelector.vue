@@ -42,7 +42,7 @@ function toggle(dayIndex: number, current: number[]) {
       v-for="day in days"
       :key="day.index"
       type="button"
-      class="font-outfit flex h-[38px] w-[38px] items-center justify-center rounded-[11px] text-[0.7rem] font-bold transition-all duration-150"
+      class="font-outfit flex h-[38px] w-[38px] items-center justify-center rounded-[11px] text-xs font-bold transition-all duration-150"
       :class="
         modelValue.includes(day.index)
           ? 'bg-secondary-500 text-white shadow-sm dark:bg-slate-200 dark:text-slate-900'
