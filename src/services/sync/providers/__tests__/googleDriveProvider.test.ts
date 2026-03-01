@@ -229,13 +229,31 @@ describe('GoogleDriveProvider', () => {
       expect(time).toBeNull();
     });
 
-    it('returns null for non-401 API errors', async () => {
+    it('re-throws 404 errors', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+
+      mockGetFileModifiedTime.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
+
+      await expect(provider.getLastModified()).rejects.toThrow('Not Found');
+    });
+
+    it('returns null for non-401/404 API errors', async () => {
       const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
 
       mockGetFileModifiedTime.mockRejectedValueOnce(new MockDriveApiError('Rate limited', 429));
 
       const time = await provider.getLastModified();
       expect(time).toBeNull();
+    });
+  });
+
+  describe('write — 404 handling', () => {
+    it('re-throws 404 errors (file deleted)', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Not Found', 404));
+
+      await expect(provider.write('{"data":"test"}')).rejects.toThrow('Not Found');
     });
   });
 });

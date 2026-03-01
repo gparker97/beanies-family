@@ -146,11 +146,20 @@ describe('driveService', () => {
       expect(call[0]).toContain('fields=modifiedTime');
     });
 
-    it('returns null on error', async () => {
+    it('throws on error (no longer swallowed)', async () => {
       globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
-      const time = await getFileModifiedTime(mockToken, 'file-1');
-      expect(time).toBeNull();
+      await expect(getFileModifiedTime(mockToken, 'file-1')).rejects.toThrow('Network error');
+    });
+
+    it('throws DriveApiError on 404', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: async () => ({ error: { message: 'File not found' } }),
+      });
+
+      await expect(getFileModifiedTime(mockToken, 'file-1')).rejects.toThrow(DriveApiError);
     });
   });
 

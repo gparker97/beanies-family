@@ -38,6 +38,7 @@ import {
   listBeanpodFiles,
   clearFolderCache,
   getAppFolderId,
+  DriveApiError,
 } from '@/services/google/driveService';
 import { clearQueue } from '@/services/sync/offlineQueue';
 import type { SyncFileData } from '@/types/models';
@@ -71,6 +72,7 @@ export const useSyncStore = defineStore('sync', () => {
   const driveFileId = computed(() => syncService.getProvider()?.getFileId() ?? null);
   const driveFolderId = computed(() => getAppFolderId());
   const showGoogleReconnect = ref(false);
+  const driveFileNotFound = ref(false);
 
   // Save failure state (mirrors syncService failure tracking)
   const saveFailureLevel = ref<'none' | 'warning' | 'critical'>('none');
@@ -362,9 +364,16 @@ export const useSyncStore = defineStore('sync', () => {
         // setupAutoSync guards against double-setup internally.
         setupAutoSync();
       } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
-        // Google Drive read failed (e.g., expired token after force-close) —
-        // show reconnect toast so user can re-authenticate when ready.
-        showGoogleReconnect.value = true;
+        if (result.fileNotFound) {
+          // File was deleted/moved on Drive — show file-not-found banner
+          driveFileNotFound.value = true;
+          showSaveFailureBanner.value = true;
+          stopFilePolling();
+        } else {
+          // Google Drive read failed (e.g., expired token after force-close) —
+          // show reconnect toast so user can re-authenticate when ready.
+          showGoogleReconnect.value = true;
+        }
       }
       return { success: result.success };
     } finally {
@@ -658,6 +667,7 @@ export const useSyncStore = defineStore('sync', () => {
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
+    driveFileNotFound.value = false;
     syncService.setSessionPassword(null);
 
     // Clear cached encryption password for this family
@@ -857,6 +867,13 @@ export const useSyncStore = defineStore('sync', () => {
         isCrossDeviceReload = false;
       }
     } catch (e) {
+      // 404 from Drive — file was deleted/moved
+      if (e instanceof DriveApiError && e.status === 404) {
+        driveFileNotFound.value = true;
+        showSaveFailureBanner.value = true;
+        stopFilePolling();
+        return false;
+      }
       console.warn('[syncStore] reloadIfFileChanged failed:', e);
       return false;
     } finally {
@@ -973,6 +990,7 @@ export const useSyncStore = defineStore('sync', () => {
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
+    driveFileNotFound.value = false;
     saveFailureLevel.value = 'none';
     lastSaveError.value = null;
     showSaveFailureBanner.value = false;
@@ -993,6 +1011,11 @@ export const useSyncStore = defineStore('sync', () => {
    * and reloads data from Drive.
    */
   async function handleGoogleReconnected(): Promise<void> {
+    // If file was deleted/moved, reconnecting won't help — leave banner visible
+    if (driveFileNotFound.value) {
+      return;
+    }
+
     showGoogleReconnect.value = false;
     showSaveFailureBanner.value = false;
     syncService.resetSaveFailures();
@@ -1258,6 +1281,7 @@ export const useSyncStore = defineStore('sync', () => {
     driveFolderId,
     isGoogleDriveAvailable,
     showGoogleReconnect,
+    driveFileNotFound,
     saveFailureLevel,
     lastSaveError,
     showSaveFailureBanner,

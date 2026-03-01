@@ -68,6 +68,11 @@ export class GoogleDriveProvider implements StorageProvider {
         return;
       }
 
+      // 404 — file gone (deleted/moved), let caller handle
+      if (e instanceof DriveApiError && e.status === 404) {
+        throw e;
+      }
+
       // Network error — queue for offline flush
       if (e instanceof TypeError && e.message.includes('fetch')) {
         enqueueOfflineSave(content);
@@ -105,7 +110,8 @@ export class GoogleDriveProvider implements StorageProvider {
       return await getFileModifiedTime(token, this.fileId);
     } catch (e) {
       // 401 — auth failure, let caller handle (e.g., show reconnect prompt)
-      if (e instanceof DriveApiError && e.status === 401) {
+      // 404 — file gone (deleted/moved), let caller handle (e.g., show file-not-found banner)
+      if (e instanceof DriveApiError && (e.status === 401 || e.status === 404)) {
         throw e;
       }
       // Network errors and other failures — non-critical for a metadata check

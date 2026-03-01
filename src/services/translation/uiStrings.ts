@@ -1395,6 +1395,19 @@ const STRING_DEFS = {
   'googleDrive.saveFailureReconnect': { en: 'Reconnect to Google Drive' },
   'googleDrive.downloadBackup': { en: 'Download backup' },
   'googleDrive.saveRetrying': { en: 'Save failed — retrying...' },
+  'googleDrive.fileNotFoundTitle': {
+    en: 'Your data file was not found',
+    beanie: "we can't find your beanpod",
+  },
+  'googleDrive.fileNotFoundBody': {
+    en: 'The pod file on Google Drive may have been deleted or moved. Go to Settings to reconnect or choose a different file.',
+    beanie: 'your beanpod might have been moved or deleted. head to settings to sort it out',
+  },
+  'googleDrive.goToSettings': { en: 'Go to Settings', beanie: 'go to settings' },
+  'googleDrive.reconnectFailed': {
+    en: 'Could not reconnect. Try again.',
+    beanie: "couldn't reconnect. try again",
+  },
   'storage.localFile': { en: 'Local File' },
   'storage.dropbox': { en: 'Dropbox' },
   'storage.iCloud': { en: 'iCloud' },
