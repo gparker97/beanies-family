@@ -39,12 +39,12 @@ describe('driveService', () => {
       expect(fetch).toHaveBeenCalledOnce();
     });
 
-    it('creates folder if not found', async () => {
+    it('retries once then creates folder if not found', async () => {
       let callCount = 0;
-      globalThis.fetch = vi.fn().mockImplementation(async (_url: string, _init?: RequestInit) => {
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
         callCount++;
-        if (callCount === 1) {
-          // Search returns empty
+        if (callCount <= 2) {
+          // Both searches return empty
           return {
             ok: true,
             status: 200,
@@ -61,11 +61,75 @@ describe('driveService', () => {
 
       const id = await getOrCreateAppFolder(mockToken);
       expect(id).toBe('new-folder-456');
-      expect(fetch).toHaveBeenCalledTimes(2);
+      // 3 calls: initial search, retry search (after 1s delay), create
+      expect(fetch).toHaveBeenCalledTimes(3);
 
-      // Second call to create should be POST
-      const createCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[1]!;
+      // Third call should be POST (create)
+      const createCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[2]!;
       expect(createCall[1]?.method).toBe('POST');
+    });
+
+    it('finds folder on retry without creating a new one', async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // First search returns empty
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ files: [] }),
+          };
+        }
+        // Retry finds the folder
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'found-on-retry', name: 'beanies.family' }] }),
+        };
+      });
+
+      const id = await getOrCreateAppFolder(mockToken);
+      expect(id).toBe('found-on-retry');
+      // Only 2 calls: initial search + retry search (no create)
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('picks folder with files when duplicates exist', async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Search returns 2 folders
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              files: [
+                { id: 'empty-folder', name: 'beanies.family' },
+                { id: 'folder-with-files', name: 'beanies.family' },
+              ],
+            }),
+          };
+        }
+        if (callCount === 2) {
+          // First folder has no files
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ files: [] }),
+          };
+        }
+        // Second folder has files
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'file-1' }] }),
+        };
+      });
+
+      const id = await getOrCreateAppFolder(mockToken);
+      expect(id).toBe('folder-with-files');
     });
 
     it('caches folder ID across calls', async () => {
@@ -180,11 +244,64 @@ describe('driveService', () => {
       });
     });
 
-    it('returns empty array when no files exist', async () => {
-      globalThis.fetch = mockFetch({ files: [] });
+    it('falls back to Drive-wide search when folder is empty', async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Folder-based search returns empty
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ files: [] }),
+          };
+        }
+        // Drive-wide fallback also returns empty
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [] }),
+        };
+      });
 
       const result = await listBeanpodFiles(mockToken, 'folder-1');
       expect(result).toHaveLength(0);
+      // 2 calls: folder search + Drive-wide fallback
+      expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('finds files via Drive-wide fallback when folder search fails', async () => {
+      let callCount = 0;
+      globalThis.fetch = vi.fn().mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Folder-based search returns empty
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ files: [] }),
+          };
+        }
+        // Drive-wide fallback finds the file
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [
+              {
+                id: 'f1',
+                name: 'family.beanpod',
+                modifiedTime: '2026-03-01T12:00:00Z',
+                parents: ['correct-folder'],
+              },
+            ],
+          }),
+        };
+      });
+
+      const result = await listBeanpodFiles(mockToken, 'wrong-folder');
+      expect(result).toHaveLength(1);
+      expect(result[0].fileId).toBe('f1');
     });
   });
 
@@ -228,7 +345,10 @@ describe('driveService', () => {
     });
 
     it('includes Authorization header in requests', async () => {
-      globalThis.fetch = mockFetch({ files: [] });
+      // Use a response with files so we don't trigger the fallback search
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'f1', name: 'test.beanpod', modifiedTime: '2026-03-01T00:00:00Z' }],
+      });
 
       await listBeanpodFiles(mockToken, 'folder-1');
 

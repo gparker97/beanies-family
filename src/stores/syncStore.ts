@@ -1207,6 +1207,7 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * List .beanpod files available on Google Drive.
+   * Auto-retries once with cleared folder cache if the first attempt returns empty.
    * @param options.forceNewAccount - When true, forces Google's account chooser
    */
   async function listGoogleDriveFiles(options?: {
@@ -1217,7 +1218,17 @@ export const useSyncStore = defineStore('sync', () => {
       forceConsent: options?.forceNewAccount,
     });
     const folderId = await getOrCreateAppFolder(token);
-    return listBeanpodFiles(token, folderId);
+    const files = await listBeanpodFiles(token, folderId);
+
+    if (files.length > 0) return files;
+
+    // First attempt returned empty — clear folder cache and retry once
+    // (listBeanpodFiles already tried Drive-wide fallback, so this retries
+    // the entire folder discovery from scratch)
+    console.warn('[syncStore] No files found, retrying with cleared folder cache...');
+    clearFolderCache();
+    const retryFolderId = await getOrCreateAppFolder(token);
+    return listBeanpodFiles(token, retryFolderId);
   }
 
   /**
