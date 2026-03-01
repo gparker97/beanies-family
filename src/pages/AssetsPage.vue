@@ -435,8 +435,9 @@ function getAppreciationPercent(asset: Asset): number {
             v-for="asset in group.assets"
             :key="asset.id"
             data-testid="asset-card"
-            class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
             :class="syncHighlightClass(asset.id)"
+            @click="openEditModal(asset)"
           >
             <!-- Card Header -->
             <div class="mb-4 flex items-start justify-between">
@@ -464,7 +465,11 @@ function getAppreciationPercent(asset: Asset): number {
               </div>
 
               <!-- Action Menu -->
-              <ActionButtons @edit="openEditModal(asset)" @delete="deleteAsset(asset.id)" />
+              <ActionButtons
+                @click.stop
+                @edit="openEditModal(asset)"
+                @delete="deleteAsset(asset.id)"
+              />
             </div>
 
             <!-- Value Display -->
