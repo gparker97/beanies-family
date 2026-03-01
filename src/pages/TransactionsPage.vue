@@ -267,6 +267,9 @@ async function deleteRecurringItemById(id: string) {
       message: 'recurring.deleteConfirm',
     })
   ) {
+    // Delete all transactions generated from this recurring item
+    await transactionsStore.deleteTransactionsByRecurringItemId(id);
+    // Delete the recurring template itself
     await recurringStore.deleteRecurringItem(id);
     playWhoosh();
   }
