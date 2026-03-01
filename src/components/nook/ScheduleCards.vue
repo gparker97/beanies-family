@@ -2,12 +2,12 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
-import { toISODateString } from '@/utils/date';
+import { toDateInputValue } from '@/utils/date';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
 
-const todayStr = computed(() => toISODateString(new Date()).split('T')[0] ?? '');
+const todayStr = computed(() => toDateInputValue(new Date()));
 
 const todayFormatted = computed(() =>
   new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -24,7 +24,7 @@ const weekTodos = computed(() => {
   const start = todayStr.value;
   const end = new Date(today);
   end.setDate(end.getDate() + 7);
-  const endStr = toISODateString(end).split('T')[0] ?? '';
+  const endStr = toDateInputValue(end);
   return todoStore.filteredOpenTodos.filter((todo) => {
     if (!todo.dueDate) return false;
     const dateStr = todo.dueDate.split('T')[0] ?? '';

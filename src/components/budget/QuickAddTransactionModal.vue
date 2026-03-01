@@ -12,7 +12,7 @@ import { useFormModal } from '@/composables/useFormModal';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
-import { toISODateString } from '@/utils/date';
+import { toDateInputValue } from '@/utils/date';
 import type { CreateTransactionInput } from '@/types/models';
 
 const props = defineProps<{
@@ -33,7 +33,7 @@ const direction = ref<'expense' | 'income'>('expense');
 const description = ref('');
 const amount = ref<number | undefined>(undefined);
 const category = ref('');
-const date = ref(toISODateString(new Date()));
+const date = ref(toDateInputValue(new Date()));
 const accountId = ref('');
 
 const { isSubmitting } = useFormModal(
@@ -46,7 +46,7 @@ const { isSubmitting } = useFormModal(
       description.value = '';
       amount.value = undefined;
       category.value = '';
-      date.value = toISODateString(new Date());
+      date.value = toDateInputValue(new Date());
       // Default to first active account
       const active = accountsStore.activeAccounts;
       accountId.value = active.length > 0 ? active[0]!.id : '';
