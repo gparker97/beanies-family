@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import { addMonths, formatMonthYear } from '@/utils/date';
+import { addMonths, formatMonthYearShort } from '@/utils/date';
 
 const props = defineProps<{
   modelValue: Date;
@@ -21,7 +21,7 @@ function next() {
 
 <template>
   <div
-    class="inline-flex items-center gap-1 rounded-[14px] bg-white px-2 py-1.5 shadow-sm dark:bg-slate-800"
+    class="inline-flex items-center gap-1 rounded-[14px] bg-white px-3 py-1.5 shadow-[0_2px_8px_rgba(44,62,80,0.05)] dark:bg-slate-800"
   >
     <button
       type="button"
@@ -31,9 +31,9 @@ function next() {
       <BeanieIcon name="chevron-left" size="sm" />
     </button>
     <span
-      class="font-outfit min-w-[140px] text-center text-sm font-semibold text-[var(--color-text)]"
+      class="font-outfit min-w-[100px] text-center text-[0.7rem] font-semibold text-[var(--color-text)]"
     >
-      {{ formatMonthYear(modelValue) }}
+      {{ formatMonthYearShort(modelValue) }}
     </span>
     <button
       type="button"

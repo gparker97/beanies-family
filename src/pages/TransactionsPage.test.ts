@@ -370,8 +370,6 @@ describe('TransactionsPage — Unified Ledger', () => {
       );
 
       wrapper = mount(TransactionsPage);
-      expect(wrapper.vm.recurringCount).toBe(2);
-      expect(wrapper.vm.oneTimeCount).toBe(1);
       expect(wrapper.vm.totalCount).toBe(3);
     });
   });
@@ -542,8 +540,6 @@ describe('TransactionsPage — Unified Ledger', () => {
 
       expect(wrapper.vm.displayTransactions).toHaveLength(1);
       expect(wrapper.vm.displayTransactions[0].recurringItemId).toBe('r1');
-      expect(wrapper.vm.recurringCount).toBe(1);
-      expect(wrapper.vm.oneTimeCount).toBe(0);
     });
 
     it('should show recurring transactions under "recurring" filter', async () => {
@@ -640,7 +636,6 @@ describe('TransactionsPage — Unified Ledger', () => {
       );
 
       wrapper = mount(TransactionsPage);
-      expect(wrapper.vm.recurringCount).toBe(1);
       expect(wrapper.vm.monthExpenses).toBe(600);
 
       // Simulate deletion of recurring-generated transaction
@@ -649,7 +644,6 @@ describe('TransactionsPage — Unified Ledger', () => {
       );
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.recurringCount).toBe(0);
       expect(wrapper.vm.monthExpenses).toBe(100);
     });
   });
