@@ -11,7 +11,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { confirm } from '@/composables/useConfirm';
-import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { playWhoosh } from '@/composables/useSounds';
 import { CATEGORY_EMOJI_MAP } from '@/constants/categories';
 import { formatMonthYearShort } from '@/utils/date';
@@ -25,6 +25,7 @@ const budgetStore = useBudgetStore();
 const transactionsStore = useTransactionsStore();
 const settingsStore = useSettingsStore();
 const { isUnlocked, MASK } = usePrivacyMode();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 
@@ -35,18 +36,18 @@ const showQuickAddModal = ref(false);
 // Hero card values
 const budgetAmount = computed(() =>
   isUnlocked.value
-    ? formatCurrencyWithCode(budgetStore.effectiveBudgetAmount, settingsStore.baseCurrency)
+    ? formatInDisplayCurrency(budgetStore.effectiveBudgetAmount, settingsStore.baseCurrency)
     : MASK
 );
 const spentAmount = computed(() =>
   isUnlocked.value
-    ? formatCurrencyWithCode(budgetStore.currentMonthSpending, settingsStore.baseCurrency)
+    ? formatInDisplayCurrency(budgetStore.currentMonthSpending, settingsStore.baseCurrency)
     : MASK
 );
 const remainingAmount = computed(() => {
   if (!isUnlocked.value) return MASK;
   const remaining = budgetStore.effectiveBudgetAmount - budgetStore.currentMonthSpending;
-  return formatCurrencyWithCode(Math.abs(remaining), settingsStore.baseCurrency);
+  return formatInDisplayCurrency(Math.abs(remaining), settingsStore.baseCurrency);
 });
 const isOverBudget = computed(
   () => budgetStore.currentMonthSpending > budgetStore.effectiveBudgetAmount
@@ -258,7 +259,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
             <div class="mt-1.5 flex items-center justify-between text-[0.6rem] text-white/30">
               <span>
                 <template v-if="isUnlocked">
-                  {{ formatCurrencyWithCode(0, settingsStore.baseCurrency) }}
+                  {{ formatInDisplayCurrency(0, settingsStore.baseCurrency) }}
                 </template>
                 <template v-else>{{ MASK }}</template>
               </span>
@@ -297,13 +298,13 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               class="rounded-full bg-emerald-50 px-2 py-0.5 text-[0.6rem] font-medium text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
             >
               {{ t('budget.summary.recurring') }}:
-              {{ formatCurrencyWithCode(budgetStore.recurringIncome, settingsStore.baseCurrency) }}
+              {{ formatInDisplayCurrency(budgetStore.recurringIncome, settingsStore.baseCurrency) }}
             </span>
             <span
               class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-medium text-slate-500 opacity-60 dark:bg-slate-700/40 dark:text-slate-400"
             >
               {{ t('budget.summary.oneTime') }}:
-              {{ formatCurrencyWithCode(budgetStore.oneTimeIncome, settingsStore.baseCurrency) }}
+              {{ formatInDisplayCurrency(budgetStore.oneTimeIncome, settingsStore.baseCurrency) }}
             </span>
           </div>
         </SummaryStatCard>
@@ -320,14 +321,14 @@ async function handleQuickAdd(data: CreateTransactionInput) {
             >
               {{ t('budget.summary.recurring') }}:
               {{
-                formatCurrencyWithCode(budgetStore.recurringExpenses, settingsStore.baseCurrency)
+                formatInDisplayCurrency(budgetStore.recurringExpenses, settingsStore.baseCurrency)
               }}
             </span>
             <span
               class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-medium text-slate-500 opacity-60 dark:bg-slate-700/40 dark:text-slate-400"
             >
               {{ t('budget.summary.oneTime') }}:
-              {{ formatCurrencyWithCode(budgetStore.oneTimeExpenses, settingsStore.baseCurrency) }}
+              {{ formatInDisplayCurrency(budgetStore.oneTimeExpenses, settingsStore.baseCurrency) }}
             </span>
           </div>
         </SummaryStatCard>
@@ -423,9 +424,9 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                     v-if="isUnlocked"
                     class="font-outfit text-sm font-semibold text-slate-700 dark:text-slate-200"
                   >
-                    {{ formatCurrencyWithCode(cat.spent, settingsStore.baseCurrency) }}
+                    {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
                     <span class="text-xs font-normal text-slate-400">
-                      / {{ formatCurrencyWithCode(cat.budgeted, settingsStore.baseCurrency) }}
+                      / {{ formatInDisplayCurrency(cat.budgeted, settingsStore.baseCurrency) }}
                     </span>
                   </span>
                   <span v-else class="text-sm text-slate-400">{{ MASK }}</span>
@@ -442,7 +443,9 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               <!-- Over-budget message (only for over status) -->
               <div v-if="cat.status === 'over' && isUnlocked" class="mt-1">
                 <span class="text-[0.6rem] font-medium text-[var(--heritage-orange)]">
-                  {{ formatCurrencyWithCode(cat.spent - cat.budgeted, settingsStore.baseCurrency) }}
+                  {{
+                    formatInDisplayCurrency(cat.spent - cat.budgeted, settingsStore.baseCurrency)
+                  }}
                   {{ t('budget.category.overAmount') }} ·
                   {{ t('budget.category.overEncouragement') }} 💪
                 </span>
@@ -514,7 +517,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 {{
                   isUnlocked && budgetStore.activeBudget?.mode === 'percentage'
                     ? `= ${budgetAmount} / ${t('budget.settings.perMonth')}`
-                    : `$0 / ${t('budget.settings.perMonth')}`
+                    : `${formatInDisplayCurrency(0, settingsStore.baseCurrency)} / ${t('budget.settings.perMonth')}`
                 }}
               </p>
             </div>
