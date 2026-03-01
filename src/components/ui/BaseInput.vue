@@ -57,7 +57,7 @@ function handleInput(event: Event) {
       class="font-outfit block text-[0.6rem] font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
     >
       {{ label }}
-      <span v-if="required" class="text-red-500">*</span>
+      <span v-if="required" class="text-primary-500">*</span>
     </label>
 
     <input
