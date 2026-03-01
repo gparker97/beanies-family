@@ -8,6 +8,7 @@ import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { getGoogleAccountEmail } from '@/services/google/googleAuth';
 import {
   isPlatformAuthenticatorAvailable,
   hasRegisteredPasskeys,
@@ -331,18 +332,61 @@ const showDrivePicker = ref(false);
 const driveFiles = ref<Array<{ fileId: string; name: string; modifiedTime: string }>>([]);
 const isDriveLoading = ref(false);
 
+const showDriveEmptyState = ref(false);
+
 async function handleLoadFromGoogleDrive() {
   if (!syncStore.isGoogleDriveAvailable) return;
 
   isDriveLoading.value = true;
   formError.value = null;
+  showDriveEmptyState.value = false;
 
   try {
     driveFiles.value = await syncStore.listGoogleDriveFiles({
       forceNewAccount: props.forceNewGoogleAccount,
     });
     if (driveFiles.value.length === 0) {
-      formError.value = t('googleDrive.noFilesFound');
+      showDriveEmptyState.value = true;
+    } else {
+      showDrivePicker.value = true;
+    }
+  } catch (e) {
+    formError.value = (e as Error).message || t('googleDrive.authFailed');
+  } finally {
+    isDriveLoading.value = false;
+  }
+}
+
+async function handleDriveRetry() {
+  isDriveLoading.value = true;
+  showDriveEmptyState.value = false;
+  formError.value = null;
+
+  try {
+    driveFiles.value = await syncStore.listGoogleDriveFiles();
+    if (driveFiles.value.length === 0) {
+      showDriveEmptyState.value = true;
+    } else {
+      showDrivePicker.value = true;
+    }
+  } catch (e) {
+    formError.value = (e as Error).message || t('googleDrive.authFailed');
+  } finally {
+    isDriveLoading.value = false;
+  }
+}
+
+async function handleDriveSwitchAccount() {
+  isDriveLoading.value = true;
+  showDriveEmptyState.value = false;
+  formError.value = null;
+
+  try {
+    driveFiles.value = await syncStore.listGoogleDriveFiles({
+      forceNewAccount: true,
+    });
+    if (driveFiles.value.length === 0) {
+      showDriveEmptyState.value = true;
     } else {
       showDrivePicker.value = true;
     }
@@ -673,6 +717,57 @@ async function handleDriveRefresh() {
         <p class="text-primary-500/70 mt-2 text-[0.7rem] font-semibold">
           {{ t('loginV6.acceptsBeanpod') }}
         </p>
+      </div>
+
+      <!-- Google Drive empty state with retry/switch actions -->
+      <div
+        v-if="showDriveEmptyState"
+        class="mt-3 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/50 p-6 text-center dark:border-amber-600/40 dark:bg-amber-900/10"
+      >
+        <div
+          class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30"
+        >
+          <svg
+            class="h-6 w-6 text-amber-600 dark:text-amber-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          {{ t('googleDrive.noFilesFound') }}
+        </p>
+        <p v-if="getGoogleAccountEmail()" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('googleDrive.connectedAs', { email: getGoogleAccountEmail()! }) }}
+        </p>
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {{ t('googleDrive.noFilesHint') }}
+        </p>
+        <div class="mt-4 flex gap-2">
+          <BaseButton
+            variant="secondary"
+            class="flex-1"
+            :disabled="isDriveLoading"
+            @click="handleDriveRetry"
+          >
+            {{ t('googleDrive.retrySearch') }}
+          </BaseButton>
+          <BaseButton
+            variant="secondary"
+            class="flex-1"
+            :disabled="isDriveLoading"
+            @click="handleDriveSwitchAccount"
+          >
+            {{ t('googleDrive.switchAccount') }}
+          </BaseButton>
+        </div>
       </div>
 
       <!-- Google Drive File Picker Modal -->

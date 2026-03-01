@@ -85,6 +85,7 @@ export class GoogleDriveProvider implements StorageProvider {
 
   /**
    * Read file content from Google Drive.
+   * On 401: try silent refresh first, then interactive auth (consistent with write()).
    */
   async read(): Promise<string | null> {
     try {
@@ -92,6 +93,10 @@ export class GoogleDriveProvider implements StorageProvider {
       return await readFile(token, this.fileId);
     } catch (e) {
       if (e instanceof DriveApiError && e.status === 401) {
+        const silentToken = await attemptSilentRefresh();
+        if (silentToken) {
+          return await readFile(silentToken, this.fileId);
+        }
         const newToken = await requestAccessToken();
         return await readFile(newToken, this.fileId);
       }

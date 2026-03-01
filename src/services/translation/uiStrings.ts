@@ -1408,6 +1408,18 @@ const STRING_DEFS = {
     en: 'Could not reconnect. Try again.',
     beanie: "couldn't reconnect. try again",
   },
+  'googleDrive.noFilesHint': {
+    en: 'Make sure the file is in a folder named "beanies.family" on this account.',
+    beanie: 'check the beanies.family folder on this account',
+  },
+  'googleDrive.retrySearch': {
+    en: 'Retry',
+    beanie: 'try again',
+  },
+  'googleDrive.switchAccount': {
+    en: 'Switch account',
+    beanie: 'different account',
+  },
   'storage.localFile': { en: 'Local File' },
   'storage.dropbox': { en: 'Dropbox' },
   'storage.iCloud': { en: 'iCloud' },
