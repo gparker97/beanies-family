@@ -1,4 +1,4 @@
-import { mount, VueWrapper } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { nextTick } from 'vue';
@@ -88,7 +88,8 @@ describe('TransactionModal — Save Flow', () => {
     useSettingsStore();
   });
 
-  function mountModal(props: Record<string, unknown> = {}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function mountModal(props: Record<string, unknown> = {}): any {
     return mount(TransactionModal, {
       props: { open: true, ...props },
     });
@@ -104,7 +105,8 @@ describe('TransactionModal — Save Flow', () => {
     return wrapper;
   }
 
-  function fillRequiredFields(wrapper: VueWrapper) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function fillRequiredFields(wrapper: any) {
     wrapper.vm.description = 'Test expense';
     wrapper.vm.amount = 42.5;
     wrapper.vm.category = 'food';
