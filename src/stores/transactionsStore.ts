@@ -327,6 +327,26 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return result ?? false;
   }
 
+  async function deleteTransactionsByRecurringItemId(recurringItemId: string): Promise<number> {
+    const result = await wrapAsync(isLoading, error, async () => {
+      const toDelete = transactions.value.filter((t) => t.recurringItemId === recurringItemId);
+      let count = 0;
+      for (const tx of toDelete) {
+        const success = await transactionRepo.deleteTransaction(tx.id);
+        if (success) {
+          useTombstoneStore().recordDeletion('transaction', tx.id);
+          // Reverse balance
+          const adjustment = calculateBalanceAdjustment(tx.type, tx.amount, true);
+          await adjustAccountBalance(tx.accountId, -adjustment);
+          count++;
+        }
+      }
+      transactions.value = transactions.value.filter((t) => t.recurringItemId !== recurringItemId);
+      return count;
+    });
+    return result ?? 0;
+  }
+
   function getTransactionById(id: string): Transaction | undefined {
     return transactions.value.find((t) => t.id === id);
   }
@@ -379,6 +399,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
     createTransaction,
     updateTransaction,
     deleteTransaction,
+    deleteTransactionsByRecurringItemId,
     getTransactionById,
     getTransactionsByAccountId,
     getTransactionsByDateRange,

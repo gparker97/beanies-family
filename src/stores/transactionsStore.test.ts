@@ -684,4 +684,103 @@ describe('transactionsStore - Summary Card Calculations', () => {
       );
     });
   });
+
+  describe('deleteTransactionsByRecurringItemId', () => {
+    it('should delete all transactions with the given recurringItemId', async () => {
+      const store = useTransactionsStore();
+      const accountsStore = useAccountsStore();
+      accountsStore.accounts.push({ ...mockAccount });
+
+      store.transactions.push(
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'expense',
+          amount: 100,
+          recurringItemId: 'recurring-1',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'expense',
+          amount: 200,
+          recurringItemId: 'recurring-1',
+        }),
+        createThisMonthTransaction({ id: 'txn-3', type: 'expense', amount: 50 }) // one-time
+      );
+
+      vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+
+      const count = await store.deleteTransactionsByRecurringItemId('recurring-1');
+
+      expect(count).toBe(2);
+      expect(store.transactions).toHaveLength(1);
+      expect(store.transactions[0].id).toBe('txn-3');
+    });
+
+    it('should not affect transactions from other recurring items', async () => {
+      const store = useTransactionsStore();
+      const accountsStore = useAccountsStore();
+      accountsStore.accounts.push({ ...mockAccount });
+
+      store.transactions.push(
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'expense',
+          amount: 100,
+          recurringItemId: 'recurring-1',
+        }),
+        createThisMonthTransaction({
+          id: 'txn-2',
+          type: 'expense',
+          amount: 200,
+          recurringItemId: 'recurring-2',
+        })
+      );
+
+      vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+
+      await store.deleteTransactionsByRecurringItemId('recurring-1');
+
+      expect(store.transactions).toHaveLength(1);
+      expect(store.transactions[0].recurringItemId).toBe('recurring-2');
+    });
+
+    it('should return 0 when no transactions match', async () => {
+      const store = useTransactionsStore();
+
+      store.transactions.push(
+        createThisMonthTransaction({ id: 'txn-1', type: 'expense', amount: 100 })
+      );
+
+      const count = await store.deleteTransactionsByRecurringItemId('nonexistent');
+
+      expect(count).toBe(0);
+      expect(store.transactions).toHaveLength(1);
+    });
+
+    it('should reverse account balances for deleted transactions', async () => {
+      const store = useTransactionsStore();
+      const accountsStore = useAccountsStore();
+      accountsStore.accounts.push({ ...mockAccount });
+
+      store.transactions.push(
+        createThisMonthTransaction({
+          id: 'txn-1',
+          type: 'expense',
+          amount: 500,
+          recurringItemId: 'recurring-1',
+        })
+      );
+
+      vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+      vi.mocked(accountRepo.updateAccount).mockResolvedValue({
+        ...mockAccount,
+        balance: 1500,
+      });
+
+      await store.deleteTransactionsByRecurringItemId('recurring-1');
+
+      // Balance should be reversed: expense of 500 reversed = +500
+      expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1500 });
+    });
+  });
 });
