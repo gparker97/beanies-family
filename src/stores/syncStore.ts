@@ -151,21 +151,6 @@ export const useSyncStore = defineStore('sync', () => {
     if (restored) {
       const providerType = syncService.getProviderType();
 
-      // Ensure family is registered in cloud registry (idempotent PUT).
-      // Covers families created before the registry feature was added.
-      const ctx = useFamilyContextStore();
-      if (ctx.activeFamilyId) {
-        const provider = syncService.getProvider();
-        registry
-          .registerFamily(ctx.activeFamilyId, {
-            provider: providerType ?? 'local',
-            fileId: provider?.getFileId() ?? undefined,
-            displayPath: provider?.getDisplayName() ?? fileName.value,
-            familyName: ctx.activeFamilyName,
-          })
-          .catch(() => {});
-      }
-
       if (providerType === 'google_drive') {
         // Google Drive: don't set needsPermission — that flag is only for
         // local File System Access API permission grants (user gesture required).
@@ -1286,6 +1271,24 @@ export const useSyncStore = defineStore('sync', () => {
     });
   }
 
+  /**
+   * Ensure the current family is registered in the cloud registry.
+   * Idempotent PUT — safe to call on every sign-in. Fire-and-forget.
+   */
+  function ensureRegistered(): void {
+    const ctx = useFamilyContextStore();
+    if (!ctx.activeFamilyId) return;
+    const provider = syncService.getProvider();
+    registry
+      .registerFamily(ctx.activeFamilyId, {
+        provider: storageProviderType.value ?? 'local',
+        fileId: provider?.getFileId() ?? undefined,
+        displayPath: provider?.getDisplayName() ?? fileName.value,
+        familyName: ctx.activeFamilyName,
+      })
+      .catch(() => {});
+  }
+
   return {
     // State
     isInitialized,
@@ -1345,5 +1348,6 @@ export const useSyncStore = defineStore('sync', () => {
     resumeFilePolling,
     resetState,
     clearError,
+    ensureRegistered,
   };
 });

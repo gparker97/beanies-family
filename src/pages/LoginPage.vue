@@ -348,6 +348,7 @@ function handleBiometricFallback() {
 
 function handleSignedIn(destination: string) {
   syncStore.setupAutoSync();
+  syncStore.ensureRegistered();
   router.replace(destination);
 }
 </script>
