@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-01",
-    "translationCount": 1041
+    "translationCount": 1080
   },
   "translations": {
     "app.name": {
@@ -5209,6 +5209,201 @@
     "budget.category.noBudget": {
       "translation": "无设定限值",
       "hash": "b02cqq",
+      "lastUpdated": "2026-03-01"
+    },
+    "recurring.active": {
+      "translation": "状态",
+      "hash": "wchdly",
+      "lastUpdated": "2026-03-01"
+    },
+    "recurring.paused": {
+      "translation": "已暂停",
+      "hash": "vm13n6",
+      "lastUpdated": "2026-03-01"
+    },
+    "recurring.pauseItem": {
+      "translation": "暂停循环",
+      "hash": "mz91il",
+      "lastUpdated": "2026-03-01"
+    },
+    "recurring.resumeItem": {
+      "translation": "继续重复",
+      "hash": "3c5oq",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.pageTitle": {
+      "translation": "我们的账户",
+      "hash": "ibympm",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtitleCounts": {
+      "translation": "{members}成员· {accounts}帐户",
+      "hash": "wpu2fb",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.groupByMember": {
+      "translation": "成员",
+      "hash": "wz48xy",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.groupByCategory": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.addAnAccount": {
+      "translation": "添加新帐户",
+      "hash": "z9jkyv",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.assetClass.cash": {
+      "translation": "货币资金",
+      "hash": "18uvn",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.assetClass.investments": {
+      "translation": "投资",
+      "hash": "m47b34",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.liabilityClass.creditCards": {
+      "translation": "信用卡",
+      "hash": "tqr0xo",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.liabilityClass.loans": {
+      "translation": "贷款",
+      "hash": "17tbab",
+      "lastUpdated": "2026-03-01"
+    },
+    "form.month": {
+      "translation": "月",
+      "hash": "18ddnk",
+      "lastUpdated": "2026-03-01"
+    },
+    "notFound.title": {
+      "translation": "找不到",
+      "hash": "tjiq45",
+      "lastUpdated": "2026-03-01"
+    },
+    "settings.lastSyncNever": {
+      "translation": "从未",
+      "hash": "18qxyk",
+      "lastUpdated": "2026-03-01"
+    },
+    "login.welcome": {
+      "translation": "欢迎！",
+      "hash": "n3v5j2",
+      "lastUpdated": "2026-03-01"
+    },
+    "login.title": {
+      "translation": "登录",
+      "hash": "17tfm1",
+      "lastUpdated": "2026-03-01"
+    },
+    "join.title": {
+      "translation": "加入家庭",
+      "hash": "yt5aee",
+      "lastUpdated": "2026-03-01"
+    },
+    "todo.noDateSet": {
+      "translation": "没有设置日期",
+      "hash": "gvr5n3",
+      "lastUpdated": "2026-03-01"
+    },
+    "todo.addedToday": {
+      "translation": "今日已新增",
+      "hash": "2cgdfl",
+      "lastUpdated": "2026-03-01"
+    },
+    "todo.addedYesterday": {
+      "translation": "昨天新增",
+      "hash": "uo7xku",
+      "lastUpdated": "2026-03-01"
+    },
+    "todo.addedDaysAgo": {
+      "translation": "{days}天前新增",
+      "hash": "b75duz",
+      "lastUpdated": "2026-03-01"
+    },
+    "todo.sortLabel": {
+      "translation": "排序 ",
+      "hash": "1bo858",
+      "lastUpdated": "2026-03-01"
+    },
+    "planner.recurrence.biweekly": {
+      "translation": "两周一次",
+      "hash": "kw3f6w",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.category.overAmount": {
+      "translation": "超過",
+      "hash": "21djo",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.category.overEncouragement": {
+      "translation": "只差一点点了",
+      "hash": "s42i55",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.budgetProgress": {
+      "translation": "预算进度",
+      "hash": "t35k88",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.dayLabel": {
+      "translation": "白天",
+      "hash": "1gu4",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.daysOf": {
+      "translation": "关",
+      "hash": "2qf",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.percentSpent": {
+      "translation": "已消费",
+      "hash": "1ta0dq",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.addTransactions.subtitle": {
+      "translation": "一次性或重复性—按自己的方式添加",
+      "hash": "3vskih",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.subtitle": {
+      "translation": "立即添加费用或收入",
+      "hash": "cyqp48",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.batchAdd.subtitle": {
+      "translation": "一次添加多笔交易",
+      "hash": "55bfas",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.csvUpload.subtitle": {
+      "translation": "从您的银行对账单导入",
+      "hash": "9is0bh",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.upcoming.today": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.upcoming.tomorrow": {
+      "translation": "明天",
+      "hash": "g30o2j",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.upcoming.inDays": {
+      "translation": "{days}天后",
+      "hash": "l9lilr",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.upcoming.recurring": {
+      "translation": "重复性开支",
+      "hash": "ja22fx",
       "lastUpdated": "2026-03-01"
     }
   }
