@@ -316,6 +316,11 @@
   transform: translateY(-2px);
 }
 
+/* Nook card dark-mode background (shared across nook widgets) */
+.dark .nook-card-dark {
+  background: rgb(30 41 59) !important;
+}
+
 /* Reduced motion: disable all beanie animations */
 @media (prefers-reduced-motion: reduce) {
   .animate-beanie-bounce,

@@ -21,7 +21,7 @@ const features = [
       <div class="py-10 text-center">
         <!-- Beanie with telescope illustration -->
         <div class="relative mx-auto mb-8 h-48 w-48">
-          <div class="absolute inset-0 rounded-full bg-orange-50 dark:bg-[#2C3E50]" />
+          <div class="dark:bg-secondary-500 absolute inset-0 rounded-full bg-orange-50" />
 
           <svg
             viewBox="0 0 200 200"
@@ -176,12 +176,12 @@ const features = [
         </div>
 
         <!-- Heading -->
-        <h2 class="font-headline text-xl font-bold text-[#2C3E50] dark:text-[#ECF0F1]">
+        <h2 class="font-headline text-secondary-500 text-xl font-bold dark:text-[#ECF0F1]">
           {{ t('forecast.comingSoon') }}
         </h2>
 
         <!-- Description -->
-        <p class="mx-auto mt-2 max-w-sm text-sm text-[#2C3E50]/60 dark:text-[#BDC3C7]">
+        <p class="text-secondary-500/60 mx-auto mt-2 max-w-sm text-sm dark:text-[#BDC3C7]">
           {{ t('forecast.comingSoonDescription') }}
         </p>
 
@@ -193,7 +193,7 @@ const features = [
               alt=""
               class="h-6 w-6 flex-shrink-0"
             />
-            <span class="text-sm text-[#2C3E50] dark:text-[#ECF0F1]">
+            <span class="text-secondary-500 text-sm dark:text-[#ECF0F1]">
               {{ t(feature) }}
             </span>
           </li>

@@ -63,15 +63,13 @@ const activityItems = computed<ActivityItem[]>(() => {
 
 <template>
   <div
-    class="nook-activity-card rounded-[var(--sq)] border-l-4 border-[#27AE60] p-6 shadow-[var(--card-shadow)]"
+    class="nook-activity-card nook-card-dark rounded-[var(--sq)] border-l-4 border-[#27AE60] p-6 shadow-[var(--card-shadow)]"
   >
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-base">{{ '⚡' }}</span>
-        <span
-          class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-        >
+        <span class="nook-section-label text-secondary-500 dark:text-gray-400">
           {{ t('nook.recentActivity') }}
         </span>
       </div>
@@ -120,9 +118,5 @@ const activityItems = computed<ActivityItem[]>(() => {
 <style scoped>
 .nook-activity-card {
   background: linear-gradient(135deg, white 85%, rgb(39 174 96 / 4%));
-}
-
-:global(.dark) .nook-activity-card {
-  background: rgb(30 41 59);
 }
 </style>

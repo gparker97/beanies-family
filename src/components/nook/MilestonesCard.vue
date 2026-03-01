@@ -114,21 +114,19 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
 
 <template>
   <div
-    class="nook-milestones-card rounded-[var(--sq)] border-l-4 border-[#E67E22] p-6 shadow-[var(--card-shadow)]"
+    class="nook-milestones-card nook-card-dark border-terracotta-400 rounded-[var(--sq)] border-l-4 p-6 shadow-[var(--card-shadow)]"
   >
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <div class="flex items-center gap-2">
         <span class="text-base">{{ '🏆' }}</span>
-        <span
-          class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-        >
+        <span class="nook-section-label text-secondary-500 dark:text-gray-400">
           {{ t('nook.milestones') }}
         </span>
       </div>
       <span
         v-if="upcomingCount > 0"
-        class="rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.65rem] font-semibold text-[#F15D22]"
+        class="text-primary-500 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.65rem] font-semibold"
       >
         {{ upcomingCount }} {{ t('nook.upcoming') }}
       </span>
@@ -180,9 +178,5 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
 <style scoped>
 .nook-milestones-card {
   background: linear-gradient(135deg, white 85%, rgb(230 126 34 / 5%));
-}
-
-:global(.dark) .nook-milestones-card {
-  background: rgb(30 41 59);
 }
 </style>

@@ -189,9 +189,7 @@ function getGoalIcon(type: string): string {
       <!-- Savings Goals -->
       <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
         <div class="mb-4 flex items-center justify-between">
-          <div
-            class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-          >
+          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
             {{ t('dashboard.savingsGoals') }}
           </div>
           <router-link
@@ -225,9 +223,7 @@ function getGoalIcon(type: string): string {
       <!-- Upcoming Transactions -->
       <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
         <div class="mb-4 flex items-center justify-between">
-          <div
-            class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-          >
+          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
             {{ t('dashboard.upcomingTransactions') }}
           </div>
           <router-link
@@ -263,9 +259,7 @@ function getGoalIcon(type: string): string {
       <!-- Recent Transactions -->
       <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
         <div class="mb-4 flex items-center justify-between">
-          <div
-            class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-          >
+          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
             {{ t('dashboard.recentTransactions') }}
           </div>
           <router-link

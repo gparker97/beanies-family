@@ -39,12 +39,12 @@ function handleDismiss() {
   >
     <div
       v-if="needRefresh"
-      class="flex items-center gap-3 rounded-lg bg-[#2C3E50] px-4 py-3 text-sm text-white shadow-lg"
+      class="bg-secondary-500 flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-white shadow-lg"
       role="alert"
     >
       <span>{{ t('pwa.updateAvailable') }}</span>
       <button
-        class="rounded-md bg-[#F15D22] px-3 py-1 text-xs font-semibold transition-colors hover:bg-[#d94f1a]"
+        class="bg-primary-500 hover:bg-primary-600 rounded-md px-3 py-1 text-xs font-semibold transition-colors"
         @click="handleUpdate"
       >
         {{ t('pwa.updateButton') }}

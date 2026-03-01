@@ -32,11 +32,11 @@ function navigateTo(path: string) {
       :key="tab.path"
       type="button"
       class="flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 transition-colors"
-      :class="tab.active ? 'text-[#F15D22]' : 'text-gray-400 dark:text-gray-500'"
+      :class="tab.active ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'"
       @click="navigateTo(tab.path)"
     >
       <!-- Active indicator dot -->
-      <span v-if="tab.active" class="mb-0.5 h-1 w-1 rounded-full bg-[#F15D22]" />
+      <span v-if="tab.active" class="bg-primary-500 mb-0.5 h-1 w-1 rounded-full" />
       <span class="text-xl leading-none">{{ tab.emoji }}</span>
       <span class="text-[0.6rem] font-semibold">{{ tab.label }}</span>
     </button>

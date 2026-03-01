@@ -71,13 +71,18 @@ function formatDate(iso: string): string {
       <button
         v-for="file in files"
         :key="file.fileId"
-        class="flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 text-left transition-colors hover:border-[#F15D22]/40 hover:bg-[#F15D22]/5 dark:border-slate-600 dark:hover:border-[#F15D22]/30 dark:hover:bg-[#F15D22]/10"
+        class="hover:border-primary-500/40 hover:bg-primary-500/5 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/10 flex w-full items-center gap-3 rounded-xl border border-gray-200 p-3 text-left transition-colors dark:border-slate-600"
         @click="emit('select', { fileId: file.fileId, fileName: file.name })"
       >
         <div
-          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#F15D22]/10"
+          class="bg-primary-500/10 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg"
         >
-          <svg class="h-5 w-5 text-[#F15D22]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg
+            class="text-primary-500 h-5 w-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"

@@ -167,7 +167,7 @@ async function handleSignOutAndClearData() {
         @click="emit('toggleMenu')"
       >
         <svg
-          class="h-5 w-5 text-[#2C3E50] dark:text-gray-300"
+          class="text-secondary-500 h-5 w-5 dark:text-gray-300"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -180,7 +180,7 @@ async function handleSignOutAndClearData() {
           <line x1="3" y1="18" x2="21" y2="18" />
         </svg>
         <!-- Heritage Orange accent line -->
-        <span class="absolute right-2.5 bottom-1.5 left-2.5 h-[2px] rounded-full bg-[#F15D22]" />
+        <span class="bg-primary-500 absolute right-2.5 bottom-1.5 left-2.5 h-[2px] rounded-full" />
       </button>
 
       <!-- Center: Greeting or page title (truncated) -->
@@ -231,7 +231,7 @@ async function handleSignOutAndClearData() {
           :aria-label="t('header.notifications')"
         >
           <BeanieIcon name="bell" size="md" />
-          <span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F15D22]" />
+          <span class="bg-primary-500 absolute top-1.5 right-1.5 h-2 w-2 rounded-full" />
         </button>
       </div>
     </template>
@@ -274,7 +274,7 @@ async function handleSignOutAndClearData() {
             class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-all"
             :class="
               chip.active
-                ? 'bg-[#F15D22] text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
+                ? 'bg-primary-500 text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
                 : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-500 dark:hover:text-gray-300'
             "
             @click="selectCurrencyChip(chip.code)"
@@ -357,7 +357,7 @@ async function handleSignOutAndClearData() {
               class="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all"
               :class="
                 lang.code === settingsStore.language
-                  ? 'bg-[#F15D22]/10 dark:bg-[#F15D22]/20'
+                  ? 'bg-primary-500/10 dark:bg-primary-500/20'
                   : 'hover:bg-gray-50 dark:hover:bg-slate-700'
               "
               @mousedown.prevent="selectLanguage(lang.code)"
@@ -366,7 +366,7 @@ async function handleSignOutAndClearData() {
                 class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-[10px]"
                 :class="
                   lang.code === settingsStore.language
-                    ? 'bg-[#F15D22]/15 shadow-[0_2px_6px_rgba(241,93,34,0.15)]'
+                    ? 'bg-primary-500/15 shadow-[0_2px_6px_rgba(241,93,34,0.15)]'
                     : 'bg-gray-100 dark:bg-slate-600'
                 "
               >
@@ -382,7 +382,7 @@ async function handleSignOutAndClearData() {
                 class="text-sm font-medium"
                 :class="
                   lang.code === settingsStore.language
-                    ? 'text-[#F15D22]'
+                    ? 'text-primary-500'
                     : 'text-gray-500 dark:text-gray-400'
                 "
               >
@@ -436,7 +436,7 @@ async function handleSignOutAndClearData() {
         >
           <BeanieIcon name="bell" size="md" />
           <!-- Heritage Orange notification dot -->
-          <span class="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#F15D22]" />
+          <span class="bg-primary-500 absolute top-1.5 right-1.5 h-2 w-2 rounded-full" />
         </button>
 
         <!-- Profile dropdown (avatar + chevron only) -->

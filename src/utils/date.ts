@@ -25,26 +25,9 @@ export function formatDateShort(isoString: ISODateString, locale: string = 'en-U
   });
 }
 
-export function formatDateTime(isoString: ISODateString, locale: string = 'en-US'): string {
-  const date = fromISODateString(isoString);
-  return date.toLocaleString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export function getStartOfDay(date: Date): Date {
   const result = new Date(date);
   result.setHours(0, 0, 0, 0);
-  return result;
-}
-
-export function getEndOfDay(date: Date): Date {
-  const result = new Date(date);
-  result.setHours(23, 59, 59, 999);
   return result;
 }
 
@@ -54,14 +37,6 @@ export function getStartOfMonth(date: Date): Date {
 
 export function getEndOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-export function getStartOfYear(date: Date): Date {
-  return new Date(date.getFullYear(), 0, 1);
-}
-
-export function getEndOfYear(date: Date): Date {
-  return new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999);
 }
 
 export function addDays(date: Date, days: number): Date {
@@ -93,31 +68,6 @@ export function isDateBetween(
   return d >= s && d <= e;
 }
 
-export function daysBetween(start: Date, end: Date): number {
-  const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.floor((end.getTime() - start.getTime()) / msPerDay);
-}
-
-export function getRelativeTimeString(isoString: ISODateString, locale: string = 'en-US'): string {
-  const date = fromISODateString(isoString);
-  const now = new Date();
-  const diffInMs = now.getTime() - date.getTime();
-  const diffInDays = Math.floor(diffInMs / (24 * 60 * 60 * 1000));
-
-  if (diffInDays === 0) {
-    return 'Today';
-  } else if (diffInDays === 1) {
-    return 'Yesterday';
-  } else if (diffInDays < 7) {
-    return `${diffInDays} days ago`;
-  } else if (diffInDays < 30) {
-    const weeks = Math.floor(diffInDays / 7);
-    return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-  } else {
-    return formatDate(isoString, locale);
-  }
-}
-
 /**
  * Get the start and end dates for the previous month
  */
@@ -144,7 +94,7 @@ export function getLastNMonthsRange(months: number): { start: Date; end: Date } 
 
 /**
  * Human-friendly relative time (e.g. "2 hours ago", "just now").
- * Finer-grained than getRelativeTimeString — includes minutes/hours.
+ * Human-friendly relative time with minute/hour granularity.
  */
 export function timeAgo(isoString: ISODateString): string {
   const date = fromISODateString(isoString);

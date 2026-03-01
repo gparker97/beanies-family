@@ -81,7 +81,7 @@ onUnmounted(() => {
           class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700"
         >
           <slot name="header">
-            <h2 class="font-outfit text-lg font-semibold text-[#2C3E50] dark:text-gray-100">
+            <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
               {{ title }}
             </h2>
           </slot>

@@ -43,7 +43,7 @@ function goToTodos() {
     style="border-left-color: #9b59b6"
   >
     <div class="mb-3 flex items-center justify-between">
-      <h3 class="font-outfit text-base font-bold text-[#2C3E50] dark:text-gray-100">
+      <h3 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
         &#x2705; {{ t('planner.todoPreview') }}
       </h3>
       <button
@@ -56,7 +56,7 @@ function goToTodos() {
     </div>
 
     <div v-if="previewTodos.length === 0" class="py-2 text-center">
-      <p class="text-sm text-[#2C3E50]/40 dark:text-gray-500">{{ t('todo.noTodos') }}</p>
+      <p class="text-secondary-500/40 text-sm dark:text-gray-500">{{ t('todo.noTodos') }}</p>
     </div>
 
     <div v-else class="space-y-1.5">
@@ -78,7 +78,7 @@ function goToTodos() {
         />
 
         <!-- Title -->
-        <span class="min-w-0 flex-1 truncate text-sm text-[#2C3E50] dark:text-gray-200">
+        <span class="text-secondary-500 min-w-0 flex-1 truncate text-sm dark:text-gray-200">
           {{ todo.title }}
         </span>
 

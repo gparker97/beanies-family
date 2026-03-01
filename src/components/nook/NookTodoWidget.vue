@@ -80,7 +80,7 @@ async function toggleComplete(todoId: string) {
 
 <template>
   <div
-    class="nook-todo-card relative overflow-hidden rounded-[var(--sq)] border-l-4 border-[#9B59B6] p-6 shadow-[var(--card-shadow)]"
+    class="nook-todo-card nook-card-dark relative overflow-hidden rounded-[var(--sq)] border-l-4 border-[#9B59B6] p-6 shadow-[var(--card-shadow)]"
   >
     <!-- Watermark -->
     <div
@@ -93,9 +93,7 @@ async function toggleComplete(todoId: string) {
     <!-- Header -->
     <div class="mb-4 flex items-center justify-between">
       <div class="flex items-center">
-        <span
-          class="font-outfit text-secondary-500/45 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-        >
+        <span class="nook-section-label text-secondary-500 dark:text-gray-400">
           ✅ {{ t('nook.familyTodo') }}
         </span>
         <span
@@ -246,9 +244,5 @@ async function toggleComplete(todoId: string) {
 <style scoped>
 .nook-todo-card {
   background: linear-gradient(135deg, white 85%, rgb(155 89 182 / 6%));
-}
-
-:global(.dark) .nook-todo-card {
-  background: rgb(30 41 59);
 }
 </style>

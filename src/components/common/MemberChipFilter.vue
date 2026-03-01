@@ -27,7 +27,7 @@ const { t } = useTranslation();
 
 const chipBase =
   'inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-sm font-medium transition-all';
-const chipActive = 'bg-gradient-to-r from-[#2C3E50] to-[#3D5368] text-white';
+const chipActive = 'bg-gradient-to-r from-secondary-500 to-[#3D5368] text-white';
 const chipInactive =
   'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400';
 </script>

@@ -54,7 +54,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
 
 <template>
   <div>
-    <h3 class="font-outfit mb-3 text-base font-bold text-[#2C3E50] dark:text-gray-100">
+    <h3 class="font-outfit text-secondary-500 mb-3 text-base font-bold dark:text-gray-100">
       {{ t('planner.upcoming') }}
     </h3>
 
@@ -62,7 +62,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
       v-if="upcoming.length === 0"
       class="rounded-3xl bg-white p-6 text-center shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800"
     >
-      <p class="text-sm text-[#2C3E50]/40 dark:text-gray-500">{{ t('planner.noUpcoming') }}</p>
+      <p class="text-secondary-500/40 text-sm dark:text-gray-500">{{ t('planner.noUpcoming') }}</p>
     </div>
 
     <div v-else class="space-y-1.5">
@@ -84,30 +84,30 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
           <!-- Line 1: Title + date -->
           <div class="flex items-center justify-between gap-2">
             <h4
-              class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100"
+              class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-100"
             >
               {{ occ.activity.title }}
             </h4>
-            <span class="flex-shrink-0 text-xs text-[#2C3E50]/40 dark:text-gray-500">
+            <span class="text-secondary-500/40 flex-shrink-0 text-xs dark:text-gray-500">
               {{ formatDisplayDate(occ.date) }}
             </span>
           </div>
 
           <!-- Line 2: Time + recurrence + reminder + assignee -->
           <div class="mt-0.5 flex items-center gap-2">
-            <span v-if="occ.activity.startTime" class="text-xs font-medium text-[#F15D22]">
+            <span v-if="occ.activity.startTime" class="text-primary-500 text-xs font-medium">
               {{ occ.activity.startTime
               }}{{ occ.activity.endTime ? ` - ${occ.activity.endTime}` : '' }}
             </span>
             <span
               v-if="occ.activity.recurrence !== 'none'"
-              class="rounded-full bg-[#AED6F1]/20 px-1.5 py-px text-[0.6rem] font-semibold text-[#2C3E50]/50 dark:bg-[#AED6F1]/10 dark:text-gray-400"
+              class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-[0.6rem] font-semibold dark:text-gray-400"
             >
               {{ recurrenceLabel(occ.activity.recurrence) }}
             </span>
             <span
               v-if="occ.activity.reminderMinutes > 0"
-              class="text-[0.6rem] text-[#2C3E50]/30 dark:text-gray-500"
+              class="text-secondary-500/30 text-[0.6rem] dark:text-gray-500"
               title="Reminder set"
             >
               &#x1F514;
@@ -128,7 +128,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
       <button
         v-if="hasMore"
         type="button"
-        class="mt-2 w-full cursor-pointer rounded-2xl py-2 text-center text-sm font-semibold text-[#F15D22] transition-colors hover:bg-[#F15D22]/5"
+        class="text-primary-500 hover:bg-primary-500/5 mt-2 w-full cursor-pointer rounded-2xl py-2 text-center text-sm font-semibold transition-colors"
         @click="showMore"
       >
         {{ t('planner.viewMore') }}
