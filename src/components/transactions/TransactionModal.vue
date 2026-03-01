@@ -17,7 +17,6 @@ import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import type {
   Transaction,
-  TransactionType,
   CreateTransactionInput,
   UpdateTransactionInput,
   CreateRecurringItemInput,
@@ -123,7 +122,7 @@ const saveLabel = computed(() =>
   isEditing.value ? t('modal.saveTransaction') : t('modal.addTransaction')
 );
 
-const effectiveType = computed<TransactionType>(() =>
+const effectiveType = computed<'income' | 'expense'>(() =>
   direction.value === 'in' ? 'income' : 'expense'
 );
 
