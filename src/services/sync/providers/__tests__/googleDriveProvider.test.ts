@@ -213,6 +213,52 @@ describe('GoogleDriveProvider', () => {
     });
   });
 
+  describe('read — 401 retry with silent refresh', () => {
+    it('tries silent refresh before interactive auth on 401', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { attemptSilentRefresh, requestAccessToken } =
+        await import('@/services/google/googleAuth');
+
+      // First read fails with 401
+      mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+
+      // Silent refresh succeeds
+      (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce('silent-token');
+
+      // Second read succeeds
+      mockReadFile.mockResolvedValueOnce('{"version":"2.0"}');
+
+      const content = await provider.read();
+
+      expect(attemptSilentRefresh).toHaveBeenCalled();
+      expect(requestAccessToken).not.toHaveBeenCalled();
+      expect(mockReadFile).toHaveBeenCalledWith('silent-token', 'file-123');
+      expect(content).toBe('{"version":"2.0"}');
+    });
+
+    it('falls back to interactive auth when silent refresh fails', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { attemptSilentRefresh, requestAccessToken } =
+        await import('@/services/google/googleAuth');
+
+      // First read fails with 401
+      mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+
+      // Silent refresh fails
+      (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+
+      // Second read succeeds
+      mockReadFile.mockResolvedValueOnce('{"version":"2.0"}');
+
+      const content = await provider.read();
+
+      expect(attemptSilentRefresh).toHaveBeenCalled();
+      expect(requestAccessToken).toHaveBeenCalled();
+      expect(mockReadFile).toHaveBeenCalledWith('refreshed-token', 'file-123');
+      expect(content).toBe('{"version":"2.0"}');
+    });
+  });
+
   describe('getLastModified — 401 handling', () => {
     it('re-throws 401 errors', async () => {
       const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');

@@ -147,8 +147,11 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
 
   // If we have a valid token, return it
   if (isTokenValid()) {
+    console.warn('[googleAuth] Using cached valid token');
     return accessToken!;
   }
+
+  console.warn(`[googleAuth] Requesting access token (forceConsent=${!!options?.forceConsent})`);
 
   return new Promise((resolve, reject) => {
     tokenClient = window.google!.accounts!.oauth2!.initTokenClient({
@@ -156,12 +159,14 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
       scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
       callback: (response: TokenResponse) => {
         if (response.error) {
+          console.warn(`[googleAuth] Token request error: ${response.error}`);
           reject(new Error(response.error_description ?? response.error));
           return;
         }
 
         accessToken = response.access_token;
         expiresAt = Date.now() + response.expires_in * 1000;
+        console.warn(`[googleAuth] Token acquired, expires in ${response.expires_in}s`);
 
         // Cache in localStorage so it survives page refreshes and tab close
         persistToken();
@@ -175,6 +180,7 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
         resolve(response.access_token);
       },
       error_callback: (error) => {
+        console.warn(`[googleAuth] Token error callback: ${error.message ?? error.type}`);
         reject(new Error(error.message ?? 'Google sign-in failed'));
       },
     });
@@ -212,6 +218,7 @@ export async function attemptSilentRefresh(): Promise<string | null> {
   if (!clientId || !window.google?.accounts?.oauth2) return null;
 
   try {
+    console.warn('[googleAuth] Attempting silent token refresh...');
     const token = await Promise.race([
       new Promise<string>((resolve, reject) => {
         const client = window.google!.accounts!.oauth2!.initTokenClient({
@@ -240,8 +247,10 @@ export async function attemptSilentRefresh(): Promise<string | null> {
         setTimeout(() => reject(new Error('Silent refresh timeout')), 5000)
       ),
     ]);
+    console.warn('[googleAuth] Silent refresh succeeded');
     return token;
   } catch {
+    console.warn('[googleAuth] Silent refresh failed');
     return null;
   }
 }
