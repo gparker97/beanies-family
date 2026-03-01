@@ -97,9 +97,9 @@ function getDaysUntil(date: Date): string {
   const diffTime = date.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays <= 7) return `${diffDays} days`;
+  if (diffDays === 0) return t('date.today');
+  if (diffDays === 1) return t('date.tomorrow');
+  if (diffDays <= 7) return `${diffDays} ${t('date.days')}`;
   return formatDateShort(date.toISOString());
 }
 

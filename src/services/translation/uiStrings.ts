@@ -588,6 +588,7 @@ const STRING_DEFS = {
   },
 
   // Not Found (404)
+  'notFound.title': { en: 'Not Found' },
   'notFound.heading': { en: 'Oops! This bean got lost...' },
   'notFound.description': {
     en: "The page you're looking for has wandered off. Let's get you back to your beanies.",
@@ -1025,6 +1026,11 @@ const STRING_DEFS = {
   'auth.createPassword': { en: 'Create a password' },
   'auth.confirmPassword': { en: 'Confirm password' },
   'auth.confirmPasswordPlaceholder': { en: 'Re-enter your password' },
+
+  // Login — Page titles
+  'login.welcome': { en: 'Welcome' },
+  'login.title': { en: 'Login' },
+  'join.title': { en: 'Join Family', beanie: 'Join the Pod' },
 
   // Login — Invite / Join
   'login.inviteAsParent': { en: 'Parent', beanie: 'Big Bean' },

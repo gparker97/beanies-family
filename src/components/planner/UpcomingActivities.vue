@@ -38,8 +38,8 @@ function formatDisplayDate(dateStr: string) {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  if (dateStr === formatDate(today)) return 'Today';
-  if (dateStr === formatDate(tomorrow)) return 'Tomorrow';
+  if (dateStr === formatDate(today)) return t('date.today');
+  if (dateStr === formatDate(tomorrow)) return t('date.tomorrow');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 

@@ -214,7 +214,7 @@ async function handleClearData() {
 }
 
 function formatLastSync(timestamp: string | null): string {
-  if (!timestamp) return 'Never';
+  if (!timestamp) return t('settings.lastSyncNever');
   const date = new Date(timestamp);
   return date.toLocaleString();
 }
