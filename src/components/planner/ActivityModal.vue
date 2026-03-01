@@ -188,8 +188,8 @@ const { isEditing, isSubmitting } = useFormModal(
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
       pickupMemberId.value = activity.pickupMemberId ?? '';
       location.value = activity.location ?? '';
-      feeSchedule.value = activity.feeSchedule;
-      feeAmount.value = activity.feeAmount;
+      feeSchedule.value = activity.feeSchedule === 'none' ? 'per_session' : activity.feeSchedule;
+      feeAmount.value = activity.feeAmount ?? 0;
       feeCurrency.value = activity.feeCurrency ?? settingsStore.baseCurrency;
       feePayerId.value = activity.feePayerId ?? '';
       instructorName.value = activity.instructorName ?? '';
@@ -215,8 +215,8 @@ const { isEditing, isSubmitting } = useFormModal(
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
       location.value = '';
-      feeSchedule.value = 'none';
-      feeAmount.value = undefined;
+      feeSchedule.value = 'per_session';
+      feeAmount.value = 0;
       feeCurrency.value = settingsStore.baseCurrency;
       feePayerId.value = '';
       instructorName.value = '';
@@ -254,7 +254,7 @@ function todayStr() {
 }
 
 const feeScheduleChipOptions = computed(() =>
-  (['none', 'per_session', 'weekly', 'monthly', 'termly', 'yearly'] as FeeSchedule[]).map((f) => ({
+  (['per_session', 'weekly', 'monthly', 'termly', 'yearly'] as FeeSchedule[]).map((f) => ({
     value: f,
     label: t(`planner.fee.${f}` as const),
   }))
@@ -274,7 +274,14 @@ const frequencyOptions = [
   { value: 'monthly', label: t('planner.recurrence.monthly') },
 ];
 
-const canSave = computed(() => title.value.trim().length > 0 && date.value.length > 0);
+const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
+
+const canSave = computed(() => {
+  if (!title.value.trim() || !date.value) return false;
+  if (hasCost.value && feeSchedule.value === 'none') return false;
+  if (hasCost.value && !feePayerId.value) return false;
+  return true;
+});
 
 const modalTitle = computed(() =>
   isEditing.value ? t('planner.editActivity') : t('planner.newActivity')
@@ -307,10 +314,10 @@ function handleSave() {
     dropoffMemberId: dropoffMemberId.value || undefined,
     pickupMemberId: pickupMemberId.value || undefined,
     location: location.value.trim() || undefined,
-    feeSchedule: feeAmount.value ? ('per_session' as FeeSchedule) : feeSchedule.value,
-    feeAmount: feeAmount.value || (feeSchedule.value !== 'none' ? feeAmount.value : undefined),
-    feeCurrency: feeAmount.value || feeSchedule.value !== 'none' ? feeCurrency.value : undefined,
-    feePayerId: feePayerId.value || undefined,
+    feeSchedule: hasCost.value ? feeSchedule.value : ('none' as FeeSchedule),
+    feeAmount: hasCost.value ? feeAmount.value : undefined,
+    feeCurrency: hasCost.value ? feeCurrency.value : undefined,
+    feePayerId: hasCost.value ? feePayerId.value || undefined : undefined,
     instructorName: instructorName.value.trim() || undefined,
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,
@@ -366,7 +373,7 @@ function handleSave() {
       />
     </div>
 
-    <!-- 4. Cost per Session + Who Pays? -->
+    <!-- 4. Cost + Fee Schedule -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <AmountInput
         v-model="feeAmount"
@@ -374,14 +381,14 @@ function handleSave() {
         font-size="1.1rem"
         :label="t('modal.costPerSession')"
       />
-      <FormFieldGroup :label="t('planner.field.feePayer')">
-        <FamilyChipPicker v-model="feePayerId" mode="single" compact />
+      <FormFieldGroup :label="t('planner.field.feeSchedule')">
+        <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
       </FormFieldGroup>
     </div>
 
-    <!-- 5. Fee Schedule chips -->
-    <FormFieldGroup :label="t('planner.field.feeSchedule')" optional>
-      <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+    <!-- 5. Who Pays? (required if cost > 0) -->
+    <FormFieldGroup v-if="hasCost" :label="t('planner.field.feePayer')">
+      <FamilyChipPicker v-model="feePayerId" mode="single" compact />
     </FormFieldGroup>
 
     <!-- 6. Recurring / One-off toggle -->
