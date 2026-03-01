@@ -256,8 +256,8 @@ function handleBack() {
         alt=""
         class="mx-auto h-[100px] w-[100px]"
       />
-      <p class="font-outfit text-[0.85rem] font-bold text-[#2C3E50] dark:text-gray-200">
-        beanies<span class="text-[#F15D22]">.family</span>
+      <p class="font-outfit text-secondary-500 text-[0.85rem] font-bold dark:text-gray-200">
+        beanies<span class="text-primary-500">.family</span>
       </p>
     </div>
 
@@ -269,7 +269,7 @@ function handleBack() {
             class="flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors"
             :class="
               step === currentStep
-                ? 'bg-[#F15D22] text-white'
+                ? 'bg-primary-500 text-white'
                 : step < currentStep
                   ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
                   : 'bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-gray-500'
@@ -307,7 +307,7 @@ function handleBack() {
           v-for="step in totalSteps"
           :key="step"
           class="text-[0.52rem] font-semibold"
-          :class="step === currentStep ? 'text-[#F15D22]' : 'opacity-25'"
+          :class="step === currentStep ? 'text-primary-500' : 'opacity-25'"
         >
           {{ stepLabels[step - 1]?.() }}
         </span>
@@ -355,7 +355,7 @@ function handleBack() {
               </label>
               <select
                 v-model="ownerRole"
-                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-[#F15D22] focus:ring-1 focus:ring-[#F15D22] focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
+                class="focus:border-primary-500 focus:ring-primary-500 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
               >
                 <option value="parent">{{ t('loginV6.parentBean') }}</option>
                 <option value="child">{{ t('loginV6.littleBean') }}</option>
@@ -407,14 +407,16 @@ function handleBack() {
 
       <!-- Storage section — v6 styled rounded box -->
       <div
-        class="rounded-[18px] border-2 border-[#F15D22]/15 bg-[#F15D22]/[0.02] p-4 dark:border-[#F15D22]/10 dark:bg-[#F15D22]/[0.03]"
+        class="border-primary-500/15 bg-primary-500/[0.02] dark:border-primary-500/10 dark:bg-primary-500/[0.03] rounded-[18px] border-2 p-4"
       >
         <div
-          class="font-outfit mb-1.5 text-[0.6rem] font-bold tracking-[0.1em] text-[#F15D22] uppercase"
+          class="font-outfit text-primary-500 mb-1.5 text-[0.6rem] font-bold tracking-[0.1em] uppercase"
         >
           {{ t('loginV6.storageSectionLabel') }}
         </div>
-        <p class="mb-3 text-[0.7rem] leading-relaxed text-[#2C3E50] opacity-40 dark:text-gray-300">
+        <p
+          class="text-secondary-500 mb-3 text-[0.7rem] leading-relaxed opacity-40 dark:text-gray-300"
+        >
           {{ t('loginV6.storageDescription') }}
         </p>
 
@@ -429,7 +431,7 @@ function handleBack() {
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
                 : isSavingStorage
                   ? 'border-blue-300 bg-blue-50/50 dark:border-blue-600/50 dark:bg-blue-900/15'
-                  : 'border-transparent bg-[#AED6F1]/15 hover:border-blue-300 hover:bg-blue-50 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
+                  : 'bg-sky-silk-300/15 border-transparent hover:border-blue-300 hover:bg-blue-50 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
             "
             @click="handleChooseGoogleDriveStorage"
           >
@@ -503,7 +505,7 @@ function handleBack() {
           </button>
           <div
             v-else
-            class="flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent bg-[#AED6F1]/15 px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
+            class="bg-sky-silk-300/15 flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
           >
             <svg
               class="mb-1.5 h-6 w-6"
@@ -520,14 +522,14 @@ function handleBack() {
               >{{ t('googleDrive.storageLabel') }}</span
             >
             <span
-              class="mt-1 rounded-full bg-[#F15D22]/10 px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap text-[#F15D22]"
+              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap"
               >{{ t('loginV6.cloudComingSoon') }}</span
             >
           </div>
 
           <!-- Dropbox (coming soon) -->
           <div
-            class="flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent bg-[#AED6F1]/15 px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
+            class="bg-sky-silk-300/15 flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
           >
             <svg
               class="mb-1.5 h-6 w-6"
@@ -544,14 +546,14 @@ function handleBack() {
               >{{ t('storage.dropbox') }}</span
             >
             <span
-              class="mt-1 rounded-full bg-[#F15D22]/10 px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap text-[#F15D22]"
+              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap"
               >{{ t('loginV6.cloudComingSoon') }}</span
             >
           </div>
 
           <!-- iCloud (coming soon) -->
           <div
-            class="flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent bg-[#AED6F1]/15 px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
+            class="bg-sky-silk-300/15 flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
           >
             <svg
               class="mb-1.5 h-6 w-6"
@@ -568,7 +570,7 @@ function handleBack() {
               >{{ t('storage.iCloud') }}</span
             >
             <span
-              class="mt-1 rounded-full bg-[#F15D22]/10 px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap text-[#F15D22]"
+              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap"
               >{{ t('loginV6.cloudComingSoon') }}</span
             >
           </div>
@@ -579,7 +581,7 @@ function handleBack() {
             :class="
               storageType === 'local'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
-                : 'border-transparent bg-[#AED6F1]/15 hover:border-[#F15D22]/40 hover:bg-[#F15D22]/5 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
+                : 'bg-sky-silk-300/15 hover:border-primary-500/40 hover:bg-primary-500/5 border-transparent dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
             "
             :disabled="isSavingStorage"
             @click="handleChooseLocalStorage"
@@ -600,7 +602,7 @@ function handleBack() {
             </svg>
             <svg
               v-else
-              class="mb-1.5 h-6 w-6 text-[#F15D22]"
+              class="text-primary-500 mb-1.5 h-6 w-6"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -685,7 +687,7 @@ function handleBack() {
             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
               {{ familyStore.owner.name }}
               <span
-                class="ml-1.5 inline-block rounded-full bg-[#F15D22]/15 px-2 py-0.5 text-[0.65rem] font-semibold text-[#F15D22]"
+                class="bg-primary-500/15 text-primary-500 ml-1.5 inline-block rounded-full px-2 py-0.5 text-[0.65rem] font-semibold"
                 >{{ t('loginV6.you') }}</span
               >
             </p>
@@ -753,7 +755,7 @@ function handleBack() {
               class="rounded-full px-3 py-1 text-sm transition-colors"
               :class="
                 newMemberRole === 'parent'
-                  ? 'bg-[#2C3E50] text-white'
+                  ? 'bg-secondary-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
               "
               @click="newMemberRole = 'parent'"
@@ -765,7 +767,7 @@ function handleBack() {
               class="rounded-full px-3 py-1 text-sm transition-colors"
               :class="
                 newMemberRole === 'child'
-                  ? 'bg-[#2C3E50] text-white'
+                  ? 'bg-secondary-500 text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-400'
               "
               @click="newMemberRole = 'child'"
@@ -806,7 +808,7 @@ function handleBack() {
       {{ ' ' }}
       <button
         type="button"
-        class="text-sm font-medium text-[#F15D22] hover:text-[#E67E22]"
+        class="text-primary-500 hover:text-terracotta-400 text-sm font-medium"
         @click="emit('navigate', 'load-pod')"
       >
         {{ t('loginV6.loadItLink') }}
@@ -880,7 +882,7 @@ function handleBack() {
 
           <!-- Sharing hint — prominent callout -->
           <div
-            class="rounded-xl border border-[#F15D22]/25 bg-[#F15D22]/[0.06] p-3 dark:border-[#F15D22]/15 dark:bg-[#F15D22]/[0.08]"
+            class="border-primary-500/25 bg-primary-500/[0.06] dark:border-primary-500/15 dark:bg-primary-500/[0.08] rounded-xl border p-3"
           >
             <div class="flex gap-2.5">
               <img
@@ -889,7 +891,7 @@ function handleBack() {
                 class="mt-0.5 h-5 w-5 flex-shrink-0"
               />
               <p
-                class="text-[0.78rem] leading-relaxed font-medium text-[#2C3E50] dark:text-gray-200"
+                class="text-secondary-500 text-[0.78rem] leading-relaxed font-medium dark:text-gray-200"
               >
                 {{ t('googleDrive.shareHint') }}
               </p>

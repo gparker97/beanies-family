@@ -35,7 +35,7 @@ describe('MobileBottomNav', () => {
     const buttons = wrapper.findAll('button');
 
     // First tab (dashboard) should have active color
-    expect(buttons[0]!.classes()).toContain('text-[#F15D22]');
+    expect(buttons[0]!.classes()).toContain('text-primary-500');
     // Other tabs should not
     expect(buttons[1]!.classes()).toContain('text-gray-400');
   });

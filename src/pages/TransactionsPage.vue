@@ -7,6 +7,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
@@ -14,10 +15,10 @@ import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -43,7 +44,7 @@ const transactionsStore = useTransactionsStore();
 const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
-const familyStore = useFamilyStore();
+const { getMemberNameByAccountId, getMemberColorByAccountId } = useMemberInfo();
 const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
@@ -194,20 +195,6 @@ function getAccountName(accountId: string): string {
 function getCategoryName(categoryId: string): string {
   const category = getCategoryById(categoryId);
   return category?.name || categoryId;
-}
-
-function getMemberNameByAccountId(accountId: string): string {
-  const account = accountsStore.accounts.find((a) => a.id === accountId);
-  if (!account) return 'Unknown';
-  const member = familyStore.members.find((m) => m.id === account.memberId);
-  return member?.name || 'Unknown';
-}
-
-function getMemberColorByAccountId(accountId: string): string {
-  const account = accountsStore.accounts.find((a) => a.id === accountId);
-  if (!account) return '#6b7280';
-  const member = familyStore.members.find((m) => m.id === account.memberId);
-  return member?.color || '#6b7280';
 }
 
 function getAccountTypeByAccountId(accountId: string) {
@@ -622,22 +609,11 @@ function applyCustomDateRange() {
                 :type="transaction.type === 'income' ? 'income' : 'expense'"
                 size="lg"
               />
-              <div class="flex gap-1">
-                <button
-                  class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                  :title="t('action.edit')"
-                  @click="openEditModal(transaction)"
-                >
-                  <BeanieIcon name="edit" size="md" />
-                </button>
-                <button
-                  class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                  :title="t('action.delete')"
-                  @click="deleteTransaction(transaction.id)"
-                >
-                  <BeanieIcon name="trash" size="md" />
-                </button>
-              </div>
+              <ActionButtons
+                size="md"
+                @edit="openEditModal(transaction)"
+                @delete="deleteTransaction(transaction.id)"
+              />
             </div>
           </div>
         </div>

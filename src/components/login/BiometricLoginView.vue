@@ -129,7 +129,7 @@ async function handleBiometricLogin() {
     <div class="w-full space-y-4">
       <button
         :disabled="isAuthenticating"
-        class="group flex w-full items-center justify-center gap-3 rounded-2xl bg-[#2C3E50] px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 dark:bg-slate-700"
+        class="group bg-secondary-500 flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-4 text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 dark:bg-slate-700"
         @click="handleBiometricLogin"
       >
         <template v-if="isAuthenticating">

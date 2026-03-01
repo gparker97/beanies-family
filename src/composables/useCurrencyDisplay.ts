@@ -1,7 +1,8 @@
 import { computed } from 'vue';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { CurrencyCode, ExchangeRate } from '@/types/models';
+import { getRate } from '@/utils/currency';
+import type { CurrencyCode } from '@/types/models';
 
 /**
  * Format currency with code prefix (e.g., "USD $100.00", "SGD $100.00")
@@ -41,49 +42,6 @@ export interface ConvertedAmount {
   isConverted: boolean;
   /** Whether conversion failed (rate not available) */
   conversionFailed: boolean;
-}
-
-/**
- * Get exchange rate from the rates array
- */
-function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
-  if (from === to) return 1;
-
-  // Direct rate
-  const direct = rates.find((r) => r.from === from && r.to === to);
-  if (direct) return direct.rate;
-
-  // Inverse rate
-  const inverse = rates.find((r) => r.from === to && r.to === from);
-  if (inverse) return 1 / inverse.rate;
-
-  // Try to find a path through the base currency (commonly USD)
-  // First, convert from -> base, then base -> to
-  const baseCurrencies: CurrencyCode[] = ['USD', 'EUR', 'GBP'];
-  for (const base of baseCurrencies) {
-    if (base === from || base === to) continue;
-
-    const fromToBase = rates.find((r) => r.from === from && r.to === base);
-    const baseToTarget = rates.find((r) => r.from === base && r.to === to);
-
-    if (fromToBase && baseToTarget) {
-      return fromToBase.rate * baseToTarget.rate;
-    }
-
-    // Try inverse paths
-    const baseToFrom = rates.find((r) => r.from === base && r.to === from);
-    const targetToBase = rates.find((r) => r.from === to && r.to === base);
-
-    if (baseToFrom && baseToTarget) {
-      return (1 / baseToFrom.rate) * baseToTarget.rate;
-    }
-
-    if (fromToBase && targetToBase) {
-      return fromToBase.rate * (1 / targetToBase.rate);
-    }
-  }
-
-  return undefined;
 }
 
 /**

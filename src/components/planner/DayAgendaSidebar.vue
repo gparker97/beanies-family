@@ -2,8 +2,9 @@
 import { computed } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { toDateInputValue as formatDate } from '@/utils/date';
 import type { ActivityRecurrence } from '@/types/models';
 
 const props = defineProps<{
@@ -18,8 +19,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { getMemberName, getMemberColor } = useMemberInfo();
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
 
 /** Format the selected date as a readable header (e.g. "Saturday, March 15") */
 const dateHeader = computed(() => {
@@ -82,23 +83,9 @@ const upcomingActivities = computed(() => {
     .slice(0, 10);
 });
 
-function formatDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 function formatDisplayDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function getMemberName(id?: string) {
-  if (!id) return null;
-  return familyStore.members.find((m) => m.id === id)?.name ?? null;
-}
-
-function getMemberColor(id?: string) {
-  if (!id) return '#95A5A6';
-  return familyStore.members.find((m) => m.id === id)?.color ?? '#95A5A6';
 }
 
 function recurrenceLabel(recurrence: ActivityRecurrence) {
@@ -110,7 +97,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
   <BaseSidePanel :open="open" :title="t('planner.dayAgenda')" @close="emit('close')">
     <!-- Date header -->
     <div class="mb-5">
-      <h3 class="font-outfit text-base font-bold text-[#2C3E50] dark:text-gray-100">
+      <h3 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
         {{ dateHeader }}
       </h3>
     </div>
@@ -134,26 +121,26 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
         <div class="min-w-0 flex-1">
           <div class="flex items-center justify-between gap-2">
             <h4
-              class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100"
+              class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-100"
             >
               {{ occ.activity.title }}
             </h4>
           </div>
 
           <div class="mt-0.5 flex items-center gap-2">
-            <span v-if="occ.activity.startTime" class="text-xs font-medium text-[#F15D22]">
+            <span v-if="occ.activity.startTime" class="text-primary-500 text-xs font-medium">
               {{ occ.activity.startTime
               }}{{ occ.activity.endTime ? ` - ${occ.activity.endTime}` : '' }}
             </span>
             <span
               v-if="occ.activity.recurrence !== 'none'"
-              class="rounded-full bg-[#AED6F1]/20 px-1.5 py-px text-[0.6rem] font-semibold text-[#2C3E50]/50 dark:bg-[#AED6F1]/10 dark:text-gray-400"
+              class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-[0.6rem] font-semibold dark:text-gray-400"
             >
               {{ recurrenceLabel(occ.activity.recurrence) }}
             </span>
             <span class="flex-1" />
             <span
-              v-if="getMemberName(occ.activity.assigneeId)"
+              v-if="occ.activity.assigneeId"
               class="inline-flex items-center rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
               :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
             >
@@ -166,7 +153,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
 
     <!-- Empty state -->
     <div v-else class="rounded-2xl bg-gray-50 py-8 text-center dark:bg-slate-700/50">
-      <p class="text-sm text-[#2C3E50]/40 dark:text-gray-500">
+      <p class="text-secondary-500/40 text-sm dark:text-gray-500">
         {{ t('planner.noActivitiesForDay') }}
       </p>
     </div>
@@ -174,7 +161,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
     <!-- Add Activity button -->
     <button
       type="button"
-      class="font-outfit mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+      class="font-outfit from-primary-500 to-terracotta-400 mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
       @click="emit('add-activity')"
     >
       {{ t('planner.addActivity') }}
@@ -182,7 +169,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
 
     <!-- Upcoming activities after this day -->
     <div v-if="upcomingActivities.length > 0" class="mt-8">
-      <h3 class="font-outfit mb-3 text-base font-bold text-[#2C3E50] dark:text-gray-100">
+      <h3 class="font-outfit text-secondary-500 mb-3 text-base font-bold dark:text-gray-100">
         {{ t('planner.upcomingAfterDay') }}
       </h3>
 
@@ -203,28 +190,28 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
           <div class="min-w-0 flex-1">
             <div class="flex items-center justify-between gap-2">
               <h4
-                class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100"
+                class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-100"
               >
                 {{ occ.activity.title }}
               </h4>
-              <span class="flex-shrink-0 text-xs text-[#2C3E50]/40 dark:text-gray-500">
+              <span class="text-secondary-500/40 flex-shrink-0 text-xs dark:text-gray-500">
                 {{ formatDisplayDate(occ.date) }}
               </span>
             </div>
 
             <div class="mt-0.5 flex items-center gap-2">
-              <span v-if="occ.activity.startTime" class="text-xs font-medium text-[#F15D22]">
+              <span v-if="occ.activity.startTime" class="text-primary-500 text-xs font-medium">
                 {{ occ.activity.startTime }}
               </span>
               <span
                 v-if="occ.activity.recurrence !== 'none'"
-                class="rounded-full bg-[#AED6F1]/20 px-1.5 py-px text-[0.6rem] font-semibold text-[#2C3E50]/50 dark:bg-[#AED6F1]/10 dark:text-gray-400"
+                class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-[0.6rem] font-semibold dark:text-gray-400"
               >
                 {{ recurrenceLabel(occ.activity.recurrence) }}
               </span>
               <span class="flex-1" />
               <span
-                v-if="getMemberName(occ.activity.assigneeId)"
+                v-if="occ.activity.assigneeId"
                 class="inline-flex items-center rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
                 :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
               >

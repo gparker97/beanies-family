@@ -3,6 +3,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { convertAmount } from '@/utils/currency';
 import {
   addDays,
   addMonths,
@@ -12,7 +13,6 @@ import {
   toISODateString,
   isDateBetween,
 } from '@/utils/date';
-import type { CurrencyCode, ExchangeRate } from '@/types/models';
 
 export type PeriodKey = '1W' | '1M' | '3M' | '1Y' | 'all';
 
@@ -25,26 +25,6 @@ export interface NetWorthDataPoint {
 export interface PeriodComparison {
   changeAmount: number;
   changePercent: number;
-}
-
-function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number | undefined {
-  if (from === to) return 1;
-  const direct = rates.find((r) => r.from === from && r.to === to);
-  if (direct) return direct.rate;
-  const inverse = rates.find((r) => r.from === to && r.to === from);
-  if (inverse) return 1 / inverse.rate;
-  return undefined;
-}
-
-function convertAmount(
-  amount: number,
-  fromCurrency: CurrencyCode,
-  baseCurrency: CurrencyCode,
-  rates: ExchangeRate[]
-): number {
-  if (fromCurrency === baseCurrency) return amount;
-  const rate = getRate(rates, fromCurrency, baseCurrency);
-  return rate !== undefined ? amount * rate : amount;
 }
 
 function formatLabel(date: Date, period: PeriodKey): string {

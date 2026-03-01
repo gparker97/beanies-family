@@ -4,6 +4,7 @@ import { useCountUp } from '@/composables/useCountUp';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
 import { BaseCard, BaseButton } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import GoalModal from '@/components/goals/GoalModal.vue';
@@ -12,7 +13,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
-import { useFamilyStore } from '@/stores/familyStore';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { formatDate } from '@/utils/date';
 import type {
@@ -36,7 +37,7 @@ onMounted(() => {
 });
 
 const goalsStore = useGoalsStore();
-const familyStore = useFamilyStore();
+const { getMemberName, getMemberColor } = useMemberInfo();
 
 // Animated stat card counts
 const { displayValue: animatedActiveCount } = useCountUp(
@@ -80,18 +81,6 @@ const priorityOptions = computed(() => [
   { value: 'high' as GoalPriority, label: t('goals.priority.high') },
   { value: 'critical' as GoalPriority, label: t('goals.priority.critical') },
 ]);
-
-function getMemberName(memberId?: string): string {
-  if (!memberId) return 'Family';
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.name || 'Unknown';
-}
-
-function getMemberColor(memberId?: string): string {
-  if (!memberId) return '#3b82f6';
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.color || '#6b7280';
-}
 
 function openAddModal() {
   editingGoal.value = null;
@@ -219,27 +208,12 @@ async function deleteCompletedGoal(id: string) {
               <p class="mt-0.5 flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
                 <span
                   class="inline-block h-2.5 w-2.5 rounded-full"
-                  :style="{ backgroundColor: getMemberColor(goal.memberId) }"
+                  :style="{ backgroundColor: getMemberColor(goal.memberId, '#3b82f6') }"
                 />
-                {{ getMemberName(goal.memberId) }}
+                {{ getMemberName(goal.memberId, 'Family') }}
               </p>
             </div>
-            <div class="flex gap-1">
-              <button
-                class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                title="Edit"
-                @click="openEditModal(goal)"
-              >
-                <BeanieIcon name="edit" size="md" />
-              </button>
-              <button
-                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                title="Delete"
-                @click="deleteGoal(goal.id)"
-              >
-                <BeanieIcon name="trash" size="md" />
-              </button>
-            </div>
+            <ActionButtons size="md" @edit="openEditModal(goal)" @delete="deleteGoal(goal.id)" />
           </div>
           <div class="mb-2 flex items-center justify-between text-sm">
             <span class="text-gray-500 dark:text-gray-400">{{ t('goals.progress') }}</span>
@@ -303,9 +277,9 @@ async function deleteCompletedGoal(id: string) {
                 <span class="flex items-center gap-1">
                   <span
                     class="inline-block h-2.5 w-2.5 rounded-full"
-                    :style="{ backgroundColor: getMemberColor(goal.memberId) }"
+                    :style="{ backgroundColor: getMemberColor(goal.memberId, '#3b82f6') }"
                   />
-                  {{ getMemberName(goal.memberId) }}
+                  {{ getMemberName(goal.memberId, 'Family') }}
                 </span>
                 <span> {{ t('goals.completedOn') }}: {{ formatDate(goal.updatedAt) }} </span>
               </div>

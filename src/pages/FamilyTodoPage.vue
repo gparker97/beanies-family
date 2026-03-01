@@ -13,7 +13,7 @@ import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
 import FilterBar from '@/components/todo/FilterBar.vue';
-import MemberFilterChips from '@/components/todo/MemberFilterChips.vue';
+import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import type { TodoFilter, TodoSort } from '@/components/todo/FilterBar.vue';
 import type { TodoItem } from '@/types/models';
 
@@ -180,10 +180,16 @@ async function handleDelete(id: string) {
         @update:sort-by="sortBy = $event"
       />
 
-      <MemberFilterChips
+      <MemberChipFilter
         v-if="familyStore.members.length > 1"
-        :selected="memberFilter"
-        @update:selected="memberFilter = $event"
+        :is-all-active="memberFilter === 'all'"
+        :is-member-active="(id: string) => memberFilter === id"
+        show-unassigned
+        :is-unassigned-active="memberFilter === 'unassigned'"
+        :all-label="t('todo.allBeans')"
+        @select-all="memberFilter = 'all'"
+        @select-member="memberFilter = $event"
+        @select-unassigned="memberFilter = 'unassigned'"
       />
 
       <!-- Open Tasks Section -->

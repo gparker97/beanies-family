@@ -24,8 +24,8 @@ const views = [
       class="font-outfit cursor-pointer rounded-xl px-4 py-2 text-sm font-semibold transition-all"
       :class="
         view.id === activeView
-          ? 'bg-gradient-to-r from-[#F15D22] to-[#E67E22] text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
-          : 'text-[#2C3E50]/50 hover:text-[#2C3E50]/70 dark:text-gray-400 dark:hover:text-gray-300'
+          ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
+          : 'text-secondary-500/50 hover:text-secondary-500/70 dark:text-gray-400 dark:hover:text-gray-300'
       "
       :title="view.id !== 'month' ? t('planner.comingSoon') : undefined"
       @click="view.id === 'month' ? emit('update:activeView', view.id) : undefined"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ColorCircleSelector from '@/components/ui/ColorCircleSelector.vue';
@@ -9,6 +9,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
 import { isTemporaryEmail } from '@/utils/email';
 import { getAvatarVariant } from '@/composables/useMemberAvatar';
 import type {
@@ -31,9 +32,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-
-const isEditing = computed(() => !!props.member);
-const isSubmitting = ref(false);
 
 // Color options with gradients
 const MEMBER_COLORS = [
@@ -103,22 +101,22 @@ const ageGroup = computed<AgeGroup>(() => (beanRole.value === 'child' ? 'child' 
 // Avatar variant derived from gender + ageGroup
 const avatarVariant = computed(() => getAvatarVariant(gender.value, ageGroup.value));
 
-// Reset form
-watch(
+// Reset form when modal opens
+const { isEditing, isSubmitting } = useFormModal(
+  () => props.member,
   () => props.open,
-  (isOpen) => {
-    if (!isOpen) return;
-    if (props.member) {
-      const m = props.member;
-      name.value = m.name;
-      email.value = isTemporaryEmail(m.email) ? '' : m.email;
-      gender.value = m.gender || 'other';
-      beanRole.value = m.ageGroup === 'child' ? 'child' : 'parent';
-      color.value = m.color;
-      dobMonth.value = m.dateOfBirth?.month?.toString() ?? '1';
-      dobDay.value = m.dateOfBirth?.day?.toString() ?? '1';
-      dobYear.value = m.dateOfBirth?.year?.toString() ?? '';
-    } else {
+  {
+    onEdit: (member) => {
+      name.value = member.name;
+      email.value = isTemporaryEmail(member.email) ? '' : member.email;
+      gender.value = member.gender || 'other';
+      beanRole.value = member.ageGroup === 'child' ? 'child' : 'parent';
+      color.value = member.color;
+      dobMonth.value = member.dateOfBirth?.month?.toString() ?? '1';
+      dobDay.value = member.dateOfBirth?.day?.toString() ?? '1';
+      dobYear.value = member.dateOfBirth?.year?.toString() ?? '';
+    },
+    onNew: () => {
       const randomColor =
         MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)]?.value ?? '#3b82f6';
       name.value = '';
@@ -132,7 +130,7 @@ watch(
       canViewFinances.value = true;
       canEditActivities.value = true;
       canManagePod.value = false;
-    }
+    },
   }
 );
 

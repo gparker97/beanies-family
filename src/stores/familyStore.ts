@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import * as familyRepo from '@/services/indexeddb/repositories/familyMemberRepository';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
@@ -26,43 +27,29 @@ export const useFamilyStore = defineStore('family', () => {
 
   // Actions
   async function loadMembers() {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       members.value = await familyRepo.getAllFamilyMembers();
       // Set current member to owner if not set
       if (!currentMemberId.value && owner.value) {
         currentMemberId.value = owner.value.id;
       }
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load family members';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createMember(input: CreateFamilyMemberInput): Promise<FamilyMember | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const member = await familyRepo.createFamilyMember(input);
       members.value.push(member);
       return member;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create family member';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateMember(
     id: string,
     input: UpdateFamilyMemberInput
   ): Promise<FamilyMember | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const updated = await familyRepo.updateFamilyMember(id, input);
       if (updated) {
         const index = members.value.findIndex((m) => m.id === id);
@@ -70,19 +57,13 @@ export const useFamilyStore = defineStore('family', () => {
           members.value[index] = updated;
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update family member';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteMember(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await familyRepo.deleteFamilyMember(id);
       if (success) {
         useTombstoneStore().recordDeletion('familyMember', id);
@@ -92,12 +73,8 @@ export const useFamilyStore = defineStore('family', () => {
         }
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete family member';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   async function updateMemberRole(

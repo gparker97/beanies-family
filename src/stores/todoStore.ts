@@ -1,8 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
-import { useMemberFilterStore } from './memberFilterStore';
+import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
 import * as todoRepo from '@/services/indexeddb/repositories/todoRepository';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
 import { toISODateString } from '@/utils/date';
@@ -32,17 +33,7 @@ export const useTodoStore = defineStore('todos', () => {
 
   // ========== FILTERED GETTERS (by global member filter) ==========
 
-  const filteredTodos = computed(() => {
-    const memberFilter = useMemberFilterStore();
-    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
-      return todos.value;
-    }
-    return todos.value.filter((t) => {
-      // Unassigned todos always show
-      if (!t.assigneeId) return true;
-      return memberFilter.isMemberSelected(t.assigneeId);
-    });
-  });
+  const filteredTodos = createMemberFiltered(todos, (t) => t.assigneeId);
 
   const filteredOpenTodos = computed(() => {
     return filteredTodos.value
@@ -62,36 +53,22 @@ export const useTodoStore = defineStore('todos', () => {
 
   // Actions
   async function loadTodos() {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       todos.value = await todoRepo.getAllTodos();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load todos';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createTodo(input: CreateTodoInput): Promise<TodoItem | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const todo = await todoRepo.createTodo(input);
       todos.value.push(todo);
       return todo;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create todo';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateTodo(id: string, input: UpdateTodoInput): Promise<TodoItem | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const updated = await todoRepo.updateTodo(id, input);
       if (updated) {
         const index = todos.value.findIndex((t) => t.id === id);
@@ -99,31 +76,21 @@ export const useTodoStore = defineStore('todos', () => {
           todos.value[index] = updated;
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update todo';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteTodo(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await todoRepo.deleteTodo(id);
       if (success) {
         useTombstoneStore().recordDeletion('todo', id);
         todos.value = todos.value.filter((t) => t.id !== id);
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete todo';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   async function toggleComplete(id: string, completedBy: string): Promise<TodoItem | null> {

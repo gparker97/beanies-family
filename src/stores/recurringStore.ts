@@ -2,15 +2,14 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useAccountsStore } from './accountsStore';
 import { useMemberFilterStore } from './memberFilterStore';
-import { useSettingsStore } from './settingsStore';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
+import { convertToBaseCurrency } from '@/utils/currency';
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import type {
   RecurringItem,
   CreateRecurringItemInput,
   UpdateRecurringItemInput,
-  CurrencyCode,
-  ExchangeRate,
 } from '@/types/models';
 
 export const useRecurringStore = defineStore('recurring', () => {
@@ -18,36 +17,6 @@ export const useRecurringStore = defineStore('recurring', () => {
   const recurringItems = ref<RecurringItem[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
-
-  // Helper to get exchange rate
-  function getRate(
-    rates: ExchangeRate[],
-    from: CurrencyCode,
-    to: CurrencyCode
-  ): number | undefined {
-    if (from === to) return 1;
-
-    // Direct rate
-    const direct = rates.find((r) => r.from === from && r.to === to);
-    if (direct) return direct.rate;
-
-    // Inverse rate
-    const inverse = rates.find((r) => r.from === to && r.to === from);
-    if (inverse) return 1 / inverse.rate;
-
-    return undefined;
-  }
-
-  // Helper to convert amount to base currency
-  function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): number {
-    const settingsStore = useSettingsStore();
-    const baseCurrency = settingsStore.baseCurrency;
-
-    if (fromCurrency === baseCurrency) return amount;
-
-    const rate = getRate(settingsStore.exchangeRates, fromCurrency, baseCurrency);
-    return rate !== undefined ? amount * rate : amount;
-  }
 
   // Getters
   const activeItems = computed(() => recurringItems.value.filter((item) => item.isActive));
@@ -161,41 +130,27 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   // Actions
   async function loadRecurringItems(): Promise<void> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       recurringItems.value = await recurringRepo.getAllRecurringItems();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load recurring items';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createRecurringItem(
     input: CreateRecurringItemInput
   ): Promise<RecurringItem | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const item = await recurringRepo.createRecurringItem(input);
       recurringItems.value.push(item);
       return item;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create recurring item';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateRecurringItem(
     id: string,
     input: UpdateRecurringItemInput
   ): Promise<RecurringItem | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const updated = await recurringRepo.updateRecurringItem(id, input);
       if (updated) {
         const index = recurringItems.value.findIndex((item) => item.id === id);
@@ -203,31 +158,21 @@ export const useRecurringStore = defineStore('recurring', () => {
           recurringItems.value[index] = updated;
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update recurring item';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteRecurringItem(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await recurringRepo.deleteRecurringItem(id);
       if (success) {
         useTombstoneStore().recordDeletion('recurringItem', id);
         recurringItems.value = recurringItems.value.filter((item) => item.id !== id);
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete recurring item';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   async function toggleActive(id: string): Promise<boolean> {

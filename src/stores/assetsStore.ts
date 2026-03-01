@@ -1,52 +1,17 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { useMemberFilterStore } from './memberFilterStore';
-import { useSettingsStore } from './settingsStore';
+import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { useTombstoneStore } from './tombstoneStore';
+import { wrapAsync } from '@/composables/useStoreActions';
+import { convertToBaseCurrency } from '@/utils/currency';
 import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
-import type {
-  Asset,
-  CreateAssetInput,
-  UpdateAssetInput,
-  CurrencyCode,
-  ExchangeRate,
-} from '@/types/models';
+import type { Asset, CreateAssetInput, UpdateAssetInput } from '@/types/models';
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
   const assets = ref<Asset[]>([]);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
-
-  // Helper to get exchange rate
-  function getRate(
-    rates: ExchangeRate[],
-    from: CurrencyCode,
-    to: CurrencyCode
-  ): number | undefined {
-    if (from === to) return 1;
-
-    // Direct rate
-    const direct = rates.find((r) => r.from === from && r.to === to);
-    if (direct) return direct.rate;
-
-    // Inverse rate
-    const inverse = rates.find((r) => r.from === to && r.to === from);
-    if (inverse) return 1 / inverse.rate;
-
-    return undefined;
-  }
-
-  // Helper to convert amount to base currency
-  function convertToBaseCurrency(amount: number, fromCurrency: CurrencyCode): number {
-    const settingsStore = useSettingsStore();
-    const baseCurrency = settingsStore.baseCurrency;
-
-    if (fromCurrency === baseCurrency) return amount;
-
-    const rate = getRate(settingsStore.exchangeRates, fromCurrency, baseCurrency);
-    return rate !== undefined ? amount * rate : amount;
-  }
 
   // Getters
   // Total value of all assets (included in net worth), converted to base currency
@@ -103,13 +68,7 @@ export const useAssetsStore = defineStore('assets', () => {
   // ========== FILTERED GETTERS (by global member filter) ==========
 
   // Assets filtered by global member filter
-  const filteredAssets = computed(() => {
-    const memberFilter = useMemberFilterStore();
-    if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
-      return assets.value;
-    }
-    return assets.value.filter((a) => memberFilter.isMemberSelected(a.memberId));
-  });
+  const filteredAssets = createMemberFiltered(assets, (a) => a.memberId);
 
   // Filtered total asset value
   const filteredTotalAssetValue = computed(() =>
@@ -132,36 +91,22 @@ export const useAssetsStore = defineStore('assets', () => {
 
   // Actions
   async function loadAssets() {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    await wrapAsync(isLoading, error, async () => {
       assets.value = await assetRepo.getAllAssets();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load assets';
-    } finally {
-      isLoading.value = false;
-    }
+    });
   }
 
   async function createAsset(input: CreateAssetInput): Promise<Asset | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const asset = await assetRepo.createAsset(input);
       assets.value.push(asset);
       return asset;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to create asset';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? null;
   }
 
   async function updateAsset(id: string, input: UpdateAssetInput): Promise<Asset | null> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const updated = await assetRepo.updateAsset(id, input);
       if (updated) {
         const index = assets.value.findIndex((a) => a.id === id);
@@ -169,31 +114,21 @@ export const useAssetsStore = defineStore('assets', () => {
           assets.value[index] = updated;
         }
       }
-      return updated ?? null;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update asset';
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+      return updated;
+    });
+    return result ?? null;
   }
 
   async function deleteAsset(id: string): Promise<boolean> {
-    isLoading.value = true;
-    error.value = null;
-    try {
+    const result = await wrapAsync(isLoading, error, async () => {
       const success = await assetRepo.deleteAsset(id);
       if (success) {
         useTombstoneStore().recordDeletion('asset', id);
         assets.value = assets.value.filter((a) => a.id !== id);
       }
       return success;
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to delete asset';
-      return false;
-    } finally {
-      isLoading.value = false;
-    }
+    });
+    return result ?? false;
   }
 
   function getAssetById(id: string): Asset | undefined {

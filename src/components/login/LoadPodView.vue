@@ -431,7 +431,7 @@ async function handleDriveRefresh() {
     <!-- Loading state (only for auto-load and permission grant) -->
     <div v-if="isLoadingFile" class="py-12 text-center">
       <div
-        class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
+        class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
       ></div>
       <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
     </div>
@@ -475,23 +475,23 @@ async function handleDriveRefresh() {
           class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
           :class="
             selectedSource === 'google_drive'
-              ? 'border-[#F15D22] bg-[#FEF0E8]/40 shadow-md dark:border-[#F15D22]/60 dark:bg-[#F15D22]/10'
-              : 'border-gray-200 bg-white hover:border-[#F15D22]/40 dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-[#F15D22]/30'
+              ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
+              : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
           "
           :disabled="isDriveLoading"
           @click="handleLoadFromGoogleDrive"
         >
           <span
-            class="absolute -top-2.5 right-3 rounded-full bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-2.5 py-0.5 text-[0.6rem] font-bold text-white shadow-sm"
+            class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-[0.6rem] font-bold text-white shadow-sm"
           >
             {{ t('loginV6.recommended') }}
           </span>
           <div
-            class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-[#F15D22]/10 dark:bg-[#F15D22]/20"
+            class="bg-primary-500/10 dark:bg-primary-500/20 mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
           >
             <svg
               v-if="isDriveLoading"
-              class="h-5 w-5 animate-spin text-[#F15D22]"
+              class="text-primary-500 h-5 w-5 animate-spin"
               fill="none"
               viewBox="0 0 24 24"
             >
@@ -509,7 +509,7 @@ async function handleDriveRefresh() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               />
             </svg>
-            <svg v-else class="h-5 w-5 text-[#F15D22]" viewBox="0 0 24 24" fill="currentColor">
+            <svg v-else class="text-primary-500 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path
                 d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
               />
@@ -580,8 +580,8 @@ async function handleDriveRefresh() {
           class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
           :class="
             selectedSource === 'local'
-              ? 'border-[#F15D22] bg-[#FEF0E8]/40 shadow-md dark:border-[#F15D22]/60 dark:bg-[#F15D22]/10'
-              : 'border-gray-200 bg-white hover:border-[#F15D22]/40 dark:border-slate-600 dark:bg-slate-700/50 dark:hover:border-[#F15D22]/30'
+              ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
+              : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
           "
           @click="selectedSource = selectedSource === 'local' ? null : 'local'"
         >
@@ -589,14 +589,14 @@ async function handleDriveRefresh() {
             class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
             :class="
               selectedSource === 'local'
-                ? 'bg-[#F15D22]/15 dark:bg-[#F15D22]/20'
+                ? 'bg-primary-500/15 dark:bg-primary-500/20'
                 : 'bg-gray-100 dark:bg-slate-700'
             "
           >
             <svg
               class="h-5 w-5"
               :class="
-                selectedSource === 'local' ? 'text-[#F15D22]' : 'text-gray-400 dark:text-gray-500'
+                selectedSource === 'local' ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'
               "
               fill="none"
               stroke="currentColor"
@@ -627,8 +627,8 @@ async function handleDriveRefresh() {
         class="group mt-3 w-full cursor-pointer rounded-2xl border-[3px] border-dashed px-6 py-8 text-center transition-all"
         :class="
           isDragging
-            ? 'border-[#F15D22] bg-[#FEF0E8]/40 dark:border-[#F15D22]/60 dark:bg-[#F15D22]/10'
-            : 'border-[#F15D22]/20 bg-gradient-to-br from-[#F15D22]/[0.02] to-[#AED6F1]/[0.04] hover:border-[#F15D22]/40 hover:bg-[#FEF0E8]/30 dark:border-[#F15D22]/15 dark:from-[#F15D22]/[0.03] dark:to-[#AED6F1]/[0.02] dark:hover:border-[#F15D22]/30'
+            ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40'
+            : 'border-primary-500/20 from-primary-500/[0.02] to-sky-silk-300/[0.04] hover:border-primary-500/40 dark:border-primary-500/15 dark:from-primary-500/[0.03] dark:to-sky-silk-300/[0.02] dark:hover:border-primary-500/30 bg-gradient-to-br hover:bg-[#FEF0E8]/30'
         "
         @click="handleLoadFile"
         @keydown.enter="handleLoadFile"
@@ -641,16 +641,16 @@ async function handleDriveRefresh() {
           class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl transition-colors"
           :class="
             isDragging
-              ? 'bg-[#F15D22]/15 dark:bg-[#F15D22]/20'
-              : 'bg-gray-100 group-hover:bg-[#F15D22]/10 dark:bg-slate-700'
+              ? 'bg-primary-500/15 dark:bg-primary-500/20'
+              : 'group-hover:bg-primary-500/10 bg-gray-100 dark:bg-slate-700'
           "
         >
           <svg
             class="h-7 w-7 transition-colors"
             :class="
               isDragging
-                ? 'text-[#F15D22]'
-                : 'text-gray-400 group-hover:text-[#F15D22] dark:text-gray-500'
+                ? 'text-primary-500'
+                : 'group-hover:text-primary-500 text-gray-400 dark:text-gray-500'
             "
             fill="none"
             stroke="currentColor"
@@ -667,10 +667,10 @@ async function handleDriveRefresh() {
         <p class="font-medium text-gray-700 dark:text-gray-300">
           {{ t('loginV6.dropZoneText') }}
         </p>
-        <p class="mt-1 text-sm text-[#F15D22]">
+        <p class="text-primary-500 mt-1 text-sm">
           {{ t('loginV6.dropZoneBrowse') }}
         </p>
-        <p class="mt-2 text-[0.7rem] font-semibold text-[#F15D22]/70">
+        <p class="text-primary-500/70 mt-2 text-[0.7rem] font-semibold">
           {{ t('loginV6.acceptsBeanpod') }}
         </p>
       </div>
@@ -721,10 +721,10 @@ async function handleDriveRefresh() {
           class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
         >
           <div
-            class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#F15D22]/10"
+            class="bg-primary-500/10 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
           >
             <svg
-              class="h-5 w-5 text-[#F15D22]"
+              class="text-primary-500 h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -750,7 +750,7 @@ async function handleDriveRefresh() {
           class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
         >
           <div
-            class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#AED6F1]/20"
+            class="bg-sky-silk-300/20 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
           >
             <svg
               class="h-5 w-5 text-[#3498db]"
@@ -838,7 +838,7 @@ async function handleDriveRefresh() {
 
         <BaseButton
           type="submit"
-          class="mt-4 w-full bg-gradient-to-r from-[#F15D22] to-[#E67E22]"
+          class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
           :disabled="isLoadingFile"
         >
           {{ t('loginV6.unlockButton') }}

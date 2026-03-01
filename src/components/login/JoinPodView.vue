@@ -432,7 +432,7 @@ function handleBack() {
       <!-- Looking up spinner -->
       <div v-if="isLookingUp" class="py-12 text-center">
         <div
-          class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
+          class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
         ></div>
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('join.lookingUp') }}</p>
       </div>
@@ -474,7 +474,7 @@ function handleBack() {
         </div>
 
         <!-- File guidance card -->
-        <div class="rounded-2xl bg-[#2C3E50] p-5 dark:bg-slate-700">
+        <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
           <p class="mb-3 text-sm font-semibold text-white">
             {{ t('join.needsFile') }}
           </p>
@@ -495,8 +495,8 @@ function handleBack() {
             class="w-full cursor-pointer rounded-2xl border-2 border-dashed px-5 py-6 text-center transition-all"
             :class="
               isDragging
-                ? 'border-[#F15D22] bg-[#F15D22]/10'
-                : 'border-white/20 hover:border-[#F15D22]/50 hover:bg-white/5'
+                ? 'border-primary-500 bg-primary-500/10'
+                : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
             "
             @click="handleLoadFile"
             @keydown.enter="handleLoadFile"
@@ -507,7 +507,7 @@ function handleBack() {
           >
             <div v-if="isLoadingFile" class="py-2">
               <div
-                class="mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-[#F15D22]"
+                class="border-t-primary-500 mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white/30"
               ></div>
               <p class="text-xs text-white/60">{{ t('auth.loadingFile') }}</p>
             </div>
@@ -528,7 +528,7 @@ function handleBack() {
               <p class="text-sm font-medium text-white/80">
                 {{ t('join.dropZoneText') }}
               </p>
-              <p class="mt-1 text-xs text-[#F15D22]">
+              <p class="text-primary-500 mt-1 text-xs">
                 {{ t('join.loadFileButton') }}
               </p>
             </template>
@@ -586,7 +586,7 @@ function handleBack() {
           </p>
 
           <!-- What happens next card -->
-          <div class="mt-6 rounded-2xl bg-[#2C3E50] p-5 dark:bg-slate-700">
+          <div class="bg-secondary-500 mt-6 rounded-2xl p-5 dark:bg-slate-700">
             <p class="mb-3 text-sm font-semibold text-white">
               {{ t('loginV6.whatsNext') }}
             </p>
@@ -632,7 +632,7 @@ function handleBack() {
         {{ ' ' }}
         <button
           type="button"
-          class="text-sm font-medium text-[#F15D22] hover:text-[#E67E22]"
+          class="text-primary-500 hover:text-terracotta-400 text-sm font-medium"
           @click="emit('navigate', 'create')"
         >
           {{ t('loginV6.createLink') }}
@@ -694,7 +694,7 @@ function handleBack() {
             />
             <!-- Unclaimed indicator -->
             <div
-              class="absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#F15D22] text-xs font-bold text-white dark:border-slate-800"
+              class="bg-primary-500 absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-slate-800"
             >
               +
             </div>
@@ -765,7 +765,7 @@ function handleBack() {
           <button
             v-if="unclaimedMembers.length > 1"
             type="button"
-            class="text-sm font-medium text-[#F15D22] hover:text-[#E67E22]"
+            class="text-primary-500 hover:text-terracotta-400 text-sm font-medium"
             @click="handleBack"
           >
             {{ t('action.change') }}
@@ -825,7 +825,7 @@ function handleBack() {
 
         <BaseButton
           type="submit"
-          class="mt-4 w-full bg-gradient-to-r from-[#F15D22] to-[#E67E22]"
+          class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
           :disabled="isLoadingFile"
         >
           {{ t('loginV6.unlockButton') }}

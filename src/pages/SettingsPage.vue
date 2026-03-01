@@ -252,12 +252,12 @@ function formatLastSync(timestamp: string | null): string {
               <span
                 v-for="code in settingsStore.preferredCurrencies"
                 :key="code"
-                class="inline-flex items-center gap-1 rounded-full bg-[#F15D22]/10 px-2.5 py-1 text-xs font-medium text-[#F15D22]"
+                class="bg-primary-500/10 text-primary-500 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
               >
                 {{ getCurrencyInfo(code)?.symbol }} {{ code }}
                 <button
                   type="button"
-                  class="ml-0.5 cursor-pointer text-[#F15D22]/60 hover:text-[#F15D22]"
+                  class="text-primary-500/60 hover:text-primary-500 ml-0.5 cursor-pointer"
                   @click="removePreferredCurrency(code)"
                 >
                   &times;

@@ -62,7 +62,7 @@ const encryptionTitle = computed(() => {
 });
 
 const SECTION_COLORS: Record<string, string> = {
-  treehouse: 'text-[#F15D22]',
+  treehouse: 'text-primary-500',
   piggyBank: 'text-[#27AE60]',
 };
 
@@ -78,7 +78,7 @@ const sections = computed(() =>
 </script>
 
 <template>
-  <aside class="flex h-full w-64 flex-shrink-0 flex-col bg-[#2C3E50] p-4">
+  <aside class="bg-secondary-500 flex h-full w-64 flex-shrink-0 flex-col p-4">
     <!-- Logo & Branding -->
     <div class="mb-4 flex items-center gap-3 px-1">
       <div
@@ -92,7 +92,7 @@ const sections = computed(() =>
       </div>
       <div class="min-w-0">
         <h1 class="font-outfit text-base leading-tight font-bold">
-          <span class="text-white">beanies</span><span class="text-[#F15D22]">.family</span>
+          <span class="text-white">beanies</span><span class="text-primary-500">.family</span>
         </h1>
         <p
           class="font-outfit mt-0.5 text-[0.75rem] font-light tracking-[0.06em] text-white/25 italic"
@@ -129,7 +129,7 @@ const sections = computed(() =>
             class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
             :class="[
               isActive(item.path)
-                ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
                 : 'border-l-4 border-transparent hover:bg-white/[0.05]',
               item.comingSoon && !isActive(item.path)
                 ? 'text-white/25'
@@ -144,7 +144,7 @@ const sections = computed(() =>
             <!-- Badge (e.g. active goals count) -->
             <span
               v-if="item.badge > 0"
-              class="min-w-[1.2rem] rounded-full bg-[#F15D22] px-1.5 text-center text-[0.6rem] font-semibold text-white"
+              class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-[0.6rem] font-semibold text-white"
             >
               {{ item.badge }}
             </span>
@@ -169,7 +169,7 @@ const sections = computed(() =>
         class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1.1rem] font-medium transition-all duration-150"
         :class="
           isActive(item.path)
-            ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+            ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
             : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
         "
         @click="navigateTo(item.path)"

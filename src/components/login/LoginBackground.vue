@@ -25,7 +25,7 @@ async function selectLanguage(code: LanguageCode) {
 
 <template>
   <div
-    class="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-[#F8F9FA] via-[#FEF0E8] to-[#EBF5FD] p-4 dark:from-[#1a252f] dark:via-[#2C3E50] dark:to-[#1a252f]"
+    class="dark:via-secondary-500 relative flex min-h-screen items-center justify-center bg-gradient-to-br from-[#F8F9FA] via-[#FEF0E8] to-[#EBF5FD] p-4 dark:from-[#1a252f] dark:to-[#1a252f]"
   >
     <!-- Language switcher -->
     <div class="absolute top-4 right-4 z-10">
@@ -56,7 +56,7 @@ async function selectLanguage(code: LanguageCode) {
           class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors"
           :class="
             lang.code === settingsStore.language
-              ? 'bg-[#F15D22]/10 text-[#F15D22]'
+              ? 'bg-primary-500/10 text-primary-500'
               : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700'
           "
           @mousedown.prevent="selectLanguage(lang.code)"
