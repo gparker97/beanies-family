@@ -482,7 +482,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                     {{ t('recurring.paused') }}
                   </span>
                   <span
-                    v-else
+                    v-if="!tx.recurringItemId"
                     class="text-secondary-500 rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
                   >
                     {{ t('transactions.typeOneTime') }}
@@ -543,7 +543,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                 {{ t('recurring.paused') }}
               </span>
               <span
-                v-else
+                v-if="!tx.recurringItemId"
                 class="text-secondary-500 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
               >
                 {{ t('transactions.typeOneTime') }}

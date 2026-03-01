@@ -56,9 +56,9 @@ const timeAgo = computed(() => {
   const diffMs = now.getTime() - created.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 0) return 'Added today';
-  if (diffDays === 1) return 'Added yesterday';
-  return `Added ${diffDays} days ago`;
+  if (diffDays === 0) return t('todo.addedToday');
+  if (diffDays === 1) return t('todo.addedYesterday');
+  return t('todo.addedDaysAgo').replace('{days}', String(diffDays));
 });
 </script>
 
@@ -160,7 +160,7 @@ const timeAgo = computed(() => {
         </span>
 
         <!-- No date set -->
-        <span v-else class="text-xs opacity-35">No date set</span>
+        <span v-else class="text-xs opacity-35">{{ t('todo.noDateSet') }}</span>
 
         <!-- Assignee chip (gradient background with member color) -->
         <span

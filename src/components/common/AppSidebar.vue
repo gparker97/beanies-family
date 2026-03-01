@@ -97,7 +97,7 @@ const sections = computed(() =>
         <p
           class="font-outfit mt-0.5 text-[0.75rem] font-light tracking-[0.06em] text-white/25 italic"
         >
-          every bean counts.
+          {{ t('app.tagline') }}
         </p>
       </div>
     </div>
@@ -276,7 +276,7 @@ const sections = computed(() =>
       </div>
 
       <!-- Version -->
-      <p class="text-[0.6rem] text-white/20">v1.0.0 - MVP</p>
+      <p class="text-[0.6rem] text-white/20">{{ t('app.version') }}</p>
     </div>
   </aside>
 </template>
