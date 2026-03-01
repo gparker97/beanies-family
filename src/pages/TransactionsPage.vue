@@ -417,11 +417,22 @@ function isRecurringItemInactive(tx: Transaction): boolean {
             v-for="tx in txns"
             :key="tx.id"
             data-testid="transaction-item"
-            class="group border-b border-[var(--tint-slate-5)] px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
+            class="group cursor-pointer border-b border-[var(--tint-slate-5)] px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
             :class="[
               syncHighlightClass(tx.id),
               isRecurringItemInactive(tx) ? 'opacity-60 hover:opacity-100' : '',
             ]"
+            @click="
+              () => {
+                if (tx.recurringItemId) {
+                  const ri = getRecurringItem(tx);
+                  if (ri) openEditRecurringModal(ri);
+                  else openEditModal(tx);
+                } else {
+                  openEditModal(tx);
+                }
+              }
+            "
           >
             <!-- Icon (desktop) -->
             <div
@@ -552,6 +563,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
               <template v-if="tx.recurringItemId">
                 <ActionButtons
                   size="sm"
+                  @click.stop
                   @edit="
                     () => {
                       const ri = getRecurringItem(tx);
@@ -565,6 +577,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
               <template v-else>
                 <ActionButtons
                   size="sm"
+                  @click.stop
                   @edit="openEditModal(tx)"
                   @delete="deleteTransaction(tx.id)"
                 />

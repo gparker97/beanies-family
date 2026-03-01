@@ -152,7 +152,7 @@ watch(mode, () => {
   <BeanieFormModal
     :open="open"
     :title="modalTitle"
-    icon="\u{1F4B5}"
+    icon="💵"
     icon-bg="var(--tint-green-10)"
     :save-label="saveLabel"
     :save-disabled="!canSave"

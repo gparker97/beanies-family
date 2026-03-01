@@ -1,32 +1,47 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-
 import { BaseButton } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
+import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import AccountModal from '@/components/accounts/AccountModal.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { usePrivacyMode } from '@/composables/usePrivacyMode';
+import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { convertToBaseCurrency } from '@/utils/currency';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 const accountsStore = useAccountsStore();
+const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { t } = useTranslation();
 const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
+const { isUnlocked } = usePrivacyMode();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingAccount = ref<Account | null>(null);
+const groupBy = ref<'member' | 'category'>('member');
+const addModalDefaults = ref<{ memberId?: string; type?: AccountType } | undefined>();
+
+const groupByOptions = computed(() => [
+  { value: 'member', label: t('accounts.groupByMember') },
+  { value: 'category', label: t('accounts.groupByCategory') },
+]);
 
 const accountTypes = computed(() => [
   { value: 'checking' as AccountType, label: t('accounts.type.checking') },
@@ -39,50 +54,96 @@ const accountTypes = computed(() => [
   { value: 'other' as AccountType, label: t('accounts.type.other') },
 ]);
 
+const typeOrder: AccountType[] = [
+  'checking',
+  'savings',
+  'investment',
+  'crypto',
+  'credit_card',
+  'loan',
+  'cash',
+  'other',
+];
+
 // Uses filtered data based on global member filter
 const accounts = computed(() => accountsStore.filteredAccounts);
-
-// Group accounts by type for organized display
-const accountsByType = computed(() => {
-  const groups = new Map<AccountType, Account[]>();
-  const typeOrder: AccountType[] = [
-    'checking',
-    'savings',
-    'investment',
-    'crypto',
-    'credit_card',
-    'loan',
-    'cash',
-    'other',
-  ];
-
-  for (const account of accounts.value) {
-    const existing = groups.get(account.type) || [];
-    existing.push(account);
-    groups.set(account.type, existing);
-  }
-
-  // Return in defined order, only types that have accounts
-  return typeOrder
-    .filter((type) => groups.has(type))
-    .map((type) => ({
-      type,
-      label: getAccountTypeLabel(type),
-      accounts: groups.get(type) || [],
-    }));
-});
 
 // Summary card values
 const baseCurrency = computed(() => settingsStore.baseCurrency);
 const totalAssets = computed(() => accountsStore.filteredTotalAssets);
 const totalLiabilities = computed(() => accountsStore.filteredTotalLiabilities);
-const totalBalance = computed(() => accountsStore.filteredTotalBalance);
 
+// Subtitle counts
+const subtitleText = computed(() =>
+  t('accounts.subtitleCounts')
+    .replace('{members}', String(familyStore.members.length))
+    .replace('{accounts}', String(accounts.value.length))
+);
+
+// Hero breakdown computeds
+const assetBreakdown = computed(() => {
+  const eligible = accounts.value.filter(
+    (a) => a.isActive && a.includeInNetWorth && a.type !== 'credit_card' && a.type !== 'loan'
+  );
+  return {
+    cash: eligible
+      .filter((a) => ['checking', 'savings', 'cash'].includes(a.type))
+      .reduce((s, a) => s + convertToBaseCurrency(a.balance, a.currency), 0),
+    investments: eligible
+      .filter((a) => ['investment', 'crypto'].includes(a.type))
+      .reduce((s, a) => s + convertToBaseCurrency(a.balance, a.currency), 0),
+  };
+});
+
+const liabilityBreakdown = computed(() => {
+  const eligible = accounts.value.filter((a) => a.isActive && a.includeInNetWorth);
+  return {
+    creditCards: eligible
+      .filter((a) => a.type === 'credit_card')
+      .reduce((s, a) => s + convertToBaseCurrency(a.balance, a.currency), 0),
+    loans: eligible
+      .filter((a) => a.type === 'loan')
+      .reduce((s, a) => s + convertToBaseCurrency(a.balance, a.currency), 0),
+  };
+});
+
+// Unified sections for both member and category views
+interface AccountSection {
+  key: string;
+  label: string;
+  accounts: Account[];
+  addDefaults: { memberId?: string; type?: AccountType };
+  header: { kind: 'member'; memberId: string } | { kind: 'category'; accountType: AccountType };
+}
+
+const sections = computed<AccountSection[]>(() => {
+  if (groupBy.value === 'member') {
+    return familyStore.members
+      .filter((m) => accounts.value.some((a) => a.memberId === m.id))
+      .map((m) => ({
+        key: m.id,
+        label: m.name,
+        accounts: accounts.value.filter((a) => a.memberId === m.id),
+        addDefaults: { memberId: m.id },
+        header: { kind: 'member' as const, memberId: m.id },
+      }));
+  }
+  return typeOrder
+    .filter((type) => accounts.value.some((a) => a.type === type))
+    .map((type) => ({
+      key: type,
+      label: getAccountTypeLabel(type),
+      accounts: accounts.value.filter((a) => a.type === type),
+      addDefaults: { type },
+      header: { kind: 'category' as const, accountType: type },
+    }));
+});
+
+// Helpers
 function getAccountTypeLabel(type: AccountType): string {
   return accountTypes.value.find((t) => t.value === type)?.label || type;
 }
 
-// Get icon and color config for each account type
 function getAccountTypeConfig(type: AccountType): {
   bgColor: string;
   iconColor: string;
@@ -130,7 +191,24 @@ function getAccountTypeConfig(type: AccountType): {
   return configs[type] || configs.other;
 }
 
-function openAddModal() {
+function isLiability(type: AccountType): boolean {
+  return type === 'credit_card' || type === 'loan';
+}
+
+function getMemberForAccount(memberId: string) {
+  return familyStore.members.find((m) => m.id === memberId);
+}
+
+function sectionMemberTotal(section: AccountSection): number {
+  return section.accounts.reduce(
+    (s, a) => s + convertToBaseCurrency(a.balance, a.currency) * (isLiability(a.type) ? -1 : 1),
+    0
+  );
+}
+
+// Modal handlers
+function openAddWithDefaults(defaults?: { memberId?: string; type?: AccountType }) {
+  addModalDefaults.value = defaults;
   editingAccount.value = null;
   showAddModal.value = true;
 }
@@ -179,27 +257,58 @@ async function deleteAccount(id: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Action bar -->
-    <div class="flex justify-end">
-      <BaseButton @click="openAddModal">
+    <!-- Page Header -->
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
+          {{ t('accounts.pageTitle') }}
+        </h1>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {{ subtitleText }}
+        </p>
+      </div>
+      <BaseButton @click="openAddWithDefaults()">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('accounts.addAccount') }}
       </BaseButton>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <!-- Hero Section: 2:1 layout -->
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <!-- Total Assets (wide) -->
       <SummaryStatCard
         :label="t('common.totalAssets')"
         :amount="totalAssets"
         :currency="baseCurrency"
-        tint="green"
+        tint="slate"
+        dark
+        class="lg:col-span-2"
       >
         <template #icon>
-          <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
+          <BeanieIcon name="arrow-up" size="md" class="text-white" />
         </template>
+        <!-- Asset breakdown -->
+        <div v-if="isUnlocked" class="mt-3 grid grid-cols-2 gap-4 border-t border-white/10 pt-3">
+          <div>
+            <div class="font-outfit text-xs font-semibold uppercase opacity-40">
+              {{ t('accounts.assetClass.cash') }}
+            </div>
+            <div class="font-outfit mt-0.5 text-sm font-semibold">
+              {{ formatCurrencyWithCode(assetBreakdown.cash, baseCurrency) }}
+            </div>
+          </div>
+          <div>
+            <div class="font-outfit text-xs font-semibold uppercase opacity-40">
+              {{ t('accounts.assetClass.investments') }}
+            </div>
+            <div class="font-outfit mt-0.5 text-sm font-semibold">
+              {{ formatCurrencyWithCode(assetBreakdown.investments, baseCurrency) }}
+            </div>
+          </div>
+        </div>
       </SummaryStatCard>
 
+      <!-- Total Liabilities -->
       <SummaryStatCard
         :label="t('common.totalLiabilities')"
         :amount="totalLiabilities"
@@ -209,19 +318,34 @@ async function deleteAccount(id: string) {
         <template #icon>
           <BeanieIcon name="arrow-down" size="md" class="text-primary-500" />
         </template>
+        <!-- Liability breakdown -->
+        <div
+          v-if="isUnlocked"
+          class="mt-3 space-y-2 border-t border-gray-100 pt-3 dark:border-slate-700"
+        >
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('accounts.liabilityClass.creditCards') }}
+            </span>
+            <span class="font-outfit text-xs font-semibold text-gray-700 dark:text-gray-300">
+              {{ formatCurrencyWithCode(liabilityBreakdown.creditCards, baseCurrency) }}
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t('accounts.liabilityClass.loans') }}
+            </span>
+            <span class="font-outfit text-xs font-semibold text-gray-700 dark:text-gray-300">
+              {{ formatCurrencyWithCode(liabilityBreakdown.loans, baseCurrency) }}
+            </span>
+          </div>
+        </div>
       </SummaryStatCard>
+    </div>
 
-      <SummaryStatCard
-        :label="t('dashboard.netWorth')"
-        :amount="totalBalance"
-        :currency="baseCurrency"
-        tint="slate"
-        dark
-      >
-        <template #icon>
-          <BeanieIcon name="dollar-circle" size="md" class="text-white" />
-        </template>
-      </SummaryStatCard>
+    <!-- Group By Toggle -->
+    <div class="flex items-center gap-3">
+      <TogglePillGroup v-model="groupBy" :options="groupByOptions" />
     </div>
 
     <!-- Empty State -->
@@ -231,46 +355,75 @@ async function deleteAccount(id: string) {
         {{ t('accounts.noAccounts') }}
       </h3>
       <p class="mt-1 mb-4 text-gray-500 dark:text-gray-400">{{ t('accounts.getStarted') }}</p>
-      <BaseButton @click="openAddModal">
+      <BaseButton @click="openAddWithDefaults()">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('accounts.addAccount') }}
       </BaseButton>
     </div>
 
-    <!-- Accounts Grid by Type -->
+    <!-- Unified Sections Loop -->
     <div v-else class="space-y-8">
-      <div v-for="group in accountsByType" :key="group.type">
-        <!-- Section Header -->
-        <div class="mb-4 flex items-center gap-3">
+      <div v-for="section in sections" :key="section.key">
+        <!-- Section Header: Member view -->
+        <div v-if="section.header.kind === 'member'" class="mb-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <BeanieAvatar
+              v-if="getMemberForAccount(section.header.memberId)"
+              :variant="getMemberAvatarVariant(getMemberForAccount(section.header.memberId)!)"
+              :color="getMemberColor(section.header.memberId)"
+              size="sm"
+            />
+            <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
+              {{ section.label }}
+            </h2>
+            <span class="text-sm text-gray-500 dark:text-gray-400"
+              >({{ section.accounts.length }})</span
+            >
+          </div>
+          <span
+            v-if="isUnlocked"
+            class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-300"
+          >
+            {{ formatCurrencyWithCode(sectionMemberTotal(section), baseCurrency) }}
+          </span>
+        </div>
+
+        <!-- Section Header: Category view -->
+        <div v-else class="mb-4 flex items-center gap-3">
           <div
             class="flex h-8 w-8 items-center justify-center rounded-lg"
             :class="[
-              getAccountTypeConfig(group.type).bgColor,
-              getAccountTypeConfig(group.type).darkBgColor,
+              getAccountTypeConfig(section.header.accountType).bgColor,
+              getAccountTypeConfig(section.header.accountType).darkBgColor,
             ]"
           >
             <BeanieIcon
-              :name="`account-${group.type}`"
+              :name="`account-${section.header.accountType}`"
               size="sm"
-              :class="getAccountTypeConfig(group.type).iconColor"
+              :class="getAccountTypeConfig(section.header.accountType).iconColor"
             />
           </div>
           <h2 class="nook-section-label text-secondary-500 dark:text-gray-400">
-            {{ group.label }}
+            {{ section.label }}
           </h2>
           <span class="text-sm text-gray-500 dark:text-gray-400"
-            >({{ group.accounts.length }})</span
+            >({{ section.accounts.length }})</span
           >
         </div>
 
         <!-- Account Cards Grid -->
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="account in group.accounts"
+            v-for="account in section.accounts"
             :key="account.id"
             data-testid="account-card"
-            class="rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-            :class="[{ 'opacity-60': !account.isActive }, syncHighlightClass(account.id)]"
+            class="cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            :class="[
+              { 'opacity-60': !account.isActive },
+              { 'border-l-primary-500 border-l-4': isLiability(account.type) },
+              syncHighlightClass(account.id),
+            ]"
+            @click="openEditModal(account)"
           >
             <!-- Card Header -->
             <div class="mb-4 flex items-start justify-between">
@@ -303,6 +456,7 @@ async function deleteAccount(id: string) {
               <!-- Action Menu -->
               <ActionButtons
                 edit-test-id="edit-account-btn"
+                @click.stop
                 @edit="openEditModal(account)"
                 @delete="deleteAccount(account.id)"
               />
@@ -317,9 +471,7 @@ async function deleteAccount(id: string) {
                 <CurrencyAmount
                   :amount="account.balance"
                   :currency="account.currency"
-                  :type="
-                    account.type === 'credit_card' || account.type === 'loan' ? 'expense' : 'income'
-                  "
+                  :type="isLiability(account.type) ? 'expense' : 'income'"
                   size="xl"
                 />
               </div>
@@ -329,17 +481,31 @@ async function deleteAccount(id: string) {
             <div
               class="flex items-center justify-between border-t border-gray-100 pt-3 dark:border-slate-700"
             >
-              <!-- Owner Badge -->
+              <!-- Left: Owner avatar (category view) or type badge (member view) -->
               <div class="flex items-center gap-2">
-                <div
-                  class="flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium text-white"
-                  :style="{ backgroundColor: getMemberColor(account.memberId) }"
-                >
-                  <BeanieIcon name="user" size="xs" />
-                </div>
-                <span class="text-sm text-gray-600 dark:text-gray-400">{{
-                  getMemberName(account.memberId)
-                }}</span>
+                <template v-if="groupBy === 'category'">
+                  <BeanieAvatar
+                    v-if="getMemberForAccount(account.memberId)"
+                    :variant="getMemberAvatarVariant(getMemberForAccount(account.memberId)!)"
+                    :color="getMemberColor(account.memberId)"
+                    size="xs"
+                  />
+                  <span class="text-sm text-gray-600 dark:text-gray-400">{{
+                    getMemberName(account.memberId)
+                  }}</span>
+                </template>
+                <template v-else>
+                  <span
+                    class="rounded-full px-2 py-0.5 text-xs font-medium"
+                    :class="[
+                      getAccountTypeConfig(account.type).bgColor,
+                      getAccountTypeConfig(account.type).darkBgColor,
+                      getAccountTypeConfig(account.type).iconColor,
+                    ]"
+                  >
+                    {{ getAccountTypeLabel(account.type) }}
+                  </span>
+                </template>
               </div>
 
               <!-- Status Indicators -->
@@ -360,6 +526,19 @@ async function deleteAccount(id: string) {
               </div>
             </div>
           </div>
+
+          <!-- "+ Add an Account" dashed card -->
+          <button
+            type="button"
+            data-testid="add-account-card"
+            class="hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 flex min-h-[180px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors dark:border-slate-600 dark:text-gray-500"
+            @click="openAddWithDefaults(section.addDefaults)"
+          >
+            <BeanieIcon name="plus" size="lg" />
+            <span class="font-outfit text-sm font-semibold">
+              {{ t('accounts.addAnAccount') }}
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -367,6 +546,7 @@ async function deleteAccount(id: string) {
     <!-- Add Account Modal -->
     <AccountModal
       :open="showAddModal"
+      :defaults="addModalDefaults"
       @close="showAddModal = false"
       @save="handleAccountSave"
       @delete="handleAccountDelete"

@@ -94,7 +94,7 @@ function handleSave() {
   <BeanieFormModal
     :open="open"
     :title="t('budget.quickAdd.title')"
-    icon="\u26A1"
+    icon="⚡"
     icon-bg="var(--tint-orange-8)"
     size="narrow"
     :save-label="t('common.save')"

@@ -195,8 +195,9 @@ async function deleteCompletedGoal(id: string) {
         <div
           v-for="goal in filteredGoalsByPriority"
           :key="goal.id"
-          class="rounded-[var(--sq)] bg-white p-4 shadow-[var(--card-shadow)] dark:bg-slate-800"
+          class="cursor-pointer rounded-[var(--sq)] bg-white p-4 shadow-[var(--card-shadow)] dark:bg-slate-800"
           :class="syncHighlightClass(goal.id)"
+          @click="openEditModal(goal)"
         >
           <div class="mb-2 flex items-center justify-between">
             <div>
@@ -213,7 +214,12 @@ async function deleteCompletedGoal(id: string) {
                 {{ getMemberName(goal.memberId, 'Family') }}
               </p>
             </div>
-            <ActionButtons size="md" @edit="openEditModal(goal)" @delete="deleteGoal(goal.id)" />
+            <ActionButtons
+              size="md"
+              @click.stop
+              @edit="openEditModal(goal)"
+              @delete="deleteGoal(goal.id)"
+            />
           </div>
           <div class="mb-2 flex items-center justify-between text-sm">
             <span class="text-gray-500 dark:text-gray-400">{{ t('goals.progress') }}</span>
