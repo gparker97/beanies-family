@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { BaseCombobox } from '@/components/ui';
+import AccountCategoryPicker from '@/components/accounts/AccountCategoryPicker.vue';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -16,6 +16,7 @@ import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { COUNTRIES } from '@/constants/countries';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
+import { getSubtypeEmoji } from '@/constants/accountCategories';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 const props = defineProps<{
@@ -32,37 +33,15 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const { currencyOptions } = useCurrencyOptions();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
-// Icon chip options for account types
-const ACCOUNT_ICON_OPTIONS = [
-  { value: '🏦', label: 'Bank', icon: '🏦' },
-  { value: '🐷', label: 'Savings', icon: '🐷' },
-  { value: '💳', label: 'Credit Card', icon: '💳' },
-  { value: '📈', label: 'Investment', icon: '📈' },
-  { value: '💵', label: 'Cash', icon: '💵' },
-  { value: '🏠', label: 'Property', icon: '🏠' },
-  { value: '🎓', label: 'Education', icon: '🎓' },
-  { value: '🔒', label: 'Locked', icon: '🔒' },
-  { value: '📦', label: 'Other', icon: '📦' },
-];
-
-// Account type chips
-const accountTypeOptions = computed(() => [
-  { value: 'checking', label: '🏦 ' + t('accounts.type.checking') },
-  { value: 'savings', label: '🐷 ' + t('accounts.type.savings') },
-  { value: 'investment', label: '📈 ' + t('accounts.type.investment') },
-  { value: 'credit_card', label: '💳 ' + t('accounts.type.credit_card') },
-  { value: 'cash', label: '💵 ' + t('accounts.type.cash') },
-]);
-
 // Form state
-const icon = ref('');
 const name = ref('');
-const type = ref<AccountType>('checking');
+const type = ref<AccountType | ''>('');
 const balance = ref<number | undefined>(0);
 const currency = ref('');
 const memberId = ref('');
@@ -70,6 +49,18 @@ const institution = ref('');
 const institutionCountry = ref('');
 const isActive = ref(true);
 const includeInNetWorth = ref(true);
+const showMoreDetails = ref(false);
+
+// MRU: find most recent institution/country from existing accounts
+function getMruDefaults() {
+  const latest = accountsStore.accounts
+    .filter((a) => a.institution)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return {
+    institution: latest?.institution ?? '',
+    institutionCountry: latest?.institutionCountry ?? '',
+  };
+}
 
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
@@ -77,7 +68,6 @@ const { isEditing, isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit: (account) => {
-      icon.value = account.icon ?? '';
       name.value = account.name;
       type.value = account.type;
       balance.value = account.balance;
@@ -87,23 +77,26 @@ const { isEditing, isSubmitting } = useFormModal(
       institutionCountry.value = account.institutionCountry ?? '';
       isActive.value = account.isActive;
       includeInNetWorth.value = account.includeInNetWorth;
+      // Auto-expand "More Details" if toggles differ from defaults
+      showMoreDetails.value = !account.includeInNetWorth || !account.isActive;
     },
     onNew: () => {
-      icon.value = '';
+      const mru = getMruDefaults();
       name.value = '';
-      type.value = props.defaults?.type ?? 'checking';
+      type.value = props.defaults?.type ?? '';
       balance.value = 0;
       currency.value = settingsStore.displayCurrency;
       memberId.value = props.defaults?.memberId ?? familyStore.currentMemberId ?? '';
-      institution.value = '';
-      institutionCountry.value = '';
+      institution.value = mru.institution;
+      institutionCountry.value = mru.institutionCountry;
       isActive.value = true;
       includeInNetWorth.value = true;
+      showMoreDetails.value = false;
     },
   }
 );
 
-const canSave = computed(() => name.value.trim().length > 0);
+const canSave = computed(() => name.value.trim().length > 0 && type.value !== '');
 
 const modalTitle = computed(() =>
   isEditing.value ? t('accounts.editAccount') : t('accounts.addAccount')
@@ -112,6 +105,8 @@ const modalTitle = computed(() =>
 const saveLabel = computed(() =>
   isEditing.value ? t('modal.saveAccount') : t('modal.addAccount')
 );
+
+const modalIcon = computed(() => (type.value ? getSubtypeEmoji(type.value as AccountType) : '🏦'));
 
 async function handleRemoveCustomInstitution(instName: string) {
   await removeCustomInstitution(instName);
@@ -132,9 +127,9 @@ async function handleSave() {
   isSubmitting.value = true;
   try {
     const data = {
-      icon: icon.value || undefined,
+      icon: getSubtypeEmoji(type.value as AccountType) || undefined,
       name: name.value.trim(),
-      type: type.value,
+      type: type.value as AccountType,
       balance: balance.value ?? 0,
       currency: currency.value,
       memberId: memberId.value,
@@ -167,7 +162,7 @@ function handleDelete() {
   <BeanieFormModal
     :open="open"
     :title="modalTitle"
-    :icon="icon || '🏦'"
+    :icon="modalIcon"
     icon-bg="var(--tint-silk-20)"
     :save-label="saveLabel"
     :save-disabled="!canSave"
@@ -177,35 +172,12 @@ function handleDelete() {
     @save="handleSave"
     @delete="handleDelete"
   >
-    <!-- 1. Icon Picker -->
-    <FormFieldGroup :label="t('modal.selectCategory')">
-      <FrequencyChips v-model="icon" :options="ACCOUNT_ICON_OPTIONS" />
+    <!-- 1. Account Owner -->
+    <FormFieldGroup :label="t('modal.accountOwner')">
+      <FamilyChipPicker v-model="memberId" mode="single" />
     </FormFieldGroup>
 
-    <!-- 2. Account name -->
-    <div>
-      <input
-        v-model="name"
-        type="text"
-        class="font-outfit w-full border-none bg-transparent text-lg font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
-        :placeholder="t('modal.accountName')"
-      />
-    </div>
-
-    <!-- 3. Account type chips -->
-    <FormFieldGroup :label="t('modal.accountType')">
-      <FrequencyChips v-model="type" :options="accountTypeOptions" />
-    </FormFieldGroup>
-
-    <!-- 4. Balance (hero) -->
-    <AmountInput
-      v-model="balance"
-      :currency-symbol="currency || settingsStore.displayCurrency"
-      font-size="1.6rem"
-      :label="t('modal.balance')"
-    />
-
-    <!-- 5. Institution + Country -->
+    <!-- 2. Institution + Country -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
       <BaseCombobox
         v-model="institution"
@@ -227,39 +199,108 @@ function handleDelete() {
       />
     </div>
 
-    <!-- 6. Currency -->
-    <FormFieldGroup :label="t('form.currency')">
-      <BaseSelect v-model="currency" :options="currencyOptions" />
+    <!-- 3. Account Name (styled like TransactionModal description) -->
+    <FormFieldGroup :label="t('modal.accountName')" required>
+      <div
+        class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+      >
+        <input
+          v-model="name"
+          type="text"
+          class="font-outfit w-full border-none bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+          :placeholder="t('modal.accountName')"
+        />
+      </div>
     </FormFieldGroup>
 
-    <!-- 7. Owner -->
-    <FormFieldGroup :label="t('modal.owner')">
-      <FamilyChipPicker v-model="memberId" mode="single" show-shared />
+    <!-- 4. Category / Type (two-level picker) -->
+    <FormFieldGroup :label="t('modal.selectCategory')">
+      <AccountCategoryPicker v-model="type" />
     </FormFieldGroup>
 
-    <!-- 8. Include in net worth toggle -->
-    <div
-      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
-    >
-      <div>
-        <div class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
-          {{ t('modal.includeInNetWorth') }}
+    <!-- 5. Currency + Balance (side by side, styled like TransactionModal) -->
+    <FormFieldGroup :label="t('modal.balance')">
+      <div class="flex items-stretch gap-2">
+        <div class="relative flex-shrink-0">
+          <select
+            v-model="currency"
+            class="focus:border-primary-500 font-outfit h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-sm font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+          >
+            <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
+              {{ opt.value }}
+            </option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+            <svg
+              class="h-3 w-3 text-[var(--color-text)] opacity-35"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
         </div>
-        <div class="text-xs text-[var(--color-text-muted)]">
-          {{ t('modal.includeInNetWorthDesc') }}
+        <div class="min-w-0 flex-1">
+          <AmountInput
+            v-model="balance"
+            :currency-symbol="currency || settingsStore.displayCurrency"
+            font-size="1.8rem"
+          />
         </div>
       </div>
-      <ToggleSwitch v-model="includeInNetWorth" />
-    </div>
+    </FormFieldGroup>
 
-    <!-- 9. Active toggle -->
-    <div
-      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
-    >
-      <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
-        {{ t('form.isActive') }}
-      </span>
-      <ToggleSwitch v-model="isActive" />
+    <!-- 6. "More Details..." collapsible -->
+    <div>
+      <button
+        type="button"
+        class="font-outfit text-primary-500 text-sm font-semibold transition-colors hover:underline"
+        @click="showMoreDetails = !showMoreDetails"
+      >
+        {{ t('modal.moreDetails') }}
+        <span
+          class="ml-1 inline-block transition-transform"
+          :class="{ 'rotate-180': showMoreDetails }"
+          >&#9662;</span
+        >
+      </button>
+
+      <div v-if="showMoreDetails" class="mt-3 space-y-3">
+        <!-- Include in Net Worth toggle -->
+        <div
+          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+        >
+          <div>
+            <div
+              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200"
+            >
+              {{ t('modal.includeInNetWorth') }}
+            </div>
+            <div class="text-xs text-[var(--color-text-muted)]">
+              {{ t('modal.includeInNetWorthDesc') }}
+            </div>
+          </div>
+          <ToggleSwitch v-model="includeInNetWorth" />
+        </div>
+
+        <!-- Active toggle -->
+        <div
+          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+        >
+          <span
+            class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200"
+          >
+            {{ t('form.isActive') }}
+          </span>
+          <ToggleSwitch v-model="isActive" />
+        </div>
+      </div>
     </div>
   </BeanieFormModal>
 </template>

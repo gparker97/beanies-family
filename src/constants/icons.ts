@@ -405,6 +405,58 @@ export const ACCOUNT_TYPE_ICONS: Record<string, AccountTypeIconDef> = {
     color: '#6b7280',
     label: 'Other',
   },
+  'account-retirement_401k': {
+    paths: [
+      'M12 2L3 7v2h18V7L12 2zM5 11v6h2v-6H5zm4 0v6h2v-6H9zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM3 19v2h18v-2H3z',
+    ],
+    color: '#6366f1',
+    label: '401k',
+  },
+  'account-retirement_ira': {
+    paths: [
+      'M12 2L3 7v2h18V7L12 2zM5 11v6h2v-6H5zm4 0v6h2v-6H9zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM3 19v2h18v-2H3z',
+    ],
+    color: '#6366f1',
+    label: 'IRA',
+  },
+  'account-retirement_roth_ira': {
+    paths: [
+      'M12 2L3 7v2h18V7L12 2zM5 11v6h2v-6H5zm4 0v6h2v-6H9zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM3 19v2h18v-2H3z',
+    ],
+    color: '#6366f1',
+    label: 'ROTH IRA',
+  },
+  'account-retirement_bene_ira': {
+    paths: [
+      'M12 2L3 7v2h18V7L12 2zM5 11v6h2v-6H5zm4 0v6h2v-6H9zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM3 19v2h18v-2H3z',
+    ],
+    color: '#6366f1',
+    label: 'BENE IRA',
+  },
+  'account-retirement_kids_ira': {
+    paths: [
+      'M12 2L3 7v2h18V7L12 2zM5 11v6h2v-6H5zm4 0v6h2v-6H9zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM3 19v2h18v-2H3z',
+    ],
+    color: '#6366f1',
+    label: 'Kids IRA',
+  },
+  'account-retirement': {
+    paths: [
+      'M12 2L3 7v2h18V7L12 2zM5 11v6h2v-6H5zm4 0v6h2v-6H9zm4 0v6h2v-6h-2zm4 0v6h2v-6h-2zM3 19v2h18v-2H3z',
+    ],
+    color: '#6366f1',
+    label: 'Retirement',
+  },
+  'account-education_529': {
+    paths: ['M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z'],
+    color: '#14b8a6',
+    label: 'College Fund (529)',
+  },
+  'account-education_savings': {
+    paths: ['M12 3L1 9l11 6 9-4.91V17h2V9L12 3zM5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82z'],
+    color: '#14b8a6',
+    label: 'Education Savings',
+  },
 };
 
 // ─── Asset Type Icons ──────────────────────────────────────────────────────

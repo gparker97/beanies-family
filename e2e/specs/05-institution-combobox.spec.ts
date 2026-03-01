@@ -47,7 +47,9 @@ test.describe('Account Institution Combobox', () => {
 
     // Fill remaining required fields and save
     await page.getByPlaceholder('Account Name').fill('HSBC Account');
-    await page.getByRole('button', { name: '🏦 Checking Account', exact: true }).click();
+    // Select type: Bank category → Checking subtype
+    await page.getByRole('button', { name: '🏦 Bank', exact: true }).click();
+    await page.getByRole('button', { name: '🏦 Checking', exact: true }).click();
     await page.locator('input[type="number"]').first().fill('5000');
     await page.getByRole('button', { name: 'Add Account' }).last().click();
 

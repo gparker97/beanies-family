@@ -17,18 +17,39 @@ export class AccountsPage {
   }
 
   /**
-   * Account type values map to FrequencyChips button labels in the modal.
-   * Must match exact chip text to avoid ambiguity with icon picker chips.
+   * Account type values map to category → subtype chip clicks in the new
+   * AccountCategoryPicker. Returns the category chip label and (optional)
+   * subtype chip label needed to select the given account type.
    */
-  private typeToChipLabel(type: string): string {
-    const labels: Record<string, string> = {
-      checking: '🏦 Checking Account',
-      savings: '🐷 Savings Account',
-      investment: '📈 Investment Account',
-      credit_card: '💳 Credit Card',
-      cash: '💵 Cash',
+  private typeToChipSequence(type: string): { category: string; subtype?: string } {
+    const map: Record<string, { category: string; subtype?: string }> = {
+      checking: { category: '🏦 Bank', subtype: '🏦 Checking' },
+      savings: { category: '🏦 Bank', subtype: '🐷 Savings' },
+      credit_card: { category: '🏦 Bank', subtype: '💳 Credit Card' },
+      investment: { category: '📈 Investment', subtype: '📈 Brokerage' },
+      crypto: { category: '📈 Investment', subtype: '₿ Crypto' },
+      retirement_401k: { category: '🏛️ Retirement', subtype: '🏛️ 401k' },
+      retirement_ira: { category: '🏛️ Retirement', subtype: '🏛️ IRA' },
+      retirement_roth_ira: { category: '🏛️ Retirement', subtype: '🏛️ ROTH IRA' },
+      retirement_bene_ira: { category: '🏛️ Retirement', subtype: '🏛️ BENE IRA' },
+      retirement_kids_ira: { category: '🏛️ Retirement', subtype: '🏛️ Kids IRA' },
+      retirement: { category: '🏛️ Retirement', subtype: '🏛️ Retirement' },
+      education_529: { category: '📈 Investment', subtype: '🎓 College Fund (529)' },
+      education_savings: { category: '📈 Investment', subtype: '🎓 Education Savings' },
+      cash: { category: '💵 Cash' }, // auto-selects, no subtype needed
+      loan: { category: '🏦 Loan' }, // auto-selects
+      other: { category: '📦 Other' }, // auto-selects
     };
-    return labels[type] || type;
+    return map[type] || { category: '📦 Other' };
+  }
+
+  /** Click the category and subtype chips to select an account type */
+  private async selectAccountType(type: string) {
+    const { category, subtype } = this.typeToChipSequence(type);
+    await this.page.getByRole('button', { name: category, exact: true }).click();
+    if (subtype) {
+      await this.page.getByRole('button', { name: subtype, exact: true }).click();
+    }
   }
 
   async addAccount(data: { name: string; type: string; balance: number; currency?: string }) {
@@ -39,9 +60,8 @@ export class AccountsPage {
     // Name — raw input with placeholder "Account Name"
     await this.page.getByPlaceholder('Account Name').fill(data.name);
 
-    // Type — FrequencyChips component, click the matching chip button (exact to avoid icon picker ambiguity)
-    const chipLabel = this.typeToChipLabel(data.type);
-    await this.page.getByRole('button', { name: chipLabel, exact: true }).click();
+    // Type — AccountCategoryPicker: click category chip, then subtype chip
+    await this.selectAccountType(data.type);
 
     // Balance — AmountInput with type="number", use the number input
     const balanceInput = this.page.locator('input[type="number"]').first();
@@ -81,9 +101,8 @@ export class AccountsPage {
     // Name
     await this.page.getByPlaceholder('Account Name').fill(data.name);
 
-    // Type — chip button (exact to avoid icon picker ambiguity)
-    const chipLabel = this.typeToChipLabel(data.type);
-    await this.page.getByRole('button', { name: chipLabel, exact: true }).click();
+    // Type — AccountCategoryPicker: click category chip, then subtype chip
+    await this.selectAccountType(data.type);
 
     // Balance
     const balanceInput = this.page.locator('input[type="number"]').first();

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-01",
-    "translationCount": 1080
+    "translationCount": 1110
   },
   "translations": {
     "app.name": {
@@ -5404,6 +5404,156 @@
     "budget.upcoming.recurring": {
       "translation": "重复性开支",
       "hash": "ja22fx",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.retirement_401k": {
+      "translation": "401k",
+      "hash": "y85y",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.retirement_ira": {
+      "translation": "IRA",
+      "hash": "1k54",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.retirement_roth_ira": {
+      "translation": "ROTH IRA",
+      "hash": "ccvzex",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.retirement_bene_ira": {
+      "translation": "BENE IRA",
+      "hash": "u8344u",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.retirement_kids_ira": {
+      "translation": "儿童IRA",
+      "hash": "cn50bf",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.retirement": {
+      "translation": "养老",
+      "hash": "kvxyjd",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.education_529": {
+      "translation": "大学基金(529)",
+      "hash": "l0yx2b",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.type.education_savings": {
+      "translation": "教育储蓄",
+      "hash": "psujun",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.cat.bank": {
+      "translation": "银行",
+      "hash": "187rw",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.cat.investment": {
+      "translation": "投资",
+      "hash": "65s0zx",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.cat.retirement": {
+      "translation": "养老",
+      "hash": "kvxyjd",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.cat.cash": {
+      "translation": "货币资金",
+      "hash": "18uvn",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.cat.loan": {
+      "translation": "借款",
+      "hash": "1evps",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.cat.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.savings": {
+      "translation": "节省金额",
+      "hash": "ciwz1j",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.checking": {
+      "translation": "正在检查",
+      "hash": "qhim7u",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.creditCard": {
+      "translation": "贷记卡",
+      "hash": "lkxejb",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.brokerage": {
+      "translation": "经纪商",
+      "hash": "b4jfqe",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.crypto": {
+      "translation": "crypto\n\n英 ['krɪptəʊ]   美 ['krɪptoʊ]  \nn.\n（尤指信仰共产主义的）秘密成员;",
+      "hash": "xiwvdt",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.retirement": {
+      "translation": "养老",
+      "hash": "kvxyjd",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.401k": {
+      "translation": "401k",
+      "hash": "y85y",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.ira": {
+      "translation": "IRA",
+      "hash": "1k54",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.rothIra": {
+      "translation": "ROTH IRA",
+      "hash": "ccvzex",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.beneIra": {
+      "translation": "BENE IRA",
+      "hash": "u8344u",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.kidsIra": {
+      "translation": "儿童IRA",
+      "hash": "cn50bf",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.retirementGeneral": {
+      "translation": "养老",
+      "hash": "kvxyjd",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.education": {
+      "translation": "教育",
+      "hash": "sc02a0",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.collegeFund529": {
+      "translation": "大学基金(529)",
+      "hash": "l0yx2b",
+      "lastUpdated": "2026-03-01"
+    },
+    "accounts.subtype.educationSavings": {
+      "translation": "教育储蓄",
+      "hash": "psujun",
+      "lastUpdated": "2026-03-01"
+    },
+    "modal.accountOwner": {
+      "translation": "帐户持有者",
+      "hash": "pv5a2o",
       "lastUpdated": "2026-03-01"
     }
   }
