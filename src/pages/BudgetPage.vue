@@ -133,8 +133,8 @@ async function handleSaveBudget(data: CreateBudgetInput | { id: string; data: Up
 
 async function handleDeleteBudget(id: string) {
   const confirmed = await confirm({
-    title: t('budget.confirm.deleteTitle'),
-    message: t('budget.confirm.deleteMessage'),
+    title: 'budget.confirm.deleteTitle',
+    message: 'budget.confirm.deleteMessage',
     variant: 'danger',
   });
   if (confirmed) {

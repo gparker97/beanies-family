@@ -13,7 +13,7 @@ import type {
   UpdateTransactionInput,
   ISODateString,
 } from '@/types/models';
-import { getStartOfMonth, getEndOfMonth, toISODateString, isDateBetween } from '@/utils/date';
+import { getStartOfMonth, getEndOfMonth, toDateInputValue, isDateBetween } from '@/utils/date';
 
 export const useTransactionsStore = defineStore('transactions', () => {
   // State
@@ -30,8 +30,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   const thisMonthTransactions = computed(() => {
     const now = new Date();
-    const start = toISODateString(getStartOfMonth(now));
-    const end = toISODateString(getEndOfMonth(now));
+    const start = toDateInputValue(getStartOfMonth(now));
+    const end = toDateInputValue(getEndOfMonth(now));
     return transactions.value.filter((t) => isDateBetween(t.date, start, end));
   });
 
@@ -85,7 +85,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
     const categoryTotals = new Map<string, number>();
     for (const t of thisMonthTransactions.value.filter((t) => t.type === 'expense')) {
       const current = categoryTotals.get(t.category) || 0;
-      categoryTotals.set(t.category, current + t.amount);
+      categoryTotals.set(t.category, current + convertToBaseCurrency(t.amount, t.currency));
     }
     return categoryTotals;
   });
@@ -119,10 +119,23 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   const filteredThisMonthTransactions = computed(() => {
     const now = new Date();
-    const start = toISODateString(getStartOfMonth(now));
-    const end = toISODateString(getEndOfMonth(now));
+    const start = toDateInputValue(getStartOfMonth(now));
+    const end = toDateInputValue(getEndOfMonth(now));
     return filteredTransactions.value.filter((t) => isDateBetween(t.date, start, end));
   });
+
+  // Filtered totals for this month (respects global member filter)
+  const filteredThisMonthIncome = computed(() =>
+    filteredThisMonthTransactions.value
+      .filter((t) => t.type === 'income')
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  const filteredThisMonthExpenses = computed(() =>
+    filteredThisMonthTransactions.value
+      .filter((t) => t.type === 'expense')
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
 
   // Filtered one-time income for this month
   const filteredThisMonthOneTimeIncome = computed(() =>
@@ -137,6 +150,30 @@ export const useTransactionsStore = defineStore('transactions', () => {
       .filter((t) => t.type === 'expense' && !t.recurringItemId)
       .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
   );
+
+  // Filtered recurring income for this month
+  const filteredThisMonthRecurringIncome = computed(() =>
+    filteredThisMonthTransactions.value
+      .filter((t) => t.type === 'income' && t.recurringItemId)
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // Filtered recurring expenses for this month
+  const filteredThisMonthRecurringExpenses = computed(() =>
+    filteredThisMonthTransactions.value
+      .filter((t) => t.type === 'expense' && t.recurringItemId)
+      .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
+  );
+
+  // Filtered expenses by category for this month
+  const filteredExpensesByCategory = computed(() => {
+    const categoryTotals = new Map<string, number>();
+    for (const t of filteredThisMonthTransactions.value.filter((t) => t.type === 'expense')) {
+      const current = categoryTotals.get(t.category) || 0;
+      categoryTotals.set(t.category, current + convertToBaseCurrency(t.amount, t.currency));
+    }
+    return categoryTotals;
+  });
 
   /**
    * Calculate the balance adjustment for an account based on transaction type.
@@ -330,8 +367,13 @@ export const useTransactionsStore = defineStore('transactions', () => {
     filteredSortedTransactions,
     filteredRecentTransactions,
     filteredThisMonthTransactions,
+    filteredThisMonthIncome,
+    filteredThisMonthExpenses,
     filteredThisMonthOneTimeIncome,
     filteredThisMonthOneTimeExpenses,
+    filteredThisMonthRecurringIncome,
+    filteredThisMonthRecurringExpenses,
+    filteredExpensesByCategory,
     // Actions
     loadTransactions,
     createTransaction,

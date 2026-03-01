@@ -57,15 +57,34 @@ export function addYears(date: Date, years: number): Date {
   return result;
 }
 
+/**
+ * Check if a date falls between start and end (inclusive).
+ * Compares using date-only strings (YYYY-MM-DD) to avoid timezone issues.
+ * Transaction dates may be stored as "YYYY-MM-DD" or full ISO timestamps —
+ * this function normalizes both to date-only for safe comparison.
+ */
 export function isDateBetween(
   date: ISODateString,
   start: ISODateString,
   end: ISODateString
 ): boolean {
-  const d = new Date(date);
-  const s = new Date(start);
-  const e = new Date(end);
+  const d = extractDatePart(date);
+  const s = extractDatePart(start);
+  const e = extractDatePart(end);
   return d >= s && d <= e;
+}
+
+/**
+ * Extract the YYYY-MM-DD portion from any date string.
+ * For full ISO timestamps, converts to local date to avoid timezone shifts.
+ * For date-only strings ("YYYY-MM-DD"), returns as-is.
+ */
+function extractDatePart(dateStr: string): string {
+  // If it's already a date-only string (YYYY-MM-DD), return as-is
+  if (dateStr.length === 10) return dateStr;
+  // For full ISO timestamps, parse and extract local date
+  const d = new Date(dateStr);
+  return toDateInputValue(d);
 }
 
 /**
