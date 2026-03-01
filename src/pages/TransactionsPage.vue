@@ -4,7 +4,7 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
-import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
+import { BaseCard, BaseModal } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
@@ -18,7 +18,6 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
-import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -39,7 +38,6 @@ import {
 } from '@/utils/date';
 
 const transactionsStore = useTransactionsStore();
-const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const { getMemberNameByAccountId, getMemberColorByAccountId } = useMemberInfo();
@@ -137,14 +135,6 @@ const monthExpenses = computed(() =>
 
 const monthNet = computed(() => monthIncome.value - monthExpenses.value);
 
-const recurringCount = computed(
-  () => monthTransactions.value.filter((tx) => tx.recurringItemId).length
-);
-
-const oneTimeCount = computed(
-  () => monthTransactions.value.filter((tx) => !tx.recurringItemId).length
-);
-
 const totalCount = computed(() => monthTransactions.value.length);
 
 // Page subtitle
@@ -159,14 +149,18 @@ function getCategoryName(categoryId: string): string {
   return category?.name || categoryId;
 }
 
-function getAccountName(accountId: string): string {
-  const account = accountsStore.accounts.find((a) => a.id === accountId);
-  return account?.name || 'Unknown';
-}
-
 function formatDateGroupHeader(dateKey: string): string {
   const d = new Date(dateKey + 'T00:00:00');
+  const today = toDateInputValue(new Date());
+  if (dateKey === today) {
+    const dayMonth = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(d);
+    return `Today \u2014 ${dayMonth}`;
+  }
   return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'long' }).format(d).toUpperCase();
+}
+
+function isDateToday(dateKey: string): boolean {
+  return dateKey === toDateInputValue(new Date());
 }
 
 function getRecurringFrequencyLabel(tx: Transaction): string {
@@ -286,124 +280,102 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- Header -->
     <div>
-      <h1 class="font-outfit text-2xl font-bold text-[var(--color-text)]">
+      <h1 class="font-outfit text-[1.5rem] font-bold text-[var(--color-text)]">
         {{ t('transactions.pageTitle') }}
       </h1>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ subtitle }}</p>
+      <p class="mt-0.5 text-[0.8rem] text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
     </div>
 
-    <!-- Toolbar -->
-    <div class="flex flex-wrap items-center gap-3">
-      <!-- Filter pills -->
-      <TogglePillGroup
-        :model-value="activeFilter"
-        :options="[
-          { value: 'all', label: t('transactions.filterAll') },
-          { value: 'recurring', label: t('transactions.filterRecurring') },
-          { value: 'one-time', label: t('transactions.filterOneTime') },
-        ]"
-        @update:model-value="activeFilter = $event as 'all' | 'recurring' | 'one-time'"
-      />
+    <!-- Secondary toolbar: filters + search + month + add -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <!-- Filter pills -->
+        <TogglePillGroup
+          :model-value="activeFilter"
+          :options="[
+            { value: 'all', label: t('transactions.filterAll') },
+            { value: 'recurring', label: t('transactions.filterRecurring') },
+            { value: 'one-time', label: t('transactions.filterOneTime') },
+          ]"
+          @update:model-value="activeFilter = $event as 'all' | 'recurring' | 'one-time'"
+        />
 
-      <!-- Search -->
-      <div class="relative max-w-[320px] min-w-[180px] flex-1">
-        <BeanieIcon
-          name="search"
-          size="sm"
-          class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
-        />
-        <input
-          v-model="searchQuery"
-          type="text"
-          :placeholder="t('transactions.searchPlaceholder')"
-          class="focus:border-primary-300 focus:ring-primary-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30 w-full rounded-[14px] border border-gray-200 bg-white py-2 pr-3 pl-9 text-sm text-[var(--color-text)] placeholder:text-gray-400 focus:ring-2 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:placeholder:text-gray-500"
-        />
+        <!-- Search -->
+        <div
+          class="flex w-[220px] items-center gap-2 rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-2 dark:bg-slate-700"
+        >
+          <BeanieIcon
+            name="search"
+            size="sm"
+            class="shrink-0 text-[var(--color-text)] opacity-25"
+          />
+          <input
+            v-model="searchQuery"
+            type="text"
+            :placeholder="t('transactions.searchPlaceholder')"
+            class="w-full border-none bg-transparent text-[0.75rem] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text)] placeholder:opacity-25 dark:text-gray-100"
+          />
+        </div>
+
+        <!-- Month navigator -->
+        <MonthNavigator v-model="selectedMonth" />
       </div>
 
-      <!-- Month navigator -->
-      <MonthNavigator v-model="selectedMonth" />
-
-      <!-- Add button -->
-      <BaseButton class="ml-auto" @click="openAddModal">
-        {{ t('transactions.addTransaction') }}
-      </BaseButton>
+      <!-- Add button (gradient pill) -->
+      <button
+        class="font-outfit cursor-pointer rounded-full bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-5 py-2.5 text-[0.75rem] font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(241,93,34,0.3)]"
+        @click="openAddModal"
+      >
+        + {{ t('transactions.addTransaction') }}
+      </button>
     </div>
 
-    <!-- Summary row -->
-    <div class="flex flex-wrap items-start gap-4">
-      <!-- Income / Expenses / Net cards -->
-      <div class="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
-        <SummaryStatCard
-          :label="t('transactions.income')"
-          :amount="monthIncome"
-          :currency="baseCurrency"
-          tint="green"
-        >
-          <template #icon>
-            <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
-          </template>
-        </SummaryStatCard>
+    <!-- Summary cards (3 across) -->
+    <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+      <SummaryStatCard
+        :label="t('transactions.income')"
+        :amount="monthIncome"
+        :currency="baseCurrency"
+        tint="green"
+      >
+        <template #icon>
+          <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
+        </template>
+      </SummaryStatCard>
 
-        <SummaryStatCard
-          :label="t('transactions.expenses')"
-          :amount="monthExpenses"
-          :currency="baseCurrency"
-          tint="orange"
-        >
-          <template #icon>
-            <BeanieIcon name="arrow-down" size="md" class="text-primary-500" />
-          </template>
-        </SummaryStatCard>
+      <SummaryStatCard
+        :label="t('transactions.expenses')"
+        :amount="monthExpenses"
+        :currency="baseCurrency"
+        tint="orange"
+      >
+        <template #icon>
+          <BeanieIcon name="arrow-down" size="md" class="text-primary-500" />
+        </template>
+      </SummaryStatCard>
 
-        <SummaryStatCard
-          :label="t('transactions.net')"
-          :amount="monthNet"
-          :currency="baseCurrency"
-          tint="slate"
-          :dark="monthNet >= 0"
-        >
-          <template #icon>
-            <BeanieIcon
-              name="bar-chart"
-              size="md"
-              :class="monthNet >= 0 ? 'text-white' : 'text-primary-500'"
-            />
-          </template>
-        </SummaryStatCard>
-      </div>
-
-      <!-- Count pills -->
-      <div class="flex gap-3 pt-1">
-        <div
-          class="dark:bg-primary-900/20 flex items-center gap-1.5 rounded-[10px] bg-[var(--tint-orange-8)] px-3 py-2"
-        >
-          <BeanieIcon name="repeat" size="xs" class="text-primary-500" />
-          <span class="font-outfit text-primary-500 text-sm font-semibold">{{
-            recurringCount
-          }}</span>
-          <span class="text-xs text-gray-500 dark:text-gray-400">{{
-            t('transactions.recurringCount')
-          }}</span>
-        </div>
-        <div
-          class="flex items-center gap-1.5 rounded-[10px] bg-[var(--tint-slate-5)] px-3 py-2 dark:bg-slate-700"
-        >
-          <BeanieIcon name="arrow-right-left" size="xs" class="text-secondary-500" />
-          <span class="font-outfit text-secondary-500 text-sm font-semibold">{{
-            oneTimeCount
-          }}</span>
-          <span class="text-xs text-gray-500 dark:text-gray-400">{{
-            t('transactions.oneTimeCount')
-          }}</span>
-        </div>
-      </div>
+      <SummaryStatCard
+        :label="t('transactions.net')"
+        :amount="monthNet"
+        :currency="baseCurrency"
+        tint="slate"
+        :dark="monthNet >= 0"
+      >
+        <template #icon>
+          <BeanieIcon
+            name="bar-chart"
+            size="md"
+            :class="monthNet >= 0 ? 'text-white' : 'text-primary-500'"
+          />
+        </template>
+      </SummaryStatCard>
     </div>
 
     <!-- Transaction list -->
-    <BaseCard>
+    <BaseCard :padding="false">
       <div
         v-if="displayTransactions.length === 0"
         class="py-12 text-center text-gray-500 dark:text-gray-400"
@@ -416,12 +388,12 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
       <template v-else>
         <!-- Grid header (desktop) -->
         <div
-          class="hidden border-b border-gray-100 pb-2 text-xs font-medium tracking-wider text-gray-400 uppercase md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-3 dark:border-slate-700 dark:text-gray-500"
+          class="font-outfit hidden border-b-2 border-[var(--tint-slate-5)] bg-[rgba(44,62,80,0.015)] px-4 py-3 text-[0.6rem] font-semibold tracking-[0.08em] uppercase opacity-30 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700 dark:bg-slate-800/50"
         >
           <div></div>
           <div>{{ t('transactions.title') }}</div>
           <div>{{ t('family.title') }}</div>
-          <div class="text-right">{{ t('form.amount') }}</div>
+          <div>{{ t('form.amount') }}</div>
           <div>{{ t('form.type') }}</div>
           <div></div>
         </div>
@@ -429,11 +401,15 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
         <!-- Date-grouped rows -->
         <div v-for="[dateKey, txns] in groupedTransactions" :key="dateKey">
           <!-- Date group header -->
-          <div class="flex items-center gap-3 pt-5 pb-2">
-            <span class="text-xs font-semibold tracking-wider text-gray-400 dark:text-gray-500">
-              {{ formatDateGroupHeader(dateKey) }}
-            </span>
-            <div class="h-px flex-1 bg-gray-100 dark:bg-slate-700"></div>
+          <div
+            class="font-outfit px-4 pt-3 pb-1.5 text-[0.65rem] font-bold tracking-[0.08em] uppercase"
+            :class="
+              isDateToday(dateKey)
+                ? 'text-primary-500 bg-[rgba(241,93,34,0.02)]'
+                : 'text-[var(--color-text)] opacity-30'
+            "
+          >
+            {{ formatDateGroupHeader(dateKey) }}
           </div>
 
           <!-- Transaction rows -->
@@ -441,14 +417,16 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
             v-for="tx in txns"
             :key="tx.id"
             data-testid="transaction-item"
-            class="group py-3 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-3"
+            class="group border-b border-[var(--tint-slate-5)] px-4 py-3.5 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
             :class="syncHighlightClass(tx.id)"
           >
-            <!-- Icon -->
+            <!-- Icon (desktop) -->
             <div
               class="hidden h-9 w-9 items-center justify-center rounded-[12px] md:flex"
               :class="
-                tx.type === 'income' ? 'bg-[var(--tint-success-10)]' : 'bg-[var(--tint-orange-8)]'
+                tx.type === 'income'
+                  ? 'bg-[rgba(39,174,96,0.1)]'
+                  : 'bg-[var(--tint-slate-5)] dark:bg-slate-700'
               "
             >
               <CategoryIcon :category="tx.category" size="sm" />
@@ -460,16 +438,18 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
               <div
                 class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] md:hidden"
                 :class="
-                  tx.type === 'income' ? 'bg-[var(--tint-success-10)]' : 'bg-[var(--tint-orange-8)]'
+                  tx.type === 'income'
+                    ? 'bg-[rgba(39,174,96,0.1)]'
+                    : 'bg-[var(--tint-slate-5)] dark:bg-slate-700'
                 "
               >
                 <CategoryIcon :category="tx.category" size="sm" />
               </div>
               <div>
-                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <p class="font-outfit text-[0.8rem] font-semibold text-gray-900 dark:text-gray-100">
                   {{ tx.description }}
                 </p>
-                <p class="text-xs text-gray-500 dark:text-gray-400">
+                <p class="text-[0.6rem] text-[var(--color-text)] opacity-35">
                   {{ getCategoryName(tx.category) }}
                   <span class="md:hidden">
                     &middot; {{ getMemberNameByAccountId(tx.accountId) }}
@@ -480,18 +460,18 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
                   <CurrencyAmount
                     :amount="tx.amount"
                     :currency="tx.currency"
-                    :type="tx.type === 'income' ? 'income' : 'expense'"
+                    :type="tx.type === 'income' ? 'income' : 'neutral'"
                     size="sm"
                   />
                   <span
                     v-if="tx.recurringItemId"
-                    class="text-primary-500 dark:bg-primary-900/20 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-medium"
+                    class="text-primary-500 dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.55rem] font-semibold"
                   >
                     {{ t('transactions.typeRecurring') }}
                   </span>
                   <span
                     v-else
-                    class="rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+                    class="text-secondary-500 rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
                   >
                     {{ t('transactions.typeOneTime') }}
                   </span>
@@ -500,43 +480,53 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
             </div>
 
             <!-- Member (desktop) -->
-            <div class="hidden md:block">
-              <div class="flex items-center gap-1.5">
-                <BeanieIcon
-                  name="user-filled"
-                  size="xs"
-                  :style="{ color: getMemberColorByAccountId(tx.accountId) }"
-                />
-                <span class="text-sm text-gray-700 dark:text-gray-300">
-                  {{ getMemberNameByAccountId(tx.accountId) }}
-                </span>
+            <div class="hidden items-center gap-1.5 md:flex">
+              <div
+                class="flex h-5 w-5 items-center justify-center rounded-full text-[9px]"
+                :style="{
+                  background: `linear-gradient(135deg, ${getMemberColorByAccountId(tx.accountId)}, ${getMemberColorByAccountId(tx.accountId)}88)`,
+                }"
+              >
+                <span class="leading-none text-white">{{
+                  getMemberNameByAccountId(tx.accountId).charAt(0)
+                }}</span>
               </div>
-              <p class="text-xs text-gray-400 dark:text-gray-500">
-                {{ getAccountName(tx.accountId) }}
-              </p>
+              <span class="text-[0.72rem] text-[var(--color-text)] opacity-50">
+                {{ getMemberNameByAccountId(tx.accountId) }}
+              </span>
             </div>
 
             <!-- Amount (desktop) -->
-            <div class="hidden text-right md:block">
-              <CurrencyAmount
-                :amount="tx.amount"
-                :currency="tx.currency"
-                :type="tx.type === 'income' ? 'income' : 'expense'"
-                size="md"
-              />
+            <div class="hidden md:block">
+              <span
+                class="font-outfit text-[0.85rem] font-bold"
+                :class="
+                  tx.type === 'income'
+                    ? 'text-[#27AE60]'
+                    : 'text-[var(--color-text)] dark:text-gray-100'
+                "
+              >
+                {{ tx.type === 'income' ? '+' : '\u2212' }}
+                <CurrencyAmount
+                  :amount="tx.amount"
+                  :currency="tx.currency"
+                  type="neutral"
+                  size="sm"
+                />
+              </span>
             </div>
 
             <!-- Type pill (desktop) -->
             <div class="hidden md:block">
               <span
                 v-if="tx.recurringItemId"
-                class="text-primary-500 dark:bg-primary-900/20 inline-block rounded-full bg-[var(--tint-orange-8)] px-2.5 py-1 text-xs font-medium"
+                class="text-primary-500 dark:bg-primary-900/20 inline-block rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.55rem] font-semibold"
               >
                 {{ getRecurringFrequencyLabel(tx) }}
               </span>
               <span
                 v-else
-                class="inline-block rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+                class="text-secondary-500 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
               >
                 {{ t('transactions.typeOneTime') }}
               </span>
