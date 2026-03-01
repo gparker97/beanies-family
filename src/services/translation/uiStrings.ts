@@ -560,7 +560,7 @@ const STRING_DEFS = {
   'form.fromAccount': { en: 'from account' },
   'form.toAccount': { en: 'to account' },
   'form.owner': { en: 'owner' },
-  'form.institution': { en: 'financial institution', beanie: 'banks' },
+  'form.institution': { en: 'financial institution', beanie: 'bank' },
   'form.country': { en: 'country' },
   'form.other': { en: 'other' },
   'form.searchInstitutions': { en: 'search institutions...', beanie: 'find your bank...' },

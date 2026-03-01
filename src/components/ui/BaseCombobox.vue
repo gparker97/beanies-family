@@ -192,30 +192,36 @@ function clearSelection() {
 <template>
   <div ref="dropdownRef" class="relative space-y-1">
     <!-- Label -->
-    <label v-if="label" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+    <label
+      v-if="label"
+      class="font-outfit block text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+    >
       {{ label }}
-      <span v-if="required" class="text-red-500">*</span>
+      <span v-if="required" class="text-primary-500">*</span>
     </label>
 
     <!-- Trigger button -->
     <button
       type="button"
       data-testid="combobox-trigger"
-      class="flex w-full items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors focus:ring-2 focus:outline-none"
+      class="flex w-full items-center justify-between rounded-[16px] border-2 border-transparent px-4 py-3 text-left transition-all duration-200 focus:outline-none"
       :class="[
         error
-          ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
-          : 'focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700 border-gray-300 dark:border-slate-600',
-        disabled
-          ? 'cursor-not-allowed bg-gray-50 opacity-50 dark:bg-slate-900'
-          : 'cursor-pointer bg-white hover:border-gray-400 dark:bg-slate-800 dark:hover:border-slate-500',
+          ? 'border-red-500 focus:border-red-500'
+          : 'focus:border-primary-500 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)]',
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+        'bg-[var(--tint-slate-5)] dark:bg-slate-700',
       ]"
       :disabled="disabled"
       @click="toggleDropdown"
     >
       <span
-        class="flex-1 truncate"
-        :class="hasSelection ? 'text-gray-900 dark:text-gray-100' : 'text-gray-400'"
+        class="font-outfit flex-1 truncate text-sm font-semibold"
+        :class="
+          hasSelection
+            ? 'text-[var(--color-text)] dark:text-gray-100'
+            : 'text-[var(--color-text-muted)] opacity-30'
+        "
       >
         {{ displayText }}
       </span>
@@ -269,7 +275,7 @@ function clearSelection() {
       v-model="customText"
       type="text"
       data-testid="combobox-custom-input"
-      class="focus:border-primary-500 focus:ring-sky-silk-100 dark:focus:ring-primary-700 block w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-gray-900 transition-colors focus:ring-2 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+      class="focus:border-primary-500 font-outfit block w-full rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 text-sm font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
       :placeholder="otherPlaceholder"
       @blur="handleCustomBlur"
       @keydown="handleCustomKeydown"
@@ -279,7 +285,7 @@ function clearSelection() {
     <div
       v-if="isOpen"
       data-testid="combobox-dropdown"
-      class="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
+      class="absolute z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-[16px] border border-gray-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800"
     >
       <!-- Search input -->
       <div
