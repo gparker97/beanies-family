@@ -713,7 +713,7 @@ describe('transactionsStore - Summary Card Calculations', () => {
 
       expect(count).toBe(2);
       expect(store.transactions).toHaveLength(1);
-      expect(store.transactions[0].id).toBe('txn-3');
+      expect(store.transactions[0]!.id).toBe('txn-3');
     });
 
     it('should not affect transactions from other recurring items', async () => {
@@ -741,7 +741,7 @@ describe('transactionsStore - Summary Card Calculations', () => {
       await store.deleteTransactionsByRecurringItemId('recurring-1');
 
       expect(store.transactions).toHaveLength(1);
-      expect(store.transactions[0].recurringItemId).toBe('recurring-2');
+      expect(store.transactions[0]!.recurringItemId).toBe('recurring-2');
     });
 
     it('should return 0 when no transactions match', async () => {
