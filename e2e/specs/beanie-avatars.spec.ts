@@ -52,7 +52,7 @@ test.describe('Beanie Avatars', () => {
     await page.getByPlaceholder('bean@example.com').fill('luna@example.com');
 
     // Select Female gender chip
-    await page.getByRole('button', { name: /Female/ }).click();
+    await page.getByRole('button', { name: /female/i }).click();
 
     // Submit via the save/add button inside the modal
     await page.getByRole('button', { name: /add to family|add to pod/i }).click();
