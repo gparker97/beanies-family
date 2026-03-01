@@ -5,7 +5,6 @@ import { useTombstoneStore } from './tombstoneStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useRecurringStore } from './recurringStore';
 import { wrapAsync } from '@/composables/useStoreActions';
-import { convertToBaseCurrency } from '@/utils/currency';
 import * as budgetRepo from '@/services/indexeddb/repositories/budgetRepository';
 import { getCategoryById } from '@/constants/categories';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput } from '@/types/models';
@@ -41,16 +40,16 @@ export const useBudgetStore = defineStore('budget', () => {
     () => filteredBudgets.value.find((b) => b.isActive) ?? null
   );
 
-  // Cross-store computed: monthly income
+  // Cross-store computed: monthly income (respects global member filter)
   const monthlyIncome = computed(() => {
     const txStore = useTransactionsStore();
-    return txStore.thisMonthIncome;
+    return txStore.filteredThisMonthIncome;
   });
 
-  // Cross-store computed: current month spending
+  // Cross-store computed: current month spending (respects global member filter)
   const currentMonthSpending = computed(() => {
     const txStore = useTransactionsStore();
-    return txStore.thisMonthExpenses;
+    return txStore.filteredThisMonthExpenses;
   });
 
   // Monthly savings = income - spending
@@ -72,10 +71,10 @@ export const useBudgetStore = defineStore('budget', () => {
     return budget.totalAmount;
   });
 
-  // Spending by category (from transactions store)
+  // Spending by category (respects global member filter)
   const spendingByCategory = computed(() => {
     const txStore = useTransactionsStore();
-    return txStore.expensesByCategory;
+    return txStore.filteredExpensesByCategory;
   });
 
   // Category budget status array
@@ -87,8 +86,8 @@ export const useBudgetStore = defineStore('budget', () => {
       .map((bc) => {
         const cat = getCategoryById(bc.categoryId);
         const spent = spendingByCategory.value.get(bc.categoryId) ?? 0;
-        const spentInBase = convertToBaseCurrency(spent, budget.currency);
-        const percentUsed = bc.amount > 0 ? (spentInBase / bc.amount) * 100 : 0;
+        // spent is already in base currency (converted in transactionsStore)
+        const percentUsed = bc.amount > 0 ? (spent / bc.amount) * 100 : 0;
 
         let status: CategoryBudgetStatus = 'ok';
         if (percentUsed >= 100) status = 'over';
@@ -100,7 +99,7 @@ export const useBudgetStore = defineStore('budget', () => {
           icon: cat?.icon ?? '',
           color: cat?.color ?? '#6B7280',
           budgeted: bc.amount,
-          spent: spentInBase,
+          spent,
           percentUsed: Math.round(percentUsed),
           status,
         };
@@ -170,11 +169,13 @@ export const useBudgetStore = defineStore('budget', () => {
       .slice(0, 5);
   });
 
-  // Recurring vs one-time breakdowns
-  const recurringIncome = computed(() => useTransactionsStore().thisMonthRecurringIncome);
-  const oneTimeIncome = computed(() => useTransactionsStore().thisMonthOneTimeIncome);
-  const recurringExpenses = computed(() => useTransactionsStore().thisMonthRecurringExpenses);
-  const oneTimeExpenses = computed(() => useTransactionsStore().thisMonthOneTimeExpenses);
+  // Recurring vs one-time breakdowns (respects global member filter)
+  const recurringIncome = computed(() => useTransactionsStore().filteredThisMonthRecurringIncome);
+  const oneTimeIncome = computed(() => useTransactionsStore().filteredThisMonthOneTimeIncome);
+  const recurringExpenses = computed(
+    () => useTransactionsStore().filteredThisMonthRecurringExpenses
+  );
+  const oneTimeExpenses = computed(() => useTransactionsStore().filteredThisMonthOneTimeExpenses);
 
   // ========== ACTIONS ==========
 
@@ -192,7 +193,7 @@ export const useBudgetStore = defineStore('budget', () => {
           await budgetRepo.updateBudget(existing.id, { isActive: false });
           const idx = budgets.value.findIndex((b) => b.id === existing.id);
           if (idx !== -1) {
-            budgets.value[idx] = { ...budgets.value[idx], isActive: false };
+            budgets.value[idx] = { ...budgets.value[idx]!, isActive: false };
           }
         }
       }
@@ -211,7 +212,7 @@ export const useBudgetStore = defineStore('budget', () => {
           await budgetRepo.updateBudget(existing.id, { isActive: false });
           const idx = budgets.value.findIndex((b) => b.id === existing.id);
           if (idx !== -1) {
-            budgets.value[idx] = { ...budgets.value[idx], isActive: false };
+            budgets.value[idx] = { ...budgets.value[idx]!, isActive: false };
           }
         }
       }
