@@ -130,11 +130,13 @@ test.describe('Family Planner', () => {
     const dayBtns = page.locator('button.h-\\[38px\\].w-\\[38px\\]');
 
     // The date watcher auto-selects today's day of week — deselect all currently active
-    // then select only the days we want. Click Saturday (nth 5) to deselect it if active.
-    const satBtn = dayBtns.nth(5);
-    const satClasses = await satBtn.getAttribute('class');
-    if (satClasses?.includes('text-white')) {
-      await satBtn.click(); // deselect Saturday
+    // days before selecting only the ones we want (date-independent).
+    for (let i = 0; i < 7; i++) {
+      const btn = dayBtns.nth(i);
+      const cls = await btn.getAttribute('class');
+      if (cls?.includes('text-white')) {
+        await btn.click();
+      }
     }
 
     // Click M (Monday, index 0) and W (Wednesday, index 2)
