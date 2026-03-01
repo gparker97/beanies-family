@@ -100,7 +100,7 @@ const emit = defineEmits<{
     <!-- Sort -->
     <div class="flex items-center gap-1.5">
       <span class="font-outfit text-xs font-medium text-[var(--color-text)] opacity-50">
-        Sort:
+        {{ t('todo.sortLabel') }}
       </span>
       <select
         :value="sortBy"

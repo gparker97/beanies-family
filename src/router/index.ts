@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { useTranslationStore } from '@/stores/translationStore';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -9,104 +11,104 @@ const routes: RouteRecordRaw[] = [
     path: '/welcome',
     name: 'Welcome',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { title: 'Welcome', requiresAuth: false },
+    meta: { titleKey: 'login.welcome', requiresAuth: false },
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { title: 'Login', requiresAuth: false },
+    meta: { titleKey: 'login.title', requiresAuth: false },
   },
   {
     path: '/join',
     name: 'JoinFamily',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { title: 'Join Family', requiresAuth: false },
+    meta: { titleKey: 'join.title', requiresAuth: false },
     props: { initialView: 'join' },
   },
   {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/pages/DashboardPage.vue'),
-    meta: { title: 'Dashboard', requiresAuth: true },
+    meta: { titleKey: 'nav.dashboard', requiresAuth: true },
   },
   {
     path: '/accounts',
     name: 'Accounts',
     component: () => import('@/pages/AccountsPage.vue'),
-    meta: { title: 'Accounts', requiresAuth: true },
+    meta: { titleKey: 'nav.accounts', requiresAuth: true },
   },
   {
     path: '/transactions',
     name: 'Transactions',
     component: () => import('@/pages/TransactionsPage.vue'),
-    meta: { title: 'Transactions', requiresAuth: true },
+    meta: { titleKey: 'nav.transactions', requiresAuth: true },
   },
   {
     path: '/assets',
     name: 'Assets',
     component: () => import('@/pages/AssetsPage.vue'),
-    meta: { title: 'Assets', requiresAuth: true },
+    meta: { titleKey: 'nav.assets', requiresAuth: true },
   },
   {
     path: '/goals',
     name: 'Goals',
     component: () => import('@/pages/GoalsPage.vue'),
-    meta: { title: 'Goals', requiresAuth: true },
+    meta: { titleKey: 'nav.goals', requiresAuth: true },
   },
   {
     path: '/reports',
     name: 'Reports',
     component: () => import('@/pages/ReportsPage.vue'),
-    meta: { title: 'Reports', requiresAuth: true },
+    meta: { titleKey: 'nav.reports', requiresAuth: true },
   },
   {
     path: '/forecast',
     name: 'Forecast',
     component: () => import('@/pages/ForecastPage.vue'),
-    meta: { title: 'Forecast', requiresAuth: true },
+    meta: { titleKey: 'nav.forecast', requiresAuth: true },
   },
   {
     path: '/family',
     name: 'Family',
     component: () => import('@/pages/FamilyPage.vue'),
-    meta: { title: 'Family Members', requiresAuth: true },
+    meta: { titleKey: 'nav.family', requiresAuth: true },
   },
   {
     path: '/nook',
     name: 'Nook',
     component: () => import('@/pages/FamilyNookPage.vue'),
-    meta: { title: 'Family Nook', requiresAuth: true },
+    meta: { titleKey: 'nav.nook', requiresAuth: true },
   },
   {
     path: '/planner',
     name: 'Planner',
     component: () => import('@/pages/FamilyPlannerPage.vue'),
-    meta: { title: 'Family Planner', requiresAuth: true },
+    meta: { titleKey: 'nav.planner', requiresAuth: true },
   },
   {
     path: '/todo',
     name: 'Todo',
     component: () => import('@/pages/FamilyTodoPage.vue'),
-    meta: { title: 'Family To-Do', requiresAuth: true },
+    meta: { titleKey: 'nav.todo', requiresAuth: true },
   },
   {
     path: '/budgets',
     name: 'Budgets',
     component: () => import('@/pages/BudgetPage.vue'),
-    meta: { title: 'Budgets', requiresAuth: true },
+    meta: { titleKey: 'nav.budgets', requiresAuth: true },
   },
   {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/pages/SettingsPage.vue'),
-    meta: { title: 'Settings', requiresAuth: true },
+    meta: { titleKey: 'nav.settings', requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),
-    meta: { title: 'Not Found' },
+    meta: { titleKey: 'notFound.title' },
   },
 ];
 
@@ -117,7 +119,9 @@ const router = createRouter({
 
 // Update document title on route change
 router.afterEach((to) => {
-  const title = to.meta.title as string | undefined;
+  const titleKey = to.meta.titleKey as UIStringKey | undefined;
+  const translationStore = useTranslationStore();
+  const title = titleKey ? translationStore.t(titleKey) : undefined;
   document.title = title ? `${title} | beanies.family` : 'beanies.family';
 });
 

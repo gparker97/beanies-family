@@ -196,7 +196,7 @@ const chartOptions = computed(() => ({
           index: number,
           ticks: { value: number }[]
         ) {
-          if (index === ticks.length - 1) return 'Today';
+          if (index === ticks.length - 1) return t('date.today');
           return this.getLabelForValue(index);
         },
       },

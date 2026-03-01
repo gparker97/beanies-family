@@ -197,7 +197,7 @@ const reminderChipOptions = [
 
 const frequencyOptions = [
   { value: 'weekly', label: t('planner.recurrence.weekly') },
-  { value: 'biweekly', label: 'Biweekly' },
+  { value: 'biweekly', label: t('planner.recurrence.biweekly') },
   { value: 'monthly', label: t('planner.recurrence.monthly') },
 ];
 

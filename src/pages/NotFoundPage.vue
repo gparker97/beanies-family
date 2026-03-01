@@ -190,7 +190,7 @@ function goHome() {
 
       <!-- Subtle tagline -->
       <p class="text-secondary-500/30 mt-6 text-sm italic dark:text-[#BDC3C7]/30">
-        every bean counts
+        {{ t('app.tagline') }}
       </p>
     </div>
   </div>
