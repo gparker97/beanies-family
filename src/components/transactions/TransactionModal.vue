@@ -8,6 +8,7 @@ import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityLinkDropdown from '@/components/ui/ActivityLinkDropdown.vue';
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -16,15 +17,18 @@ import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import type {
   Transaction,
+  RecurringItem,
   CreateTransactionInput,
   UpdateTransactionInput,
   CreateRecurringItemInput,
   RecurringFrequency,
 } from '@/types/models';
+import { toDateInputValue } from '@/utils/date';
 
 const props = defineProps<{
   open: boolean;
   transaction?: Transaction | null;
+  recurringItem?: RecurringItem | null;
 }>();
 
 const emit = defineEmits<{
@@ -53,6 +57,8 @@ const accountId = ref('');
 const activityId = ref<string | undefined>(undefined);
 const currency = ref(settingsStore.displayCurrency);
 const dayOfMonth = ref(1);
+const monthOfYear = ref(1);
+const isActive = ref(true);
 
 const LAST_ACCOUNT_KEY = 'beanies_last_transaction_account';
 
@@ -63,25 +69,47 @@ function getLastAccountId(): string {
 }
 
 function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return toDateInputValue(new Date());
 }
+
+const isEditingRecurring = computed(() => !!props.recurringItem);
 
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
-  () => props.transaction,
+  () => props.transaction ?? props.recurringItem ?? null,
   () => props.open,
   {
-    onEdit: (transaction) => {
-      direction.value = transaction.type === 'income' ? 'in' : 'out';
-      amount.value = transaction.amount;
-      description.value = transaction.description;
-      category.value = transaction.category;
-      recurrenceMode.value = transaction.recurring ? 'recurring' : 'one-time';
-      date.value = transaction.date;
-      accountId.value = transaction.accountId;
-      activityId.value = transaction.activityId;
-      currency.value = transaction.currency;
+    onEdit: (entity) => {
+      if (props.recurringItem) {
+        // Editing a recurring item
+        const item = props.recurringItem;
+        direction.value = item.type === 'income' ? 'in' : 'out';
+        amount.value = item.amount;
+        description.value = item.description;
+        category.value = item.category;
+        recurrenceMode.value = 'recurring';
+        recurrenceFrequency.value = item.frequency;
+        dayOfMonth.value = item.dayOfMonth || 1;
+        monthOfYear.value = item.monthOfYear || 1;
+        startDate.value = item.startDate ? item.startDate.split('T')[0] : todayStr();
+        endDate.value = item.endDate ? item.endDate.split('T')[0] : '';
+        accountId.value = item.accountId;
+        activityId.value = undefined;
+        currency.value = item.currency;
+        isActive.value = item.isActive;
+      } else {
+        // Editing a transaction
+        const transaction = entity as Transaction;
+        direction.value = transaction.type === 'income' ? 'in' : 'out';
+        amount.value = transaction.amount;
+        description.value = transaction.description;
+        category.value = transaction.category;
+        recurrenceMode.value = transaction.recurring ? 'recurring' : 'one-time';
+        date.value = transaction.date;
+        accountId.value = transaction.accountId;
+        activityId.value = transaction.activityId;
+        currency.value = transaction.currency;
+      }
     },
     onNew: () => {
       direction.value = 'out';
@@ -96,6 +124,8 @@ const { isEditing, isSubmitting } = useFormModal(
       activityId.value = undefined;
       currency.value = settingsStore.displayCurrency;
       dayOfMonth.value = new Date().getDate();
+      monthOfYear.value = new Date().getMonth() + 1;
+      isActive.value = true;
     },
   }
 );
@@ -117,17 +147,35 @@ const dayOfMonthOptions = Array.from({ length: 28 }, (_, i) => ({
   label: String(i + 1),
 }));
 
+const monthOptions = [
+  { value: '1', label: 'January' },
+  { value: '2', label: 'February' },
+  { value: '3', label: 'March' },
+  { value: '4', label: 'April' },
+  { value: '5', label: 'May' },
+  { value: '6', label: 'June' },
+  { value: '7', label: 'July' },
+  { value: '8', label: 'August' },
+  { value: '9', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
 const canSave = computed(
   () => description.value.trim().length > 0 && amount.value !== undefined && amount.value > 0
 );
 
-const modalTitle = computed(() =>
-  isEditing.value ? t('transactions.editTransaction') : t('transactions.addTransaction')
-);
+const modalTitle = computed(() => {
+  if (isEditingRecurring.value)
+    return isEditing.value ? t('recurring.editItem') : t('recurring.addItem');
+  return isEditing.value ? t('transactions.editTransaction') : t('transactions.addTransaction');
+});
 
-const saveLabel = computed(() =>
-  isEditing.value ? t('modal.saveTransaction') : t('modal.addTransaction')
-);
+const saveLabel = computed(() => {
+  if (isEditingRecurring.value) return isEditing.value ? t('common.save') : t('recurring.addItem');
+  return isEditing.value ? t('modal.saveTransaction') : t('modal.addTransaction');
+});
 
 const effectiveType = computed<'income' | 'expense'>(() =>
   direction.value === 'in' ? 'income' : 'expense'
@@ -139,11 +187,8 @@ function handleSave() {
   localStorage.setItem(LAST_ACCOUNT_KEY, accountId.value);
 
   try {
-    if (recurrenceMode.value === 'recurring' && !isEditing.value) {
-      const effectiveDayOfMonth =
-        recurrenceFrequency.value === 'yearly'
-          ? new Date(startDate.value).getDate()
-          : dayOfMonth.value;
+    // Editing an existing recurring item
+    if (isEditingRecurring.value) {
       const recurringData: CreateRecurringItemInput = {
         accountId: accountId.value,
         type: effectiveType.value,
@@ -152,8 +197,30 @@ function handleSave() {
         category: category.value,
         description: description.value.trim(),
         frequency: recurrenceFrequency.value as RecurringFrequency,
-        dayOfMonth: effectiveDayOfMonth,
-        startDate: startDate.value,
+        dayOfMonth: dayOfMonth.value,
+        monthOfYear: recurrenceFrequency.value === 'yearly' ? monthOfYear.value : undefined,
+        startDate: startDate.value || toDateInputValue(new Date()),
+        endDate: endDate.value || undefined,
+        isActive: isActive.value,
+        lastProcessedDate: props.recurringItem?.lastProcessedDate,
+      };
+      emit('save-recurring', recurringData);
+      return;
+    }
+
+    // Creating a new recurring item
+    if (recurrenceMode.value === 'recurring' && !isEditing.value) {
+      const recurringData: CreateRecurringItemInput = {
+        accountId: accountId.value,
+        type: effectiveType.value,
+        amount: amount.value!,
+        currency: currency.value,
+        category: category.value,
+        description: description.value.trim(),
+        frequency: recurrenceFrequency.value as RecurringFrequency,
+        dayOfMonth: dayOfMonth.value,
+        monthOfYear: recurrenceFrequency.value === 'yearly' ? monthOfYear.value : undefined,
+        startDate: startDate.value || toDateInputValue(new Date()),
         endDate: endDate.value || undefined,
         isActive: true,
       };
@@ -161,6 +228,7 @@ function handleSave() {
       return;
     }
 
+    // One-time transaction (create or edit)
     const data = {
       accountId: accountId.value,
       activityId: activityId.value || undefined,
@@ -184,7 +252,9 @@ function handleSave() {
 }
 
 function handleDelete() {
-  if (props.transaction) {
+  if (props.recurringItem) {
+    emit('delete', props.recurringItem.id);
+  } else if (props.transaction) {
     emit('delete', props.transaction.id);
   }
 }
@@ -194,8 +264,14 @@ function handleDelete() {
   <BeanieFormModal
     :open="open"
     :title="modalTitle"
-    :icon="direction === 'in' ? '💚' : '🧡'"
-    :icon-bg="direction === 'in' ? 'var(--tint-green-10)' : 'var(--tint-orange-8)'"
+    :icon="isEditingRecurring ? '🔄' : direction === 'in' ? '💚' : '🧡'"
+    :icon-bg="
+      isEditingRecurring
+        ? 'var(--tint-orange-8)'
+        : direction === 'in'
+          ? 'var(--tint-green-10)'
+          : 'var(--tint-orange-8)'
+    "
     :save-label="saveLabel"
     :save-disabled="!canSave"
     :is-submitting="isSubmitting"
@@ -302,8 +378,8 @@ function handleDelete() {
       <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
     </FormFieldGroup>
 
-    <!-- 6. Recurring / One-time toggle -->
-    <FormFieldGroup :label="t('modal.schedule')">
+    <!-- 6. Recurring / One-time toggle (hidden when editing a recurring item) -->
+    <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.schedule')">
       <TogglePillGroup
         v-model="recurrenceMode"
         :options="[
@@ -314,7 +390,7 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 7. Recurring details -->
-    <ConditionalSection :show="recurrenceMode === 'recurring'">
+    <ConditionalSection :show="recurrenceMode === 'recurring' || isEditingRecurring">
       <div class="space-y-4">
         <div class="flex items-end gap-4">
           <div class="min-w-0 flex-1">
@@ -355,18 +431,47 @@ function handleDelete() {
             </FormFieldGroup>
           </div>
         </div>
+        <!-- Month select (yearly only) -->
+        <FormFieldGroup v-if="recurrenceFrequency === 'yearly'" :label="t('form.month')">
+          <div class="relative">
+            <select
+              :value="String(monthOfYear)"
+              class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-[1rem] font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+              @change="monthOfYear = Number(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in monthOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+              <svg
+                class="h-4 w-4 text-[var(--color-text)] opacity-35"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
+          </div>
+        </FormFieldGroup>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <BaseInput v-model="startDate" :label="t('form.startDate')" type="date" required />
           <BaseInput v-model="endDate" :label="`${t('form.endDate')} (optional)`" type="date" />
         </div>
-        <FormFieldGroup :label="t('modal.linkToActivity')" optional>
+        <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.linkToActivity')" optional>
           <ActivityLinkDropdown v-model="activityId" />
         </FormFieldGroup>
       </div>
     </ConditionalSection>
 
     <!-- 8. Date (for one-time) -->
-    <ConditionalSection :show="recurrenceMode === 'one-time'">
+    <ConditionalSection :show="recurrenceMode === 'one-time' && !isEditingRecurring">
       <div class="space-y-4">
         <FormFieldGroup :label="t('form.date')">
           <BaseInput v-model="date" type="date" required />
@@ -376,5 +481,18 @@ function handleDelete() {
         </FormFieldGroup>
       </div>
     </ConditionalSection>
+
+    <!-- 9. Active toggle (recurring edit only) -->
+    <div
+      v-if="isEditingRecurring"
+      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+    >
+      <span
+        class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
+      >
+        {{ t('recurring.active') }}
+      </span>
+      <ToggleSwitch v-model="isActive" size="sm" />
+    </div>
   </BeanieFormModal>
 </template>
