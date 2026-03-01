@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import CategoryIcon from '@/components/common/CategoryIcon.vue';
-import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import BudgetSettingsModal from '@/components/budget/BudgetSettingsModal.vue';
 import QuickAddTransactionModal from '@/components/budget/QuickAddTransactionModal.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
+import ActivityItem from '@/components/dashboard/ActivityItem.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
@@ -15,10 +14,12 @@ import { confirm } from '@/composables/useConfirm';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { playWhoosh } from '@/composables/useSounds';
 import { CATEGORY_EMOJI_MAP } from '@/constants/categories';
+import { formatMonthYearShort } from '@/utils/date';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { CreateBudgetInput, UpdateBudgetInput, CreateTransactionInput } from '@/types/models';
+import type { CurrencyCode } from '@/types/models';
 
 const budgetStore = useBudgetStore();
 const transactionsStore = useTransactionsStore();
@@ -86,36 +87,37 @@ const paceMessageKey = computed(() => {
   }
 });
 
-// Mode display text
-const modeText = computed(() => {
-  const budget = budgetStore.activeBudget;
-  if (!budget) return '';
-  if (budget.mode === 'percentage') {
-    return `${budget.percentage}${t('budget.hero.percentageMode')}`;
-  }
-  return t('budget.hero.fixedMode');
+// Hero card — days tracking
+const daysInMonth = computed(() => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 });
+const currentDay = computed(() => new Date().getDate());
 
-// Category status colors
-function getCategoryStatusColor(status: string): string {
-  switch (status) {
-    case 'over':
-      return 'bg-orange-500';
-    case 'warning':
-      return 'bg-amber-400';
-    default:
-      return 'bg-emerald-500';
-  }
+// Percentage spent text
+const percentSpentText = computed(() => `${Math.round(budgetStore.budgetProgress)}%`);
+
+// Current month/year label for category header
+const currentMonthLabel = computed(() => formatMonthYearShort(new Date()));
+
+// Build subtitle for upcoming transaction rows
+function buildUpcomingSubtitle(tx: { daysUntil: number }): string {
+  let label: string;
+  if (tx.daysUntil === 0) label = t('budget.upcoming.today');
+  else if (tx.daysUntil === 1) label = t('budget.upcoming.tomorrow');
+  else label = t('budget.upcoming.inDays').replace('{days}', String(tx.daysUntil));
+  return `${label} · ${t('budget.upcoming.recurring')}`;
 }
 
-function getCategoryStatusBg(status: string): string {
+// Category progress bar gradient class by status
+function getCategoryBarClass(status: string): string {
   switch (status) {
     case 'over':
-      return 'bg-orange-50 dark:bg-orange-900/20';
+      return 'bg-[var(--heritage-orange)]';
     case 'warning':
-      return 'bg-amber-50 dark:bg-amber-900/20';
+      return 'bg-gradient-to-r from-[#F15D22] to-[#E67E22]';
     default:
-      return 'bg-emerald-50 dark:bg-emerald-900/20';
+      return 'bg-gradient-to-r from-[#27AE60] to-[#2ECC71]';
   }
 }
 
@@ -171,65 +173,114 @@ async function handleQuickAdd(data: CreateTransactionInput) {
     <template v-else>
       <!-- Hero Card -->
       <div
-        class="overflow-hidden rounded-[var(--sq)] bg-gradient-to-br from-[#2C3E50] to-[#34495E] p-6 text-white shadow-lg"
+        class="relative overflow-hidden rounded-[var(--sq)] bg-gradient-to-br from-[#2C3E50] to-[#3D5368] p-6 text-white shadow-lg"
         :class="syncHighlightClass(budgetStore.activeBudget.id)"
       >
-        <!-- Top row: spent vs budget -->
-        <div class="flex items-baseline justify-between">
-          <div>
-            <p class="text-xs font-medium tracking-wider text-slate-300 uppercase">
-              {{ t('budget.hero.spent') }}
-            </p>
-            <p class="font-outfit mt-1 text-3xl font-extrabold">{{ spentAmount }}</p>
-          </div>
-          <div class="text-right">
-            <p class="text-xs font-medium tracking-wider text-slate-300 uppercase">
-              {{ t('budget.hero.of') }}
-            </p>
-            <p class="font-outfit mt-1 text-xl font-bold text-slate-200">{{ budgetAmount }}</p>
-          </div>
-        </div>
+        <!-- Decorative radial glow -->
+        <div
+          class="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full"
+          style="background: radial-gradient(circle, rgb(241 93 34 / 10%) 0%, transparent 70%)"
+        />
 
-        <!-- Progress bar with time marker -->
-        <div class="relative mt-5">
-          <div class="h-3 overflow-hidden rounded-full bg-white/10">
-            <div
-              class="h-full rounded-full transition-all duration-700 ease-out"
-              :class="
-                isOverBudget
-                  ? 'bg-gradient-to-r from-orange-400 to-red-400'
-                  : 'bg-gradient-to-r from-[#F15D22] to-[#E67E22]'
-              "
-              :style="{ width: `${progressWidth}%` }"
-            />
-          </div>
-          <!-- Time position marker -->
-          <div class="absolute top-0 h-3" :style="{ left: `${budgetStore.monthTimeProgress}%` }">
-            <div class="h-full w-0.5 border-l-2 border-dashed border-white/40" />
-          </div>
-        </div>
+        <div class="relative flex flex-col gap-5 lg:flex-row lg:items-stretch">
+          <!-- Left content -->
+          <div class="min-w-0 flex-1">
+            <!-- Icon + label row -->
+            <div class="mb-3 flex items-center gap-3">
+              <div
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-[rgba(241,93,34,0.15)]"
+              >
+                <BeanieIcon name="target" size="md" class="text-[var(--heritage-orange)]" />
+              </div>
+              <div>
+                <p class="font-outfit text-[0.85rem] font-bold">
+                  {{ t('budget.hero.budgetProgress') }}
+                </p>
+                <p class="text-[0.7rem] text-white/50">
+                  {{ t('budget.hero.dayLabel') }} {{ currentDay }} {{ t('budget.hero.daysOf') }}
+                  {{ daysInMonth }}
+                </p>
+              </div>
+            </div>
 
-        <!-- Bottom row: remaining + motivational message -->
-        <div class="mt-3 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="text-lg">{{ paceEmoji }}</span>
-            <span class="text-sm text-slate-300">{{ t(paceMessageKey) }}</span>
+            <!-- Amount line: $3,760 / $5,032 -->
+            <div class="mb-2 flex items-baseline gap-1.5">
+              <span class="font-outfit text-[2.2rem] leading-none font-extrabold">
+                {{ spentAmount }}
+              </span>
+              <span class="font-outfit text-[1rem] font-medium text-white/35">
+                / {{ budgetAmount }}
+              </span>
+            </div>
+
+            <!-- Percentage + remaining -->
+            <div class="mb-4 flex items-center gap-1.5 text-[0.8rem]">
+              <span
+                class="bg-gradient-to-r from-[#F15D22] to-[#E67E22] bg-clip-text font-bold text-transparent"
+              >
+                {{ percentSpentText }} {{ t('budget.hero.percentSpent') }}
+              </span>
+              <span class="text-white/35">·</span>
+              <span :class="isOverBudget ? 'text-orange-300' : 'text-emerald-300'">
+                {{ remainingAmount }}
+                {{ isOverBudget ? t('budget.hero.over') : t('budget.hero.remaining') }}
+              </span>
+            </div>
+
+            <!-- Progress bar with fill marker + time marker -->
+            <div class="relative">
+              <div class="h-3.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  class="relative h-full rounded-full transition-all duration-700 ease-out"
+                  :class="
+                    isOverBudget
+                      ? 'bg-gradient-to-r from-orange-400 to-red-400'
+                      : 'bg-gradient-to-r from-[#F15D22] to-[#E67E22]'
+                  "
+                  :style="{ width: `${progressWidth}%` }"
+                >
+                  <!-- White fill marker at edge -->
+                  <div
+                    class="absolute top-1/2 right-0 h-[14px] w-[3px] -translate-y-1/2 rounded-full bg-white shadow-[0_0_6px_rgba(255,255,255,0.5)]"
+                  />
+                </div>
+              </div>
+              <!-- Time position marker -->
+              <div
+                class="absolute top-0 h-3.5"
+                :style="{ left: `${budgetStore.monthTimeProgress}%` }"
+              >
+                <div class="h-full w-0.5 bg-white/25" />
+              </div>
+            </div>
+
+            <!-- Scale labels -->
+            <div class="mt-1.5 flex items-center justify-between text-[0.6rem] text-white/30">
+              <span>
+                <template v-if="isUnlocked">
+                  {{ formatCurrencyWithCode(0, settingsStore.baseCurrency) }}
+                </template>
+                <template v-else>{{ MASK }}</template>
+              </span>
+              <span> ↑ {{ Math.round(budgetStore.monthTimeProgress) }}%</span>
+              <span>
+                <template v-if="isUnlocked">{{ budgetAmount }}</template>
+                <template v-else>{{ MASK }}</template>
+              </span>
+            </div>
           </div>
-          <div class="text-right">
-            <span class="text-sm" :class="isOverBudget ? 'text-orange-300' : 'text-emerald-300'">
+
+          <!-- Right motivational panel -->
+          <div
+            class="flex w-full flex-col items-center justify-center rounded-2xl bg-white/5 px-5 py-4 text-center lg:w-[200px]"
+          >
+            <span class="text-[2.5rem]">{{ paceEmoji }}</span>
+            <p class="font-outfit mt-2 text-[1.05rem] font-bold">{{ t(paceMessageKey) }}</p>
+            <p class="mt-1 text-[0.72rem] text-white/40">
               {{ remainingAmount }}
               {{ isOverBudget ? t('budget.hero.over') : t('budget.hero.remaining') }}
-            </span>
+            </p>
           </div>
-        </div>
-
-        <!-- Mode indicator -->
-        <div class="mt-2 text-right">
-          <span
-            class="rounded-full bg-white/10 px-2.5 py-0.5 text-[0.65rem] font-medium text-slate-300"
-          >
-            {{ modeText }}
-          </span>
         </div>
       </div>
 
@@ -249,7 +300,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               {{ formatCurrencyWithCode(budgetStore.recurringIncome, settingsStore.baseCurrency) }}
             </span>
             <span
-              class="rounded-full bg-sky-50 px-2 py-0.5 text-[0.6rem] font-medium text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
+              class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-medium text-slate-500 opacity-60 dark:bg-slate-700/40 dark:text-slate-400"
             >
               {{ t('budget.summary.oneTime') }}:
               {{ formatCurrencyWithCode(budgetStore.oneTimeIncome, settingsStore.baseCurrency) }}
@@ -273,7 +324,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               }}
             </span>
             <span
-              class="rounded-full bg-sky-50 px-2 py-0.5 text-[0.6rem] font-medium text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
+              class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.6rem] font-medium text-slate-500 opacity-60 dark:bg-slate-700/40 dark:text-slate-400"
             >
               {{ t('budget.summary.oneTime') }}:
               {{ formatCurrencyWithCode(budgetStore.oneTimeExpenses, settingsStore.baseCurrency) }}
@@ -285,16 +336,15 @@ async function handleQuickAdd(data: CreateTransactionInput) {
           :label="t('budget.summary.monthlySavings')"
           :amount="budgetStore.monthlySavings"
           :currency="settingsStore.baseCurrency"
-          tint="slate"
-          :dark="true"
+          tint="green"
         >
           <div v-if="isUnlocked && budgetStore.monthlyIncome > 0" class="mt-1">
             <span
-              class="rounded-full px-2 py-0.5 text-[0.6rem] font-semibold"
+              class="text-[0.6rem] font-semibold"
               :class="
                 budgetStore.savingsRate >= 0
-                  ? 'bg-emerald-400/20 text-emerald-300'
-                  : 'bg-orange-400/20 text-orange-300'
+                  ? 'text-[#27AE60] dark:text-emerald-400'
+                  : 'text-[var(--heritage-orange)]'
               "
             >
               {{ budgetStore.savingsRate }}% {{ t('budget.summary.savingsRate') }}
@@ -324,52 +374,31 @@ async function handleQuickAdd(data: CreateTransactionInput) {
           >
             {{ t('budget.empty.title') }}
           </div>
-          <div v-else class="space-y-3">
-            <div
+          <div v-else>
+            <ActivityItem
               v-for="tx in budgetStore.upcomingTransactions"
               :key="tx.id"
-              class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2.5 dark:bg-slate-700/30"
-            >
-              <div class="flex items-center gap-3">
-                <CategoryIcon :category="tx.category" size="sm" />
-                <div>
-                  <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ tx.description }}
-                  </p>
-                  <p class="text-xs text-slate-400 dark:text-slate-500">
-                    {{
-                      tx.daysUntil === 0
-                        ? 'Today'
-                        : tx.daysUntil === 1
-                          ? 'Tomorrow'
-                          : `In ${tx.daysUntil} days`
-                    }}
-                  </p>
-                </div>
-              </div>
-              <span
-                class="font-outfit text-sm font-semibold"
-                :class="
-                  tx.type === 'income'
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : 'text-slate-700 dark:text-slate-200'
-                "
-              >
-                <template v-if="isUnlocked">
-                  {{ tx.type === 'income' ? '+' : '-' }}
-                  <CurrencyAmount :amount="tx.amount" :currency="tx.currency" />
-                </template>
-                <template v-else>{{ MASK }}</template>
-              </span>
-            </div>
+              :icon="CATEGORY_EMOJI_MAP[tx.category] || '💰'"
+              :icon-tint="tx.type === 'income' ? 'green' : 'orange'"
+              :name="tx.description"
+              :subtitle="buildUpcomingSubtitle(tx)"
+              :amount="tx.amount"
+              :currency="tx.currency as CurrencyCode"
+              :type="tx.type === 'income' ? 'income' : 'expense'"
+            />
           </div>
         </div>
 
         <!-- Spending by Category -->
         <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <span class="nook-section-label text-secondary-500 mb-4 block dark:text-gray-400">
-            {{ t('budget.section.spendingByCategory') }}
-          </span>
+          <div class="mb-4 flex items-center justify-between">
+            <span class="nook-section-label text-secondary-500 dark:text-gray-400">
+              {{ t('budget.section.spendingByCategory') }}
+            </span>
+            <span class="text-[0.7rem] font-medium text-slate-400 dark:text-slate-500">
+              {{ currentMonthLabel }}
+            </span>
+          </div>
           <div
             v-if="budgetStore.categoryBudgetStatus.length === 0"
             class="py-6 text-center text-sm text-slate-400 dark:text-slate-500"
@@ -380,8 +409,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
             <div
               v-for="cat in budgetStore.categoryBudgetStatus"
               :key="cat.categoryId"
-              class="rounded-lg px-3 py-2.5"
-              :class="getCategoryStatusBg(cat.status)"
+              class="rounded-[14px] px-3 py-2.5"
             >
               <div class="mb-1.5 flex items-center justify-between">
                 <div class="flex items-center gap-2">
@@ -404,23 +432,19 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 </div>
               </div>
               <!-- Progress bar -->
-              <div class="h-1.5 overflow-hidden rounded-full bg-white/60 dark:bg-slate-600/40">
+              <div class="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-600/40">
                 <div
                   class="h-full rounded-full transition-all duration-500"
-                  :class="getCategoryStatusColor(cat.status)"
+                  :class="getCategoryBarClass(cat.status)"
                   :style="{ width: `${Math.min(100, cat.percentUsed)}%` }"
                 />
               </div>
-              <div class="mt-1 text-right">
-                <span
-                  class="text-[0.6rem] font-semibold uppercase"
-                  :class="{
-                    'text-emerald-600 dark:text-emerald-400': cat.status === 'ok',
-                    'text-amber-600 dark:text-amber-400': cat.status === 'warning',
-                    'text-orange-600 dark:text-orange-400': cat.status === 'over',
-                  }"
-                >
-                  {{ cat.percentUsed }}%
+              <!-- Over-budget message (only for over status) -->
+              <div v-if="cat.status === 'over' && isUnlocked" class="mt-1">
+                <span class="text-[0.6rem] font-medium text-[var(--heritage-orange)]">
+                  {{ formatCurrencyWithCode(cat.spent - cat.budgeted, settingsStore.baseCurrency) }}
+                  {{ t('budget.category.overAmount') }} ·
+                  {{ t('budget.category.overEncouragement') }} 💪
                 </span>
               </div>
             </div>
@@ -561,34 +585,57 @@ async function handleQuickAdd(data: CreateTransactionInput) {
 
         <!-- Add Transactions -->
         <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <span class="nook-section-label text-secondary-500 mb-4 block dark:text-gray-400">
+          <span class="nook-section-label text-secondary-500 block dark:text-gray-400">
             {{ t('budget.section.addTransactions') }}
           </span>
+          <p class="mt-1 mb-4 text-[0.7rem] text-slate-400 dark:text-slate-500">
+            {{ t('budget.addTransactions.subtitle') }}
+          </p>
           <div class="space-y-3">
             <!-- Quick Add (functional) -->
             <button
-              class="flex w-full items-center gap-3 rounded-lg bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-4 py-3 text-left text-white shadow-sm transition-transform hover:scale-[1.01] active:scale-[0.99]"
+              class="flex w-full items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 text-left transition-colors hover:bg-slate-100 dark:bg-slate-700/30 dark:hover:bg-slate-700/50"
               @click="showQuickAddModal = true"
             >
-              <span class="text-xl">⚡</span>
-              <div>
-                <p class="text-sm font-semibold">{{ t('budget.quickAdd.title') }}</p>
-                <p class="text-xs opacity-80">{{ t('budget.quickAdd.description') }}</p>
+              <div
+                class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-r from-[#F15D22] to-[#E67E22]"
+              >
+                <BeanieIcon name="plus" size="sm" class="text-white" />
               </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-[0.8rem] font-semibold text-slate-700 dark:text-slate-200">
+                  {{ t('budget.quickAdd.title') }}
+                </p>
+                <p class="text-[0.65rem] text-slate-400 dark:text-slate-500">
+                  {{ t('budget.quickAdd.subtitle') }}
+                </p>
+              </div>
+              <BeanieIcon
+                name="chevron-right"
+                size="sm"
+                class="flex-shrink-0 text-slate-300 dark:text-slate-600"
+              />
             </button>
 
             <!-- Batch Add (coming soon) -->
             <div
-              class="relative flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 opacity-60 dark:bg-slate-700/30"
+              class="relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60 dark:bg-slate-700/30"
             >
-              <span class="text-xl">📋</span>
-              <div>
-                <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+              <div
+                class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--tint-silk-10)]"
+              >
+                <span class="text-[0.9rem]">📋</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-[0.8rem] font-semibold text-slate-600 dark:text-slate-300">
                   {{ t('budget.batchAdd.title') }}
+                </p>
+                <p class="text-[0.65rem] text-slate-400 dark:text-slate-500">
+                  {{ t('budget.batchAdd.subtitle') }}
                 </p>
               </div>
               <span
-                class="ml-auto rounded-full bg-sky-100 px-2 py-0.5 text-[0.6rem] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                class="ml-auto flex-shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[0.6rem] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
               >
                 {{ t('budget.comingSoon') }}
               </span>
@@ -596,16 +643,23 @@ async function handleQuickAdd(data: CreateTransactionInput) {
 
             <!-- CSV Upload (coming soon) -->
             <div
-              class="relative flex items-center gap-3 rounded-lg bg-slate-50 px-4 py-3 opacity-60 dark:bg-slate-700/30"
+              class="relative flex items-center gap-3.5 rounded-[14px] bg-[var(--tint-slate-5)] p-3.5 opacity-60 dark:bg-slate-700/30"
             >
-              <span class="text-xl">📄</span>
-              <div>
-                <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">
+              <div
+                class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--tint-slate-5)]"
+              >
+                <span class="text-[0.9rem]">📄</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-[0.8rem] font-semibold text-slate-600 dark:text-slate-300">
                   {{ t('budget.csvUpload.title') }}
+                </p>
+                <p class="text-[0.65rem] text-slate-400 dark:text-slate-500">
+                  {{ t('budget.csvUpload.subtitle') }}
                 </p>
               </div>
               <span
-                class="ml-auto rounded-full bg-sky-100 px-2 py-0.5 text-[0.6rem] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
+                class="ml-auto flex-shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[0.6rem] font-semibold text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
               >
                 {{ t('budget.comingSoon') }}
               </span>

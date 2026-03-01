@@ -691,6 +691,20 @@ const STRING_DEFS = {
   'transactions.descriptionPlaceholder': {
     en: 'e.g., Grocery shopping',
   },
+  'transactions.filterAll': { en: 'All', beanie: 'All Beans' },
+  'transactions.filterRecurring': { en: 'Recurring', beanie: 'Recurring' },
+  'transactions.filterOneTime': { en: 'One-time', beanie: 'One-off' },
+  'transactions.searchPlaceholder': {
+    en: 'Search transactions...',
+    beanie: 'Find a bean...',
+  },
+  'transactions.recurringCount': { en: 'Recurring', beanie: 'Recurring' },
+  'transactions.oneTimeCount': { en: 'One-time', beanie: 'One-off' },
+  'transactions.typeRecurring': { en: 'recurring', beanie: 'recurring' },
+  'transactions.typeOneTime': { en: 'one-time', beanie: 'one-off' },
+  'transactions.transactionCount': { en: 'transactions', beanie: 'beans' },
+  'transactions.pageTitle': { en: 'All Transactions', beanie: 'All Beans' },
+  'transactions.dayOfMonth': { en: 'Day of month', beanie: 'Day of month' },
 
   // Reports (additional)
   'reports.next3Months': { en: 'Next 3 Months' },
@@ -1612,6 +1626,32 @@ const STRING_DEFS = {
   'budget.category.warning': { en: 'Watch it' },
   'budget.category.over': { en: 'Over' },
   'budget.category.noBudget': { en: 'No limit set' },
+  'budget.category.overAmount': { en: 'over', beanie: 'over' },
+  'budget.category.overEncouragement': {
+    en: 'just a little more to go',
+    beanie: 'keep those beans tight',
+  },
+
+  // Hero card v7
+  'budget.hero.budgetProgress': { en: 'Budget Progress', beanie: 'Bean Progress' },
+  'budget.hero.dayLabel': { en: 'Day' },
+  'budget.hero.daysOf': { en: 'of' },
+  'budget.hero.percentSpent': { en: 'spent' },
+
+  // Add Transactions
+  'budget.addTransactions.subtitle': {
+    en: 'One-time or recurring — add them your way',
+    beanie: 'Plant beans one at a time or in bunches',
+  },
+  'budget.quickAdd.subtitle': { en: 'Add an expense or income instantly' },
+  'budget.batchAdd.subtitle': { en: 'Add multiple transactions at once' },
+  'budget.csvUpload.subtitle': { en: 'Import from your bank statement' },
+
+  // Upcoming transactions
+  'budget.upcoming.today': { en: 'Today' },
+  'budget.upcoming.tomorrow': { en: 'Tomorrow' },
+  'budget.upcoming.inDays': { en: 'In {days} days' },
+  'budget.upcoming.recurring': { en: 'recurring' },
 } satisfies Record<string, StringEntry>;
 
 /**
