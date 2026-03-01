@@ -280,7 +280,7 @@ Pending (v7 — New Pages & Navigation):
 - [ ] Family Nook 🏡 homepage (#97)
 - [ ] Family Planner 📅 calendar hub (#98)
 - [ ] Family To-Do ✅ task management (#99)
-- [ ] Mobile bottom tab bar: 5-tab layout (#101)
+- [x] Mobile bottom tab bar: 5-tab layout (#101)
 
 Pending (Future Phases):
 

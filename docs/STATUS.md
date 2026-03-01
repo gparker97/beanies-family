@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-01
-> **Updated by:** Claude (Text casing standardization)
+> **Updated by:** Claude (Mobile bottom tab bar 5-tab layout #101)
 
 ## Current Phase
 
@@ -337,12 +337,12 @@
 ### Mobile Responsive Layout (Issue #63)
 
 - **`src/composables/useBreakpoint.ts`** — Reactive `isMobile` / `isTablet` / `isDesktop` refs using `matchMedia` with singleton listeners, SSR-safe defaults
-- **`src/components/common/MobileBottomNav.vue`** — Fixed bottom tab bar (4 tabs: Nook, Accounts, Goals, Pod) with safe area insets, Heritage Orange active state, dark mode support
+- **`src/components/common/MobileBottomNav.vue`** — Fixed bottom tab bar (5 tabs: Nook, Planner, Piggy Bank, Budget, Pod) with safe area insets, Heritage Orange 8% background pill active state, nested route matching, dark mode support
 - **`src/components/common/MobileHamburgerMenu.vue`** — Full-screen slide-in overlay from left with Deep Slate background, brand logo, controls section (member filter, privacy toggle, language selector, currency chips), all 9 nav items, user profile card, security indicators footer. Closes on backdrop click, Escape key, and route change
 - **`src/components/common/AppHeader.vue`** — Mobile: hamburger button + greeting/page title + notification bell. Desktop: unchanged (all controls preserved)
 - **`src/App.vue`** — Sidebar hidden on mobile (`v-if="isDesktop"`), bottom nav shown on mobile, hamburger menu wired up, reduced mobile padding (`p-4 md:p-6`), bottom padding clearance (`pb-24`)
 - **`src/components/ui/BaseModal.vue`** — `fullscreenMobile` prop: removes rounded corners and max-width on mobile viewports
-- **`src/constants/navigation.ts`** — `MobileTabDef` interface and `MOBILE_TAB_ITEMS` constant (4 tabs)
+- **`src/constants/navigation.ts`** — `MobileTabDef` interface and `MOBILE_TAB_ITEMS` constant (5 tabs: Nook, Planner, Piggy Bank, Budget, Pod)
 - **`src/services/translation/uiStrings.ts`** — 7 new i18n keys: `mobile.nook`, `mobile.pod`, `mobile.menu`, `mobile.closeMenu`, `mobile.navigation`, `mobile.controls`, `mobile.viewingAll`
 - **Responsive page pass** — Fixed hardcoded grid/width classes across 5 pages:
   - TransactionsPage: `grid-cols-2` → `grid-cols-1 md:grid-cols-2` (2 form modals)
@@ -679,7 +679,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | #98   | Family Planner 📅: calendar and scheduling hub                  | High     |
 | #99   | Family To-Do ✅: standalone task management page                | High     | ✅ Done |
 | #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     | ✅ Done |
-| #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   |
+| #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   | ✅ Done |
 
 ### Existing Issues Updated
 
@@ -720,62 +720,63 @@ _(None currently tracked)_
 
 ## Decision Log
 
-| Date       | Decision                                                   | Rationale                                                                                                                                               |
-| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-02-17 | Created docs/STATUS.md for project tracking                | Multiple contributors need shared context                                                                                                               |
-| 2026-02-17 | Added ARCHITECTURE.md and 8 ADR documents                  | Document key decisions for contributor onboarding                                                                                                       |
-| Prior      | Switched from idb library to native IndexedDB APIs         | Reduce dependencies                                                                                                                                     |
-| Prior      | Chose File System Access API over Google Drive for sync    | Simpler implementation, no OAuth needed, user controls file location                                                                                    |
-| Prior      | Used AES-GCM + PBKDF2 for encryption                       | Industry standard, no external dependencies (Web Crypto API)                                                                                            |
-| Prior      | Stored amounts in original currency, convert on display    | No data loss from premature conversion, flexible display                                                                                                |
-| Prior      | Recurring items as templates, not transactions             | Clean separation, catch-up processing, easy to preview                                                                                                  |
-| Prior      | MyMemory API for translations                              | Free, CORS-enabled, no API key required                                                                                                                 |
-| 2026-02-17 | Per-family databases instead of familyId on all models     | No repository code changes, no schema migration, clean tenant isolation                                                                                 |
-| 2026-02-17 | Global settings (theme, language, rates) in registry DB    | Device-level preferences survive family switching                                                                                                       |
-| 2026-02-22 | File-based auth replaces Cognito (ADR-014)                 | PBKDF2 password hashes in data file; true local-first, ~165KB bundle reduction, no cloud auth infrastructure                                            |
-| 2026-02-18 | File-first architecture: encrypted file as source of truth | Security value proposition, user data control, IndexedDB is ephemeral                                                                                   |
-| 2026-02-18 | Encryption enabled by default for new data files           | Secure by default; upgraded to mandatory (no opt-out) on 2026-02-22                                                                                     |
-| 2026-02-18 | Auto-sync always on (no toggle)                            | Simplifies UX, data file always stays current                                                                                                           |
-| 2026-02-19 | Rebranded to beanies.family (Issue #22)                    | Heritage Orange + Deep Slate palette, Outfit + Inter fonts, squircles                                                                                   |
-| 2026-02-20 | Centralized icon system (Issue #44)                        | Single source of truth for ~72 icons, brand-enforced stroke style                                                                                       |
-| 2026-02-20 | Web Audio API for sound effects (Issue #46)                | Zero bundle size, no audio files, sub-ms latency, browser-native                                                                                        |
-| 2026-02-20 | Beanie UI overhaul complete (Issue #40)                    | All 13 sections done: icons, animations, sounds, empty states, 404, etc                                                                                 |
-| 2026-02-20 | Beanie character avatars (Issue #39)                       | Inline SVG avatars by gender/age, children wear beanie hats, replaces initial circles                                                                   |
-| 2026-02-20 | Collapsible completed goals section (Issue #55)            | Disclosure pattern over tabs — completed goals are secondary archive                                                                                    |
-| 2026-02-20 | Financial institution dropdown (Issue #42)                 | Searchable combobox with custom entry persistence, deferred save                                                                                        |
-| 2026-02-21 | Sidebar redesign — Deep Slate + emoji nav (Issue #59)      | Permanent dark sidebar, emoji icons, nav extracted to shared constant for mobile reuse                                                                  |
-| 2026-02-21 | v4 UI framework proposal uploaded                          | New screens: Budget (#68), Login UI (#69), Landing (#72). Redesigns: Accounts (#70), Transactions (#71), Family Hub (#73)                               |
-| 2026-02-22 | v5 UI framework proposal uploaded, v3 removed              | v5 adds split login flow (Welcome Gate, Sign In, Create Pod, Join Pod) + updated onboarding. v3 deleted as obsolete                                     |
-| 2026-02-22 | v6 UI framework proposal uploaded                          | v6 adds detailed login screens (Load Pod, Unlock Pod, Pick Bean) for file-based auth. Encryption mandatory, no skip                                     |
-| 2026-02-22 | Encryption made mandatory for all data files               | No option to skip encryption during setup or disable it in settings. All `.beanpod` files are always AES-256 encrypted                                  |
-| 2026-02-21 | Header redesign — seamless icon-only controls (#67)        | Page titles in header (not in views), no border/bg, squircle icon-only controls, notification bell, avatar-only profile                                 |
-| 2026-02-21 | Net worth chart via transaction replay (#66)               | Option A (replay backwards from current balances) chosen over snapshot approach for MVP simplicity                                                      |
-| 2026-02-21 | PNG brand avatars replace inline SVGs (#65)                | Hand-crafted PNGs are more expressive; member differentiation via colored ring + pastel background                                                      |
-| 2026-02-22 | Configurable currency chips in header (#36)                | Inline chips for instant switching; max 4 preferred currencies persisted in settings                                                                    |
-| 2026-02-22 | SVG flag images instead of emoji flags (#38)               | Emoji flags don't render on Windows; SVGs ensure cross-platform visibility                                                                              |
-| 2026-02-22 | Full i18n string extraction                                | All ~200 hardcoded UI strings moved to uiStrings.ts; project rule: no hardcoded text in templates                                                       |
-| 2026-02-22 | Plans archive in docs/plans/                               | Accepted plans saved before implementation for historical reference and future context                                                                  |
-| 2026-02-22 | Performance reference document                             | Client-side resource boundaries, growth projections, and mitigation strategies documented                                                               |
-| 2026-02-22 | Mobile responsive layout (#63)                             | Hamburger menu + 4-tab bottom nav + breakpoint composable; sidebar hidden on mobile; responsive page grids                                              |
-| 2026-02-22 | AWS infrastructure via Terraform (#8-#11)                  | S3/CloudFront/ACM/Route53 for hosting, modular IaC with remote state                                                                                    |
-| 2026-02-22 | CI/CD pipeline with E2E gating (#11)                       | GitHub Actions: lint + type-check + unit tests + Playwright E2E must pass before deploy to production                                                   |
-| 2026-02-22 | Site deployed to beanies.family                            | Production build, S3 sync, CloudFront CDN, HTTPS via ACM                                                                                                |
-| 2026-02-22 | Trusted device mode (#74)                                  | Persistent IndexedDB cache across sign-outs for instant returning user access; explicit "Sign out & clear data" option                                  |
-| 2026-02-22 | Post-sign-in redirect checks onboarding status             | New users redirected to /setup instead of /dashboard; direct DB read after sign-in for reliability                                                      |
-| 2026-02-22 | Login page UI redesign per v6 wireframes (#69)             | 5-view flow (welcome/load-pod/pick-bean/create/join), legacy SetupPage removed, /welcome dedicated route                                                |
-| 2026-02-23 | Encryption pipeline security hardening (#84)               | 7 bugs fixed: defense-in-depth guards prevent plaintext writes when encryption is enabled                                                               |
-| 2026-02-24 | PWA functionality complete (#6)                            | Offline banner, install prompt (30s delay, 7-day dismiss), SW update prompt, manifest completion, meta tags                                             |
-| 2026-02-24 | SW registerType changed to `prompt`                        | User-controlled updates instead of silent auto-update; hourly background check for new versions                                                         |
-| 2026-02-24 | Automated translation pipeline                             | Fixed broken translation script (STRING_DEFS parser), added --all multi-lang support, stale key cleanup, daily GitHub Actions workflow with auto-deploy |
-| 2026-02-24 | Playwright browser caching in CI                           | Cache `~/.cache/ms-playwright` keyed on browser + version; saves ~8 min per E2E job (chromium download)                                                 |
-| 2026-02-24 | Mobile privacy toggle in header                            | Show/hide figures icon always visible on mobile/tablet (not buried in hamburger menu) for better UX                                                     |
-| 2026-02-24 | Issue #16 updated: unified passkey login + data unlock     | Single biometric gesture replaces both member password and encryption password; password fallback preserved                                             |
-| 2026-02-24 | Issue #16 implemented: passkey/biometric login             | PRF + cached password dual-path, BiometricLoginView, PasskeyPromptModal, PasskeySettings rewrite, registry DB v3 with passkeys store (ADR-015)          |
-| 2026-02-26 | Cross-device sync via file polling (#103)                  | 10s file polling + visibility-change reload + force save on hidden; near-instant relay planned as #104                                                  |
-| 2026-02-26 | Cloud relay plan created (#104)                            | AWS API Gateway WebSocket + Lambda + DynamoDB for near-instant cross-device notifications; plan at `docs/plans/2026-02-26-cloud-relay-sync.md`          |
-| 2026-02-27 | Fix cross-device passkey authentication                    | Synced passkeys (iCloud/Google/Windows) auto-register locally using cached password; no more "registered on another device" error (ADR-015 updated)     |
-| 2026-02-28 | Reverted Prettier reformatting of brand HTML files         | Commit 46e33c0 accidentally reformatted 6 docs/brand HTML files (60k+ lines). Reverted and added `docs/brand` to `.prettierignore`                      |
-| 2026-02-28 | Fixed beanie-avatars E2E test for redesigned modal         | Test referenced old test IDs from pre-modal-redesign; updated to use role chips, "More Details" toggle, placeholder input                               |
-| 2026-02-28 | Merged rollup security bump (4.57.1 → 4.59.0)              | Dependabot PR #102; minor version bump with security label, no breaking changes                                                                         |
-| 2026-02-28 | Strengthened DRY principle in CLAUDE.md                    | Expanded code conventions with explicit rules for shared components, helper functions, constants, and duplicate elimination                             |
-| 2026-03-01 | Text casing standardization                                | All non-sentence UI text lowercase in uiStrings.ts; AppHeader fixed to use titleKey; duplicate page h1s removed; casing rules documented                |
+| Date       | Decision                                                   | Rationale                                                                                                                                                     |
+| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-02-17 | Created docs/STATUS.md for project tracking                | Multiple contributors need shared context                                                                                                                     |
+| 2026-02-17 | Added ARCHITECTURE.md and 8 ADR documents                  | Document key decisions for contributor onboarding                                                                                                             |
+| Prior      | Switched from idb library to native IndexedDB APIs         | Reduce dependencies                                                                                                                                           |
+| Prior      | Chose File System Access API over Google Drive for sync    | Simpler implementation, no OAuth needed, user controls file location                                                                                          |
+| Prior      | Used AES-GCM + PBKDF2 for encryption                       | Industry standard, no external dependencies (Web Crypto API)                                                                                                  |
+| Prior      | Stored amounts in original currency, convert on display    | No data loss from premature conversion, flexible display                                                                                                      |
+| Prior      | Recurring items as templates, not transactions             | Clean separation, catch-up processing, easy to preview                                                                                                        |
+| Prior      | MyMemory API for translations                              | Free, CORS-enabled, no API key required                                                                                                                       |
+| 2026-02-17 | Per-family databases instead of familyId on all models     | No repository code changes, no schema migration, clean tenant isolation                                                                                       |
+| 2026-02-17 | Global settings (theme, language, rates) in registry DB    | Device-level preferences survive family switching                                                                                                             |
+| 2026-02-22 | File-based auth replaces Cognito (ADR-014)                 | PBKDF2 password hashes in data file; true local-first, ~165KB bundle reduction, no cloud auth infrastructure                                                  |
+| 2026-02-18 | File-first architecture: encrypted file as source of truth | Security value proposition, user data control, IndexedDB is ephemeral                                                                                         |
+| 2026-02-18 | Encryption enabled by default for new data files           | Secure by default; upgraded to mandatory (no opt-out) on 2026-02-22                                                                                           |
+| 2026-02-18 | Auto-sync always on (no toggle)                            | Simplifies UX, data file always stays current                                                                                                                 |
+| 2026-02-19 | Rebranded to beanies.family (Issue #22)                    | Heritage Orange + Deep Slate palette, Outfit + Inter fonts, squircles                                                                                         |
+| 2026-02-20 | Centralized icon system (Issue #44)                        | Single source of truth for ~72 icons, brand-enforced stroke style                                                                                             |
+| 2026-02-20 | Web Audio API for sound effects (Issue #46)                | Zero bundle size, no audio files, sub-ms latency, browser-native                                                                                              |
+| 2026-02-20 | Beanie UI overhaul complete (Issue #40)                    | All 13 sections done: icons, animations, sounds, empty states, 404, etc                                                                                       |
+| 2026-02-20 | Beanie character avatars (Issue #39)                       | Inline SVG avatars by gender/age, children wear beanie hats, replaces initial circles                                                                         |
+| 2026-02-20 | Collapsible completed goals section (Issue #55)            | Disclosure pattern over tabs — completed goals are secondary archive                                                                                          |
+| 2026-02-20 | Financial institution dropdown (Issue #42)                 | Searchable combobox with custom entry persistence, deferred save                                                                                              |
+| 2026-02-21 | Sidebar redesign — Deep Slate + emoji nav (Issue #59)      | Permanent dark sidebar, emoji icons, nav extracted to shared constant for mobile reuse                                                                        |
+| 2026-02-21 | v4 UI framework proposal uploaded                          | New screens: Budget (#68), Login UI (#69), Landing (#72). Redesigns: Accounts (#70), Transactions (#71), Family Hub (#73)                                     |
+| 2026-02-22 | v5 UI framework proposal uploaded, v3 removed              | v5 adds split login flow (Welcome Gate, Sign In, Create Pod, Join Pod) + updated onboarding. v3 deleted as obsolete                                           |
+| 2026-02-22 | v6 UI framework proposal uploaded                          | v6 adds detailed login screens (Load Pod, Unlock Pod, Pick Bean) for file-based auth. Encryption mandatory, no skip                                           |
+| 2026-02-22 | Encryption made mandatory for all data files               | No option to skip encryption during setup or disable it in settings. All `.beanpod` files are always AES-256 encrypted                                        |
+| 2026-02-21 | Header redesign — seamless icon-only controls (#67)        | Page titles in header (not in views), no border/bg, squircle icon-only controls, notification bell, avatar-only profile                                       |
+| 2026-02-21 | Net worth chart via transaction replay (#66)               | Option A (replay backwards from current balances) chosen over snapshot approach for MVP simplicity                                                            |
+| 2026-02-21 | PNG brand avatars replace inline SVGs (#65)                | Hand-crafted PNGs are more expressive; member differentiation via colored ring + pastel background                                                            |
+| 2026-02-22 | Configurable currency chips in header (#36)                | Inline chips for instant switching; max 4 preferred currencies persisted in settings                                                                          |
+| 2026-02-22 | SVG flag images instead of emoji flags (#38)               | Emoji flags don't render on Windows; SVGs ensure cross-platform visibility                                                                                    |
+| 2026-02-22 | Full i18n string extraction                                | All ~200 hardcoded UI strings moved to uiStrings.ts; project rule: no hardcoded text in templates                                                             |
+| 2026-02-22 | Plans archive in docs/plans/                               | Accepted plans saved before implementation for historical reference and future context                                                                        |
+| 2026-02-22 | Performance reference document                             | Client-side resource boundaries, growth projections, and mitigation strategies documented                                                                     |
+| 2026-02-22 | Mobile responsive layout (#63)                             | Hamburger menu + 4-tab bottom nav + breakpoint composable; sidebar hidden on mobile; responsive page grids                                                    |
+| 2026-02-22 | AWS infrastructure via Terraform (#8-#11)                  | S3/CloudFront/ACM/Route53 for hosting, modular IaC with remote state                                                                                          |
+| 2026-02-22 | CI/CD pipeline with E2E gating (#11)                       | GitHub Actions: lint + type-check + unit tests + Playwright E2E must pass before deploy to production                                                         |
+| 2026-02-22 | Site deployed to beanies.family                            | Production build, S3 sync, CloudFront CDN, HTTPS via ACM                                                                                                      |
+| 2026-02-22 | Trusted device mode (#74)                                  | Persistent IndexedDB cache across sign-outs for instant returning user access; explicit "Sign out & clear data" option                                        |
+| 2026-02-22 | Post-sign-in redirect checks onboarding status             | New users redirected to /setup instead of /dashboard; direct DB read after sign-in for reliability                                                            |
+| 2026-02-22 | Login page UI redesign per v6 wireframes (#69)             | 5-view flow (welcome/load-pod/pick-bean/create/join), legacy SetupPage removed, /welcome dedicated route                                                      |
+| 2026-02-23 | Encryption pipeline security hardening (#84)               | 7 bugs fixed: defense-in-depth guards prevent plaintext writes when encryption is enabled                                                                     |
+| 2026-02-24 | PWA functionality complete (#6)                            | Offline banner, install prompt (30s delay, 7-day dismiss), SW update prompt, manifest completion, meta tags                                                   |
+| 2026-02-24 | SW registerType changed to `prompt`                        | User-controlled updates instead of silent auto-update; hourly background check for new versions                                                               |
+| 2026-02-24 | Automated translation pipeline                             | Fixed broken translation script (STRING_DEFS parser), added --all multi-lang support, stale key cleanup, daily GitHub Actions workflow with auto-deploy       |
+| 2026-02-24 | Playwright browser caching in CI                           | Cache `~/.cache/ms-playwright` keyed on browser + version; saves ~8 min per E2E job (chromium download)                                                       |
+| 2026-02-24 | Mobile privacy toggle in header                            | Show/hide figures icon always visible on mobile/tablet (not buried in hamburger menu) for better UX                                                           |
+| 2026-02-24 | Issue #16 updated: unified passkey login + data unlock     | Single biometric gesture replaces both member password and encryption password; password fallback preserved                                                   |
+| 2026-02-24 | Issue #16 implemented: passkey/biometric login             | PRF + cached password dual-path, BiometricLoginView, PasskeyPromptModal, PasskeySettings rewrite, registry DB v3 with passkeys store (ADR-015)                |
+| 2026-02-26 | Cross-device sync via file polling (#103)                  | 10s file polling + visibility-change reload + force save on hidden; near-instant relay planned as #104                                                        |
+| 2026-02-26 | Cloud relay plan created (#104)                            | AWS API Gateway WebSocket + Lambda + DynamoDB for near-instant cross-device notifications; plan at `docs/plans/2026-02-26-cloud-relay-sync.md`                |
+| 2026-02-27 | Fix cross-device passkey authentication                    | Synced passkeys (iCloud/Google/Windows) auto-register locally using cached password; no more "registered on another device" error (ADR-015 updated)           |
+| 2026-02-28 | Reverted Prettier reformatting of brand HTML files         | Commit 46e33c0 accidentally reformatted 6 docs/brand HTML files (60k+ lines). Reverted and added `docs/brand` to `.prettierignore`                            |
+| 2026-02-28 | Fixed beanie-avatars E2E test for redesigned modal         | Test referenced old test IDs from pre-modal-redesign; updated to use role chips, "More Details" toggle, placeholder input                                     |
+| 2026-02-28 | Merged rollup security bump (4.57.1 → 4.59.0)              | Dependabot PR #102; minor version bump with security label, no breaking changes                                                                               |
+| 2026-02-28 | Strengthened DRY principle in CLAUDE.md                    | Expanded code conventions with explicit rules for shared components, helper functions, constants, and duplicate elimination                                   |
+| 2026-03-01 | Text casing standardization                                | All non-sentence UI text lowercase in uiStrings.ts; AppHeader fixed to use titleKey; duplicate page h1s removed; casing rules documented                      |
+| 2026-03-01 | Mobile bottom tab bar: 5-tab layout (#101)                 | 5 tabs (Nook/Planner/Piggy Bank/Budget/Pod), Heritage Orange 8% pill active state, v7 hamburger button (3-div design), nested route matching, 3 new i18n keys |
