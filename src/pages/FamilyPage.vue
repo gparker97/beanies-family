@@ -40,9 +40,13 @@ const inviteCopiedLink = ref(false);
 const inviteCode = computed(() => familyContextStore.activeFamilyId ?? '');
 const inviteLink = computed(() => {
   const fam = inviteCode.value;
-  const p = 'local';
+  const p = syncStore.storageProviderType ?? 'local';
   const ref = syncStore.fileName ? btoa(syncStore.fileName) : '';
-  return `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${ref}`;
+  let url = `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${ref}`;
+  if (p === 'google_drive' && syncStore.driveFileId) {
+    url += `&fileId=${encodeURIComponent(syncStore.driveFileId)}`;
+  }
+  return url;
 });
 
 function openInviteModal() {
@@ -394,7 +398,11 @@ function cancelEditFamilyName() {
             </svg>
           </div>
           <p class="text-sm text-amber-800 dark:text-amber-200">
-            {{ t('join.shareFileNote') }}
+            {{
+              syncStore.storageProviderType === 'google_drive'
+                ? t('join.shareFileNoteCloud')
+                : t('join.shareFileNote')
+            }}
           </p>
         </div>
       </div>
