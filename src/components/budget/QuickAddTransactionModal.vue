@@ -49,7 +49,7 @@ const { isSubmitting } = useFormModal(
       date.value = toISODateString(new Date());
       // Default to first active account
       const active = accountsStore.activeAccounts;
-      accountId.value = active.length > 0 ? active[0].id : '';
+      accountId.value = active.length > 0 ? active[0]!.id : '';
     },
   }
 );
