@@ -23,9 +23,7 @@ function getRoleLabel(member: { role: string; ageGroup?: string }): string {
 
 <template>
   <div>
-    <div
-      class="font-outfit text-secondary-500/45 mb-3 text-[0.75rem] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
-    >
+    <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
       {{ t('dashboard.yourBeans') }}
     </div>
     <div class="flex gap-4 overflow-x-auto py-2">

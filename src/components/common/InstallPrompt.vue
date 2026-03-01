@@ -62,7 +62,7 @@ function handleDismiss() {
           </p>
           <div class="mt-3 flex gap-2">
             <button
-              class="rounded-lg bg-[#F15D22] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#d94f1a]"
+              class="bg-primary-500 hover:bg-primary-600 rounded-lg px-4 py-1.5 text-sm font-medium text-white transition-colors"
               @click="handleInstall"
             >
               {{ t('pwa.installButton') }}

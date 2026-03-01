@@ -357,7 +357,7 @@ function handleSignedIn(destination: string) {
     <!-- Loading state during initialization -->
     <div v-if="isInitializing" class="py-12 text-center">
       <div
-        class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
+        class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
       ></div>
     </div>
 
@@ -393,7 +393,7 @@ function handleSignedIn(destination: string) {
             class="mx-auto mb-4 h-16 w-16"
           />
           <div
-            class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
+            class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
           ></div>
           <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
         </div>

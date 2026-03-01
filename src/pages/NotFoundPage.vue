@@ -19,7 +19,7 @@ function goHome() {
       <!-- Lost beanie illustration -->
       <div class="relative mx-auto mb-8 h-56 w-56">
         <!-- Background circle -->
-        <div class="absolute inset-0 rounded-full bg-orange-50 dark:bg-[#2C3E50]" />
+        <div class="dark:bg-secondary-500 absolute inset-0 rounded-full bg-orange-50" />
 
         <!-- SVG beanie illustration -->
         <svg
@@ -170,12 +170,14 @@ function goHome() {
       </p>
 
       <!-- Heading -->
-      <h1 class="font-headline mt-[-1rem] text-2xl font-bold text-[#2C3E50] dark:text-[#ECF0F1]">
+      <h1
+        class="font-headline text-secondary-500 mt-[-1rem] text-2xl font-bold dark:text-[#ECF0F1]"
+      >
         {{ t('notFound.heading') }}
       </h1>
 
       <!-- Description -->
-      <p class="mt-3 text-base text-[#2C3E50]/60 dark:text-[#BDC3C7]">
+      <p class="text-secondary-500/60 mt-3 text-base dark:text-[#BDC3C7]">
         {{ t('notFound.description') }}
       </p>
 
@@ -187,7 +189,9 @@ function goHome() {
       </div>
 
       <!-- Subtle tagline -->
-      <p class="mt-6 text-sm text-[#2C3E50]/30 italic dark:text-[#BDC3C7]/30">every bean counts</p>
+      <p class="text-secondary-500/30 mt-6 text-sm italic dark:text-[#BDC3C7]/30">
+        every bean counts
+      </p>
     </div>
   </div>
 </template>

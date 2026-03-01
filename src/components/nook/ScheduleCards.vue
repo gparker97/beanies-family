@@ -43,7 +43,7 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
   <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <!-- Left — Today's Schedule -->
     <div
-      class="nook-schedule-today rounded-[var(--sq)] border-l-4 border-[#AED6F1] p-6 shadow-[var(--card-shadow)]"
+      class="nook-schedule-today nook-card-dark border-sky-silk-300 rounded-[var(--sq)] border-l-4 p-6 shadow-[var(--card-shadow)]"
     >
       <!-- Header -->
       <div class="mb-4 flex items-center justify-between">
@@ -89,7 +89,7 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
 
     <!-- Right — This Week -->
     <div
-      class="nook-schedule-week rounded-[var(--sq)] border-l-4 border-[#F15D22] p-6 shadow-[var(--card-shadow)]"
+      class="nook-schedule-week nook-card-dark border-primary-500 rounded-[var(--sq)] border-l-4 p-6 shadow-[var(--card-shadow)]"
     >
       <!-- Header -->
       <div class="mb-4 flex items-center justify-between">
@@ -103,7 +103,7 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
         </div>
         <router-link
           to="/planner"
-          class="text-[0.75rem] font-semibold text-[#F15D22] hover:underline"
+          class="text-primary-500 text-[0.75rem] font-semibold hover:underline"
         >
           {{ t('nook.fullCalendar') }} &rarr;
         </router-link>
@@ -143,10 +143,5 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
 
 .nook-schedule-week {
   background: linear-gradient(135deg, white 85%, rgb(241 93 34 / 4%));
-}
-
-:global(.dark) .nook-schedule-today,
-:global(.dark) .nook-schedule-week {
-  background: rgb(30 41 59);
 }
 </style>

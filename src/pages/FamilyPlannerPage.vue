@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
-import MemberFilter from '@/components/planner/MemberFilter.vue';
+import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
@@ -20,6 +21,18 @@ import type {
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
+const memberFilterStore = useMemberFilterStore();
+
+function toggleAllMembers() {
+  if (!memberFilterStore.isAllSelected) memberFilterStore.selectAll();
+}
+function toggleMember(id: string) {
+  if (memberFilterStore.isAllSelected) {
+    memberFilterStore.selectOnly(id);
+  } else {
+    memberFilterStore.toggleMember(id);
+  }
+}
 
 const activeView = ref('month');
 const showInactive = ref(false);
@@ -107,16 +120,16 @@ function openTodoViewModal(todo: TodoItem) {
     <!-- Header -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 class="font-outfit text-2xl font-bold text-[#2C3E50] dark:text-gray-100">
+        <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
           &#x1F4C5; {{ t('planner.title') }}
         </h1>
-        <p class="mt-0.5 text-sm text-[#2C3E50]/40 dark:text-gray-500">
+        <p class="text-secondary-500/40 mt-0.5 text-sm dark:text-gray-500">
           {{ headerSubtitle }}
         </p>
       </div>
       <button
         type="button"
-        class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
         @click="openAddModal()"
       >
         {{ t('planner.addActivity') }}
@@ -126,7 +139,14 @@ function openTodoViewModal(todo: TodoItem) {
     <!-- View toggle + Member filter -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <ViewToggle :active-view="activeView" @update:active-view="activeView = $event" />
-      <MemberFilter />
+      <MemberChipFilter
+        :is-all-active="memberFilterStore.isAllSelected"
+        :is-member-active="
+          (id: string) => memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
+        "
+        @select-all="toggleAllMembers"
+        @select-member="toggleMember"
+      />
     </div>
 
     <!-- Calendar grid -->
@@ -146,7 +166,7 @@ function openTodoViewModal(todo: TodoItem) {
     <div v-if="activityStore.inactiveActivities.length > 0">
       <button
         type="button"
-        class="flex items-center gap-2 text-sm text-[#2C3E50]/50 transition-colors hover:text-[#2C3E50] dark:text-gray-500 dark:hover:text-gray-300"
+        class="text-secondary-500/50 hover:text-secondary-500 flex items-center gap-2 text-sm transition-colors dark:text-gray-500 dark:hover:text-gray-300"
         @click="showInactive = !showInactive"
       >
         <span class="text-xs opacity-50">{{ showInactive ? '&#x25B2;' : '&#x25BC;' }}</span>
@@ -167,11 +187,11 @@ function openTodoViewModal(todo: TodoItem) {
         >
           <span class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full bg-gray-400" />
           <span
-            class="font-outfit min-w-0 flex-1 truncate text-sm font-semibold text-[#2C3E50]/60 dark:text-gray-400"
+            class="font-outfit text-secondary-500/60 min-w-0 flex-1 truncate text-sm font-semibold dark:text-gray-400"
           >
             {{ activity.title }}
           </span>
-          <span class="flex-shrink-0 text-xs text-[#2C3E50]/30 dark:text-gray-500">
+          <span class="text-secondary-500/30 flex-shrink-0 text-xs dark:text-gray-500">
             {{ t('planner.showInactive') }}
           </span>
         </button>

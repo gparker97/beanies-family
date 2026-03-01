@@ -15,6 +15,7 @@ import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
+import ToastContainer from '@/components/ui/ToastContainer.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
@@ -465,6 +466,9 @@ watch(
       <UpdatePrompt />
       <InstallPrompt />
     </div>
+
+    <!-- General toast notifications (errors, success, info) -->
+    <ToastContainer />
 
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />

@@ -124,7 +124,7 @@ async function deleteFamily(family: FamilyEntry) {
     <!-- Loading state -->
     <div v-if="isLoading" class="py-8 text-center">
       <div
-        class="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#F15D22]"
+        class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
       ></div>
     </div>
 
@@ -153,7 +153,7 @@ async function deleteFamily(family: FamilyEntry) {
           {{ t('familyPicker.noFamilies') }}
         </p>
         <button
-          class="inline-flex items-center gap-2 rounded-2xl bg-[#F15D22] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg"
+          class="bg-primary-500 inline-flex items-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:-translate-y-0.5 hover:shadow-lg"
           @click="$emit('load-different-file')"
         >
           {{ t('familyPicker.loadFile') }}
@@ -164,11 +164,11 @@ async function deleteFamily(family: FamilyEntry) {
       <div v-else class="space-y-3">
         <div v-for="family in families" :key="family.id" class="flex items-center gap-2">
           <button
-            class="flex flex-1 items-center gap-3 rounded-2xl border-2 border-gray-200 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[#F15D22]/40 hover:shadow-lg dark:border-slate-600 dark:hover:border-[#F15D22]/30"
+            class="hover:border-primary-500/40 dark:hover:border-primary-500/30 flex flex-1 items-center gap-3 rounded-2xl border-2 border-gray-200 p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-600"
             @click="selectFamily(family)"
           >
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F15D22]/10 text-[#F15D22]"
+              class="bg-primary-500/10 text-primary-500 flex h-10 w-10 items-center justify-center rounded-xl"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

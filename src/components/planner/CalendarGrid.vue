@@ -169,7 +169,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
       <div class="flex items-center gap-3">
         <button
           type="button"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#2C3E50]/50 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+          class="text-secondary-500/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
           @click="prevMonth"
         >
           <svg
@@ -183,13 +183,13 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           </svg>
         </button>
         <h3
-          class="font-outfit min-w-[160px] text-center text-lg font-bold text-[#2C3E50] dark:text-gray-100"
+          class="font-outfit text-secondary-500 min-w-[160px] text-center text-lg font-bold dark:text-gray-100"
         >
           {{ monthLabel }}
         </h3>
         <button
           type="button"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-[#2C3E50]/50 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+          class="text-secondary-500/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
           @click="nextMonth"
         >
           <svg
@@ -205,7 +205,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
       </div>
       <button
         type="button"
-        class="font-outfit cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold text-[#F15D22] transition-colors hover:bg-[#F15D22]/10"
+        class="font-outfit text-primary-500 hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
         @click="goToToday"
       >
         {{ t('planner.today') }}
@@ -217,7 +217,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
       <div
         v-for="label in dayLabels"
         :key="label"
-        class="font-outfit py-2 text-center text-xs font-semibold tracking-wide text-[#2C3E50]/40 uppercase dark:text-gray-500"
+        class="font-outfit text-secondary-500/40 py-2 text-center text-xs font-semibold tracking-wide uppercase dark:text-gray-500"
       >
         {{ label }}
       </div>
@@ -232,12 +232,12 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
         class="relative flex h-[60px] cursor-pointer flex-col items-center justify-start rounded-xl pt-1.5 transition-colors md:h-[72px]"
         :class="[
           cell.isCurrentMonth
-            ? 'text-[#2C3E50] dark:text-gray-200'
-            : 'text-[#2C3E50]/20 dark:text-gray-600',
+            ? 'text-secondary-500 dark:text-gray-200'
+            : 'text-secondary-500/20 dark:text-gray-600',
           cell.weekRow === todayWeekRow && cell.isCurrentMonth
             ? 'bg-[rgba(241,93,34,0.04)]'
             : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
-          props.selectedDate === cell.date ? 'ring-2 ring-[#F15D22] ring-inset' : '',
+          props.selectedDate === cell.date ? 'ring-primary-500 ring-2 ring-inset' : '',
         ]"
         @click="handleDayClick(cell.date)"
       >
@@ -246,7 +246,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           class="font-outfit flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
           :class="
             cell.isToday
-              ? 'bg-gradient-to-br from-[#F15D22] to-[#E67E22] text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
+              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
               : ''
           "
         >
@@ -263,7 +263,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           />
           <span
             v-if="cell.activities.length > 4"
-            class="text-[0.5rem] text-[#2C3E50]/30 dark:text-gray-500"
+            class="text-secondary-500/30 text-[0.5rem] dark:text-gray-500"
           >
             +{{ cell.activities.length - 4 }}
           </span>

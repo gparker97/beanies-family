@@ -14,6 +14,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
 import { CATEGORY_COLORS } from '@/stores/activityStore';
 import type {
   FamilyActivity,
@@ -41,8 +42,6 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
-
-const isEditing = computed(() => !!props.activity);
 
 // Activity icon chip options — emoji→category mapping
 const ACTIVITY_ICON_OPTIONS = [
@@ -94,38 +93,42 @@ const effectiveRecurrence = computed<ActivityRecurrence>(() => {
 });
 
 // Reset form when modal opens
-watch(
+const { isEditing, isSubmitting } = useFormModal(
+  () => props.activity,
   () => props.open,
-  (isOpen) => {
-    if (!isOpen) return;
-    if (props.activity) {
-      const a = props.activity;
-      icon.value = a.icon ?? '';
-      title.value = a.title;
-      description.value = a.description ?? '';
-      date.value = a.date;
-      startTime.value = a.startTime ?? '';
-      endTime.value = a.endTime ?? '';
-      recurrenceMode.value = a.recurrence === 'none' ? 'one-off' : 'recurring';
+  {
+    onEdit: (activity) => {
+      icon.value = activity.icon ?? '';
+      title.value = activity.title;
+      description.value = activity.description ?? '';
+      date.value = activity.date;
+      startTime.value = activity.startTime ?? '';
+      endTime.value = activity.endTime ?? '';
+      recurrenceMode.value = activity.recurrence === 'none' ? 'one-off' : 'recurring';
       recurrenceFrequency.value =
-        a.recurrence === 'monthly' ? 'monthly' : a.recurrence === 'weekly' ? 'weekly' : 'weekly';
-      daysOfWeek.value = a.daysOfWeek ?? [];
-      category.value = a.category;
-      assigneeIds.value = a.assigneeId ? [a.assigneeId] : [];
-      dropoffMemberId.value = a.dropoffMemberId ?? '';
-      pickupMemberId.value = a.pickupMemberId ?? '';
-      location.value = a.location ?? '';
-      feeSchedule.value = a.feeSchedule;
-      feeAmount.value = a.feeAmount;
-      feeCurrency.value = a.feeCurrency ?? settingsStore.baseCurrency;
-      feePayerId.value = a.feePayerId ?? '';
-      instructorName.value = a.instructorName ?? '';
-      instructorContact.value = a.instructorContact ?? '';
-      reminderMinutes.value = a.reminderMinutes;
-      notes.value = a.notes ?? '';
-      isActive.value = a.isActive;
-      color.value = a.color ?? CATEGORY_COLORS[a.category];
-    } else {
+        activity.recurrence === 'monthly'
+          ? 'monthly'
+          : activity.recurrence === 'weekly'
+            ? 'weekly'
+            : 'weekly';
+      daysOfWeek.value = activity.daysOfWeek ?? [];
+      category.value = activity.category;
+      assigneeIds.value = activity.assigneeId ? [activity.assigneeId] : [];
+      dropoffMemberId.value = activity.dropoffMemberId ?? '';
+      pickupMemberId.value = activity.pickupMemberId ?? '';
+      location.value = activity.location ?? '';
+      feeSchedule.value = activity.feeSchedule;
+      feeAmount.value = activity.feeAmount;
+      feeCurrency.value = activity.feeCurrency ?? settingsStore.baseCurrency;
+      feePayerId.value = activity.feePayerId ?? '';
+      instructorName.value = activity.instructorName ?? '';
+      instructorContact.value = activity.instructorContact ?? '';
+      reminderMinutes.value = activity.reminderMinutes;
+      notes.value = activity.notes ?? '';
+      isActive.value = activity.isActive;
+      color.value = activity.color ?? CATEGORY_COLORS[activity.category];
+    },
+    onNew: () => {
       icon.value = '';
       title.value = '';
       description.value = '';
@@ -150,7 +153,7 @@ watch(
       notes.value = '';
       isActive.value = true;
       color.value = '';
-    }
+    },
   }
 );
 
@@ -262,6 +265,7 @@ function handleSave() {
     icon-bg="var(--tint-orange-8)"
     :save-label="saveLabel"
     :save-disabled="!canSave"
+    :is-submitting="isSubmitting"
     :show-delete="isEditing"
     @close="emit('close')"
     @save="handleSave"

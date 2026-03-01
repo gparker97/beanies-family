@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
@@ -13,6 +13,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import type {
   Transaction,
@@ -37,9 +38,6 @@ const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const { currencyOptions } = useCurrencyOptions();
 
-const isEditing = computed(() => !!props.transaction);
-const isSubmitting = ref(false);
-
 // Form state
 const direction = ref<'in' | 'out'>('out');
 const amount = ref<number | undefined>(undefined);
@@ -59,23 +57,23 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Reset form
-watch(
+// Reset form when modal opens
+const { isEditing, isSubmitting } = useFormModal(
+  () => props.transaction,
   () => props.open,
-  (isOpen) => {
-    if (!isOpen) return;
-    if (props.transaction) {
-      const tx = props.transaction;
-      direction.value = tx.type === 'income' ? 'in' : 'out';
-      amount.value = tx.amount;
-      description.value = tx.description;
-      category.value = tx.category;
-      recurrenceMode.value = tx.recurring ? 'recurring' : 'one-time';
-      date.value = tx.date;
-      accountId.value = tx.accountId;
-      activityId.value = tx.activityId;
-      currency.value = tx.currency;
-    } else {
+  {
+    onEdit: (transaction) => {
+      direction.value = transaction.type === 'income' ? 'in' : 'out';
+      amount.value = transaction.amount;
+      description.value = transaction.description;
+      category.value = transaction.category;
+      recurrenceMode.value = transaction.recurring ? 'recurring' : 'one-time';
+      date.value = transaction.date;
+      accountId.value = transaction.accountId;
+      activityId.value = transaction.activityId;
+      currency.value = transaction.currency;
+    },
+    onNew: () => {
       direction.value = 'out';
       amount.value = undefined;
       description.value = '';
@@ -87,7 +85,7 @@ watch(
       accountId.value = accountsStore.accounts[0]?.id ?? '';
       activityId.value = undefined;
       currency.value = settingsStore.displayCurrency;
-    }
+    },
   }
 );
 

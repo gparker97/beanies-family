@@ -202,7 +202,7 @@ async function handleSignIn() {
           ></div>
           <div
             v-else
-            class="absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-[#F15D22] text-xs font-bold text-white dark:border-slate-800"
+            class="bg-primary-500 absolute right-0 bottom-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-slate-800"
           >
             +
           </div>
@@ -265,7 +265,7 @@ async function handleSignIn() {
         <button
           v-if="allMembers.length > 1"
           type="button"
-          class="text-sm font-medium text-[#F15D22] hover:text-[#E67E22]"
+          class="text-primary-500 hover:text-terracotta-400 text-sm font-medium"
           @click="clearSelection"
         >
           {{ t('action.change') }}
