@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-01
-> **Updated by:** Claude (codebase dedup & cleanup, Node 24 upgrade)
+> **Updated by:** Claude (Budget page implementation, issue #68)
 
 ## Current Phase
 
@@ -495,6 +495,27 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 - Removed Node version matrix from `main-ci.yml` (was `[20.x, 24.x]`, now single `24`)
 - Fixed `createRepository.ts` TS2352 error exposed by Node 24's stricter TypeScript
 
+### Budget Page (Issue #68) — Closed
+
+- **Data model** — `Budget`, `BudgetCategory`, `BudgetMode` types in `models.ts`. `CreateBudgetInput`/`UpdateBudgetInput` aliases. `'budget'` added to `EntityType` union. `budgets` added to `SyncFileData.data`
+- **Database** — DB_VERSION 5→6. `budgets` object store with `by-memberId` and `by-isActive` indexes. Export/import/clear support
+- **`src/services/indexeddb/repositories/budgetRepository.ts`** (new) — Standard `createRepository` pattern + `getActiveBudget()` helper
+- **`src/stores/budgetStore.ts`** (new) — Core budget state + cross-store computed getters: `activeBudget`, `effectiveBudgetAmount` (resolves percentage mode), `categoryBudgetStatus` (per-category spend tracking with ok/warning/over), `budgetProgress`, `paceStatus` (great/onTrack/caution/overBudget), `upcomingTransactions` (next 5 recurring), `monthlySavings`, `savingsRate`, recurring/one-time breakdowns
+- **`src/components/budget/BudgetSettingsModal.vue`** (new) — BeanieFormModal with mode toggle (% of income / fixed), percentage input with live effective budget preview, fixed amount input, currency selector, FamilyChipPicker for owner, collapsible category allocations with per-category AmountInput
+- **`src/components/budget/QuickAddTransactionModal.vue`** (new) — Simplified transaction entry: direction toggle (Money In/Out), hero AmountInput, CategoryChipPicker, description, date, account select
+- **`src/pages/BudgetPage.vue`** (new) — Full budget tracking page:
+  - Hero card: Deep Slate gradient, Heritage Orange progress bar with time-position marker, motivational message + emoji based on pace
+  - 3-column summary cards: Monthly Income, Current Spending, Monthly Savings (with recurring/one-time breakdowns, count-up animation)
+  - Two-column content: Upcoming Transactions (next 5 scheduled) + Spending by Category (progress bars, color-coded status)
+  - Bottom section: Budget Settings card + Add Transactions card (Quick Add functional, Batch Add + CSV Upload with "beanies in development" badge)
+  - Empty state with EmptyStateIllustration when no budget exists
+  - Privacy mode, dark mode, and mobile responsive support
+- **Router + navigation** — `/budgets` route changed from DashboardPage to BudgetPage. `comingSoon` removed from budgets nav item
+- **Sync infrastructure** — Budgets added to mergeService, fileSync validation + change detection, syncStore auto-sync watch + reload, App.vue data loading
+- **EmptyStateIllustration** — Added `'budget'` variant with beanie + bar chart SVG
+- ~70 new translation strings under `budget.*` namespace with beanie mode overrides
+- Plan saved: `docs/plans/2026-03-01-budget-page.md`
+
 ### Recent Fixes
 
 - **Multi-family isolation hardening** — Fixed cross-family data leakage when authenticated user's familyId could not be resolved:
@@ -575,6 +596,7 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 - [x] Configurable currency chips (Issue #36) ✓
 - [x] Branded language picker flags (Issue #38) ✓
 - [x] Replace native confirm/alert dialogs with branded modal (Issue #56) ✓
+- [x] Budget page (Issue #68) ✓
 - [ ] Switchable UI themes (Issue #41)
 - [ ] Data validation and error handling improvements
 - [x] Mobile responsive layout (Issue #63) ✓

@@ -221,6 +221,27 @@ export interface Goal {
   updatedAt: ISODateString;
 }
 
+// Budget - Monthly spending plan
+export type BudgetMode = 'percentage' | 'fixed';
+
+export interface BudgetCategory {
+  categoryId: string; // references EXPENSE_CATEGORIES[].id
+  amount: number; // planned monthly amount
+}
+
+export interface Budget {
+  id: UUID;
+  memberId?: UUID; // null = family-wide budget
+  mode: BudgetMode;
+  totalAmount: number; // for fixed: the cap; for percentage: calculated
+  percentage?: number; // only for percentage mode (e.g., 68 = 68%)
+  currency: CurrencyCode;
+  categories: BudgetCategory[];
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
 // Todo item - Family task management
 export interface TodoItem {
   id: UUID;
@@ -358,6 +379,7 @@ export type EntityType =
   | 'transaction'
   | 'asset'
   | 'goal'
+  | 'budget'
   | 'recurringItem'
   | 'todo'
   | 'familyActivity'
@@ -408,6 +430,9 @@ export type UpdateAssetInput = Partial<Omit<Asset, 'id' | 'createdAt' | 'updated
 export type CreateGoalInput = Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateGoalInput = Partial<Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>>;
 
+export type CreateBudgetInput = Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateBudgetInput = Partial<Omit<Budget, 'id' | 'createdAt' | 'updatedAt'>>;
+
 export type CreateRecurringItemInput = Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateRecurringItemInput = Partial<
   Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>
@@ -438,6 +463,7 @@ export interface SyncFileData {
     recurringItems: RecurringItem[];
     todos?: TodoItem[];
     activities?: FamilyActivity[];
+    budgets?: Budget[];
     deletions: DeletionTombstone[];
     settings: Settings | null;
   };
