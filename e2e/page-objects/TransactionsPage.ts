@@ -21,16 +21,16 @@ export class TransactionsPage {
     await this.page.goto('/transactions');
   }
 
-  async selectDateFilter(filter: 'current_month' | 'last_month' | 'last_3_months') {
-    // Switch to transactions tab if not already there (date filters only visible on transactions tab)
-    await this.page.getByRole('button', { name: 'One Time Transactions' }).click();
-
-    const filterButtons = {
-      current_month: 'Current Month',
-      last_month: 'Last Month',
-      last_3_months: 'Last 3 Months',
-    };
-    await this.page.getByRole('button', { name: filterButtons[filter] }).click();
+  /**
+   * Navigate the MonthNavigator by a number of months.
+   * Negative offset = past months, positive = future months, 0 = no-op.
+   */
+  async navigateMonth(offset: number) {
+    const label = offset < 0 ? 'Previous month' : 'Next month';
+    const clicks = Math.abs(offset);
+    for (let i = 0; i < clicks; i++) {
+      await this.page.getByRole('button', { name: label }).click();
+    }
   }
 
   async addTransaction(data: {
@@ -40,47 +40,46 @@ export class TransactionsPage {
     amount: number;
     category?: string;
   }) {
-    // Switch to transactions tab if not already there (default is recurring tab)
-    await this.page.getByRole('button', { name: 'One Time Transactions' }).click();
-    await this.page.getByRole('button', { name: 'Add Transaction' }).click();
+    // Click the gradient "+ Add Transaction" button on the page
+    await this.page.getByRole('button', { name: /\+.*Add Transaction/ }).click();
 
-    // Direction toggle (TogglePillGroup) — default is "out" (expense)
+    const dialog = this.page.locator('[role="dialog"]');
+
+    // Direction toggle — default is "out" (expense)
     if (data.type === 'income') {
-      await this.page.getByRole('button', { name: /Money In/ }).click();
+      await dialog.getByRole('button', { name: /Money In/ }).click();
     }
 
-    // Amount (AmountInput — number input)
-    await this.page.locator('input[type="number"]').fill(data.amount.toString());
-
-    // Description (raw input with placeholder)
-    await this.page.getByPlaceholder('Description').fill(data.description);
-
-    // Category — two-level CategoryChipPicker: click group chip, then sub-category chip
-    if (data.category) {
-      const group = CATEGORY_GROUP_MAP[data.category];
-      if (group) {
-        // Click the group chip to expand it
-        await this.page.locator('[role="dialog"]').getByRole('button', { name: group }).click();
-      }
-      // Click the sub-category chip (capitalize first letter to match display name)
-      const categoryName = data.category
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
-      await this.page
-        .locator('[role="dialog"]')
-        .getByRole('button', { name: categoryName })
-        .click();
-    }
-
-    // Account — BaseSelect with "Select an account" placeholder option
-    await this.page
+    // Account — BaseSelect with placeholder option
+    await dialog
       .locator('select')
       .filter({ has: this.page.locator('option', { hasText: 'Select an account' }) })
       .selectOption({ label: data.account });
 
-    // Save
-    await this.page.getByRole('button', { name: 'Add Transaction' }).last().click();
-    await expect(this.page.locator('[role="dialog"]')).toHaveCount(0);
+    // Description
+    await dialog.getByPlaceholder('Description').fill(data.description);
+
+    // Amount (AmountInput — number input)
+    await dialog.locator('input[type="number"]').fill(data.amount.toString());
+
+    // Category — two-level CategoryChipPicker
+    if (data.category) {
+      const group = CATEGORY_GROUP_MAP[data.category];
+      if (group) {
+        await dialog.getByRole('button', { name: group }).click();
+      }
+      const categoryName = data.category
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      await dialog.getByRole('button', { name: categoryName }).click();
+    }
+
+    // Switch schedule to "One-time" (default is "Recurring")
+    await dialog.getByRole('button', { name: 'One-time' }).click();
+
+    // Save — button text is "Add Transaction"
+    await dialog.getByRole('button', { name: 'Add Transaction' }).click();
+    await expect(dialog).toHaveCount(0);
   }
 
   async getTransactionCount(): Promise<number> {

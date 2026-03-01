@@ -25,6 +25,7 @@ function next() {
   >
     <button
       type="button"
+      aria-label="Previous month"
       class="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
       @click="prev"
     >
@@ -37,6 +38,7 @@ function next() {
     </span>
     <button
       type="button"
+      aria-label="Next month"
       class="rounded-lg p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-gray-200"
       @click="next"
     >
