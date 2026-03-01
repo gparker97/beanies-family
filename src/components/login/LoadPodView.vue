@@ -745,7 +745,7 @@ async function handleDriveRefresh() {
           {{ t('googleDrive.noFilesFound') }}
         </p>
         <p v-if="getGoogleAccountEmail()" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {{ t('googleDrive.connectedAs', { email: getGoogleAccountEmail()! }) }}
+          {{ t('googleDrive.connectedAs').replace('{email}', getGoogleAccountEmail()!) }}
         </p>
         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {{ t('googleDrive.noFilesHint') }}

@@ -36,7 +36,7 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
   const folders = await searchAppFolders(token);
 
   if (folders.length === 1) {
-    return cacheFolderId(folders[0].id);
+    return cacheFolderId(folders[0]!.id);
   }
 
   if (folders.length > 1) {
@@ -56,7 +56,9 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
   if (retryFolders.length > 0) {
     console.warn('[driveService] App folder found on retry');
     const bestId =
-      retryFolders.length > 1 ? await pickFolderWithFiles(token, retryFolders) : retryFolders[0].id;
+      retryFolders.length > 1
+        ? await pickFolderWithFiles(token, retryFolders)
+        : retryFolders[0]!.id;
     return cacheFolderId(bestId);
   }
 
@@ -275,8 +277,8 @@ async function pickFolderWithFiles(
     }
   }
   // None had files — use the first one
-  console.warn(`[driveService] No folder had files, using first: ${folders[0].id}`);
-  return folders[0].id;
+  console.warn(`[driveService] No folder had files, using first: ${folders[0]!.id}`);
+  return folders[0]!.id;
 }
 
 /** Map raw Drive API file results to our shape. */

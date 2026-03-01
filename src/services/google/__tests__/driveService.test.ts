@@ -301,7 +301,7 @@ describe('driveService', () => {
 
       const result = await listBeanpodFiles(mockToken, 'wrong-folder');
       expect(result).toHaveLength(1);
-      expect(result[0].fileId).toBe('f1');
+      expect(result[0]!.fileId).toBe('f1');
     });
   });
 
