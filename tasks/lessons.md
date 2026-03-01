@@ -205,3 +205,19 @@ if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
 **Symptom:** The planner's todo modal was missing emojis that the todo page and nook widget had. The nook widget wasn't calling `.trim()` on description. These inconsistencies were invisible until a side-by-side comparison.
 
 **Rule:** When a UI pattern appears in 2+ locations with identical structure, extract it into a shared component immediately. Use prop-driven visibility (`todo: Item | null` where non-null = open) and self-contained internal state. Follow the `ActivityModal.vue` pattern: props for data in, emits for actions out, all logic encapsulated.
+
+## 12. Always check the current state of the app before performing work
+
+**Date:** 2026-03-01
+**Context:** RecurringItemForm still used old BaseInput/BaseSelect/BaseButton pattern while all other modals had been refactored to BeanieFormModal. New work (ToggleSwitch addition) was built on top of the outdated component without noticing it needed modernization first.
+
+**Pattern:** When given a plan that modifies a specific component, it's tempting to jump straight in and make the planned changes. But the component may have fallen behind a project-wide refactoring wave (e.g., a modal redesign that touched 6 modals but missed one). Building new features on top of outdated code bakes in the inconsistency.
+
+**Symptom:** The "edit recurring" modal looked completely different from the "add transaction" modal — old-style dropdowns and buttons vs. modern chips, pill toggles, and styled inputs. The user perceived it as a reversion.
+
+**Rule:** Before modifying any component, check that it follows the **current** patterns used elsewhere in the app:
+
+1. Open the file and compare its imports/structure against sibling components (e.g., does this modal use `BeanieFormModal` like other modals?)
+2. If it uses outdated patterns (old component library, deprecated wrappers, missing composables), modernize it first or flag the discrepancy
+3. Never assume a component is up-to-date just because it works — compare against the canonical pattern (e.g., `TransactionModal.vue` for form modals)
+4. When a plan references a file to modify, treat "read and verify current state" as step zero

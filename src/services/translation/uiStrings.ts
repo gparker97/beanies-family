@@ -221,6 +221,10 @@ const STRING_DEFS = {
     en: 'Are you sure you want to delete this recurring item? Existing transactions will not be affected.',
   },
   'recurring.next': { en: 'Next' },
+  'recurring.active': { en: 'Active', beanie: 'Active' },
+  'recurring.paused': { en: 'Paused', beanie: 'Paused' },
+  'recurring.pauseItem': { en: 'Pause recurring', beanie: 'Pause recurring' },
+  'recurring.resumeItem': { en: 'Resume recurring', beanie: 'Resume recurring' },
 
   // Accounts
   'accounts.title': { en: 'Accounts', beanie: 'Bean Jars' },
@@ -537,6 +541,7 @@ const STRING_DEFS = {
     beanie: 'Count this in my total net worth',
   },
   'form.isActive': { en: 'Active' },
+  'form.month': { en: 'Month' },
   'form.required': { en: 'Required' },
 
   // Validation messages
@@ -801,6 +806,7 @@ const STRING_DEFS = {
   'settings.error': { en: 'Error' },
   'settings.saved': { en: 'Saved' },
   'settings.lastSaved': { en: 'Last Saved' },
+  'settings.lastSyncNever': { en: 'Never' },
   'settings.loadAnotherDataFile': { en: 'Load another Family Data File' },
   'settings.switchDataFile': { en: 'Switch to a different data file' },
   'settings.browse': { en: 'Browse...' },
@@ -1289,6 +1295,11 @@ const STRING_DEFS = {
   'todo.status.open': { en: 'Open' },
   'todo.status.completed': { en: 'Completed' },
   'todo.noDueDate': { en: 'No due date' },
+  'todo.noDateSet': { en: 'No date set' },
+  'todo.addedToday': { en: 'Added today' },
+  'todo.addedYesterday': { en: 'Added yesterday' },
+  'todo.addedDaysAgo': { en: 'Added {days} days ago' },
+  'todo.sortLabel': { en: 'Sort:' },
   'todo.overdue': { en: 'Overdue', beanie: 'Past the beanie deadline!' },
   'confirm.deleteTodoTitle': { en: 'Delete Task', beanie: 'Remove Task' },
   'confirm.deleteLocalFamilyTitle': { en: 'Delete Local Family Data' },
@@ -1480,6 +1491,7 @@ const STRING_DEFS = {
   'planner.recurrence.monthly': { en: 'Monthly' },
   'planner.recurrence.yearly': { en: 'Yearly' },
   'planner.recurrence.none': { en: 'One-time' },
+  'planner.recurrence.biweekly': { en: 'Biweekly' },
 
   // Planner — Fee schedule labels
   'planner.fee.none': { en: 'No fees' },
