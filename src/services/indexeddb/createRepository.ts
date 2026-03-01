@@ -46,7 +46,7 @@ export function createRepository<
       id: generateUUID(),
       createdAt: now,
       updatedAt: now,
-    } as Entity;
+    } as unknown as Entity;
 
     await db.add(storeName, entity as StoreValue<FinanceDB, S>);
     return entity;
