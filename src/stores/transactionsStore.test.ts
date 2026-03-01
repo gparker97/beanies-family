@@ -334,7 +334,7 @@ describe('transactionsStore - Summary Card Calculations', () => {
   // Helper to create a transaction for current month
   const createThisMonthTransaction = (overrides: Partial<Transaction> = {}): Transaction => {
     const now = new Date();
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-15T00:00:00.000Z`;
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-15`;
     return {
       id: `txn-${Math.random().toString(36).slice(2)}`,
       accountId: 'test-account-1',

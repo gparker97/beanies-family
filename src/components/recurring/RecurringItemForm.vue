@@ -10,7 +10,7 @@ import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { RecurringItem, CreateRecurringItemInput, RecurringFrequency } from '@/types/models';
-import { toISODateString } from '@/utils/date';
+import { toDateInputValue } from '@/utils/date';
 
 interface Props {
   item?: RecurringItem;
@@ -41,7 +41,7 @@ const formData = ref({
   monthOfYear: props.item?.monthOfYear || 1,
   startDate: props.item?.startDate
     ? props.item.startDate.split('T')[0]
-    : toISODateString(new Date()).split('T')[0],
+    : toDateInputValue(new Date()),
   endDate: props.item?.endDate ? props.item.endDate.split('T')[0] : '',
   isActive: props.item?.isActive ?? true,
 });
