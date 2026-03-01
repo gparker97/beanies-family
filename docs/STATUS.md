@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-01
-> **Updated by:** Claude (Budget page implementation, issue #68)
+> **Updated by:** Claude (Budget page bug fixes + deploy)
 
 ## Current Phase
 
@@ -515,6 +515,12 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 - **EmptyStateIllustration** — Added `'budget'` variant with beanie + bar chart SVG
 - ~70 new translation strings under `budget.*` namespace with beanie mode overrides
 - Plan saved: `docs/plans/2026-03-01-budget-page.md`
+- **Bug fixes (post-launch):**
+  - Fixed zero spending bug: `isDateBetween()` normalized to date-only string comparison to eliminate timezone-dependent filtering failures
+  - Fixed member filter not applied to budget summary cards (income, spending, savings, category breakdowns now use filtered variants)
+  - Fixed multi-currency category aggregation (raw amounts now converted via `convertToBaseCurrency()` before summing)
+  - Fixed emoji unicode escapes rendering as literal text on Add Transactions card
+  - Redesigned Budget Settings card to match v7 UI mockup (side-by-side mode cards, Heritage Orange info callout)
 
 ### Recent Fixes
 
@@ -686,7 +692,6 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 
 ### Phase 2 — Enhanced Features
 
-- [ ] Budget page with category budgets and spending vs planned (#68)
 - [ ] Data import/export (CSV, etc.)
 - [x] PWA offline support / install prompt / SW update prompt (#6) ✓
 - [ ] Cloud relay for near-instant cross-device sync (#104)
