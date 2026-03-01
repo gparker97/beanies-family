@@ -110,13 +110,9 @@ export async function readFile(token: string, fileId: string): Promise<string | 
  * Get a file's modified time (lightweight metadata-only call for polling).
  */
 export async function getFileModifiedTime(token: string, fileId: string): Promise<string | null> {
-  try {
-    const res = await driveRequest(token, `${DRIVE_API}/files/${fileId}?fields=modifiedTime`);
-    const data = await res.json();
-    return data.modifiedTime ?? null;
-  } catch {
-    return null;
-  }
+  const res = await driveRequest(token, `${DRIVE_API}/files/${fileId}?fields=modifiedTime`);
+  const data = await res.json();
+  return data.modifiedTime ?? null;
 }
 
 /**

@@ -5,6 +5,7 @@ import { requestAccessToken, loadGIS } from '@/services/google/googleAuth';
 
 const { t } = useTranslation();
 const isReconnecting = ref(false);
+const reconnectError = ref(false);
 
 const emit = defineEmits<{
   reconnected: [];
@@ -12,12 +13,13 @@ const emit = defineEmits<{
 
 async function handleReconnect() {
   isReconnecting.value = true;
+  reconnectError.value = false;
   try {
     await loadGIS();
     await requestAccessToken();
     emit('reconnected');
   } catch {
-    // Will retry on next click
+    reconnectError.value = true;
   } finally {
     isReconnecting.value = false;
   }
@@ -41,9 +43,14 @@ async function handleReconnect() {
         d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.072 16.5c-.77.833.192 2.5 1.732 2.5z"
       />
     </svg>
-    <p class="text-sm text-amber-800 dark:text-amber-200">
-      {{ t('googleDrive.sessionExpired') }}
-    </p>
+    <div class="flex flex-col">
+      <p class="text-sm text-amber-800 dark:text-amber-200">
+        {{ t('googleDrive.sessionExpired') }}
+      </p>
+      <p v-if="reconnectError" class="text-xs text-amber-700 dark:text-amber-300">
+        {{ t('googleDrive.reconnectFailed') }}
+      </p>
+    </div>
     <button
       :disabled="isReconnecting"
       class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700 disabled:opacity-50"

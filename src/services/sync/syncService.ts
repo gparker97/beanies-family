@@ -13,6 +13,7 @@ import { createFamilyWithId } from '@/services/familyContext';
 import { clearSettingsWAL } from '@/services/sync/settingsWAL';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { LocalStorageProvider } from './providers/localProvider';
+import { DriveApiError } from '@/services/google/driveService';
 import type { SyncFileData } from '@/types/models';
 import { generateUUID } from '@/utils/id';
 
@@ -547,6 +548,11 @@ export async function load(): Promise<SyncFileData | null> {
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
+    // Drive API 404 — file was deleted or moved
+    if (e instanceof DriveApiError && e.status === 404) {
+      updateState({ isSyncing: false, lastError: `DriveApiError:404:${(e as Error).message}` });
+      return null;
+    }
     updateState({ isSyncing: false, lastError: (e as Error).message });
     return null;
   }
@@ -561,6 +567,7 @@ export async function load(): Promise<SyncFileData | null> {
 export async function loadAndImport(options: { merge?: boolean } = {}): Promise<{
   success: boolean;
   needsPassword?: boolean;
+  fileNotFound?: boolean;
   fileHandle?: FileSystemFileHandle;
   rawSyncData?: SyncFileData;
   hasLocalChanges?: boolean;
@@ -568,6 +575,11 @@ export async function loadAndImport(options: { merge?: boolean } = {}): Promise<
 }> {
   const syncData = await load();
   if (!syncData) {
+    // Check if load() failed due to a 404 (file deleted/moved on Drive)
+    const lastError = getState().lastError;
+    if (lastError?.startsWith('DriveApiError:404:')) {
+      return { success: false, fileNotFound: true };
+    }
     // No data or error - state already updated by load()
     return { success: false };
   }

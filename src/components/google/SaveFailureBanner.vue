@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
 import { requestAccessToken, loadGIS } from '@/services/google/googleAuth';
@@ -7,9 +8,11 @@ import { exportToFile } from '@/services/sync/fileSync';
 
 const props = defineProps<{
   show: boolean;
+  fileNotFound?: boolean;
 }>();
 
 const { t } = useTranslation();
+const router = useRouter();
 const syncStore = useSyncStore();
 const isReconnecting = ref(false);
 const isDownloading = ref(false);
@@ -43,6 +46,10 @@ async function handleDownloadBackup() {
   } finally {
     isDownloading.value = false;
   }
+}
+
+function goToSettings() {
+  router.push('/settings');
 }
 </script>
 
@@ -78,27 +85,43 @@ async function handleDownloadBackup() {
             />
           </svg>
           <div class="min-w-0">
-            <p class="text-sm font-semibold">{{ t('googleDrive.saveFailureTitle') }}</p>
-            <p class="text-xs text-red-100">{{ t('googleDrive.saveFailureBody') }}</p>
+            <template v-if="props.fileNotFound">
+              <p class="text-sm font-semibold">{{ t('googleDrive.fileNotFoundTitle') }}</p>
+              <p class="text-xs text-red-100">{{ t('googleDrive.fileNotFoundBody') }}</p>
+            </template>
+            <template v-else>
+              <p class="text-sm font-semibold">{{ t('googleDrive.saveFailureTitle') }}</p>
+              <p class="text-xs text-red-100">{{ t('googleDrive.saveFailureBody') }}</p>
+            </template>
           </div>
         </div>
 
         <!-- Action buttons -->
         <div class="flex flex-shrink-0 gap-2">
-          <button
-            :disabled="isDownloading"
-            class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:opacity-50"
-            @click="handleDownloadBackup"
-          >
-            {{ isDownloading ? '...' : t('googleDrive.downloadBackup') }}
-          </button>
-          <button
-            :disabled="isReconnecting"
-            class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
-            @click="handleReconnect"
-          >
-            {{ isReconnecting ? '...' : t('googleDrive.saveFailureReconnect') }}
-          </button>
+          <template v-if="props.fileNotFound">
+            <button
+              class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50"
+              @click="goToSettings"
+            >
+              {{ t('googleDrive.goToSettings') }}
+            </button>
+          </template>
+          <template v-else>
+            <button
+              :disabled="isDownloading"
+              class="rounded-lg bg-white/20 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/30 disabled:opacity-50"
+              @click="handleDownloadBackup"
+            >
+              {{ isDownloading ? '...' : t('googleDrive.downloadBackup') }}
+            </button>
+            <button
+              :disabled="isReconnecting"
+              class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50"
+              @click="handleReconnect"
+            >
+              {{ isReconnecting ? '...' : t('googleDrive.saveFailureReconnect') }}
+            </button>
+          </template>
         </div>
       </div>
     </div>
