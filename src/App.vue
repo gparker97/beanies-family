@@ -452,6 +452,7 @@ watch(
     <!-- Save failure banner (non-dismissable, shows when 3+ saves fail) -->
     <SaveFailureBanner
       :show="syncStore.showSaveFailureBanner && !authStore.needsAuth"
+      :file-not-found="syncStore.driveFileNotFound"
       @reconnected="handleGoogleReconnected"
     />
 

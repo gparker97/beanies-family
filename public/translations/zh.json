@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-02-28",
-    "translationCount": 957
+    "lastUpdated": "2026-03-01",
+    "translationCount": 969
   },
   "translations": {
     "app.name": {
@@ -4488,8 +4488,8 @@
     },
     "modal.selectCategory": {
       "translation": "选择类别",
-      "hash": "",
-      "lastUpdated": "2026-02-28"
+      "hash": "rsi6cf",
+      "lastUpdated": "2026-03-01"
     },
     "modal.schedule": {
       "translation": "计划",
@@ -4790,6 +4790,66 @@
       "translation": "已连接为{email}",
       "hash": "gka0r",
       "lastUpdated": "2026-02-28"
+    },
+    "modal.selectSubcategory": {
+      "translation": "选择类型",
+      "hash": "glbhnh",
+      "lastUpdated": "2026-03-01"
+    },
+    "modal.selectTime": {
+      "translation": "选择时间",
+      "hash": "glb5ps",
+      "lastUpdated": "2026-03-01"
+    },
+    "fastLogin.welcomeBackName": {
+      "translation": "欢迎回来，{{name}}！",
+      "hash": "lhiznz",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.saveFailureTitle": {
+      "translation": "您的数据未保存",
+      "hash": "gtq6we",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.saveFailureBody": {
+      "translation": "最近的更改尚未保存到Google云端硬盘。重新连接以防止数据丢失。",
+      "hash": "38an7h",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.saveFailureReconnect": {
+      "translation": "重新连接到Google云端硬盘",
+      "hash": "kocb5r",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.downloadBackup": {
+      "translation": "下载备份",
+      "hash": "h2zeti",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.saveRetrying": {
+      "translation": "保存失败—正在重试...",
+      "hash": "fkeep4",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.fileNotFoundTitle": {
+      "translation": "未找到您的数据文件",
+      "hash": "nyozer",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.fileNotFoundBody": {
+      "translation": "Google云端硬盘上的pod文件可能已被删除或移动。转到“设置”以重新连接或选择其他文件。",
+      "hash": "s0t6vu",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.goToSettings": {
+      "translation": "打开设置",
+      "hash": "kscoxc",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.reconnectFailed": {
+      "translation": "无法重新连接。请重试。",
+      "hash": "a0g3ow",
+      "lastUpdated": "2026-03-01"
     }
   }
 }
