@@ -49,6 +49,14 @@ const accountTypes = computed(() => [
   { value: 'credit_card' as AccountType, label: t('accounts.type.credit_card') },
   { value: 'investment' as AccountType, label: t('accounts.type.investment') },
   { value: 'crypto' as AccountType, label: t('accounts.type.crypto') },
+  { value: 'retirement_401k' as AccountType, label: t('accounts.type.retirement_401k') },
+  { value: 'retirement_ira' as AccountType, label: t('accounts.type.retirement_ira') },
+  { value: 'retirement_roth_ira' as AccountType, label: t('accounts.type.retirement_roth_ira') },
+  { value: 'retirement_bene_ira' as AccountType, label: t('accounts.type.retirement_bene_ira') },
+  { value: 'retirement_kids_ira' as AccountType, label: t('accounts.type.retirement_kids_ira') },
+  { value: 'retirement' as AccountType, label: t('accounts.type.retirement') },
+  { value: 'education_529' as AccountType, label: t('accounts.type.education_529') },
+  { value: 'education_savings' as AccountType, label: t('accounts.type.education_savings') },
   { value: 'cash' as AccountType, label: t('accounts.type.cash') },
   { value: 'loan' as AccountType, label: t('accounts.type.loan') },
   { value: 'other' as AccountType, label: t('accounts.type.other') },
@@ -59,6 +67,14 @@ const typeOrder: AccountType[] = [
   'savings',
   'investment',
   'crypto',
+  'retirement_401k',
+  'retirement_ira',
+  'retirement_roth_ira',
+  'retirement_bene_ira',
+  'retirement_kids_ira',
+  'retirement',
+  'education_529',
+  'education_savings',
   'credit_card',
   'loan',
   'cash',
@@ -90,7 +106,20 @@ const assetBreakdown = computed(() => {
       .filter((a) => ['checking', 'savings', 'cash'].includes(a.type))
       .reduce((s, a) => s + convertToBaseCurrency(a.balance, a.currency), 0),
     investments: eligible
-      .filter((a) => ['investment', 'crypto'].includes(a.type))
+      .filter((a) =>
+        [
+          'investment',
+          'crypto',
+          'retirement_401k',
+          'retirement_ira',
+          'retirement_roth_ira',
+          'retirement_bene_ira',
+          'retirement_kids_ira',
+          'retirement',
+          'education_529',
+          'education_savings',
+        ].includes(a.type)
+      )
       .reduce((s, a) => s + convertToBaseCurrency(a.balance, a.currency), 0),
   };
 });
@@ -175,6 +204,46 @@ function getAccountTypeConfig(type: AccountType): {
         bgColor: 'bg-amber-100',
         iconColor: 'text-amber-600',
         darkBgColor: 'dark:bg-amber-900/30',
+      },
+      retirement_401k: {
+        bgColor: 'bg-indigo-100',
+        iconColor: 'text-indigo-600',
+        darkBgColor: 'dark:bg-indigo-900/30',
+      },
+      retirement_ira: {
+        bgColor: 'bg-indigo-100',
+        iconColor: 'text-indigo-600',
+        darkBgColor: 'dark:bg-indigo-900/30',
+      },
+      retirement_roth_ira: {
+        bgColor: 'bg-indigo-100',
+        iconColor: 'text-indigo-600',
+        darkBgColor: 'dark:bg-indigo-900/30',
+      },
+      retirement_bene_ira: {
+        bgColor: 'bg-indigo-100',
+        iconColor: 'text-indigo-600',
+        darkBgColor: 'dark:bg-indigo-900/30',
+      },
+      retirement_kids_ira: {
+        bgColor: 'bg-indigo-100',
+        iconColor: 'text-indigo-600',
+        darkBgColor: 'dark:bg-indigo-900/30',
+      },
+      retirement: {
+        bgColor: 'bg-indigo-100',
+        iconColor: 'text-indigo-600',
+        darkBgColor: 'dark:bg-indigo-900/30',
+      },
+      education_529: {
+        bgColor: 'bg-teal-100',
+        iconColor: 'text-teal-600',
+        darkBgColor: 'dark:bg-teal-900/30',
+      },
+      education_savings: {
+        bgColor: 'bg-teal-100',
+        iconColor: 'text-teal-600',
+        darkBgColor: 'dark:bg-teal-900/30',
       },
       cash: {
         bgColor: 'bg-emerald-100',
