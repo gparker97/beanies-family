@@ -296,9 +296,9 @@ Pending (Future Phases):
 When asked to implement a GitHub issue/ticket:
 
 1. **Assign** the issue to the person who requested the work
-2. **Move to in progress**: Add a comment noting implementation is starting, with a brief summary of the approach
+2. **Move to in progress**: Apply the `in-progress` label and add a comment noting implementation is starting, with a brief summary of the approach
 3. **Implement** the feature/fix
-4. **Mark ready for testing**: Once complete, add a comment summarizing the changes made and apply the `ready-for-testing` label to the issue
+4. **Mark ready for testing**: Once complete, remove the `in-progress` label, apply the `ready-for-testing` label, and add a comment summarizing the changes made
 5. **Ask questions** before starting if requirements are unclear
 
 ## Issue Labeling
@@ -310,7 +310,7 @@ Every issue must have relevant labels applied. When creating or triaging issues,
 3. **Page** (if applicable — pick all that apply): `page: dashboard`, `page: accounts`, `page: transactions`, `page: assets`, `page: goals`, `page: reports`, `page: forecast`, `page: family`, `page: settings`, `page: login`
 4. **Area** (if applicable — pick all that apply): `area: ui`, `area: data`, `area: sync`, `area: brand`, `area: i18n`, `area: pwa`
 5. **Special** (as needed): `security`, `auth`, `privacy`
-6. **Status**: Apply `ready-for-testing` when implementation is complete and ready for review
+6. **Status** (managed during implementation): Apply `in-progress` when work begins, replace with `ready-for-testing` when implementation is complete and ready for review
 
 ## Plans Archive
 
