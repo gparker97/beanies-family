@@ -178,7 +178,7 @@ function formatDate(dateStr: string): string {
                     v-model="editLabel"
                     type="text"
                     :placeholder="t('passkey.renameLabel')"
-                    class="w-48 rounded border border-gray-300 bg-white px-2 py-0.5 text-sm text-gray-900 focus:border-[#F15D22] focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
+                    class="focus:border-primary-500 w-48 rounded border border-gray-300 bg-white px-2 py-0.5 text-sm text-gray-900 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
                     @keydown.escape="cancelEditing"
                   />
                   <button

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 
 interface Props {
   modelValue?: string;
@@ -16,7 +16,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
+const { getMemberName } = useMemberInfo();
 
 const isOpen = ref(false);
 
@@ -26,12 +26,6 @@ const selectedActivity = computed(() => {
   if (!props.modelValue) return null;
   return activities.value.find((a) => a.id === props.modelValue) ?? null;
 });
-
-function getMemberName(memberId?: string): string {
-  if (!memberId) return '';
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.name ?? '';
-}
 
 function select(id: string | undefined) {
   emit('update:modelValue', id);

@@ -48,7 +48,7 @@ const labelClasses = computed(() => {
       class="animate-spin"
       style="animation-duration: 1.8s"
     />
-    <p v-if="label" :class="labelClasses" class="text-[#2C3E50]/50 dark:text-[#BDC3C7]/50">
+    <p v-if="label" :class="labelClasses" class="text-secondary-500/50 dark:text-[#BDC3C7]/50">
       {{ t('action.loading') }}
     </p>
   </div>

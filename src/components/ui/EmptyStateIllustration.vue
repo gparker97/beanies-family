@@ -19,7 +19,7 @@ const prefersReducedMotion = useReducedMotion();
 
 <template>
   <div class="relative mx-auto h-40 w-40">
-    <div class="absolute inset-0 rounded-full bg-orange-50 dark:bg-[#2C3E50]" />
+    <div class="dark:bg-secondary-500 absolute inset-0 rounded-full bg-orange-50" />
 
     <!-- Accounts: Beanie looking at empty piggy bank -->
     <svg

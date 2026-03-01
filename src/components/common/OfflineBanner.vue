@@ -17,7 +17,7 @@ const { t } = useTranslation();
   >
     <div
       v-if="!isOnline"
-      class="fixed top-0 right-0 left-0 z-[200] flex items-center justify-center bg-[#F15D22] px-4 py-2 text-sm font-medium text-white shadow-md"
+      class="bg-primary-500 fixed top-0 right-0 left-0 z-[200] flex items-center justify-center px-4 py-2 text-sm font-medium text-white shadow-md"
       role="status"
       aria-live="polite"
     >

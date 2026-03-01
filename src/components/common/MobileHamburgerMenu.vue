@@ -69,7 +69,7 @@ function mapItems(items: NavItemDef[]) {
 }
 
 const SECTION_COLORS: Record<string, string> = {
-  treehouse: 'text-[#F15D22]',
+  treehouse: 'text-primary-500',
   piggyBank: 'text-[#27AE60]',
 };
 
@@ -207,7 +207,7 @@ const encryptionLabel = computed(() => {
         >
           <div
             v-if="open"
-            class="absolute inset-y-0 left-0 flex w-80 flex-col overflow-y-auto bg-[#2C3E50]"
+            class="bg-secondary-500 absolute inset-y-0 left-0 flex w-80 flex-col overflow-y-auto"
           >
             <!-- Close button -->
             <button
@@ -243,7 +243,8 @@ const encryptionLabel = computed(() => {
               </div>
               <div class="min-w-0">
                 <h1 class="font-outfit text-base leading-tight font-bold">
-                  <span class="text-white">beanies</span><span class="text-[#F15D22]">.family</span>
+                  <span class="text-white">beanies</span
+                  ><span class="text-primary-500">.family</span>
                 </h1>
                 <p
                   class="font-outfit mt-0.5 text-[0.5rem] font-light tracking-[0.06em] text-white/25 italic"
@@ -308,7 +309,7 @@ const encryptionLabel = computed(() => {
                   class="flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-[0.75rem] transition-colors"
                   :class="[
                     lang.code === settingsStore.language
-                      ? 'bg-[#F15D22]/20 text-white'
+                      ? 'bg-primary-500/20 text-white'
                       : 'text-white/40 hover:bg-white/[0.05] hover:text-white/60',
                     translationStore.isLoading ? 'pointer-events-none opacity-50' : '',
                   ]"
@@ -318,7 +319,7 @@ const encryptionLabel = computed(() => {
                   <!-- Loading spinner on active language -->
                   <svg
                     v-if="translationStore.isLoading && lang.code === settingsStore.language"
-                    class="h-4 w-4 animate-spin text-[#F15D22]"
+                    class="text-primary-500 h-4 w-4 animate-spin"
                     viewBox="0 0 24 24"
                     fill="none"
                   >
@@ -358,7 +359,7 @@ const encryptionLabel = computed(() => {
                   class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-all"
                   :class="
                     code === settingsStore.displayCurrency
-                      ? 'bg-[#F15D22] text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-white/40 hover:text-white/60'
                   "
                   @click="selectCurrency(code)"
@@ -400,7 +401,7 @@ const encryptionLabel = computed(() => {
                     class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1rem] font-medium transition-all duration-150"
                     :class="[
                       item.active
-                        ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                        ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
                         : 'border-l-4 border-transparent hover:bg-white/[0.05]',
                       item.comingSoon && !item.active
                         ? 'text-white/25'
@@ -414,7 +415,7 @@ const encryptionLabel = computed(() => {
                     <span class="flex-1">{{ item.label }}</span>
                     <span
                       v-if="item.badge > 0"
-                      class="min-w-[1.2rem] rounded-full bg-[#F15D22] px-1.5 text-center text-[0.6rem] font-semibold text-white"
+                      class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-[0.6rem] font-semibold text-white"
                     >
                       {{ item.badge }}
                     </span>
@@ -439,7 +440,7 @@ const encryptionLabel = computed(() => {
                 class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-[1rem] font-medium transition-all duration-150"
                 :class="
                   item.active
-                    ? 'border-l-4 border-[#F15D22] bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                    ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
                     : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
                 "
                 @click="navigateTo(item.path)"

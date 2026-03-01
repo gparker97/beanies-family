@@ -25,7 +25,7 @@ const emit = defineEmits<{
         @click="emit('navigate', 'load-pod')"
       >
         <div
-          class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#2C3E50] dark:bg-slate-600"
+          class="bg-secondary-500 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl dark:bg-slate-600"
         >
           <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -46,7 +46,7 @@ const emit = defineEmits<{
 
       <!-- Create a new pod -->
       <button
-        class="flex-1 rounded-3xl bg-gradient-to-br from-[#F15D22] to-[#E67E22] p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+        class="from-primary-500 to-terracotta-400 flex-1 rounded-3xl bg-gradient-to-br p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
         @click="emit('navigate', 'create')"
       >
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
@@ -73,10 +73,10 @@ const emit = defineEmits<{
         @click="emit('navigate', 'join')"
       >
         <div
-          class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#AED6F1]/30 dark:bg-[#AED6F1]/10"
+          class="bg-sky-silk-300/30 dark:bg-sky-silk-300/10 mb-4 flex h-12 w-12 items-center justify-center rounded-2xl"
         >
           <svg
-            class="h-6 w-6 text-[#2C3E50] dark:text-[#AED6F1]"
+            class="text-secondary-500 dark:text-sky-silk-300 h-6 w-6"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

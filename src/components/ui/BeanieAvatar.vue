@@ -55,7 +55,7 @@ const isFiltered = computed(() => props.variant === 'family-filtered');
     <!-- Filter badge overlay for family-filtered variant -->
     <div
       v-if="isFiltered"
-      class="absolute right-0 bottom-0 flex h-[40%] w-[40%] items-center justify-center rounded-full bg-[#2C3E50]/80"
+      class="bg-secondary-500/80 absolute right-0 bottom-0 flex h-[40%] w-[40%] items-center justify-center rounded-full"
     >
       <svg
         viewBox="0 0 16 16"

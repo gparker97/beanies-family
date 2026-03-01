@@ -4,6 +4,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -12,6 +13,7 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { COUNTRIES } from '@/constants/countries';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
@@ -32,6 +34,7 @@ const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
+const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
@@ -157,16 +160,6 @@ const assetsByType = computed(() => {
 
 function getAssetTypeLabel(type: AssetType): string {
   return assetTypes.value.find((t) => t.value === type)?.label || type;
-}
-
-function getMemberName(memberId: string): string {
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.name || 'Unknown';
-}
-
-function getMemberColor(memberId: string): string {
-  const member = familyStore.members.find((m) => m.id === memberId);
-  return member?.color || '#6b7280';
 }
 
 // Get icon and color config for each asset type
@@ -471,23 +464,7 @@ function getAppreciationPercent(asset: Asset): number {
               </div>
 
               <!-- Action Menu -->
-              <div class="flex gap-1">
-                <button
-                  data-testid="edit-asset-btn"
-                  class="hover:text-primary-600 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-                  title="Edit asset"
-                  @click="openEditModal(asset)"
-                >
-                  <BeanieIcon name="edit" size="sm" />
-                </button>
-                <button
-                  class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                  title="Delete asset"
-                  @click="deleteAsset(asset.id)"
-                >
-                  <BeanieIcon name="trash" size="sm" />
-                </button>
-              </div>
+              <ActionButtons @edit="openEditModal(asset)" @delete="deleteAsset(asset.id)" />
             </div>
 
             <!-- Value Display -->
