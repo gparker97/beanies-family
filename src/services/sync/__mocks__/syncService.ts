@@ -59,3 +59,4 @@ export const setEncryptionRequiredCallback = vi.fn();
 export const setSessionPassword = vi.fn();
 export const getSessionPassword = vi.fn(() => null);
 export const getSessionFileHandle = vi.fn(() => null);
+export const setPasskeySecrets = vi.fn();

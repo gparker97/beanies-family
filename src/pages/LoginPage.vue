@@ -55,6 +55,8 @@ const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 const isSingleFamilyAutoSelect = ref(false);
+const crossDeviceCredentialId = ref<string | undefined>();
+const crossDeviceMemberId = ref<string | undefined>();
 
 onMounted(async () => {
   if (familyStore.members.length === 0) {
@@ -335,6 +337,33 @@ function handleBiometricAvailable(payload: { familyId: string; familyName?: stri
 
 function handleFileLoaded() {
   fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+
+  if (crossDeviceMemberId.value) {
+    // Cross-device flow: passkey already verified this member, auto-sign-in
+    authStore.createSessionForVerifiedMember(
+      crossDeviceMemberId.value,
+      familyContextStore.activeFamilyId ?? ''
+    );
+
+    // Register the synced credential with the current session password
+    if (crossDeviceCredentialId.value && syncStore.currentSessionPassword) {
+      registerSyncedCredentialFromPassword(
+        crossDeviceCredentialId.value,
+        crossDeviceMemberId.value,
+        familyContextStore.activeFamilyId ?? '',
+        syncStore.currentSessionPassword
+      );
+    }
+
+    // Clear cross-device state
+    crossDeviceMemberId.value = undefined;
+    crossDeviceCredentialId.value = undefined;
+
+    // Navigate — member already identified, skip pick-bean
+    handleSignedIn('/nook');
+    return;
+  }
+
   activeView.value = 'pick-bean';
 }
 
@@ -344,6 +373,36 @@ function handleBiometricFallback() {
   autoLoadPod.value = syncStore.isConfigured && !syncStore.needsPermission;
   needsPermissionGrant.value = syncStore.isConfigured && syncStore.needsPermission;
   activeView.value = 'load-pod';
+}
+
+function handleCrossDevicePassword(payload: { memberId: string; credentialId: string }) {
+  crossDeviceMemberId.value = payload.memberId;
+  crossDeviceCredentialId.value = payload.credentialId;
+  // Fall through to password entry
+  handleBiometricFallback();
+}
+
+async function registerSyncedCredentialFromPassword(
+  credentialId: string,
+  memberId: string,
+  familyId: string,
+  password: string
+) {
+  try {
+    const { listRegisteredPasskeys, registerSyncedCredential } =
+      await import('@/services/auth/passkeyService');
+    const registrations = await listRegisteredPasskeys(memberId);
+    const sourceReg = registrations.find((r) => r.familyId === familyId);
+    if (sourceReg) {
+      await registerSyncedCredential({
+        credentialId,
+        sourceRegistration: sourceReg,
+        cachedPassword: password,
+      });
+    }
+  } catch {
+    // Non-critical — user can still log in with password next time
+  }
 }
 
 function handleSignedIn(destination: string) {
@@ -377,6 +436,7 @@ function handleSignedIn(destination: string) {
         :show-not-you-link="isSingleFamilyAutoSelect"
         @signed-in="handleSignedIn"
         @use-password="handleBiometricFallback"
+        @cross-device-password="handleCrossDevicePassword"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
       />
 

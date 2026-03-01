@@ -53,6 +53,16 @@ export interface PasskeyRegistration {
   lastUsedAt?: ISODateString;
 }
 
+// PasskeySecret - PRF-wrapped file password stored in .beanpod envelope
+export interface PasskeySecret {
+  credentialId: string; // Which passkey credential created this
+  memberId: UUID; // Which member this belongs to
+  wrappedPassword: string; // AES-GCM encrypted file password
+  hkdfSalt: string; // HKDF salt (base64)
+  iv: string; // AES-GCM IV (base64)
+  createdAt: ISODateString;
+}
+
 // Family member gender and age group for avatar selection
 export type Gender = 'male' | 'female' | 'other';
 export type AgeGroup = 'adult' | 'child';
@@ -462,6 +472,7 @@ export interface SyncFileData {
   encrypted: boolean;
   familyId?: UUID; // v2.0: identifies which family this data belongs to
   familyName?: string; // v2.0: human-readable family name
+  passkeySecrets?: PasskeySecret[]; // PRF-wrapped passwords (outside encryption envelope)
   data: {
     familyMembers: FamilyMember[];
     accounts: Account[];

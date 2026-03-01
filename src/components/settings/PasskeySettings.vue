@@ -64,6 +64,11 @@ async function handleRegister() {
     const result = await authStore.registerPasskeyForCurrentUser(registrationPassword.value);
 
     if (result.success) {
+      // Store PRF-wrapped password in the .beanpod envelope for cross-device access
+      if (result.passkeySecret) {
+        syncStore.addPasskeySecret(result.passkeySecret);
+        await syncStore.syncNow(true);
+      }
       statusMessage.value = { text: t('passkey.registerSuccess'), type: 'success' };
       showPasswordInput.value = false;
       registrationPassword.value = '';
@@ -83,6 +88,7 @@ async function handleRemove(credentialId: string) {
     await showConfirm({ title: 'confirm.removePasskeyTitle', message: 'passkey.removeConfirm' })
   ) {
     await removePasskey(credentialId);
+    syncStore.removePasskeySecretsForCredential(credentialId);
     await loadPasskeys();
   }
 }

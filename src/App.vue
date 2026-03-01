@@ -93,6 +93,10 @@ async function handleEnablePasskey() {
     const result = await authStore.registerPasskeyForCurrentUser(password);
     if (!result.success) {
       console.warn('[passkey] Registration failed:', result.error);
+    } else if (result.passkeySecret) {
+      // Store PRF-wrapped password in the .beanpod envelope for cross-device access
+      syncStore.addPasskeySecret(result.passkeySecret);
+      await syncStore.syncNow(true);
     }
   } catch (e) {
     console.warn('[passkey] Unexpected error during passkey registration:', e);
