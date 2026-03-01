@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import { BaseCard } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
@@ -54,8 +53,7 @@ const searchQuery = ref('');
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
-const showRecurringModal = ref(false);
-const editingRecurringItem = ref<RecurringItem | undefined>(undefined);
+const editingRecurringItem = ref<RecurringItem | null>(null);
 
 // ── Computeds ─────────────────────────────────────────────────────────────
 const baseCurrency = computed(() => settingsStore.baseCurrency);
@@ -183,6 +181,7 @@ function openEditModal(transaction: Transaction) {
 function closeEditModal() {
   showEditModal.value = false;
   editingTransaction.value = null;
+  editingRecurringItem.value = null;
 }
 
 async function handleTransactionSave(
@@ -198,15 +197,22 @@ async function handleTransactionSave(
 }
 
 async function handleTransactionDelete(id: string) {
+  // Capture recurring item before closing the modal (which clears the ref)
+  const wasEditingRecurring = editingRecurringItem.value;
   closeEditModal();
-  if (
-    await showConfirm({
-      title: 'confirm.deleteTransactionTitle',
-      message: 'transactions.deleteConfirm',
-    })
-  ) {
-    await transactionsStore.deleteTransaction(id);
-    playWhoosh();
+
+  if (wasEditingRecurring) {
+    await deleteRecurringItemById(id);
+  } else {
+    if (
+      await showConfirm({
+        title: 'confirm.deleteTransactionTitle',
+        message: 'transactions.deleteConfirm',
+      })
+    ) {
+      await transactionsStore.deleteTransaction(id);
+      playWhoosh();
+    }
   }
 }
 
@@ -224,34 +230,25 @@ async function deleteTransaction(id: string) {
 
 // ── Recurring save from TransactionModal ──────────────────────────────────
 async function handleSaveRecurring(data: CreateRecurringItemInput) {
-  await recurringStore.createRecurringItem(data);
-  // Process the new recurring item to generate due transactions immediately
-  const result = await processRecurringItems();
-  if (result.processed > 0) {
-    await transactionsStore.loadTransactions();
+  if (editingRecurringItem.value) {
+    await recurringStore.updateRecurringItem(editingRecurringItem.value.id, data);
+    closeEditModal();
+  } else {
+    await recurringStore.createRecurringItem(data);
+    // Process the new recurring item to generate due transactions immediately
+    const result = await processRecurringItems();
+    if (result.processed > 0) {
+      await transactionsStore.loadTransactions();
+    }
+    showAddModal.value = false;
   }
-  showAddModal.value = false;
 }
 
 // ── Recurring CRUD (for editing recurring templates) ──────────────────────
 function openEditRecurringModal(item: RecurringItem) {
   editingRecurringItem.value = item;
-  showRecurringModal.value = true;
-}
-
-async function handleRecurringSave(input: CreateRecurringItemInput) {
-  if (editingRecurringItem.value) {
-    await recurringStore.updateRecurringItem(editingRecurringItem.value.id, input);
-  } else {
-    await recurringStore.createRecurringItem(input);
-  }
-  showRecurringModal.value = false;
-  editingRecurringItem.value = undefined;
-}
-
-function handleRecurringClose() {
-  showRecurringModal.value = false;
-  editingRecurringItem.value = undefined;
+  editingTransaction.value = null;
+  showEditModal.value = true;
 }
 
 async function deleteRecurringItemById(id: string) {
@@ -587,23 +584,15 @@ function isRecurringItemInactive(tx: Transaction): boolean {
       @delete="handleTransactionDelete"
     />
 
-    <!-- Edit Transaction Modal -->
+    <!-- Edit Transaction / Recurring Modal -->
     <TransactionModal
       :open="showEditModal"
       :transaction="editingTransaction"
+      :recurring-item="editingRecurringItem"
       @close="closeEditModal"
       @save="handleTransactionSave"
       @save-recurring="handleSaveRecurring"
       @delete="handleTransactionDelete"
-    />
-
-    <!-- Edit Recurring Modal -->
-    <RecurringItemForm
-      :open="showRecurringModal"
-      :item="editingRecurringItem"
-      @save="handleRecurringSave"
-      @close="handleRecurringClose"
-      @delete="deleteRecurringItemById"
     />
   </div>
 </template>
