@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-01",
-    "translationCount": 969
+    "translationCount": 1030
   },
   "translations": {
     "app.name": {
@@ -4849,6 +4849,311 @@
     "googleDrive.reconnectFailed": {
       "translation": "无法重新连接。请重试。",
       "hash": "a0g3ow",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.noFilesHint": {
+      "translation": "确保该文件位于此帐户上名为“beanies.family”的文件夹中。",
+      "hash": "q59df8",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.retrySearch": {
+      "translation": "重试",
+      "hash": "1ay360",
+      "lastUpdated": "2026-03-01"
+    },
+    "googleDrive.switchAccount": {
+      "translation": "切换账号",
+      "hash": "9ueush",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.title": {
+      "translation": "预算",
+      "hash": "x3510l",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.subtitle": {
+      "translation": "根据您的计划跟踪您的支出",
+      "hash": "w8uv4j",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.addBudget": {
+      "translation": "设置预算",
+      "hash": "8s1rm4",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.editBudget": {
+      "translation": "编辑预算",
+      "hash": "ya0yqt",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.deleteBudget": {
+      "translation": "删除预算",
+      "hash": "c5a10m",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.spent": {
+      "translation": "已花费",
+      "hash": "1bole6",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.of": {
+      "translation": "关",
+      "hash": "2qf",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.remaining": {
+      "translation": "剩余",
+      "hash": "edvnjq",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.over": {
+      "translation": "预算",
+      "hash": "eolpg1",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.percentageMode": {
+      "translation": "占收入的百分比",
+      "hash": "4xypcn",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.hero.fixedMode": {
+      "translation": "固定金额",
+      "hash": "2ukazo",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.pace.great": {
+      "translation": "看起来很棒！远低于预算",
+      "hash": "ucf39s",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.pace.onTrack": {
+      "translation": "本月进展顺利",
+      "hash": "cj1qo",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.pace.caution": {
+      "translation": "消费正在回升—请保持警惕",
+      "hash": "atekm4",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.pace.over": {
+      "translation": "超出预算—是时候控制它了",
+      "hash": "b795q9",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.summary.monthlyIncome": {
+      "translation": "月收入",
+      "hash": "a1n3a4",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.summary.currentSpending": {
+      "translation": "当前支出",
+      "hash": "oe8rhx",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.summary.monthlySavings": {
+      "translation": "20%的月储蓄",
+      "hash": "q4xj6u",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.summary.savingsRate": {
+      "translation": "储蓄率",
+      "hash": "1e7aqh",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.summary.recurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.summary.oneTime": {
+      "translation": "一次性",
+      "hash": "xf6j90",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.section.upcomingTransactions": {
+      "translation": "即将开始的交易",
+      "hash": "3vbvaf",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.section.spendingByCategory": {
+      "translation": "支出（按类别）",
+      "hash": "ifl1mz",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.section.budgetSettings": {
+      "translation": "预算设置",
+      "hash": "1nssbm",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.section.addTransactions": {
+      "translation": "交易",
+      "hash": "6dgfv0",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.section.viewAll": {
+      "translation": "檢視全部",
+      "hash": "ktimxy",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.title": {
+      "translation": "快捷添加",
+      "hash": "gei2qa",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.moneyIn": {
+      "translation": "收钱",
+      "hash": "4ffdx7",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.moneyOut": {
+      "translation": "取钱",
+      "hash": "4rz92m",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.description": {
+      "translation": "Description",
+      "hash": "xqskk",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.amount": {
+      "translation": "金额(元)",
+      "hash": "whwdbs",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.category": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.date": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.quickAdd.account": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.batchAdd.title": {
+      "translation": "批量增加",
+      "hash": "gxeikb",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.csvUpload.title": {
+      "translation": "Csv 上传",
+      "hash": "7k478b",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.comingSoon": {
+      "translation": "正在开发的beanies",
+      "hash": "ophanb",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.title": {
+      "translation": "预算设置",
+      "hash": "1nssbm",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.mode": {
+      "translation": "预算模式",
+      "hash": "s69bq6",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.percentageOfIncome": {
+      "translation": "占收入的百分比",
+      "hash": "a7h79l",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.fixedAmount": {
+      "translation": "固定金额",
+      "hash": "cavlmk",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.percentageLabel": {
+      "translation": "占月收入的百分比",
+      "hash": "u47t0f",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.fixedLabel": {
+      "translation": "每月预算金额",
+      "hash": "u16uu8",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.categoryAllocations": {
+      "translation": "类别分配",
+      "hash": "1sh84x",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.categoryHint": {
+      "translation": "设置每个类别的消费限额（可选）",
+      "hash": "2t9myy",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.effectiveBudget": {
+      "translation": "有效的预算",
+      "hash": "3j6pz6",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.owner": {
+      "translation": "预算所有人",
+      "hash": "l1xcew",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.perMonth": {
+      "translation": "每月",
+      "hash": "p7ui4j",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.infoPercentage": {
+      "translation": "您的预算已设置为总收入的{percentage} %。它会在收入变化时自动调整。剩余的{remaining} %流向节约目标。",
+      "hash": "rd8m0l",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.settings.infoFixed": {
+      "translation": "您的预算设置为每月{amount}的固定金额。您可以随时通过设置进行调整。",
+      "hash": "1tp8h2",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.empty.title": {
+      "translation": "无预算",
+      "hash": "wju5nw",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.empty.description": {
+      "translation": "设置每月预算，以跟踪您的支出和储蓄目标",
+      "hash": "fwt5s9",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.confirm.deleteTitle": {
+      "translation": "删除预算",
+      "hash": "le2lln",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.confirm.deleteMessage": {
+      "translation": "这将删除您的预算配置。您的交易不会受到影响。",
+      "hash": "r101ao",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.category.onTrack": {
+      "translation": "正在跟踪",
+      "hash": "1u2k16",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.category.warning": {
+      "translation": "……！危险！！",
+      "hash": "a30mrg",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.category.over": {
+      "translation": "结束",
+      "hash": "1gxys",
+      "lastUpdated": "2026-03-01"
+    },
+    "budget.category.noBudget": {
+      "translation": "无设定限值",
+      "hash": "b02cqq",
       "lastUpdated": "2026-03-01"
     }
   }
