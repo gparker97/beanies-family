@@ -9,11 +9,11 @@ export class AssetsPage {
   }
 
   getLenderCombobox() {
-    return new ComboboxHelper(this.page, 'Lender');
+    return new ComboboxHelper(this.page, 'lender');
   }
 
   getLenderCountryCombobox() {
-    return new ComboboxHelper(this.page, 'Country');
+    return new ComboboxHelper(this.page, 'country');
   }
 
   async addAssetWithLoan(data: {
@@ -36,7 +36,7 @@ export class AssetsPage {
     await this.page.getByLabel('Current Value').fill(data.currentValue.toString());
 
     if (data.hasLoan) {
-      await this.page.getByText('This asset has a loan').click();
+      await this.page.getByText('this asset has a loan').click();
 
       if (data.outstandingBalance !== undefined) {
         await this.page.getByLabel('Outstanding Balance').fill(data.outstandingBalance.toString());

@@ -46,10 +46,10 @@ test.describe('Account Institution Combobox', () => {
     await page.getByRole('button', { name: 'HSBC' }).click();
 
     // Fill remaining required fields and save
-    await page.getByPlaceholder('Account Name').fill('HSBC Account');
+    await page.getByPlaceholder('account name').fill('HSBC Account');
     // Select type: Bank category → Checking subtype
-    await page.getByRole('button', { name: '🏦 Bank', exact: true }).click();
-    await page.getByRole('button', { name: '🏦 Checking', exact: true }).click();
+    await page.getByRole('button', { name: '🏦 bank', exact: true }).click();
+    await page.getByRole('button', { name: '🏦 checking', exact: true }).click();
     await page.locator('input[type="number"]').first().fill('5000');
     await page.getByRole('button', { name: 'Add Account' }).last().click();
 
@@ -207,7 +207,7 @@ test.describe('Asset Loan Lender Combobox', () => {
     await assetsPage.goto();
 
     await page.getByRole('button', { name: 'Add Asset' }).first().click();
-    await page.getByText('This asset has a loan').click();
+    await page.getByText('this asset has a loan').click();
 
     const lenderCombobox = assetsPage.getLenderCombobox();
     await lenderCombobox.open();
