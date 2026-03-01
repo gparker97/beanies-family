@@ -133,6 +133,20 @@ export function timeAgo(isoString: ISODateString): string {
 }
 
 /**
+ * Format a date as "Month Year" (e.g. "February 2026")
+ */
+export function formatMonthYear(date: Date): string {
+  return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(date);
+}
+
+/**
+ * Format a date as "Mon YYYY" (e.g. "Feb 2026")
+ */
+export function formatMonthYearShort(date: Date): string {
+  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(date);
+}
+
+/**
  * Format a date for HTML date input (YYYY-MM-DD)
  */
 export function toDateInputValue(date: Date): string {
