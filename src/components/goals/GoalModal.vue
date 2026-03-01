@@ -36,10 +36,10 @@ const { currencyOptions } = useCurrencyOptions();
 
 // Goal type icon chip options
 const GOAL_ICON_OPTIONS = [
-  { value: '🐷', label: 'Savings', icon: '🐷' },
   { value: '🎯', label: 'Debt Payoff', icon: '🎯' },
   { value: '📈', label: 'Investment', icon: '📈' },
   { value: '🛍️', label: 'Purchase', icon: '🛍️' },
+  { value: '🐷', label: 'Savings', icon: '🐷' },
   { value: '📦', label: 'Other', icon: '📦' },
 ];
 

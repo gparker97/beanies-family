@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue';
+import { computed, ref, watchEffect } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import {
   ACCOUNT_CATEGORIES,
   getCategoryForType,
   type AccountCategory,
+  type AccountSubtype,
 } from '@/constants/accountCategories';
 import type { AccountType } from '@/types/models';
 
@@ -52,6 +53,35 @@ function isAutoSelected(cat: AccountCategory): boolean {
 }
 
 const expandedCat = () => ACCOUNT_CATEGORIES.find((c) => c.id === expandedCategory.value);
+
+// Sort alphabetically by translated label, "Other" always last
+function sortOtherLast<T>(
+  items: T[],
+  labelFn: (item: T) => string,
+  isOther: (item: T) => boolean
+): T[] {
+  return [...items].sort((a, b) => {
+    if (isOther(a)) return 1;
+    if (isOther(b)) return -1;
+    return labelFn(a).localeCompare(labelFn(b));
+  });
+}
+
+const sortedCategories = computed(() =>
+  sortOtherLast(
+    ACCOUNT_CATEGORIES,
+    (cat) => t(cat.labelKey),
+    (cat) => cat.id === 'other'
+  )
+);
+
+function sortedSubtypes(subtypes: AccountSubtype[]): AccountSubtype[] {
+  return sortOtherLast(
+    subtypes,
+    (sub) => t(sub.labelKey),
+    (sub) => sub.type === 'other'
+  );
+}
 </script>
 
 <template>
@@ -59,7 +89,7 @@ const expandedCat = () => ACCOUNT_CATEGORIES.find((c) => c.id === expandedCatego
     <!-- All category chips (shown when no category is expanded) -->
     <div v-if="!expandedCategory" class="flex flex-wrap gap-2">
       <button
-        v-for="cat in ACCOUNT_CATEGORIES"
+        v-for="cat in sortedCategories"
         :key="cat.id"
         type="button"
         class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
@@ -95,7 +125,7 @@ const expandedCat = () => ACCOUNT_CATEGORIES.find((c) => c.id === expandedCatego
       <!-- Flat subtypes (e.g. Bank) -->
       <div v-if="expandedCat()!.subtypes" class="flex flex-wrap gap-2">
         <button
-          v-for="sub in expandedCat()!.subtypes"
+          v-for="sub in sortedSubtypes(expandedCat()!.subtypes!)"
           :key="sub.type"
           type="button"
           class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
@@ -127,7 +157,7 @@ const expandedCat = () => ACCOUNT_CATEGORIES.find((c) => c.id === expandedCatego
           </div>
           <div class="flex flex-wrap gap-2">
             <button
-              v-for="sub in group.subtypes"
+              v-for="sub in sortedSubtypes(group.subtypes)"
               :key="sub.type"
               type="button"
               class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"

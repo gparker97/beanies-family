@@ -23,7 +23,9 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 
-const members = computed(() => familyStore.members);
+const members = computed(() =>
+  [...familyStore.members].sort((a, b) => a.name.localeCompare(b.name))
+);
 
 const SHARED_ID = '__shared__';
 
