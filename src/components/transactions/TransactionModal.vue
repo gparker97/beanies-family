@@ -20,6 +20,8 @@ import type {
   TransactionType,
   CreateTransactionInput,
   UpdateTransactionInput,
+  CreateRecurringItemInput,
+  RecurringFrequency,
 } from '@/types/models';
 
 const props = defineProps<{
@@ -30,6 +32,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   save: [data: CreateTransactionInput | { id: string; data: UpdateTransactionInput }];
+  'save-recurring': [data: CreateRecurringItemInput];
   delete: [id: string];
 }>();
 
@@ -51,6 +54,7 @@ const endDate = ref('');
 const accountId = ref('');
 const activityId = ref<string | undefined>(undefined);
 const currency = ref('');
+const dayOfMonth = ref(1);
 
 function todayStr() {
   const d = new Date();
@@ -85,6 +89,7 @@ const { isEditing, isSubmitting } = useFormModal(
       accountId.value = accountsStore.accounts[0]?.id ?? '';
       activityId.value = undefined;
       currency.value = settingsStore.displayCurrency;
+      dayOfMonth.value = new Date().getDate();
     },
   }
 );
@@ -96,10 +101,15 @@ const accountOptions = computed(() =>
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
 
 const frequencyOptions = [
-  { value: 'weekly', label: 'Weekly' },
+  { value: 'daily', label: 'Daily' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'yearly', label: 'Yearly' },
 ];
+
+const dayOfMonthOptions = Array.from({ length: 28 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
 
 const canSave = computed(
   () => description.value.trim().length > 0 && amount.value !== undefined && amount.value > 0
@@ -122,6 +132,24 @@ function handleSave() {
   isSubmitting.value = true;
 
   try {
+    if (recurrenceMode.value === 'recurring' && !isEditing.value) {
+      const recurringData: CreateRecurringItemInput = {
+        accountId: accountId.value,
+        type: effectiveType.value,
+        amount: amount.value!,
+        currency: currency.value,
+        category: category.value,
+        description: description.value.trim(),
+        frequency: recurrenceFrequency.value as RecurringFrequency,
+        dayOfMonth: dayOfMonth.value,
+        startDate: startDate.value,
+        endDate: endDate.value || undefined,
+        isActive: true,
+      };
+      emit('save-recurring', recurringData);
+      return;
+    }
+
     const data = {
       accountId: accountId.value,
       activityId: activityId.value || undefined,
@@ -214,6 +242,16 @@ function handleDelete() {
       <div class="space-y-4">
         <FormFieldGroup :label="t('modal.howOften')">
           <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
+        </FormFieldGroup>
+        <FormFieldGroup
+          v-if="recurrenceFrequency === 'monthly' || recurrenceFrequency === 'yearly'"
+          :label="t('transactions.dayOfMonth')"
+        >
+          <BaseSelect
+            :model-value="String(dayOfMonth)"
+            :options="dayOfMonthOptions"
+            @update:model-value="dayOfMonth = Number($event)"
+          />
         </FormFieldGroup>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <BaseInput v-model="startDate" :label="t('form.startDate')" type="date" />
