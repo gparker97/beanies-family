@@ -41,6 +41,7 @@ const currentStep = ref<JoinStep>('verify');
 const targetFamilyId = ref('');
 const targetProvider = ref('local');
 const targetFileRef = ref('');
+const targetDriveFileId = ref('');
 const registryEntry = ref<RegistryEntry | null>(null);
 const isLookingUp = ref(false);
 const lookupDone = ref(false);
@@ -90,11 +91,13 @@ onMounted(async () => {
   const fam = (route.query.fam as string) || (route.query.code as string) || '';
   const p = (route.query.p as string) || 'local';
   const fileRef = (route.query.ref as string) || '';
+  const fileIdParam = (route.query.fileId as string) || '';
 
   if (fam) {
     targetFamilyId.value = fam;
     targetProvider.value = p;
     targetFileRef.value = fileRef;
+    targetDriveFileId.value = fileIdParam;
     await performLookup(fam);
   }
 });
@@ -106,10 +109,10 @@ async function performLookup(familyId: string) {
 
   try {
     if (!isRegistryConfigured()) {
-      // Registry not configured — skip lookup, go straight to file load
+      // Registry not configured — try cloud load if we have provider info from URL
       registryEntry.value = null;
       lookupDone.value = true;
-      needsManualFileLoad.value = true;
+      await attemptFileLoad();
       return;
     }
 
@@ -122,18 +125,22 @@ async function performLookup(familyId: string) {
       targetFamilyId.value = familyId;
       targetProvider.value = entry.provider || 'local';
       await attemptFileLoad();
+    } else {
+      // Registry didn't find it — still try cloud load if URL had provider info
+      await attemptFileLoad();
     }
-    // If entry is null but registry IS configured, it's genuinely not found — UI shows warning
   } catch {
-    // Network error — treat like unavailable, allow file load
+    // Network error — try cloud load if we have provider info, else manual fallback
     lookupDone.value = true;
-    needsManualFileLoad.value = true;
+    await attemptFileLoad();
   } finally {
     isLookingUp.value = false;
   }
 }
 
-function parseMagicLink(input: string): { fam: string; p?: string; ref?: string } | null {
+function parseMagicLink(
+  input: string
+): { fam: string; p?: string; ref?: string; fileId?: string } | null {
   try {
     const url = new URL(input);
     const fam = url.searchParams.get('fam') || url.searchParams.get('code');
@@ -142,6 +149,7 @@ function parseMagicLink(input: string): { fam: string; p?: string; ref?: string 
         fam,
         p: url.searchParams.get('p') || undefined,
         ref: url.searchParams.get('ref') || undefined,
+        fileId: url.searchParams.get('fileId') || undefined,
       };
   } catch {
     // Not a URL — return null
@@ -163,6 +171,7 @@ async function handleManualCodeSubmit() {
     targetFamilyId.value = parsed.fam;
     targetProvider.value = parsed.p || 'local';
     targetFileRef.value = parsed.ref || '';
+    targetDriveFileId.value = parsed.fileId || '';
   } else {
     targetFamilyId.value = raw;
   }
@@ -177,8 +186,36 @@ async function attemptFileLoad() {
     return;
   }
 
-  // Future: cloud providers would fetch the file directly here
-  // For now, fall back to manual file load
+  if (targetProvider.value === 'google_drive') {
+    const fileId = targetDriveFileId.value || registryEntry.value?.fileId;
+    const fileName = expectedFileName.value || 'family.beanpod';
+
+    if (!fileId) {
+      needsManualFileLoad.value = true;
+      return;
+    }
+
+    isLoadingFile.value = true;
+    try {
+      const result = await syncStore.loadFromGoogleDrive(fileId, fileName);
+      if (result.success) {
+        await onFileLoaded();
+      } else if (result.needsPassword) {
+        showDecryptModal.value = true;
+      } else {
+        formError.value = syncStore.error || t('auth.fileLoadFailed');
+        needsManualFileLoad.value = true;
+      }
+    } catch {
+      formError.value = t('join.cloudLoadFailed');
+      needsManualFileLoad.value = true;
+    } finally {
+      isLoadingFile.value = false;
+    }
+    return;
+  }
+
+  // Unknown provider — fall back to manual
   needsManualFileLoad.value = true;
 }
 
@@ -429,12 +466,14 @@ function handleBack() {
         {{ formError }}
       </div>
 
-      <!-- Looking up spinner -->
-      <div v-if="isLookingUp" class="py-12 text-center">
+      <!-- Looking up / cloud loading spinner -->
+      <div v-if="isLookingUp || (isLoadingFile && !needsManualFileLoad)" class="py-12 text-center">
         <div
           class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
         ></div>
-        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('join.lookingUp') }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          {{ isLoadingFile ? t('join.loadingFromCloud') : t('join.lookingUp') }}
+        </p>
       </div>
 
       <!-- Family found + needs manual file load -->
