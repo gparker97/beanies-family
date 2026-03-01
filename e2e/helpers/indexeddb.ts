@@ -106,7 +106,7 @@ export class IndexedDBHelper {
         return new Promise<void>((resolve, reject) => {
           // Use the per-family DB name, or fall back to legacy name for migration
           const targetDb = familyDbName || 'gp-family-finance';
-          const request = indexedDB.open(targetDb, 5);
+          const request = indexedDB.open(targetDb, 6);
 
           request.onsuccess = () => {
             const db = request.result;
@@ -194,7 +194,7 @@ export class IndexedDBHelper {
     return await this.page.evaluate((familyDbName) => {
       return new Promise<ExportedData>((resolve, reject) => {
         const targetDb = familyDbName || 'gp-family-finance';
-        const request = indexedDB.open(targetDb, 5);
+        const request = indexedDB.open(targetDb, 6);
 
         request.onsuccess = () => {
           const db = request.result;
