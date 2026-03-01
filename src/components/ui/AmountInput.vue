@@ -41,7 +41,7 @@ function handleInput(event: Event) {
   <div>
     <label
       v-if="label"
-      class="font-outfit mb-2 block text-[0.6rem] font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+      class="font-outfit mb-2 block text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
     >
       {{ label }}
     </label>

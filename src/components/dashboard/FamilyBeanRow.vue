@@ -51,10 +51,10 @@ function getRoleLabel(member: { role: string; ageGroup?: string }): string {
             class="absolute right-0.5 bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#27AE60] dark:border-slate-800"
           />
         </div>
-        <div class="font-outfit text-secondary-500 text-[0.7rem] font-semibold dark:text-gray-200">
+        <div class="font-outfit text-secondary-500 text-xs font-semibold dark:text-gray-200">
           {{ member.name }}
         </div>
-        <div class="text-secondary-500/35 text-[0.6rem] dark:text-gray-500">
+        <div class="text-secondary-500/35 text-xs dark:text-gray-500">
           {{ getRoleLabel(member) }}
         </div>
       </button>
@@ -70,9 +70,7 @@ function getRoleLabel(member: { role: string; ageGroup?: string }): string {
         >
           ➕
         </div>
-        <div
-          class="font-outfit text-secondary-500/30 text-[0.7rem] font-semibold dark:text-gray-500"
-        >
+        <div class="font-outfit text-secondary-500/30 text-xs font-semibold dark:text-gray-500">
           {{ t('dashboard.addBean') }}
         </div>
       </button>

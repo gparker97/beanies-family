@@ -283,10 +283,10 @@ function isRecurringItemInactive(tx: Transaction): boolean {
   <div class="space-y-5">
     <!-- Header -->
     <div>
-      <h1 class="font-outfit text-[1.5rem] font-bold text-[var(--color-text)]">
+      <h1 class="font-outfit text-2xl font-bold text-[var(--color-text)]">
         {{ t('transactions.pageTitle') }}
       </h1>
-      <p class="mt-0.5 text-[0.8rem] text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
+      <p class="mt-0.5 text-sm text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
     </div>
 
     <!-- Secondary toolbar: filters + search + month + add -->
@@ -316,7 +316,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
             v-model="searchQuery"
             type="text"
             :placeholder="t('transactions.searchPlaceholder')"
-            class="w-full border-none bg-transparent text-[0.75rem] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text)] placeholder:opacity-25 dark:text-gray-100"
+            class="w-full border-none bg-transparent text-xs text-[var(--color-text)] outline-none placeholder:text-[var(--color-text)] placeholder:opacity-25 dark:text-gray-100"
           />
         </div>
 
@@ -326,7 +326,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
 
       <!-- Add button (gradient pill) -->
       <button
-        class="font-outfit cursor-pointer rounded-full bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-5 py-2.5 text-[0.75rem] font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(241,93,34,0.3)]"
+        class="font-outfit cursor-pointer rounded-full bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(241,93,34,0.3)]"
         @click="openAddModal"
       >
         + {{ t('transactions.addTransaction') }}
@@ -388,7 +388,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
       <template v-else>
         <!-- Grid header (desktop) -->
         <div
-          class="font-outfit hidden border-b-2 border-[var(--tint-slate-5)] bg-[rgba(44,62,80,0.015)] px-4 py-3 text-[0.6rem] font-semibold tracking-[0.08em] uppercase opacity-30 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700 dark:bg-slate-800/50"
+          class="font-outfit hidden border-b-2 border-[var(--tint-slate-5)] bg-[rgba(44,62,80,0.015)] px-4 py-3 text-xs font-semibold tracking-[0.08em] uppercase opacity-30 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700 dark:bg-slate-800/50"
         >
           <div></div>
           <div>{{ t('transactions.title') }}</div>
@@ -402,7 +402,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
         <div v-for="[dateKey, txns] in groupedTransactions" :key="dateKey">
           <!-- Date group header -->
           <div
-            class="font-outfit px-4 pt-3 pb-1.5 text-[0.65rem] font-bold tracking-[0.08em] uppercase"
+            class="font-outfit px-4 pt-3 pb-1.5 text-xs font-bold tracking-[0.08em] uppercase"
             :class="
               isDateToday(dateKey)
                 ? 'text-primary-500 bg-[rgba(241,93,34,0.02)]'
@@ -449,10 +449,10 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                 <CategoryIcon :category="tx.category" size="sm" />
               </div>
               <div>
-                <p class="font-outfit text-[0.8rem] font-semibold text-gray-900 dark:text-gray-100">
+                <p class="font-outfit text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {{ tx.description }}
                 </p>
-                <p class="text-[0.6rem] text-[var(--color-text)] opacity-35">
+                <p class="text-xs text-[var(--color-text)] opacity-35">
                   {{ getCategoryName(tx.category) }}
                   <span class="md:hidden">
                     &middot; {{ getMemberNameByAccountId(tx.accountId) }}
@@ -468,19 +468,19 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                   />
                   <span
                     v-if="tx.recurringItemId"
-                    class="text-primary-500 dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.55rem] font-semibold"
+                    class="text-primary-500 dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
                   >
                     {{ t('transactions.typeRecurring') }}
                   </span>
                   <span
                     v-if="isRecurringItemInactive(tx)"
-                    class="rounded-lg bg-gray-200 px-2 py-0.5 text-[0.55rem] font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
+                    class="rounded-lg bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
                   >
                     {{ t('recurring.paused') }}
                   </span>
                   <span
                     v-if="!tx.recurringItemId"
-                    class="text-secondary-500 rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
+                    class="text-secondary-500 rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold dark:bg-slate-700 dark:text-gray-400"
                   >
                     {{ t('transactions.typeOneTime') }}
                   </span>
@@ -500,7 +500,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                   getMemberNameByAccountId(tx.accountId).charAt(0)
                 }}</span>
               </div>
-              <span class="text-[0.72rem] text-[var(--color-text)] opacity-50">
+              <span class="text-xs text-[var(--color-text)] opacity-50">
                 {{ getMemberNameByAccountId(tx.accountId) }}
               </span>
             </div>
@@ -508,7 +508,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
             <!-- Amount (desktop) -->
             <div class="hidden md:block">
               <span
-                class="font-outfit text-[0.85rem] font-bold"
+                class="font-outfit text-sm font-bold"
                 :class="
                   tx.type === 'income'
                     ? 'text-[#27AE60]'
@@ -529,19 +529,19 @@ function isRecurringItemInactive(tx: Transaction): boolean {
             <div class="hidden md:block">
               <span
                 v-if="tx.recurringItemId"
-                class="text-primary-500 dark:bg-primary-900/20 inline-block rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.55rem] font-semibold"
+                class="text-primary-500 dark:bg-primary-900/20 inline-block rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
               >
                 {{ getRecurringFrequencyLabel(tx) }}
               </span>
               <span
                 v-if="isRecurringItemInactive(tx)"
-                class="ml-1 inline-block rounded-lg bg-gray-200 px-2 py-0.5 text-[0.55rem] font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
+                class="ml-1 inline-block rounded-lg bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
               >
                 {{ t('recurring.paused') }}
               </span>
               <span
                 v-if="!tx.recurringItemId"
-                class="text-secondary-500 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
+                class="text-secondary-500 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold dark:bg-slate-700 dark:text-gray-400"
               >
                 {{ t('transactions.typeOneTime') }}
               </span>

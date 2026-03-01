@@ -87,30 +87,28 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
     <!-- Header -->
     <div class="mb-4 flex items-center gap-2.5">
       <span class="text-xl">{{ '🐷' }}</span>
-      <span class="font-outfit text-[0.75rem] font-bold tracking-[0.08em] text-white/50 uppercase">
+      <span class="font-outfit text-xs font-bold tracking-[0.08em] text-white/50 uppercase">
         {{ t('nook.piggyBank') }}
       </span>
     </div>
 
     <!-- Net worth section -->
     <div>
-      <div
-        class="font-outfit mb-1 text-[0.65rem] font-semibold tracking-[0.1em] text-white/40 uppercase"
-      >
+      <div class="font-outfit mb-1 text-xs font-semibold tracking-[0.1em] text-white/40 uppercase">
         {{ t('nook.familyNetWorth') }}
       </div>
-      <div class="font-outfit text-[2rem] font-extrabold text-white">
+      <div class="font-outfit text-3xl font-extrabold text-white">
         {{ formattedNetWorth }}
       </div>
       <div class="mt-1 flex items-center gap-1.5">
         <span
-          class="font-outfit text-[0.7rem] font-semibold"
+          class="font-outfit text-xs font-semibold"
           :class="isPositiveChange ? 'text-[#6EE7B7]' : 'text-red-400'"
         >
           {{ isPositiveChange ? '↑' : '↓' }}
           {{ isPositiveChange ? '+' : '-' }}{{ formattedMonthlyChange }}
         </span>
-        <span class="text-[0.6rem] text-white/35">
+        <span class="text-xs text-white/35">
           {{ t('nook.thisMonth') }}
         </span>
       </div>
@@ -119,10 +117,10 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
     <!-- Budget section -->
     <div class="mt-4 border-t border-white/[0.08] pt-4">
       <div class="flex items-center justify-between">
-        <span class="text-[0.65rem] text-white/40">
+        <span class="text-xs text-white/40">
           {{ t('nook.monthlyBudget') }}
         </span>
-        <span class="font-outfit text-[0.7rem] font-semibold text-white">
+        <span class="font-outfit text-xs font-semibold text-white">
           {{ formattedMonthlyExpenses }}
         </span>
       </div>
@@ -140,7 +138,7 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
 
     <!-- CTA button -->
     <button
-      class="font-outfit mt-4 w-full cursor-pointer rounded-[14px] py-3 text-center text-[0.8rem] font-semibold text-white"
+      class="font-outfit mt-4 w-full cursor-pointer rounded-[14px] py-3 text-center text-sm font-semibold text-white"
       :style="{
         background: 'linear-gradient(135deg, #F15D22, #E67E22)',
         boxShadow: '0 4px 16px rgba(241,93,34,0.25)',

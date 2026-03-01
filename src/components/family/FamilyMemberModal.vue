@@ -213,7 +213,7 @@ function handleDelete() {
       <input
         v-model="name"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-center text-[1.2rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit w-full border-none bg-transparent text-center text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.memberName')"
       />
     </div>
@@ -249,7 +249,7 @@ function handleDelete() {
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
         >
           <span
-            class="font-outfit text-[0.75rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
+            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200"
           >
             {{ t('modal.canViewFinances') }}
           </span>
@@ -259,7 +259,7 @@ function handleDelete() {
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
         >
           <span
-            class="font-outfit text-[0.75rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
+            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200"
           >
             {{ t('modal.canEditActivities') }}
           </span>
@@ -269,7 +269,7 @@ function handleDelete() {
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
         >
           <span
-            class="font-outfit text-[0.75rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
+            class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200"
           >
             {{ t('modal.canManagePod') }}
           </span>

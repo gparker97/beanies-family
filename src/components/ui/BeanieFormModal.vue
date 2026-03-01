@@ -59,7 +59,7 @@ const modalSize = props.size === 'narrow' ? 'lg' : 'xl';
         </div>
         <!-- Title -->
         <h2
-          class="font-outfit flex-1 text-[1.1rem] font-bold text-[var(--color-text)] dark:text-gray-100"
+          class="font-outfit flex-1 text-lg font-bold text-[var(--color-text)] dark:text-gray-100"
         >
           {{ title }}
         </h2>
@@ -91,7 +91,7 @@ const modalSize = props.size === 'narrow' ? 'lg' : 'xl';
         <!-- Save button -->
         <button
           type="button"
-          class="font-outfit flex-1 rounded-[16px] py-3.5 text-[0.88rem] font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+          class="font-outfit flex-1 rounded-[16px] py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
           :class="
             saveGradient === 'purple'
               ? 'bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500'

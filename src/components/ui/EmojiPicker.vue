@@ -36,7 +36,7 @@ const emit = defineEmits<{
   </div>
   <div
     v-if="modelValue"
-    class="font-outfit text-primary-500 mt-1.5 text-[0.6rem] font-semibold tracking-[0.1em] uppercase opacity-45"
+    class="font-outfit text-primary-500 mt-1.5 text-xs font-semibold tracking-[0.1em] uppercase opacity-45"
   >
     {{ options.find((o) => o.emoji === modelValue)?.label }}
   </div>

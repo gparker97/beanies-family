@@ -287,20 +287,18 @@ const periodLabel = computed(() => {
 
     <div class="relative z-10 flex items-start justify-between">
       <div>
-        <div
-          class="font-outfit mb-2 text-[0.7rem] font-semibold tracking-[0.15em] uppercase opacity-50"
-        >
+        <div class="font-outfit mb-2 text-xs font-semibold tracking-[0.15em] uppercase opacity-50">
           {{ label }}
         </div>
         <div
           data-testid="hero-amount"
-          class="font-outfit mb-1 text-[2.8rem] leading-none font-extrabold"
+          class="font-outfit mb-1 text-4xl leading-none font-extrabold"
         >
           {{ formattedAmount }}
         </div>
         <div
           v-if="isUnlocked && (changeAmount !== 0 || changePercent !== 0)"
-          class="font-outfit mt-2 inline-flex items-center gap-1.5 text-[0.8rem] font-semibold"
+          class="font-outfit mt-2 inline-flex items-center gap-1.5 text-sm font-semibold"
           :class="isPositiveChange ? 'text-emerald-300' : 'text-red-300'"
         >
           <span>{{ isPositiveChange ? '↑' : '↓' }}</span>
@@ -319,7 +317,7 @@ const periodLabel = computed(() => {
           v-for="period in periods"
           :key="period.key"
           type="button"
-          class="font-outfit cursor-pointer rounded-[10px] px-3 py-1.5 text-[0.6rem] font-semibold transition-all"
+          class="font-outfit cursor-pointer rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-all"
           :class="
             period.key === selectedPeriod
               ? 'bg-primary-500/40 text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
@@ -335,7 +333,7 @@ const periodLabel = computed(() => {
     <!-- Chart area -->
     <div class="relative mt-5 h-28">
       <div v-if="historyData.length === 0" class="flex h-full items-center justify-center">
-        <span class="font-outfit text-[0.75rem] font-medium text-white/20">
+        <span class="font-outfit text-xs font-medium text-white/20">
           {{ t('dashboard.noDataYet') }}
         </span>
       </div>

@@ -152,7 +152,7 @@ async function handleDelete(id: string) {
     <!-- Page header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="font-outfit text-[1.6rem] font-extrabold text-[var(--color-text)]">
+        <h1 class="font-outfit text-2xl font-extrabold text-[var(--color-text)]">
           ✅ {{ t('todo.title') }}
         </h1>
         <p class="mt-0.5 text-sm text-[var(--color-text-muted)]">

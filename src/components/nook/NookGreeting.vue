@@ -27,13 +27,11 @@ const todayDate = computed(() =>
 
 <template>
   <div>
-    <h1
-      class="font-outfit text-secondary-500 text-[1.5rem] leading-tight font-bold dark:text-gray-100"
-    >
+    <h1 class="font-outfit text-secondary-500 text-2xl leading-tight font-bold dark:text-gray-100">
       {{ greetingParts.before }}<span class="text-primary-500">{{ memberName }}</span
       >{{ greetingParts.after }}
     </h1>
-    <p class="text-secondary-500/40 mt-1 text-[0.8rem] dark:text-gray-400">
+    <p class="text-secondary-500/40 mt-1 text-sm dark:text-gray-400">
       {{ todayDate }} &middot; {{ t('nook.familyAtAGlance') }}
     </p>
   </div>

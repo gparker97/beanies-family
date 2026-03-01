@@ -115,7 +115,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
     <!-- Trigger button -->
     <button
       type="button"
-      class="font-outfit flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[0.7rem] font-semibold transition-all duration-150"
+      class="font-outfit flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
       :class="
         modelValue
           ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
@@ -154,7 +154,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
           <button
             v-if="!showCustomInput"
             type="button"
-            class="font-outfit text-primary-500 hover:bg-primary-500/5 w-full rounded-lg px-2.5 py-1.5 text-left text-[0.7rem] font-semibold transition-colors"
+            class="font-outfit text-primary-500 hover:bg-primary-500/5 w-full rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition-colors"
             :class="isCustomTime ? 'dark:bg-primary-500/15 bg-[var(--tint-orange-8)]' : ''"
             @click="openCustom"
           >
@@ -169,12 +169,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
               ref="customInputRef"
               v-model="customValue"
               type="time"
-              class="font-outfit border-primary-500 flex-1 rounded-lg border-2 bg-white px-2 py-1 text-[0.7rem] outline-none dark:bg-slate-700 dark:text-gray-200"
+              class="font-outfit border-primary-500 flex-1 rounded-lg border-2 bg-white px-2 py-1 text-xs outline-none dark:bg-slate-700 dark:text-gray-200"
               @keydown.enter="applyCustom"
             />
             <button
               type="button"
-              class="font-outfit bg-primary-500 rounded-lg px-2.5 py-1 text-[0.65rem] font-semibold text-white"
+              class="font-outfit bg-primary-500 rounded-lg px-2.5 py-1 text-xs font-semibold text-white"
               @click="applyCustom"
             >
               OK
@@ -188,7 +188,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
             v-for="time in presets"
             :key="time"
             type="button"
-            class="font-outfit flex w-full items-center px-4 py-1.5 text-[0.7rem] font-semibold transition-colors"
+            class="font-outfit flex w-full items-center px-4 py-1.5 text-xs font-semibold transition-colors"
             :class="
               modelValue === time
                 ? 'text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'

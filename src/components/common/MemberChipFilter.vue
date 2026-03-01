@@ -53,7 +53,7 @@ const chipInactive =
       @click="emit('select-member', member.id)"
     >
       <span
-        class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-[0.6rem] font-bold text-white"
+        class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-xs font-bold text-white"
         :style="{ background: `linear-gradient(135deg, ${member.color}, ${member.color}dd)` }"
       >
         {{ member.name.charAt(0).toUpperCase() }}

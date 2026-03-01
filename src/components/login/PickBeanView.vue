@@ -237,7 +237,7 @@ async function handleSignIn() {
           />
         </svg>
       </div>
-      <p class="text-[0.7rem] font-semibold opacity-50">
+      <p class="text-xs font-semibold opacity-50">
         {{ t('loginV6.pickBeanInfoText') }}
       </p>
     </div>

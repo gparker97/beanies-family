@@ -271,7 +271,7 @@ async function handleSignOutAndClearData() {
             v-for="chip in currencyChips"
             :key="chip.code"
             type="button"
-            class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-[0.65rem] font-semibold transition-all"
+            class="font-outfit cursor-pointer rounded-full px-2.5 py-1 text-xs font-semibold transition-all"
             :class="
               chip.active
                 ? 'bg-primary-500 text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
