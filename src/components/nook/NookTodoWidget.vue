@@ -108,57 +108,94 @@ async function toggleComplete(todoId: string) {
     </div>
 
     <!-- Quick-add bar -->
-    <div class="mb-4 flex gap-2">
-      <div
-        class="flex flex-1 items-center gap-2.5 rounded-2xl px-4 py-3"
-        style="background: var(--tint-slate-5)"
-      >
-        <span class="text-base opacity-40">✏️</span>
-        <input
-          v-model="newTaskTitle"
-          type="text"
-          :placeholder="t('nook.addTaskPlaceholder')"
-          class="font-outfit min-w-0 flex-1 bg-transparent text-sm font-medium text-[var(--color-text)] outline-none placeholder:opacity-40"
-          @keydown="handleKeydown"
-        />
-        <button
-          v-if="newTaskTitle.trim()"
-          type="button"
-          class="font-outfit shrink-0 rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition-all hover:opacity-90"
-          style="background: linear-gradient(135deg, #9b59b6, #8e44ad)"
-          @click="addTask"
+    <div class="mb-4 space-y-2">
+      <!-- Row 1: Input bar (+ date/assignee on desktop) -->
+      <div class="flex gap-2">
+        <div
+          class="flex flex-1 items-center gap-2.5 rounded-2xl px-4 py-3"
+          style="background: var(--tint-slate-5)"
         >
-          {{ t('action.add') }}
-        </button>
-      </div>
-      <div
-        class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
-        :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
-        :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
-      >
-        <span class="text-base">📅</span>
-        <input
-          v-model="newTaskDate"
-          type="date"
-          class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-          :style="{ color: newTaskDate ? 'var(--color-primary)' : 'var(--color-text)' }"
-        />
-      </div>
-      <div
-        class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
-        :class="newTaskAssignee ? 'bg-[var(--tint-purple-8)]' : ''"
-        :style="!newTaskAssignee ? 'background: var(--tint-slate-5)' : undefined"
-      >
-        <span class="text-base">👤</span>
-        <select
-          v-model="newTaskAssignee"
-          class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold text-[var(--color-text)] shadow-none focus:shadow-none focus:ring-0"
+          <span class="text-base opacity-40">✏️</span>
+          <input
+            v-model="newTaskTitle"
+            type="text"
+            :placeholder="t('nook.addTaskPlaceholder')"
+            class="font-outfit min-w-0 flex-1 bg-transparent text-sm font-medium text-[var(--color-text)] outline-none placeholder:opacity-40"
+            @keydown="handleKeydown"
+          />
+          <button
+            v-if="newTaskTitle.trim()"
+            type="button"
+            class="font-outfit shrink-0 rounded-xl px-4 py-1.5 text-xs font-semibold text-white transition-all hover:opacity-90"
+            style="background: linear-gradient(135deg, #9b59b6, #8e44ad)"
+            @click="addTask"
+          >
+            {{ t('action.add') }}
+          </button>
+        </div>
+        <!-- Date picker (desktop) -->
+        <div
+          class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
+          :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
+          :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
         >
-          <option value="">{{ t('todo.assignTo') }}</option>
-          <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
-            {{ member.name }}
-          </option>
-        </select>
+          <span class="text-base">📅</span>
+          <input
+            v-model="newTaskDate"
+            type="date"
+            class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+            :style="{ color: newTaskDate ? 'var(--color-primary)' : 'var(--color-text)' }"
+          />
+        </div>
+        <!-- Assign dropdown (desktop) -->
+        <div
+          class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
+          :class="newTaskAssignee ? 'bg-[var(--tint-purple-8)]' : ''"
+          :style="!newTaskAssignee ? 'background: var(--tint-slate-5)' : undefined"
+        >
+          <span class="text-base">👤</span>
+          <select
+            v-model="newTaskAssignee"
+            class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold text-[var(--color-text)] shadow-none focus:shadow-none focus:ring-0"
+          >
+            <option value="">{{ t('todo.assignTo') }}</option>
+            <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
+              {{ member.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+      <!-- Row 2: Date + Assignee (mobile only) -->
+      <div class="flex gap-2 sm:hidden">
+        <div
+          class="flex flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
+          :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
+          :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
+        >
+          <span class="text-base">📅</span>
+          <input
+            v-model="newTaskDate"
+            type="date"
+            class="beanies-input font-outfit min-w-0 flex-1 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+            :style="{ color: newTaskDate ? 'var(--color-primary)' : 'var(--color-text)' }"
+          />
+        </div>
+        <div
+          class="flex flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
+          :class="newTaskAssignee ? 'bg-[var(--tint-purple-8)]' : ''"
+          :style="!newTaskAssignee ? 'background: var(--tint-slate-5)' : undefined"
+        >
+          <span class="text-base">👤</span>
+          <select
+            v-model="newTaskAssignee"
+            class="beanies-input font-outfit min-w-0 flex-1 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold text-[var(--color-text)] shadow-none focus:shadow-none focus:ring-0"
+          >
+            <option value="">{{ t('todo.assignTo') }}</option>
+            <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
+              {{ member.name }}
+            </option>
+          </select>
+        </div>
       </div>
     </div>
 
