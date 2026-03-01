@@ -5,13 +5,13 @@ import { Page, expect } from '@playwright/test';
  * Only categories used in E2E tests need to be listed here.
  */
 const CATEGORY_GROUP_MAP: Record<string, string> = {
-  groceries: 'Food',
-  dining_out: 'Food',
-  coffee_snacks: 'Food',
-  rent: 'Housing',
-  utilities: 'Housing',
-  salary: 'Employment',
-  freelance: 'Employment',
+  groceries: 'food',
+  dining_out: 'food',
+  coffee_snacks: 'food',
+  rent: 'housing',
+  utilities: 'housing',
+  salary: 'employment',
+  freelance: 'employment',
 };
 
 export class TransactionsPage {
@@ -41,23 +41,23 @@ export class TransactionsPage {
     category?: string;
   }) {
     // Click the gradient "+ Add Transaction" button on the page
-    await this.page.getByRole('button', { name: /\+.*Add Transaction/ }).click();
+    await this.page.getByRole('button', { name: /\+.*add transaction/i }).click();
 
     const dialog = this.page.locator('[role="dialog"]');
 
     // Direction toggle — default is "out" (expense)
     if (data.type === 'income') {
-      await dialog.getByRole('button', { name: /Money In/ }).click();
+      await dialog.getByRole('button', { name: /money in/i }).click();
     }
 
     // Account — BaseSelect with placeholder option
     await dialog
       .locator('select')
-      .filter({ has: this.page.locator('option', { hasText: 'Select an account' }) })
+      .filter({ has: this.page.locator('option', { hasText: 'select an account' }) })
       .selectOption({ label: data.account });
 
     // Description
-    await dialog.getByPlaceholder('Description').fill(data.description);
+    await dialog.getByPlaceholder('description').fill(data.description);
 
     // Amount (AmountInput — number input)
     await dialog.locator('input[type="number"]').fill(data.amount.toString());
@@ -68,14 +68,12 @@ export class TransactionsPage {
       if (group) {
         await dialog.getByRole('button', { name: group }).click();
       }
-      const categoryName = data.category
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+      const categoryName = data.category.replace(/_/g, ' ');
       await dialog.getByRole('button', { name: categoryName }).click();
     }
 
-    // Switch schedule to "One-time" (default is "Recurring")
-    await dialog.getByRole('button', { name: 'One-time' }).click();
+    // Switch schedule to "one-time" (default is "Recurring")
+    await dialog.getByRole('button', { name: 'one-time' }).click();
 
     // Save — button text is "Add Transaction"
     await dialog.getByRole('button', { name: 'Add Transaction' }).click();
