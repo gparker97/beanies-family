@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -25,6 +26,10 @@ const emit = defineEmits<{
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
+const sortedMembers = computed(() =>
+  [...familyStore.members].sort((a, b) => a.name.localeCompare(b.name))
+);
+
 const chipBase =
   'inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-sm font-medium transition-all';
 const chipActive = 'bg-gradient-to-r from-secondary-500 to-[#3D5368] text-white';
@@ -46,7 +51,7 @@ const chipInactive =
 
     <!-- Individual member chips -->
     <button
-      v-for="member in familyStore.members"
+      v-for="member in sortedMembers"
       :key="member.id"
       type="button"
       :class="[chipBase, isMemberActive(member.id) ? chipActive : chipInactive]"
