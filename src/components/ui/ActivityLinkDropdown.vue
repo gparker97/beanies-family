@@ -45,7 +45,7 @@ function handleBlur() {
 </script>
 
 <template>
-  <div class="relative">
+  <div>
     <button
       type="button"
       class="font-outfit flex w-full items-center gap-2 rounded-[14px] border-2 bg-[var(--tint-slate-5)] px-4 py-2.5 text-left text-[0.8rem] transition-all duration-150 dark:bg-slate-700"
@@ -59,13 +59,15 @@ function handleBlur() {
     >
       <template v-if="selectedActivity">
         <span class="text-base">{{ selectedActivity.icon || '📋' }}</span>
-        <span class="flex-1 truncate text-[var(--color-text)] dark:text-gray-200">
+        <span class="flex-1 truncate text-left text-[var(--color-text)] dark:text-gray-200">
           {{ selectedActivity.title }}
         </span>
       </template>
       <template v-else>
         <span class="text-base">📋</span>
-        <span class="flex-1 text-[var(--color-text-muted)]">{{ t('modal.selectActivity') }}</span>
+        <span class="flex-1 text-left text-[var(--color-text-muted)]">{{
+          t('modal.selectActivity')
+        }}</span>
       </template>
       <svg
         class="h-4 w-4 flex-shrink-0 text-[var(--color-text-muted)] transition-transform"
@@ -78,23 +80,23 @@ function handleBlur() {
       </svg>
     </button>
 
-    <!-- Dropdown -->
+    <!-- Dropdown (inline flow — pushes content below instead of overlaying) -->
     <Transition
       enter-active-class="transition-all duration-200"
-      enter-from-class="opacity-0 -translate-y-1"
-      enter-to-class="opacity-100 translate-y-0"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
       leave-active-class="transition-all duration-150"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 -translate-y-1"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
     >
       <div
         v-if="isOpen"
-        class="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-[14px] bg-white py-1 shadow-lg dark:bg-slate-800"
+        class="mt-1 max-h-48 overflow-y-auto rounded-[14px] bg-white py-1 shadow-lg dark:bg-slate-800"
       >
         <!-- None option -->
         <button
           type="button"
-          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-[0.75rem] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-[0.75rem] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
           @mousedown.prevent="select(undefined)"
         >
           {{ t('common.none') }}
@@ -104,11 +106,11 @@ function handleBlur() {
           v-for="activity in activities"
           :key="activity.id"
           type="button"
-          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-[0.75rem] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
+          class="font-outfit flex w-full items-center gap-2 px-4 py-2 text-left text-[0.75rem] hover:bg-[var(--tint-slate-5)] dark:hover:bg-slate-700"
           @mousedown.prevent="select(activity.id)"
         >
           <span class="text-sm">{{ activity.icon || '📋' }}</span>
-          <span class="flex-1 truncate text-[var(--color-text)] dark:text-gray-200">{{
+          <span class="flex-1 truncate text-left text-[var(--color-text)] dark:text-gray-200">{{
             activity.title
           }}</span>
           <span v-if="activity.assigneeId" class="text-[0.6rem] text-[var(--color-text-muted)]">
@@ -117,7 +119,7 @@ function handleBlur() {
         </button>
         <div
           v-if="activities.length === 0"
-          class="font-outfit px-4 py-2 text-[0.7rem] text-[var(--color-text-muted)]"
+          class="font-outfit px-4 py-2 text-left text-[0.7rem] text-[var(--color-text-muted)]"
         >
           {{ t('modal.noMoreActivities') }}
         </div>
