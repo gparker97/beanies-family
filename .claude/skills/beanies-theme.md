@@ -106,6 +106,25 @@ These specific elements may use custom sizes for decorative purposes:
 
 ---
 
+## Text Casing Standard
+
+All user-visible text follows a consistent casing convention:
+
+| Category | Rule | Example |
+|----------|------|---------|
+| **Page headers** (AppHeader) | all lowercase | `family planner`, `good evening, greg` |
+| **Section titles, sidebar headers, form labels** | source lowercase, CSS `uppercase` | stored as `the treehouse`, displayed as `THE TREEHOUSE` |
+| **Non-sentence text** (buttons, chips, labels, nav items, short descriptions — no period) | all lowercase | `add member`, `weekly`, `save` |
+| **Full sentences** (with period/complete thought) | sentence case | `No transactions yet. Add one to get started.` |
+
+**Rule of thumb:** if it has no period, it's lowercase.
+
+- Strings in `uiStrings.ts` store the lowercase value; CSS `uppercase` handles visual uppercasing where needed
+- Greeting strings are lowercase: `good morning,`, `good afternoon,`, `good evening,`
+- Beanie overrides follow the same rules
+
+---
+
 ## Logo & Mascot Rules
 
 - **Wordmark:** "beanies.family" in Outfit 700 — "beanies" in white/Deep Slate, ".family" in Heritage Orange

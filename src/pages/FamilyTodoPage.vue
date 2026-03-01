@@ -150,15 +150,10 @@ async function handleDelete(id: string) {
 <template>
   <div class="space-y-6">
     <!-- Page header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="font-outfit text-2xl font-extrabold text-[var(--color-text)]">
-          ✅ {{ t('todo.title') }}
-        </h1>
-        <p class="mt-0.5 text-sm text-[var(--color-text-muted)]">
-          {{ t('todo.subtitle') }}
-        </p>
-      </div>
+    <div>
+      <p class="text-sm text-[var(--color-text-muted)]">
+        {{ t('todo.subtitle') }}
+      </p>
     </div>
 
     <!-- Quick add bar -->

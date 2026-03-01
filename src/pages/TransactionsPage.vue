@@ -283,10 +283,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
   <div class="space-y-5">
     <!-- Header -->
     <div>
-      <h1 class="font-outfit text-2xl font-bold text-[var(--color-text)]">
-        {{ t('transactions.pageTitle') }}
-      </h1>
-      <p class="mt-0.5 text-sm text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
+      <p class="text-sm text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
     </div>
 
     <!-- Secondary toolbar: filters + search + month + add -->

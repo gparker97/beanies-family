@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-01
-> **Updated by:** Claude (Budget page bug fixes + deploy)
+> **Updated by:** Claude (Text casing standardization)
 
 ## Current Phase
 
@@ -495,6 +495,16 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 - Removed Node version matrix from `main-ci.yml` (was `[20.x, 24.x]`, now single `24`)
 - Fixed `createRepository.ts` TS2352 error exposed by Node 24's stricter TypeScript
 
+### Text Casing Standardization
+
+- Standardized all non-sentence UI text to lowercase across `uiStrings.ts` (~150 strings)
+- Fixed AppHeader page title system: reads `route.meta.titleKey` → `t(titleKey)` instead of empty `route.meta.title`
+- Dashboard and Nook pages show greeting instead of page title in AppHeader
+- Removed duplicate `<h1>` page titles from AccountsPage, TransactionsPage, FamilyPlannerPage, FamilyTodoPage
+- Updated E2E planner tests to use case-insensitive matchers
+- Documented casing standard in `.claude/skills/beanies-theme.md` and `CLAUDE.md`
+- Regenerated Chinese translations for all changed strings
+
 ### Budget Page (Issue #68) — Closed
 
 - **Data model** — `Budget`, `BudgetCategory`, `BudgetMode` types in `models.ts`. `CreateBudgetInput`/`UpdateBudgetInput` aliases. `'budget'` added to `EntityType` union. `budgets` added to `SyncFileData.data`
@@ -768,3 +778,4 @@ _(None currently tracked)_
 | 2026-02-28 | Fixed beanie-avatars E2E test for redesigned modal         | Test referenced old test IDs from pre-modal-redesign; updated to use role chips, "More Details" toggle, placeholder input                               |
 | 2026-02-28 | Merged rollup security bump (4.57.1 → 4.59.0)              | Dependabot PR #102; minor version bump with security label, no breaking changes                                                                         |
 | 2026-02-28 | Strengthened DRY principle in CLAUDE.md                    | Expanded code conventions with explicit rules for shared components, helper functions, constants, and duplicate elimination                             |
+| 2026-03-01 | Text casing standardization                                | All non-sentence UI text lowercase in uiStrings.ts; AppHeader fixed to use titleKey; duplicate page h1s removed; casing rules documented                |

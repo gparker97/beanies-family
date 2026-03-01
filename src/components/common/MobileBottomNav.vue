@@ -13,7 +13,7 @@ const tabs = computed(() =>
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,
-    active: route.path === item.path,
+    active: route.path === item.path || route.path.startsWith(item.path + '/'),
   }))
 );
 
@@ -31,14 +31,21 @@ function navigateTo(path: string) {
       v-for="tab in tabs"
       :key="tab.path"
       type="button"
-      class="flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 transition-colors"
-      :class="tab.active ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'"
+      class="flex min-h-[56px] flex-1 cursor-pointer flex-col items-center justify-center gap-1 transition-colors"
       @click="navigateTo(tab.path)"
     >
-      <!-- Active indicator dot -->
-      <span v-if="tab.active" class="bg-primary-500 mb-0.5 h-1 w-1 rounded-full" />
-      <span class="text-xl leading-none">{{ tab.emoji }}</span>
-      <span class="text-xs font-semibold">{{ tab.label }}</span>
+      <div
+        class="flex flex-col items-center gap-0.5 rounded-2xl px-3 py-1 transition-colors"
+        :class="tab.active ? 'bg-[rgba(241,93,34,0.08)]' : ''"
+      >
+        <span class="text-xl leading-none">{{ tab.emoji }}</span>
+        <span
+          class="font-outfit text-xs font-semibold"
+          :class="tab.active ? 'text-primary-500' : 'text-secondary-500/40'"
+        >
+          {{ tab.label }}
+        </span>
+      </div>
     </button>
   </nav>
 </template>
