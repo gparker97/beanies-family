@@ -209,11 +209,13 @@ function handleDelete() {
     </div>
 
     <!-- 3. Name -->
-    <div>
+    <div
+      class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+    >
       <input
         v-model="name"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-center text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit w-full border-none bg-transparent text-center text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-40 dark:text-gray-100"
         :placeholder="t('modal.memberName')"
       />
     </div>
