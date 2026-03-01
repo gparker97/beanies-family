@@ -64,7 +64,7 @@ const recurringStore = useRecurringStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
-const { isUnlocked, formatMasked } = usePrivacyMode();
+const { isUnlocked } = usePrivacyMode();
 
 // Helper to get exchange rate
 function getRate(rates: ExchangeRate[], from: CurrencyCode, to: CurrencyCode): number {
@@ -718,31 +718,24 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile
           :label="t('reports.currentNetWorth')"
-          :value="
-            formatMasked(
-              formatInDisplayCurrency(calculateCurrentNetWorth(), settingsStore.baseCurrency)
-            )
-          "
+          :amount="calculateCurrentNetWorth()"
+          :currency="settingsStore.baseCurrency"
           tint="slate"
           dark
         />
         <StatTile
           :label="t('reports.projectedNetWorth')"
-          :value="
-            formatMasked(
-              formatInDisplayCurrency(totalProjectedNetWorth, settingsStore.baseCurrency)
-            )
-          "
+          :amount="totalProjectedNetWorth"
+          :currency="settingsStore.baseCurrency"
+          :animation-delay="100"
           tint="purple"
         />
         <StatTile
           :label="t('reports.projectedChange')"
-          :value="
-            formatMasked(
-              (netWorthChange >= 0 ? '+' : '') +
-                formatInDisplayCurrency(netWorthChange, settingsStore.baseCurrency)
-            )
-          "
+          :amount="netWorthChange"
+          :currency="settingsStore.baseCurrency"
+          :animation-delay="200"
+          show-sign
           :tint="netWorthChange >= 0 ? 'green' : 'orange'"
         />
       </div>
@@ -783,22 +776,23 @@ const netCashFlow = computed(() => totalIncome.value - totalExpenses.value);
       <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatTile
           :label="t('reports.totalIncome')"
-          :value="formatMasked(formatInDisplayCurrency(totalIncome, settingsStore.baseCurrency))"
+          :amount="totalIncome"
+          :currency="settingsStore.baseCurrency"
           tint="green"
         />
         <StatTile
           :label="t('reports.totalExpenses')"
-          :value="formatMasked(formatInDisplayCurrency(totalExpenses, settingsStore.baseCurrency))"
+          :amount="totalExpenses"
+          :currency="settingsStore.baseCurrency"
+          :animation-delay="100"
           tint="orange"
         />
         <StatTile
           :label="t('reports.netCashFlow')"
-          :value="
-            formatMasked(
-              (netCashFlow >= 0 ? '+' : '') +
-                formatInDisplayCurrency(netCashFlow, settingsStore.baseCurrency)
-            )
-          "
+          :amount="netCashFlow"
+          :currency="settingsStore.baseCurrency"
+          :animation-delay="200"
+          show-sign
           :tint="netCashFlow >= 0 ? 'slate' : 'orange'"
           :dark="netCashFlow >= 0"
         />
