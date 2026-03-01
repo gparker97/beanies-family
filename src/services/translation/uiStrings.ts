@@ -252,6 +252,15 @@ const STRING_DEFS = {
   'accounts.type.cash': { en: 'Cash', beanie: 'Pocket Beans' },
   'accounts.type.loan': { en: 'Loan', beanie: 'Borrowed Beans' },
   'accounts.type.other': { en: 'Other' },
+  'accounts.pageTitle': { en: 'Our Accounts', beanie: 'Our Bean Jars' },
+  'accounts.subtitleCounts': { en: '{members} members · {accounts} accounts' },
+  'accounts.groupByMember': { en: 'Member' },
+  'accounts.groupByCategory': { en: 'Category' },
+  'accounts.addAnAccount': { en: 'Add an Account', beanie: 'Add a Bean Jar' },
+  'accounts.assetClass.cash': { en: 'Cash' },
+  'accounts.assetClass.investments': { en: 'Investments' },
+  'accounts.liabilityClass.creditCards': { en: 'Credit Cards' },
+  'accounts.liabilityClass.loans': { en: 'Loans' },
 
   // Transactions
   'transactions.title': { en: 'Transactions', beanie: 'Transaction' },

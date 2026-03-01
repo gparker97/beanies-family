@@ -21,6 +21,7 @@ import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } fro
 const props = defineProps<{
   open: boolean;
   account?: Account | null;
+  defaults?: { memberId?: string; type?: AccountType };
 }>();
 
 const emit = defineEmits<{
@@ -90,10 +91,10 @@ const { isEditing, isSubmitting } = useFormModal(
     onNew: () => {
       icon.value = '';
       name.value = '';
-      type.value = 'checking';
+      type.value = props.defaults?.type ?? 'checking';
       balance.value = 0;
       currency.value = settingsStore.displayCurrency;
-      memberId.value = familyStore.currentMemberId || '';
+      memberId.value = props.defaults?.memberId ?? familyStore.currentMemberId ?? '';
       institution.value = '';
       institutionCountry.value = '';
       isActive.value = true;
