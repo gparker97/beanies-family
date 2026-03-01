@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-01",
-    "translationCount": 1030
+    "translationCount": 1041
   },
   "translations": {
     "app.name": {
@@ -4849,6 +4849,61 @@
     "googleDrive.reconnectFailed": {
       "translation": "无法重新连接。请重试。",
       "hash": "a0g3ow",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.filterAll": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.filterRecurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.filterOneTime": {
+      "translation": "一次性",
+      "hash": "xf6j90",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.searchPlaceholder": {
+      "translation": "搜索交易...",
+      "hash": "f89va9",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.recurringCount": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.oneTimeCount": {
+      "translation": "一次性",
+      "hash": "xf6j90",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.typeRecurring": {
+      "translation": "重复性开支",
+      "hash": "ja22fx",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.typeOneTime": {
+      "translation": "一次性",
+      "hash": "wcozis",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.transactionCount": {
+      "translation": "交易",
+      "hash": "wbfm8l",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.pageTitle": {
+      "translation": "所有交易",
+      "hash": "fv70p8",
+      "lastUpdated": "2026-03-01"
+    },
+    "transactions.dayOfMonth": {
+      "translation": "每月的某些天",
+      "hash": "d8lkv9",
       "lastUpdated": "2026-03-01"
     },
     "googleDrive.noFilesHint": {

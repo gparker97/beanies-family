@@ -147,6 +147,22 @@ export function formatMonthYearShort(date: Date): string {
 }
 
 /**
+ * Parse a YYYY-MM-DD date string as local midnight.
+ * Unlike `new Date("2026-03-01")` which parses as UTC midnight,
+ * this function ensures the date is interpreted in the local timezone.
+ * Safe to call with any date string — full ISO timestamps are also handled.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  // YYYY-MM-DD format: parse as local date to avoid UTC timezone shift
+  if (dateStr.length === 10) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year!, month! - 1, day!);
+  }
+  // Full ISO or other format: parse normally
+  return new Date(dateStr);
+}
+
+/**
  * Format a date for HTML date input (YYYY-MM-DD)
  */
 export function toDateInputValue(date: Date): string {

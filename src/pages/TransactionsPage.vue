@@ -1,23 +1,23 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import AccountTypeIcon from '@/components/common/AccountTypeIcon.vue';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import MonthNavigator from '@/components/ui/MonthNavigator.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
+import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
-import { formatFrequency, getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
+import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -30,14 +30,12 @@ import type {
   CreateRecurringItemInput,
 } from '@/types/models';
 import {
-  formatDate,
+  formatMonthYear,
   toISODateString,
   getStartOfMonth,
   getEndOfMonth,
-  getLastMonthRange,
-  getLastNMonthsRange,
-  toDateInputValue,
   isDateBetween,
+  toDateInputValue,
 } from '@/utils/date';
 
 const transactionsStore = useTransactionsStore();
@@ -49,160 +47,136 @@ const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 
-// Tab state - recurring first by default
-const activeTab = ref<'transactions' | 'recurring'>('recurring');
+// ── State ─────────────────────────────────────────────────────────────────
+const selectedMonth = ref(new Date());
+const activeFilter = ref<'all' | 'recurring' | 'one-time'>('all');
+const searchQuery = ref('');
 
-// Date filter state
-type DateFilterType = 'current_month' | 'last_month' | 'last_3_months' | 'custom';
-const dateFilterType = ref<DateFilterType>('current_month');
-const customStartDate = ref<string>('');
-const customEndDate = ref<string>('');
-const showCustomDatePicker = ref(false);
-
-// Transaction modal state
+// Modal state
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
-
-// Recurring modal state
 const showRecurringModal = ref(false);
 const editingRecurringItem = ref<RecurringItem | undefined>(undefined);
 const isSubmittingRecurring = ref(false);
 
-// Date range based on filter type
-const dateRange = computed(() => {
-  const now = new Date();
-  let start: Date;
-  let end: Date;
-
-  switch (dateFilterType.value) {
-    case 'current_month':
-      start = getStartOfMonth(now);
-      end = getEndOfMonth(now);
-      break;
-    case 'last_month': {
-      const range = getLastMonthRange();
-      start = range.start;
-      end = range.end;
-      break;
-    }
-    case 'last_3_months': {
-      const range = getLastNMonthsRange(3);
-      start = range.start;
-      end = range.end;
-      break;
-    }
-    case 'custom':
-      if (customStartDate.value && customEndDate.value) {
-        start = new Date(customStartDate.value);
-        end = new Date(customEndDate.value);
-        end.setHours(23, 59, 59, 999); // End of day
-      } else {
-        // Fallback to current month if custom dates not set
-        start = getStartOfMonth(now);
-        end = getEndOfMonth(now);
-      }
-      break;
-  }
-
-  return {
-    start: toISODateString(start),
-    end: toISODateString(end),
-  };
-});
-
-// Display label for active filter
-const dateFilterLabel = computed(() => {
-  switch (dateFilterType.value) {
-    case 'current_month':
-      return t('date.currentMonth');
-    case 'last_month':
-      return t('date.lastMonth');
-    case 'last_3_months':
-      return t('date.last3Months');
-    case 'custom':
-      if (customStartDate.value && customEndDate.value) {
-        return `${customStartDate.value} to ${customEndDate.value}`;
-      }
-      return t('date.customRange');
-    default:
-      return t('date.allTime');
-  }
-});
-
-// Uses filtered data based on global member filter AND date filter
-const transactions = computed(() => {
-  const filtered = transactionsStore.filteredSortedTransactions.filter((t) =>
-    isDateBetween(t.date, dateRange.value.start, dateRange.value.end)
-  );
-  return filtered;
-});
-
-const recurringItems = computed(() => recurringStore.filteredRecurringItems);
-
-// Helper to convert amount to base currency (same as store)
-function convertToBaseCurrency(amount: number, fromCurrency: string): number {
-  const baseCurrency = settingsStore.baseCurrency;
-  if (fromCurrency === baseCurrency) return amount;
-
-  const rates = settingsStore.exchangeRates;
-  const directRate = rates.find((r) => r.from === fromCurrency && r.to === baseCurrency);
-  if (directRate) return amount * directRate.rate;
-
-  const inverseRate = rates.find((r) => r.from === baseCurrency && r.to === fromCurrency);
-  if (inverseRate) return amount / inverseRate.rate;
-
-  return amount; // Fallback if no rate found
-}
-
-// Filtered transaction totals for date range (converted to base currency)
-const dateFilteredIncome = computed(() =>
-  transactions.value
-    .filter((t) => t.type === 'income' && !t.recurringItemId)
-    .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
-);
-
-const dateFilteredExpenses = computed(() =>
-  transactions.value
-    .filter((t) => t.type === 'expense' && !t.recurringItemId)
-    .reduce((sum, t) => sum + convertToBaseCurrency(t.amount, t.currency), 0)
-);
-
+// ── Computeds ─────────────────────────────────────────────────────────────
 const baseCurrency = computed(() => settingsStore.baseCurrency);
 
-// Transaction tab cards
-const periodIncomeTotal = computed(
-  () =>
-    dateFilteredIncome.value +
-    (dateFilterType.value === 'current_month'
-      ? recurringStore.filteredTotalMonthlyRecurringIncome
-      : 0)
+const monthStart = computed(() => toISODateString(getStartOfMonth(selectedMonth.value)));
+const monthEnd = computed(() => toISODateString(getEndOfMonth(selectedMonth.value)));
+
+// Filter transactions to selected month
+const monthTransactions = computed(() =>
+  transactionsStore.filteredSortedTransactions.filter((tx) =>
+    isDateBetween(tx.date, monthStart.value, monthEnd.value)
+  )
 );
-const periodExpensesTotal = computed(
-  () =>
-    dateFilteredExpenses.value +
-    (dateFilterType.value === 'current_month'
-      ? recurringStore.filteredTotalMonthlyRecurringExpenses
-      : 0)
+
+// Apply type filter
+const filteredByType = computed(() => {
+  if (activeFilter.value === 'recurring') {
+    return monthTransactions.value.filter((tx) => tx.recurringItemId);
+  }
+  if (activeFilter.value === 'one-time') {
+    return monthTransactions.value.filter((tx) => !tx.recurringItemId);
+  }
+  return monthTransactions.value;
+});
+
+// Apply search
+const displayTransactions = computed(() => {
+  const q = searchQuery.value.toLowerCase().trim();
+  if (!q) return filteredByType.value;
+  return filteredByType.value.filter(
+    (tx) =>
+      tx.description.toLowerCase().includes(q) ||
+      getCategoryName(tx.category).toLowerCase().includes(q) ||
+      getMemberNameByAccountId(tx.accountId).toLowerCase().includes(q)
+  );
+});
+
+// Group by date
+const groupedTransactions = computed(() => {
+  const groups = new Map<string, Transaction[]>();
+  for (const tx of displayTransactions.value) {
+    const key = toDateInputValue(new Date(tx.date));
+    const group = groups.get(key);
+    if (group) {
+      group.push(tx);
+    } else {
+      groups.set(key, [tx]);
+    }
+  }
+  return groups;
+});
+
+// Summary computeds
+function convertToBaseCurrency(amount: number, fromCurrency: string): number {
+  const base = settingsStore.baseCurrency;
+  if (fromCurrency === base) return amount;
+  const rates = settingsStore.exchangeRates;
+  const directRate = rates.find((r) => r.from === fromCurrency && r.to === base);
+  if (directRate) return amount * directRate.rate;
+  const inverseRate = rates.find((r) => r.from === base && r.to === fromCurrency);
+  if (inverseRate) return amount / inverseRate.rate;
+  return amount;
+}
+
+const monthIncome = computed(() =>
+  monthTransactions.value
+    .filter((tx) => tx.type === 'income')
+    .reduce((sum, tx) => sum + convertToBaseCurrency(tx.amount, tx.currency), 0)
 );
-const periodNetTotal = computed(() => periodIncomeTotal.value - periodExpensesTotal.value);
+
+const monthExpenses = computed(() =>
+  monthTransactions.value
+    .filter((tx) => tx.type === 'expense')
+    .reduce((sum, tx) => sum + convertToBaseCurrency(tx.amount, tx.currency), 0)
+);
+
+const monthNet = computed(() => monthIncome.value - monthExpenses.value);
+
+const recurringCount = computed(
+  () => monthTransactions.value.filter((tx) => tx.recurringItemId).length
+);
+
+const oneTimeCount = computed(
+  () => monthTransactions.value.filter((tx) => !tx.recurringItemId).length
+);
+
+const totalCount = computed(() => monthTransactions.value.length);
+
+// Page subtitle
+const subtitle = computed(
+  () =>
+    `${formatMonthYear(selectedMonth.value)} \u00B7 ${totalCount.value} ${t('transactions.transactionCount')}`
+);
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function getCategoryName(categoryId: string): string {
+  const category = getCategoryById(categoryId);
+  return category?.name || categoryId;
+}
 
 function getAccountName(accountId: string): string {
   const account = accountsStore.accounts.find((a) => a.id === accountId);
   return account?.name || 'Unknown';
 }
 
-function getCategoryName(categoryId: string): string {
-  const category = getCategoryById(categoryId);
-  return category?.name || categoryId;
+function formatDateGroupHeader(dateKey: string): string {
+  const d = new Date(dateKey + 'T00:00:00');
+  return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'long' }).format(d).toUpperCase();
 }
 
-function getAccountTypeByAccountId(accountId: string) {
-  const account = accountsStore.accounts.find((a) => a.id === accountId);
-  return account?.type || 'other';
+function getRecurringFrequencyLabel(tx: Transaction): string {
+  if (!tx.recurringItemId) return '';
+  const item = recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
+  if (!item) return t('transactions.typeRecurring');
+  return `${t('transactions.typeRecurring')} \u00B7 ${formatFrequency(item).toLowerCase()}`;
 }
 
-// Transaction functions
+// ── Transaction CRUD ──────────────────────────────────────────────────────
 function openAddModal() {
   editingTransaction.value = null;
   showAddModal.value = true;
@@ -255,12 +229,18 @@ async function deleteTransaction(id: string) {
   }
 }
 
-// Recurring functions
-function openAddRecurringModal() {
-  editingRecurringItem.value = undefined;
-  showRecurringModal.value = true;
+// ── Recurring save from TransactionModal ──────────────────────────────────
+async function handleSaveRecurring(data: CreateRecurringItemInput) {
+  await recurringStore.createRecurringItem(data);
+  // Process the new recurring item to generate due transactions immediately
+  const result = await processRecurringItems();
+  if (result.processed > 0) {
+    await transactionsStore.loadTransactions();
+  }
+  showAddModal.value = false;
 }
 
+// ── Recurring CRUD (for editing recurring templates) ──────────────────────
 function openEditRecurringModal(item: RecurringItem) {
   editingRecurringItem.value = item;
   showRecurringModal.value = true;
@@ -286,205 +266,79 @@ function handleRecurringCancel() {
   editingRecurringItem.value = undefined;
 }
 
-async function deleteRecurringItem(id: string) {
+async function deleteRecurringItemById(id: string) {
   if (
-    await showConfirm({ title: 'confirm.deleteRecurringTitle', message: 'recurring.deleteConfirm' })
+    await showConfirm({
+      title: 'confirm.deleteRecurringTitle',
+      message: 'recurring.deleteConfirm',
+    })
   ) {
     await recurringStore.deleteRecurringItem(id);
     playWhoosh();
   }
 }
 
-async function toggleRecurringActive(id: string) {
-  await recurringStore.toggleActive(id);
-}
-
-function formatNextDate(item: RecurringItem): string {
-  const nextDate = getNextDueDateForItem(item);
-  if (!nextDate) return 'N/A';
-  return formatDate(nextDate.toISOString());
-}
-
-// Date filter functions
-function setDateFilter(type: DateFilterType) {
-  dateFilterType.value = type;
-  if (type === 'custom') {
-    showCustomDatePicker.value = true;
-    // Initialize custom dates to current month if not set
-    if (!customStartDate.value || !customEndDate.value) {
-      const now = new Date();
-      customStartDate.value = toDateInputValue(getStartOfMonth(now));
-      customEndDate.value = toDateInputValue(getEndOfMonth(now));
-    }
-  } else {
-    showCustomDatePicker.value = false;
-  }
-}
-
-function applyCustomDateRange() {
-  if (customStartDate.value && customEndDate.value) {
-    dateFilterType.value = 'custom';
-  }
+// Helper to find the recurring item for a transaction (for edit button)
+function getRecurringItem(tx: Transaction): RecurringItem | undefined {
+  if (!tx.recurringItemId) return undefined;
+  return recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
 }
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- Action bar -->
-    <div class="flex justify-end gap-2">
-      <BaseButton v-if="activeTab === 'transactions'" @click="openAddModal">
-        {{ t('transactions.addTransaction') }}
-      </BaseButton>
-      <BaseButton v-else @click="openAddRecurringModal">
-        {{ t('transactions.addRecurring') }}
-      </BaseButton>
+    <!-- Header -->
+    <div>
+      <h1 class="font-outfit text-2xl font-bold text-[var(--color-text)]">
+        {{ t('transactions.pageTitle') }}
+      </h1>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ subtitle }}</p>
     </div>
 
-    <!-- Tab Navigation -->
-    <div class="border-b border-gray-200 dark:border-slate-700">
-      <nav class="-mb-px flex gap-2">
-        <button
-          class="rounded-t-lg px-4 py-2.5 text-sm font-medium transition-all"
-          :class="
-            activeTab === 'recurring'
-              ? 'text-primary-500 bg-[var(--tint-orange-8)] font-semibold'
-              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
-          "
-          @click="activeTab = 'recurring'"
-        >
-          {{ t('transactions.recurringTransactions') }}
-          <span
-            v-if="recurringItems.length > 0"
-            class="ml-2 rounded-full px-2 py-0.5 text-xs"
-            :class="activeTab === 'recurring' ? 'bg-white/20' : 'bg-gray-200 dark:bg-slate-500'"
-          >
-            {{ recurringItems.length }}
-          </span>
-        </button>
-        <button
-          class="rounded-t-lg px-4 py-2.5 text-sm font-medium transition-all"
-          :class="
-            activeTab === 'transactions'
-              ? 'text-primary-500 bg-[var(--tint-orange-8)] font-semibold'
-              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700'
-          "
-          @click="activeTab = 'transactions'"
-        >
-          {{ t('transactions.oneTime') }}
-        </button>
-      </nav>
-    </div>
+    <!-- Toolbar -->
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- Filter pills -->
+      <TogglePillGroup
+        :model-value="activeFilter"
+        :options="[
+          { value: 'all', label: t('transactions.filterAll') },
+          { value: 'recurring', label: t('transactions.filterRecurring') },
+          { value: 'one-time', label: t('transactions.filterOneTime') },
+        ]"
+        @update:model-value="activeFilter = $event as 'all' | 'recurring' | 'one-time'"
+      />
 
-    <!-- Transactions Tab -->
-    <template v-if="activeTab === 'transactions'">
-      <!-- Date Filter -->
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('transactions.showing') }}
-          <span class="font-medium text-gray-900 dark:text-gray-100">{{ dateFilterLabel }}</span>
-        </div>
-        <div class="relative">
-          <div class="flex items-center gap-2">
-            <!-- Preset Filters -->
-            <button
-              class="rounded-lg px-3 py-1.5 text-sm transition-all"
-              :class="
-                dateFilterType === 'current_month'
-                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
-              "
-              @click="setDateFilter('current_month')"
-            >
-              {{ t('date.currentMonth') }}
-            </button>
-            <button
-              class="rounded-lg px-3 py-1.5 text-sm transition-all"
-              :class="
-                dateFilterType === 'last_month'
-                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
-              "
-              @click="setDateFilter('last_month')"
-            >
-              {{ t('date.lastMonth') }}
-            </button>
-            <button
-              class="rounded-lg px-3 py-1.5 text-sm transition-all"
-              :class="
-                dateFilterType === 'last_3_months'
-                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
-              "
-              @click="setDateFilter('last_3_months')"
-            >
-              {{ t('date.last3Months') }}
-            </button>
-            <button
-              class="rounded-lg px-3 py-1.5 text-sm transition-all"
-              :class="
-                dateFilterType === 'custom'
-                  ? 'text-primary-500 bg-[var(--tint-orange-15)] font-semibold'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600'
-              "
-              @click="setDateFilter('custom')"
-            >
-              {{ t('date.customRange') }}
-            </button>
-          </div>
-
-          <!-- Custom Date Range Picker -->
-          <div
-            v-if="showCustomDatePicker"
-            class="absolute right-0 z-10 mt-2 rounded-lg border border-gray-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-slate-800"
-          >
-            <div class="space-y-3">
-              <div>
-                <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('form.startDate') }}
-                </label>
-                <input
-                  v-model="customStartDate"
-                  type="date"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
-                />
-              </div>
-              <div>
-                <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('form.endDate') }}
-                </label>
-                <input
-                  v-model="customEndDate"
-                  type="date"
-                  class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-100"
-                />
-              </div>
-              <div class="flex gap-2">
-                <button
-                  class="flex-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600"
-                  @click="showCustomDatePicker = false"
-                >
-                  {{ t('action.cancel') }}
-                </button>
-                <button
-                  class="bg-primary-500 hover:bg-primary-600 flex-1 rounded-lg px-3 py-1.5 text-sm text-white"
-                  @click="
-                    applyCustomDateRange();
-                    showCustomDatePicker = false;
-                  "
-                >
-                  {{ t('action.apply') }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      <!-- Search -->
+      <div class="relative max-w-[320px] min-w-[180px] flex-1">
+        <BeanieIcon
+          name="search"
+          size="sm"
+          class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-gray-400"
+        />
+        <input
+          v-model="searchQuery"
+          type="text"
+          :placeholder="t('transactions.searchPlaceholder')"
+          class="focus:border-primary-300 focus:ring-primary-100 dark:focus:border-primary-500 dark:focus:ring-primary-900/30 w-full rounded-[14px] border border-gray-200 bg-white py-2 pr-3 pl-9 text-sm text-[var(--color-text)] placeholder:text-gray-400 focus:ring-2 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:placeholder:text-gray-500"
+        />
       </div>
 
-      <!-- Summary Cards -->
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <!-- Month navigator -->
+      <MonthNavigator v-model="selectedMonth" />
+
+      <!-- Add button -->
+      <BaseButton class="ml-auto" @click="openAddModal">
+        {{ t('transactions.addTransaction') }}
+      </BaseButton>
+    </div>
+
+    <!-- Summary row -->
+    <div class="flex flex-wrap items-start gap-4">
+      <!-- Income / Expenses / Net cards -->
+      <div class="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-3">
         <SummaryStatCard
-          :label="`${t('transactions.income')} (${dateFilterLabel})`"
-          :amount="periodIncomeTotal"
+          :label="t('transactions.income')"
+          :amount="monthIncome"
           :currency="baseCurrency"
           tint="green"
         >
@@ -494,8 +348,8 @@ function applyCustomDateRange() {
         </SummaryStatCard>
 
         <SummaryStatCard
-          :label="`${t('transactions.expenses')} (${dateFilterLabel})`"
-          :amount="periodExpensesTotal"
+          :label="t('transactions.expenses')"
+          :amount="monthExpenses"
           :currency="baseCurrency"
           tint="orange"
         >
@@ -505,279 +359,223 @@ function applyCustomDateRange() {
         </SummaryStatCard>
 
         <SummaryStatCard
-          :label="`${t('transactions.net')} (${dateFilterLabel})`"
-          :amount="periodNetTotal"
+          :label="t('transactions.net')"
+          :amount="monthNet"
           :currency="baseCurrency"
           tint="slate"
-          :dark="periodNetTotal >= 0"
+          :dark="monthNet >= 0"
         >
           <template #icon>
             <BeanieIcon
               name="bar-chart"
               size="md"
-              :class="periodNetTotal >= 0 ? 'text-white' : 'text-primary-500'"
+              :class="monthNet >= 0 ? 'text-white' : 'text-primary-500'"
             />
           </template>
         </SummaryStatCard>
       </div>
 
-      <!-- Transactions List -->
-      <BaseCard :title="t('transactions.allTransactions')">
+      <!-- Count pills -->
+      <div class="flex gap-3 pt-1">
         <div
-          v-if="transactions.length === 0"
-          class="py-12 text-center text-gray-500 dark:text-gray-400"
+          class="dark:bg-primary-900/20 flex items-center gap-1.5 rounded-[10px] bg-[var(--tint-orange-8)] px-3 py-2"
         >
-          <EmptyStateIllustration variant="transactions" class="mb-4" />
-          <p>{{ t('transactions.noTransactionsForPeriod') }}</p>
-          <p class="mt-2 text-sm">{{ t('transactions.tryDifferentRange') }}</p>
+          <BeanieIcon name="repeat" size="xs" class="text-primary-500" />
+          <span class="font-outfit text-primary-500 text-sm font-semibold">{{
+            recurringCount
+          }}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{
+            t('transactions.recurringCount')
+          }}</span>
         </div>
-        <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
+        <div
+          class="flex items-center gap-1.5 rounded-[10px] bg-[var(--tint-slate-5)] px-3 py-2 dark:bg-slate-700"
+        >
+          <BeanieIcon name="arrow-right-left" size="xs" class="text-secondary-500" />
+          <span class="font-outfit text-secondary-500 text-sm font-semibold">{{
+            oneTimeCount
+          }}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400">{{
+            t('transactions.oneTimeCount')
+          }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transaction list -->
+    <BaseCard>
+      <div
+        v-if="displayTransactions.length === 0"
+        class="py-12 text-center text-gray-500 dark:text-gray-400"
+      >
+        <EmptyStateIllustration variant="transactions" class="mb-4" />
+        <p>{{ t('transactions.noTransactionsForPeriod') }}</p>
+        <p class="mt-2 text-sm">{{ t('transactions.tryDifferentRange') }}</p>
+      </div>
+
+      <template v-else>
+        <!-- Grid header (desktop) -->
+        <div
+          class="hidden border-b border-gray-100 pb-2 text-xs font-medium tracking-wider text-gray-400 uppercase md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-3 dark:border-slate-700 dark:text-gray-500"
+        >
+          <div></div>
+          <div>{{ t('transactions.title') }}</div>
+          <div>{{ t('family.title') }}</div>
+          <div class="text-right">{{ t('form.amount') }}</div>
+          <div>{{ t('form.type') }}</div>
+          <div></div>
+        </div>
+
+        <!-- Date-grouped rows -->
+        <div v-for="[dateKey, txns] in groupedTransactions" :key="dateKey">
+          <!-- Date group header -->
+          <div class="flex items-center gap-3 pt-5 pb-2">
+            <span class="text-xs font-semibold tracking-wider text-gray-400 dark:text-gray-500">
+              {{ formatDateGroupHeader(dateKey) }}
+            </span>
+            <div class="h-px flex-1 bg-gray-100 dark:bg-slate-700"></div>
+          </div>
+
+          <!-- Transaction rows -->
           <div
-            v-for="transaction in transactions"
-            :key="transaction.id"
+            v-for="tx in txns"
+            :key="tx.id"
             data-testid="transaction-item"
-            class="flex items-center justify-between py-4"
-            :class="syncHighlightClass(transaction.id)"
+            class="group py-3 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-3"
+            :class="syncHighlightClass(tx.id)"
           >
-            <div class="flex items-center gap-4">
+            <!-- Icon -->
+            <div
+              class="hidden h-9 w-9 items-center justify-center rounded-[12px] md:flex"
+              :class="
+                tx.type === 'income' ? 'bg-[var(--tint-success-10)]' : 'bg-[var(--tint-orange-8)]'
+              "
+            >
+              <CategoryIcon :category="tx.category" size="sm" />
+            </div>
+
+            <!-- Description + category (mobile-friendly) -->
+            <div class="flex items-center gap-3 md:block">
+              <!-- Mobile icon -->
               <div
-                class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] md:hidden"
                 :class="
-                  transaction.type === 'income'
-                    ? 'bg-[var(--tint-success-10)]'
-                    : 'bg-[var(--tint-orange-8)]'
+                  tx.type === 'income' ? 'bg-[var(--tint-success-10)]' : 'bg-[var(--tint-orange-8)]'
                 "
               >
-                <!-- Recurring indicator -->
-                <BeanieIcon
-                  v-if="transaction.recurringItemId"
-                  name="repeat"
-                  size="md"
-                  :class="transaction.type === 'income' ? 'text-green-600' : 'text-red-600'"
-                />
-                <BeanieIcon
-                  v-else
-                  :name="transaction.type === 'income' ? 'arrow-up' : 'arrow-down'"
-                  size="md"
-                  :class="transaction.type === 'income' ? 'text-green-600' : 'text-red-600'"
-                />
+                <CategoryIcon :category="tx.category" size="sm" />
               </div>
-              <div class="space-y-0.5">
-                <!-- Transaction Name -->
-                <p class="font-medium text-gray-900 dark:text-gray-100">
-                  {{ transaction.description }}
+              <div>
+                <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {{ tx.description }}
                 </p>
-                <!-- Category -->
-                <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <CategoryIcon :category="transaction.category" size="sm" />
-                  {{ getCategoryName(transaction.category) }}
-                </p>
-                <!-- Family Member -->
-                <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <BeanieIcon
-                    name="user-filled"
-                    size="xs"
-                    :style="{ color: getMemberColorByAccountId(transaction.accountId) }"
-                  />
-                  {{ getMemberNameByAccountId(transaction.accountId) }}
-                </p>
-                <!-- Account -->
-                <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <AccountTypeIcon
-                    :type="getAccountTypeByAccountId(transaction.accountId)"
-                    size="sm"
-                  />
-                  {{ getAccountName(transaction.accountId) }}
-                </p>
-                <!-- Date -->
-                <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                  <BeanieIcon name="calendar" size="xs" class="text-gray-400" />
-                  {{ formatDate(transaction.date) }}
-                  <span
-                    v-if="transaction.recurringItemId"
-                    class="bg-sky-silk-100 text-secondary-500 dark:bg-primary-900/30 dark:text-primary-400 ml-1 rounded px-1.5 py-0.5 text-xs"
-                  >
-                    {{ t('status.recurring') }}
+                <p class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ getCategoryName(tx.category) }}
+                  <span class="md:hidden">
+                    &middot; {{ getMemberNameByAccountId(tx.accountId) }}
                   </span>
                 </p>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <CurrencyAmount
-                :amount="transaction.amount"
-                :currency="transaction.currency"
-                :type="transaction.type === 'income' ? 'income' : 'expense'"
-                size="lg"
-              />
-              <ActionButtons
-                size="md"
-                @edit="openEditModal(transaction)"
-                @delete="deleteTransaction(transaction.id)"
-              />
-            </div>
-          </div>
-        </div>
-      </BaseCard>
-    </template>
-
-    <!-- Recurring Tab -->
-    <template v-else>
-      <!-- Recurring Summary -->
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <SummaryStatCard
-          :label="t('recurring.monthlyIncome')"
-          :amount="recurringStore.filteredTotalMonthlyRecurringIncome"
-          :currency="baseCurrency"
-          tint="green"
-        >
-          <template #icon>
-            <BeanieIcon name="repeat" size="md" class="text-[#27AE60]" />
-          </template>
-        </SummaryStatCard>
-
-        <SummaryStatCard
-          :label="t('recurring.monthlyExpenses')"
-          :amount="recurringStore.filteredTotalMonthlyRecurringExpenses"
-          :currency="baseCurrency"
-          tint="orange"
-        >
-          <template #icon>
-            <BeanieIcon name="repeat" size="md" class="text-primary-500" />
-          </template>
-        </SummaryStatCard>
-
-        <SummaryStatCard
-          :label="t('recurring.netMonthly')"
-          :amount="recurringStore.filteredNetMonthlyRecurring"
-          :currency="baseCurrency"
-          tint="slate"
-          :dark="recurringStore.filteredNetMonthlyRecurring >= 0"
-        >
-          <template #icon>
-            <BeanieIcon
-              name="bar-chart"
-              size="md"
-              :class="
-                recurringStore.filteredNetMonthlyRecurring >= 0 ? 'text-white' : 'text-primary-500'
-              "
-            />
-          </template>
-        </SummaryStatCard>
-      </div>
-
-      <!-- Recurring Items List -->
-      <BaseCard :title="t('recurring.items')">
-        <div
-          v-if="recurringItems.length === 0"
-          class="py-12 text-center text-gray-500 dark:text-gray-400"
-        >
-          <EmptyStateIllustration variant="recurring" class="mb-4" />
-          <p>{{ t('recurring.noItems') }}</p>
-          <p class="mt-2">{{ t('recurring.getStarted') }}</p>
-        </div>
-        <div v-else class="divide-y divide-gray-200 dark:divide-slate-700">
-          <div
-            v-for="item in recurringItems"
-            :key="item.id"
-            class="py-4"
-            :class="[{ 'opacity-50': !item.isActive }, syncHighlightClass(item.id)]"
-          >
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-4">
-                <div
-                  class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
-                  :class="
-                    item.type === 'income'
-                      ? 'bg-[var(--tint-success-10)]'
-                      : 'bg-[var(--tint-orange-8)]'
-                  "
-                >
-                  <BeanieIcon
-                    name="repeat"
-                    size="md"
-                    :class="item.type === 'income' ? 'text-green-600' : 'text-red-600'"
+                <!-- Mobile: amount + type -->
+                <div class="mt-1 flex items-center gap-2 md:hidden">
+                  <CurrencyAmount
+                    :amount="tx.amount"
+                    :currency="tx.currency"
+                    :type="tx.type === 'income' ? 'income' : 'expense'"
+                    size="sm"
                   />
-                </div>
-                <div class="space-y-0.5">
-                  <!-- Transaction Name -->
-                  <p class="font-medium text-gray-900 dark:text-gray-100">
-                    {{ item.description }}
-                    <span
-                      v-if="!item.isActive"
-                      class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500 dark:bg-slate-700"
-                    >
-                      {{ t('status.paused') }}
-                    </span>
-                  </p>
-                  <!-- Category -->
-                  <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <CategoryIcon :category="item.category" size="sm" />
-                    {{ getCategoryName(item.category) }}
-                  </p>
-                  <!-- Family Member -->
-                  <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <BeanieIcon
-                      name="user-filled"
-                      size="xs"
-                      :style="{ color: getMemberColorByAccountId(item.accountId) }"
-                    />
-                    {{ getMemberNameByAccountId(item.accountId) }}
-                  </p>
-                  <!-- Account -->
-                  <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <AccountTypeIcon :type="getAccountTypeByAccountId(item.accountId)" size="sm" />
-                    {{ getAccountName(item.accountId) }}
-                  </p>
-                  <!-- Recurring Schedule -->
-                  <p class="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                    <BeanieIcon name="calendar" size="xs" class="text-gray-400" />
-                    {{ formatFrequency(item) }} - Next: {{ formatNextDate(item) }}
-                  </p>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <CurrencyAmount
-                  :amount="item.amount"
-                  :currency="item.currency"
-                  :type="item.type === 'income' ? 'income' : 'expense'"
-                  size="lg"
-                />
-                <div class="flex gap-1">
-                  <button
-                    class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                    :title="item.isActive ? t('action.pause') : t('action.resume')"
-                    @click="toggleRecurringActive(item.id)"
+                  <span
+                    v-if="tx.recurringItemId"
+                    class="text-primary-500 dark:bg-primary-900/20 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-medium"
                   >
-                    <BeanieIcon v-if="item.isActive" name="pause-circle" size="md" />
-                    <BeanieIcon v-else name="play-circle" size="md" />
-                  </button>
-                  <button
-                    class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                    :title="t('action.edit')"
-                    @click="openEditRecurringModal(item)"
+                    {{ t('transactions.typeRecurring') }}
+                  </span>
+                  <span
+                    v-else
+                    class="rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-slate-700 dark:text-gray-400"
                   >
-                    <BeanieIcon name="edit" size="md" />
-                  </button>
-                  <button
-                    class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                    :title="t('action.delete')"
-                    @click="deleteRecurringItem(item.id)"
-                  >
-                    <BeanieIcon name="trash" size="md" />
-                  </button>
+                    {{ t('transactions.typeOneTime') }}
+                  </span>
                 </div>
               </div>
             </div>
+
+            <!-- Member (desktop) -->
+            <div class="hidden md:block">
+              <div class="flex items-center gap-1.5">
+                <BeanieIcon
+                  name="user-filled"
+                  size="xs"
+                  :style="{ color: getMemberColorByAccountId(tx.accountId) }"
+                />
+                <span class="text-sm text-gray-700 dark:text-gray-300">
+                  {{ getMemberNameByAccountId(tx.accountId) }}
+                </span>
+              </div>
+              <p class="text-xs text-gray-400 dark:text-gray-500">
+                {{ getAccountName(tx.accountId) }}
+              </p>
+            </div>
+
+            <!-- Amount (desktop) -->
+            <div class="hidden text-right md:block">
+              <CurrencyAmount
+                :amount="tx.amount"
+                :currency="tx.currency"
+                :type="tx.type === 'income' ? 'income' : 'expense'"
+                size="md"
+              />
+            </div>
+
+            <!-- Type pill (desktop) -->
+            <div class="hidden md:block">
+              <span
+                v-if="tx.recurringItemId"
+                class="text-primary-500 dark:bg-primary-900/20 inline-block rounded-full bg-[var(--tint-orange-8)] px-2.5 py-1 text-xs font-medium"
+              >
+                {{ getRecurringFrequencyLabel(tx) }}
+              </span>
+              <span
+                v-else
+                class="inline-block rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-500 dark:bg-slate-700 dark:text-gray-400"
+              >
+                {{ t('transactions.typeOneTime') }}
+              </span>
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-2 flex justify-end md:mt-0">
+              <template v-if="tx.recurringItemId">
+                <ActionButtons
+                  size="sm"
+                  @edit="
+                    () => {
+                      const ri = getRecurringItem(tx);
+                      if (ri) openEditRecurringModal(ri);
+                      else openEditModal(tx);
+                    }
+                  "
+                  @delete="deleteRecurringItemById(tx.recurringItemId!)"
+                />
+              </template>
+              <template v-else>
+                <ActionButtons
+                  size="sm"
+                  @edit="openEditModal(tx)"
+                  @delete="deleteTransaction(tx.id)"
+                />
+              </template>
+            </div>
           </div>
         </div>
-      </BaseCard>
-    </template>
+      </template>
+    </BaseCard>
 
     <!-- Add Transaction Modal -->
     <TransactionModal
       :open="showAddModal"
       @close="showAddModal = false"
       @save="handleTransactionSave"
+      @save-recurring="handleSaveRecurring"
       @delete="handleTransactionDelete"
     />
 
@@ -787,10 +585,11 @@ function applyCustomDateRange() {
       :transaction="editingTransaction"
       @close="closeEditModal"
       @save="handleTransactionSave"
+      @save-recurring="handleSaveRecurring"
       @delete="handleTransactionDelete"
     />
 
-    <!-- Add/Edit Recurring Modal -->
+    <!-- Edit Recurring Modal -->
     <BaseModal
       :open="showRecurringModal"
       :title="editingRecurringItem ? t('recurring.editItem') : t('recurring.addItem')"

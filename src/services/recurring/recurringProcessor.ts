@@ -2,7 +2,14 @@ import * as accountRepo from '@/services/indexeddb/repositories/accountRepositor
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
 import type { RecurringItem, CreateTransactionInput } from '@/types/models';
-import { toISODateString, addDays, addMonths, addYears, getStartOfDay } from '@/utils/date';
+import {
+  toDateInputValue,
+  addDays,
+  addMonths,
+  addYears,
+  getStartOfDay,
+  parseLocalDate,
+} from '@/utils/date';
 
 export interface ProcessResult {
   processed: number;
@@ -24,7 +31,7 @@ export async function processRecurringItems(): Promise<ProcessResult> {
     for (const item of activeItems) {
       try {
         // Skip if end date has passed
-        if (item.endDate && new Date(item.endDate) < today) {
+        if (item.endDate && parseLocalDate(item.endDate) < today) {
           // Deactivate the item since it's expired
           await recurringRepo.updateRecurringItem(item.id, { isActive: false });
           continue;
@@ -45,7 +52,7 @@ export async function processRecurringItems(): Promise<ProcessResult> {
         if (dueDates.length > 0) {
           const lastDue = dueDates[dueDates.length - 1];
           if (lastDue) {
-            await recurringRepo.updateLastProcessedDate(item.id, toISODateString(lastDue));
+            await recurringRepo.updateLastProcessedDate(item.id, toDateInputValue(lastDue));
           }
         }
       } catch (e) {
@@ -64,12 +71,12 @@ export async function processRecurringItems(): Promise<ProcessResult> {
  */
 function getDueDatesSince(item: RecurringItem, today: Date): Date[] {
   const dueDates: Date[] = [];
-  const startDate = new Date(item.startDate);
+  const startDate = parseLocalDate(item.startDate);
 
   // Determine the starting point for calculation
   let checkDate: Date;
   if (item.lastProcessedDate) {
-    checkDate = getNextDueDate(item, new Date(item.lastProcessedDate));
+    checkDate = getNextDueDate(item, parseLocalDate(item.lastProcessedDate));
   } else {
     checkDate = getFirstDueDate(item, startDate);
   }
@@ -77,7 +84,7 @@ function getDueDatesSince(item: RecurringItem, today: Date): Date[] {
   // Collect all due dates up to and including today
   while (checkDate <= today) {
     // Check end date
-    if (item.endDate && checkDate > new Date(item.endDate)) {
+    if (item.endDate && checkDate > parseLocalDate(item.endDate)) {
       break;
     }
 
@@ -185,7 +192,7 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     amount: item.amount,
     currency: item.currency,
     category: item.category,
-    date: toISODateString(date),
+    date: toDateInputValue(date),
     description: item.description,
     isReconciled: false,
     recurringItemId: item.id,
@@ -225,8 +232,8 @@ export function previewUpcomingDates(item: RecurringItem, count: number = 5): Da
   const today = getStartOfDay(now);
 
   let nextDate = item.lastProcessedDate
-    ? getNextDueDate(item, new Date(item.lastProcessedDate))
-    : getFirstDueDate(item, new Date(item.startDate));
+    ? getNextDueDate(item, parseLocalDate(item.lastProcessedDate))
+    : getFirstDueDate(item, parseLocalDate(item.startDate));
 
   // If next date is in the past, advance to future
   while (nextDate < today) {
@@ -234,7 +241,7 @@ export function previewUpcomingDates(item: RecurringItem, count: number = 5): Da
   }
 
   for (let i = 0; i < count; i++) {
-    if (item.endDate && nextDate > new Date(item.endDate)) {
+    if (item.endDate && nextDate > parseLocalDate(item.endDate)) {
       break;
     }
     dates.push(new Date(nextDate));
