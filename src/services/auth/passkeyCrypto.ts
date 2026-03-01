@@ -126,6 +126,82 @@ export function buildPRFExtension(): { prf: { eval: { first: BufferSource } } } 
   };
 }
 
+// --- Password wrapping (AES-GCM) ---
+// Unlike AES-KW DEK wrapping above which wraps CryptoKeys,
+// these functions wrap string passwords for storage in the .beanpod envelope.
+
+const PASSWORD_WRAP_ALGO = 'AES-GCM';
+const PASSWORD_WRAP_KEY_LENGTH = 256;
+const PASSWORD_WRAP_IV_LENGTH = 12;
+
+/**
+ * Derive an AES-GCM key for password wrapping from PRF output.
+ * Uses a different HKDF info string than DEK wrapping to ensure domain separation.
+ */
+export async function derivePasswordWrappingKey(
+  prfOutput: ArrayBuffer,
+  hkdfSalt: Uint8Array
+): Promise<CryptoKey> {
+  const keyMaterial = await crypto.subtle.importKey('raw', prfOutput, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {
+      name: 'HKDF',
+      hash: HKDF_HASH,
+      salt: hkdfSalt.buffer as ArrayBuffer,
+      info: new TextEncoder().encode('beanies.family-passkey-password-wrap'),
+    },
+    keyMaterial,
+    { name: PASSWORD_WRAP_ALGO, length: PASSWORD_WRAP_KEY_LENGTH },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * Encrypt a file password using PRF output.
+ * Returns the encrypted password + the HKDF salt and AES-GCM IV needed for decryption.
+ */
+export async function wrapPassword(
+  password: string,
+  prfOutput: ArrayBuffer
+): Promise<{ wrappedPassword: string; hkdfSalt: string; iv: string }> {
+  const hkdfSalt = generateHKDFSalt();
+  const iv = crypto.getRandomValues(new Uint8Array(PASSWORD_WRAP_IV_LENGTH));
+  const wrappingKey = await derivePasswordWrappingKey(prfOutput, hkdfSalt);
+  const encrypted = await crypto.subtle.encrypt(
+    { name: PASSWORD_WRAP_ALGO, iv },
+    wrappingKey,
+    new TextEncoder().encode(password)
+  );
+  return {
+    wrappedPassword: bufferToBase64(encrypted),
+    hkdfSalt: bufferToBase64(hkdfSalt.buffer as ArrayBuffer),
+    iv: bufferToBase64(iv.buffer as ArrayBuffer),
+  };
+}
+
+/**
+ * Decrypt a file password using PRF output.
+ * Reverses wrapPassword — requires the same PRF output that was used to wrap.
+ */
+export async function unwrapPassword(
+  wrappedPassword: string,
+  hkdfSalt: string,
+  iv: string,
+  prfOutput: ArrayBuffer
+): Promise<string> {
+  const wrappingKey = await derivePasswordWrappingKey(
+    prfOutput,
+    new Uint8Array(base64ToBuffer(hkdfSalt))
+  );
+  const decrypted = await crypto.subtle.decrypt(
+    { name: PASSWORD_WRAP_ALGO, iv: base64ToBuffer(iv) },
+    wrappingKey,
+    base64ToBuffer(wrappedPassword)
+  );
+  return new TextDecoder().decode(decrypted);
+}
+
 // --- Utility functions ---
 
 function bufferToBase64(buffer: ArrayBuffer): string {

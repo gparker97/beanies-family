@@ -7,9 +7,15 @@
  * Acceptable for local-first — no network replay threat.
  */
 
-import { isPRFSupported, buildPRFExtension } from './passkeyCrypto';
+import {
+  isPRFSupported,
+  getPRFOutput,
+  buildPRFExtension,
+  wrapPassword,
+  unwrapPassword,
+} from './passkeyCrypto';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
-import type { PasskeyRegistration } from '@/types/models';
+import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { getGlobalSettings } from '@/services/indexeddb/repositories/globalSettingsRepository';
 
@@ -49,6 +55,7 @@ export interface RegisterPasskeyResult {
   success: boolean;
   error?: string;
   prfSupported?: boolean;
+  passkeySecret?: PasskeySecret;
 }
 
 export async function registerPasskeyForMember(
@@ -126,9 +133,31 @@ export async function registerPasskeyForMember(
 
   await passkeyRepo.savePasskeyRegistration(registration);
 
+  // If PRF is available, wrap the file password for cross-device access
+  let passkeySecret: PasskeySecret | undefined;
+  if (prfAvailable) {
+    const prfOutput = getPRFOutput(extensionResults);
+    if (prfOutput) {
+      try {
+        const wrapped = await wrapPassword(encryptionPassword, prfOutput);
+        passkeySecret = {
+          credentialId: registration.credentialId,
+          memberId,
+          wrappedPassword: wrapped.wrappedPassword,
+          hkdfSalt: wrapped.hkdfSalt,
+          iv: wrapped.iv,
+          createdAt: toISODateString(new Date()),
+        };
+      } catch {
+        // PRF wrap failed — non-critical, fall back to Level 1
+      }
+    }
+  }
+
   return {
     success: true,
     prfSupported: registration.prfSupported,
+    passkeySecret,
   };
 }
 
@@ -136,11 +165,13 @@ export async function registerPasskeyForMember(
 
 export interface AuthenticatePasskeyParams {
   familyId: string;
+  passkeySecrets?: PasskeySecret[];
 }
 
 export interface AuthenticatePasskeyResult {
   success: boolean;
   memberId?: string;
+  credentialId?: string; // Credential ID (for cross-device registration)
   cachedPassword?: string; // Encryption password for file decryption
   error?: string;
 }
@@ -214,19 +245,11 @@ export async function authenticateWithPasskey(
         const cachedPassword = await getCachedPasswordForFamily(params.familyId);
         if (cachedPassword) {
           // Auto-register: create a local registration for the synced credential
-          const syncedRegistration: PasskeyRegistration = {
+          await registerSyncedCredential({
             credentialId,
-            memberId: memberMatch.memberId,
-            familyId: memberMatch.familyId,
-            publicKey: memberMatch.publicKey,
-            transports: memberMatch.transports,
-            prfSupported: memberMatch.prfSupported,
+            sourceRegistration: memberMatch,
             cachedPassword,
-            label: memberMatch.label + ' (synced)',
-            createdAt: memberMatch.createdAt,
-            lastUsedAt: toISODateString(new Date()),
-          };
-          await passkeyRepo.savePasskeyRegistration(syncedRegistration);
+          });
 
           return {
             success: true,
@@ -235,8 +258,47 @@ export async function authenticateWithPasskey(
           };
         }
 
-        // No cached password available — user must enter password manually
-        return { success: false, error: 'CROSS_DEVICE_NO_CACHE' };
+        // No cached password — try PRF unwrap from passkeySecrets in the .beanpod envelope
+        if (params.passkeySecrets && params.passkeySecrets.length > 0) {
+          const extensionResults = assertion.getClientExtensionResults();
+          const prfOutput = getPRFOutput(extensionResults);
+          if (prfOutput) {
+            const memberSecrets = params.passkeySecrets.filter(
+              (s) => s.memberId === memberIdFromHandle
+            );
+            for (const secret of memberSecrets) {
+              try {
+                const password = await unwrapPassword(
+                  secret.wrappedPassword,
+                  secret.hkdfSalt,
+                  secret.iv,
+                  prfOutput
+                );
+                // PRF unwrap succeeded — auto-register synced credential
+                await registerSyncedCredential({
+                  credentialId,
+                  sourceRegistration: memberMatch,
+                  cachedPassword: password,
+                });
+                return {
+                  success: true,
+                  memberId: memberIdFromHandle,
+                  cachedPassword: password,
+                };
+              } catch {
+                // Wrong PRF output or corrupt secret — try next
+              }
+            }
+          }
+        }
+
+        // PRF unwrap unavailable or failed — user must enter password manually
+        return {
+          success: false,
+          error: 'CROSS_DEVICE_NO_CACHE',
+          memberId: memberMatch.memberId,
+          credentialId,
+        };
       }
     }
     // Neither credential ID nor userHandle matches this family's registrations
@@ -261,6 +323,32 @@ export async function authenticateWithPasskey(
     success: false,
     error: 'Passkey verified but cannot decrypt file. Please re-register in Settings.',
   };
+}
+
+// --- Synced credential registration ---
+
+/**
+ * Register a synced passkey credential locally, copying metadata from a known registration.
+ * Used when a passkey syncs via iCloud Keychain / Google Password Manager to a new device.
+ */
+export async function registerSyncedCredential(params: {
+  credentialId: string;
+  sourceRegistration: PasskeyRegistration;
+  cachedPassword: string;
+}): Promise<void> {
+  const syncedRegistration: PasskeyRegistration = {
+    credentialId: params.credentialId,
+    memberId: params.sourceRegistration.memberId,
+    familyId: params.sourceRegistration.familyId,
+    publicKey: params.sourceRegistration.publicKey,
+    transports: params.sourceRegistration.transports,
+    prfSupported: params.sourceRegistration.prfSupported,
+    cachedPassword: params.cachedPassword,
+    label: params.sourceRegistration.label + ' (synced)',
+    createdAt: params.sourceRegistration.createdAt,
+    lastUsedAt: toISODateString(new Date()),
+  };
+  await passkeyRepo.savePasskeyRegistration(syncedRegistration);
 }
 
 // --- Management ---

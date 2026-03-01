@@ -5,7 +5,9 @@ import {
   registerPasskeyForMember,
   authenticateWithPasskey,
   hasRegisteredPasskeys,
+  type RegisterPasskeyResult,
 } from '@/services/auth/passkeyService';
+import type { PasskeySecret } from '@/types/models';
 import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
@@ -328,19 +330,36 @@ export const useAuthStore = defineStore('auth', () => {
    * Sign in using a registered passkey (biometric).
    * Returns cachedPassword for file decryption.
    */
-  async function signInWithPasskey(familyId: string): Promise<{
+  async function signInWithPasskey(
+    familyId: string,
+    passkeySecrets?: PasskeySecret[]
+  ): Promise<{
     success: boolean;
     cachedPassword?: string;
+    credentialId?: string;
     error?: string;
   }> {
     isLoading.value = true;
     error.value = null;
 
     try {
-      const result = await authenticateWithPasskey({ familyId });
+      const result = await authenticateWithPasskey({ familyId, passkeySecrets });
       if (!result.success || !result.memberId) {
+        // For CROSS_DEVICE_NO_CACHE, create a partial session so the
+        // member is already identified after file decryption
+        if (result.error === 'CROSS_DEVICE_NO_CACHE' && result.memberId) {
+          const user: AuthUser = {
+            memberId: result.memberId,
+            email: '',
+            familyId,
+            role: undefined,
+          };
+          currentUser.value = user;
+          isAuthenticated.value = true;
+          persistSession(user);
+        }
         error.value = result.error ?? 'Passkey authentication failed';
-        return { success: false, error: error.value };
+        return { success: false, credentialId: result.credentialId, error: error.value };
       }
 
       // The member data may not be loaded yet (file not decrypted),
@@ -366,6 +385,29 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: error.value };
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /**
+   * Create a full session for a member already verified by passkey (cross-device flow).
+   * Skips password verification — the passkey already authenticated the user.
+   */
+  function createSessionForVerifiedMember(memberId: string, familyId: string): void {
+    const familyStore = useFamilyStore();
+    const member = familyStore.members.find((m) => m.id === memberId);
+    const user: AuthUser = {
+      memberId,
+      email: member?.email ?? '',
+      familyId,
+      role: member?.role,
+    };
+    currentUser.value = user;
+    isAuthenticated.value = true;
+    freshSignIn.value = true;
+    persistSession(user);
+    if (member) {
+      familyStore.setCurrentMember(member.id);
+      familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
     }
   }
 
@@ -398,7 +440,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function registerPasskeyForCurrentUser(
     encryptionPassword: string,
     label?: string
-  ): Promise<{ success: boolean; error?: string; prfSupported?: boolean }> {
+  ): Promise<RegisterPasskeyResult> {
     if (!currentUser.value) {
       return { success: false, error: 'Not signed in' };
     }
@@ -517,6 +559,7 @@ export const useAuthStore = defineStore('auth', () => {
     initializeAuth,
     signIn,
     signInWithPasskey,
+    createSessionForVerifiedMember,
     updateSessionWithMemberData,
     registerPasskeyForCurrentUser,
     checkHasRegisteredPasskeys,
