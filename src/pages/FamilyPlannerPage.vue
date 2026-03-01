@@ -119,14 +119,9 @@ function openTodoViewModal(todo: TodoItem) {
   <div class="space-y-6">
     <!-- Header -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
-          &#x1F4C5; {{ t('planner.title') }}
-        </h1>
-        <p class="text-secondary-500/40 mt-0.5 text-sm dark:text-gray-500">
-          {{ headerSubtitle }}
-        </p>
-      </div>
+      <p class="text-secondary-500/40 text-sm dark:text-gray-500">
+        {{ headerSubtitle }}
+      </p>
       <button
         type="button"
         class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"

@@ -327,15 +327,10 @@ async function deleteAccount(id: string) {
 <template>
   <div class="space-y-6">
     <!-- Page Header -->
-    <div class="flex items-start justify-between">
-      <div>
-        <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
-          {{ t('accounts.pageTitle') }}
-        </h1>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          {{ subtitleText }}
-        </p>
-      </div>
+    <div class="flex items-center justify-between">
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        {{ subtitleText }}
+      </p>
       <BaseButton @click="openAddWithDefaults()">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('accounts.addAccount') }}

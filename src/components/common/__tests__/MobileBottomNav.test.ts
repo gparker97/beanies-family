@@ -23,10 +23,10 @@ describe('MobileBottomNav', () => {
     mockRoute.path = '/nook';
   });
 
-  it('renders 4 navigation tabs', () => {
+  it('renders 5 navigation tabs', () => {
     const wrapper = mount(MobileBottomNav);
     const buttons = wrapper.findAll('button');
-    expect(buttons).toHaveLength(4);
+    expect(buttons).toHaveLength(5);
   });
 
   it('highlights active tab based on current route', () => {
@@ -34,10 +34,17 @@ describe('MobileBottomNav', () => {
     const wrapper = mount(MobileBottomNav);
     const buttons = wrapper.findAll('button');
 
-    // First tab (dashboard) should have active color
-    expect(buttons[0]!.classes()).toContain('text-primary-500');
-    // Other tabs should not
-    expect(buttons[1]!.classes()).toContain('text-gray-400');
+    // First tab (nook) should have active pill background
+    const firstPill = buttons[0]!.find('div');
+    expect(firstPill.classes()).toContain('bg-[rgba(241,93,34,0.08)]');
+
+    // First tab label should have active text color
+    const firstLabel = buttons[0]!.find('span.font-outfit');
+    expect(firstLabel.classes()).toContain('text-primary-500');
+
+    // Second tab label should have inactive text color
+    const secondLabel = buttons[1]!.find('span.font-outfit');
+    expect(secondLabel.classes()).toContain('text-secondary-500/40');
   });
 
   it('navigates on tab click', async () => {
@@ -45,14 +52,25 @@ describe('MobileBottomNav', () => {
     const buttons = wrapper.findAll('button');
 
     await buttons[1]!.trigger('click');
-    expect(mockPush).toHaveBeenCalledWith('/accounts');
+    expect(mockPush).toHaveBeenCalledWith('/planner');
   });
 
   it('renders tab labels', () => {
     const wrapper = mount(MobileBottomNav);
     expect(wrapper.text()).toContain('mobile.nook');
-    expect(wrapper.text()).toContain('nav.accounts');
-    expect(wrapper.text()).toContain('nav.goals');
+    expect(wrapper.text()).toContain('mobile.planner');
+    expect(wrapper.text()).toContain('mobile.piggyBank');
+    expect(wrapper.text()).toContain('mobile.budget');
     expect(wrapper.text()).toContain('mobile.pod');
+  });
+
+  it('highlights tab for nested routes', () => {
+    mockRoute.path = '/dashboard/accounts';
+    const wrapper = mount(MobileBottomNav);
+    const buttons = wrapper.findAll('button');
+
+    // Third tab (Piggy Bank → /dashboard) should be active for /dashboard/accounts
+    const piggyPill = buttons[2]!.find('div');
+    expect(piggyPill.classes()).toContain('bg-[rgba(241,93,34,0.08)]');
   });
 });

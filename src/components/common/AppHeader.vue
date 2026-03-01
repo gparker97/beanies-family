@@ -26,6 +26,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { isTemporaryEmail } from '@/utils/email';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const emit = defineEmits<{ toggleMenu: [] }>();
@@ -41,7 +42,7 @@ const translationStore = useTranslationStore();
 const { t } = useTranslation();
 
 // ── Page title / Dashboard greeting ──────────────────────────────────────
-const isDashboard = computed(() => route.name === 'Dashboard');
+const isNookOrDashboard = computed(() => route.name === 'Dashboard' || route.name === 'Nook');
 const memberName = computed(
   () => familyStore.currentMember?.name || familyStore.owner?.name || 'there'
 );
@@ -62,7 +63,10 @@ const todayFormatted = computed(() => {
   });
 });
 
-const pageTitle = computed(() => (route.meta?.title as string) || '');
+const pageTitle = computed(() => {
+  const titleKey = route.meta?.titleKey as UIStringKey | undefined;
+  return titleKey ? t(titleKey) : '';
+});
 
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
@@ -162,31 +166,19 @@ async function handleSignOutAndClearData() {
       <!-- Left: Hamburger -->
       <button
         type="button"
-        class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
+        class="flex h-10 w-10 cursor-pointer flex-col items-start justify-center gap-[5px] rounded-[14px] bg-white pl-3 shadow-[0_2px_8px_rgba(44,62,80,0.06)] dark:bg-slate-800 dark:shadow-none"
         :aria-label="t('mobile.menu')"
         @click="emit('toggleMenu')"
       >
-        <svg
-          class="text-secondary-500 h-5 w-5 dark:text-gray-300"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          stroke-width="1.75"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <line x1="3" y1="6" x2="21" y2="6" />
-          <line x1="3" y1="12" x2="21" y2="12" />
-          <line x1="3" y1="18" x2="21" y2="18" />
-        </svg>
-        <!-- Heritage Orange accent line -->
-        <span class="bg-primary-500 absolute right-2.5 bottom-1.5 left-2.5 h-[2px] rounded-full" />
+        <span class="bg-secondary-500/50 h-[2px] w-[14px] rounded-full dark:bg-gray-400/50" />
+        <span class="bg-secondary-500/50 h-[2px] w-[14px] rounded-full dark:bg-gray-400/50" />
+        <span class="bg-primary-500 h-[2px] w-[10px] rounded-full" />
       </button>
 
       <!-- Center: Greeting or page title (truncated) -->
       <div class="mx-3 min-w-0 flex-1 text-center">
         <h1 class="font-outfit text-secondary-500 truncate text-base font-bold dark:text-gray-100">
-          {{ isDashboard ? greeting : pageTitle }}
+          {{ isNookOrDashboard ? greeting : pageTitle }}
         </h1>
       </div>
 
@@ -240,7 +232,7 @@ async function handleSignOutAndClearData() {
     <template v-else>
       <!-- Left side - Page title or greeting -->
       <div class="min-w-0">
-        <template v-if="isDashboard">
+        <template v-if="isNookOrDashboard">
           <h1 class="font-outfit text-secondary-500 truncate text-lg font-bold dark:text-gray-100">
             {{ greeting }}
           </h1>
