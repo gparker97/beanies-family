@@ -7,6 +7,7 @@ import { useRecurringStore } from './recurringStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as budgetRepo from '@/services/indexeddb/repositories/budgetRepository';
 import { getCategoryById } from '@/constants/categories';
+import { toDateInputValue } from '@/utils/date';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput } from '@/types/models';
 
 export type PaceStatus = 'great' | 'onTrack' | 'caution' | 'overBudget';
@@ -161,7 +162,7 @@ export const useBudgetStore = defineStore('budget', () => {
           currency: item.currency,
           category: item.category,
           type: item.type,
-          nextDate: nextDate.toISOString().split('T')[0],
+          nextDate: toDateInputValue(nextDate),
           daysUntil: Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
         };
       })
