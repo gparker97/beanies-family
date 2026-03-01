@@ -42,7 +42,7 @@ import {
   DriveApiError,
 } from '@/services/google/driveService';
 import { clearQueue } from '@/services/sync/offlineQueue';
-import type { SyncFileData } from '@/types/models';
+import type { SyncFileData, PasskeySecret } from '@/types/models';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 
@@ -65,6 +65,9 @@ export const useSyncStore = defineStore('sync', () => {
     driveFileName?: string;
     driveAccountEmail?: string;
   } | null>(null);
+
+  // PRF-wrapped password secrets (stored in .beanpod envelope, outside encryption)
+  const passkeySecrets = ref<PasskeySecret[]>([]);
 
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
@@ -95,6 +98,17 @@ export const useSyncStore = defineStore('sync', () => {
   const currentSessionPassword = computed(() => sessionPassword.value);
 
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
+
+  /**
+   * Extract passkeySecrets from a raw sync file envelope (if present).
+   * Called whenever a file is loaded, before decryption.
+   */
+  function extractPasskeySecrets(rawSyncData: SyncFileData | undefined): void {
+    if (rawSyncData?.passkeySecrets && rawSyncData.passkeySecrets.length > 0) {
+      passkeySecrets.value = rawSyncData.passkeySecrets;
+      syncPasskeySecretsToService();
+    }
+  }
 
   // Getters
   const syncStatus = computed(() => {
@@ -208,6 +222,7 @@ export const useSyncStore = defineStore('sync', () => {
           driveFileName: provider?.getDisplayName(),
           driveAccountEmail: provider?.getAccountEmail() ?? undefined,
         };
+        extractPasskeySecrets(loadResult.rawSyncData);
       }
     }
 
@@ -338,6 +353,7 @@ export const useSyncStore = defineStore('sync', () => {
           driveFileName: provider?.getDisplayName(),
           driveAccountEmail: provider?.getAccountEmail() ?? undefined,
         };
+        extractPasskeySecrets(result.rawSyncData);
         return { success: false, needsPassword: true };
       }
 
@@ -400,6 +416,7 @@ export const useSyncStore = defineStore('sync', () => {
         fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
         rawSyncData: result.rawSyncData,
       };
+      extractPasskeySecrets(result.rawSyncData);
       return { success: false, needsPassword: true };
     }
 
@@ -440,6 +457,7 @@ export const useSyncStore = defineStore('sync', () => {
         fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
         rawSyncData: result.rawSyncData,
       };
+      extractPasskeySecrets(result.rawSyncData);
       return { success: false, needsPassword: true };
     }
 
@@ -589,6 +607,10 @@ export const useSyncStore = defineStore('sync', () => {
       if (familyContextStore.activeFamilyId) {
         await invalidatePasskeysForPasswordChange(familyContextStore.activeFamilyId, password);
       }
+
+      // Invalidate PRF-wrapped secrets — they're encrypted with the old password.
+      // Devices with stale secrets will fall back to Level 1 (password entry).
+      clearAllPasskeySecrets();
     } else {
       // Rollback on failure
       sessionPassword.value = null;
@@ -604,9 +626,10 @@ export const useSyncStore = defineStore('sync', () => {
    * Immediately re-saves the file unencrypted
    */
   async function disableEncryption(): Promise<boolean> {
-    // Clear session password
+    // Clear session password and passkey secrets (no password = nothing to wrap)
     sessionPassword.value = null;
     syncService.setSessionPassword(null);
+    clearAllPasskeySecrets();
 
     // Update settings in DB
     await saveSettings({ encryptionEnabled: false });
@@ -1144,6 +1167,7 @@ export const useSyncStore = defineStore('sync', () => {
           driveFileName,
           driveAccountEmail: provider.getAccountEmail() ?? undefined,
         };
+        extractPasskeySecrets(data as SyncFileData);
         storageProviderType.value = 'google_drive';
         return { success: false, needsPassword: true };
       }
@@ -1271,6 +1295,31 @@ export const useSyncStore = defineStore('sync', () => {
     });
   }
 
+  // --- Passkey secret management ---
+
+  function syncPasskeySecretsToService(): void {
+    syncService.setPasskeySecrets(passkeySecrets.value);
+  }
+
+  function addPasskeySecret(secret: PasskeySecret): void {
+    // Replace existing secret for same credentialId
+    passkeySecrets.value = [
+      ...passkeySecrets.value.filter((s) => s.credentialId !== secret.credentialId),
+      secret,
+    ];
+    syncPasskeySecretsToService();
+  }
+
+  function removePasskeySecretsForCredential(credentialId: string): void {
+    passkeySecrets.value = passkeySecrets.value.filter((s) => s.credentialId !== credentialId);
+    syncPasskeySecretsToService();
+  }
+
+  function clearAllPasskeySecrets(): void {
+    passkeySecrets.value = [];
+    syncPasskeySecretsToService();
+  }
+
   /**
    * Ensure the current family is registered in the cloud registry.
    * Idempotent PUT — safe to call on every sign-in. Fire-and-forget.
@@ -1349,5 +1398,10 @@ export const useSyncStore = defineStore('sync', () => {
     resetState,
     clearError,
     ensureRegistered,
+    // Passkey secrets
+    passkeySecrets,
+    addPasskeySecret,
+    removePasskeySecretsForCredential,
+    clearAllPasskeySecrets,
   };
 });

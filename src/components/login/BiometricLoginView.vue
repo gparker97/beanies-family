@@ -16,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'signed-in': [destination: string];
   'use-password': [];
+  'cross-device-password': [payload: { memberId: string; credentialId: string }];
   back: [];
 }>();
 
@@ -32,11 +33,15 @@ async function handleBiometricLogin() {
   errorMessage.value = null;
 
   try {
-    const result = await authStore.signInWithPasskey(props.familyId);
+    const result = await authStore.signInWithPasskey(props.familyId, syncStore.passkeySecrets);
 
     if (!result.success) {
       if (result.error === 'CROSS_DEVICE_NO_CACHE') {
-        errorMessage.value = t('passkey.crossDeviceNoCache');
+        emit('cross-device-password', {
+          memberId: authStore.currentUser?.memberId ?? '',
+          credentialId: result.credentialId ?? '',
+        });
+        return;
       } else if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
         errorMessage.value = t('passkey.wrongFamilyError');
       } else {

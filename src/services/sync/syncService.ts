@@ -432,7 +432,10 @@ async function doSave(password?: string): Promise<boolean> {
 
     // Create sync data — mark as encrypted if password is provided
     const needsEncryption = !!password;
-    const syncData = await createSyncFileData(needsEncryption);
+    const syncData = await createSyncFileData(
+      needsEncryption,
+      currentPasskeySecrets.length > 0 ? currentPasskeySecrets : undefined
+    );
 
     let fileContent: string;
 
@@ -455,6 +458,9 @@ async function doSave(password?: string): Promise<boolean> {
       }
       if (syncData.familyName) {
         encryptedSyncData.familyName = syncData.familyName;
+      }
+      if (syncData.passkeySecrets && syncData.passkeySecrets.length > 0) {
+        encryptedSyncData.passkeySecrets = syncData.passkeySecrets;
       }
       fileContent = JSON.stringify(encryptedSyncData, null, 2);
     } else {
@@ -655,6 +661,16 @@ export function setSessionPassword(password: string | null): void {
  */
 export function getSessionPassword(): string | null {
   return sessionPassword;
+}
+
+// Store passkey secrets for inclusion in the .beanpod envelope
+let currentPasskeySecrets: import('@/types/models').PasskeySecret[] = [];
+
+/**
+ * Set passkey secrets to include in saved files (called by syncStore).
+ */
+export function setPasskeySecrets(secrets: import('@/types/models').PasskeySecret[]): void {
+  currentPasskeySecrets = secrets;
 }
 
 /**

@@ -8,7 +8,7 @@ import { getFamilyById } from '@/services/familyContext';
 import { getSettings } from '@/services/indexeddb/repositories/settingsRepository';
 import { mergeData } from '@/services/sync/mergeService';
 import { useTombstoneStore } from '@/stores/tombstoneStore';
-import type { SyncFileData, DeletionTombstone } from '@/types/models';
+import type { SyncFileData, DeletionTombstone, PasskeySecret } from '@/types/models';
 import { SYNC_FILE_VERSION } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -65,7 +65,10 @@ function detectMergeChanges(
 /**
  * Creates a SyncFileData object from current database state
  */
-export async function createSyncFileData(encrypted = false): Promise<SyncFileData> {
+export async function createSyncFileData(
+  encrypted = false,
+  passkeySecrets?: PasskeySecret[]
+): Promise<SyncFileData> {
   const data = await exportAllData();
 
   // Inject tombstones from the in-memory store into the export
@@ -87,6 +90,11 @@ export async function createSyncFileData(encrypted = false): Promise<SyncFileDat
     if (family) {
       syncData.familyName = family.name;
     }
+  }
+
+  // Include PRF-wrapped password secrets in the envelope (outside encryption)
+  if (passkeySecrets && passkeySecrets.length > 0) {
+    syncData.passkeySecrets = passkeySecrets;
   }
 
   return syncData;
