@@ -83,7 +83,7 @@ const STRING_DEFS = {
   'modal.moreDetails': { en: 'More Details' },
   'modal.whatsTheActivity': { en: "What's the activity?" },
   'modal.whatNeedsDoing': { en: 'What needs doing?' },
-  'modal.costPerSession': { en: 'Cost per Session' },
+  'modal.costPerSession': { en: 'Cost' },
   'modal.whosGoing': { en: 'Who?' },
   'modal.startTime': { en: 'Start Time' },
   'modal.endTime': { en: 'End Time' },
