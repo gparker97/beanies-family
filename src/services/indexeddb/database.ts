@@ -5,6 +5,7 @@ import type {
   Transaction,
   Asset,
   Goal,
+  Budget,
   Settings,
   SyncQueueItem,
   RecurringItem,
@@ -16,7 +17,7 @@ import type {
 
 const LEGACY_DB_NAME = 'gp-family-finance';
 const DB_NAME_PREFIX = 'gp-family-finance-';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 export interface FinanceDB extends DBSchema {
   familyMembers: {
@@ -53,6 +54,11 @@ export interface FinanceDB extends DBSchema {
     key: string;
     value: TodoItem;
     indexes: { 'by-assigneeId': string; 'by-completed': number; 'by-dueDate': string };
+  };
+  budgets: {
+    key: string;
+    value: Budget;
+    indexes: { 'by-memberId': string; 'by-isActive': number };
   };
   activities: {
     key: string;
@@ -133,6 +139,13 @@ function createFinanceDB(dbName: string): Promise<IDBPDatabase<FinanceDB>> {
         todosStore.createIndex('by-assigneeId', 'assigneeId', { unique: false });
         todosStore.createIndex('by-completed', 'completed', { unique: false });
         todosStore.createIndex('by-dueDate', 'dueDate', { unique: false });
+      }
+
+      // Budgets store
+      if (!db.objectStoreNames.contains('budgets')) {
+        const budgetsStore = db.createObjectStore('budgets', { keyPath: 'id' });
+        budgetsStore.createIndex('by-memberId', 'memberId', { unique: false });
+        budgetsStore.createIndex('by-isActive', 'isActive', { unique: false });
       }
 
       // Activities store
@@ -273,6 +286,7 @@ export async function clearAllData(): Promise<void> {
       'transactions',
       'assets',
       'goals',
+      'budgets',
       'recurringItems',
       'todos',
       'activities',
@@ -288,6 +302,7 @@ export async function clearAllData(): Promise<void> {
     tx.objectStore('transactions').clear(),
     tx.objectStore('assets').clear(),
     tx.objectStore('goals').clear(),
+    tx.objectStore('budgets').clear(),
     tx.objectStore('recurringItems').clear(),
     tx.objectStore('todos').clear(),
     tx.objectStore('activities').clear(),
@@ -306,6 +321,7 @@ export interface ExportedData {
   recurringItems: RecurringItem[];
   todos?: TodoItem[];
   activities?: FamilyActivity[];
+  budgets?: Budget[];
   deletions: DeletionTombstone[];
   settings: Settings | null;
 }
@@ -322,6 +338,7 @@ export async function exportAllData(): Promise<ExportedData> {
     recurringItems,
     todos,
     activities,
+    budgets,
     settings,
   ] = await Promise.all([
     db.getAll('familyMembers'),
@@ -332,6 +349,7 @@ export async function exportAllData(): Promise<ExportedData> {
     db.getAll('recurringItems'),
     db.getAll('todos'),
     db.getAll('activities'),
+    db.getAll('budgets'),
     db.get('settings', 'app_settings'),
   ]);
 
@@ -344,6 +362,7 @@ export async function exportAllData(): Promise<ExportedData> {
     recurringItems,
     todos,
     activities,
+    budgets,
     deletions: [], // Tombstones injected by createSyncFileData from the tombstone store
     settings: settings ?? null,
   };
@@ -360,6 +379,7 @@ export async function importAllData(data: ExportedData): Promise<void> {
       'transactions',
       'assets',
       'goals',
+      'budgets',
       'recurringItems',
       'todos',
       'activities',
@@ -374,6 +394,7 @@ export async function importAllData(data: ExportedData): Promise<void> {
     clearTx.objectStore('transactions').clear(),
     clearTx.objectStore('assets').clear(),
     clearTx.objectStore('goals').clear(),
+    clearTx.objectStore('budgets').clear(),
     clearTx.objectStore('recurringItems').clear(),
     clearTx.objectStore('todos').clear(),
     clearTx.objectStore('activities').clear(),
@@ -389,6 +410,7 @@ export async function importAllData(data: ExportedData): Promise<void> {
       'transactions',
       'assets',
       'goals',
+      'budgets',
       'recurringItems',
       'todos',
       'activities',
@@ -442,6 +464,13 @@ export async function importAllData(data: ExportedData): Promise<void> {
   if (data.activities) {
     for (const activity of data.activities) {
       promises.push(importTx.objectStore('activities').add(activity));
+    }
+  }
+
+  // Import budgets (if present - handle legacy files without this field)
+  if (data.budgets) {
+    for (const budget of data.budgets) {
+      promises.push(importTx.objectStore('budgets').add(budget));
     }
   }
 

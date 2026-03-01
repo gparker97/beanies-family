@@ -8,7 +8,8 @@ type EmptyStateVariant =
   | 'assets'
   | 'goals'
   | 'reports'
-  | 'dashboard';
+  | 'dashboard'
+  | 'budget';
 
 defineProps<{
   variant: EmptyStateVariant;
@@ -553,6 +554,65 @@ const prefersReducedMotion = useReducedMotion();
       <circle cx="88" cy="112" r="3.5" fill="#F15D22" opacity="0.8" />
       <defs>
         <linearGradient id="emptySheen7" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="white" stop-opacity="0.6" />
+          <stop offset="100%" stop-color="white" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+    </svg>
+
+    <!-- Budget: Beanie with a chart/clipboard -->
+    <svg
+      v-else-if="variant === 'budget'"
+      viewBox="0 0 160 160"
+      class="relative h-full w-full"
+      xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="A beanie planning a budget"
+    >
+      <ellipse cx="80" cy="140" rx="45" ry="6" fill="#AED6F1" opacity="0.3" />
+      <!-- Beanie with pencil -->
+      <g :class="{ 'animate-beanie-float': !prefersReducedMotion }">
+        <ellipse cx="60" cy="102" rx="23" ry="29" fill="#AED6F1" />
+        <ellipse cx="60" cy="102" rx="23" ry="29" fill="url(#emptySheen8)" opacity="0.4" />
+        <ellipse cx="53" cy="93" rx="3" ry="4" fill="#2C3E50" />
+        <circle cx="52" cy="92" r="1.2" fill="white" opacity="0.7" />
+        <ellipse cx="67" cy="93" rx="3" ry="4" fill="#2C3E50" />
+        <circle cx="66" cy="92" r="1.2" fill="white" opacity="0.7" />
+        <path
+          d="M55 108 Q60 112 65 108"
+          stroke="#2C3E50"
+          stroke-width="1.5"
+          fill="none"
+          stroke-linecap="round"
+        />
+        <!-- Pencil arm -->
+        <path
+          d="M81 97 Q90 85 95 75"
+          stroke="#AED6F1"
+          stroke-width="4.5"
+          fill="none"
+          stroke-linecap="round"
+        />
+        <path d="M95 75 L97 70" stroke="#E67E22" stroke-width="2.5" stroke-linecap="round" />
+      </g>
+      <!-- Budget chart / bars -->
+      <g opacity="0.5">
+        <rect x="100" y="100" width="8" height="28" rx="2" fill="#F15D22" opacity="0.6" />
+        <rect x="112" y="108" width="8" height="20" rx="2" fill="#E67E22" opacity="0.5" />
+        <rect x="124" y="114" width="8" height="14" rx="2" fill="#AED6F1" opacity="0.6" />
+        <!-- Baseline -->
+        <line
+          x1="96"
+          y1="129"
+          x2="136"
+          y2="129"
+          stroke="#2C3E50"
+          stroke-width="1.5"
+          opacity="0.3"
+        />
+      </g>
+      <defs>
+        <linearGradient id="emptySheen8" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stop-color="white" stop-opacity="0.6" />
           <stop offset="100%" stop-color="white" stop-opacity="0" />
         </linearGradient>
