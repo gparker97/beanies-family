@@ -25,7 +25,7 @@
     "lint:fix": "npm run lint:eslint -- --fix && npm run lint:style -- --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "type-check": "vue-tsc --noEmit",
+    "type-check": "vue-tsc -b --noEmit",
     "validate": "npm run type-check && npm run lint && npm run format:check && npm run test:run && npm run build",
     "security:check": "npm run security:audit; npm run security:lint",
     "security:audit": "npm audit --audit-level=moderate",
