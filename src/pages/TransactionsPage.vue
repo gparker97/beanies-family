@@ -4,7 +4,7 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
-import { BaseCard, BaseModal } from '@/components/ui';
+import { BaseCard } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
@@ -56,7 +56,6 @@ const showEditModal = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
 const showRecurringModal = ref(false);
 const editingRecurringItem = ref<RecurringItem | undefined>(undefined);
-const isSubmittingRecurring = ref(false);
 
 // ── Computeds ─────────────────────────────────────────────────────────────
 const baseCurrency = computed(() => settingsStore.baseCurrency);
@@ -154,7 +153,7 @@ function formatDateGroupHeader(dateKey: string): string {
   const today = toDateInputValue(new Date());
   if (dateKey === today) {
     const dayMonth = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(d);
-    return `Today \u2014 ${dayMonth}`;
+    return `${t('date.today')} \u2014 ${dayMonth}`;
   }
   return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'long' }).format(d).toUpperCase();
 }
@@ -240,22 +239,17 @@ function openEditRecurringModal(item: RecurringItem) {
   showRecurringModal.value = true;
 }
 
-async function handleRecurringSubmit(input: CreateRecurringItemInput) {
-  isSubmittingRecurring.value = true;
-  try {
-    if (editingRecurringItem.value) {
-      await recurringStore.updateRecurringItem(editingRecurringItem.value.id, input);
-    } else {
-      await recurringStore.createRecurringItem(input);
-    }
-    showRecurringModal.value = false;
-    editingRecurringItem.value = undefined;
-  } finally {
-    isSubmittingRecurring.value = false;
+async function handleRecurringSave(input: CreateRecurringItemInput) {
+  if (editingRecurringItem.value) {
+    await recurringStore.updateRecurringItem(editingRecurringItem.value.id, input);
+  } else {
+    await recurringStore.createRecurringItem(input);
   }
+  showRecurringModal.value = false;
+  editingRecurringItem.value = undefined;
 }
 
-function handleRecurringCancel() {
+function handleRecurringClose() {
   showRecurringModal.value = false;
   editingRecurringItem.value = undefined;
 }
@@ -279,6 +273,12 @@ async function deleteRecurringItemById(id: string) {
 function getRecurringItem(tx: Transaction): RecurringItem | undefined {
   if (!tx.recurringItemId) return undefined;
   return recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
+}
+
+function isRecurringItemInactive(tx: Transaction): boolean {
+  if (!tx.recurringItemId) return false;
+  const item = recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
+  return item ? !item.isActive : false;
 }
 </script>
 
@@ -420,8 +420,11 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
             v-for="tx in txns"
             :key="tx.id"
             data-testid="transaction-item"
-            class="group border-b border-[var(--tint-slate-5)] px-4 py-3.5 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
-            :class="syncHighlightClass(tx.id)"
+            class="group border-b border-[var(--tint-slate-5)] px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
+            :class="[
+              syncHighlightClass(tx.id),
+              isRecurringItemInactive(tx) ? 'opacity-60 hover:opacity-100' : '',
+            ]"
           >
             <!-- Icon (desktop) -->
             <div
@@ -471,6 +474,12 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
                     class="text-primary-500 dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[0.55rem] font-semibold"
                   >
                     {{ t('transactions.typeRecurring') }}
+                  </span>
+                  <span
+                    v-if="isRecurringItemInactive(tx)"
+                    class="rounded-lg bg-gray-200 px-2 py-0.5 text-[0.55rem] font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
+                  >
+                    {{ t('recurring.paused') }}
                   </span>
                   <span
                     v-else
@@ -528,6 +537,12 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
                 {{ getRecurringFrequencyLabel(tx) }}
               </span>
               <span
+                v-if="isRecurringItemInactive(tx)"
+                class="ml-1 inline-block rounded-lg bg-gray-200 px-2 py-0.5 text-[0.55rem] font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
+              >
+                {{ t('recurring.paused') }}
+              </span>
+              <span
                 v-else
                 class="text-secondary-500 inline-block rounded-lg bg-[var(--tint-slate-5)] px-2 py-0.5 text-[0.55rem] font-semibold dark:bg-slate-700 dark:text-gray-400"
               >
@@ -583,17 +598,12 @@ function getRecurringItem(tx: Transaction): RecurringItem | undefined {
     />
 
     <!-- Edit Recurring Modal -->
-    <BaseModal
+    <RecurringItemForm
       :open="showRecurringModal"
-      :title="editingRecurringItem ? t('recurring.editItem') : t('recurring.addItem')"
-      size="lg"
-      @close="handleRecurringCancel"
-    >
-      <RecurringItemForm
-        :item="editingRecurringItem"
-        @submit="handleRecurringSubmit"
-        @cancel="handleRecurringCancel"
-      />
-    </BaseModal>
+      :item="editingRecurringItem"
+      @save="handleRecurringSave"
+      @close="handleRecurringClose"
+      @delete="deleteRecurringItemById"
+    />
   </div>
 </template>
