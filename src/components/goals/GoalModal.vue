@@ -9,6 +9,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import type {
   Goal,
@@ -32,9 +33,6 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const { currencyOptions } = useCurrencyOptions();
-
-const isEditing = computed(() => !!props.goal);
-const isSubmitting = ref(false);
 
 // Goal type icon chip options
 const GOAL_ICON_OPTIONS = [
@@ -79,23 +77,23 @@ const priority = ref<GoalPriority>('medium');
 const memberId = ref('');
 const deadline = ref('');
 
-// Reset form
-watch(
+// Reset form when modal opens
+const { isEditing, isSubmitting } = useFormModal(
+  () => props.goal,
   () => props.open,
-  (isOpen) => {
-    if (!isOpen) return;
-    if (props.goal) {
-      const g = props.goal;
-      goalEmoji.value = typeToEmoji[g.type] || '🐷';
-      name.value = g.name;
-      type.value = g.type;
-      targetAmount.value = g.targetAmount;
-      currentAmount.value = g.currentAmount;
-      currency.value = g.currency;
-      priority.value = g.priority;
-      memberId.value = g.memberId ?? '';
-      deadline.value = g.deadline ?? '';
-    } else {
+  {
+    onEdit: (goal) => {
+      goalEmoji.value = typeToEmoji[goal.type] || '🐷';
+      name.value = goal.name;
+      type.value = goal.type;
+      targetAmount.value = goal.targetAmount;
+      currentAmount.value = goal.currentAmount;
+      currency.value = goal.currency;
+      priority.value = goal.priority;
+      memberId.value = goal.memberId ?? '';
+      deadline.value = goal.deadline ?? '';
+    },
+    onNew: () => {
       goalEmoji.value = '';
       name.value = '';
       type.value = 'savings';
@@ -105,7 +103,7 @@ watch(
       priority.value = 'medium';
       memberId.value = '';
       deadline.value = '';
-    }
+    },
   }
 );
 

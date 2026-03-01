@@ -7,6 +7,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import RecurringItemForm from '@/components/recurring/RecurringItemForm.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
@@ -608,22 +609,11 @@ function applyCustomDateRange() {
                 :type="transaction.type === 'income' ? 'income' : 'expense'"
                 size="lg"
               />
-              <div class="flex gap-1">
-                <button
-                  class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                  :title="t('action.edit')"
-                  @click="openEditModal(transaction)"
-                >
-                  <BeanieIcon name="edit" size="md" />
-                </button>
-                <button
-                  class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                  :title="t('action.delete')"
-                  @click="deleteTransaction(transaction.id)"
-                >
-                  <BeanieIcon name="trash" size="md" />
-                </button>
-              </div>
+              <ActionButtons
+                size="md"
+                @edit="openEditModal(transaction)"
+                @delete="deleteTransaction(transaction.id)"
+              />
             </div>
           </div>
         </div>

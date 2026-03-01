@@ -4,6 +4,7 @@ import { useCountUp } from '@/composables/useCountUp';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
 import { BaseCard, BaseButton } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import GoalModal from '@/components/goals/GoalModal.vue';
@@ -212,22 +213,7 @@ async function deleteCompletedGoal(id: string) {
                 {{ getMemberName(goal.memberId, 'Family') }}
               </p>
             </div>
-            <div class="flex gap-1">
-              <button
-                class="hover:text-primary-600 rounded-lg p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                title="Edit"
-                @click="openEditModal(goal)"
-              >
-                <BeanieIcon name="edit" size="md" />
-              </button>
-              <button
-                class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                title="Delete"
-                @click="deleteGoal(goal.id)"
-              >
-                <BeanieIcon name="trash" size="md" />
-              </button>
-            </div>
+            <ActionButtons size="md" @edit="openEditModal(goal)" @delete="deleteGoal(goal.id)" />
           </div>
           <div class="mb-2 flex items-center justify-between text-sm">
             <span class="text-gray-500 dark:text-gray-400">{{ t('goals.progress') }}</span>

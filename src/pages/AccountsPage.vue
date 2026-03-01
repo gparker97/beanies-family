@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
 import { BaseButton } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
@@ -300,23 +301,11 @@ async function deleteAccount(id: string) {
               </div>
 
               <!-- Action Menu -->
-              <div class="flex gap-1">
-                <button
-                  data-testid="edit-account-btn"
-                  class="hover:text-primary-600 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-                  title="Edit account"
-                  @click="openEditModal(account)"
-                >
-                  <BeanieIcon name="edit" size="sm" />
-                </button>
-                <button
-                  class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                  title="Delete account"
-                  @click="deleteAccount(account.id)"
-                >
-                  <BeanieIcon name="trash" size="sm" />
-                </button>
-              </div>
+              <ActionButtons
+                edit-test-id="edit-account-btn"
+                @edit="openEditModal(account)"
+                @delete="deleteAccount(account.id)"
+              />
             </div>
 
             <!-- Balance Display -->

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
-import MemberFilter from '@/components/planner/MemberFilter.vue';
+import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
@@ -20,6 +21,18 @@ import type {
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
+const memberFilterStore = useMemberFilterStore();
+
+function toggleAllMembers() {
+  if (!memberFilterStore.isAllSelected) memberFilterStore.selectAll();
+}
+function toggleMember(id: string) {
+  if (memberFilterStore.isAllSelected) {
+    memberFilterStore.selectOnly(id);
+  } else {
+    memberFilterStore.toggleMember(id);
+  }
+}
 
 const activeView = ref('month');
 const showInactive = ref(false);
@@ -126,7 +139,14 @@ function openTodoViewModal(todo: TodoItem) {
     <!-- View toggle + Member filter -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <ViewToggle :active-view="activeView" @update:active-view="activeView = $event" />
-      <MemberFilter />
+      <MemberChipFilter
+        :is-all-active="memberFilterStore.isAllSelected"
+        :is-member-active="
+          (id: string) => memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
+        "
+        @select-all="toggleAllMembers"
+        @select-member="toggleMember"
+      />
     </div>
 
     <!-- Calendar grid -->

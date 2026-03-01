@@ -4,6 +4,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
 import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
+import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -463,23 +464,7 @@ function getAppreciationPercent(asset: Asset): number {
               </div>
 
               <!-- Action Menu -->
-              <div class="flex gap-1">
-                <button
-                  data-testid="edit-asset-btn"
-                  class="hover:text-primary-600 rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-                  title="Edit asset"
-                  @click="openEditModal(asset)"
-                >
-                  <BeanieIcon name="edit" size="sm" />
-                </button>
-                <button
-                  class="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-                  title="Delete asset"
-                  @click="deleteAsset(asset.id)"
-                >
-                  <BeanieIcon name="trash" size="sm" />
-                </button>
-              </div>
+              <ActionButtons @edit="openEditModal(asset)" @delete="deleteAsset(asset.id)" />
             </div>
 
             <!-- Value Display -->

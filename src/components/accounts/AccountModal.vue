@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
@@ -11,6 +11,7 @@ import { BaseCombobox } from '@/components/ui';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { COUNTRIES } from '@/constants/countries';
@@ -34,9 +35,6 @@ const settingsStore = useSettingsStore();
 const { currencyOptions } = useCurrencyOptions();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
-
-const isEditing = computed(() => !!props.account);
-const isSubmitting = ref(false);
 
 // Icon chip options for account types
 const ACCOUNT_ICON_OPTIONS = [
@@ -73,23 +71,23 @@ const isActive = ref(true);
 const includeInNetWorth = ref(true);
 
 // Reset form when modal opens
-watch(
+const { isEditing, isSubmitting } = useFormModal(
+  () => props.account,
   () => props.open,
-  (isOpen) => {
-    if (!isOpen) return;
-    if (props.account) {
-      const a = props.account;
-      icon.value = a.icon ?? '';
-      name.value = a.name;
-      type.value = a.type;
-      balance.value = a.balance;
-      currency.value = a.currency;
-      memberId.value = a.memberId;
-      institution.value = a.institution ?? '';
-      institutionCountry.value = a.institutionCountry ?? '';
-      isActive.value = a.isActive;
-      includeInNetWorth.value = a.includeInNetWorth;
-    } else {
+  {
+    onEdit: (account) => {
+      icon.value = account.icon ?? '';
+      name.value = account.name;
+      type.value = account.type;
+      balance.value = account.balance;
+      currency.value = account.currency;
+      memberId.value = account.memberId;
+      institution.value = account.institution ?? '';
+      institutionCountry.value = account.institutionCountry ?? '';
+      isActive.value = account.isActive;
+      includeInNetWorth.value = account.includeInNetWorth;
+    },
+    onNew: () => {
       icon.value = '';
       name.value = '';
       type.value = 'checking';
@@ -100,7 +98,7 @@ watch(
       institutionCountry.value = '';
       isActive.value = true;
       includeInNetWorth.value = true;
-    }
+    },
   }
 );
 
