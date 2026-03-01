@@ -209,8 +209,8 @@ function handleDelete() {
       <TogglePillGroup
         v-model="direction"
         :options="[
-          { value: 'in', label: '💚 ' + t('modal.moneyIn'), variant: 'green' },
           { value: 'out', label: '🧡 ' + t('modal.moneyOut'), variant: 'orange' },
+          { value: 'in', label: '💚 ' + t('modal.moneyIn'), variant: 'green' },
         ]"
       />
     </FormFieldGroup>
