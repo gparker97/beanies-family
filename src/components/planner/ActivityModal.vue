@@ -71,7 +71,7 @@ const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
 const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
 const daysOfWeek = ref<number[]>([]);
 const category = ref<ActivityCategory>('lesson');
-const assigneeIds = ref<string[]>([]);
+const assigneeId = ref('');
 const dropoffMemberId = ref<string>('');
 const pickupMemberId = ref<string>('');
 const location = ref('');
@@ -113,7 +113,7 @@ const { isEditing, isSubmitting } = useFormModal(
             : 'weekly';
       daysOfWeek.value = activity.daysOfWeek ?? [];
       category.value = activity.category;
-      assigneeIds.value = activity.assigneeId ? [activity.assigneeId] : [];
+      assigneeId.value = activity.assigneeId ?? '';
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
       pickupMemberId.value = activity.pickupMemberId ?? '';
       location.value = activity.location ?? '';
@@ -139,7 +139,7 @@ const { isEditing, isSubmitting } = useFormModal(
       recurrenceFrequency.value = 'weekly';
       daysOfWeek.value = [];
       category.value = 'lesson';
-      assigneeIds.value = [];
+      assigneeId.value = '';
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
       location.value = '';
@@ -215,7 +215,7 @@ function handleSave() {
   if (!canSave.value) return;
 
   const currentMember = familyStore.currentMember ?? familyStore.owner;
-  const primaryAssignee = assigneeIds.value[0] || undefined;
+  const primaryAssignee = assigneeId.value || undefined;
 
   const baseData = {
     title: title.value.trim(),
@@ -332,7 +332,7 @@ function handleSave() {
 
     <!-- 8. Who's going? -->
     <FormFieldGroup :label="t('modal.whosGoing')">
-      <FamilyChipPicker v-model="assigneeIds" mode="multi" />
+      <FamilyChipPicker v-model="assigneeId" mode="single" />
     </FormFieldGroup>
 
     <!-- 9. Dropoff / Pickup -->

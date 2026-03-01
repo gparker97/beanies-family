@@ -32,7 +32,7 @@ const mode = ref<'view' | 'edit'>('view');
 const editForm = ref({
   title: '',
   description: '',
-  assigneeIds: [] as string[],
+  assigneeId: '' as string,
   dueDate: '',
   dueTime: '',
 });
@@ -46,7 +46,7 @@ watch(
       editForm.value = {
         title: newTodo.title,
         description: newTodo.description ?? '',
-        assigneeIds: newTodo.assigneeId ? [newTodo.assigneeId] : [],
+        assigneeId: newTodo.assigneeId ?? '',
         dueDate: newTodo.dueDate?.split('T')[0] ?? '',
         dueTime: newTodo.dueTime ?? '',
       };
@@ -105,7 +105,7 @@ function switchToEdit() {
   editForm.value = {
     title: props.todo.title,
     description: props.todo.description ?? '',
-    assigneeIds: props.todo.assigneeId ? [props.todo.assigneeId] : [],
+    assigneeId: props.todo.assigneeId ?? '',
     dueDate: props.todo.dueDate?.split('T')[0] ?? '',
     dueTime: props.todo.dueTime ?? '',
   };
@@ -123,7 +123,7 @@ async function saveEdit() {
     await todoStore.updateTodo(props.todo.id, {
       title: editForm.value.title.trim(),
       description: editForm.value.description.trim() || undefined,
-      assigneeId: editForm.value.assigneeIds[0] || undefined,
+      assigneeId: editForm.value.assigneeId || undefined,
       dueDate: editForm.value.dueDate || undefined,
       dueTime: editForm.value.dueTime || undefined,
     });
@@ -317,7 +317,7 @@ async function handleDelete() {
 
     <!-- 3. Family chip picker (multi-select, compact) -->
     <FormFieldGroup :label="t('todo.assignTo')">
-      <FamilyChipPicker v-model="editForm.assigneeIds" mode="multi" compact />
+      <FamilyChipPicker v-model="editForm.assigneeId" mode="single" compact />
     </FormFieldGroup>
 
     <!-- 4. Notes (optional) -->
