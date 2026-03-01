@@ -51,7 +51,6 @@ export const NAV_ITEMS: NavItemDef[] = [
     path: '/budgets',
     emoji: '\u{1F4B5}',
     section: 'piggyBank',
-    comingSoon: true,
   },
   { labelKey: 'nav.transactions', path: '/transactions', emoji: '\u{1F4B3}', section: 'piggyBank' },
   {

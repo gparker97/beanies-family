@@ -151,6 +151,7 @@ export function mergeData(
     ),
     todos: mergeRecords(localData.todos ?? [], fileData.todos ?? [], tombstoneMap),
     activities: mergeRecords(localData.activities ?? [], fileData.activities ?? [], tombstoneMap),
+    budgets: mergeRecords(localData.budgets ?? [], fileData.budgets ?? [], tombstoneMap),
     deletions: mergedTombstones,
     settings: mergeSettings(localData.settings, fileData.settings),
   };

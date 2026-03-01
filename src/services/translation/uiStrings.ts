@@ -1514,6 +1514,104 @@ const STRING_DEFS = {
   'planner.day.thu': { en: 'Thu' },
   'planner.day.fri': { en: 'Fri' },
   'planner.day.sat': { en: 'Sat' },
+
+  // ───── Budget Page ─────
+  'budget.title': { en: 'Budget', beanie: 'Bean Budget' },
+  'budget.subtitle': {
+    en: 'Track your spending against your plan',
+    beanie: 'Keep your beans in line',
+  },
+  'budget.addBudget': { en: 'Set Up Budget', beanie: 'Plant a Budget' },
+  'budget.editBudget': { en: 'Edit Budget' },
+  'budget.deleteBudget': { en: 'Delete Budget' },
+
+  // Budget — Hero card
+  'budget.hero.spent': { en: 'Spent' },
+  'budget.hero.of': { en: 'of' },
+  'budget.hero.remaining': { en: 'remaining' },
+  'budget.hero.over': { en: 'over budget' },
+  'budget.hero.percentageMode': { en: '% of income' },
+  'budget.hero.fixedMode': { en: 'Fixed amount' },
+
+  // Budget — Motivational messages
+  'budget.pace.great': { en: 'Looking great! Well under budget', beanie: 'Beans are thriving!' },
+  'budget.pace.onTrack': { en: 'Right on track this month', beanie: 'Steady bean growth' },
+  'budget.pace.caution': {
+    en: 'Spending is picking up — stay mindful',
+    beanie: 'Careful with those beans!',
+  },
+  'budget.pace.over': { en: 'Over budget — time to rein it in', beanie: 'Too many beans spent!' },
+
+  // Budget — Summary cards
+  'budget.summary.monthlyIncome': { en: 'Monthly Income', beanie: 'Beans Earned' },
+  'budget.summary.currentSpending': { en: 'Current Spending', beanie: 'Beans Spent' },
+  'budget.summary.monthlySavings': { en: 'Monthly Savings', beanie: 'Beans Saved' },
+  'budget.summary.savingsRate': { en: 'savings rate' },
+  'budget.summary.recurring': { en: 'Recurring' },
+  'budget.summary.oneTime': { en: 'One-time' },
+
+  // Budget — Sections
+  'budget.section.upcomingTransactions': { en: 'Upcoming Transactions' },
+  'budget.section.spendingByCategory': { en: 'Spending by Category' },
+  'budget.section.budgetSettings': { en: 'Budget Settings' },
+  'budget.section.addTransactions': { en: 'Add Transactions' },
+  'budget.section.viewAll': { en: 'View All' },
+
+  // Budget — Quick Add
+  'budget.quickAdd.title': { en: 'Quick Add' },
+  'budget.quickAdd.moneyIn': { en: 'Money In', beanie: 'Beans In' },
+  'budget.quickAdd.moneyOut': { en: 'Money Out', beanie: 'Beans Out' },
+  'budget.quickAdd.description': { en: 'Description' },
+  'budget.quickAdd.amount': { en: 'Amount' },
+  'budget.quickAdd.category': { en: 'Category' },
+  'budget.quickAdd.date': { en: 'Date' },
+  'budget.quickAdd.account': { en: 'Account' },
+
+  // Budget — Batch / CSV (coming soon)
+  'budget.batchAdd.title': { en: 'Batch Add' },
+  'budget.csvUpload.title': { en: 'CSV Upload' },
+  'budget.comingSoon': { en: 'beanies in development', beanie: 'beans sprouting' },
+
+  // Budget — Settings modal
+  'budget.settings.title': { en: 'Budget Settings' },
+  'budget.settings.mode': { en: 'Budget Mode' },
+  'budget.settings.percentageOfIncome': { en: '% of Income' },
+  'budget.settings.fixedAmount': { en: 'Fixed Amount' },
+  'budget.settings.percentageLabel': { en: 'Percentage of monthly income' },
+  'budget.settings.fixedLabel': { en: 'Monthly budget amount' },
+  'budget.settings.categoryAllocations': { en: 'Category Allocations' },
+  'budget.settings.categoryHint': { en: 'Set spending limits per category (optional)' },
+  'budget.settings.effectiveBudget': { en: 'Effective budget' },
+  'budget.settings.owner': { en: 'Budget Owner' },
+  'budget.settings.perMonth': { en: 'per month' },
+  'budget.settings.infoPercentage': {
+    en: 'Your budget is set to {percentage}% of combined income. It auto-adjusts when income changes. The remaining {remaining}% flows to savings goals.',
+    beanie:
+      'Your bean budget uses {percentage}% of your harvest. It grows with your income! The other {remaining}% goes to your bean stash.',
+  },
+  'budget.settings.infoFixed': {
+    en: 'Your budget is set to a fixed amount of {amount} per month. Adjust anytime from the settings.',
+    beanie: 'Your bean plan is a fixed pot of {amount} every month. Tweak it whenever you like!',
+  },
+
+  // Budget — Empty state
+  'budget.empty.title': { en: 'No budget yet', beanie: 'No bean plan yet' },
+  'budget.empty.description': {
+    en: 'Set up a monthly budget to track your spending and savings goals',
+    beanie: 'Plant a budget and watch your beans grow',
+  },
+
+  // Budget — Confirm dialog
+  'budget.confirm.deleteTitle': { en: 'Delete Budget?' },
+  'budget.confirm.deleteMessage': {
+    en: 'This will remove your budget configuration. Your transactions will not be affected.',
+  },
+
+  // Budget — Category status
+  'budget.category.onTrack': { en: 'On track' },
+  'budget.category.warning': { en: 'Watch it' },
+  'budget.category.over': { en: 'Over' },
+  'budget.category.noBudget': { en: 'No limit set' },
 } satisfies Record<string, StringEntry>;
 
 /**
