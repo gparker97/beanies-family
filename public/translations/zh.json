@@ -452,9 +452,9 @@
       "lastUpdated": "2026-02-10"
     },
     "accounts.type.credit_card": {
-      "translation": "贷记卡",
-      "hash": "lkxejb",
-      "lastUpdated": "2026-02-10"
+      "translation": "信用卡",
+      "hash": "5zidk9",
+      "lastUpdated": "2026-03-01"
     },
     "accounts.type.investment": {
       "translation": "投资帐户",
@@ -4342,14 +4342,14 @@
       "lastUpdated": "2026-02-28"
     },
     "planner.field.dropoff": {
-      "translation": "还车",
-      "hash": "63q5ov",
-      "lastUpdated": "2026-02-28"
+      "translation": "还车值班",
+      "hash": "ujijmw",
+      "lastUpdated": "2026-03-01"
     },
     "planner.field.pickup": {
-      "translation": "提车",
-      "hash": "hyx293",
-      "lastUpdated": "2026-02-28"
+      "translation": "提货职责",
+      "hash": "fikwnw",
+      "lastUpdated": "2026-03-01"
     },
     "planner.field.location": {
       "translation": "位置",
@@ -4367,9 +4367,9 @@
       "lastUpdated": "2026-02-28"
     },
     "planner.field.feePayer": {
-      "translation": "通过付费",
-      "hash": "e9q3nv",
-      "lastUpdated": "2026-02-28"
+      "translation": "谁付费？",
+      "hash": "h9sqj2",
+      "lastUpdated": "2026-03-01"
     },
     "planner.field.instructor": {
       "translation": "讲师/教练",
@@ -4392,9 +4392,9 @@
       "lastUpdated": "2026-02-28"
     },
     "planner.field.moreDetails": {
-      "translation": "更多详细信息",
-      "hash": "zfmpux",
-      "lastUpdated": "2026-02-28"
+      "translation": "添加更多详细信息",
+      "hash": "8j2moa",
+      "lastUpdated": "2026-03-01"
     },
     "planner.field.color": {
       "translation": "高亮色彩",
@@ -4617,9 +4617,9 @@
       "lastUpdated": "2026-02-28"
     },
     "modal.whosGoing": {
-      "translation": "谁要去？",
-      "hash": "rgaqm3",
-      "lastUpdated": "2026-02-28"
+      "translation": "谁？",
+      "hash": "1lroh",
+      "lastUpdated": "2026-03-01"
     },
     "modal.startTime": {
       "translation": "开始时间",
@@ -5417,33 +5417,33 @@
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.retirement_roth_ira": {
-      "translation": "ROTH IRA",
-      "hash": "ccvzex",
+      "translation": "roth ira",
+      "hash": "lmuvr",
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.retirement_bene_ira": {
-      "translation": "BENE IRA",
-      "hash": "u8344u",
+      "translation": "bene ira",
+      "hash": "rui3jm",
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.retirement_kids_ira": {
-      "translation": "儿童IRA",
-      "hash": "cn50bf",
+      "translation": "kida ira",
+      "hash": "dzi67h",
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.retirement": {
-      "translation": "养老",
-      "hash": "kvxyjd",
+      "translation": "退休",
+      "hash": "c2wwsn",
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.education_529": {
       "translation": "大学基金(529)",
-      "hash": "l0yx2b",
+      "hash": "smtf37",
       "lastUpdated": "2026-03-01"
     },
     "accounts.type.education_savings": {
       "translation": "教育储蓄",
-      "hash": "psujun",
+      "hash": "nl9lxd",
       "lastUpdated": "2026-03-01"
     },
     "accounts.cat.bank": {

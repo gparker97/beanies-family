@@ -9,6 +9,7 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
+import GroupedChipPicker from '@/components/ui/GroupedChipPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -16,6 +17,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { CATEGORY_COLORS } from '@/stores/activityStore';
+import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
 import type {
   FamilyActivity,
   ActivityCategory,
@@ -43,21 +45,76 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 
-// Activity icon chip options — emoji→category mapping
+// Activity icon chip options — emoji→category mapping (flat for lookups)
 const ACTIVITY_ICON_OPTIONS = [
-  { value: '⚽', label: 'Sport', icon: '⚽', category: 'sport' as ActivityCategory },
-  { value: '🎹', label: 'Music', icon: '🎹', category: 'lesson' as ActivityCategory },
+  { value: '⚽', label: 'Soccer', icon: '⚽', category: 'sport' as ActivityCategory },
+  { value: '🏈', label: 'Football', icon: '🏈', category: 'sport' as ActivityCategory },
+  { value: '⚾', label: 'Baseball', icon: '⚾', category: 'sport' as ActivityCategory },
   { value: '🏊', label: 'Swimming', icon: '🏊', category: 'sport' as ActivityCategory },
   { value: '🥋', label: 'Martial Arts', icon: '🥋', category: 'sport' as ActivityCategory },
   { value: '🤸', label: 'Gymnastics', icon: '🤸', category: 'sport' as ActivityCategory },
+  { value: '🏃', label: 'Other', icon: '🏃', category: 'sport' as ActivityCategory },
+  { value: '🎹', label: 'Piano', icon: '🎹', category: 'lesson' as ActivityCategory },
   { value: '📚', label: 'Tutoring', icon: '📚', category: 'lesson' as ActivityCategory },
   { value: '🎨', label: 'Art', icon: '🎨', category: 'lesson' as ActivityCategory },
-  { value: '🏥', label: 'Medical', icon: '🏥', category: 'appointment' as ActivityCategory },
-  { value: '🎓', label: 'Education', icon: '🎓', category: 'lesson' as ActivityCategory },
+  { value: '🧮', label: 'Math', icon: '🧮', category: 'lesson' as ActivityCategory },
+  { value: '🌐', label: 'Language', icon: '🌐', category: 'lesson' as ActivityCategory },
   { value: '🎸', label: 'Guitar', icon: '🎸', category: 'lesson' as ActivityCategory },
   { value: '🔬', label: 'Science', icon: '🔬', category: 'lesson' as ActivityCategory },
+  { value: '📓', label: 'Other', icon: '📓', category: 'lesson' as ActivityCategory },
+  { value: '🏥', label: 'Medical', icon: '🏥', category: 'appointment' as ActivityCategory },
+  { value: '🦷', label: 'Dental', icon: '🦷', category: 'appointment' as ActivityCategory },
+  { value: '📝', label: 'Other', icon: '📝', category: 'appointment' as ActivityCategory },
   { value: '✈️', label: 'Travel', icon: '✈️', category: 'other' as ActivityCategory },
   { value: '📦', label: 'Other', icon: '📦', category: 'other' as ActivityCategory },
+];
+
+// Grouped icon options for the GroupedChipPicker
+const ACTIVITY_ICON_GROUPS: ChipGroup[] = [
+  {
+    name: 'Sport',
+    icon: '🏅',
+    items: [
+      { value: '⚽', label: 'Soccer', icon: '⚽' },
+      { value: '🏈', label: 'Football', icon: '🏈' },
+      { value: '⚾', label: 'Baseball', icon: '⚾' },
+      { value: '🏊', label: 'Swimming', icon: '🏊' },
+      { value: '🥋', label: 'Martial Arts', icon: '🥋' },
+      { value: '🤸', label: 'Gymnastics', icon: '🤸' },
+      { value: '🏃', label: 'Other', icon: '🏃' },
+    ],
+  },
+  {
+    name: 'Lesson',
+    icon: '📖',
+    items: [
+      { value: '🎹', label: 'Piano', icon: '🎹' },
+      { value: '📚', label: 'Tutoring', icon: '📚' },
+      { value: '🎨', label: 'Art', icon: '🎨' },
+      { value: '🧮', label: 'Math', icon: '🧮' },
+      { value: '🌐', label: 'Language', icon: '🌐' },
+      { value: '🎸', label: 'Guitar', icon: '🎸' },
+      { value: '🔬', label: 'Science', icon: '🔬' },
+      { value: '📓', label: 'Other', icon: '📓' },
+    ],
+  },
+  {
+    name: 'Appointment',
+    icon: '📋',
+    items: [
+      { value: '🏥', label: 'Medical', icon: '🏥' },
+      { value: '🦷', label: 'Dental', icon: '🦷' },
+      { value: '📝', label: 'Other', icon: '📝' },
+    ],
+  },
+  {
+    name: 'Other',
+    icon: '📦',
+    items: [
+      { value: '✈️', label: 'Travel', icon: '✈️' },
+      { value: '📦', label: 'Other', icon: '📦' },
+    ],
+  },
 ];
 
 // Form state
@@ -85,12 +142,26 @@ const reminderMinutes = ref<ReminderMinutes>(0);
 const notes = ref('');
 const isActive = ref(true);
 const color = ref('');
+const showMoreDetails = ref(false);
 
 // Map recurrence mode + frequency to ActivityRecurrence
 const effectiveRecurrence = computed<ActivityRecurrence>(() => {
   if (recurrenceMode.value === 'one-off') return 'none';
   return recurrenceFrequency.value === 'biweekly' ? 'weekly' : recurrenceFrequency.value;
 });
+
+// Check if any "more details" field has data (for auto-expand in edit mode)
+function hasDetailData(activity: FamilyActivity): boolean {
+  return !!(
+    activity.notes ||
+    activity.dropoffMemberId ||
+    activity.pickupMemberId ||
+    activity.instructorName ||
+    activity.instructorContact ||
+    activity.reminderMinutes > 0 ||
+    !activity.isActive
+  );
+}
 
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
@@ -127,6 +198,7 @@ const { isEditing, isSubmitting } = useFormModal(
       notes.value = activity.notes ?? '';
       isActive.value = activity.isActive;
       color.value = activity.color ?? CATEGORY_COLORS[activity.category];
+      showMoreDetails.value = hasDetailData(activity);
     },
     onNew: () => {
       icon.value = '';
@@ -153,6 +225,7 @@ const { isEditing, isSubmitting } = useFormModal(
       notes.value = '';
       isActive.value = true;
       color.value = '';
+      showMoreDetails.value = false;
     },
   }
 );
@@ -237,7 +310,7 @@ function handleSave() {
     feeSchedule: feeAmount.value ? ('per_session' as FeeSchedule) : feeSchedule.value,
     feeAmount: feeAmount.value || (feeSchedule.value !== 'none' ? feeAmount.value : undefined),
     feeCurrency: feeAmount.value || feeSchedule.value !== 'none' ? feeCurrency.value : undefined,
-    feePayerId: feeSchedule.value !== 'none' ? feePayerId.value || undefined : undefined,
+    feePayerId: feePayerId.value || undefined,
     instructorName: instructorName.value.trim() || undefined,
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,
@@ -271,13 +344,20 @@ function handleSave() {
     @save="handleSave"
     @delete="emit('delete')"
   >
-    <!-- 1. Icon Picker -->
-    <FormFieldGroup :label="t('modal.selectCategory')">
-      <FrequencyChips v-model="icon" :options="ACTIVITY_ICON_OPTIONS" />
+    <!-- 1. Who? -->
+    <FormFieldGroup :label="t('modal.whosGoing')">
+      <FamilyChipPicker v-model="assigneeId" mode="single" />
     </FormFieldGroup>
 
-    <!-- 2. Title -->
-    <div>
+    <!-- 2. Category picker (grouped) -->
+    <FormFieldGroup :label="t('modal.selectCategory')">
+      <GroupedChipPicker v-model="icon" :groups="ACTIVITY_ICON_GROUPS" />
+    </FormFieldGroup>
+
+    <!-- 3. Activity title (styled wrapper) -->
+    <div
+      class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+    >
       <input
         v-model="title"
         type="text"
@@ -286,7 +366,25 @@ function handleSave() {
       />
     </div>
 
-    <!-- 3. Recurring / One-off toggle -->
+    <!-- 4. Cost per Session + Who Pays? -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <AmountInput
+        v-model="feeAmount"
+        :currency-symbol="settingsStore.baseCurrency"
+        font-size="1.1rem"
+        :label="t('modal.costPerSession')"
+      />
+      <FormFieldGroup :label="t('planner.field.feePayer')">
+        <FamilyChipPicker v-model="feePayerId" mode="single" compact />
+      </FormFieldGroup>
+    </div>
+
+    <!-- 5. Fee Schedule chips -->
+    <FormFieldGroup :label="t('planner.field.feeSchedule')" optional>
+      <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+    </FormFieldGroup>
+
+    <!-- 6. Recurring / One-off toggle -->
     <FormFieldGroup :label="t('modal.schedule')">
       <TogglePillGroup
         v-model="recurrenceMode"
@@ -297,7 +395,7 @@ function handleSave() {
       />
     </FormFieldGroup>
 
-    <!-- 4. Recurring details -->
+    <!-- 7. Recurring details -->
     <ConditionalSection :show="recurrenceMode === 'recurring'">
       <div class="space-y-4">
         <FormFieldGroup :label="t('modal.whichDays')">
@@ -310,7 +408,7 @@ function handleSave() {
       </div>
     </ConditionalSection>
 
-    <!-- 5. Date + Start / End time -->
+    <!-- 8. Date + Start / End time -->
     <div class="grid grid-cols-3 gap-4">
       <FormFieldGroup :label="t('planner.field.date')">
         <BaseInput v-model="date" type="date" required />
@@ -325,86 +423,81 @@ function handleSave() {
       </FormFieldGroup>
     </div>
 
-    <!-- 7. Location (optional) -->
+    <!-- 9. Location -->
     <FormFieldGroup :label="t('planner.field.location')" optional>
       <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
     </FormFieldGroup>
 
-    <!-- 8. Who's going? -->
-    <FormFieldGroup :label="t('modal.whosGoing')">
-      <FamilyChipPicker v-model="assigneeId" mode="single" />
-    </FormFieldGroup>
+    <!-- 10. "Add more details" collapsible -->
+    <div>
+      <button
+        type="button"
+        class="font-outfit text-primary-500 text-sm font-semibold transition-colors hover:underline"
+        @click="showMoreDetails = !showMoreDetails"
+      >
+        {{ t('planner.field.moreDetails') }}
+        <span
+          class="ml-1 inline-block transition-transform"
+          :class="{ 'rotate-180': showMoreDetails }"
+          >&#9662;</span
+        >
+      </button>
 
-    <!-- 9. Dropoff / Pickup -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <FormFieldGroup :label="t('planner.field.dropoff')" optional>
-        <FamilyChipPicker v-model="dropoffMemberId" mode="single" compact />
-      </FormFieldGroup>
-      <FormFieldGroup :label="t('planner.field.pickup')" optional>
-        <FamilyChipPicker v-model="pickupMemberId" mode="single" compact />
-      </FormFieldGroup>
-    </div>
+      <div v-if="showMoreDetails" class="mt-3 space-y-4">
+        <!-- Notes -->
+        <FormFieldGroup :label="t('planner.field.notes')" optional>
+          <textarea
+            v-model="notes"
+            rows="2"
+            class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+            :placeholder="t('planner.field.notes')"
+          />
+        </FormFieldGroup>
 
-    <!-- 10. Instructor -->
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <FormFieldGroup :label="t('planner.field.instructor')" optional>
-        <BaseInput v-model="instructorName" :placeholder="t('planner.field.instructor')" />
-      </FormFieldGroup>
-      <FormFieldGroup :label="t('planner.field.instructorContact')" optional>
-        <BaseInput
-          v-model="instructorContact"
-          :placeholder="t('planner.field.instructorContact')"
-        />
-      </FormFieldGroup>
-    </div>
+        <!-- Drop Off Duty / Pick Up Duty -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormFieldGroup :label="t('planner.field.dropoff')" optional>
+            <FamilyChipPicker v-model="dropoffMemberId" mode="single" compact />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('planner.field.pickup')" optional>
+            <FamilyChipPicker v-model="pickupMemberId" mode="single" compact />
+          </FormFieldGroup>
+        </div>
 
-    <!-- 11. Cost per session -->
-    <AmountInput
-      v-model="feeAmount"
-      :currency-symbol="settingsStore.baseCurrency"
-      font-size="1.1rem"
-      :label="t('modal.costPerSession')"
-    />
+        <!-- Instructor -->
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormFieldGroup :label="t('planner.field.instructor')" optional>
+            <BaseInput v-model="instructorName" :placeholder="t('planner.field.instructor')" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('planner.field.instructorContact')" optional>
+            <BaseInput
+              v-model="instructorContact"
+              :placeholder="t('planner.field.instructorContact')"
+            />
+          </FormFieldGroup>
+        </div>
 
-    <!-- 12. Fee schedule chips -->
-    <FormFieldGroup :label="t('planner.field.feeSchedule')" optional>
-      <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
-    </FormFieldGroup>
+        <!-- Reminder chips -->
+        <FormFieldGroup :label="t('planner.field.reminder')" optional>
+          <FrequencyChips
+            :model-value="String(reminderMinutes)"
+            :options="reminderChipOptions"
+            @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
+          />
+        </FormFieldGroup>
 
-    <!-- 13. Fee payer (when fee is set) -->
-    <ConditionalSection :show="feeSchedule !== 'none'">
-      <FormFieldGroup :label="t('planner.field.feePayer')" optional>
-        <FamilyChipPicker v-model="feePayerId" mode="single" compact />
-      </FormFieldGroup>
-    </ConditionalSection>
-
-    <!-- 14. Reminder chips -->
-    <FormFieldGroup :label="t('planner.field.reminder')" optional>
-      <FrequencyChips
-        :model-value="String(reminderMinutes)"
-        :options="reminderChipOptions"
-        @update:model-value="reminderMinutes = Number($event) as ReminderMinutes"
-      />
-    </FormFieldGroup>
-
-    <!-- 15. Notes (optional) -->
-    <FormFieldGroup :label="t('planner.field.notes')" optional>
-      <textarea
-        v-model="notes"
-        rows="2"
-        class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
-        :placeholder="t('planner.field.notes')"
-      />
-    </FormFieldGroup>
-
-    <!-- 16. Active toggle -->
-    <div
-      class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
-    >
-      <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
-        {{ t('planner.field.active') }}
-      </span>
-      <ToggleSwitch v-model="isActive" size="sm" />
+        <!-- Active toggle -->
+        <div
+          class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+        >
+          <span
+            class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200"
+          >
+            {{ t('planner.field.active') }}
+          </span>
+          <ToggleSwitch v-model="isActive" size="sm" />
+        </div>
+      </div>
     </div>
   </BeanieFormModal>
 </template>
