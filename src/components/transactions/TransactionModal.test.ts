@@ -96,8 +96,9 @@ describe('TransactionModal — Save Flow', () => {
   }
 
   /** Mount closed, then open — triggers useFormModal's watch so onEdit/onNew runs */
-  async function mountAndOpen(props: Record<string, unknown> = {}) {
-    const wrapper = mount(TransactionModal, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function mountAndOpen(props: Record<string, unknown> = {}): Promise<any> {
+    const wrapper: any = mount(TransactionModal, {
       props: { open: false, ...props },
     });
     await wrapper.setProps({ open: true });
