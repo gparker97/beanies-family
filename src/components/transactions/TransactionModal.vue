@@ -54,6 +54,14 @@ const activityId = ref<string | undefined>(undefined);
 const currency = ref(settingsStore.displayCurrency);
 const dayOfMonth = ref(1);
 
+const LAST_ACCOUNT_KEY = 'beanies_last_transaction_account';
+
+function getLastAccountId(): string {
+  const saved = localStorage.getItem(LAST_ACCOUNT_KEY);
+  if (saved && accountsStore.accounts.some((a) => a.id === saved)) return saved;
+  return accountsStore.accounts[0]?.id ?? '';
+}
+
 function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -84,7 +92,7 @@ const { isEditing, isSubmitting } = useFormModal(
       date.value = todayStr();
       startDate.value = todayStr();
       endDate.value = '';
-      accountId.value = accountsStore.accounts[0]?.id ?? '';
+      accountId.value = getLastAccountId();
       activityId.value = undefined;
       currency.value = settingsStore.displayCurrency;
       dayOfMonth.value = new Date().getDate();
@@ -128,6 +136,7 @@ const effectiveType = computed<'income' | 'expense'>(() =>
 function handleSave() {
   if (!canSave.value) return;
   isSubmitting.value = true;
+  localStorage.setItem(LAST_ACCOUNT_KEY, accountId.value);
 
   try {
     if (recurrenceMode.value === 'recurring' && !isEditing.value) {
@@ -251,46 +260,42 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 4. Amount + Currency (inline row) -->
-    <div class="flex items-end gap-2">
-      <div class="relative flex-shrink-0">
-        <FormFieldGroup :label="t('form.currency')">
-          <div class="relative">
-            <select
-              v-model="currency"
-              class="focus:border-primary-500 font-outfit w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 py-3 pr-7 text-center text-[0.85rem] font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+    <FormFieldGroup :label="t('form.amount')" required>
+      <div class="flex items-stretch gap-2">
+        <div class="relative flex-shrink-0">
+          <select
+            v-model="currency"
+            class="focus:border-primary-500 font-outfit h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-[0.85rem] font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+          >
+            <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
+              {{ opt.value }}
+            </option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+            <svg
+              class="h-3 w-3 text-[var(--color-text)] opacity-35"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
-                {{ opt.value }}
-              </option>
-            </select>
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <svg
-                class="h-3 w-3 text-[var(--color-text)] opacity-35"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </div>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
           </div>
-        </FormFieldGroup>
-      </div>
-      <div class="min-w-0 flex-1">
-        <FormFieldGroup :label="t('form.amount')" required>
+        </div>
+        <div class="min-w-0 flex-1">
           <AmountInput
             v-model="amount"
             :currency-symbol="currency || settingsStore.displayCurrency"
             font-size="1.8rem"
           />
-        </FormFieldGroup>
+        </div>
       </div>
-    </div>
+    </FormFieldGroup>
 
     <!-- 5. Category chips (two-level drill-down) -->
     <FormFieldGroup :label="t('form.category')" required>
@@ -311,7 +316,7 @@ function handleDelete() {
     <!-- 7. Recurring details -->
     <ConditionalSection :show="recurrenceMode === 'recurring'">
       <div class="space-y-4">
-        <div class="flex items-end gap-3">
+        <div class="flex items-end gap-4">
           <div class="min-w-0 flex-1">
             <FormFieldGroup :label="t('modal.howOften')">
               <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
@@ -322,7 +327,7 @@ function handleDelete() {
               <div class="relative">
                 <select
                   :value="String(dayOfMonth)"
-                  class="focus:border-primary-500 font-outfit w-[70px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 py-3 pr-7 text-center text-[0.95rem] font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-1.5 pr-6 pl-3 text-[0.65rem] font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
                   @change="dayOfMonth = Number(($event.target as HTMLSelectElement).value)"
                 >
                   <option v-for="opt in dayOfMonthOptions" :key="opt.value" :value="opt.value">
@@ -333,7 +338,7 @@ function handleDelete() {
                   class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5"
                 >
                   <svg
-                    class="h-3 w-3 text-[var(--color-text)] opacity-35"
+                    class="h-2.5 w-2.5 text-[var(--color-text)] opacity-35"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -354,19 +359,22 @@ function handleDelete() {
           <BaseInput v-model="startDate" :label="t('form.startDate')" type="date" required />
           <BaseInput v-model="endDate" :label="`${t('form.endDate')} (optional)`" type="date" />
         </div>
+        <FormFieldGroup :label="t('modal.linkToActivity')" optional>
+          <ActivityLinkDropdown v-model="activityId" />
+        </FormFieldGroup>
       </div>
     </ConditionalSection>
 
     <!-- 8. Date (for one-time) -->
     <ConditionalSection :show="recurrenceMode === 'one-time'">
-      <FormFieldGroup :label="t('form.date')">
-        <BaseInput v-model="date" type="date" required />
-      </FormFieldGroup>
+      <div class="space-y-4">
+        <FormFieldGroup :label="t('form.date')">
+          <BaseInput v-model="date" type="date" required />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('modal.linkToActivity')" optional>
+          <ActivityLinkDropdown v-model="activityId" />
+        </FormFieldGroup>
+      </div>
     </ConditionalSection>
-
-    <!-- 9. Activity link -->
-    <FormFieldGroup :label="t('modal.linkToActivity')" optional>
-      <ActivityLinkDropdown v-model="activityId" />
-    </FormFieldGroup>
   </BeanieFormModal>
 </template>
