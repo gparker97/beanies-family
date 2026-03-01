@@ -58,7 +58,7 @@ const amountPrefix = computed(() => {
   <div class="flex items-center gap-3 border-b border-[var(--tint-slate-5)] py-3 last:border-b-0">
     <!-- Icon -->
     <div
-      class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-[0.9rem]"
+      class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-sm"
       :class="tintBg"
     >
       {{ icon }}
@@ -66,18 +66,16 @@ const amountPrefix = computed(() => {
 
     <!-- Info -->
     <div class="min-w-0 flex-1">
-      <div class="text-secondary-500 text-[0.8rem] font-semibold dark:text-gray-100">
+      <div class="text-secondary-500 text-sm font-semibold dark:text-gray-100">
         {{ name }}
       </div>
-      <div class="text-secondary-500/35 text-[0.65rem] dark:text-gray-500">
+      <div class="text-secondary-500/35 text-xs dark:text-gray-500">
         {{ subtitle }}
       </div>
     </div>
 
     <!-- Amount -->
-    <div
-      class="font-outfit text-secondary-500 flex-shrink-0 text-[0.85rem] font-bold dark:text-gray-200"
-    >
+    <div class="font-outfit text-secondary-500 flex-shrink-0 text-sm font-bold dark:text-gray-200">
       <template v-if="isUnlocked">{{ amountPrefix }}{{ converted.displayFormatted }}</template>
       <template v-else>{{ MASK }}</template>
     </div>

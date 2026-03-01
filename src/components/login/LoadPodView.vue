@@ -526,7 +526,7 @@ async function handleDriveRefresh() {
           @click="handleLoadFromGoogleDrive"
         >
           <span
-            class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-[0.6rem] font-bold text-white shadow-sm"
+            class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
           >
             {{ t('loginV6.recommended') }}
           </span>
@@ -562,7 +562,7 @@ async function handleDriveRefresh() {
           <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ t('googleDrive.storageLabel') }}
           </p>
-          <p class="mt-0.5 text-[0.68rem] text-gray-500 dark:text-gray-400">
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             {{ t('loginV6.googleDriveCardDesc') }}
           </p>
         </button>
@@ -572,7 +572,7 @@ async function handleDriveRefresh() {
           class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
         >
           <span
-            class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-[0.6rem] font-bold text-white"
+            class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
           >
             {{ t('loginV6.cloudComingSoon') }}
           </span>
@@ -588,7 +588,7 @@ async function handleDriveRefresh() {
           <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ t('storage.dropbox') }}
           </p>
-          <p class="mt-0.5 text-[0.68rem] text-gray-500 dark:text-gray-400">
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             {{ t('loginV6.dropboxCardDesc') }}
           </p>
         </div>
@@ -598,7 +598,7 @@ async function handleDriveRefresh() {
           class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
         >
           <span
-            class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-[0.6rem] font-bold text-white"
+            class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
           >
             {{ t('loginV6.cloudComingSoon') }}
           </span>
@@ -614,7 +614,7 @@ async function handleDriveRefresh() {
           <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ t('storage.iCloud') }}
           </p>
-          <p class="mt-0.5 text-[0.68rem] text-gray-500 dark:text-gray-400">
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             {{ t('loginV6.iCloudCardDesc') }}
           </p>
         </div>
@@ -657,7 +657,7 @@ async function handleDriveRefresh() {
           <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
             {{ t('storage.localFile') }}
           </p>
-          <p class="mt-0.5 text-[0.68rem] text-gray-500 dark:text-gray-400">
+          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
             {{ t('loginV6.localFileCardDesc') }}
           </p>
         </button>
@@ -714,7 +714,7 @@ async function handleDriveRefresh() {
         <p class="text-primary-500 mt-1 text-sm">
           {{ t('loginV6.dropZoneBrowse') }}
         </p>
-        <p class="text-primary-500/70 mt-2 text-[0.7rem] font-semibold">
+        <p class="text-primary-500/70 mt-2 text-xs font-semibold">
           {{ t('loginV6.acceptsBeanpod') }}
         </p>
       </div>
@@ -803,10 +803,10 @@ async function handleDriveRefresh() {
               />
             </svg>
           </div>
-          <p class="text-[0.68rem] font-bold text-gray-700 dark:text-gray-300">
+          <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
             {{ t('loginV6.securityYourData') }}
           </p>
-          <p class="mt-0.5 text-[0.62rem] opacity-35">
+          <p class="mt-0.5 text-xs opacity-35">
             {{ t('loginV6.securityYourDataDesc') }}
           </p>
         </div>
@@ -832,10 +832,10 @@ async function handleDriveRefresh() {
               />
             </svg>
           </div>
-          <p class="text-[0.68rem] font-bold text-gray-700 dark:text-gray-300">
+          <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
             {{ t('loginV6.securityEncrypted') }}
           </p>
-          <p class="mt-0.5 text-[0.62rem] opacity-35">
+          <p class="mt-0.5 text-xs opacity-35">
             {{ t('loginV6.securityEncryptedDesc') }}
           </p>
         </div>
@@ -861,10 +861,10 @@ async function handleDriveRefresh() {
               />
             </svg>
           </div>
-          <p class="text-[0.68rem] font-bold text-gray-700 dark:text-gray-300">
+          <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
             {{ t('loginV6.securityZeroServers') }}
           </p>
-          <p class="mt-0.5 text-[0.62rem] opacity-35">
+          <p class="mt-0.5 text-xs opacity-35">
             {{ t('loginV6.securityZeroServersDesc') }}
           </p>
         </div>
@@ -877,7 +877,7 @@ async function handleDriveRefresh() {
         <!-- File loaded badge -->
         <div
           v-if="loadedFileName"
-          class="mx-auto mb-4 inline-flex items-center gap-2 rounded-full bg-[#27AE60]/[0.08] px-3 py-1.5 text-[0.68rem] font-semibold text-[#27AE60] dark:bg-green-900/30 dark:text-green-400"
+          class="mx-auto mb-4 inline-flex items-center gap-2 rounded-full bg-[#27AE60]/[0.08] px-3 py-1.5 text-xs font-semibold text-[#27AE60] dark:bg-green-900/30 dark:text-green-400"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -900,16 +900,16 @@ async function handleDriveRefresh() {
         <!-- Cloud account email -->
         <p
           v-if="syncStore.providerAccountEmail"
-          class="mb-2 text-[0.65rem] text-gray-400 dark:text-gray-500"
+          class="mb-2 text-xs text-gray-400 dark:text-gray-500"
         >
           {{ syncStore.providerAccountEmail }}
         </p>
 
         <!-- Heading -->
-        <h3 class="font-outfit text-[1.2rem] font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('loginV6.unlockTitle') }}
         </h3>
-        <p class="mt-1 text-[0.75rem] opacity-40">
+        <p class="mt-1 text-xs opacity-40">
           {{ t('loginV6.unlockSubtitle') }}
         </p>
       </div>
@@ -939,7 +939,7 @@ async function handleDriveRefresh() {
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
 
-        <p class="mt-3 text-center text-[0.68rem] opacity-30">
+        <p class="mt-3 text-center text-xs opacity-30">
           {{ t('loginV6.unlockFooter') }}
         </p>
       </form>

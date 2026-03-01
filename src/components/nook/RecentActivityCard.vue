@@ -73,7 +73,7 @@ const activityItems = computed<ActivityItem[]>(() => {
           {{ t('nook.recentActivity') }}
         </span>
       </div>
-      <router-link to="/transactions" class="text-primary-500 text-[0.75rem] font-medium">
+      <router-link to="/transactions" class="text-primary-500 text-xs font-medium">
         {{ t('nook.seeAll') }} &rarr;
       </router-link>
     </div>
@@ -87,7 +87,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       >
         <!-- Icon container -->
         <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[0.9rem]"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm"
           :class="{
             'bg-[var(--tint-success-10)]': item.iconTint === 'green',
             'bg-[var(--tint-orange-8)]': item.iconTint === 'orange',
@@ -98,10 +98,10 @@ const activityItems = computed<ActivityItem[]>(() => {
 
         <!-- Content -->
         <div class="min-w-0 flex-1">
-          <div class="text-secondary-500 truncate text-[0.8rem] font-semibold dark:text-gray-100">
+          <div class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
             {{ item.description }}
           </div>
-          <div class="text-secondary-500/35 text-[0.65rem] dark:text-gray-500">
+          <div class="text-secondary-500/35 text-xs dark:text-gray-500">
             {{ item.time }}
           </div>
         </div>

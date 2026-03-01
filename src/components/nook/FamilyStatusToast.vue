@@ -44,13 +44,13 @@ const title = computed(() => t('nook.statusGreatWeek'));
 
     <!-- Text -->
     <div class="min-w-0">
-      <p class="font-outfit truncate text-[0.85rem] leading-snug font-semibold">
+      <p class="font-outfit truncate text-sm leading-snug font-semibold">
         {{ title }}
       </p>
-      <p v-if="subtitle" class="mt-0.5 truncate text-[0.7rem] opacity-70">
+      <p v-if="subtitle" class="mt-0.5 truncate text-xs opacity-70">
         {{ subtitle }}
       </p>
-      <p v-else class="mt-0.5 truncate text-[0.7rem] opacity-70">
+      <p v-else class="mt-0.5 truncate text-xs opacity-70">
         {{ t('nook.familyAtAGlance') }}
       </p>
     </div>

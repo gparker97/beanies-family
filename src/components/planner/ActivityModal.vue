@@ -281,7 +281,7 @@ function handleSave() {
       <input
         v-model="title"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-[1.2rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.whatsTheActivity')"
       />
     </div>
@@ -401,9 +401,7 @@ function handleSave() {
     <div
       class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
-      <span
-        class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-      >
+      <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
         {{ t('planner.field.active') }}
       </span>
       <ToggleSwitch v-model="isActive" size="sm" />

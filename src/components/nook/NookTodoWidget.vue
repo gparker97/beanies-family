@@ -97,12 +97,12 @@ async function toggleComplete(todoId: string) {
           ✅ {{ t('nook.familyTodo') }}
         </span>
         <span
-          class="ml-2 rounded-full bg-[rgba(155,89,182,0.12)] px-2 py-0.5 text-[0.65rem] font-semibold text-[#9B59B6]"
+          class="ml-2 rounded-full bg-[rgba(155,89,182,0.12)] px-2 py-0.5 text-xs font-semibold text-[#9B59B6]"
         >
           {{ t('nook.openCount').replace('{count}', String(openCount)) }}
         </span>
       </div>
-      <router-link to="/todo" class="text-primary-500 text-[0.75rem] font-medium hover:underline">
+      <router-link to="/todo" class="text-primary-500 text-xs font-medium hover:underline">
         {{ t('nook.viewAll') }} &rarr;
       </router-link>
     </div>
@@ -201,9 +201,7 @@ async function toggleComplete(todoId: string) {
               class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
             >
               ⏰{{ formattedDate(todo.dueDate) }}
-              <span
-                class="rounded-full bg-white/25 px-1.5 py-px text-[0.55rem] font-bold uppercase"
-              >
+              <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
                 {{ t('todo.overdue') }}
               </span>
             </span>
@@ -216,7 +214,7 @@ async function toggleComplete(todoId: string) {
             </span>
             <span
               v-if="todo.assigneeId && getMember(todo.assigneeId)"
-              class="rounded-md px-2 py-0.5 text-[0.65rem] font-medium text-white"
+              class="rounded-md px-2 py-0.5 text-xs font-medium text-white"
               :style="{
                 background: `linear-gradient(135deg, ${getMember(todo.assigneeId)!.color || '#3b82f6'}, ${getMember(todo.assigneeId)!.color || '#3b82f6'}cc)`,
               }"
@@ -232,7 +230,7 @@ async function toggleComplete(todoId: string) {
     <router-link
       v-if="hasMore"
       to="/todo"
-      class="text-primary-500 hover:text-primary-600 font-outfit mt-4 block text-center text-[0.8rem] font-semibold transition-colors"
+      class="text-primary-500 hover:text-primary-600 font-outfit mt-4 block text-center text-sm font-semibold transition-colors"
     >
       +{{ remainingCount }} {{ t('nook.moretasks') }} &rarr;
     </router-link>

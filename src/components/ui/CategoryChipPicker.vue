@@ -53,7 +53,7 @@ const groups = () => getCategoriesGrouped(props.type);
         v-for="group in groups()"
         :key="group.name"
         type="button"
-        class="font-outfit rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] px-3.5 py-1.5 text-[0.65rem] font-semibold text-[var(--color-text-muted)] transition-all duration-150 hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400"
+        class="font-outfit rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text-muted)] transition-all duration-150 hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400"
         @click="selectGroup(group.name)"
       >
         <span class="mr-1">{{ GROUP_EMOJI_MAP[group.name] || '📦' }}</span>
@@ -66,14 +66,14 @@ const groups = () => getCategoriesGrouped(props.type);
       <div class="flex items-center gap-2">
         <button
           type="button"
-          class="font-outfit border-primary-500 text-primary-500 dark:bg-primary-500/15 rounded-full border-2 bg-[var(--tint-orange-8)] px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all duration-150"
+          class="font-outfit border-primary-500 text-primary-500 dark:bg-primary-500/15 rounded-full border-2 bg-[var(--tint-orange-8)] px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
           @click="collapse"
         >
           <span class="mr-1">{{ GROUP_EMOJI_MAP[expandedGroup] || '📦' }}</span>
           {{ expandedGroup }}
           <span class="ml-1 opacity-60">&times;</span>
         </button>
-        <span class="font-outfit text-[0.6rem] text-[var(--color-text-muted)]">
+        <span class="font-outfit text-xs text-[var(--color-text-muted)]">
           {{ t('modal.selectSubcategory') }}
         </span>
       </div>
@@ -83,7 +83,7 @@ const groups = () => getCategoriesGrouped(props.type);
           v-for="cat in groups().find((g) => g.name === expandedGroup)?.categories"
           :key="cat.id"
           type="button"
-          class="font-outfit rounded-full px-3.5 py-1.5 text-[0.65rem] font-semibold transition-all duration-150"
+          class="font-outfit rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-150"
           :class="
             modelValue === cat.id
               ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'

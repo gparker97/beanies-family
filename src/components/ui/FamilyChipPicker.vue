@@ -49,9 +49,7 @@ function toggle(id: string) {
   }
 }
 
-const avatarSize = computed(() =>
-  props.compact ? 'h-6 w-6 text-[0.55rem]' : 'h-7 w-7 text-[0.65rem]'
-);
+const avatarSize = computed(() => (props.compact ? 'h-6 w-6 text-xs' : 'h-7 w-7 text-xs'));
 </script>
 
 <template>
@@ -74,9 +72,7 @@ const avatarSize = computed(() =>
       >
         {{ t('common.all').charAt(0) }}
       </span>
-      <span
-        class="font-outfit text-[0.7rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-      >
+      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200">
         {{ t('common.shared') }}
       </span>
     </button>
@@ -101,9 +97,7 @@ const avatarSize = computed(() =>
       >
         {{ member.name.charAt(0).toUpperCase() }}
       </span>
-      <span
-        class="font-outfit text-[0.7rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-      >
+      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-200">
         {{ member.name }}
       </span>
     </button>

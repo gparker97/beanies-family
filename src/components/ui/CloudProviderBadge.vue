@@ -26,7 +26,7 @@ const iconClass = computed(() => {
 });
 
 const textClass = computed(() => {
-  const sizeMap = { xs: 'text-[0.6rem]', sm: 'text-xs', md: 'text-sm' };
+  const sizeMap = { xs: 'text-xs', sm: 'text-xs', md: 'text-sm' };
   const colorMap = {
     light: 'text-gray-500 dark:text-gray-400',
     dark: 'text-white/30',
@@ -35,7 +35,7 @@ const textClass = computed(() => {
 });
 
 const emailClass = computed(() => {
-  const sizeMap = { xs: 'text-[0.55rem]', sm: 'text-[0.65rem]', md: 'text-xs' };
+  const sizeMap = { xs: 'text-xs', sm: 'text-xs', md: 'text-xs' };
   const colorMap = {
     light: 'text-gray-400 dark:text-gray-500',
     dark: 'text-white/20',

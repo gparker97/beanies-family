@@ -256,7 +256,7 @@ function handleBack() {
         alt=""
         class="mx-auto h-[100px] w-[100px]"
       />
-      <p class="font-outfit text-secondary-500 text-[0.85rem] font-bold dark:text-gray-200">
+      <p class="font-outfit text-secondary-500 text-sm font-bold dark:text-gray-200">
         beanies<span class="text-primary-500">.family</span>
       </p>
     </div>
@@ -306,7 +306,7 @@ function handleBack() {
         <span
           v-for="step in totalSteps"
           :key="step"
-          class="text-[0.52rem] font-semibold"
+          class="text-xs font-semibold"
           :class="step === currentStep ? 'text-primary-500' : 'opacity-25'"
         >
           {{ stepLabels[step - 1]?.() }}
@@ -349,7 +349,7 @@ function handleBack() {
             <!-- Role dropdown -->
             <div>
               <label
-                class="font-outfit mb-1 block text-[0.6rem] font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+                class="font-outfit mb-1 block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
               >
                 {{ t('form.type') }}
               </label>
@@ -410,13 +410,11 @@ function handleBack() {
         class="border-primary-500/15 bg-primary-500/[0.02] dark:border-primary-500/10 dark:bg-primary-500/[0.03] rounded-[18px] border-2 p-4"
       >
         <div
-          class="font-outfit text-primary-500 mb-1.5 text-[0.6rem] font-bold tracking-[0.1em] uppercase"
+          class="font-outfit text-primary-500 mb-1.5 text-xs font-bold tracking-[0.1em] uppercase"
         >
           {{ t('loginV6.storageSectionLabel') }}
         </div>
-        <p
-          class="text-secondary-500 mb-3 text-[0.7rem] leading-relaxed opacity-40 dark:text-gray-300"
-        >
+        <p class="text-secondary-500 mb-3 text-xs leading-relaxed opacity-40 dark:text-gray-300">
           {{ t('loginV6.storageDescription') }}
         </p>
 
@@ -489,7 +487,7 @@ function handleBack() {
               />
             </svg>
             <span
-              class="font-outfit text-[0.68rem] font-semibold"
+              class="font-outfit text-xs font-semibold"
               :class="
                 storageType === 'google_drive'
                   ? 'text-green-700 dark:text-green-400'
@@ -518,11 +516,11 @@ function handleBack() {
               />
             </svg>
             <span
-              class="font-outfit text-center text-[0.68rem] font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
+              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
               >{{ t('googleDrive.storageLabel') }}</span
             >
             <span
-              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap"
+              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
               >{{ t('loginV6.cloudComingSoon') }}</span
             >
           </div>
@@ -542,11 +540,11 @@ function handleBack() {
               />
             </svg>
             <span
-              class="font-outfit text-center text-[0.68rem] font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
+              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
               >{{ t('storage.dropbox') }}</span
             >
             <span
-              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap"
+              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
               >{{ t('loginV6.cloudComingSoon') }}</span
             >
           </div>
@@ -566,11 +564,11 @@ function handleBack() {
               />
             </svg>
             <span
-              class="font-outfit text-center text-[0.68rem] font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
+              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
               >{{ t('storage.iCloud') }}</span
             >
             <span
-              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-[0.5rem] font-bold whitespace-nowrap"
+              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
               >{{ t('loginV6.cloudComingSoon') }}</span
             >
           </div>
@@ -614,7 +612,7 @@ function handleBack() {
               />
             </svg>
             <span
-              class="font-outfit text-[0.68rem] font-semibold"
+              class="font-outfit text-xs font-semibold"
               :class="
                 storageType === 'local'
                   ? 'text-green-700 dark:text-green-400'
@@ -687,7 +685,7 @@ function handleBack() {
             <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
               {{ familyStore.owner.name }}
               <span
-                class="bg-primary-500/15 text-primary-500 ml-1.5 inline-block rounded-full px-2 py-0.5 text-[0.65rem] font-semibold"
+                class="bg-primary-500/15 text-primary-500 ml-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-semibold"
                 >{{ t('loginV6.you') }}</span
               >
             </p>
@@ -746,7 +744,7 @@ function handleBack() {
         <!-- Role toggle -->
         <div class="flex items-center gap-3">
           <span
-            class="font-outfit text-[0.6rem] font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+            class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
             >{{ t('form.type') }}</span
           >
           <div class="flex gap-2">
@@ -890,9 +888,7 @@ function handleBack() {
                 alt=""
                 class="mt-0.5 h-5 w-5 flex-shrink-0"
               />
-              <p
-                class="text-secondary-500 text-[0.78rem] leading-relaxed font-medium dark:text-gray-200"
-              >
+              <p class="text-secondary-500 text-sm leading-relaxed font-medium dark:text-gray-200">
                 {{ t('googleDrive.shareHint') }}
               </p>
             </div>

@@ -263,7 +263,7 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
           />
           <span
             v-if="cell.activities.length > 4"
-            class="text-secondary-500/30 text-[0.5rem] dark:text-gray-500"
+            class="text-secondary-500/30 text-xs dark:text-gray-500"
           >
             +{{ cell.activities.length - 4 }}
           </span>

@@ -62,23 +62,43 @@ Icon containers use colour-tinted backgrounds at 8–20% opacity rather than sol
 
 ## Typography
 
-| Font | Weights Available | Use for |
-|------|-------------------|---------|
-| Outfit | 300, 400, 500, 600, 700, 800 | Navigation labels, headings, financial amounts, button text, card titles, dashboard greeting, net worth figures, goal percentages, app name |
-| Inter | 300, 400, 500, 600, 700 | Body text, table data, form inputs, notification descriptions, calendar entries, sidebar security indicators, running prose |
+### Six-Level Typography Scale
 
-- Financial figures always use Outfit — they must be clear and easy to read
-- UI labels: Outfit, 0.75rem, weight 600, uppercase, tracking 0.08em, 45% opacity
-- Financial amounts: Outfit, 2rem+, weight 800
-- Numbers should emphasise the "Every bean counts" value proposition
+All text in the app must use one of these six standard levels. **No custom `text-[X.Xrem]` sizes — only standard Tailwind classes.** Minimum font size is `text-xs` (12px / 0.75rem).
 
-### Font loading
+| Level | Class | Size | Font | Weight | Use |
+|-------|-------|------|------|--------|-----|
+| Display | `text-3xl` / `text-4xl` | 30–36px | Outfit | 800 | Hero numbers (net worth, budget spent, large emoji accents) |
+| Page Title | `text-2xl` | 24px | Outfit | 700 | Page headers ("Transactions", "Family To-Do") |
+| Section Title | `text-lg` | 18px | Outfit | 600 | Section headers, modal titles, BeanieFormModal title |
+| Item Title | `text-base` | 16px | Outfit | 600 | List items, card titles, form select values |
+| Body | `text-sm` | 14px | Inter | 400 | Descriptions, body text, form labels, activity details, save button text |
+| Caption | `text-xs` | 12px | Inter/Outfit | varies | Badges, timestamps, meta text, chips, pill labels, table headers |
+
+### Rules
+
+- **Minimum size:** `text-xs` (0.75rem / 12px) — no text smaller than this
+- **Standard classes only:** Use `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`, `text-3xl`, `text-4xl`. Never use custom `text-[X.Xrem]` for font sizes
+- **Font families:** Outfit = headings, values, emphasis, navigation, amounts. Inter = body text, data tables, form descriptions, prose
+- **Financial figures** always use Outfit — they must be clear and easy to read
+- **UI labels** (form field headers, section labels): Outfit, `text-xs`, weight 600, uppercase, tracking 0.08em, 35–45% opacity
+- **Financial amounts:** Outfit, `text-3xl`+, weight 800
+
+### Exceptions
+
+These specific elements may use custom sizes for decorative purposes:
+- Dropdown arrows (`▼`) at `text-[0.5rem]` — purely decorative
+- Brand tagline "every bean counts" — intentionally small italic
+- "NEW" sidebar badges — decorative indicator
+- Background decorative emoji (e.g., large watermark emoji)
+
+### Font Loading
 
 ```html
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 ```
 
-### Financial value table styling
+### Financial Value Styling
 
 - Negative values: Heritage Orange (never red)
 - Positive values: soft green (`#27AE60`)
@@ -284,7 +304,7 @@ Extends BaseModal with the standard form layout. **Use this for ALL create/edit 
 | Prop | Type | Default | Purpose |
 |------|------|---------|---------|
 | `open` | boolean | required | Show/hide |
-| `title` | string | required | Header text (Outfit 1.1rem bold) |
+| `title` | string | required | Header text (Outfit `text-lg` bold) |
 | `icon` | string | — | Emoji displayed in icon box |
 | `iconBg` | string | `var(--tint-orange-8)` | Icon box background |
 | `size` | `'default'`\|`'narrow'` | `'default'` | Maps to BaseModal `xl`/`lg` |
@@ -311,7 +331,7 @@ Extends BaseModal with the standard form layout. **Use this for ALL create/edit 
 
 **Icon box:** 44×44px, rounded-[14px] (squircle), tinted background. Use `var(--tint-orange-8)` for finance forms, `var(--tint-purple-12)` for to-do forms, `var(--tint-silk-20)` for family forms.
 
-**Save button:** Full-width flex-1, rounded-[16px], py-3.5, Outfit 0.88rem bold. Gradient: `from-primary-500 to-terracotta-400` (orange) or `from-purple-500 to-purple-400` (purple). Spinner on submit.
+**Save button:** Full-width flex-1, rounded-[16px], py-3.5, Outfit `text-sm` bold. Gradient: `from-primary-500 to-terracotta-400` (orange) or `from-purple-500 to-purple-400` (purple). Spinner on submit.
 
 **Delete button:** 48×48px, rounded-[14px], red tint bg (8%), 🗑️ emoji.
 

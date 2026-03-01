@@ -34,7 +34,7 @@ function getSelectedClasses(variant?: string): string {
       v-for="opt in options"
       :key="opt.value"
       type="button"
-      class="font-outfit rounded-[11px] px-4 py-2 text-[0.75rem] font-semibold transition-all duration-200"
+      class="font-outfit rounded-[11px] px-4 py-2 text-xs font-semibold transition-all duration-200"
       :class="
         modelValue === opt.value
           ? getSelectedClasses(opt.variant)

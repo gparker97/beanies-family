@@ -14,7 +14,7 @@ withDefaults(defineProps<Props>(), {
 <template>
   <div class="space-y-2">
     <label
-      class="font-outfit text-[0.6rem] font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+      class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
     >
       {{ label }}
       <span v-if="required" class="text-primary-500">*</span>

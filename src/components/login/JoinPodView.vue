@@ -799,10 +799,10 @@ function handleBack() {
     <!-- Decrypt Modal -->
     <BaseModal :open="showDecryptModal" @close="showDecryptModal = false">
       <div class="text-center">
-        <h3 class="font-outfit text-[1.2rem] font-bold text-gray-900 dark:text-gray-100">
+        <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('loginV6.unlockTitle') }}
         </h3>
-        <p class="mt-1 text-[0.75rem] opacity-40">
+        <p class="mt-1 text-xs opacity-40">
           {{ t('loginV6.unlockSubtitle') }}
         </p>
       </div>

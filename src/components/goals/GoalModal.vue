@@ -178,7 +178,7 @@ function handleDelete() {
       <input
         v-model="name"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-[1.1rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit w-full border-none bg-transparent text-lg font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.goalName')"
       />
     </div>

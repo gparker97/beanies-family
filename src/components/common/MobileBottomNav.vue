@@ -38,7 +38,7 @@ function navigateTo(path: string) {
       <!-- Active indicator dot -->
       <span v-if="tab.active" class="bg-primary-500 mb-0.5 h-1 w-1 rounded-full" />
       <span class="text-xl leading-none">{{ tab.emoji }}</span>
-      <span class="text-[0.6rem] font-semibold">{{ tab.label }}</span>
+      <span class="text-xs font-semibold">{{ tab.label }}</span>
     </button>
   </nav>
 </template>

@@ -35,8 +35,8 @@ const emit = defineEmits<{
         {{ icon }}
       </div>
       <div class="min-w-0 flex-1">
-        <div class="font-outfit text-[0.85rem] font-semibold">{{ title }}</div>
-        <div class="mt-0.5 text-[0.7rem] opacity-70">{{ message }}</div>
+        <div class="font-outfit text-sm font-semibold">{{ title }}</div>
+        <div class="mt-0.5 text-xs opacity-70">{{ message }}</div>
       </div>
       <button
         type="button"

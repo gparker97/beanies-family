@@ -186,7 +186,7 @@ function handleDelete() {
       <input
         v-model="name"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-[1.1rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit w-full border-none bg-transparent text-lg font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.accountName')"
       />
     </div>
@@ -241,12 +241,10 @@ function handleDelete() {
       class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
       <div>
-        <div
-          class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-        >
+        <div class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
           {{ t('modal.includeInNetWorth') }}
         </div>
-        <div class="text-[0.65rem] text-[var(--color-text-muted)]">
+        <div class="text-xs text-[var(--color-text-muted)]">
           {{ t('modal.includeInNetWorthDesc') }}
         </div>
       </div>
@@ -257,9 +255,7 @@ function handleDelete() {
     <div
       class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
-      <span
-        class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-      >
+      <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
         {{ t('form.isActive') }}
       </span>
       <ToggleSwitch v-model="isActive" />

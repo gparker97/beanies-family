@@ -172,7 +172,7 @@ async function handleDelete() {
       <!-- Task title -->
       <div>
         <span
-          class="font-outfit text-[1.2rem] font-bold text-[var(--color-text)] dark:text-gray-100"
+          class="font-outfit text-xl font-bold text-[var(--color-text)] dark:text-gray-100"
           :class="{ 'line-through opacity-50': todo.completed }"
         >
           {{ todo.title }}
@@ -205,7 +205,7 @@ async function handleDelete() {
         >
           {{ viewFormattedDate }}
           <template v-if="todo.dueTime"> &middot; {{ todo.dueTime }}</template>
-          <span class="rounded-full bg-white/25 px-1.5 py-px text-[0.6rem] font-bold uppercase">
+          <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
             {{ t('todo.overdue') }}
           </span>
         </span>
@@ -289,7 +289,7 @@ async function handleDelete() {
       <input
         v-model="editForm.title"
         type="text"
-        class="font-outfit w-full border-none bg-transparent text-[1.3rem] font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+        class="font-outfit w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.whatNeedsDoing')"
       />
     </div>

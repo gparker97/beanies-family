@@ -296,7 +296,7 @@ function handleDelete() {
       <div class="relative">
         <select
           v-model="accountId"
-          class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-[1rem] font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+          class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
         >
           <option value="" disabled>{{ t('form.selectAccount') }}</option>
           <option v-for="opt in accountOptions" :key="opt.value" :value="opt.value">
@@ -329,7 +329,7 @@ function handleDelete() {
         <input
           v-model="description"
           type="text"
-          class="font-outfit w-full border-none bg-transparent text-[1rem] font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+          class="font-outfit w-full border-none bg-transparent text-base font-semibold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
           :placeholder="t('form.description')"
         />
       </div>
@@ -341,7 +341,7 @@ function handleDelete() {
         <div class="relative flex-shrink-0">
           <select
             v-model="currency"
-            class="focus:border-primary-500 font-outfit h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-[0.85rem] font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+            class="focus:border-primary-500 font-outfit h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-sm font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
           >
             <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
               {{ opt.value }}
@@ -403,7 +403,7 @@ function handleDelete() {
               <div class="relative">
                 <select
                   :value="String(dayOfMonth)"
-                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-1.5 pr-6 pl-3 text-[0.65rem] font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
+                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-1.5 pr-6 pl-3 text-xs font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
                   @change="dayOfMonth = Number(($event.target as HTMLSelectElement).value)"
                 >
                   <option v-for="opt in dayOfMonthOptions" :key="opt.value" :value="opt.value">
@@ -436,7 +436,7 @@ function handleDelete() {
           <div class="relative">
             <select
               :value="String(monthOfYear)"
-              class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-[1rem] font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
+              class="focus:border-primary-500 font-outfit w-full cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 pr-10 text-base font-semibold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
               @change="monthOfYear = Number(($event.target as HTMLSelectElement).value)"
             >
               <option v-for="opt in monthOptions" :key="opt.value" :value="opt.value">
@@ -487,9 +487,7 @@ function handleDelete() {
       v-if="isEditingRecurring"
       class="flex items-center justify-between rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
     >
-      <span
-        class="font-outfit text-[0.8rem] font-semibold text-[var(--color-text)] dark:text-gray-200"
-      >
+      <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-200">
         {{ t('recurring.active') }}
       </span>
       <ToggleSwitch v-model="isActive" size="sm" />

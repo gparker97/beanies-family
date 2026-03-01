@@ -85,7 +85,7 @@ function goToTodos() {
         <!-- Assignee chip -->
         <span
           v-if="todo.assigneeId"
-          class="flex-shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-medium text-white"
+          class="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"
           :style="{ backgroundColor: getMemberColor(todo.assigneeId) }"
         >
           {{ getMemberName(todo.assigneeId) }}
@@ -94,7 +94,7 @@ function goToTodos() {
         <!-- Due date badge -->
         <span
           v-if="todo.dueDate"
-          class="flex-shrink-0 rounded-full bg-[#9B59B6]/10 px-2 py-0.5 text-[0.6rem] font-medium text-[#9B59B6]"
+          class="flex-shrink-0 rounded-full bg-[#9B59B6]/10 px-2 py-0.5 text-xs font-medium text-[#9B59B6]"
         >
           {{ t('planner.onCalendar') }}
         </span>
