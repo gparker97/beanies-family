@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-01",
-    "translationCount": 1110
+    "translationCount": 1113
   },
   "translations": {
     "app.name": {
@@ -5554,6 +5554,21 @@
     "modal.accountOwner": {
       "translation": "帐户持有者",
       "hash": "pv5a2o",
+      "lastUpdated": "2026-03-01"
+    },
+    "join.shareFileNoteCloud": {
+      "translation": "系统将提示您的家庭成员使用Google登录，以自动访问共享文件。",
+      "hash": "ln3yh9",
+      "lastUpdated": "2026-03-01"
+    },
+    "join.cloudLoadFailed": {
+      "translation": "无法从云存储加载文件。您可以在下方手动加载。",
+      "hash": "r08wnj",
+      "lastUpdated": "2026-03-01"
+    },
+    "join.loadingFromCloud": {
+      "translation": "正在从Google云端硬盘加载家庭数据...",
+      "hash": "hke5v",
       "lastUpdated": "2026-03-01"
     }
   }

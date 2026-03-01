@@ -1260,6 +1260,16 @@ const STRING_DEFS = {
   'join.shareFileNote': {
     en: 'Important: also share the .beanpod file with them (email, cloud folder, or USB)',
   },
+  'join.shareFileNoteCloud': {
+    en: 'Your family member will be prompted to sign in with Google to access the shared file automatically.',
+  },
+  'join.cloudLoadFailed': {
+    en: "Couldn't load the file from cloud storage. You can load it manually below.",
+  },
+  'join.loadingFromCloud': {
+    en: 'Loading family data from Google Drive...',
+    beanie: 'Fetching your beans from the cloud...',
+  },
   'join.enterCodeManually': { en: 'Or enter a family code manually' },
   'join.codeInputLabel': { en: 'Family code' },
   'join.codeInputHint': {
