@@ -331,8 +331,11 @@ test.describe('Family Planner', () => {
 
     // Recurrence defaults to Recurring + Weekly
 
-    // Location and instructor fields are now inline
+    // Location is visible inline
     await page.getByPlaceholder('Location').fill('City Sports Park');
+
+    // Instructor fields are inside "Add more details" collapsible
+    await page.getByRole('button', { name: 'Add more details' }).click();
     await page.getByPlaceholder('Instructor / Coach').fill('Coach Johnson');
     await page.getByPlaceholder('Contact').fill('coach@sports.com');
 
