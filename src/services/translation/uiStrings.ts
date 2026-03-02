@@ -1610,6 +1610,7 @@ const STRING_DEFS = {
   'todo.assignTo': { en: 'Assign to', beanie: 'assign to' },
   'todo.unassigned': { en: 'Unassigned', beanie: 'unassigned' },
   'todo.allBeans': { en: 'All Beans', beanie: 'all beans' },
+  'todo.selectDueDate': { en: 'Due Date', beanie: 'due date' },
   'todo.dueDate': { en: 'Due date', beanie: 'due date' },
   'todo.dueTime': { en: 'Time', beanie: 'time' },
   'todo.description': { en: 'Description', beanie: 'description' },
