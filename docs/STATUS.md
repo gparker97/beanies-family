@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-02
-> **Updated by:** Claude (Automerge + Family Key migration planning #119)
+> **Updated by:** Claude (Automerge foundation #110)
 
 ## Current Phase
 
@@ -608,7 +608,7 @@ Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + 
 
 **Phase 1 — Foundation (parallelizable):**
 
-- [ ] #110 — Automerge CRDT document service and repository factory
+- [x] #110 — Automerge CRDT document service and repository factory
 - [ ] #111 — Family key encryption, wrapping, and invite link service
 - [ ] #112 — Google Drive OAuth PKCE migration (replaces GIS implicit grant)
 
