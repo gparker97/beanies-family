@@ -14,6 +14,7 @@ const title = ref('');
 const dueDate = ref('');
 const assigneeId = ref('');
 const titleInput = ref<HTMLInputElement>();
+const dateInputFocused = ref(false);
 
 function focus() {
   titleInput.value?.focus();
@@ -84,10 +85,14 @@ function handleKeydown(e: KeyboardEvent) {
             v-model="dueDate"
             type="date"
             class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-3 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-            :style="{ color: dueDate ? 'var(--color-primary)' : 'transparent' }"
+            :style="{
+              color: dueDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
+            }"
+            @focus="dateInputFocused = true"
+            @blur="dateInputFocused = false"
           />
           <span
-            v-if="!dueDate"
+            v-if="!dueDate && !dateInputFocused"
             class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
           >
             {{ t('todo.selectDueDate') }}
@@ -127,10 +132,14 @@ function handleKeydown(e: KeyboardEvent) {
             v-model="dueDate"
             type="date"
             class="beanies-input font-outfit w-full min-w-0 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-            :style="{ color: dueDate ? 'var(--color-primary)' : 'transparent' }"
+            :style="{
+              color: dueDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
+            }"
+            @focus="dateInputFocused = true"
+            @blur="dateInputFocused = false"
           />
           <span
-            v-if="!dueDate"
+            v-if="!dueDate && !dateInputFocused"
             class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
           >
             {{ t('todo.selectDueDate') }}
