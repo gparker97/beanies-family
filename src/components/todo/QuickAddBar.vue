@@ -13,6 +13,13 @@ const emit = defineEmits<{
 const title = ref('');
 const dueDate = ref('');
 const assigneeId = ref('');
+const titleInput = ref<HTMLInputElement>();
+
+function focus() {
+  titleInput.value?.focus();
+}
+
+defineExpose({ focus });
 
 function handleAdd() {
   const trimmed = title.value.trim();
@@ -47,6 +54,7 @@ function handleKeydown(e: KeyboardEvent) {
       >
         <span class="text-lg opacity-40">✏️</span>
         <input
+          ref="titleInput"
           v-model="title"
           type="text"
           :placeholder="t('todo.quickAddPlaceholder')"
@@ -71,12 +79,20 @@ function handleKeydown(e: KeyboardEvent) {
         :style="!dueDate ? 'background: var(--tint-slate-5)' : undefined"
       >
         <span class="text-base">📅</span>
-        <input
-          v-model="dueDate"
-          type="date"
-          class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-3 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-          :style="{ color: dueDate ? 'var(--color-primary)' : 'var(--color-text)' }"
-        />
+        <div class="relative">
+          <input
+            v-model="dueDate"
+            type="date"
+            class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-3 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+            :style="{ color: dueDate ? 'var(--color-primary)' : 'transparent' }"
+          />
+          <span
+            v-if="!dueDate"
+            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
+          >
+            {{ t('todo.selectDueDate') }}
+          </span>
+        </div>
       </div>
 
       <!-- Assign dropdown (desktop) -->
@@ -106,12 +122,20 @@ function handleKeydown(e: KeyboardEvent) {
         :style="!dueDate ? 'background: var(--tint-slate-5)' : undefined"
       >
         <span class="text-base">📅</span>
-        <input
-          v-model="dueDate"
-          type="date"
-          class="beanies-input font-outfit min-w-0 flex-1 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-          :style="{ color: dueDate ? 'var(--color-primary)' : 'var(--color-text)' }"
-        />
+        <div class="relative min-w-0 flex-1">
+          <input
+            v-model="dueDate"
+            type="date"
+            class="beanies-input font-outfit w-full min-w-0 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+            :style="{ color: dueDate ? 'var(--color-primary)' : 'transparent' }"
+          />
+          <span
+            v-if="!dueDate"
+            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
+          >
+            {{ t('todo.selectDueDate') }}
+          </span>
+        </div>
       </div>
       <div
         class="flex flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"

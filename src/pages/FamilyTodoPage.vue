@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
@@ -12,9 +12,7 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
-import FilterBar from '@/components/todo/FilterBar.vue';
-import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
-import type { TodoFilter, TodoSort } from '@/components/todo/FilterBar.vue';
+import type { TodoSort } from '@/components/todo/FilterBar.vue';
 import type { TodoItem } from '@/types/models';
 
 const route = useRoute();
@@ -28,14 +26,21 @@ const authStore = useAuthStore();
 const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 
 // Local filter state
-const activeFilter = ref<TodoFilter>('all');
 const sortBy = ref<TodoSort>('newest');
 const memberFilter = ref('all');
 const showCompletedSection = ref(false);
 
+// Ref to QuickAddBar for auto-focus
+const quickAddBar = ref<InstanceType<typeof QuickAddBar> | null>(null);
+
 // View/edit modal
 const selectedTodo = ref<TodoItem | null>(null);
 const startInEditMode = ref(false);
+
+// Sorted members for chip filter
+const sortedMembers = computed(() =>
+  [...familyStore.members].sort((a, b) => a.name.localeCompare(b.name))
+);
 
 // Computed: filtered + sorted todos
 const displayedOpenTodos = computed(() => {
@@ -43,18 +48,7 @@ const displayedOpenTodos = computed(() => {
 
   // Apply page-local member filter
   if (memberFilter.value !== 'all') {
-    if (memberFilter.value === 'unassigned') {
-      items = items.filter((t) => !t.assigneeId);
-    } else {
-      items = items.filter((t) => t.assigneeId === memberFilter.value);
-    }
-  }
-
-  // Apply status filter
-  if (activeFilter.value === 'scheduled') {
-    items = items.filter((t) => t.dueDate);
-  } else if (activeFilter.value === 'noDate') {
-    items = items.filter((t) => !t.dueDate);
+    items = items.filter((t) => t.assigneeId === memberFilter.value);
   }
 
   // Apply sort
@@ -66,13 +60,9 @@ const displayedCompletedTodos = computed(() => {
 
   // Apply page-local member filter
   if (memberFilter.value !== 'all') {
-    if (memberFilter.value === 'unassigned') {
-      items = items.filter((t) => !t.assigneeId);
-    } else {
-      items = items.filter(
-        (t) => t.assigneeId === memberFilter.value || t.completedBy === memberFilter.value
-      );
-    }
+    items = items.filter(
+      (t) => t.assigneeId === memberFilter.value || t.completedBy === memberFilter.value
+    );
   }
 
   return items;
@@ -125,12 +115,16 @@ function openEditModal(todo: TodoItem) {
 }
 
 // Open view modal from query param (e.g. navigated from Family Nook)
-onMounted(() => {
+onMounted(async () => {
   const viewId = route.query.view as string | undefined;
   if (viewId) {
     const todo = todoStore.todos.find((t) => t.id === viewId);
     if (todo) openViewModal(todo);
   }
+
+  // Auto-focus the quick add bar
+  await nextTick();
+  quickAddBar.value?.focus();
 });
 
 async function handleDelete(id: string) {
@@ -149,15 +143,28 @@ async function handleDelete(id: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Page header -->
-    <div>
+    <!-- Page header with sort -->
+    <div class="flex items-center justify-between">
       <p class="text-sm text-[var(--color-text-muted)]">
         {{ t('todo.subtitle') }}
       </p>
+      <div v-if="hasAnyTodos" class="flex items-center gap-1.5">
+        <span class="font-outfit text-xs font-medium text-[var(--color-text)] opacity-50">
+          {{ t('todo.sortLabel') }}
+        </span>
+        <select
+          v-model="sortBy"
+          class="beanies-input font-outfit cursor-pointer rounded-lg border-gray-200 py-1.5 pr-7 pl-2 text-xs font-semibold text-[var(--color-text)] dark:border-slate-600"
+        >
+          <option value="newest">{{ t('todo.sort.newest') }}</option>
+          <option value="oldest">{{ t('todo.sort.oldest') }}</option>
+          <option value="dueDate">{{ t('todo.sort.dueDate') }}</option>
+        </select>
+      </div>
     </div>
 
     <!-- Quick add bar -->
-    <QuickAddBar @add="handleQuickAdd" />
+    <QuickAddBar ref="quickAddBar" @add="handleQuickAdd" />
 
     <!-- Empty state -->
     <div v-if="!hasAnyTodos" class="py-12 text-center">
@@ -168,27 +175,37 @@ async function handleDelete(id: string) {
 
     <!-- Filters (only show when there are todos) -->
     <template v-if="hasAnyTodos">
-      <FilterBar
-        :active-filter="activeFilter"
-        :sort-by="sortBy"
-        @update:active-filter="activeFilter = $event"
-        @update:sort-by="sortBy = $event"
-      />
-
-      <MemberChipFilter
+      <!-- Member chip filter (desktop only, toggle to filter) -->
+      <div
         v-if="familyStore.members.length > 1"
-        :is-all-active="memberFilter === 'all'"
-        :is-member-active="(id: string) => memberFilter === id"
-        show-unassigned
-        :is-unassigned-active="memberFilter === 'unassigned'"
-        :all-label="t('todo.allBeans')"
-        @select-all="memberFilter = 'all'"
-        @select-member="memberFilter = $event"
-        @select-unassigned="memberFilter = 'unassigned'"
-      />
+        class="hidden flex-wrap items-center gap-2 sm:flex"
+      >
+        <button
+          v-for="member in sortedMembers"
+          :key="member.id"
+          type="button"
+          class="inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-sm font-medium transition-all"
+          :class="
+            memberFilter === member.id
+              ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
+              : 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
+          "
+          @click="memberFilter = memberFilter === member.id ? 'all' : member.id"
+        >
+          <span
+            class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full text-xs font-bold text-white"
+            :style="{
+              background: `linear-gradient(135deg, ${member.color}, ${member.color}dd)`,
+            }"
+          >
+            {{ member.name.charAt(0).toUpperCase() }}
+          </span>
+          {{ member.name }}
+        </button>
+      </div>
 
       <!-- Open Tasks Section -->
-      <div v-if="activeFilter !== 'done'">
+      <div>
         <p class="nook-section-label mb-2 text-purple-500">
           {{ t('todo.section.open') }} ({{ displayedOpenTodos.length }})
         </p>
@@ -215,9 +232,8 @@ async function handleDelete(id: string) {
       </div>
 
       <!-- Completed Section -->
-      <div v-if="activeFilter === 'done' || activeFilter === 'all'">
+      <div v-if="displayedCompletedTodos.length > 0">
         <button
-          v-if="activeFilter === 'all' && displayedCompletedTodos.length > 0"
           class="flex items-center gap-2 text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
           @click="showCompletedSection = !showCompletedSection"
         >
@@ -227,13 +243,7 @@ async function handleDelete(id: string) {
           </span>
         </button>
 
-        <div v-if="activeFilter === 'done' || showCompletedSection" class="mt-2 space-y-2">
-          <p
-            v-if="activeFilter === 'done'"
-            class="nook-section-label mb-2 text-green-600 dark:text-green-400"
-          >
-            {{ t('todo.section.completed') }} ({{ displayedCompletedTodos.length }})
-          </p>
+        <div v-if="showCompletedSection" class="mt-2 space-y-2">
           <div
             v-for="todo in displayedCompletedTodos"
             :key="todo.id"
