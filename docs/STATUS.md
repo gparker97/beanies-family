@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-01
-> **Updated by:** Claude (Mobile bottom tab bar 5-tab layout #101)
+> **Last updated:** 2026-03-02
+> **Updated by:** Claude (Automerge + Family Key migration planning #119)
 
 ## Current Phase
 
@@ -430,12 +430,12 @@
 - `FamilyBeanRow.vue` `getRoleLabel` now checks `member.ageGroup` (adult/child) instead of only `member.role`
 - Adults with 'member' role correctly show "Parent"/"Big Bean" instead of "Little Bean"
 
-### Cross-Device Passkey Authentication Fix
+### Cross-Device Passkey Authentication Fix (Issue #108) — Superseded
 
-- **passkeyService.ts** — When a synced passkey (iCloud Keychain, Google Password Manager, Windows Hello) is used on a device where it wasn't originally registered, the system now auto-registers the credential locally using the family's cached encryption password instead of returning an error
-- **BiometricLoginView.vue** — New `CROSS_DEVICE_NO_CACHE` error handling with user-friendly message directing to password entry
-- **uiStrings.ts** — Updated cross-device error message to explain synced passkey behavior
-- **ADR-015** — Updated with cross-device passkey sync section documenting the auto-registration approach and trust model
+- **Implemented but superseded** by the Automerge + Family Key migration (#119)
+- Level 1 (cross-device UX) and Level 2 (PRF-wrapped password in .beanpod) were fully implemented
+- The family key model eliminates the cross-device problem entirely — passkeys wrap the family key directly, which is always available in the file envelope
+- All #108 code (PasskeySecret type, passkeyCrypto wrapPassword/unwrapPassword, cross-device flow in BiometricLoginView/LoginPage, passkeySecrets in sync layer) will be replaced or removed during the migration (#114, #115, #116)
 
 ### Biometric Login After Family Switching (Issue #16 follow-up)
 
@@ -450,7 +450,7 @@
 - **`syncStore.ts` — `startFilePolling()` / `stopFilePolling()`**: 10-second interval polling for external file changes, auto-started by `setupAutoSync()`, stopped on sign-out/disconnect
 - **`App.vue` — visibility change handling**: `reloadIfFileChanged()` on tab/app resume; `syncStore.syncNow(true)` force save on `hidden` to prevent data loss on quick reload
 - **Data loss fix**: `flushPendingSave()` + `syncNow(true)` on `visibilityState: hidden` ensures debounced saves are flushed before page reload
-- Cloud relay for near-instant sync planned as follow-up (#104, `docs/plans/2026-02-26-cloud-relay-sync.md`)
+- Cloud relay for near-instant sync planned as follow-up (#118, supersedes #104)
 
 ### Family Nook Landing Page Fix
 
@@ -600,7 +600,44 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 - ~100+ beanie string overrides across all pages
 - Unit tests and E2E tests (4 specs)
 
-## Up Next (Phase 1 Remaining)
+## Up Next
+
+### Automerge + Family Key Migration (Epic #119)
+
+Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + family key encryption. Plan: `docs/plans/2026-03-02-automerge-family-key-migration.md`
+
+**Phase 1 — Foundation (parallelizable):**
+
+- [ ] #110 — Automerge CRDT document service and repository factory
+- [ ] #111 — Family key encryption, wrapping, and invite link service
+- [ ] #112 — Google Drive OAuth PKCE migration (replaces GIS implicit grant)
+
+**Phase 2 — Core Migration:**
+
+- [ ] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal, `gp-` → `beanies-` DB rename
+
+**Phase 3 — Auth & UI:**
+
+- [ ] #114 — Auth and onboarding flows for family key model (includes #108 code cleanup)
+- [ ] #115 — UI updates for family key model and invite flow
+
+**Phase 4 — Cleanup:**
+
+- [ ] #116 — Dead code removal, documentation updates, final verification
+
+**Follow-up:**
+
+- [ ] #117 — Family key rotation on member removal
+- [ ] #118 — WebSocket push relay for real-time cross-device sync (supersedes #104)
+
+**Superseded issues (closed):**
+
+- #104 — Cloud relay → superseded by #118
+- #108 — Cross-device passkey auth → superseded by family key model (#114)
+- #17 — Password rotation → obsoleted by family key model
+- #15 — Password recovery → superseded by invite links (#111/#114)
+
+### Phase 1 Remaining (non-migration)
 
 - [x] Financial institution dropdown (Issue #42) ✓
 - [x] Beanie language mode (Issue #35) ✓
@@ -704,8 +741,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 
 - [ ] Data import/export (CSV, etc.)
 - [x] PWA offline support / install prompt / SW update prompt (#6) ✓
-- [ ] Cloud relay for near-instant cross-device sync (#104)
-- [x] Google Drive sync (OAuth integration) — #78, ADR-016
+- [x] Google Drive sync (OAuth integration) — #78, ADR-016 (being upgraded to OAuth PKCE in #112)
 - [ ] Skip/modify individual recurring occurrences
 - [ ] Landing/marketing page (#72)
 
