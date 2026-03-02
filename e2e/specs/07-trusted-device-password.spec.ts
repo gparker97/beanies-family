@@ -9,7 +9,7 @@ import { bypassLoginIfNeeded } from '../helpers/auth';
 async function getGlobalSettings(page: import('@playwright/test').Page) {
   return await page.evaluate(async () => {
     return new Promise<Record<string, unknown> | null>((resolve) => {
-      const request = indexedDB.open('gp-finance-registry');
+      const request = indexedDB.open('beanies-registry');
       request.onsuccess = () => {
         const db = request.result;
         try {
@@ -49,7 +49,7 @@ async function updateGlobalSettings(
 ) {
   await page.evaluate(async (updates) => {
     return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open('gp-finance-registry');
+      const request = indexedDB.open('beanies-registry');
       request.onsuccess = () => {
         const db = request.result;
         try {

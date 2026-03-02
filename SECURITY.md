@@ -213,7 +213,7 @@ This application is designed with the following compliance considerations:
 For security inquiries, contact:
 
 - **Security Team**: security@yourdomain.com (Update this)
-- **General Issues**: https://github.com/gparker97/gp-family-finance-planner/issues
+- **General Issues**: https://github.com/greg-grobrix/beanies-family/issues
 - **Private Reports**: Use GitHub Security Advisories
 
 ---

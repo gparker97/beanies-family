@@ -28,10 +28,9 @@ import * as registry from '@/services/registry/registryService';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import {
-  loadGIS,
+  initializeAuth,
   requestAccessToken,
   onTokenExpired,
-  isTokenValid,
   fetchGoogleUserEmail,
 } from '@/services/google/googleAuth';
 import {
@@ -170,21 +169,19 @@ export const useSyncStore = defineStore('sync', () => {
         // local File System Access API permission grants (user gesture required).
         needsPermission.value = false;
 
-        // Pre-load GIS library (non-interactive script load).
-        // Do NOT call requestAccessToken() here — after a PWA force-close
-        // sessionStorage is cleared and requestAccessToken() would trigger
-        // Google's account chooser popup before the login screen renders.
-        // Token acquisition happens on-demand in provider.read()/write().
+        // Initialize PKCE auth — loads stored refresh token from IndexedDB.
+        // Does NOT trigger any interactive popups. Token acquisition happens
+        // on-demand in provider.read()/write() or via silent refresh.
         try {
-          await loadGIS();
+          const ctx = useFamilyContextStore();
+          if (ctx.activeFamilyId) {
+            await initializeAuth(ctx.activeFamilyId);
+          }
         } catch {
-          console.warn('[syncStore] Failed to pre-load Google Identity Services');
+          console.warn('[syncStore] Failed to initialize Google auth');
         }
-        // Only set up expiry handler if a valid token already exists
-        // (e.g., normal page refresh within the same tab session)
-        if (isTokenValid()) {
-          setupTokenExpiryHandler();
-        }
+        // Set up token expiry handler for auto-refresh fallback
+        setupTokenExpiryHandler();
       } else {
         // Local file: check if we have File System Access API permission
         const hasPermission = await syncService.hasPermission();
@@ -1124,7 +1121,6 @@ export const useSyncStore = defineStore('sync', () => {
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
     try {
       // Authenticate if needed
-      await loadGIS();
       const token = await requestAccessToken();
 
       // Fetch account email before creating provider so it's available immediately
@@ -1241,7 +1237,6 @@ export const useSyncStore = defineStore('sync', () => {
   async function listGoogleDriveFiles(options?: {
     forceNewAccount?: boolean;
   }): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
-    await loadGIS();
     const token = await requestAccessToken({
       forceConsent: options?.forceNewAccount,
     });

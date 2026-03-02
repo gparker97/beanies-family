@@ -6,14 +6,14 @@ export class IndexedDBHelper {
 
   /**
    * Find the active per-family database name by reading the registry.
-   * Falls back to looking for any gp-family-finance-* database.
+   * Falls back to looking for any beanies-data-{familyId} database.
    */
   private async getActiveFamilyDbName(): Promise<string | null> {
     return await this.page.evaluate(async () => {
       // Try reading the registry DB to find lastActiveFamilyId
       try {
         const registryDb = await new Promise<IDBDatabase>((resolve, reject) => {
-          const request = indexedDB.open('gp-finance-registry', 1);
+          const request = indexedDB.open('beanies-registry', 1);
           request.onsuccess = () => resolve(request.result);
           request.onerror = () => reject(request.error);
         });
@@ -30,16 +30,16 @@ export class IndexedDBHelper {
         registryDb.close();
 
         if (settings?.lastActiveFamilyId) {
-          return `gp-family-finance-${settings.lastActiveFamilyId}`;
+          return `beanies-data-${settings.lastActiveFamilyId}`;
         }
       } catch {
         // Registry doesn't exist yet
       }
 
-      // Fallback: find any gp-family-finance-* database
+      // Fallback: find any beanies-data-* database
       if ('databases' in indexedDB) {
         const dbs = await indexedDB.databases();
-        const familyDb = dbs.find((db) => db.name?.startsWith('gp-family-finance-'));
+        const familyDb = dbs.find((db) => db.name?.startsWith('beanies-data-'));
         if (familyDb?.name) {
           return familyDb.name;
         }
@@ -60,9 +60,9 @@ export class IndexedDBHelper {
         const deletePromises = dbs
           .filter(
             (db) =>
-              db.name?.startsWith('gp-family-finance') ||
-              db.name === 'gp-finance-registry' ||
-              db.name === 'gp-finance-file-handles'
+              db.name?.startsWith('beanies-data') ||
+              db.name === 'beanies-registry' ||
+              db.name === 'beanies-file-handles'
           )
           .map(
             (db) =>
@@ -80,7 +80,7 @@ export class IndexedDBHelper {
         await Promise.all(deletePromises);
       } else {
         // Fallback: try known names
-        const knownNames = ['gp-family-finance', 'gp-finance-registry', 'gp-finance-file-handles'];
+        const knownNames = ['beanies-data', 'beanies-registry', 'beanies-file-handles'];
         await Promise.all(
           knownNames.map(
             (name) =>
@@ -105,7 +105,7 @@ export class IndexedDBHelper {
       ({ testData, familyDbName }) => {
         return new Promise<void>((resolve, reject) => {
           // Use the per-family DB name, or fall back to legacy name for migration
-          const targetDb = familyDbName || 'gp-family-finance';
+          const targetDb = familyDbName || 'beanies-data';
           const request = indexedDB.open(targetDb, 6);
 
           request.onsuccess = () => {
@@ -193,7 +193,7 @@ export class IndexedDBHelper {
 
     return await this.page.evaluate((familyDbName) => {
       return new Promise<ExportedData>((resolve, reject) => {
-        const targetDb = familyDbName || 'gp-family-finance';
+        const targetDb = familyDbName || 'beanies-data';
         const request = indexedDB.open(targetDb, 6);
 
         request.onsuccess = () => {

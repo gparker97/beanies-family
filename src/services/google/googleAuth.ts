@@ -1,82 +1,42 @@
 /**
- * Google OAuth 2.0 via Google Identity Services (GIS).
+ * Google OAuth 2.0 via Authorization Code + PKCE.
  *
- * Uses the implicit grant flow to obtain an access token with `drive.file` scope.
- * Token is cached in localStorage so it survives page refreshes and tab
- * close/reopen within the ~1 hour token lifetime. The expiry check
- * (`expires > Date.now()`) handles stale tokens automatically.
- * Dynamically loads the GIS library on first use (zero bundle impact).
+ * Replaces the GIS implicit grant flow with PKCE for long-lived refresh tokens.
+ * Token exchange and refresh happen via a Lambda proxy at api.beanies.family
+ * (keeps client_secret server-side). Refresh tokens are stored per-family in
+ * IndexedDB and survive page refresh, browser restarts, and device reboots.
+ *
+ * Public API surface is intentionally preserved from the GIS implementation
+ * to minimize downstream changes.
  */
 
-// GIS type declarations (minimal — we only use what we need)
-interface TokenClient {
-  requestAccessToken(options?: { prompt?: string }): void;
-}
+import { generateCodeVerifier, generateCodeChallenge } from './pkce';
+import { exchangeCodeForTokens, refreshAccessToken } from './oauthProxy';
+import {
+  storeGoogleRefreshToken,
+  getGoogleRefreshToken,
+  clearGoogleRefreshToken,
+} from '@/services/sync/fileHandleStore';
 
-interface TokenResponse {
-  access_token: string;
-  expires_in: number;
-  error?: string;
-  error_description?: string;
-}
-
-interface GoogleOAuth2 {
-  initTokenClient(config: {
-    client_id: string;
-    scope: string;
-    callback: (response: TokenResponse) => void;
-    error_callback?: (error: { type: string; message?: string }) => void;
-  }): TokenClient;
-  revoke(token: string, callback?: () => void): void;
-}
-
-declare global {
-  interface Window {
-    google?: {
-      accounts?: {
-        oauth2?: GoogleOAuth2;
-      };
-    };
-  }
-}
-
-const GIS_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
 const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
-const SESSION_TOKEN_KEY = 'gis_token';
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
-// In-memory token state (hydrated from sessionStorage on load)
+// In-memory token state
 let accessToken: string | null = null;
 let expiresAt: number = 0;
-let tokenClient: TokenClient | null = null;
+let refreshToken: string | null = null;
+let currentFamilyId: string | null = null;
 
-// Cached Google account email (fetched after OAuth, cleared on revoke)
+// Cached Google account email
 let cachedEmail: string | null = null;
-
-// Restore token from localStorage on module load
-try {
-  const cached = localStorage.getItem(SESSION_TOKEN_KEY);
-  if (cached) {
-    const { token, expires } = JSON.parse(cached) as { token: string; expires: number };
-    if (token && expires > Date.now()) {
-      accessToken = token;
-      expiresAt = expires;
-      // Schedule expiry warning for remaining lifetime
-      const remainingSec = Math.floor((expires - Date.now()) / 1000);
-      scheduleExpiryWarning(remainingSec);
-    } else {
-      localStorage.removeItem(SESSION_TOKEN_KEY);
-    }
-  }
-} catch {
-  // Ignore parse errors — start fresh
-}
 
 // Expiry callbacks
 type ExpiryCallback = () => void;
 const expiryCallbacks: ExpiryCallback[] = [];
-let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Check if Google Drive integration is configured (client ID set in env)
@@ -89,44 +49,39 @@ function getClientId(): string {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 }
 
-/**
- * Load the Google Identity Services script dynamically.
- * No-ops if already loaded.
- */
-export async function loadGIS(): Promise<void> {
-  if (window.google?.accounts?.oauth2) {
-    return; // Already loaded
-  }
-
-  return new Promise((resolve, reject) => {
-    // Check if script tag already exists
-    const existing = document.querySelector(`script[src="${GIS_SCRIPT_URL}"]`);
-    if (existing) {
-      // Script is loading — wait for it
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () =>
-        reject(new Error('Failed to load Google Identity Services'))
-      );
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = GIS_SCRIPT_URL;
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Google Identity Services'));
-    document.head.appendChild(script);
-  });
+function getRedirectUri(): string {
+  return `${window.location.origin}/oauth/callback`;
 }
 
 /**
- * Request an OAuth access token. Shows Google sign-in prompt if needed.
- * Must be called after loadGIS().
- * Returns the access token or throws on error/cancel.
+ * Initialize auth for a family — loads stored refresh token from IndexedDB.
+ * Call this once after login, before any Drive operations.
+ */
+export async function initializeAuth(familyId: string): Promise<void> {
+  currentFamilyId = familyId;
+  const stored = await getGoogleRefreshToken(familyId);
+  if (stored) {
+    refreshToken = stored;
+    console.warn('[googleAuth] Loaded refresh token for family', familyId);
+  }
+}
+
+/**
+ * Backward compatibility — no-op. Previously loaded the GIS script.
+ * Consumers can safely call this; it does nothing in the PKCE flow.
+ */
+export async function loadGIS(): Promise<void> {
+  // No-op — PKCE does not require external scripts
+}
+
+/**
+ * Request an OAuth access token via PKCE popup flow.
  *
- * @param options.forceConsent - When true, clears cached token and forces the
- *   Google account chooser (prompt: 'consent'). Use when loading a different
- *   file to let the user pick a different Google account.
+ * If a valid token exists, returns it immediately.
+ * If a refresh token is available, tries silent refresh first.
+ * Otherwise, opens the Google consent popup.
+ *
+ * @param options.forceConsent - Force the account chooser / consent screen.
  */
 export async function requestAccessToken(options?: { forceConsent?: boolean }): Promise<string> {
   const clientId = getClientId();
@@ -136,59 +91,57 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
     );
   }
 
-  if (!window.google?.accounts?.oauth2) {
-    throw new Error('Google Identity Services not loaded. Call loadGIS() first.');
-  }
-
   // If forcing consent, clear existing token so we don't short-circuit
   if (options?.forceConsent) {
     clearTokenState();
   }
 
-  // If we have a valid token, return it
+  // Return cached token if still valid
   if (isTokenValid()) {
-    console.warn('[googleAuth] Using cached valid token');
     return accessToken!;
   }
 
-  console.warn(`[googleAuth] Requesting access token (forceConsent=${!!options?.forceConsent})`);
+  // Try silent refresh first (if we have a refresh token)
+  if (refreshToken) {
+    const silentToken = await attemptSilentRefresh();
+    if (silentToken) return silentToken;
+  }
 
-  return new Promise((resolve, reject) => {
-    tokenClient = window.google!.accounts!.oauth2!.initTokenClient({
-      client_id: clientId,
-      scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
-      callback: (response: TokenResponse) => {
-        if (response.error) {
-          console.warn(`[googleAuth] Token request error: ${response.error}`);
-          reject(new Error(response.error_description ?? response.error));
-          return;
-        }
+  // Full popup auth flow
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-        accessToken = response.access_token;
-        expiresAt = Date.now() + response.expires_in * 1000;
-        console.warn(`[googleAuth] Token acquired, expires in ${response.expires_in}s`);
+  const prompt = options?.forceConsent ? 'consent' : 'consent';
+  const authUrl = buildAuthUrl(clientId, codeChallenge, prompt);
+  const code = await openAuthPopup(authUrl);
 
-        // Cache in localStorage so it survives page refreshes and tab close
-        persistToken();
-
-        // Schedule expiry warning (5 min before expiry)
-        scheduleExpiryWarning(response.expires_in);
-
-        // Fire-and-forget: fetch account email for display purposes
-        fetchGoogleUserEmail(response.access_token).catch(() => {});
-
-        resolve(response.access_token);
-      },
-      error_callback: (error) => {
-        console.warn(`[googleAuth] Token error callback: ${error.message ?? error.type}`);
-        reject(new Error(error.message ?? 'Google sign-in failed'));
-      },
-    });
-
-    // Force consent prompt to show account chooser, or try silent auth
-    const prompt = options?.forceConsent ? 'consent' : '';
-    tokenClient.requestAccessToken({ prompt });
+  const tokens = await exchangeCodeForTokens({
+    code,
+    codeVerifier,
+    redirectUri: getRedirectUri(),
+    clientId,
   });
+
+  // Update in-memory state
+  accessToken = tokens.access_token;
+  expiresAt = Date.now() + tokens.expires_in * 1000;
+
+  // Store refresh token if provided (Google only sends it on first consent)
+  if (tokens.refresh_token) {
+    refreshToken = tokens.refresh_token;
+    if (currentFamilyId) {
+      await storeGoogleRefreshToken(currentFamilyId, tokens.refresh_token);
+    }
+  }
+
+  // Schedule auto-refresh
+  scheduleAutoRefresh(tokens.expires_in);
+
+  // Fire-and-forget: fetch account email
+  fetchGoogleUserEmail(tokens.access_token).catch(() => {});
+
+  console.warn(`[googleAuth] Token acquired via PKCE, expires in ${tokens.expires_in}s`);
+  return tokens.access_token;
 }
 
 /**
@@ -206,51 +159,45 @@ export function getAccessToken(): string | null {
 }
 
 /**
- * Attempt a silent token refresh (no popup).
- * Uses GIS `requestAccessToken({ prompt: '' })` which succeeds when the
- * Google session is still active (cookie alive). Returns the new token
- * on success, or `null` if interactive auth is required.
- *
- * Wrapped in a 5-second timeout — silent auth that hangs is treated as failure.
+ * Attempt a silent token refresh using the stored refresh token.
+ * Returns the new access token on success, or null if interactive auth is required.
  */
 export async function attemptSilentRefresh(): Promise<string | null> {
   const clientId = getClientId();
-  if (!clientId || !window.google?.accounts?.oauth2) return null;
+  if (!clientId || !refreshToken) return null;
 
   try {
     console.warn('[googleAuth] Attempting silent token refresh...');
-    const token = await Promise.race([
-      new Promise<string>((resolve, reject) => {
-        const client = window.google!.accounts!.oauth2!.initTokenClient({
-          client_id: clientId,
-          scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
-          callback: (response: TokenResponse) => {
-            if (response.error) {
-              reject(new Error(response.error_description ?? response.error));
-              return;
-            }
-            // Update in-memory state
-            accessToken = response.access_token;
-            expiresAt = Date.now() + response.expires_in * 1000;
-            persistToken();
-            scheduleExpiryWarning(response.expires_in);
-            fetchGoogleUserEmail(response.access_token).catch(() => {});
-            resolve(response.access_token);
-          },
-          error_callback: (error) => {
-            reject(new Error(error.message ?? 'Silent refresh failed'));
-          },
-        });
-        client.requestAccessToken({ prompt: '' });
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Silent refresh timeout')), 5000)
-      ),
-    ]);
+    const tokens = await refreshAccessToken({
+      refreshToken,
+      clientId,
+    });
+
+    accessToken = tokens.access_token;
+    expiresAt = Date.now() + tokens.expires_in * 1000;
+
+    // Schedule next auto-refresh
+    scheduleAutoRefresh(tokens.expires_in);
+
+    // Fetch email if not cached
+    fetchGoogleUserEmail(tokens.access_token).catch(() => {});
+
     console.warn('[googleAuth] Silent refresh succeeded');
-    return token;
-  } catch {
-    console.warn('[googleAuth] Silent refresh failed');
+    return tokens.access_token;
+  } catch (e) {
+    console.warn('[googleAuth] Silent refresh failed:', (e as Error).message);
+
+    // If the refresh token is revoked/invalid, clear it
+    if (
+      (e as Error).message.includes('invalid_grant') ||
+      (e as Error).message.includes('Token has been expired or revoked')
+    ) {
+      refreshToken = null;
+      if (currentFamilyId) {
+        await clearGoogleRefreshToken(currentFamilyId);
+      }
+    }
+
     return null;
   }
 }
@@ -271,19 +218,29 @@ export async function getValidToken(): Promise<string> {
 }
 
 /**
- * Revoke the current access token and clear state.
+ * Revoke the current tokens and clear all state.
  */
-export function revokeToken(): void {
-  if (accessToken && window.google?.accounts?.oauth2) {
-    window.google.accounts.oauth2.revoke(accessToken, () => {
-      // Revocation complete
-    });
+export async function revokeToken(): Promise<void> {
+  // Revoke access token via Google's endpoint
+  if (accessToken) {
+    try {
+      await fetch(`${GOOGLE_REVOKE_URL}?token=${accessToken}`, { method: 'POST' });
+    } catch {
+      // Best-effort revocation
+    }
   }
+
+  // Clear stored refresh token
+  if (currentFamilyId) {
+    await clearGoogleRefreshToken(currentFamilyId);
+  }
+
   clearTokenState();
 }
 
 /**
- * Register a callback to be notified when the token is about to expire.
+ * Register a callback to be notified when the token is about to expire
+ * and automatic refresh has failed.
  * Returns an unsubscribe function.
  */
 export function onTokenExpired(callback: ExpiryCallback): () => void {
@@ -299,48 +256,113 @@ export function onTokenExpired(callback: ExpiryCallback): () => void {
 function clearTokenState(): void {
   accessToken = null;
   expiresAt = 0;
-  tokenClient = null;
+  refreshToken = null;
   cachedEmail = null;
+
+  // Clean up legacy localStorage token (from GIS flow)
   try {
-    localStorage.removeItem(SESSION_TOKEN_KEY);
+    localStorage.removeItem('gis_token');
   } catch {
-    // Ignore — localStorage may not be available
+    // Ignore
   }
-  if (expiryTimer) {
-    clearTimeout(expiryTimer);
-    expiryTimer = null;
+
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+    refreshTimer = null;
   }
 }
 
-function persistToken(): void {
-  if (!accessToken || !expiresAt) return;
-  try {
-    localStorage.setItem(
-      SESSION_TOKEN_KEY,
-      JSON.stringify({ token: accessToken, expires: expiresAt })
-    );
-  } catch {
-    // Ignore — localStorage may not be available (private browsing, etc.)
-  }
+function buildAuthUrl(clientId: string, codeChallenge: string, prompt: string): string {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: getRedirectUri(),
+    response_type: 'code',
+    scope: `${DRIVE_FILE_SCOPE} ${USERINFO_EMAIL_SCOPE}`,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+    access_type: 'offline',
+    prompt,
+  });
+  return `${GOOGLE_AUTH_URL}?${params.toString()}`;
 }
 
-function scheduleExpiryWarning(expiresInSeconds: number): void {
-  if (expiryTimer) {
-    clearTimeout(expiryTimer);
-  }
+/**
+ * Open a centered popup for Google OAuth and wait for the auth code.
+ * Returns the authorization code received via postMessage from the callback page.
+ */
+function openAuthPopup(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    const features = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
 
-  // Fire 5 minutes before expiry, or immediately if less than 5 min remaining
-  const warningMs = Math.max(0, (expiresInSeconds - 300) * 1000);
+    const popup = window.open(url, 'beanies-oauth', features);
 
-  expiryTimer = setTimeout(async () => {
-    // Try silent refresh before notifying subscribers
-    const refreshed = await attemptSilentRefresh();
-    if (refreshed) {
-      // Silent refresh succeeded — no need to bother the user
+    if (!popup) {
+      reject(new Error('Popup blocked — please allow popups for this site'));
       return;
     }
 
-    // Silent refresh failed — fire expiry callbacks (e.g., show reconnect toast)
+    // Non-null reference for closures (popup is confirmed non-null above)
+    const win = popup;
+
+    // Listen for the callback message
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'oauth-callback') return;
+
+      cleanup();
+
+      if (event.data.error) {
+        reject(new Error(event.data.error));
+        return;
+      }
+
+      if (event.data.code) {
+        resolve(event.data.code);
+        return;
+      }
+
+      reject(new Error('No authorization code received'));
+    }
+
+    // Poll for popup close (user closed it without completing)
+    const pollTimer = setInterval(() => {
+      if (win.closed) {
+        cleanup();
+        reject(new Error('Authentication cancelled'));
+      }
+    }, 500);
+
+    function cleanup() {
+      window.removeEventListener('message', onMessage);
+      clearInterval(pollTimer);
+      if (!win.closed) win.close();
+    }
+
+    window.addEventListener('message', onMessage);
+  });
+}
+
+/**
+ * Schedule automatic token refresh 5 minutes before expiry.
+ * On failure, fires expiry callbacks as fallback (e.g., show reconnect toast).
+ */
+function scheduleAutoRefresh(expiresInSeconds: number): void {
+  if (refreshTimer) {
+    clearTimeout(refreshTimer);
+  }
+
+  // Refresh 5 minutes before expiry, or immediately if less than 5 min remaining
+  const refreshMs = Math.max(0, (expiresInSeconds - 300) * 1000);
+
+  refreshTimer = setTimeout(async () => {
+    const refreshed = await attemptSilentRefresh();
+    if (refreshed) return;
+
+    // Silent refresh failed — notify subscribers (e.g., show reconnect toast)
     expiryCallbacks.forEach((cb) => {
       try {
         cb();
@@ -348,7 +370,7 @@ function scheduleExpiryWarning(expiresInSeconds: number): void {
         console.warn('[googleAuth] Expiry callback error:', e);
       }
     });
-  }, warningMs);
+  }, refreshMs);
 }
 
 /**

@@ -87,8 +87,8 @@ describe('Multi-Family Database Isolation', () => {
   });
 
   it('should use different database names for different families', () => {
-    expect(getFamilyDatabaseName('family-aaa')).toBe('gp-family-finance-family-aaa');
-    expect(getFamilyDatabaseName('family-bbb')).toBe('gp-family-finance-family-bbb');
+    expect(getFamilyDatabaseName('family-aaa')).toBe('beanies-data-family-aaa');
+    expect(getFamilyDatabaseName('family-bbb')).toBe('beanies-data-family-bbb');
     expect(getFamilyDatabaseName('family-aaa')).not.toBe(getFamilyDatabaseName('family-bbb'));
   });
 

@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
-import { requestAccessToken, loadGIS } from '@/services/google/googleAuth';
+import { requestAccessToken } from '@/services/google/googleAuth';
 import { exportToFile } from '@/services/sync/fileSync';
 
 const props = defineProps<{
@@ -24,7 +24,6 @@ const emit = defineEmits<{
 async function handleReconnect() {
   isReconnecting.value = true;
   try {
-    await loadGIS();
     await requestAccessToken();
     emit('reconnected');
   } catch {

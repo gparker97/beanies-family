@@ -13,7 +13,7 @@ Use a **local-first architecture** where all data is stored client-side in the b
 
 ### Implementation Details
 
-- **Database**: `gp-family-finance` (IndexedDB, currently version 3)
+- **Database**: `beanies-data-{familyId}` (IndexedDB, version 6)
 - **Library**: Uses the `idb` library for typed IndexedDB access (`src/services/indexeddb/database.ts`)
 - **Repository pattern**: Each entity type has its own repository module in `src/services/indexeddb/repositories/`
 - **Data flow**: Vue components → Pinia stores → IndexedDB repositories
