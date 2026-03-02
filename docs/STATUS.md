@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-02
-> **Updated by:** Claude (Family key encryption #111, OAuth PKCE plan #112)
+> **Updated by:** Claude (OAuth PKCE migration #112 — implemented & deployed)
 
 ## Current Phase
 
@@ -20,7 +20,9 @@
 - Unit test infrastructure (Vitest with happy-dom)
 - Linting (ESLint + Prettier + Stylelint + Husky pre-commit hooks)
 - File-based sync via File System Access API (with encryption support)
-- Google Drive cloud storage integration (StorageProvider abstraction, OAuth via GIS, Drive REST API, offline queue, file picker, reconnect toast) — ADR-016
+- Google Drive cloud storage integration (StorageProvider abstraction, OAuth PKCE with Lambda proxy, Drive REST API, offline queue, file picker, reconnect toast) — ADR-016, #112
+- OAuth Lambda proxy (`beanies-family-oauth-prod`) — stateless token exchange & refresh at `api.beanies.family/oauth/google/*`, keeps client_secret server-side
+- IndexedDB naming convention: `beanies-data-{familyId}`, `beanies-registry`, `beanies-file-handles` (migrated from `gp-finance-*`)
 - Cross-device sync hardening: record-level merge (v3.0 file format), deletion tombstones, 6 sync bug fixes — ADR-017
 - Exchange rate auto-fetching from free currency API
 - Recurring transaction processor (daily/monthly/yearly)
@@ -611,11 +613,11 @@ Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + 
 
 - [x] #110 — Automerge CRDT document service and repository factory
 - [x] #111 — Family key encryption, wrapping, and invite link service (PR #121)
-- [ ] #112 — Google Drive OAuth PKCE migration (replaces GIS implicit grant) — plan committed on `feat/112-oauth-pkce`, implementation next
+- [x] #112 — Google Drive OAuth PKCE migration (replaces GIS implicit grant) — PR #122, deployed to prod
 
 **Phase 2 — Core Migration:**
 
-- [ ] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal, `gp-` → `beanies-` DB rename
+- [ ] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal (note: `gp-` → `beanies-` DB rename already completed in #112)
 
 **Phase 3 — Auth & UI:**
 
@@ -742,7 +744,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 
 - [ ] Data import/export (CSV, etc.)
 - [x] PWA offline support / install prompt / SW update prompt (#6) ✓
-- [x] Google Drive sync (OAuth integration) — #78, ADR-016 (being upgraded to OAuth PKCE in #112)
+- [x] Google Drive sync (OAuth PKCE + Lambda proxy) — #78, #112, ADR-016
 - [ ] Skip/modify individual recurring occurrences
 - [ ] Landing/marketing page (#72)
 
