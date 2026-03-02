@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { requestAccessToken, loadGIS } from '@/services/google/googleAuth';
+import { requestAccessToken } from '@/services/google/googleAuth';
 
 const { t } = useTranslation();
 const isReconnecting = ref(false);
@@ -15,7 +15,6 @@ async function handleReconnect() {
   isReconnecting.value = true;
   reconnectError.value = false;
   try {
-    await loadGIS();
     await requestAccessToken();
     emit('reconnected');
   } catch {

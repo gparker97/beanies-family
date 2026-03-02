@@ -15,8 +15,8 @@ import type {
   DeletionTombstone,
 } from '@/types/models';
 
-const LEGACY_DB_NAME = 'gp-family-finance';
-const DB_NAME_PREFIX = 'gp-family-finance-';
+const LEGACY_DB_NAME = 'beanies-data';
+const DB_NAME_PREFIX = 'beanies-data-';
 const DB_VERSION = 6;
 
 export interface FinanceDB extends DBSchema {
@@ -228,7 +228,7 @@ export async function getDatabase(): Promise<IDBPDatabase<FinanceDB>> {
 }
 
 /**
- * Open the legacy database (pre-migration `gp-family-finance`).
+ * Open the legacy database (pre-migration `beanies-data`).
  * Used only during migration.
  */
 export async function getLegacyDatabase(): Promise<IDBPDatabase<FinanceDB>> {

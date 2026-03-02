@@ -15,7 +15,6 @@ import {
   getValidToken,
   isTokenValid,
   revokeToken,
-  loadGIS,
   requestAccessToken,
   attemptSilentRefresh,
   fetchGoogleUserEmail,
@@ -136,7 +135,6 @@ export class GoogleDriveProvider implements StorageProvider {
    */
   async requestAccess(): Promise<boolean> {
     try {
-      await loadGIS();
       await requestAccessToken();
       return true;
     } catch {
@@ -204,7 +202,6 @@ export class GoogleDriveProvider implements StorageProvider {
    * Authenticates, creates/finds the app folder, and creates the file.
    */
   static async createNew(fileName: string): Promise<GoogleDriveProvider> {
-    await loadGIS();
     const token = await requestAccessToken();
 
     // Capture account email (best-effort, non-blocking for provider creation)

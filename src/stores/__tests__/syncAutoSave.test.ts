@@ -254,10 +254,12 @@ vi.mock('@/services/sync/fileHandleStore', () => ({
   clearProviderConfig: vi.fn(async () => {}),
 }));
 vi.mock('@/services/google/googleAuth', () => ({
-  loadGIS: vi.fn(async () => {}),
+  initializeAuth: vi.fn(async () => {}),
   requestAccessToken: vi.fn(async () => 'mock-token'),
   onTokenExpired: vi.fn(() => () => {}),
-  revokeToken: vi.fn(),
+  revokeToken: vi.fn(async () => {}),
+  isTokenValid: vi.fn(() => false),
+  fetchGoogleUserEmail: vi.fn(async () => null),
 }));
 vi.mock('@/services/google/driveService', () => ({
   getOrCreateAppFolder: vi.fn(async () => 'folder-id'),

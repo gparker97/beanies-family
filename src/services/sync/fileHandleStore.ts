@@ -2,7 +2,7 @@ import { openDB, type IDBPDatabase } from 'idb';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import type { StorageProviderType } from './storageProvider';
 
-const HANDLE_DB_NAME = 'gp-finance-file-handles';
+const HANDLE_DB_NAME = 'beanies-file-handles';
 const HANDLE_DB_VERSION = 1;
 const HANDLE_STORE = 'handles';
 const LEGACY_SYNC_FILE_KEY = 'syncFile';
@@ -187,4 +187,42 @@ export async function getProviderConfig(familyId: string): Promise<PersistedProv
 export async function clearProviderConfig(familyId: string): Promise<void> {
   const db = await getHandleDatabase();
   await db.delete(HANDLE_STORE, `providerConfig-${familyId}`);
+}
+
+// --- Google OAuth refresh token persistence ---
+
+/**
+ * Store a Google OAuth refresh token for a family.
+ */
+export async function storeGoogleRefreshToken(
+  familyId: string,
+  refreshToken: string
+): Promise<void> {
+  const db = await getHandleDatabase();
+  await db.put(
+    HANDLE_STORE,
+    refreshToken as unknown as FileSystemFileHandle,
+    `googleRefreshToken-${familyId}`
+  );
+}
+
+/**
+ * Retrieve the stored Google OAuth refresh token for a family.
+ */
+export async function getGoogleRefreshToken(familyId: string): Promise<string | null> {
+  try {
+    const db = await getHandleDatabase();
+    const token = await db.get(HANDLE_STORE, `googleRefreshToken-${familyId}`);
+    return typeof token === 'string' ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear the stored Google OAuth refresh token for a family.
+ */
+export async function clearGoogleRefreshToken(familyId: string): Promise<void> {
+  const db = await getHandleDatabase();
+  await db.delete(HANDLE_STORE, `googleRefreshToken-${familyId}`);
 }

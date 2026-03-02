@@ -105,6 +105,12 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.settings', requiresAuth: true },
   },
   {
+    path: '/oauth/callback',
+    name: 'OAuthCallback',
+    component: () => import('@/pages/OAuthCallbackPage.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),

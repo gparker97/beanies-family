@@ -5,7 +5,7 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
  * E2E tests for Google Drive cloud storage integration.
  *
  * Uses Playwright route interception to mock:
- * - Google Identity Services (GIS) OAuth script
+ * - OAuth Lambda proxy endpoints (token exchange & refresh)
  * - Google Drive REST API endpoints
  *
  * These tests verify the mock API infrastructure works correctly,
@@ -16,6 +16,8 @@ const MOCK_ACCESS_TOKEN = 'mock-e2e-access-token';
 const MOCK_FOLDER_ID = 'mock-app-folder-id';
 const MOCK_FILE_ID = 'mock-beanpod-file-id';
 const MOCK_FILE_NAME = 'test-family.beanpod';
+
+const MOCK_REFRESH_TOKEN = 'mock-e2e-refresh-token';
 
 const MOCK_BEANPOD_CONTENT = JSON.stringify({
   version: '2.0',
@@ -56,33 +58,40 @@ const MOCK_BEANPOD_CONTENT = JSON.stringify({
   },
 });
 
-const MOCK_GIS_SCRIPT = `
-  window.google = window.google || {};
-  window.google.accounts = window.google.accounts || {};
-  window.google.accounts.oauth2 = {
-    initTokenClient: function(config) {
-      return {
-        requestAccessToken: function(opts) {
-          setTimeout(function() {
-            config.callback({
-              access_token: '${MOCK_ACCESS_TOKEN}',
-              expires_in: 3600,
-            });
-          }, 50);
-        }
-      };
-    },
-    revoke: function(token, cb) { if (cb) cb(); }
-  };
-`;
-
 async function mockGoogleAPIs(page: Page) {
-  // Mock GIS script
-  await page.route(/accounts\.google\.com\/gsi\/client/, async (route: Route) => {
+  // Mock OAuth Lambda token exchange endpoint
+  await page.route(/\/oauth\/google\/token/, async (route: Route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fulfill({ status: 405, body: JSON.stringify({ error: 'Method not allowed' }) });
+      return;
+    }
     await route.fulfill({
       status: 200,
-      contentType: 'text/javascript',
-      body: MOCK_GIS_SCRIPT,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        access_token: MOCK_ACCESS_TOKEN,
+        refresh_token: MOCK_REFRESH_TOKEN,
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'drive.file userinfo.email',
+      }),
+    });
+  });
+
+  // Mock OAuth Lambda token refresh endpoint
+  await page.route(/\/oauth\/google\/refresh/, async (route: Route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fulfill({ status: 405, body: JSON.stringify({ error: 'Method not allowed' }) });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        access_token: MOCK_ACCESS_TOKEN,
+        expires_in: 3600,
+        token_type: 'Bearer',
+      }),
     });
   });
 
@@ -220,29 +229,46 @@ test.describe('Google Drive Sync', () => {
     await expect(page.getByText('Google Drive').first()).toBeVisible();
   });
 
-  test('GIS mock script loads and returns access token', async ({ page }) => {
+  test('OAuth mock exchanges code for tokens', async ({ page }) => {
     await page.goto('/');
 
-    const token = await page.evaluate(async () => {
-      await new Promise<void>((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error('GIS load failed'));
-        document.head.appendChild(script);
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/oauth/google/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: 'test-auth-code',
+          code_verifier: 'test-verifier',
+          redirect_uri: 'http://localhost:5173/oauth/callback',
+          client_id: 'test-client-id',
+        }),
       });
-
-      return new Promise<string>((resolve) => {
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: 'test-id',
-          scope: 'https://www.googleapis.com/auth/drive.file',
-          callback: (resp: any) => resolve(resp.access_token),
-        });
-        client.requestAccessToken();
-      });
+      return res.json();
     });
 
-    expect(token).toBe(MOCK_ACCESS_TOKEN);
+    expect(result.access_token).toBe(MOCK_ACCESS_TOKEN);
+    expect(result.refresh_token).toBe(MOCK_REFRESH_TOKEN);
+    expect(result.expires_in).toBe(3600);
+  });
+
+  test('OAuth mock refreshes access token', async ({ page }) => {
+    await page.goto('/');
+
+    const result = await page.evaluate(async () => {
+      const res = await fetch('/oauth/google/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          refresh_token: 'test-refresh-token',
+          client_id: 'test-client-id',
+        }),
+      });
+      return res.json();
+    });
+
+    expect(result.access_token).toBe(MOCK_ACCESS_TOKEN);
+    expect(result.expires_in).toBe(3600);
+    expect(result.refresh_token).toBeUndefined();
   });
 
   test('Drive mock returns folder search results', async ({ page }) => {

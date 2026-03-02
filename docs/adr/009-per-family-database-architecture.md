@@ -18,7 +18,7 @@ Use **per-family IndexedDB databases** with a shared **registry database**.
 
 ### Registry Database
 
-- **Name:** `gp-finance-registry`
+- **Name:** `beanies-registry`
 - **Implementation:** `src/services/indexeddb/registryDatabase.ts`
 - **Stores:**
   - `families` — Family entities (`id`, `name`, `createdAt`, `updatedAt`)
@@ -28,8 +28,8 @@ Use **per-family IndexedDB databases** with a shared **registry database**.
 
 ### Per-Family Databases
 
-- **Name pattern:** `gp-family-finance-{familyId}`
-- **Schema:** Identical to the original `gp-family-finance` database (version 3)
+- **Name pattern:** `beanies-data-{familyId}`
+- **Schema:** Version 6, all entity stores
 - **Stores:** familyMembers, accounts, transactions, assets, goals, recurringItems, settings, syncQueue, translations
 
 ### Key Implementation Details
@@ -53,7 +53,7 @@ Use **per-family IndexedDB databases** with a shared **registry database**.
 
 ### Legacy Migration
 
-- `src/services/migration/legacyMigration.ts` detects the old `gp-family-finance` database.
+- `src/services/migration/legacyMigration.ts` detects legacy databases (`gp-family-finance`, etc.).
 - Migration creates a default family, copies all data to a new per-family DB, extracts global settings to the registry, and marks the old DB as migrated.
 - Existing users experience zero disruption — migration is automatic on first launch.
 

@@ -104,7 +104,7 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 
 ### Per-Family Databases
 
-Each family gets its own IndexedDB: `gp-family-finance-{familyId}` (version 3). This provides clean tenant isolation — no `familyId` columns needed on records.
+Each family gets its own IndexedDB: `beanies-data-{familyId}` (version 6). This provides clean tenant isolation — no `familyId` columns needed on records.
 
 | Object Store   | Key         | Indexes                            |
 | -------------- | ----------- | ---------------------------------- |
@@ -120,7 +120,7 @@ Each family gets its own IndexedDB: `gp-family-finance-{familyId}` (version 3). 
 
 ### Registry Database
 
-A shared `gp-finance-registry` database stores cross-family metadata:
+A shared `beanies-registry` database stores cross-family metadata:
 
 | Object Store       | Purpose                                                          |
 | ------------------ | ---------------------------------------------------------------- |
@@ -131,7 +131,7 @@ A shared `gp-finance-registry` database stores cross-family metadata:
 
 ### File Handle Database
 
-`gp-finance-file-handles` (version 1) stores File System Access API handles per family using `syncFile-{familyId}` keys.
+`beanies-file-handles` (version 1) stores File System Access API handles per family using `syncFile-{familyId}` keys. Also stores Google OAuth refresh tokens (`googleRefreshToken-{familyId}`) and provider config (`providerConfig-{familyId}`).
 
 ## Entity Relationships
 

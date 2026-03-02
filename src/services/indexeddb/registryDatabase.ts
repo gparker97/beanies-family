@@ -6,7 +6,7 @@ import type {
   PasskeyRegistration,
 } from '@/types/models';
 
-const REGISTRY_DB_NAME = 'gp-finance-registry';
+const REGISTRY_DB_NAME = 'beanies-registry';
 const REGISTRY_DB_VERSION = 3;
 
 export interface RegistryDB extends DBSchema {
