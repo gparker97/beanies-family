@@ -108,20 +108,27 @@ These specific elements may use custom sizes for decorative purposes:
 
 ## Text Casing Standard
 
-All user-visible text follows a consistent casing convention:
+`uiStrings.ts` uses a dual-value system — every entry has an `en` value (standard English) and a `beanie` value (cosmetic overlay):
 
-| Category | Rule | Example |
-|----------|------|---------|
-| **Page headers** (AppHeader) | all lowercase | `family planner`, `good evening, greg` |
-| **Section titles, sidebar headers, form labels** | source lowercase, CSS `uppercase` | stored as `the treehouse`, displayed as `THE TREEHOUSE` |
-| **Non-sentence text** (buttons, chips, labels, nav items, short descriptions — no period) | all lowercase | `add member`, `weekly`, `save` |
-| **Full sentences** (with period/complete thought) | sentence case | `No transactions yet. Add one to get started.` |
+| Layer | Rule | Example |
+|-------|------|---------|
+| **`en` (English)** | Title Case for labels/headers, Sentence case for sentences | `en: 'Family Planner'`, `en: 'No transactions yet.'` |
+| **`beanie` (Beanie mode)** | All lowercase — the casual personality layer | `beanie: 'our plans 📅'`, `beanie: 'no transactions yet.'` |
 
-**Rule of thumb:** if it has no period, it's lowercase.
+### Rules by category
 
-- Strings in `uiStrings.ts` store the lowercase value; CSS `uppercase` handles visual uppercasing where needed
-- Greeting strings are lowercase: `good morning,`, `good afternoon,`, `good evening,`
-- Beanie overrides follow the same rules
+| Category | `en` value | `beanie` value |
+|----------|-----------|----------------|
+| **Page headers** (AppHeader) | Title Case | all lowercase |
+| **Nav items** | Title Case | lowercase + emoji |
+| **Section titles, form labels** | Title Case (CSS `uppercase` for display) | all lowercase |
+| **Non-sentence text** (buttons, chips, labels) | Title Case | all lowercase |
+| **Full sentences** | Sentence case | all lowercase |
+
+- Every entry in `uiStrings.ts` must have both `en` and `beanie` values
+- Brand constants (`app.name`, `app.tagline`, `app.version`) are exceptions — no beanie value needed
+- Greeting strings: `en: 'Good evening,'` / `beanie: 'good evening,'`
+- CSS `uppercase` handles visual uppercasing for section headers and form labels
 
 ---
 
