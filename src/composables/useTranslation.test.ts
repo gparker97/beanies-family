@@ -33,7 +33,7 @@ describe('translationStore beanie mode', () => {
     // currentLanguage defaults to 'en'
 
     expect(store.t('dashboard.netWorth')).toBe(UI_STRINGS['dashboard.netWorth']);
-    expect(store.t('dashboard.netWorth')).toBe('family net worth');
+    expect(store.t('dashboard.netWorth')).toBe('Family Net Worth');
   });
 
   it('t(key) returns beanie string when beanieMode=true, language="en", key has override', () => {
@@ -63,7 +63,7 @@ describe('translationStore beanie mode', () => {
     // NOT beanie strings — this is the critical constraint
     const result = store.t('dashboard.netWorth');
     expect(result).toBe(UI_STRINGS['dashboard.netWorth']);
-    expect(result).toBe('family net worth');
+    expect(result).toBe('Family Net Worth');
     expect(result).not.toBe(BEANIE_STRINGS['dashboard.netWorth']);
   });
 
@@ -81,7 +81,7 @@ describe('translationStore beanie mode', () => {
 
     // Start with beanie mode off
     store.setBeanieMode(false);
-    expect(store.t('dashboard.netWorth')).toBe('family net worth');
+    expect(store.t('dashboard.netWorth')).toBe('Family Net Worth');
 
     // Enable beanie mode
     store.setBeanieMode(true);
@@ -89,7 +89,7 @@ describe('translationStore beanie mode', () => {
 
     // Disable beanie mode
     store.setBeanieMode(false);
-    expect(store.t('dashboard.netWorth')).toBe('family net worth');
+    expect(store.t('dashboard.netWorth')).toBe('Family Net Worth');
   });
 
   it('beanieMode defaults to false', () => {
