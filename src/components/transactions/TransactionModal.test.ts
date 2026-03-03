@@ -366,6 +366,247 @@ describe('TransactionModal — Save Flow', () => {
     });
   });
 
+  describe('One-time to recurring conversion', () => {
+    const existingTransaction: Transaction = {
+      id: 'txn-convert',
+      accountId: 'account-1',
+      type: 'expense',
+      amount: 75,
+      currency: 'USD',
+      category: 'food',
+      date: '2026-03-15',
+      description: 'Weekly groceries',
+      isReconciled: false,
+      createdAt: '2026-03-15T00:00:00.000Z',
+      updatedAt: '2026-03-15T00:00:00.000Z',
+    };
+
+    it('should emit save-recurring when editing one-time and switching to recurring', async () => {
+      const wrapper = await mountAndOpen({ transaction: existingTransaction });
+
+      // Switch to recurring mode
+      wrapper.vm.recurrenceMode = 'recurring';
+      wrapper.vm.recurrenceFrequency = 'monthly';
+      wrapper.vm.dayOfMonth = 15;
+      await nextTick();
+
+      wrapper.vm.handleSave();
+      await nextTick();
+
+      const recurringEvents = wrapper.emitted('save-recurring');
+      expect(recurringEvents).toBeTruthy();
+      expect(recurringEvents).toHaveLength(1);
+
+      const payload = recurringEvents![0][0] as CreateRecurringItemInput;
+      expect(payload.accountId).toBe('account-1');
+      expect(payload.description).toBe('Weekly groceries');
+      expect(payload.amount).toBe(75);
+      expect(payload.type).toBe('expense');
+      expect(payload.frequency).toBe('monthly');
+      expect(payload.dayOfMonth).toBe(15);
+      expect(payload.isActive).toBe(true);
+
+      // Must NOT emit save (transaction save)
+      expect(wrapper.emitted('save')).toBeFalsy();
+    });
+
+    it('should initialize dayOfMonth from transaction date when editing', async () => {
+      const wrapper = await mountAndOpen({ transaction: existingTransaction });
+
+      // dayOfMonth should be initialized from the transaction date (March 15)
+      expect(wrapper.vm.dayOfMonth).toBe(15);
+      expect(wrapper.vm.startDate).toBe('2026-03-15');
+      expect(wrapper.vm.recurrenceFrequency).toBe('monthly');
+    });
+
+    it('should initialize monthOfYear from transaction date when editing', async () => {
+      const wrapper = await mountAndOpen({ transaction: existingTransaction });
+
+      // monthOfYear should be initialized from the transaction date (March = 3)
+      expect(wrapper.vm.monthOfYear).toBe(3);
+    });
+
+    it('should not emit save for one-time path during conversion', async () => {
+      const wrapper = await mountAndOpen({ transaction: existingTransaction });
+
+      wrapper.vm.recurrenceMode = 'recurring';
+      wrapper.vm.recurrenceFrequency = 'monthly';
+      await nextTick();
+
+      wrapper.vm.handleSave();
+
+      // Should only emit save-recurring, not save
+      expect(wrapper.emitted('save-recurring')).toBeTruthy();
+      expect(wrapper.emitted('save')).toBeFalsy();
+    });
+  });
+
+  describe('initialValues pre-filling', () => {
+    it('should pre-fill form fields from initialValues', async () => {
+      const initialValues: Partial<CreateTransactionInput> = {
+        accountId: 'account-1',
+        type: 'expense',
+        amount: 200,
+        currency: 'USD',
+        category: 'utilities',
+        date: '2026-04-15',
+        description: 'Projected electricity',
+      };
+
+      const wrapper = await mountAndOpen({ initialValues });
+
+      expect(wrapper.vm.description).toBe('Projected electricity');
+      expect(wrapper.vm.amount).toBe(200);
+      expect(wrapper.vm.direction).toBe('out');
+      expect(wrapper.vm.category).toBe('utilities');
+      expect(wrapper.vm.accountId).toBe('account-1');
+      expect(wrapper.vm.date).toBe('2026-04-15');
+      expect(wrapper.vm.currency).toBe('USD');
+    });
+
+    it('should set recurrenceMode to one-time when initialValues provided', async () => {
+      const wrapper = await mountAndOpen({
+        initialValues: {
+          type: 'expense' as const,
+          amount: 100,
+          description: 'Test',
+        },
+      });
+
+      expect(wrapper.vm.recurrenceMode).toBe('one-time');
+    });
+
+    it('should set recurrenceMode to recurring when no initialValues', async () => {
+      const wrapper = await mountAndOpen({});
+      expect(wrapper.vm.recurrenceMode).toBe('recurring');
+    });
+
+    it('should pre-fill income direction from initialValues', async () => {
+      const wrapper = await mountAndOpen({
+        initialValues: {
+          type: 'income' as const,
+          amount: 5000,
+          description: 'Projected salary',
+        },
+      });
+
+      expect(wrapper.vm.direction).toBe('in');
+    });
+
+    it('should emit save with CreateTransactionInput when saving pre-filled one-time', async () => {
+      const initialValues: Partial<CreateTransactionInput> = {
+        accountId: 'account-1',
+        type: 'expense',
+        amount: 150,
+        currency: 'USD',
+        category: 'utilities',
+        date: '2026-04-10',
+        description: 'Projected bill',
+      };
+
+      const wrapper = await mountAndOpen({ initialValues });
+
+      wrapper.vm.handleSave();
+      await nextTick();
+
+      const saveEvents = wrapper.emitted('save');
+      expect(saveEvents).toBeTruthy();
+      expect(saveEvents).toHaveLength(1);
+
+      const payload = saveEvents![0][0] as CreateTransactionInput;
+      expect(payload.description).toBe('Projected bill');
+      expect(payload.amount).toBe(150);
+      expect(payload.type).toBe('expense');
+      expect(payload.date).toBe('2026-04-10');
+
+      // Must NOT emit save-recurring
+      expect(wrapper.emitted('save-recurring')).toBeFalsy();
+    });
+  });
+
+  describe('startDate → dayOfMonth auto-sync', () => {
+    const existingRecurringItem: RecurringItem = {
+      id: 'ri-sync',
+      accountId: 'account-1',
+      type: 'expense',
+      amount: 100,
+      currency: 'USD',
+      category: 'utilities',
+      description: 'Monthly bill',
+      frequency: 'monthly',
+      dayOfMonth: 1,
+      startDate: '2026-01-01T00:00:00.000Z',
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    it('should sync dayOfMonth when startDate changes (monthly)', async () => {
+      const wrapper = await mountAndOpen({ recurringItem: existingRecurringItem });
+
+      expect(wrapper.vm.dayOfMonth).toBe(1);
+
+      // User changes startDate to the 20th
+      wrapper.vm.startDate = '2026-03-20';
+      await nextTick();
+
+      expect(wrapper.vm.dayOfMonth).toBe(20);
+    });
+
+    it('should include synced dayOfMonth in emitted save-recurring data', async () => {
+      const wrapper = await mountAndOpen({ recurringItem: existingRecurringItem });
+
+      // User changes startDate to the 15th
+      wrapper.vm.startDate = '2026-04-15';
+      await nextTick();
+
+      wrapper.vm.handleSave();
+
+      const payload = wrapper.emitted('save-recurring')![0][0] as CreateRecurringItemInput;
+      expect(payload.dayOfMonth).toBe(15);
+      expect(payload.startDate).toBe('2026-04-15');
+    });
+
+    it('should clamp dayOfMonth to 28 for dates above 28', async () => {
+      const wrapper = await mountAndOpen({ recurringItem: existingRecurringItem });
+
+      wrapper.vm.startDate = '2026-01-31';
+      await nextTick();
+
+      expect(wrapper.vm.dayOfMonth).toBe(28);
+    });
+
+    it('should NOT override dayOfMonth during initial form population', async () => {
+      const itemWithDay15: RecurringItem = {
+        ...existingRecurringItem,
+        dayOfMonth: 15,
+        startDate: '2026-01-01T00:00:00.000Z', // day 1 in startDate
+      };
+
+      const wrapper = await mountAndOpen({ recurringItem: itemWithDay15 });
+
+      // dayOfMonth should be 15 (from the recurring item), not 1 (from startDate)
+      expect(wrapper.vm.dayOfMonth).toBe(15);
+    });
+
+    it('should sync monthOfYear when startDate changes (yearly)', async () => {
+      const yearlyItem: RecurringItem = {
+        ...existingRecurringItem,
+        frequency: 'yearly',
+        dayOfMonth: 1,
+        monthOfYear: 1,
+      };
+
+      const wrapper = await mountAndOpen({ recurringItem: yearlyItem });
+
+      wrapper.vm.startDate = '2026-06-20';
+      await nextTick();
+
+      expect(wrapper.vm.dayOfMonth).toBe(20);
+      expect(wrapper.vm.monthOfYear).toBe(6);
+    });
+  });
+
   describe('Validation', () => {
     it('should not emit save when description is empty', () => {
       const wrapper = mountModal();

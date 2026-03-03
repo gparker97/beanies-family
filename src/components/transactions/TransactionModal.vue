@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
@@ -29,6 +29,7 @@ const props = defineProps<{
   open: boolean;
   transaction?: Transaction | null;
   recurringItem?: RecurringItem | null;
+  initialValues?: Partial<CreateTransactionInput> | null;
 }>();
 
 const emit = defineEmits<{
@@ -60,6 +61,26 @@ const dayOfMonth = ref(1);
 const monthOfYear = ref(1);
 const isActive = ref(true);
 
+// When the user edits startDate, auto-sync dayOfMonth so that
+// syncLinkedTransactions picks up the new day. Without this, changing
+// startDate alone leaves dayOfMonth (and thus materialized transaction
+// dates) unchanged — the root cause of the "date doesn't update" bug.
+let suppressDaySync = false;
+watch(
+  startDate,
+  (newVal) => {
+    if (suppressDaySync || !newVal) return;
+    const day = new Date(newVal + 'T00:00:00').getDate();
+    if (recurrenceFrequency.value === 'monthly') {
+      dayOfMonth.value = Math.min(day, 28);
+    } else if (recurrenceFrequency.value === 'yearly') {
+      dayOfMonth.value = Math.min(day, 28);
+      monthOfYear.value = new Date(newVal + 'T00:00:00').getMonth() + 1;
+    }
+  },
+  { flush: 'sync' }
+);
+
 const LAST_ACCOUNT_KEY = 'beanies_last_transaction_account';
 
 function getLastAccountId(): string {
@@ -80,6 +101,7 @@ const { isEditing, isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit: (entity) => {
+      suppressDaySync = true;
       if (props.recurringItem) {
         // Editing a recurring item
         const item = props.recurringItem;
@@ -109,23 +131,35 @@ const { isEditing, isSubmitting } = useFormModal(
         accountId.value = transaction.accountId;
         activityId.value = transaction.activityId;
         currency.value = transaction.currency;
+        // Initialize recurring fields from the transaction date so that
+        // switching to recurring mode pre-fills sensible defaults
+        const txDate = new Date(transaction.date + 'T00:00:00');
+        dayOfMonth.value = txDate.getDate();
+        monthOfYear.value = txDate.getMonth() + 1;
+        startDate.value = transaction.date.substring(0, 10);
+        endDate.value = '';
+        recurrenceFrequency.value = 'monthly';
       }
+      suppressDaySync = false;
     },
     onNew: () => {
-      direction.value = 'out';
-      amount.value = undefined;
-      description.value = '';
-      category.value = '';
-      recurrenceMode.value = 'recurring';
-      date.value = todayStr();
+      suppressDaySync = true;
+      const iv = props.initialValues;
+      direction.value = iv?.type === 'income' ? 'in' : iv?.type === 'expense' ? 'out' : 'out';
+      amount.value = iv?.amount ?? undefined;
+      description.value = iv?.description ?? '';
+      category.value = iv?.category ?? '';
+      recurrenceMode.value = iv ? 'one-time' : 'recurring';
+      date.value = iv?.date ?? todayStr();
       startDate.value = todayStr();
       endDate.value = '';
-      accountId.value = getLastAccountId();
+      accountId.value = iv?.accountId ?? getLastAccountId();
       activityId.value = undefined;
-      currency.value = settingsStore.displayCurrency;
+      currency.value = iv?.currency ?? settingsStore.displayCurrency;
       dayOfMonth.value = new Date().getDate();
       monthOfYear.value = new Date().getMonth() + 1;
       isActive.value = true;
+      suppressDaySync = false;
     },
   }
 );
@@ -208,8 +242,9 @@ function handleSave() {
       return;
     }
 
-    // Creating a new recurring item
-    if (recurrenceMode.value === 'recurring' && !isEditing.value) {
+    // Editing a one-time transaction → user switched to recurring (conversion)
+    // OR creating a brand new recurring item
+    if (recurrenceMode.value === 'recurring' && (!isEditing.value || !isEditingRecurring.value)) {
       const recurringData: CreateRecurringItemInput = {
         accountId: accountId.value,
         type: effectiveType.value,
@@ -392,45 +427,9 @@ function handleDelete() {
     <!-- 7. Recurring details -->
     <ConditionalSection :show="recurrenceMode === 'recurring' || isEditingRecurring">
       <div class="space-y-4">
-        <div class="flex items-end gap-4">
-          <div class="min-w-0 flex-1">
-            <FormFieldGroup :label="t('modal.howOften')">
-              <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
-            </FormFieldGroup>
-          </div>
-          <div v-if="recurrenceFrequency === 'monthly'" class="flex-shrink-0">
-            <FormFieldGroup :label="t('transactions.dayOfMonth')">
-              <div class="relative">
-                <select
-                  :value="String(dayOfMonth)"
-                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-1.5 pr-6 pl-3 text-xs font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
-                  @change="dayOfMonth = Number(($event.target as HTMLSelectElement).value)"
-                >
-                  <option v-for="opt in dayOfMonthOptions" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
-                <div
-                  class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5"
-                >
-                  <svg
-                    class="h-2.5 w-2.5 text-[var(--color-text)] opacity-35"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </FormFieldGroup>
-          </div>
-        </div>
+        <FormFieldGroup :label="t('modal.howOften')">
+          <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
+        </FormFieldGroup>
         <!-- Month select (yearly only) -->
         <FormFieldGroup v-if="recurrenceFrequency === 'yearly'" :label="t('form.month')">
           <div class="relative">
@@ -460,8 +459,41 @@ function handleDelete() {
             </div>
           </div>
         </FormFieldGroup>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <!-- Start date, day-of-month, end date in a row -->
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <BaseInput v-model="startDate" :label="t('form.startDate')" type="date" required />
+          <div v-if="recurrenceFrequency === 'monthly'" class="flex items-end">
+            <FormFieldGroup :label="t('transactions.dayOfMonth')">
+              <div class="relative">
+                <select
+                  :value="String(dayOfMonth)"
+                  class="focus:border-primary-500 font-outfit w-[62px] cursor-pointer appearance-none rounded-full border-2 border-transparent bg-[var(--tint-slate-5)] py-2 pr-6 pl-3 text-sm font-semibold text-[var(--color-text)] transition-all duration-150 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-400"
+                  @change="dayOfMonth = Number(($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="opt in dayOfMonthOptions" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <div
+                  class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5"
+                >
+                  <svg
+                    class="h-2.5 w-2.5 text-[var(--color-text)] opacity-35"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </FormFieldGroup>
+          </div>
           <BaseInput v-model="endDate" :label="`${t('form.endDate')} (optional)`" type="date" />
         </div>
         <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.linkToActivity')" optional>
