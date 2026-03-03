@@ -11,6 +11,7 @@ import UpdatePrompt from '@/components/common/UpdatePrompt.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
+import RecurringEditScopeModal from '@/components/ui/RecurringEditScopeModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
@@ -482,6 +483,7 @@ watch(
     <!-- Celebration toasts and modals -->
     <CelebrationOverlay />
     <ConfirmModal />
+    <RecurringEditScopeModal />
     <TrustDeviceModal
       :open="showTrustPrompt"
       @trust="handleTrustDevice"

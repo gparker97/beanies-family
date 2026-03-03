@@ -233,6 +233,16 @@ const STRING_DEFS = {
   'recurring.paused': { en: 'Paused', beanie: 'paused' },
   'recurring.pauseItem': { en: 'Pause recurring', beanie: 'pause recurring' },
   'recurring.resumeItem': { en: 'Resume recurring', beanie: 'resume recurring' },
+  'recurring.editScopeTitle': { en: 'Edit Recurring', beanie: 'edit recurring bean' },
+  'recurring.scopeThisOnly': { en: 'This Occurrence Only', beanie: 'just this bean' },
+  'recurring.scopeThisOnlyDesc': { en: 'Change only this date', beanie: 'change only this date' },
+  'recurring.scopeAll': { en: 'All Occurrences', beanie: 'all the beans' },
+  'recurring.scopeAllDesc': { en: 'Update the template', beanie: 'update the template' },
+  'recurring.scopeThisAndFuture': { en: 'This & All Future', beanie: 'this & future beans' },
+  'recurring.scopeThisAndFutureDesc': {
+    en: 'Split from this date forward',
+    beanie: 'split from here on',
+  },
 
   // Accounts
   'accounts.title': { en: 'Accounts', beanie: 'bean jars' },
@@ -818,6 +828,8 @@ const STRING_DEFS = {
   'transactions.typeRecurring': { en: 'recurring', beanie: 'recurring' },
   'transactions.typeOneTime': { en: 'one-time', beanie: 'one-off' },
   'transactions.transactionCount': { en: 'transactions', beanie: 'beans' },
+  'transactions.projected': { en: 'Projected', beanie: 'future bean' },
+  'transactions.projectedLabel': { en: 'projected', beanie: 'projected' },
   'transactions.pageTitle': { en: 'All Transactions', beanie: 'all beans' },
   'transactions.dayOfMonth': { en: 'Day of month', beanie: 'day of month' },
 

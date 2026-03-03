@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import TransactionsPage from './TransactionsPage.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -9,6 +9,10 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import type { Transaction, Account, FamilyMember, RecurringItem } from '@/types/models';
 import { toISODateString, addMonths, toDateInputValue } from '@/utils/date';
+
+// Import mocked repos for setting up mockImplementation in save-flow tests
+import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
+import * as recurringItemRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 
 // Mock repositories
 vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
@@ -86,10 +90,18 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
 
 // Mock recurring processor
 const mockProcessRecurringItems = vi.fn().mockResolvedValue({ processed: 0, errors: [] });
+const mockGetDueDatesInRange = vi.fn(
+  (item: { dayOfMonth?: number }, rangeStart: Date, rangeEnd: Date) => {
+    const day = item.dayOfMonth || 1;
+    const d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), day);
+    return d >= rangeStart && d <= rangeEnd ? [d] : [];
+  }
+);
 vi.mock('@/services/recurring/recurringProcessor', () => ({
   formatFrequency: vi.fn((item: any) => item.frequency),
   getNextDueDateForItem: vi.fn(() => new Date('2024-02-01T00:00:00.000Z')),
-  processRecurringItems: (...args: any[]) => mockProcessRecurringItems(...args),
+  processRecurringItems: (...args: unknown[]) => mockProcessRecurringItems(...(args as [any])),
+  getDueDatesInRange: (...args: unknown[]) => mockGetDueDatesInRange(...(args as [any, any, any])),
 }));
 
 describe('TransactionsPage — Unified Ledger', () => {
@@ -645,6 +657,569 @@ describe('TransactionsPage — Unified Ledger', () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.monthExpenses).toBe(100);
+    });
+  });
+
+  describe('Projected Transactions (Future Months)', () => {
+    it('should show projected transactions for future months', async () => {
+      const nextMonth = addMonths(new Date(), 1);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r1',
+          description: 'Monthly rent',
+          amount: 2000,
+          type: 'expense',
+          dayOfMonth: 15,
+          isActive: true,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = nextMonth;
+      await wrapper.vm.$nextTick();
+
+      // Should have projected transaction from the recurring item
+      expect(wrapper.vm.monthTransactions.length).toBeGreaterThan(0);
+      const projected = wrapper.vm.monthTransactions.find(
+        (tx: { isProjected?: boolean }) => tx.isProjected
+      );
+      expect(projected).toBeTruthy();
+      expect(projected.amount).toBe(2000);
+      expect(projected.description).toBe('Monthly rent');
+      expect(projected.recurringItemId).toBe('r1');
+    });
+
+    it('should dedup projected transactions against real ones', async () => {
+      const nextMonth = addMonths(new Date(), 1);
+      const nextMonthDate = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 15);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r1',
+          description: 'Monthly rent',
+          amount: 2000,
+          dayOfMonth: 15,
+          isActive: true,
+        }),
+      ];
+
+      // Add a real transaction for the same date in the future month
+      transactionsStore.transactions = [
+        createTransaction(nextMonthDate, {
+          id: 'txn-real',
+          description: 'Monthly rent',
+          amount: 2000,
+          recurringItemId: 'r1',
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = nextMonth;
+      await wrapper.vm.$nextTick();
+
+      // Should show only the real transaction, not the projected one
+      const rentTxns = wrapper.vm.monthTransactions.filter(
+        (tx: { recurringItemId?: string }) => tx.recurringItemId === 'r1'
+      );
+      expect(rentTxns).toHaveLength(1);
+      expect(rentTxns[0].isProjected).toBeFalsy();
+    });
+
+    it('should sort monthTransactions by date ascending', () => {
+      const now = new Date();
+      const thisMonth20 = new Date(now.getFullYear(), now.getMonth(), 20);
+      const thisMonth5 = new Date(now.getFullYear(), now.getMonth(), 5);
+      const thisMonth10 = new Date(now.getFullYear(), now.getMonth(), 10);
+
+      transactionsStore.transactions = [
+        createTransaction(thisMonth20, { id: 'txn-20' }),
+        createTransaction(thisMonth5, { id: 'txn-5' }),
+        createTransaction(thisMonth10, { id: 'txn-10' }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+
+      const dates = wrapper.vm.monthTransactions.map((tx: { date: string }) => tx.date);
+      for (let i = 1; i < dates.length; i++) {
+        expect(dates[i] >= dates[i - 1]).toBe(true);
+      }
+    });
+
+    it('should include projected transactions in summary totals', async () => {
+      const nextMonth = addMonths(new Date(), 1);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r-income',
+          type: 'income',
+          amount: 5000,
+          dayOfMonth: 1,
+          isActive: true,
+        }),
+        createRecurringItem({
+          id: 'r-expense',
+          type: 'expense',
+          amount: 2000,
+          dayOfMonth: 15,
+          isActive: true,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = nextMonth;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthIncome).toBe(5000);
+      expect(wrapper.vm.monthExpenses).toBe(2000);
+      expect(wrapper.vm.monthNet).toBe(3000);
+    });
+
+    it('should not show projected transactions for current month', () => {
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r1',
+          amount: 500,
+          dayOfMonth: 15,
+          isActive: true,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+
+      // Current month should have no projected transactions
+      const projected = wrapper.vm.monthTransactions.filter(
+        (tx: { isProjected?: boolean }) => tx.isProjected
+      );
+      expect(projected).toHaveLength(0);
+    });
+
+    it('should not show projected transactions for past months', async () => {
+      const lastMonth = addMonths(new Date(), -1);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r1',
+          amount: 500,
+          dayOfMonth: 15,
+          isActive: true,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = lastMonth;
+      await wrapper.vm.$nextTick();
+
+      const projected = wrapper.vm.monthTransactions.filter(
+        (tx: { isProjected?: boolean }) => tx.isProjected
+      );
+      expect(projected).toHaveLength(0);
+    });
+
+    it('should exclude inactive recurring items from projections', async () => {
+      const nextMonth = addMonths(new Date(), 1);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r-active',
+          amount: 100,
+          dayOfMonth: 10,
+          isActive: true,
+        }),
+        createRecurringItem({
+          id: 'r-inactive',
+          amount: 200,
+          dayOfMonth: 15,
+          isActive: false,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = nextMonth;
+      await wrapper.vm.$nextTick();
+
+      // Only active item should project
+      const projected = wrapper.vm.monthTransactions.filter(
+        (tx: { isProjected?: boolean }) => tx.isProjected
+      );
+      expect(projected).toHaveLength(1);
+      expect(projected[0].recurringItemId).toBe('r-active');
+    });
+  });
+
+  describe('Recurring Item Edit Reactivity', () => {
+    it('should reflect updated amount in current month after store update', async () => {
+      const now = new Date();
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 15);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({ id: 'r1', amount: 100, description: 'Old amount' }),
+      ];
+      transactionsStore.transactions = [
+        createTransaction(thisMonth, {
+          id: 'txn-1',
+          amount: 100,
+          description: 'Old amount',
+          recurringItemId: 'r1',
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      expect(wrapper.vm.monthExpenses).toBe(100);
+
+      // Simulate updating the materialized transaction (as syncLinkedTransactions does)
+      transactionsStore.transactions = transactionsStore.transactions.map((t: Transaction) =>
+        t.id === 'txn-1' ? { ...t, amount: 200, description: 'Updated amount' } : t
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthExpenses).toBe(200);
+      expect(wrapper.vm.displayTransactions[0].description).toBe('Updated amount');
+    });
+
+    it('should reflect updated recurring item in projected future transactions', async () => {
+      const nextMonth = addMonths(new Date(), 1);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r1',
+          amount: 100,
+          description: 'Original bill',
+          dayOfMonth: 10,
+          isActive: true,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = nextMonth;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthTransactions).toHaveLength(1);
+      expect(wrapper.vm.monthTransactions[0].amount).toBe(100);
+      expect(wrapper.vm.monthTransactions[0].description).toBe('Original bill');
+
+      // Update the recurring item in the store (immutable update)
+      recurringStore.recurringItems = recurringStore.recurringItems.map((item: RecurringItem) =>
+        item.id === 'r1' ? { ...item, amount: 250, description: 'Updated bill' } : item
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthTransactions).toHaveLength(1);
+      expect(wrapper.vm.monthTransactions[0].amount).toBe(250);
+      expect(wrapper.vm.monthTransactions[0].description).toBe('Updated bill');
+    });
+
+    it('should update projected date when dayOfMonth changes', async () => {
+      const nextMonth = addMonths(new Date(), 1);
+
+      recurringStore.recurringItems = [
+        createRecurringItem({
+          id: 'r1',
+          amount: 100,
+          dayOfMonth: 5,
+          isActive: true,
+        }),
+      ];
+
+      wrapper = mount(TransactionsPage);
+      wrapper.vm.selectedMonth = nextMonth;
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthTransactions[0].date).toContain('-05');
+
+      // Change dayOfMonth from 5 to 20
+      recurringStore.recurringItems = recurringStore.recurringItems.map((item: RecurringItem) =>
+        item.id === 'r1' ? { ...item, dayOfMonth: 20 } : item
+      );
+      // Reset mock to return date with new dayOfMonth
+      mockGetDueDatesInRange.mockImplementation(
+        (item: { dayOfMonth?: number }, rangeStart: Date, rangeEnd: Date) => {
+          const day = item.dayOfMonth || 1;
+          const d = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), day);
+          return d >= rangeStart && d <= rangeEnd ? [d] : [];
+        }
+      );
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthTransactions[0].date).toContain('-20');
+    });
+  });
+
+  describe('Deferred Projected Transaction Editing', () => {
+    it('should start with no pending state or initial values', () => {
+      wrapper = mount(TransactionsPage);
+
+      expect(wrapper.vm.addModalInitialValues).toBeNull();
+      expect(wrapper.vm.showAddModal).toBe(false);
+    });
+
+    it('should clear pending state when add modal is closed', async () => {
+      wrapper = mount(TransactionsPage);
+
+      // Simulate opening add modal with initial values
+      wrapper.vm.addModalInitialValues = { amount: 100 } as any;
+      wrapper.vm.showAddModal = true;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.closeAddModal();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showAddModal).toBe(false);
+      expect(wrapper.vm.addModalInitialValues).toBeNull();
+    });
+
+    it('should clear pending state when edit modal is closed', async () => {
+      wrapper = mount(TransactionsPage);
+
+      wrapper.vm.showEditModal = true;
+      await wrapper.vm.$nextTick();
+
+      wrapper.vm.closeEditModal();
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showEditModal).toBe(false);
+      expect(wrapper.vm.editingTransaction).toBeNull();
+      expect(wrapper.vm.editingRecurringItem).toBeNull();
+    });
+
+    it('should pass initialValues to add modal', async () => {
+      wrapper = mount(TransactionsPage);
+
+      const initialValues = {
+        accountId: 'account-1',
+        type: 'expense' as const,
+        amount: 500,
+        description: 'Projected bill',
+      };
+      wrapper.vm.addModalInitialValues = initialValues;
+      wrapper.vm.showAddModal = true;
+      await wrapper.vm.$nextTick();
+
+      // Verify the add modal receives the initial values prop
+      expect(wrapper.vm.addModalInitialValues).toEqual(initialValues);
+    });
+  });
+
+  describe('Save Flow — Recurring Edit via handleSaveRecurring', () => {
+    // Set up repo mocks that simulate real DB behavior (merge input over existing)
+    function setupRepoMocks() {
+      vi.mocked(recurringItemRepo.updateRecurringItem).mockImplementation(
+        async (id: string, input: any) => {
+          const existing = recurringStore.recurringItems.find((r: RecurringItem) => r.id === id);
+          if (!existing) return undefined as any;
+          return { ...existing, ...input, updatedAt: new Date().toISOString() };
+        }
+      );
+
+      vi.mocked(transactionRepo.updateTransaction).mockImplementation(
+        async (id: string, input: any) => {
+          const existing = transactionsStore.transactions.find((t: Transaction) => t.id === id);
+          if (!existing) return undefined as any;
+          return { ...existing, ...input, updatedAt: new Date().toISOString() };
+        }
+      );
+    }
+
+    afterEach(() => {
+      // Reset implementations to avoid bleeding into other test blocks
+      vi.mocked(recurringItemRepo.updateRecurringItem).mockReset();
+      vi.mocked(transactionRepo.updateTransaction).mockReset();
+    });
+
+    it('should update transaction date in UI when dayOfMonth changes', async () => {
+      const now = new Date();
+      const thisMonth15 = new Date(now.getFullYear(), now.getMonth(), 15);
+
+      const ri = createRecurringItem({
+        id: 'r1',
+        accountId: 'account-1',
+        description: 'Monthly bill',
+        amount: 100,
+        dayOfMonth: 15,
+      });
+
+      transactionsStore.transactions = [
+        createTransaction(thisMonth15, {
+          id: 'txn-1',
+          amount: 100,
+          description: 'Monthly bill',
+          recurringItemId: 'r1',
+        }),
+      ];
+      recurringStore.recurringItems = [ri];
+      setupRepoMocks();
+
+      wrapper = mount(TransactionsPage);
+
+      // Verify initial state
+      expect(wrapper.vm.monthTransactions).toHaveLength(1);
+      expect(wrapper.vm.monthTransactions[0].date).toContain('-15');
+
+      // Simulate: user opens recurring editor and changes dayOfMonth to 25
+      wrapper.vm.editingRecurringItem = ri;
+      await wrapper.vm.handleSaveRecurring({
+        accountId: 'account-1',
+        type: 'expense',
+        amount: 100,
+        currency: 'USD',
+        category: 'utilities',
+        description: 'Monthly bill',
+        frequency: 'monthly',
+        dayOfMonth: 25,
+        startDate: '2024-01-01',
+        isActive: true,
+      });
+      await wrapper.vm.$nextTick();
+
+      // Assert: transaction date should now show day 25
+      expect(wrapper.vm.monthTransactions).toHaveLength(1);
+      expect(wrapper.vm.monthTransactions[0].date).toContain('-25');
+    });
+
+    it('should update transaction amount and summary when amount changes', async () => {
+      const now = new Date();
+      const thisMonth15 = new Date(now.getFullYear(), now.getMonth(), 15);
+
+      const ri = createRecurringItem({
+        id: 'r1',
+        accountId: 'account-1',
+        description: 'Monthly bill',
+        amount: 100,
+        dayOfMonth: 15,
+      });
+
+      transactionsStore.transactions = [
+        createTransaction(thisMonth15, {
+          id: 'txn-1',
+          amount: 100,
+          type: 'expense',
+          description: 'Monthly bill',
+          recurringItemId: 'r1',
+        }),
+      ];
+      recurringStore.recurringItems = [ri];
+      setupRepoMocks();
+
+      wrapper = mount(TransactionsPage);
+      expect(wrapper.vm.monthExpenses).toBe(100);
+
+      wrapper.vm.editingRecurringItem = ri;
+      await wrapper.vm.handleSaveRecurring({
+        accountId: 'account-1',
+        type: 'expense',
+        amount: 350,
+        currency: 'USD',
+        category: 'utilities',
+        description: 'Monthly bill',
+        frequency: 'monthly',
+        dayOfMonth: 15,
+        startDate: '2024-01-01',
+        isActive: true,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthExpenses).toBe(350);
+      expect(wrapper.vm.monthTransactions[0].amount).toBe(350);
+    });
+
+    it('should update transaction description in UI when description changes', async () => {
+      const now = new Date();
+      const thisMonth15 = new Date(now.getFullYear(), now.getMonth(), 15);
+
+      const ri = createRecurringItem({
+        id: 'r1',
+        accountId: 'account-1',
+        description: 'Old name',
+        amount: 100,
+        dayOfMonth: 15,
+      });
+
+      transactionsStore.transactions = [
+        createTransaction(thisMonth15, {
+          id: 'txn-1',
+          amount: 100,
+          type: 'expense',
+          description: 'Old name',
+          recurringItemId: 'r1',
+        }),
+      ];
+      recurringStore.recurringItems = [ri];
+      setupRepoMocks();
+
+      wrapper = mount(TransactionsPage);
+      expect(wrapper.vm.monthTransactions[0].description).toBe('Old name');
+
+      wrapper.vm.editingRecurringItem = ri;
+      await wrapper.vm.handleSaveRecurring({
+        accountId: 'account-1',
+        type: 'expense',
+        amount: 100,
+        currency: 'USD',
+        category: 'utilities',
+        description: 'New name',
+        frequency: 'monthly',
+        dayOfMonth: 15,
+        startDate: '2024-01-01',
+        isActive: true,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.monthTransactions[0].description).toBe('New name');
+    });
+
+    it('should propagate all field changes through to UI after save', async () => {
+      const now = new Date();
+      const thisMonth15 = new Date(now.getFullYear(), now.getMonth(), 15);
+
+      const ri = createRecurringItem({
+        id: 'r1',
+        accountId: 'account-1',
+        type: 'expense',
+        description: 'Original',
+        amount: 100,
+        currency: 'USD',
+        category: 'utilities',
+        dayOfMonth: 15,
+      });
+
+      transactionsStore.transactions = [
+        createTransaction(thisMonth15, {
+          id: 'txn-1',
+          accountId: 'account-1',
+          amount: 100,
+          type: 'expense',
+          currency: 'USD',
+          category: 'utilities',
+          description: 'Original',
+          recurringItemId: 'r1',
+        }),
+      ];
+      recurringStore.recurringItems = [ri];
+      setupRepoMocks();
+
+      wrapper = mount(TransactionsPage);
+
+      wrapper.vm.editingRecurringItem = ri;
+      await wrapper.vm.handleSaveRecurring({
+        accountId: 'account-1',
+        type: 'expense',
+        amount: 500,
+        currency: 'USD',
+        category: 'housing',
+        description: 'Updated',
+        frequency: 'monthly',
+        dayOfMonth: 20,
+        startDate: '2024-01-01',
+        isActive: true,
+      });
+      await wrapper.vm.$nextTick();
+
+      const updatedTx = wrapper.vm.monthTransactions[0];
+      expect(updatedTx.amount).toBe(500);
+      expect(updatedTx.description).toBe('Updated');
+      expect(updatedTx.category).toBe('housing');
+      expect(updatedTx.date).toContain('-20');
+      expect(wrapper.vm.monthExpenses).toBe(500);
     });
   });
 });

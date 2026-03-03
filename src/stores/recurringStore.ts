@@ -2,14 +2,17 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useAccountsStore } from './accountsStore';
 import { useMemberFilterStore } from './memberFilterStore';
+import { useTransactionsStore } from './transactionsStore';
 import { useTombstoneStore } from './tombstoneStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
+import { toDateInputValue, parseLocalDate, addDays } from '@/utils/date';
 import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
 import type {
   RecurringItem,
   CreateRecurringItemInput,
   UpdateRecurringItemInput,
+  ISODateString,
 } from '@/types/models';
 
 export const useRecurringStore = defineStore('recurring', () => {
@@ -81,10 +84,12 @@ export const useRecurringStore = defineStore('recurring', () => {
   }
 
   // Recurring items filtered by global member filter (via account ownership)
+  // Always return a new array to avoid Vue 3.4+ computed reference-equality
+  // optimization swallowing downstream reactivity on in-place mutations.
   const filteredRecurringItems = computed(() => {
     const memberFilter = useMemberFilterStore();
     if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
-      return recurringItems.value;
+      return [...recurringItems.value];
     }
     const selectedAccountIds = getSelectedAccountIds();
     return recurringItems.value.filter((item) => selectedAccountIds.has(item.accountId));
@@ -140,7 +145,8 @@ export const useRecurringStore = defineStore('recurring', () => {
   ): Promise<RecurringItem | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const item = await recurringRepo.createRecurringItem(input);
-      recurringItems.value.push(item);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      recurringItems.value = [...recurringItems.value, item];
       return item;
     });
     return result ?? null;
@@ -153,10 +159,10 @@ export const useRecurringStore = defineStore('recurring', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const updated = await recurringRepo.updateRecurringItem(id, input);
       if (updated) {
-        const index = recurringItems.value.findIndex((item) => item.id === id);
-        if (index !== -1) {
-          recurringItems.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        recurringItems.value = recurringItems.value.map((item) =>
+          item.id === id ? updated : item
+        );
       }
       return updated;
     });
@@ -188,6 +194,54 @@ export const useRecurringStore = defineStore('recurring', () => {
 
   function getItemsByAccountId(accountId: string): RecurringItem[] {
     return recurringItems.value.filter((item) => item.accountId === accountId);
+  }
+
+  /**
+   * Split a recurring item at a given date.
+   * End-dates the original at the day before, creates a new item from the split date,
+   * and re-links any materialized transactions after the split to the new item.
+   */
+  async function splitRecurringItem(
+    itemId: string,
+    fromDate: ISODateString
+  ): Promise<RecurringItem | null> {
+    const original = recurringItems.value.find((r) => r.id === itemId);
+    if (!original) return null;
+
+    // 1. Calculate day before split date for endDate
+    const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
+
+    // 2. End-date the original item
+    await updateRecurringItem(itemId, { endDate: dayBefore });
+
+    // 3. Create new item from split date forward
+    const newItem = await createRecurringItem({
+      accountId: original.accountId,
+      type: original.type,
+      amount: original.amount,
+      currency: original.currency,
+      category: original.category,
+      description: original.description,
+      frequency: original.frequency,
+      dayOfMonth: original.dayOfMonth,
+      monthOfYear: original.monthOfYear,
+      startDate: fromDate,
+      endDate: original.endDate, // preserve original end date if any
+      isActive: true,
+    });
+
+    // 4. Re-link materialized transactions from old item after split date
+    if (newItem) {
+      const txStore = useTransactionsStore();
+      const toRelink = txStore.transactions.filter(
+        (tx) => tx.recurringItemId === itemId && toDateInputValue(new Date(tx.date)) >= fromDate
+      );
+      for (const tx of toRelink) {
+        await txStore.updateTransaction(tx.id, { recurringItemId: newItem.id });
+      }
+    }
+
+    return newItem;
   }
 
   function resetState() {
@@ -227,6 +281,7 @@ export const useRecurringStore = defineStore('recurring', () => {
     toggleActive,
     getRecurringItemById,
     getItemsByAccountId,
+    splitRecurringItem,
     resetState,
   };
 });

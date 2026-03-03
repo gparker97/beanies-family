@@ -10,6 +10,7 @@ vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
 }));
 
 vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+  getAllTransactions: vi.fn().mockResolvedValue([]),
   createTransaction: vi.fn(),
 }));
 

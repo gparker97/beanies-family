@@ -13,6 +13,43 @@ vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
   deleteRecurringItem: vi.fn(),
 }));
 
+// Mock transaction repository (needed for splitRecurringItem which uses transactionsStore)
+vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+  getAllTransactions: vi.fn().mockResolvedValue([]),
+  getTransactionById: vi.fn(),
+  createTransaction: vi.fn(),
+  updateTransaction: vi.fn(),
+  deleteTransaction: vi.fn(),
+}));
+
+// Mock account repository (needed by transactionsStore → accountsStore)
+vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+  getAllAccounts: vi.fn().mockResolvedValue([]),
+  getAccountById: vi.fn(),
+  createAccount: vi.fn(),
+  updateAccount: vi.fn(),
+  deleteAccount: vi.fn(),
+  updateAccountBalance: vi.fn(),
+}));
+
+// Mock settings repository (needed by accountsStore)
+vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+  getSettings: vi.fn(),
+  updateSettings: vi.fn(),
+  getDefaultSettings: vi.fn(() => ({
+    id: 'app_settings',
+    baseCurrency: 'USD',
+    displayCurrency: 'USD',
+    exchangeRates: [],
+    theme: 'system',
+    syncEnabled: false,
+    aiProvider: 'none',
+    aiApiKeys: {},
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  })),
+}));
+
 const createMockRecurringItem = (overrides: Partial<RecurringItem> = {}): RecurringItem => ({
   id: `recurring-${Math.random().toString(36).slice(2)}`,
   accountId: 'acc-1',
@@ -334,6 +371,180 @@ describe('recurringStore - Monthly Summary Calculations', () => {
 
       expect(store.filteredActiveExpenseItems).toHaveLength(1);
       expect(store.filteredActiveExpenseItems[0]!.id).toBe('r1');
+    });
+  });
+
+  describe('Immutable update reactivity', () => {
+    it('should trigger activeItems re-evaluation after createRecurringItem', async () => {
+      const store = useRecurringStore();
+      expect(store.activeItems).toHaveLength(0);
+
+      const newItem = createMockRecurringItem({ id: 'r-new', isActive: true });
+      vi.mocked(recurringRepo.createRecurringItem).mockResolvedValue(newItem);
+
+      await store.createRecurringItem({
+        accountId: 'acc-1',
+        type: 'expense',
+        amount: 100,
+        currency: 'USD',
+        category: 'utilities',
+        description: 'Test',
+        frequency: 'monthly',
+        dayOfMonth: 1,
+        startDate: '2024-01-01',
+        isActive: true,
+      });
+
+      expect(store.activeItems).toHaveLength(1);
+      expect(store.activeItems[0]!.id).toBe('r-new');
+    });
+
+    it('should trigger computed re-evaluation after updateRecurringItem', async () => {
+      const store = useRecurringStore();
+      const item = createMockRecurringItem({ id: 'r1', isActive: true, amount: 100 });
+      store.recurringItems = [item];
+
+      expect(store.totalMonthlyRecurringExpenses).toBe(100);
+
+      const updatedItem = { ...item, amount: 200, updatedAt: new Date().toISOString() };
+      vi.mocked(recurringRepo.updateRecurringItem).mockResolvedValue(updatedItem);
+
+      await store.updateRecurringItem('r1', { amount: 200 });
+
+      // computed should now reflect the new amount
+      expect(store.totalMonthlyRecurringExpenses).toBe(200);
+      expect(store.recurringItems[0]!.amount).toBe(200);
+    });
+
+    it('should use immutable array for create (new reference)', async () => {
+      const store = useRecurringStore();
+      const original = store.recurringItems;
+
+      const newItem = createMockRecurringItem({ id: 'r1' });
+      vi.mocked(recurringRepo.createRecurringItem).mockResolvedValue(newItem);
+
+      await store.createRecurringItem({
+        accountId: 'acc-1',
+        type: 'expense',
+        amount: 100,
+        currency: 'USD',
+        category: 'utilities',
+        description: 'Test',
+        frequency: 'monthly',
+        dayOfMonth: 1,
+        startDate: '2024-01-01',
+        isActive: true,
+      });
+
+      // The array reference should be different (immutable update)
+      expect(store.recurringItems).not.toBe(original);
+      expect(store.recurringItems).toHaveLength(1);
+    });
+
+    it('should use immutable array for update (new reference)', async () => {
+      const store = useRecurringStore();
+      const item = createMockRecurringItem({ id: 'r1', amount: 100 });
+      store.recurringItems = [item];
+
+      const before = store.recurringItems;
+      const updatedItem = { ...item, amount: 200, updatedAt: new Date().toISOString() };
+      vi.mocked(recurringRepo.updateRecurringItem).mockResolvedValue(updatedItem);
+
+      await store.updateRecurringItem('r1', { amount: 200 });
+
+      // The array reference should be different (immutable update)
+      expect(store.recurringItems).not.toBe(before);
+    });
+
+    it('should correctly update filteredRecurringItems after update', async () => {
+      const store = useRecurringStore();
+      const item = createMockRecurringItem({ id: 'r1', description: 'Old', amount: 100 });
+      store.recurringItems = [item];
+
+      // Cache the filtered items reference
+      const filteredBefore = store.filteredRecurringItems;
+      expect(filteredBefore).toHaveLength(1);
+      expect(filteredBefore[0]!.description).toBe('Old');
+
+      const updatedItem = {
+        ...item,
+        description: 'New',
+        amount: 200,
+        updatedAt: new Date().toISOString(),
+      };
+      vi.mocked(recurringRepo.updateRecurringItem).mockResolvedValue(updatedItem);
+
+      await store.updateRecurringItem('r1', { description: 'New', amount: 200 });
+
+      // filteredRecurringItems should reflect the update
+      expect(store.filteredRecurringItems).toHaveLength(1);
+      expect(store.filteredRecurringItems[0]!.description).toBe('New');
+      expect(store.filteredRecurringItems[0]!.amount).toBe(200);
+    });
+  });
+
+  describe('splitRecurringItem', () => {
+    it('should end-date original and create new item from split date', async () => {
+      const store = useRecurringStore();
+      const original = createMockRecurringItem({
+        id: 'r-original',
+        description: 'Monthly sub',
+        amount: 100,
+        dayOfMonth: 15,
+        startDate: '2026-01-01',
+        isActive: true,
+      });
+      store.recurringItems = [original];
+
+      // Mock update for end-dating original
+      vi.mocked(recurringRepo.updateRecurringItem).mockResolvedValue({
+        ...original,
+        endDate: '2026-03-14',
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Mock create for new item
+      const newItem = createMockRecurringItem({
+        id: 'r-new',
+        description: 'Monthly sub',
+        amount: 100,
+        dayOfMonth: 15,
+        startDate: '2026-03-15',
+        isActive: true,
+      });
+      vi.mocked(recurringRepo.createRecurringItem).mockResolvedValue(newItem);
+
+      const result = await store.splitRecurringItem('r-original', '2026-03-15');
+
+      expect(result).toBeTruthy();
+      expect(result!.id).toBe('r-new');
+      expect(result!.startDate).toBe('2026-03-15');
+
+      // Should have 2 items now
+      expect(store.recurringItems).toHaveLength(2);
+
+      // Original should be end-dated
+      expect(recurringRepo.updateRecurringItem).toHaveBeenCalledWith(
+        'r-original',
+        expect.objectContaining({ endDate: '2026-03-14' })
+      );
+
+      // New item should inherit properties from original
+      expect(recurringRepo.createRecurringItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Monthly sub',
+          amount: 100,
+          dayOfMonth: 15,
+          startDate: '2026-03-15',
+          isActive: true,
+        })
+      );
+    });
+
+    it('should return null for non-existent item', async () => {
+      const store = useRecurringStore();
+      const result = await store.splitRecurringItem('non-existent', '2026-03-15');
+      expect(result).toBeNull();
     });
   });
 
