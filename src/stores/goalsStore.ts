@@ -2,9 +2,8 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
-import { useTombstoneStore } from './tombstoneStore';
 import { wrapAsync } from '@/composables/useStoreActions';
-import * as goalRepo from '@/services/indexeddb/repositories/goalRepository';
+import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
 
 export const useGoalsStore = defineStore('goals', () => {
@@ -101,7 +100,6 @@ export const useGoalsStore = defineStore('goals', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await goalRepo.deleteGoal(id);
       if (success) {
-        useTombstoneStore().recordDeletion('goal', id);
         goals.value = goals.value.filter((g) => g.id !== id);
       }
       return success;

@@ -208,6 +208,71 @@ describe('createAutomergeRepository', () => {
     });
   });
 
+  describe('undefined value handling', () => {
+    it('create() strips undefined values instead of passing them to Automerge', async () => {
+      // Reproduces the real bug: TransactionModal passes { monthOfYear: undefined }
+      // for non-yearly recurring items. Automerge rejects undefined values with:
+      // "Cannot assign undefined value at /recurringItems/.../monthOfYear"
+      const recurringRepo = createAutomergeRepository<
+        'recurringItems',
+        import('@/types/models').RecurringItem
+      >('recurringItems');
+
+      const item = await recurringRepo.create({
+        accountId: 'acc-1',
+        type: 'expense',
+        amount: 100,
+        currency: 'USD',
+        category: 'utilities',
+        description: 'Electric bill',
+        frequency: 'monthly',
+        dayOfMonth: 15,
+        monthOfYear: undefined, // ← This is what the UI sends for non-yearly items
+        startDate: '2026-01-15',
+        endDate: undefined,
+        lastProcessedDate: undefined,
+        isActive: true,
+      } as any);
+
+      expect(item.id).toBeDefined();
+      expect(item.description).toBe('Electric bill');
+      // undefined fields should NOT be present on the stored entity
+      const doc = getDoc();
+      const stored = doc.recurringItems[item.id];
+      expect(stored).toBeDefined();
+      expect('monthOfYear' in stored!).toBe(false);
+    });
+
+    it('update() strips undefined values instead of passing them to Automerge', async () => {
+      const recurringRepo = createAutomergeRepository<
+        'recurringItems',
+        import('@/types/models').RecurringItem
+      >('recurringItems');
+
+      const item = await recurringRepo.create({
+        accountId: 'acc-1',
+        type: 'expense',
+        amount: 50,
+        currency: 'USD',
+        category: 'food',
+        description: 'Groceries',
+        frequency: 'monthly',
+        dayOfMonth: 1,
+        startDate: '2026-01-01',
+        isActive: true,
+      } as any);
+
+      // Update with an undefined field — should not throw
+      const updated = await recurringRepo.update(item.id, {
+        monthOfYear: undefined,
+        description: 'Updated groceries',
+      } as any);
+
+      expect(updated).toBeDefined();
+      expect(updated!.description).toBe('Updated groceries');
+    });
+  });
+
   describe('CRDT merge', () => {
     it('concurrent changes from two docs merge cleanly', async () => {
       // Create initial member

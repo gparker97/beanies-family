@@ -3,10 +3,9 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { useAssetsStore } from './assetsStore';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
-import { useTombstoneStore } from './tombstoneStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
+import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import type { Account, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 export const useAccountsStore = defineStore('accounts', () => {
@@ -155,7 +154,6 @@ export const useAccountsStore = defineStore('accounts', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await accountRepo.deleteAccount(id);
       if (success) {
-        useTombstoneStore().recordDeletion('account', id);
         accounts.value = accounts.value.filter((a) => a.id !== id);
       }
       return success;

@@ -1,10 +1,9 @@
-import { openDB } from 'idb';
+import { openDB, type IDBPDatabase } from 'idb';
 import { getRegistryDatabase } from '@/services/indexeddb/registryDatabase';
 import {
-  getLegacyDatabase,
+  getLegacyDatabaseName,
   getFamilyDatabaseName,
   setActiveFamily,
-  type FinanceDB,
 } from '@/services/indexeddb/database';
 import { saveGlobalSettings } from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type { Family, UserFamilyMapping, Settings, GlobalSettings } from '@/types/models';
@@ -13,6 +12,16 @@ import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 
 const MIGRATION_MARKER_KEY = '__migrated_to_family';
+
+/**
+ * Open the legacy single-family IndexedDB (beanies-data).
+ * Uses a permissive schema so we can read whatever stores exist.
+ */
+async function openLegacyDatabase(): Promise<IDBPDatabase> {
+  return openDB(getLegacyDatabaseName(), undefined, {
+    // No upgrade — we're only reading from an existing DB
+  });
+}
 
 /**
  * Check if the legacy database exists and has data that needs migration.
@@ -31,7 +40,7 @@ export async function needsLegacyMigration(): Promise<boolean> {
 
   // Check if legacy database exists and has data
   try {
-    const legacyDb = await getLegacyDatabase();
+    const legacyDb = await openLegacyDatabase();
     const members = await legacyDb.getAll('familyMembers');
     legacyDb.close();
     return members.length > 0;
@@ -54,7 +63,7 @@ export async function runLegacyMigration(): Promise<Family> {
   const familyId = generateUUID();
 
   // Open legacy DB and read all data
-  const legacyDb = await getLegacyDatabase();
+  const legacyDb = await openLegacyDatabase();
 
   const [familyMembers, accounts, transactions, assets, goals, recurringItems, settings] =
     await Promise.all([
@@ -123,7 +132,7 @@ export async function runLegacyMigration(): Promise<Family> {
 
   // We need to dynamically open the new per-family DB
   const newDbName = getFamilyDatabaseName(familyId);
-  const newDb = await openDB<FinanceDB>(newDbName, 3, {
+  const newDb = await openDB(newDbName, 3, {
     upgrade(db) {
       if (!db.objectStoreNames.contains('familyMembers')) {
         const familyStore = db.createObjectStore('familyMembers', { keyPath: 'id' });
@@ -242,7 +251,7 @@ export async function runLegacyMigration(): Promise<Family> {
  */
 export async function isLegacyDbMigrated(): Promise<boolean> {
   try {
-    const legacyDb = await getLegacyDatabase();
+    const legacyDb = await openLegacyDatabase();
     const marker = await legacyDb.get('settings', MIGRATION_MARKER_KEY);
     legacyDb.close();
     return !!marker;

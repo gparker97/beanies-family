@@ -1,30 +1,35 @@
+/**
+ * Sync Service — low-level sync engine with storage provider abstraction.
+ *
+ * V4 architecture: the Automerge document is the source of truth in memory.
+ * This service handles reading/writing the encrypted .beanpod V4 envelope
+ * to/from the storage provider (local file or Google Drive).
+ *
+ * The family key (AES-256-GCM) encrypts the payload — no more password-based
+ * encryption at the sync layer. The syncStore manages the family key lifecycle.
+ */
+
 import { supportsFileSystemAccess } from './capabilities';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
-import {
-  createSyncFileData,
-  validateSyncFileData,
-  importSyncFileData,
-  openFilePicker,
-} from './fileSync';
-import { encryptSyncData, decryptSyncData } from '@/services/crypto/encryption';
+import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
-import { clearSettingsWAL } from '@/services/sync/settingsWAL';
+import { onDocPersistNeeded } from '@/services/automerge/docService';
+import { persistDoc, persistEnvelope, isCacheReady } from '@/services/automerge/persistenceService';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { LocalStorageProvider } from './providers/localProvider';
 import { DriveApiError } from '@/services/google/driveService';
-import type { SyncFileData } from '@/types/models';
-import { generateUUID } from '@/utils/id';
+import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
-// Result type for openAndLoadFile that can indicate encrypted file needs password
+// Result type for openAndLoadFile
 export interface OpenFileResult {
   success: boolean;
-  data?: SyncFileData;
+  envelope?: BeanpodFileV4;
   needsPassword?: boolean;
   fileHandle?: FileSystemFileHandle;
   provider?: StorageProvider;
-  rawSyncData?: SyncFileData; // The unprocessed sync data (with encrypted flag)
+  rawText?: string; // raw file text for V3 fallback detection
 }
 
 export interface SyncServiceState {
@@ -39,15 +44,16 @@ export interface SyncServiceState {
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 2000;
 
-// Write mutex — prevents concurrent save() calls from interleaving writes.
-// Without this, two overlapping saves can corrupt the file: if the second write
-// is shorter than the first, the tail of the first write remains as trailing bytes
-// (e.g. a shorter familyName leaves stale JSON after the closing brace).
+// Write mutex — prevents concurrent save() calls from interleaving writes
 let saveInProgress: Promise<boolean> | null = null;
 
 // Current storage provider (in-memory for session) and the family it belongs to
 let currentProvider: StorageProvider | null = null;
 let currentProviderFamilyId: string | null = null;
+
+// Family key + envelope — set by syncStore after unlock
+let currentFamilyKey: CryptoKey | null = null;
+let currentEnvelope: BeanpodFileV4 | null = null;
 
 // Callbacks for state changes
 type StateCallback = (state: SyncServiceState) => void;
@@ -137,7 +143,6 @@ function updateState(updates: Partial<SyncServiceState>): void {
  */
 export function onStateChange(callback: StateCallback): () => void {
   stateCallbacks.push(callback);
-  // Return unsubscribe function
   return () => {
     const index = stateCallbacks.indexOf(callback);
     if (index > -1) {
@@ -154,8 +159,7 @@ export function getState(): SyncServiceState {
 }
 
 /**
- * Register a callback invoked after every successful save with the file's exportedAt timestamp.
- * Used by syncStore to keep lastSync in sync without manual updates scattered throughout.
+ * Register a callback invoked after every successful save with the file's timestamp.
  */
 export function onSaveComplete(callback: SaveCompleteCallback): () => void {
   saveCompleteCallbacks.push(callback);
@@ -173,7 +177,7 @@ export function getProviderType(): StorageProviderType | null {
 }
 
 /**
- * Get the current storage provider (for external use, e.g. Google Drive file ID)
+ * Get the current storage provider
  */
 export function getProvider(): StorageProvider | null {
   return currentProvider;
@@ -193,15 +197,54 @@ export function setProvider(provider: StorageProvider): void {
 }
 
 /**
+ * Set the family key and envelope for the current session.
+ * Called by syncStore after successful unlock.
+ */
+export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): void {
+  currentFamilyKey = familyKey;
+  currentEnvelope = envelope;
+}
+
+/**
+ * Get the current family key (if set).
+ */
+export function getFamilyKey(): CryptoKey | null {
+  return currentFamilyKey;
+}
+
+/**
+ * Get the current envelope (if set).
+ */
+export function getEnvelope(): BeanpodFileV4 | null {
+  return currentEnvelope;
+}
+
+/**
+ * Update the current envelope (e.g. after adding a new wrapped key).
+ */
+export function setEnvelope(envelope: BeanpodFileV4): void {
+  currentEnvelope = envelope;
+}
+
+/**
+ * Get the current session file handle (for reading encrypted blob during passkey registration).
+ */
+export function getSessionFileHandle(): FileSystemFileHandle | null {
+  if (currentProvider instanceof LocalStorageProvider) {
+    return currentProvider.getHandle();
+  }
+  return null;
+}
+
+/**
  * Reset the sync service state.
- * Must be called before re-initializing for a different family to prevent
- * stale file handles or auto-sync state from the previous family carrying over.
  */
 export function reset(): void {
   cancelPendingSave();
   currentProvider = null;
   currentProviderFamilyId = null;
-  sessionPassword = null;
+  currentFamilyKey = null;
+  currentEnvelope = null;
   resetSaveFailures();
   updateState({
     isInitialized: false,
@@ -214,16 +257,10 @@ export function reset(): void {
 
 /**
  * Initialize the sync service - try to restore file handle from storage.
- * Resets previous state first to prevent cross-family data leakage.
- * Requires an active family to be set (prevents loading a legacy/wrong family's handle).
  */
 export async function initialize(): Promise<boolean> {
-  // Always reset previous state — prevents stale handles from a previous
-  // family's session from being reused (critical for multi-family isolation)
   reset();
 
-  // Guard: don't initialize sync without an active family
-  // (prevents getSyncFileKey from falling back to legacy key)
   if (!getActiveFamilyId()) {
     console.warn('[syncService] No active family — skipping sync initialization');
     updateState({
@@ -295,8 +332,7 @@ export async function initialize(): Promise<boolean> {
 }
 
 /**
- * Request permission to use the stored file handle
- * Must be called from a user gesture (click handler)
+ * Request permission to use the stored file handle (user gesture required)
  */
 export async function requestPermission(): Promise<boolean> {
   if (!currentProvider) {
@@ -319,8 +355,7 @@ export async function requestPermission(): Promise<boolean> {
 }
 
 /**
- * Open file picker to select/create a sync file
- * Must be called from a user gesture
+ * Open file picker to select/create a sync file (user gesture required)
  */
 export async function selectSyncFile(): Promise<boolean> {
   if (!supportsFileSystemAccess()) {
@@ -332,7 +367,6 @@ export async function selectSyncFile(): Promise<boolean> {
     const provider = await LocalStorageProvider.fromSavePicker();
     if (!provider) return false;
 
-    // Store handle for persistence
     const familyId = getActiveFamilyId();
     if (familyId) {
       await provider.persist(familyId);
@@ -348,7 +382,6 @@ export async function selectSyncFile(): Promise<boolean> {
 
     return true;
   } catch (e) {
-    // User cancelled is not an error
     if ((e as Error).name === 'AbortError') {
       return false;
     }
@@ -358,31 +391,24 @@ export async function selectSyncFile(): Promise<boolean> {
 }
 
 /**
- * Save current data to the sync file.
- * Serialized via a write mutex to prevent concurrent saves from corrupting
- * the file (see saveInProgress). If a save is already running, this call
- * waits for it to finish before starting its own write.
- * @param password - If provided, the data will be encrypted with this password
+ * Save the current Automerge document to the sync file.
+ * Encrypts with the family key and writes the V4 envelope.
  */
-export async function save(password?: string): Promise<boolean> {
-  // Wait for any in-flight save to complete before starting a new one.
-  // This prevents two overlapping createWritable/write/close sequences
-  // from interleaving, which can leave stale trailing bytes in the file.
+export async function save(): Promise<boolean> {
   if (saveInProgress) {
     try {
       await saveInProgress;
     } catch {
-      // Previous save failed — proceed with ours regardless
+      // Previous save failed — proceed with ours
     }
   }
 
-  const promise = doSave(password);
+  const promise = doSave();
   saveInProgress = promise;
 
   try {
     return await promise;
   } finally {
-    // Only clear if we're still the active save (another may have queued)
     if (saveInProgress === promise) {
       saveInProgress = null;
     }
@@ -390,29 +416,25 @@ export async function save(password?: string): Promise<boolean> {
 }
 
 /**
- * Internal save implementation — callers must go through save() which
- * serializes access via the write mutex.
+ * Internal save implementation
  */
-async function doSave(password?: string): Promise<boolean> {
+async function doSave(): Promise<boolean> {
   if (!currentProvider) {
     updateState({ lastError: 'No file configured' });
     return false;
   }
 
-  // Guard: ensure the provider belongs to the currently active family.
-  // This prevents auto-sync from writing to a different family's sync file
-  // after a family switch within the same SPA session.
+  if (!currentFamilyKey || !currentEnvelope) {
+    console.warn('[syncService] save() blocked: no family key or envelope set');
+    return false;
+  }
+
+  // Guard: ensure provider belongs to the active family
   const activeFamilyId = getActiveFamilyId();
   if (currentProviderFamilyId && activeFamilyId && currentProviderFamilyId !== activeFamilyId) {
     console.warn(
       `[syncService] save() blocked: provider belongs to family ${currentProviderFamilyId} but active family is ${activeFamilyId}`
     );
-    return false;
-  }
-
-  // Guard: if encryption is required but no password provided, refuse to write plaintext.
-  if (!password && isEncryptionRequiredFn && isEncryptionRequiredFn()) {
-    console.warn('[syncService] save() blocked: encryption is enabled but no password provided');
     return false;
   }
 
@@ -430,88 +452,45 @@ async function doSave(password?: string): Promise<boolean> {
       }
     }
 
-    // Create sync data — mark as encrypted if password is provided
-    const needsEncryption = !!password;
-    const syncData = await createSyncFileData(
-      needsEncryption,
-      currentPasskeySecrets.length > 0 ? currentPasskeySecrets : undefined
-    );
-
-    let fileContent: string;
-
-    if (password) {
-      // Password-based encryption (standard path)
-      const dataJson = JSON.stringify(syncData.data);
-      const encryptedData = await encryptSyncData(dataJson, password);
-
-      // Create encrypted file format - store encrypted data as string in data field
-      // Preserve envelope fields (familyId, familyName) so the file can be identified
-      // without decryption (e.g., for family resolution on a new device)
-      const encryptedSyncData: Record<string, unknown> = {
-        version: syncData.version,
-        exportedAt: syncData.exportedAt,
-        encrypted: true,
-        data: encryptedData,
-      };
-      if (syncData.familyId) {
-        encryptedSyncData.familyId = syncData.familyId;
-      }
-      if (syncData.familyName) {
-        encryptedSyncData.familyName = syncData.familyName;
-      }
-      if (syncData.passkeySecrets && syncData.passkeySecrets.length > 0) {
-        encryptedSyncData.passkeySecrets = syncData.passkeySecrets;
-      }
-      fileContent = JSON.stringify(encryptedSyncData, null, 2);
-    } else {
-      fileContent = JSON.stringify(syncData, null, 2);
-    }
+    // Re-encrypt the Automerge doc with the family key and update the envelope
+    const fileContent = await reEncryptEnvelope(currentEnvelope, currentFamilyKey);
 
     // Write via the storage provider abstraction
     await currentProvider.write(fileContent);
-
-    // File write succeeded — clear the WAL so it doesn't override on next reload
-    const savedFamilyId = getActiveFamilyId();
-    if (savedFamilyId) {
-      clearSettingsWAL(savedFamilyId);
-    }
 
     updateState({ isSyncing: false, lastError: null });
 
     // Track save success
     recordSaveSuccess();
 
-    // Notify subscribers (syncStore) of the save timestamp
-    saveCompleteCallbacks.forEach((cb) => cb(syncData.exportedAt));
+    // Notify subscribers of save timestamp
+    const timestamp = new Date().toISOString();
+    saveCompleteCallbacks.forEach((cb) => cb(timestamp));
 
     return true;
   } catch (e) {
     const errorMsg = (e as Error).message;
     updateState({ isSyncing: false, lastError: errorMsg });
-
-    // Track save failure
     recordSaveFailure(errorMsg);
-
     return false;
   }
 }
 
 /**
- * Get the timestamp from the sync file without fully loading/importing data
- * Returns null if file doesn't exist or is empty/invalid
+ * Get the timestamp from the sync file (lightweight check for polling)
  */
 export async function getFileTimestamp(): Promise<string | null> {
   if (!currentProvider) {
     return null;
   }
-
   return currentProvider.getLastModified();
 }
 
 /**
- * Load data from the sync file
+ * Load the raw file content from the storage provider.
+ * Returns the raw text, or null if the file is empty/missing.
  */
-export async function load(): Promise<SyncFileData | null> {
+export async function load(): Promise<string | null> {
   if (!currentProvider) {
     updateState({ lastError: 'No file configured' });
     return null;
@@ -530,31 +509,20 @@ export async function load(): Promise<SyncFileData | null> {
       }
     }
 
-    // Read file via provider
     const text = await currentProvider.read();
 
-    // Handle empty file (new sync file)
     if (!text) {
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
 
-    const data = JSON.parse(text);
-
-    if (!validateSyncFileData(data)) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return null;
-    }
-
     updateState({ isSyncing: false, lastError: null });
-    return data;
+    return text;
   } catch (e) {
-    // If file doesn't exist yet or is empty, that's okay
     if ((e as Error).name === 'NotFoundError' || (e as Error).message.includes('JSON')) {
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
-    // Drive API 404 — file was deleted or moved
     if (e instanceof DriveApiError && e.status === 404) {
       updateState({ isSyncing: false, lastError: `DriveApiError:404:${(e as Error).message}` });
       return null;
@@ -565,129 +533,223 @@ export async function load(): Promise<SyncFileData | null> {
 }
 
 /**
- * Load data from sync file and import into database.
- * Checks that the sync file's familyId matches the active family to prevent
- * cross-family data leakage (e.g., loading one family's sync file into another's DB).
- * @param options.merge - If true, merge file data with local data instead of full replace.
+ * Load file and parse as V4 envelope.
+ * Returns the envelope (caller decrypts with family key), or flags for needsPassword.
  */
-export async function loadAndImport(options: { merge?: boolean } = {}): Promise<{
+export async function loadAndParseV4(): Promise<{
   success: boolean;
+  envelope?: BeanpodFileV4;
   needsPassword?: boolean;
   fileNotFound?: boolean;
-  fileHandle?: FileSystemFileHandle;
-  rawSyncData?: SyncFileData;
-  hasLocalChanges?: boolean;
-  fileExportedAt?: string;
 }> {
-  const syncData = await load();
-  if (!syncData) {
-    // Check if load() failed due to a 404 (file deleted/moved on Drive)
+  const text = await load();
+  if (!text) {
     const lastError = getState().lastError;
     if (lastError?.startsWith('DriveApiError:404:')) {
       return { success: false, fileNotFound: true };
     }
-    // No data or error - state already updated by load()
     return { success: false };
-  }
-
-  if (syncData.encrypted) {
-    updateState({ lastError: 'Encrypted file - password required' });
-    // Return the local file handle if available (for backward compat with syncStore)
-    const localHandle =
-      currentProvider instanceof LocalStorageProvider ? currentProvider.getHandle() : undefined;
-    return {
-      success: false,
-      needsPassword: true,
-      fileHandle: localHandle,
-      rawSyncData: syncData,
-    };
-  }
-
-  // Guard: if sync file has a familyId (v2.0+), it must match the active family
-  let activeFamilyId = getActiveFamilyId();
-  if (syncData.familyId && activeFamilyId && syncData.familyId !== activeFamilyId) {
-    console.warn(
-      `[syncService] Sync file familyId (${syncData.familyId}) does not match active family (${activeFamilyId}). Skipping import.`
-    );
-    updateState({
-      lastError: 'Sync file belongs to a different family',
-      isConfigured: false,
-    });
-    return { success: false };
-  }
-
-  // If no active family (e.g. sign-in flow), activate from file's familyId
-  if (!activeFamilyId && syncData.familyId) {
-    await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-    activeFamilyId = syncData.familyId;
   }
 
   try {
-    const importResult = await importSyncFileData(syncData, { merge: options.merge });
-    return {
-      success: true,
-      hasLocalChanges: importResult.hasLocalChanges,
-      fileExportedAt: syncData.exportedAt,
-    };
+    const envelope = parseBeanpodV4(text);
+
+    // Guard: familyId must match active family
+    let activeFamilyId = getActiveFamilyId();
+    if (envelope.familyId && activeFamilyId && envelope.familyId !== activeFamilyId) {
+      console.warn(
+        `[syncService] File familyId (${envelope.familyId}) does not match active family (${activeFamilyId}). Skipping.`
+      );
+      updateState({ lastError: 'Sync file belongs to a different family', isConfigured: false });
+      return { success: false };
+    }
+
+    // If no active family, adopt from file
+    if (!activeFamilyId && envelope.familyId) {
+      await createFamilyWithId(envelope.familyId, envelope.familyName ?? 'My Family');
+      activeFamilyId = envelope.familyId;
+    }
+
+    // File is V4 and encrypted — needs family key to decrypt
+    return { success: true, envelope, needsPassword: true };
   } catch (e) {
     updateState({ lastError: (e as Error).message });
     return { success: false };
   }
 }
 
-// Callback to check if encryption is required (set by syncStore)
-let isEncryptionRequiredFn: (() => boolean) | null = null;
-
 /**
- * Register a callback that returns whether encryption is currently enabled.
- * Used by triggerDebouncedSave and flushPendingSave to prevent plaintext writes.
+ * Open file picker to select an existing sync file, read it, and configure as sync target.
  */
-export function setEncryptionRequiredCallback(fn: () => boolean): void {
-  isEncryptionRequiredFn = fn;
-}
+export async function openAndLoadFile(): Promise<OpenFileResult> {
+  cancelPendingSave();
 
-// Store the current session password for auto-sync
-let sessionPassword: string | null = null;
-
-/**
- * Set the session password for encryption (used by auto-sync)
- */
-export function setSessionPassword(password: string | null): void {
-  sessionPassword = password;
-}
-
-/**
- * Get the current session password
- */
-export function getSessionPassword(): string | null {
-  return sessionPassword;
-}
-
-// Store passkey secrets for inclusion in the .beanpod envelope
-let currentPasskeySecrets: import('@/types/models').PasskeySecret[] = [];
-
-/**
- * Set passkey secrets to include in saved files (called by syncStore).
- */
-export function setPasskeySecrets(secrets: import('@/types/models').PasskeySecret[]): void {
-  currentPasskeySecrets = secrets;
-}
-
-/**
- * Get the current session file handle (for reading encrypted blob during passkey registration).
- * Returns null if the current provider is not a local filesystem provider.
- */
-export function getSessionFileHandle(): FileSystemFileHandle | null {
-  if (currentProvider instanceof LocalStorageProvider) {
-    return currentProvider.getHandle();
+  if (!supportsFileSystemAccess()) {
+    return openAndLoadFileFallback();
   }
-  return null;
+
+  try {
+    const handles = await window.showOpenFilePicker({ multiple: false });
+    const handle = handles[0];
+    if (!handle) return { success: false };
+
+    const provider = LocalStorageProvider.fromHandle(handle);
+    updateState({ isSyncing: true, lastError: null });
+
+    const text = await provider.read();
+    if (!text) {
+      updateState({ isSyncing: false, lastError: 'File is empty' });
+      return { success: false };
+    }
+
+    const version = detectFileVersion(text);
+
+    if (version === '4.0') {
+      const envelope = parseBeanpodV4(text);
+      updateState({ isSyncing: false, lastError: null });
+      return {
+        success: false,
+        needsPassword: true,
+        fileHandle: handle,
+        provider,
+        envelope,
+      };
+    }
+
+    // V3 or unknown format
+    updateState({
+      isSyncing: false,
+      lastError: `Unsupported file version: ${version ?? 'unknown'}`,
+    });
+    return { success: false, rawText: text };
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') {
+      updateState({ isSyncing: false });
+      return { success: false };
+    }
+    updateState({ isSyncing: false, lastError: (e as Error).message });
+    return { success: false };
+  }
+}
+
+/**
+ * Fallback for openAndLoadFile when File System Access API is not available
+ */
+async function openAndLoadFileFallback(): Promise<OpenFileResult> {
+  try {
+    cancelPendingSave();
+    const file = await openFilePicker();
+    if (!file) return { success: false };
+
+    if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
+      updateState({ isSyncing: false, lastError: 'Please select a .beanpod or .json file' });
+      return { success: false };
+    }
+
+    updateState({ isSyncing: true, lastError: null });
+    const text = await file.text();
+
+    if (!text.trim()) {
+      updateState({ isSyncing: false, lastError: 'File is empty' });
+      return { success: false };
+    }
+
+    const version = detectFileVersion(text);
+
+    if (version === '4.0') {
+      const envelope = parseBeanpodV4(text);
+      updateState({ isSyncing: false, lastError: null });
+      return {
+        success: false,
+        needsPassword: true,
+        envelope,
+      };
+    }
+
+    updateState({
+      isSyncing: false,
+      lastError: `Unsupported file version: ${version ?? 'unknown'}`,
+    });
+    return { success: false, rawText: text };
+  } catch (e) {
+    updateState({ isSyncing: false, lastError: (e as Error).message });
+    return { success: false };
+  }
+}
+
+/**
+ * Load a file that was dropped onto the drop zone (drag-and-drop).
+ */
+export async function loadDroppedFile(
+  file: File,
+  fileHandle?: FileSystemFileHandle
+): Promise<OpenFileResult> {
+  cancelPendingSave();
+  try {
+    updateState({ isSyncing: true, lastError: null });
+    const text = await file.text();
+
+    if (!text.trim()) {
+      updateState({ isSyncing: false, lastError: 'File is empty' });
+      return { success: false };
+    }
+
+    const version = detectFileVersion(text);
+
+    if (version === '4.0') {
+      const envelope = parseBeanpodV4(text);
+      const provider = fileHandle ? LocalStorageProvider.fromHandle(fileHandle) : undefined;
+      updateState({ isSyncing: false, lastError: null });
+      return {
+        success: false,
+        needsPassword: true,
+        fileHandle,
+        provider,
+        envelope,
+      };
+    }
+
+    updateState({
+      isSyncing: false,
+      lastError: `Unsupported file version: ${version ?? 'unknown'}`,
+    });
+    return { success: false, rawText: text };
+  } catch (e) {
+    updateState({ isSyncing: false, lastError: (e as Error).message });
+    return { success: false };
+  }
+}
+
+/**
+ * Register the docService persist callback to trigger debounced saves.
+ * Called once at startup by syncStore.
+ *
+ * Also updates the local IndexedDB persistence cache on every change,
+ * ensuring the cache is always fresh for fast startup on page refresh.
+ */
+export function registerDocPersistCallback(): void {
+  onDocPersistNeeded(() => {
+    // Update local persistence cache immediately (fire-and-forget).
+    // This ensures the cache survives page refresh even if the file
+    // save (below) hasn't completed yet.
+    if (currentFamilyKey && isCacheReady()) {
+      persistDoc(currentFamilyKey).catch((err) => {
+        console.warn('[syncService] persistDoc failed:', err);
+      });
+      if (currentEnvelope) {
+        persistEnvelope(currentEnvelope).catch((err) => {
+          console.warn('[syncService] persistEnvelope failed:', err);
+        });
+      }
+    }
+
+    // Schedule file save (debounced, slower)
+    triggerDebouncedSave();
+  });
 }
 
 /**
  * Trigger a debounced save (for auto-sync).
- * If encryption is enabled (via callback) but no session password is available,
- * the save is skipped entirely to prevent writing plaintext to an encrypted file.
  */
 export function triggerDebouncedSave(): void {
   if (saveDebounceTimer) {
@@ -696,15 +758,11 @@ export function triggerDebouncedSave(): void {
 
   saveDebounceTimer = setTimeout(() => {
     saveDebounceTimer = null;
-    // Check encryption requirement via callback before saving
-    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
-      console.warn(
-        '[syncService] Auto-save skipped: encryption is enabled but no session password available'
-      );
+    if (!currentFamilyKey || !currentEnvelope) {
+      console.warn('[syncService] Auto-save skipped: no family key or envelope');
       return;
     }
-    save(sessionPassword ?? undefined).catch((err) => {
-      // Don't throw (debounced auto-save), but record failure for UI escalation
+    save().catch((err) => {
       console.warn('[syncService] Auto-save failed:', err);
       recordSaveFailure((err as Error).message ?? 'Auto-save failed');
     });
@@ -713,16 +771,14 @@ export function triggerDebouncedSave(): void {
 
 /**
  * Cancel any pending debounced save and perform an immediate save.
- * Combines flushPendingSave + save in a single call.
- * Intended for visibilitychange → hidden and beforeunload handlers.
  */
 export async function saveNow(): Promise<boolean> {
   cancelPendingSave();
-  if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
-    console.warn('[syncService] saveNow skipped: encryption enabled but no session password');
+  if (!currentFamilyKey || !currentEnvelope) {
+    console.warn('[syncService] saveNow skipped: no family key or envelope');
     return false;
   }
-  return save(sessionPassword ?? undefined);
+  return save();
 }
 
 /**
@@ -737,22 +793,16 @@ export function cancelPendingSave(): void {
 
 /**
  * Flush any pending debounced save immediately.
- * Call before sign-out to ensure recent changes are persisted to file.
- * If encryption is enabled but no session password is available,
- * the save is skipped to prevent writing plaintext.
  */
 export async function flushPendingSave(): Promise<void> {
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = null;
-    // Guard: never write plaintext when encryption is required
-    if (isEncryptionRequiredFn && isEncryptionRequiredFn() && !sessionPassword) {
-      console.warn(
-        '[syncService] Flush skipped: encryption is enabled but no session password available'
-      );
+    if (!currentFamilyKey || !currentEnvelope) {
+      console.warn('[syncService] Flush skipped: no family key or envelope');
       return;
     }
-    await save(sessionPassword ?? undefined);
+    await save();
   }
 }
 
@@ -770,6 +820,8 @@ export async function disconnect(): Promise<void> {
   }
   currentProvider = null;
   currentProviderFamilyId = null;
+  currentFamilyKey = null;
+  currentEnvelope = null;
   updateState({
     isConfigured: false,
     fileName: null,
@@ -784,430 +836,5 @@ export async function hasPermission(): Promise<boolean> {
   if (!currentProvider) {
     return false;
   }
-
   return currentProvider.isReady();
-}
-
-/**
- * Open file picker to select an existing sync file, load its data, and configure it as the sync target.
- * Must be called from a user gesture.
- * Returns OpenFileResult with:
- * - success: true if file was loaded and imported successfully
- * - needsPassword: true if file is encrypted and requires password
- * - fileHandle: the file handle (needed for decryption flow)
- * - provider: the storage provider (preferred over fileHandle)
- * - rawSyncData: the raw sync data structure (for encrypted files, data is a string)
- */
-export async function openAndLoadFile(): Promise<OpenFileResult> {
-  // Cancel any pending auto-save from a previously loaded file to prevent
-  // it from firing after the file handle has been switched.
-  cancelPendingSave();
-
-  // Mobile / legacy browsers: fall back to <input type="file">
-  if (!supportsFileSystemAccess()) {
-    return openAndLoadFileFallback();
-  }
-
-  try {
-    // Show open file picker to select existing file.
-    // No type filter — Android's system picker filters by MIME type and doesn't
-    // recognise .beanpod as application/json, greying those files out.
-    // We validate file contents after reading instead.
-    const handles = await window.showOpenFilePicker({
-      multiple: false,
-    });
-
-    const handle = handles[0];
-    if (!handle) {
-      return { success: false };
-    }
-
-    const provider = LocalStorageProvider.fromHandle(handle);
-
-    updateState({ isSyncing: true, lastError: null });
-
-    // Read and validate the file
-    const text = await provider.read();
-
-    if (!text) {
-      updateState({ isSyncing: false, lastError: 'File is empty' });
-      return { success: false };
-    }
-
-    let data: unknown;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      updateState({ isSyncing: false, lastError: 'Invalid JSON file' });
-      return { success: false };
-    }
-
-    // For encrypted files, the data field is a string, so we need a relaxed validation
-    const obj = data as Record<string, unknown>;
-    if (
-      typeof obj.version !== 'string' ||
-      typeof obj.exportedAt !== 'string' ||
-      typeof obj.encrypted !== 'boolean'
-    ) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return { success: false };
-    }
-
-    // If encrypted, return early with needsPassword flag
-    if (obj.encrypted === true) {
-      updateState({ isSyncing: false, lastError: null });
-      return {
-        success: false,
-        needsPassword: true,
-        fileHandle: handle,
-        provider,
-        rawSyncData: data as SyncFileData,
-      };
-    }
-
-    // For unencrypted files, do full validation
-    if (!validateSyncFileData(data)) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return { success: false };
-    }
-
-    const syncData = data as SyncFileData;
-
-    // User explicitly picked this file — adopt its family identity
-    let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId) {
-      if (syncData.familyId !== activeFamilyId) {
-        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-        activeFamilyId = syncData.familyId;
-      }
-    } else if (!activeFamilyId) {
-      // v1 file with no familyId and no active family — create one
-      const newFamilyId = generateUUID();
-      await createFamilyWithId(newFamilyId, 'My Family');
-      activeFamilyId = newFamilyId;
-    }
-
-    // Import the data
-    await importSyncFileData(syncData);
-
-    // Store provider for persistence and set as sync target
-    if (activeFamilyId) {
-      await provider.persist(activeFamilyId);
-    }
-    currentProvider = provider;
-    currentProviderFamilyId = activeFamilyId;
-
-    updateState({
-      isConfigured: true,
-      fileName: provider.getDisplayName(),
-      isSyncing: false,
-      lastError: null,
-    });
-
-    return { success: true, data: syncData };
-  } catch (e) {
-    // User cancelled is not an error
-    if ((e as Error).name === 'AbortError') {
-      updateState({ isSyncing: false });
-      return { success: false };
-    }
-    updateState({ isSyncing: false, lastError: (e as Error).message });
-    return { success: false };
-  }
-}
-
-/**
- * Fallback for openAndLoadFile when File System Access API is not available
- * (mobile browsers, Firefox, etc.). Uses <input type="file"> instead.
- * No file handle is stored, so auto-sync won't be available.
- */
-async function openAndLoadFileFallback(): Promise<OpenFileResult> {
-  try {
-    cancelPendingSave();
-    const file = await openFilePicker();
-    if (!file) {
-      return { success: false };
-    }
-
-    // Validate extension
-    if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
-      updateState({ isSyncing: false, lastError: 'Please select a .beanpod or .json file' });
-      return { success: false };
-    }
-
-    updateState({ isSyncing: true, lastError: null });
-
-    const text = await file.text();
-
-    if (!text.trim()) {
-      updateState({ isSyncing: false, lastError: 'File is empty' });
-      return { success: false };
-    }
-
-    let data: unknown;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      updateState({ isSyncing: false, lastError: 'Invalid JSON file' });
-      return { success: false };
-    }
-
-    // Relaxed validation for encrypted files
-    const obj = data as Record<string, unknown>;
-    if (
-      typeof obj.version !== 'string' ||
-      typeof obj.exportedAt !== 'string' ||
-      typeof obj.encrypted !== 'boolean'
-    ) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return { success: false };
-    }
-
-    // If encrypted, return early with needsPassword flag (no handle on mobile)
-    if (obj.encrypted === true) {
-      updateState({ isSyncing: false, lastError: null });
-      return {
-        success: false,
-        needsPassword: true,
-        rawSyncData: data as SyncFileData,
-      };
-    }
-
-    // Full validation for unencrypted files
-    if (!validateSyncFileData(data)) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return { success: false };
-    }
-
-    const syncData = data as SyncFileData;
-
-    // Adopt family identity from the file
-    let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId) {
-      if (syncData.familyId !== activeFamilyId) {
-        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-        activeFamilyId = syncData.familyId;
-      }
-    } else if (!activeFamilyId) {
-      const newFamilyId = generateUUID();
-      await createFamilyWithId(newFamilyId, 'My Family');
-      activeFamilyId = newFamilyId;
-    }
-
-    // Import the data
-    await importSyncFileData(syncData);
-
-    // No file handle on mobile — mark as configured but without auto-sync
-    updateState({
-      isConfigured: true,
-      fileName: file.name,
-      isSyncing: false,
-      lastError: null,
-    });
-
-    return { success: true, data: syncData };
-  } catch (e) {
-    updateState({ isSyncing: false, lastError: (e as Error).message });
-    return { success: false };
-  }
-}
-
-/**
- * Load a file that was dropped onto the drop zone (drag-and-drop).
- * Accepts a File object and an optional FileSystemFileHandle for persistent access.
- * If a handle is provided (Chromium), the file is stored for auto-sync.
- */
-export async function loadDroppedFile(
-  file: File,
-  fileHandle?: FileSystemFileHandle
-): Promise<OpenFileResult> {
-  cancelPendingSave();
-  try {
-    updateState({ isSyncing: true, lastError: null });
-
-    const text = await file.text();
-
-    if (!text.trim()) {
-      updateState({ isSyncing: false, lastError: 'File is empty' });
-      return { success: false };
-    }
-
-    let data: unknown;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      updateState({ isSyncing: false, lastError: 'Invalid JSON file' });
-      return { success: false };
-    }
-
-    const obj = data as Record<string, unknown>;
-    if (
-      typeof obj.version !== 'string' ||
-      typeof obj.exportedAt !== 'string' ||
-      typeof obj.encrypted !== 'boolean'
-    ) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return { success: false };
-    }
-
-    // If encrypted, return early with needsPassword flag
-    if (obj.encrypted === true) {
-      updateState({ isSyncing: false, lastError: null });
-      const provider = fileHandle ? LocalStorageProvider.fromHandle(fileHandle) : undefined;
-      return {
-        success: false,
-        needsPassword: true,
-        fileHandle,
-        provider,
-        rawSyncData: data as SyncFileData,
-      };
-    }
-
-    // For unencrypted files, do full validation
-    if (!validateSyncFileData(data)) {
-      updateState({ isSyncing: false, lastError: 'Invalid sync file format' });
-      return { success: false };
-    }
-
-    const syncData = data as SyncFileData;
-
-    // Adopt the file's family identity
-    let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId) {
-      if (syncData.familyId !== activeFamilyId) {
-        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-        activeFamilyId = syncData.familyId;
-      }
-    } else if (!activeFamilyId) {
-      const newFamilyId = generateUUID();
-      await createFamilyWithId(newFamilyId, 'My Family');
-      activeFamilyId = newFamilyId;
-    }
-
-    // Import the data
-    await importSyncFileData(syncData);
-
-    // If we have a file handle, create a provider and persist it
-    if (fileHandle) {
-      const provider = LocalStorageProvider.fromHandle(fileHandle);
-      if (activeFamilyId) {
-        await provider.persist(activeFamilyId);
-      }
-      currentProvider = provider;
-      currentProviderFamilyId = activeFamilyId;
-    }
-
-    updateState({
-      isConfigured: !!fileHandle,
-      fileName: file.name,
-      isSyncing: false,
-      lastError: null,
-    });
-
-    return { success: true, data: syncData };
-  } catch (e) {
-    updateState({ isSyncing: false, lastError: (e as Error).message });
-    return { success: false };
-  }
-}
-
-/**
- * Decrypt and import data from an encrypted file.
- * Call this after openAndLoadFile returns needsPassword: true.
- * Accepts either a StorageProvider or a FileSystemFileHandle for backward compat.
- */
-export async function decryptAndImport(
-  handleOrProvider: FileSystemFileHandle | StorageProvider,
-  rawSyncData: SyncFileData,
-  password: string
-): Promise<{ success: boolean; error?: string }> {
-  cancelPendingSave();
-  updateState({ isSyncing: true, lastError: null });
-
-  // Normalize to a StorageProvider
-  const provider =
-    handleOrProvider &&
-    'type' in handleOrProvider &&
-    (handleOrProvider.type === 'local' || handleOrProvider.type === 'google_drive')
-      ? (handleOrProvider as StorageProvider)
-      : handleOrProvider instanceof FileSystemFileHandle
-        ? LocalStorageProvider.fromHandle(handleOrProvider)
-        : null;
-
-  try {
-    // The data field is actually a base64 encrypted string for encrypted files
-    const encryptedData = rawSyncData.data as unknown as string;
-
-    // Decrypt the data
-    const decryptedJson = await decryptSyncData(encryptedData, password);
-    const decryptedData = JSON.parse(decryptedJson);
-
-    // Reconstruct the sync data with decrypted content
-    // Carry over envelope fields (familyId, familyName) from the outer wrapper
-    const syncData: SyncFileData = {
-      version: rawSyncData.version,
-      exportedAt: rawSyncData.exportedAt,
-      encrypted: false, // Mark as decrypted for import
-      data: decryptedData,
-      familyId: rawSyncData.familyId,
-      familyName: rawSyncData.familyName,
-    };
-
-    // Validate the decrypted data structure
-    if (!validateSyncFileData(syncData)) {
-      updateState({ isSyncing: false, lastError: 'Invalid data structure after decryption' });
-      return { success: false, error: 'Invalid data structure after decryption' };
-    }
-
-    // User explicitly provided password — adopt the file's family identity
-    let activeFamilyId = getActiveFamilyId();
-    if (syncData.familyId) {
-      if (syncData.familyId !== activeFamilyId) {
-        await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-        activeFamilyId = syncData.familyId;
-      }
-    } else if (!activeFamilyId) {
-      // Encrypted file with no familyId and no active family — create one
-      const newFamilyId = generateUUID();
-      await createFamilyWithId(newFamilyId, 'My Family');
-      activeFamilyId = newFamilyId;
-    }
-
-    // Import the data
-    await importSyncFileData(syncData);
-
-    // Set provider as sync target
-    if (provider) {
-      if (activeFamilyId) {
-        await provider.persist(activeFamilyId);
-      }
-      currentProvider = provider;
-      currentProviderFamilyId = activeFamilyId;
-
-      updateState({
-        isConfigured: true,
-        fileName: provider.getDisplayName(),
-        isSyncing: false,
-        lastError: null,
-      });
-    } else {
-      // No provider (mobile fallback) — mark configured but no auto-sync
-      updateState({
-        isConfigured: true,
-        isSyncing: false,
-        lastError: null,
-      });
-    }
-
-    return { success: true };
-  } catch (e) {
-    const errorMessage = (e as Error).message;
-    // Check for password error
-    if (errorMessage.includes('Incorrect password') || errorMessage.includes('corrupted')) {
-      updateState({ isSyncing: false, lastError: 'Incorrect password' });
-      return { success: false, error: 'Incorrect password' };
-    }
-    updateState({ isSyncing: false, lastError: errorMessage });
-    return { success: false, error: errorMessage };
-  }
 }

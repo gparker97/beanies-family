@@ -13,7 +13,7 @@ import type {
 } from '@/types/models';
 
 // Mock repositories
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn().mockResolvedValue([]),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
   updateAccountBalance: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   getDefaultSettings: vi.fn(() => ({

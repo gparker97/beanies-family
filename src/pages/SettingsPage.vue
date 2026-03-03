@@ -11,7 +11,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
-import { clearAllData } from '@/services/indexeddb/database';
+import { deleteFamilyDatabase } from '@/services/indexeddb/database';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -208,7 +209,10 @@ async function handleClearData() {
   // Clear cached encryption password and trust flag from registry DB before wiping per-family data
   await settingsStore.clearCachedEncryptionPassword();
   await settingsStore.setTrustedDevice(false);
-  await clearAllData();
+  const familyId = useFamilyContextStore().activeFamilyId;
+  if (familyId) {
+    await deleteFamilyDatabase(familyId);
+  }
   showClearConfirm.value = false;
   window.location.reload();
 }
