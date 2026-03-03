@@ -9,6 +9,7 @@ import {
   addYears,
   getStartOfDay,
   parseLocalDate,
+  extractDatePart,
 } from '@/utils/date';
 
 export interface ProcessResult {
@@ -25,6 +26,7 @@ export async function processRecurringItems(): Promise<ProcessResult> {
 
   try {
     const activeItems = await recurringRepo.getActiveRecurringItems();
+    const allTransactions = await transactionRepo.getAllTransactions();
     const now = new Date();
     const today = getStartOfDay(now);
 
@@ -41,6 +43,13 @@ export async function processRecurringItems(): Promise<ProcessResult> {
         const dueDates = getDueDatesSince(item, today);
 
         for (const dueDate of dueDates) {
+          // Dedup: skip if a transaction already exists for this item + date
+          const dateStr = toDateInputValue(dueDate);
+          const alreadyExists = allTransactions.some(
+            (tx) => tx.recurringItemId === item.id && extractDatePart(tx.date) === dateStr
+          );
+          if (alreadyExists) continue;
+
           // Create transaction for this due date
           const success = await createTransactionFromRecurring(item, dueDate);
           if (success) {
@@ -88,6 +97,34 @@ function getDueDatesSince(item: RecurringItem, today: Date): Date[] {
       break;
     }
 
+    dueDates.push(new Date(checkDate));
+    checkDate = getNextDueDate(item, checkDate);
+  }
+
+  return dueDates;
+}
+
+/**
+ * Get all due dates for a recurring item within a date range (inclusive).
+ * Used for projecting recurring transactions into future months.
+ */
+export function getDueDatesInRange(item: RecurringItem, rangeStart: Date, rangeEnd: Date): Date[] {
+  const dueDates: Date[] = [];
+  const startDate = parseLocalDate(item.startDate);
+
+  // Begin from the item's first due date
+  let checkDate = getFirstDueDate(item, startDate);
+
+  // Advance past rangeStart
+  while (checkDate < rangeStart) {
+    checkDate = getNextDueDate(item, checkDate);
+  }
+
+  // Collect dates within range
+  while (checkDate <= rangeEnd) {
+    if (item.endDate && checkDate > parseLocalDate(item.endDate)) {
+      break;
+    }
     dueDates.push(new Date(checkDate));
     checkDate = getNextDueDate(item, checkDate);
   }

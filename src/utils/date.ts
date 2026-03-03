@@ -79,7 +79,7 @@ export function isDateBetween(
  * For full ISO timestamps, converts to local date to avoid timezone shifts.
  * For date-only strings ("YYYY-MM-DD"), returns as-is.
  */
-function extractDatePart(dateStr: string): string {
+export function extractDatePart(dateStr: string): string {
   // If it's already a date-only string (YYYY-MM-DD), return as-is
   if (dateStr.length === 10) return dateStr;
   // For full ISO timestamps, parse and extract local date

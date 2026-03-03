@@ -99,11 +99,12 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return memberFilter.getSelectedMemberAccountIds(accountsStore.accounts);
   }
 
-  // Transactions filtered by global member filter (via account ownership)
+  // Always return a new array to avoid Vue 3.4+ computed reference-equality
+  // optimization swallowing downstream reactivity on in-place mutations.
   const filteredTransactions = computed(() => {
     const memberFilter = useMemberFilterStore();
     if (!memberFilter.isInitialized || memberFilter.isAllSelected) {
-      return transactions.value;
+      return [...transactions.value];
     }
     const selectedAccountIds = getSelectedAccountIds();
     return transactions.value.filter((t) => selectedAccountIds.has(t.accountId));
@@ -220,7 +221,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const transaction = await transactionRepo.createTransaction(input);
       const isFirst = transactions.value.length === 0;
-      transactions.value.push(transaction);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      transactions.value = [...transactions.value, transaction];
       if (isFirst) {
         celebrate('first-transaction');
       }
@@ -250,10 +252,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
       const updated = await transactionRepo.updateTransaction(id, input);
       if (updated) {
-        const index = transactions.value.findIndex((t) => t.id === id);
-        if (index !== -1) {
-          transactions.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        transactions.value = transactions.value.map((t) => (t.id === id ? updated : t));
 
         // If amount, type, or account changed, adjust balances
         if (original) {

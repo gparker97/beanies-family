@@ -178,6 +178,9 @@ export interface RecurringItem {
   updatedAt: ISODateString;
 }
 
+// Display transaction — extends Transaction with projection metadata for UI
+export type DisplayTransaction = Transaction & { isProjected?: boolean };
+
 // Asset - Property, vehicles, valuables
 export type AssetType =
   | 'real_estate'

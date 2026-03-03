@@ -14,6 +14,8 @@ import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { chooseScope } from '@/composables/useRecurringEditScope';
+import { useProjectedTransactions } from '@/composables/useProjectedTransactions';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
@@ -22,6 +24,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import type {
   Transaction,
+  DisplayTransaction,
   CreateTransactionInput,
   UpdateTransactionInput,
   RecurringItem,
@@ -46,6 +49,7 @@ const { playWhoosh } = useSounds();
 
 // ── State ─────────────────────────────────────────────────────────────────
 const selectedMonth = ref(new Date());
+const { isFutureMonth, projectedTransactions } = useProjectedTransactions(selectedMonth);
 const activeFilter = ref<'all' | 'recurring' | 'one-time'>('all');
 const searchQuery = ref('');
 
@@ -55,18 +59,42 @@ const showEditModal = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
 const editingRecurringItem = ref<RecurringItem | null>(null);
 
+// Deferred projected-transaction editing state
+const pendingProjectedScope = ref<{
+  scope: 'this-only' | 'this-and-future';
+  tx: DisplayTransaction;
+} | null>(null);
+const addModalInitialValues = ref<Partial<CreateTransactionInput> | null>(null);
+
 // ── Computeds ─────────────────────────────────────────────────────────────
 const baseCurrency = computed(() => settingsStore.baseCurrency);
 
 const monthStart = computed(() => toISODateString(getStartOfMonth(selectedMonth.value)));
 const monthEnd = computed(() => toISODateString(getEndOfMonth(selectedMonth.value)));
 
-// Filter transactions to selected month
-const monthTransactions = computed(() =>
-  transactionsStore.filteredSortedTransactions.filter((tx) =>
+// Filter transactions to selected month, merging projected recurring transactions
+const monthTransactions = computed<DisplayTransaction[]>(() => {
+  const actual: DisplayTransaction[] = transactionsStore.filteredSortedTransactions.filter((tx) =>
     isDateBetween(tx.date, monthStart.value, monthEnd.value)
-  )
-);
+  );
+
+  // Build set of existing real transaction keys for dedup
+  const existingKeys = new Set(
+    actual
+      .filter((tx) => tx.recurringItemId)
+      .map((tx) => `${tx.recurringItemId}-${toDateInputValue(new Date(tx.date))}`)
+  );
+
+  // Only include projections that don't already have a real transaction
+  const deduped = projectedTransactions.value.filter(
+    (tx) => !existingKeys.has(`${tx.recurringItemId}-${tx.date}`)
+  );
+
+  const merged = [...actual, ...deduped];
+  // Sort by date ascending (earliest first) so date group headers render chronologically
+  merged.sort((a, b) => a.date.localeCompare(b.date));
+  return merged;
+});
 
 // Apply type filter
 const filteredByType = computed(() => {
@@ -93,7 +121,7 @@ const displayTransactions = computed(() => {
 
 // Group by date
 const groupedTransactions = computed(() => {
-  const groups = new Map<string, Transaction[]>();
+  const groups = new Map<string, DisplayTransaction[]>();
   for (const tx of displayTransactions.value) {
     const key = toDateInputValue(new Date(tx.date));
     const group = groups.get(key);
@@ -160,7 +188,7 @@ function isDateToday(dateKey: string): boolean {
   return dateKey === toDateInputValue(new Date());
 }
 
-function getRecurringFrequencyLabel(tx: Transaction): string {
+function getRecurringFrequencyLabel(tx: DisplayTransaction): string {
   if (!tx.recurringItemId) return '';
   const item = recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
   if (!item) return t('transactions.typeRecurring');
@@ -182,17 +210,28 @@ function closeEditModal() {
   showEditModal.value = false;
   editingTransaction.value = null;
   editingRecurringItem.value = null;
+  pendingProjectedScope.value = null;
+}
+
+function closeAddModal() {
+  showAddModal.value = false;
+  addModalInitialValues.value = null;
+  pendingProjectedScope.value = null;
 }
 
 async function handleTransactionSave(
   data: CreateTransactionInput | { id: string; data: UpdateTransactionInput }
 ) {
   if ('id' in data) {
-    await transactionsStore.updateTransaction(data.id, data.data);
+    if (!(await transactionsStore.updateTransaction(data.id, data.data))) return;
     closeEditModal();
   } else {
-    await transactionsStore.createTransaction(data);
-    showAddModal.value = false;
+    // If materializing a "this-only" projected transaction, ensure recurringItemId is set
+    if (pendingProjectedScope.value?.scope === 'this-only') {
+      data.recurringItemId = pendingProjectedScope.value.tx.recurringItemId;
+    }
+    if (!(await transactionsStore.createTransaction(data))) return;
+    closeAddModal();
   }
 }
 
@@ -210,8 +249,9 @@ async function handleTransactionDelete(id: string) {
         message: 'transactions.deleteConfirm',
       })
     ) {
-      await transactionsStore.deleteTransaction(id);
-      playWhoosh();
+      if (await transactionsStore.deleteTransaction(id)) {
+        playWhoosh();
+      }
     }
   }
 }
@@ -223,24 +263,81 @@ async function deleteTransaction(id: string) {
       message: 'transactions.deleteConfirm',
     })
   ) {
-    await transactionsStore.deleteTransaction(id);
-    playWhoosh();
+    if (await transactionsStore.deleteTransaction(id)) {
+      playWhoosh();
+    }
   }
 }
 
 // ── Recurring save from TransactionModal ──────────────────────────────────
+
+/** After updating a recurring template, propagate field changes to linked
+ *  non-reconciled materialized transactions so the UI reflects the edit. */
+async function syncLinkedTransactions(recurringItemId: string, data: CreateRecurringItemInput) {
+  const linked = transactionsStore.transactions.filter(
+    (tx) => tx.recurringItemId === recurringItemId && !tx.isReconciled
+  );
+  for (const tx of linked) {
+    // Recalculate date: keep the transaction's year/month, use new dayOfMonth
+    const txDate = new Date(tx.date + 'T00:00:00');
+    const daysInMonth = new Date(txDate.getFullYear(), txDate.getMonth() + 1, 0).getDate();
+    const newDay = Math.min(data.dayOfMonth, daysInMonth);
+    const yyyy = txDate.getFullYear();
+    const mm = String(txDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(newDay).padStart(2, '0');
+
+    await transactionsStore.updateTransaction(tx.id, {
+      amount: data.amount,
+      description: data.description,
+      category: data.category,
+      type: data.type,
+      currency: data.currency,
+      accountId: data.accountId,
+      date: `${yyyy}-${mm}-${dd}`,
+    });
+  }
+}
+
 async function handleSaveRecurring(data: CreateRecurringItemInput) {
   if (editingRecurringItem.value) {
-    await recurringStore.updateRecurringItem(editingRecurringItem.value.id, data);
+    let updatedItemId = editingRecurringItem.value.id;
+
+    // "This and future" deferred split: split first, then apply edits to the new item
+    if (pendingProjectedScope.value?.scope === 'this-and-future') {
+      const splitDate = pendingProjectedScope.value.tx.date;
+      const newItem = await recurringStore.splitRecurringItem(
+        editingRecurringItem.value.id,
+        splitDate
+      );
+      if (!newItem) return; // split failed — keep modal open
+      if (!(await recurringStore.updateRecurringItem(newItem.id, data))) return;
+      updatedItemId = newItem.id;
+    } else {
+      if (!(await recurringStore.updateRecurringItem(editingRecurringItem.value.id, data))) return;
+    }
+
+    // Propagate template changes to linked materialized transactions
+    await syncLinkedTransactions(updatedItemId, data);
     closeEditModal();
-  } else {
-    await recurringStore.createRecurringItem(data);
-    // Process the new recurring item to generate due transactions immediately
+  } else if (editingTransaction.value) {
+    // Converting a one-time transaction to recurring
+    const created = await recurringStore.createRecurringItem(data);
+    if (!created) return; // creation failed — keep modal open
+    await transactionsStore.deleteTransaction(editingTransaction.value.id);
     const result = await processRecurringItems();
     if (result.processed > 0) {
       await transactionsStore.loadTransactions();
     }
-    showAddModal.value = false;
+    closeEditModal();
+  } else {
+    // Creating a brand new recurring item
+    const created = await recurringStore.createRecurringItem(data);
+    if (!created) return; // creation failed — keep modal open
+    const result = await processRecurringItems();
+    if (result.processed > 0) {
+      await transactionsStore.loadTransactions();
+    }
+    closeAddModal();
   }
 }
 
@@ -261,18 +358,52 @@ async function deleteRecurringItemById(id: string) {
     // Delete all transactions generated from this recurring item
     await transactionsStore.deleteTransactionsByRecurringItemId(id);
     // Delete the recurring template itself
-    await recurringStore.deleteRecurringItem(id);
-    playWhoosh();
+    if (await recurringStore.deleteRecurringItem(id)) {
+      playWhoosh();
+    }
   }
 }
 
 // Helper to find the recurring item for a transaction (for edit button)
-function getRecurringItem(tx: Transaction): RecurringItem | undefined {
+function getRecurringItem(tx: DisplayTransaction): RecurringItem | undefined {
   if (!tx.recurringItemId) return undefined;
   return recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
 }
 
-function isRecurringItemInactive(tx: Transaction): boolean {
+// ── Projected transaction click handler ────────────────────────────────────
+async function handleProjectedClick(tx: DisplayTransaction) {
+  const scope = await chooseScope();
+  if (!scope) return;
+
+  const ri = getRecurringItem(tx);
+  if (!ri) return;
+
+  if (scope === 'all') {
+    // Edit the recurring template directly — no side effects needed
+    openEditRecurringModal(ri);
+  } else if (scope === 'this-only') {
+    // Defer materialization: pre-fill the add modal with projected values
+    pendingProjectedScope.value = { scope: 'this-only', tx };
+    addModalInitialValues.value = {
+      accountId: tx.accountId,
+      type: tx.type,
+      amount: tx.amount,
+      currency: tx.currency,
+      category: tx.category,
+      date: tx.date,
+      description: tx.description,
+      isReconciled: false,
+      recurringItemId: tx.recurringItemId,
+    };
+    showAddModal.value = true;
+  } else if (scope === 'this-and-future') {
+    // Defer split: open the original recurring item for editing
+    pendingProjectedScope.value = { scope: 'this-and-future', tx };
+    openEditRecurringModal(ri);
+  }
+}
+
+function isRecurringItemInactive(tx: DisplayTransaction): boolean {
   if (!tx.recurringItemId) return false;
   const item = recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
   return item ? !item.isActive : false;
@@ -336,6 +467,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
         :label="t('transactions.income')"
         :amount="monthIncome"
         :currency="baseCurrency"
+        :change-label="isFutureMonth ? t('transactions.projectedLabel') : ''"
         tint="green"
       >
         <template #icon>
@@ -347,6 +479,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
         :label="t('transactions.expenses')"
         :amount="monthExpenses"
         :currency="baseCurrency"
+        :change-label="isFutureMonth ? t('transactions.projectedLabel') : ''"
         tint="orange"
       >
         <template #icon>
@@ -358,6 +491,7 @@ function isRecurringItemInactive(tx: Transaction): boolean {
         :label="t('transactions.net')"
         :amount="monthNet"
         :currency="baseCurrency"
+        :change-label="isFutureMonth ? t('transactions.projectedLabel') : ''"
         tint="slate"
         :dark="monthNet >= 0"
       >
@@ -414,14 +548,19 @@ function isRecurringItemInactive(tx: Transaction): boolean {
             v-for="tx in txns"
             :key="tx.id"
             data-testid="transaction-item"
-            class="group cursor-pointer border-b border-[var(--tint-slate-5)] px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
+            class="group cursor-pointer border-b px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
             :class="[
               syncHighlightClass(tx.id),
+              tx.isProjected
+                ? 'border-dashed border-[var(--tint-slate-5)] opacity-60 hover:opacity-100'
+                : 'border-[var(--tint-slate-5)]',
               isRecurringItemInactive(tx) ? 'opacity-60 hover:opacity-100' : '',
             ]"
             @click="
               () => {
-                if (tx.recurringItemId) {
+                if (tx.isProjected) {
+                  handleProjectedClick(tx);
+                } else if (tx.recurringItemId) {
                   const ri = getRecurringItem(tx);
                   if (ri) openEditRecurringModal(ri);
                   else openEditModal(tx);
@@ -479,6 +618,12 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                     class="text-primary-500 dark:bg-primary-900/20 rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
                   >
                     {{ t('transactions.typeRecurring') }}
+                  </span>
+                  <span
+                    v-if="tx.isProjected"
+                    class="rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
+                  >
+                    {{ t('transactions.projected') }}
                   </span>
                   <span
                     v-if="isRecurringItemInactive(tx)"
@@ -542,6 +687,12 @@ function isRecurringItemInactive(tx: Transaction): boolean {
                 {{ getRecurringFrequencyLabel(tx) }}
               </span>
               <span
+                v-if="tx.isProjected"
+                class="ml-1 inline-block rounded-lg bg-sky-100 px-2 py-0.5 text-xs font-semibold text-sky-600 dark:bg-sky-900/30 dark:text-sky-400"
+              >
+                {{ t('transactions.projected') }}
+              </span>
+              <span
                 v-if="isRecurringItemInactive(tx)"
                 class="ml-1 inline-block rounded-lg bg-gray-200 px-2 py-0.5 text-xs font-semibold text-gray-500 dark:bg-slate-600 dark:text-gray-400"
               >
@@ -555,8 +706,8 @@ function isRecurringItemInactive(tx: Transaction): boolean {
               </span>
             </div>
 
-            <!-- Actions -->
-            <div class="mt-2 flex justify-end md:mt-0">
+            <!-- Actions (hidden for projected rows — scope picker handles them) -->
+            <div v-if="!tx.isProjected" class="mt-2 flex justify-end md:mt-0">
               <template v-if="tx.recurringItemId">
                 <ActionButtons
                   size="sm"
@@ -588,7 +739,8 @@ function isRecurringItemInactive(tx: Transaction): boolean {
     <!-- Add Transaction Modal -->
     <TransactionModal
       :open="showAddModal"
-      @close="showAddModal = false"
+      :initial-values="addModalInitialValues"
+      @close="closeAddModal"
       @save="handleTransactionSave"
       @save-recurring="handleSaveRecurring"
       @delete="handleTransactionDelete"
