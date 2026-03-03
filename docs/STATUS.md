@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-03
-> **Updated by:** Claude (projected recurring transactions, store reactivity fixes, Today button — deployed)
+> **Updated by:** Claude (#113 data layer switchover complete, merged to feature/automerge-migration)
 
 ## Current Phase
 
@@ -629,7 +629,7 @@ Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + 
 
 **Phase 2 — Core Migration:**
 
-- [ ] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal (note: `gp-` → `beanies-` DB rename already completed in #112)
+- [x] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal. Merged to `feature/automerge-migration`. Includes: all 10 stores switched to Automerge repos, sync/persistence layer rewritten for V4 beanpod, 15 deprecated files deleted, regression fixes (Automerge proxy cloning, auth session persistence, passkey lifecycle, exchange rate save). 615 tests passing.
 
 **Phase 3 — Auth & UI:**
 
