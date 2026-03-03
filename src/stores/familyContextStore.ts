@@ -73,7 +73,8 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
     try {
       const family = await familyContext.createNewFamily(name);
       activeFamily.value = family;
-      allFamilies.value.push(family);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      allFamilies.value = [...allFamilies.value, family];
       return family;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to create family';
@@ -94,7 +95,8 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
       const family = await familyContext.createFamilyWithId(familyId, name);
       activeFamily.value = family;
       if (!allFamilies.value.some((f) => f.id === family.id)) {
-        allFamilies.value.push(family);
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        allFamilies.value = [...allFamilies.value, family];
       }
       return family;
     } catch (e) {
@@ -118,10 +120,8 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
       const updated = await familyContext.updateFamilyName(activeFamily.value.id, name);
       if (updated) {
         activeFamily.value = updated;
-        const index = allFamilies.value.findIndex((f) => f.id === updated.id);
-        if (index !== -1) {
-          allFamilies.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        allFamilies.value = allFamilies.value.map((f) => (f.id === updated.id ? updated : f));
         return true;
       }
       return false;

@@ -63,7 +63,8 @@ export const useGoalsStore = defineStore('goals', () => {
   async function createGoal(input: CreateGoalInput): Promise<Goal | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const goal = await goalRepo.createGoal(input);
-      goals.value.push(goal);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      goals.value = [...goals.value, goal];
       return goal;
     });
     return result ?? null;
@@ -83,10 +84,8 @@ export const useGoalsStore = defineStore('goals', () => {
 
       const updated = await goalRepo.updateGoal(id, input);
       if (updated) {
-        const index = goals.value.findIndex((g) => g.id === id);
-        if (index !== -1) {
-          goals.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        goals.value = goals.value.map((g) => (g.id === id ? updated : g));
 
         // Fire celebration when goal transitions to completed
         if (updated.isCompleted && !wasCompleted) {
