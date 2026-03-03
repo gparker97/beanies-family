@@ -207,7 +207,7 @@ async function handleExportTranslations() {
 
 async function handleClearData() {
   // Clear cached encryption password and trust flag from registry DB before wiping per-family data
-  await settingsStore.clearCachedEncryptionPassword();
+  await settingsStore.clearCachedFamilyKey();
   await settingsStore.setTrustedDevice(false);
   const familyId = useFamilyContextStore().activeFamilyId;
   if (familyId) {
@@ -615,13 +615,6 @@ function formatLastSync(timestamp: string | null): string {
                     </BaseButton>
                   </div>
                 </div>
-
-                <p
-                  v-if="!syncStore.hasSessionPassword && syncStore.isEncryptionEnabled"
-                  class="mt-2 text-sm text-yellow-600 dark:text-yellow-400"
-                >
-                  {{ t('settings.passwordNote') }}
-                </p>
               </div>
             </div>
           </div>

@@ -23,8 +23,6 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 
-const SESSION_PASSWORD_KEY = 'beanies-file-password';
-
 type LoginView = 'create';
 type JoinStep = 'verify' | 'pick-member' | 'set-password';
 
@@ -42,6 +40,7 @@ const targetFamilyId = ref('');
 const targetProvider = ref('local');
 const targetFileRef = ref('');
 const targetDriveFileId = ref('');
+const inviteToken = ref('');
 const registryEntry = ref<RegistryEntry | null>(null);
 const isLookingUp = ref(false);
 const lookupDone = ref(false);
@@ -51,6 +50,7 @@ const formError = ref<string | null>(null);
 // File loading (inline within verify step)
 const fileLoaded = ref(false);
 const needsManualFileLoad = ref(false);
+const cloudLoadFailed = ref(false);
 const isLoadingFile = ref(false);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
@@ -87,11 +87,15 @@ function getMemberRole(member: FamilyMember): string {
 
 // --- Step 1: Verify & Load ---
 onMounted(async () => {
-  // Parse query params
-  const fam = (route.query.fam as string) || (route.query.code as string) || '';
+  // Parse query params — invite links use t= and f=, magic links use fam= and code=
+  const fam =
+    (route.query.fam as string) || (route.query.code as string) || (route.query.f as string) || '';
   const p = (route.query.p as string) || 'local';
   const fileRef = (route.query.ref as string) || '';
   const fileIdParam = (route.query.fileId as string) || '';
+  const token = (route.query.t as string) || '';
+
+  if (token) inviteToken.value = token;
 
   if (fam) {
     targetFamilyId.value = fam;
@@ -140,16 +144,18 @@ async function performLookup(familyId: string) {
 
 function parseMagicLink(
   input: string
-): { fam: string; p?: string; ref?: string; fileId?: string } | null {
+): { fam: string; p?: string; ref?: string; fileId?: string; t?: string } | null {
   try {
     const url = new URL(input);
-    const fam = url.searchParams.get('fam') || url.searchParams.get('code');
+    const fam =
+      url.searchParams.get('fam') || url.searchParams.get('code') || url.searchParams.get('f');
     if (fam)
       return {
         fam,
         p: url.searchParams.get('p') || undefined,
         ref: url.searchParams.get('ref') || undefined,
         fileId: url.searchParams.get('fileId') || undefined,
+        t: url.searchParams.get('t') || undefined,
       };
   } catch {
     // Not a URL — return null
@@ -172,6 +178,7 @@ async function handleManualCodeSubmit() {
     targetProvider.value = parsed.p || 'local';
     targetFileRef.value = parsed.ref || '';
     targetDriveFileId.value = parsed.fileId || '';
+    if (parsed.t) inviteToken.value = parsed.t;
   } else {
     targetFamilyId.value = raw;
   }
@@ -201,13 +208,19 @@ async function attemptFileLoad() {
       if (result.success) {
         await onFileLoaded();
       } else if (result.needsPassword) {
-        showDecryptModal.value = true;
+        if (await tryInviteTokenDecrypt()) {
+          await onFileLoaded();
+        } else if (!inviteToken.value) {
+          showDecryptModal.value = true;
+        }
+        // If invite token was present but failed, formError is already set
       } else {
-        formError.value = syncStore.error || t('auth.fileLoadFailed');
+        // Cloud load failed — fall back to manual file load
+        cloudLoadFailed.value = true;
         needsManualFileLoad.value = true;
       }
     } catch {
-      formError.value = t('join.cloudLoadFailed');
+      cloudLoadFailed.value = true;
       needsManualFileLoad.value = true;
     } finally {
       isLoadingFile.value = false;
@@ -228,7 +241,11 @@ async function handleLoadFile() {
     if (result.success) {
       await onFileLoaded();
     } else if (result.needsPassword) {
-      showDecryptModal.value = true;
+      if (await tryInviteTokenDecrypt()) {
+        await onFileLoaded();
+      } else if (!inviteToken.value) {
+        showDecryptModal.value = true;
+      }
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -300,7 +317,11 @@ async function handleDrop(e: DragEvent) {
     if (result.success) {
       await onFileLoaded();
     } else if (result.needsPassword) {
-      showDecryptModal.value = true;
+      if (await tryInviteTokenDecrypt()) {
+        await onFileLoaded();
+      } else if (!inviteToken.value) {
+        showDecryptModal.value = true;
+      }
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -325,7 +346,6 @@ async function handleDecrypt() {
   try {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
-      sessionStorage.setItem(SESSION_PASSWORD_KEY, decryptPassword.value);
       showDecryptModal.value = false;
       decryptPassword.value = '';
       await onFileLoaded();
@@ -339,9 +359,52 @@ async function handleDecrypt() {
   }
 }
 
+/**
+ * Try to decrypt the pending V4 file using the invite token.
+ * Returns true if decryption succeeded, false if it should fall back to the password modal.
+ */
+async function tryInviteTokenDecrypt(): Promise<boolean> {
+  if (!inviteToken.value) return false;
+
+  const pending = syncStore.pendingEncryptedFile;
+  if (!pending?.envelope?.inviteKeys) return false;
+
+  try {
+    const { hashInviteToken, redeemInviteToken, isInviteExpired } =
+      await import('@/services/crypto/inviteService');
+
+    const tokenHash = await hashInviteToken(inviteToken.value);
+    const pkg = pending.envelope.inviteKeys[tokenHash];
+
+    if (!pkg) {
+      formError.value = t('join.inviteTokenInvalid');
+      return false;
+    }
+
+    if (isInviteExpired(pkg.expiresAt)) {
+      formError.value = t('join.inviteTokenExpired');
+      return false;
+    }
+
+    const fk = await redeemInviteToken(pkg.wrapped, pkg.salt, inviteToken.value);
+    const result = await syncStore.decryptPendingFileWithKey(fk);
+
+    if (result.success) return true;
+
+    formError.value = result.error ?? t('join.inviteTokenInvalid');
+    return false;
+  } catch {
+    formError.value = t('join.inviteTokenInvalid');
+    return false;
+  }
+}
+
 async function onFileLoaded() {
-  // Validate familyId matches if we have a target
-  if (targetFamilyId.value && familyContextStore.activeFamilyId !== targetFamilyId.value) {
+  // Validate familyId matches if we have a target.
+  // Use the V4 envelope's familyId (always available after decrypt) with fallback
+  // to the context store (which may be null in a fresh browser).
+  const loadedFamilyId = syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId;
+  if (targetFamilyId.value && loadedFamilyId && loadedFamilyId !== targetFamilyId.value) {
     formError.value = t('join.fileMismatch');
     fileLoaded.value = false;
     return;
@@ -515,7 +578,7 @@ function handleBack() {
         <!-- File guidance card -->
         <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
           <p class="mb-3 text-sm font-semibold text-white">
-            {{ t('join.needsFile') }}
+            {{ cloudLoadFailed ? t('join.cloudLoadFailed') : t('join.needsFile') }}
           </p>
           <p class="mb-4 text-sm text-white/70">
             {{ t('join.needsFileDesc') }}

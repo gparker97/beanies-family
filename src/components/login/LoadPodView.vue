@@ -18,8 +18,6 @@ const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 
-const SESSION_PASSWORD_KEY = 'beanies-file-password';
-
 const props = defineProps<{
   needsPermissionGrant?: boolean;
   autoLoad?: boolean;
@@ -45,33 +43,29 @@ const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | nul
 let dragCounter = 0;
 
 /**
- * Try to auto-decrypt using a cached sessionStorage password.
+ * Try to auto-decrypt using a cached family key from trusted device settings.
  * Returns true if decryption succeeded.
  */
 async function tryAutoDecrypt(): Promise<boolean> {
-  // Use familyId from pending encrypted file's raw data for per-family cache lookup
   const pendingFamilyId = syncStore.pendingEncryptedFile?.envelope?.familyId;
+  if (!pendingFamilyId) return false;
 
-  // Try sessionStorage first (current session), then trusted device cache (persistent)
-  const passwords = [
-    sessionStorage.getItem(SESSION_PASSWORD_KEY),
-    pendingFamilyId ? settingsStore.getCachedEncryptionPassword(pendingFamilyId) : null,
-  ].filter(Boolean) as string[];
-
-  for (const pw of passwords) {
+  // Try cached family key from trusted device
+  const cachedKey = settingsStore.getCachedFamilyKey(pendingFamilyId);
+  if (cachedKey) {
     try {
-      const result = await syncStore.decryptPendingFile(pw);
+      const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+      const { base64ToBuffer } = await import('@/utils/encoding');
+      const raw = new Uint8Array(base64ToBuffer(cachedKey));
+      const fk = await importFamilyKey(raw);
+      const result = await syncStore.decryptPendingFileWithKey(fk);
       if (result.success) return true;
     } catch {
-      // Try next password
+      // Cached key invalid — clear it
     }
+    await settingsStore.clearCachedFamilyKey(pendingFamilyId);
   }
 
-  // All attempts failed — clear stale caches
-  sessionStorage.removeItem(SESSION_PASSWORD_KEY);
-  if (pendingFamilyId) {
-    await settingsStore.clearCachedEncryptionPassword(pendingFamilyId);
-  }
   return false;
 }
 
@@ -229,8 +223,6 @@ async function handleDecrypt() {
   try {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
-      sessionStorage.setItem(SESSION_PASSWORD_KEY, decryptPassword.value);
-      // decryptPendingFile already caches on trusted devices via syncStore
       showDecryptModal.value = false;
       decryptPassword.value = '';
       emit('file-loaded');

@@ -169,14 +169,14 @@ export async function deleteLocalFamily(familyId: string): Promise<void> {
   await clearFileHandleForFamily(familyId);
   await clearProviderConfig(familyId);
 
-  // 4. Clear cached encryption password
+  // 4. Clear cached family key
   const { saveGlobalSettings, getGlobalSettings: getGS } =
     await import('@/services/indexeddb/repositories/globalSettingsRepository');
   const gs = await getGS();
-  if (gs.cachedEncryptionPasswords?.[familyId]) {
-    const updated = { ...gs.cachedEncryptionPasswords };
+  if (gs.cachedFamilyKeys?.[familyId]) {
+    const updated = { ...gs.cachedFamilyKeys };
     delete updated[familyId];
-    await saveGlobalSettings({ cachedEncryptionPasswords: updated });
+    await saveGlobalSettings({ cachedFamilyKeys: updated });
   }
 
   // 5. Remove from local registry

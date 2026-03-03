@@ -110,9 +110,6 @@ export const useSyncStore = defineStore('sync', () => {
   // Encryption is always on in V4 — backward compat computed
   const isEncryptionEnabled = computed(() => true);
   const hasSessionPassword = computed(() => familyKey.value !== null);
-  // Session-scoped password retained for passkey registration and trusted device caching
-  const sessionPassword = ref<string | null>(null);
-  const currentSessionPassword = computed(() => sessionPassword.value);
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
 
   // Getters
@@ -508,9 +505,6 @@ export const useSyncStore = defineStore('sync', () => {
         syncService.setProvider(pending.provider);
       }
 
-      // Retain password for passkey registration / trusted device caching
-      sessionPassword.value = password;
-
       // Clear pending
       pendingEncryptedFile.value = null;
       needsPermission.value = false;
@@ -534,10 +528,13 @@ export const useSyncStore = defineStore('sync', () => {
         { preserveTimestamp: true }
       );
 
-      // Cache password on trusted devices
+      // Cache exported family key on trusted devices
       const settingsStore = useSettingsStore();
-      if (familyCtx.activeFamilyId) {
-        await settingsStore.cacheEncryptionPassword(password, familyCtx.activeFamilyId);
+      if (familyCtx.activeFamilyId && fk) {
+        const exported = await getExportedFamilyKey();
+        if (exported) {
+          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId);
+        }
       }
 
       // Reload all stores
@@ -583,7 +580,6 @@ export const useSyncStore = defineStore('sync', () => {
       replaceDoc(doc);
       familyKey.value = fk;
       envelope.value = cachedEnvelope;
-      sessionPassword.value = password;
       syncService.setFamilyKey(fk, cachedEnvelope);
       isConfigured.value = true; // Data is loaded — show configured UI
       needsPermission.value = true; // Still need file permission for future saves
@@ -651,7 +647,6 @@ export const useSyncStore = defineStore('sync', () => {
       const env = parseBeanpodV4(envelopeJson);
       familyKey.value = fk;
       envelope.value = env;
-      sessionPassword.value = password;
       syncService.setFamilyKey(fk, env);
 
       // 9. Initialize persistence cache (doc + envelope)
@@ -684,21 +679,164 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Set session password — stores the family key derived from password.
-   * Kept for backward compat; in V4, use decryptPendingFile instead.
+   * Clear session key material
    */
-  function setSessionPassword(_password: string): void {
-    // No-op in V4 — family key is set via decryptPendingFile
+  function clearSessionPassword(): void {
+    familyKey.value = null;
+    envelope.value = null;
   }
 
   /**
-   * Clear session password
+   * Export the current family key as base64 string.
+   * Used for trusted device caching and passkey registration.
    */
-  function clearSessionPassword(): void {
-    // Clear family key and session password on session end
-    familyKey.value = null;
-    envelope.value = null;
-    sessionPassword.value = null;
+  async function getExportedFamilyKey(): Promise<string | null> {
+    if (!familyKey.value) return null;
+    const { exportFamilyKey } = await import('@/services/crypto/familyKeyService');
+    const { bufferToBase64 } = await import('@/utils/encoding');
+    const raw = await exportFamilyKey(familyKey.value);
+    return bufferToBase64(raw);
+  }
+
+  /**
+   * Decrypt a pending file using a pre-obtained family key (skips password derivation).
+   * Used by passkey/biometric flows that already have the family key.
+   */
+  async function decryptPendingFileWithKey(
+    fk: CryptoKey
+  ): Promise<{ success: boolean; error?: string }> {
+    const pending = pendingEncryptedFile.value;
+    if (!pending) return { success: false, error: 'No pending file' };
+
+    try {
+      // Decrypt the Automerge payload with the family key
+      const doc = await decryptBeanpodPayload(pending.envelope, fk);
+      replaceDoc(doc);
+      familyKey.value = fk;
+      envelope.value = pending.envelope;
+      syncService.setFamilyKey(fk, pending.envelope);
+      isConfigured.value = true;
+
+      // Adopt family identity if needed
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      const activeFamilyId = getActiveFamilyId();
+      const familyCtx = useFamilyContextStore();
+      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+        await familyCtx.switchFamily(activeFamilyId);
+      }
+
+      // If loaded from Google Drive, persist the config
+      if (pending.driveFileId && pending.driveFileName) {
+        const { storeProviderConfig, clearFileHandleForFamily } =
+          await import('@/services/sync/fileHandleStore');
+        if (activeFamilyId) {
+          await clearFileHandleForFamily(activeFamilyId);
+          await storeProviderConfig(activeFamilyId, {
+            type: 'google_drive',
+            driveFileId: pending.driveFileId,
+            driveFileName: pending.driveFileName,
+            driveAccountEmail: pending.driveAccountEmail,
+          });
+        }
+        const provider = GoogleDriveProvider.fromExisting(
+          pending.driveFileId,
+          pending.driveFileName,
+          pending.driveAccountEmail
+        );
+        syncService.setProvider(provider);
+      }
+
+      // If file was opened with a provider (local file picker), persist it
+      if (pending.provider) {
+        if (activeFamilyId) {
+          await pending.provider.persist(activeFamilyId);
+        }
+        syncService.setProvider(pending.provider);
+      }
+
+      // Clear pending
+      pendingEncryptedFile.value = null;
+      needsPermission.value = false;
+      lastSync.value = toISODateString(new Date());
+
+      // Initialize persistence cache
+      if (familyCtx.activeFamilyId) {
+        await initPersistenceDB(familyCtx.activeFamilyId);
+        persistDoc(fk).catch(console.warn);
+        persistEnvelope(pending.envelope).catch(console.warn);
+      }
+
+      await settingsRepo.saveSettings(
+        {
+          syncEnabled: true,
+          encryptionEnabled: true,
+          syncFilePath: fileName.value ?? undefined,
+          lastSyncTimestamp: lastSync.value ?? undefined,
+        },
+        { preserveTimestamp: true }
+      );
+
+      // Cache exported family key on trusted devices
+      const settingsStore = useSettingsStore();
+      if (familyCtx.activeFamilyId) {
+        const exported = await getExportedFamilyKey();
+        if (exported) {
+          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId);
+        }
+      }
+
+      await reloadAllStores();
+      setupAutoSync();
+
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  }
+
+  /**
+   * Add a wrapped key entry to the envelope for a new member (joinFamily flow).
+   */
+  async function addMemberWrappedKey(
+    memberId: string,
+    wrappedKey: { wrapped: string; salt: string }
+  ): Promise<void> {
+    if (!envelope.value) throw new Error('No envelope loaded');
+    const env = { ...envelope.value };
+    env.wrappedKeys = {
+      ...env.wrappedKeys,
+      [memberId]: { wrapped: wrappedKey.wrapped, salt: wrappedKey.salt },
+    };
+    envelope.value = env;
+
+    // Persist updated envelope
+    if (familyKey.value) {
+      persistEnvelope(env).catch(console.warn);
+    }
+  }
+
+  /**
+   * Add an invite key package to the envelope and persist.
+   * Returns the token hash (storage key) so the caller can verify storage.
+   */
+  async function addInvitePackage(
+    tokenHash: string,
+    pkg: { salt: string; wrapped: string; expiresAt: string }
+  ): Promise<void> {
+    if (!envelope.value) throw new Error('No envelope loaded');
+    const env = { ...envelope.value };
+    env.inviteKeys = {
+      ...env.inviteKeys,
+      [tokenHash]: { salt: pkg.salt, wrapped: pkg.wrapped, expiresAt: pkg.expiresAt },
+    };
+    envelope.value = env;
+    syncService.setEnvelope(env);
+
+    // Persist updated envelope and sync
+    if (familyKey.value) {
+      persistEnvelope(env).catch(console.warn);
+    }
+    await syncNow(true);
   }
 
   /**
@@ -728,7 +866,7 @@ export const useSyncStore = defineStore('sync', () => {
     driveFileNotFound.value = false;
 
     const settingsStore = useSettingsStore();
-    await settingsStore.clearCachedEncryptionPassword(ctx.activeFamilyId ?? undefined);
+    await settingsStore.clearCachedFamilyKey(ctx.activeFamilyId ?? undefined);
     await settingsRepo.saveSettings({
       syncEnabled: false,
       syncFilePath: undefined,
@@ -860,9 +998,12 @@ export const useSyncStore = defineStore('sync', () => {
           const familyCtx = useFamilyContextStore();
           const settingsStore = useSettingsStore();
           const famId = familyCtx.activeFamilyId;
-          const cachedPw = famId ? settingsStore.getCachedEncryptionPassword(famId) : null;
-          if (cachedPw) {
-            const result = await decryptPendingFile(cachedPw);
+          const cachedKeyB64 = famId ? settingsStore.getCachedFamilyKey(famId) : null;
+          if (cachedKeyB64) {
+            const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+            const { base64ToBuffer } = await import('@/utils/encoding');
+            const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+            const result = await decryptPendingFileWithKey(fk);
             return result.success;
           }
 
@@ -949,7 +1090,6 @@ export const useSyncStore = defineStore('sync', () => {
     needsPermission.value = false;
     familyKey.value = null;
     envelope.value = null;
-    sessionPassword.value = null;
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
@@ -1168,7 +1308,6 @@ export const useSyncStore = defineStore('sync', () => {
     syncStatus,
     isEncryptionEnabled,
     hasSessionPassword,
-    currentSessionPassword,
     hasPendingEncryptedFile,
     storageProviderType,
     providerAccountEmail,
@@ -1200,8 +1339,11 @@ export const useSyncStore = defineStore('sync', () => {
     createNewFile,
     enableEncryption,
     disableEncryption,
-    setSessionPassword,
     clearSessionPassword,
+    getExportedFamilyKey,
+    decryptPendingFileWithKey,
+    addMemberWrappedKey,
+    addInvitePackage,
     disconnect,
     manualExport,
     manualImport,

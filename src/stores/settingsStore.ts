@@ -360,38 +360,38 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
-   * Cache the encryption password for a specific family on trusted devices.
+   * Cache the exported family key for a specific family on trusted devices.
    * Only stores when isTrustedDevice is true.
    */
-  async function cacheEncryptionPassword(password: string, familyId: string): Promise<void> {
+  async function cacheFamilyKey(exportedKey: string, familyId: string): Promise<void> {
     if (!isTrustedDevice.value) return;
-    const existing = globalSettings.value.cachedEncryptionPasswords ?? {};
+    const existing = globalSettings.value.cachedFamilyKeys ?? {};
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-      cachedEncryptionPasswords: { ...existing, [familyId]: password },
+      cachedFamilyKeys: { ...existing, [familyId]: exportedKey },
     });
   }
 
   /**
-   * Retrieve the cached encryption password for a specific family.
+   * Retrieve the cached family key for a specific family.
    */
-  function getCachedEncryptionPassword(familyId: string): string | null {
-    return globalSettings.value.cachedEncryptionPasswords?.[familyId] ?? null;
+  function getCachedFamilyKey(familyId: string): string | null {
+    return globalSettings.value.cachedFamilyKeys?.[familyId] ?? null;
   }
 
   /**
-   * Clear the cached encryption password.
+   * Clear the cached family key.
    * With familyId: clear one entry. Without: clear all.
    */
-  async function clearCachedEncryptionPassword(familyId?: string): Promise<void> {
+  async function clearCachedFamilyKey(familyId?: string): Promise<void> {
     if (familyId) {
-      const existing = { ...(globalSettings.value.cachedEncryptionPasswords ?? {}) };
+      const existing = { ...(globalSettings.value.cachedFamilyKeys ?? {}) };
       delete existing[familyId];
       globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-        cachedEncryptionPasswords: existing,
+        cachedFamilyKeys: existing,
       });
     } else {
       globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-        cachedEncryptionPasswords: {},
+        cachedFamilyKeys: {},
       });
     }
   }
@@ -459,9 +459,9 @@ export const useSettingsStore = defineStore('settings', () => {
     setTrustedDevice,
     setTrustedDevicePromptShown,
     setPasskeyPromptShown,
-    cacheEncryptionPassword,
-    getCachedEncryptionPassword,
-    clearCachedEncryptionPassword,
+    cacheFamilyKey,
+    getCachedFamilyKey,
+    clearCachedFamilyKey,
     convertAmount,
     resetState,
   };

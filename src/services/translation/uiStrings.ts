@@ -977,10 +977,6 @@ const STRING_DEFS = {
     en: 'Yes, Disable Encryption',
     beanie: 'yes, disable encryption',
   },
-  'settings.passwordNote': {
-    en: "Note: You'll need to enter your password when you return to access your data.",
-    beanie: "note: you'll need to enter your password when you return to access your data.",
-  },
   'settings.noAutoSyncWarning': {
     en: "Your browser doesn't support automatic file saving. Use manual export/import instead. For automatic saving, use Chrome or Edge.",
     beanie:
@@ -1183,10 +1179,6 @@ const STRING_DEFS = {
     en: 'Sign in with your fingerprint, face, or device PIN instead of a password.',
     beanie: 'sign in with your fingerprint, face, or device pin instead of a password.',
   },
-  'passkey.enterEncryptionPassword': {
-    en: 'Enter your encryption password to register',
-    beanie: 'enter your encryption password to register',
-  },
   'passkey.noPasskeys': {
     en: 'No biometric logins registered yet.',
     beanie: 'no biometric logins registered yet.',
@@ -1194,10 +1186,6 @@ const STRING_DEFS = {
   'passkey.unsupported': {
     en: 'Your browser does not support biometric login (WebAuthn).',
     beanie: 'your browser does not support biometric login (webauthn).',
-  },
-  'passkey.needsEncryption': {
-    en: 'Biometric login requires file encryption to be enabled.',
-    beanie: 'biometric login requires file encryption to be enabled.',
   },
   'passkey.rename': { en: 'Rename', beanie: 'rename' },
   'passkey.renameLabel': { en: 'Device name', beanie: 'device name' },
@@ -1375,10 +1363,6 @@ const STRING_DEFS = {
   'loginV6.createButton': { en: 'Create Pod', beanie: 'create pod' },
   'loginV6.alreadyHavePod': { en: 'Already have a pod?', beanie: 'already have a pod?' },
   'loginV6.loadItLink': { en: 'Load it', beanie: 'load it' },
-  'loginV6.passwordHint': {
-    en: 'This encrypts your data file',
-    beanie: 'this encrypts your data file',
-  },
   'loginV6.storageTitle': {
     en: 'Where should we save your pod?',
     beanie: 'where should we save your pod?',
@@ -1444,14 +1428,14 @@ const STRING_DEFS = {
     beanie:
       'onboarded beans can sign in with their password. new beans need to create a password first.',
   },
+  'loginV6.pickBeanInfoTrusted': {
+    en: 'This is a trusted device. Just tap your bean to sign in — no password needed.',
+    beanie: 'this is a trusted device. just tap your bean to sign in — no password needed.',
+  },
   'loginV6.growPodTitle': { en: 'Grow a brand-new pod', beanie: 'grow a brand-new pod' },
   'loginV6.growPodSubtitle': {
     en: 'Name your family pod and create your sign-in password.',
     beanie: 'name your family pod and create your sign-in password.',
-  },
-  'loginV6.encryptionPasswordLabel': {
-    en: 'Pod data file encryption password',
-    beanie: 'pod data file encryption password',
   },
   'loginV6.signInPasswordLabel': { en: 'Your sign-in password', beanie: 'your sign-in password' },
   'loginV6.signInPasswordHint': {
@@ -1469,14 +1453,9 @@ const STRING_DEFS = {
   },
   'loginV6.step2Title': { en: 'Save & secure your pod', beanie: 'save & secure your pod' },
   'loginV6.step2Subtitle': {
-    en: 'Choose where to store your encrypted data file and set a password to protect it.',
-    beanie: 'choose where to store your encrypted data file and set a password to protect it.',
+    en: 'Choose where to store your encrypted data file.',
+    beanie: 'choose where to store your encrypted data file.',
   },
-  'loginV6.podPasswordOptional': {
-    en: 'Optional \u2014 you can enable encryption later in Settings',
-    beanie: 'optional \u2014 you can enable encryption later in settings',
-  },
-  'loginV6.confirmPodPassword': { en: 'Confirm pod password', beanie: 'confirm pod password' },
   'loginV6.addMemberFailed': {
     en: 'Failed to add member. Please try again.',
     beanie: 'failed to add member. please try again.',
@@ -1525,6 +1504,18 @@ const STRING_DEFS = {
   'join.noUnclaimedMembers': {
     en: 'No unclaimed profiles found. Ask the family owner to create your profile first.',
     beanie: 'no unclaimed beanies found. ask your pod owner to create your profile first.',
+  },
+  'join.inviteTokenInvalid': {
+    en: 'This invite link is invalid. Ask the family owner for a new one.',
+    beanie: 'this invite link is no good. ask your pod owner for a new one.',
+  },
+  'join.inviteTokenExpired': {
+    en: 'This invite link has expired. Ask the family owner for a new one.',
+    beanie: 'this invite link has expired. ask your pod owner for a new one.',
+  },
+  'join.generatingLink': {
+    en: 'Generating secure invite link...',
+    beanie: 'generating secure invite link...',
   },
   'join.setPasswordTitle': { en: 'Create your password', beanie: 'create your password' },
   'join.setPasswordSubtitle': {
