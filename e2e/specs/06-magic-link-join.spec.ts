@@ -30,20 +30,12 @@ test.describe('Magic Link Invite System', () => {
       expect(linkText).toContain('&p=local');
       expect(linkText).toContain('&ref=');
 
-      // Verify family code is displayed
-      const codeBlock = modal.locator('code').nth(1);
-      const codeText = await codeBlock.textContent();
-      expect(codeText).toBeTruthy();
-      // Family code should be a UUID
-      expect(codeText!.trim()).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      );
+      // Verify family code is NOT displayed (magic link only)
+      const codeBlocks = modal.locator('code');
+      await expect(codeBlocks).toHaveCount(1); // Only the invite link
 
       // Verify file sharing info card is visible
       await expect(modal.getByText(/share the .beanpod file/i)).toBeVisible();
-
-      // Verify role toggle is NOT present (removed in this update)
-      await expect(modal.getByText(/parent/i, { exact: true })).not.toBeVisible();
     });
 
     // Clipboard permissions only work in Chromium
@@ -80,7 +72,7 @@ test.describe('Magic Link Invite System', () => {
   });
 
   test.describe('Join Flow (JoinPodView)', () => {
-    test('should show manual code entry when navigating to /join without params', async ({
+    test('should show invite link instructions when navigating to /join without params', async ({
       page,
     }) => {
       await page.goto('/join');
@@ -88,18 +80,17 @@ test.describe('Magic Link Invite System', () => {
       // Should show the join title
       await expect(page.getByText('Join your family')).toBeVisible();
 
-      // Should show the manual code input
-      await expect(page.getByLabel(/family code/i)).toBeVisible();
+      // Should show "How to join" instructional card with steps
+      await expect(page.getByText(/how to join/i)).toBeVisible();
+      await expect(page.getByText(/ask a parent or family admin/i)).toBeVisible();
+      await expect(page.getByText(/tap invite to generate a magic link/i)).toBeVisible();
+      await expect(page.getByText(/open the link on your device/i)).toBeVisible();
 
-      // Should show "What happens next?" card
-      await expect(page.getByText(/what happens next/i)).toBeVisible();
+      // Should show expiry note
+      await expect(page.getByText(/expire after 24 hours/i)).toBeVisible();
 
-      // Should show the 3 steps
-      await expect(page.getByText(/verify your family and load the data file/i)).toBeVisible();
-      await expect(page.getByText(/pick your profile and create a password/i)).toBeVisible();
-
-      // Should have a Next button
-      await expect(page.getByRole('button', { name: /next/i })).toBeVisible();
+      // Should NOT show a manual code input
+      await expect(page.getByLabel(/family code/i)).not.toBeVisible();
 
       // Should have a "Create a new pod" link
       await expect(page.getByRole('button', { name: /create a new pod/i })).toBeVisible();
@@ -141,18 +132,11 @@ test.describe('Magic Link Invite System', () => {
       await expect(page.getByText(/grow a brand-new pod/i)).toBeVisible({ timeout: 5000 });
     });
 
-    test('should submit manual code and attempt lookup', async ({ page }) => {
-      await page.goto('/join');
+    test('should show loading state when navigating to /join with params', async ({ page }) => {
+      const fakeFamilyId = '12345678-aaaa-bbbb-cccc-123456789abc';
+      await page.goto(`/join?fam=${fakeFamilyId}&p=local&ref=dGVzdC5iZWFucG9k`);
 
-      // Enter a family code
-      const input = page.getByLabel(/family code/i);
-      await input.fill('12345678-aaaa-bbbb-cccc-123456789abc');
-
-      // Click Next
-      await page.getByRole('button', { name: /next/i }).click();
-
-      // Should attempt lookup (spinner or result)
-      // Since API is not configured, it will show fallback
+      // Should attempt lookup and show a result (not the instructions screen)
       await page.waitForTimeout(2000);
       const result = page.getByText(/family not found|load .beanpod file/i).first();
       await expect(result).toBeVisible({ timeout: 10000 });

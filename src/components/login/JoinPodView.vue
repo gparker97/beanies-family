@@ -44,7 +44,6 @@ const inviteToken = ref('');
 const registryEntry = ref<RegistryEntry | null>(null);
 const isLookingUp = ref(false);
 const lookupDone = ref(false);
-const manualCode = ref('');
 const formError = ref<string | null>(null);
 
 // File loading (inline within verify step)
@@ -140,50 +139,6 @@ async function performLookup(familyId: string) {
   } finally {
     isLookingUp.value = false;
   }
-}
-
-function parseMagicLink(
-  input: string
-): { fam: string; p?: string; ref?: string; fileId?: string; t?: string } | null {
-  try {
-    const url = new URL(input);
-    const fam =
-      url.searchParams.get('fam') || url.searchParams.get('code') || url.searchParams.get('f');
-    if (fam)
-      return {
-        fam,
-        p: url.searchParams.get('p') || undefined,
-        ref: url.searchParams.get('ref') || undefined,
-        fileId: url.searchParams.get('fileId') || undefined,
-        t: url.searchParams.get('t') || undefined,
-      };
-  } catch {
-    // Not a URL — return null
-  }
-  return null;
-}
-
-async function handleManualCodeSubmit() {
-  formError.value = null;
-  const raw = manualCode.value.trim();
-  if (!raw) {
-    formError.value = t('auth.fillAllFields');
-    return;
-  }
-
-  // Check if the input is a magic link URL
-  const parsed = parseMagicLink(raw);
-  if (parsed) {
-    targetFamilyId.value = parsed.fam;
-    targetProvider.value = parsed.p || 'local';
-    targetFileRef.value = parsed.ref || '';
-    targetDriveFileId.value = parsed.fileId || '';
-    if (parsed.t) inviteToken.value = parsed.t;
-  } else {
-    targetFamilyId.value = raw;
-  }
-
-  await performLookup(targetFamilyId.value);
 }
 
 async function attemptFileLoad() {
@@ -511,8 +466,13 @@ function handleBack() {
     <!-- STEP 1: Verify & Load                        -->
     <!-- ============================================ -->
     <template v-if="currentStep === 'verify'">
-      <!-- Header -->
+      <!-- Header with beanie family image -->
       <div class="mb-6 text-center">
+        <img
+          src="/brand/beanies_family_icon_transparent_384x384.png"
+          alt=""
+          class="mx-auto mb-3 h-24 w-24"
+        />
         <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('join.verifyTitle') }}
         </h2>
@@ -674,56 +634,66 @@ function handleBack() {
         </div>
       </template>
 
-      <!-- No link params — manual code entry -->
+      <!-- No link params — show instructions to get a magic link -->
       <template v-else-if="!isLookingUp && !lookupDone">
-        <form @submit.prevent="handleManualCodeSubmit">
-          <BaseInput
-            v-model="manualCode"
-            :label="t('join.codeInputLabel')"
-            :placeholder="t('login.familyCodePlaceholder')"
-            required
-          />
-          <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-            {{ t('join.codeInputHint') }}
+        <!-- How to join card -->
+        <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+          <p class="mb-3 text-sm font-semibold text-white">
+            {{ t('join.howToJoinTitle') }}
           </p>
-
-          <!-- What happens next card -->
-          <div class="bg-secondary-500 mt-6 rounded-2xl p-5 dark:bg-slate-700">
-            <p class="mb-3 text-sm font-semibold text-white">
-              {{ t('loginV6.whatsNext') }}
-            </p>
-            <div class="space-y-2.5">
-              <div class="flex items-start gap-3">
-                <div
-                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-                >
-                  1
-                </div>
-                <p class="text-sm text-white/80">{{ t('loginV6.joinStep1') }}</p>
+          <div class="space-y-2.5">
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+              >
+                1
               </div>
-              <div class="flex items-start gap-3">
-                <div
-                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-                >
-                  2
-                </div>
-                <p class="text-sm text-white/80">{{ t('loginV6.joinStep2') }}</p>
+              <p class="text-sm text-white/80">{{ t('join.howToJoinStep1') }}</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+              >
+                2
               </div>
-              <div class="flex items-start gap-3">
-                <div
-                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-                >
-                  3
-                </div>
-                <p class="text-sm text-white/80">{{ t('loginV6.joinStep3') }}</p>
+              <p class="text-sm text-white/80">{{ t('join.howToJoinStep2') }}</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+              >
+                3
               </div>
+              <p class="text-sm text-white/80">{{ t('join.howToJoinStep3') }}</p>
             </div>
           </div>
+        </div>
 
-          <BaseButton type="submit" class="mt-6 w-full" :disabled="isLookingUp">
-            {{ t('join.next') }}
-          </BaseButton>
-        </form>
+        <!-- Expiry note -->
+        <div
+          class="mt-4 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
+        >
+          <div
+            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"
+          >
+            <svg
+              class="h-4 w-4 text-[#6EE7B7]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <p class="text-xs font-semibold opacity-50">
+            {{ t('join.linkExpiryNote') }}
+          </p>
+        </div>
       </template>
 
       <!-- Footer link -->
