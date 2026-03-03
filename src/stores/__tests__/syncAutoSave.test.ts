@@ -273,9 +273,7 @@ vi.mock('@/services/registry/registryService', () => ({
 }));
 
 // Passkey
-vi.mock('@/services/auth/passkeyService', () => ({
-  invalidatePasskeysForPasswordChange: vi.fn(async () => {}),
-}));
+vi.mock('@/services/auth/passkeyService', () => ({}));
 
 // Family stores — minimal stubs for the auto-sync watcher sources
 vi.mock('@/stores/familyStore', () => ({

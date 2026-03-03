@@ -35,7 +35,7 @@ export interface GlobalSettings {
   soundEnabled?: boolean;
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
-  cachedEncryptionPasswords?: Record<string, string>;
+  cachedFamilyKeys?: Record<string, string>;
   passkeyPromptShown?: boolean;
 }
 
@@ -47,19 +47,17 @@ export interface PasskeyRegistration {
   publicKey: string; // base64 public key
   transports?: string[]; // AuthenticatorTransport hints
   prfSupported: boolean; // PRF available during registration?
-  cachedPassword?: string; // Cached encryption password for file decryption
   label: string; // e.g. "MacBook Touch ID"
   createdAt: ISODateString;
   lastUsedAt?: ISODateString;
 }
 
-// PasskeySecret - PRF-wrapped file password stored in .beanpod envelope
+// PasskeySecret - PRF-wrapped family key stored in .beanpod envelope
 export interface PasskeySecret {
   credentialId: string; // Which passkey credential created this
   memberId: UUID; // Which member this belongs to
-  wrappedPassword: string; // AES-GCM encrypted file password
+  wrappedFamilyKey: string; // AES-KW wrapped family key
   hkdfSalt: string; // HKDF salt (base64)
-  iv: string; // AES-GCM IV (base64)
   createdAt: ISODateString;
 }
 

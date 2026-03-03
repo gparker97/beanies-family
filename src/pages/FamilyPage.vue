@@ -36,23 +36,63 @@ const editFamilyName = ref('');
 const showInviteModal = ref(false);
 const inviteCopiedCode = ref(false);
 const inviteCopiedLink = ref(false);
+const isGeneratingInvite = ref(false);
+const inviteLinkError = ref<string | null>(null);
 
 const inviteCode = computed(() => familyContextStore.activeFamilyId ?? '');
-const inviteLink = computed(() => {
+const inviteLink = ref('');
+
+/** Build the base join URL (without token) for display/fallback. */
+function buildBaseJoinUrl(): string {
   const fam = inviteCode.value;
   const p = syncStore.storageProviderType ?? 'local';
-  const ref = syncStore.fileName ? btoa(syncStore.fileName) : '';
-  let url = `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${ref}`;
+  const fileRef = syncStore.fileName ? btoa(syncStore.fileName) : '';
+  let url = `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${fileRef}`;
   if (p === 'google_drive' && syncStore.driveFileId) {
     url += `&fileId=${encodeURIComponent(syncStore.driveFileId)}`;
   }
   return url;
-});
+}
 
-function openInviteModal() {
+/** Generate a crypto invite link with a token-wrapped family key. */
+async function generateInviteLink(): Promise<string> {
+  const fk = syncStore.familyKey;
+  if (!fk) {
+    // No family key — fall back to base URL (V3 or unconfigured)
+    return buildBaseJoinUrl();
+  }
+
+  const { generateInviteToken, createInvitePackage, hashInviteToken } =
+    await import('@/services/crypto/inviteService');
+
+  const token = generateInviteToken();
+  const pkg = await createInvitePackage(fk, token);
+  const tokenHash = await hashInviteToken(token);
+
+  // Store the invite package in the V4 envelope
+  await syncStore.addInvitePackage(tokenHash, pkg);
+
+  // Build full URL with token + provider info
+  const base = buildBaseJoinUrl();
+  return `${base}&t=${encodeURIComponent(token)}`;
+}
+
+async function openInviteModal() {
   inviteCopiedCode.value = false;
   inviteCopiedLink.value = false;
+  inviteLinkError.value = null;
   showInviteModal.value = true;
+
+  // Generate a fresh invite link with crypto token
+  isGeneratingInvite.value = true;
+  try {
+    inviteLink.value = await generateInviteLink();
+  } catch (e) {
+    inviteLinkError.value = (e as Error).message;
+    inviteLink.value = buildBaseJoinUrl();
+  } finally {
+    isGeneratingInvite.value = false;
+  }
 }
 
 async function copyInviteCode() {
@@ -84,6 +124,10 @@ const copiedMemberId = ref<string | null>(null);
 
 async function copyMemberInviteLink(memberId: string) {
   try {
+    // Generate a fresh invite link if we don't have one yet
+    if (!inviteLink.value) {
+      inviteLink.value = await generateInviteLink();
+    }
     await navigator.clipboard.writeText(inviteLink.value);
     copiedMemberId.value = memberId;
     setTimeout(() => {
@@ -349,7 +393,15 @@ function cancelEditFamilyName() {
           <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('login.inviteLink') }}
           </label>
-          <div class="flex items-center gap-2">
+          <div v-if="isGeneratingInvite" class="flex items-center gap-2 py-2.5">
+            <div
+              class="border-t-primary-500 h-4 w-4 animate-spin rounded-full border-2 border-gray-300"
+            ></div>
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{
+              t('join.generatingLink')
+            }}</span>
+          </div>
+          <div v-else class="flex items-center gap-2">
             <code
               class="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
             >

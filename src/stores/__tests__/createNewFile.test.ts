@@ -77,7 +77,6 @@ vi.mock('@/services/auth/passwordService', () => ({
 
 // Passkey service
 vi.mock('@/services/auth/passkeyService', () => ({
-  invalidatePasskeysForPasswordChange: vi.fn(async () => {}),
   registerPasskeyForMember: vi.fn(),
   authenticateWithPasskey: vi.fn(),
   hasRegisteredPasskeys: vi.fn(() => false),

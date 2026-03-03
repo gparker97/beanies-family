@@ -27,8 +27,6 @@ const familyContextStore = useFamilyContextStore();
 const familyStore = useFamilyStore();
 const authStore = useAuthStore();
 
-const SESSION_PASSWORD_KEY = 'beanies-file-password';
-
 type LoginView =
   | 'welcome'
   | 'loading'
@@ -177,24 +175,22 @@ async function activateFamilyForBiometric(
 }
 
 /**
- * Try to auto-decrypt using cached passwords (sessionStorage, then per-family cache).
+ * Try to auto-decrypt using cached family key.
  * Returns true if decryption succeeded.
  */
 async function tryAutoDecrypt(familyId: string): Promise<boolean> {
-  const passwords = [
-    sessionStorage.getItem(SESSION_PASSWORD_KEY),
-    settingsStore.getCachedEncryptionPassword(familyId),
-  ].filter(Boolean) as string[];
+  const cachedKeyB64 = settingsStore.getCachedFamilyKey(familyId);
+  if (!cachedKeyB64) return false;
 
-  for (const pw of passwords) {
-    try {
-      const result = await syncStore.decryptPendingFile(pw);
-      if (result.success) return true;
-    } catch {
-      // Try next password
-    }
+  try {
+    const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+    const { base64ToBuffer } = await import('@/utils/encoding');
+    const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+    const result = await syncStore.decryptPendingFileWithKey(fk);
+    return result.success;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /**
@@ -345,13 +341,12 @@ function handleFileLoaded() {
       familyContextStore.activeFamilyId ?? ''
     );
 
-    // Register the synced credential with the current session password
-    if (crossDeviceCredentialId.value && syncStore.currentSessionPassword) {
-      registerSyncedCredentialFromPassword(
+    // Register the synced credential now that family key is available
+    if (crossDeviceCredentialId.value) {
+      registerSyncedCredentialFromFamilyKey(
         crossDeviceCredentialId.value,
         crossDeviceMemberId.value,
-        familyContextStore.activeFamilyId ?? '',
-        syncStore.currentSessionPassword
+        familyContextStore.activeFamilyId ?? ''
       );
     }
 
@@ -382,11 +377,10 @@ function handleCrossDevicePassword(payload: { memberId: string; credentialId: st
   handleBiometricFallback();
 }
 
-async function registerSyncedCredentialFromPassword(
+async function registerSyncedCredentialFromFamilyKey(
   credentialId: string,
   memberId: string,
-  familyId: string,
-  password: string
+  familyId: string
 ) {
   try {
     const { listRegisteredPasskeys, registerSyncedCredential } =
@@ -397,7 +391,6 @@ async function registerSyncedCredentialFromPassword(
       await registerSyncedCredential({
         credentialId,
         sourceRegistration: sourceReg,
-        cachedPassword: password,
       });
     }
   } catch {

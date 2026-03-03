@@ -85,10 +85,10 @@ describe('Password Cache - settingsStore', () => {
     // Device is not trusted by default
     expect(store.isTrustedDevice).toBe(false);
 
-    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
+    await store.cacheFamilyKey('my-secret-password', 'family-123');
 
     // Password should NOT be cached
-    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
+    expect(store.getCachedFamilyKey('family-123')).toBeNull();
   });
 
   it('should cache password when device is trusted', async () => {
@@ -99,15 +99,15 @@ describe('Password Cache - settingsStore', () => {
     expect(store.isTrustedDevice).toBe(true);
 
     // Now cache a password
-    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
+    await store.cacheFamilyKey('my-secret-password', 'family-123');
 
     // Password should be cached
-    expect(store.getCachedEncryptionPassword('family-123')).toBe('my-secret-password');
+    expect(store.getCachedFamilyKey('family-123')).toBe('my-secret-password');
   });
 
   it('should return null when no password is cached', () => {
     const store = useSettingsStore();
-    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
+    expect(store.getCachedFamilyKey('family-123')).toBeNull();
   });
 
   it('should clear cached password for specific family', async () => {
@@ -115,12 +115,12 @@ describe('Password Cache - settingsStore', () => {
 
     // Trust and cache
     await store.setTrustedDevice(true);
-    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
-    expect(store.getCachedEncryptionPassword('family-123')).toBe('my-secret-password');
+    await store.cacheFamilyKey('my-secret-password', 'family-123');
+    expect(store.getCachedFamilyKey('family-123')).toBe('my-secret-password');
 
     // Clear specific family
-    await store.clearCachedEncryptionPassword('family-123');
-    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
+    await store.clearCachedFamilyKey('family-123');
+    expect(store.getCachedFamilyKey('family-123')).toBeNull();
   });
 
   it('should clear all cached passwords when no familyId given', async () => {
@@ -128,15 +128,15 @@ describe('Password Cache - settingsStore', () => {
 
     // Trust and cache for two families
     await store.setTrustedDevice(true);
-    await store.cacheEncryptionPassword('pw-a', 'family-a');
-    await store.cacheEncryptionPassword('pw-b', 'family-b');
-    expect(store.getCachedEncryptionPassword('family-a')).toBe('pw-a');
-    expect(store.getCachedEncryptionPassword('family-b')).toBe('pw-b');
+    await store.cacheFamilyKey('pw-a', 'family-a');
+    await store.cacheFamilyKey('pw-b', 'family-b');
+    expect(store.getCachedFamilyKey('family-a')).toBe('pw-a');
+    expect(store.getCachedFamilyKey('family-b')).toBe('pw-b');
 
     // Clear all
-    await store.clearCachedEncryptionPassword();
-    expect(store.getCachedEncryptionPassword('family-a')).toBeNull();
-    expect(store.getCachedEncryptionPassword('family-b')).toBeNull();
+    await store.clearCachedFamilyKey();
+    expect(store.getCachedFamilyKey('family-a')).toBeNull();
+    expect(store.getCachedFamilyKey('family-b')).toBeNull();
   });
 
   it('should clear cached password when untrusting device', async () => {
@@ -144,17 +144,17 @@ describe('Password Cache - settingsStore', () => {
 
     // Trust and cache
     await store.setTrustedDevice(true);
-    await store.cacheEncryptionPassword('my-secret-password', 'family-123');
+    await store.cacheFamilyKey('my-secret-password', 'family-123');
 
     // Untrust — setTrustedDevice(false) does not auto-clear password,
     // but signOutAndClearData does both
     await store.setTrustedDevice(false);
     // Password is still cached until explicitly cleared
-    expect(store.getCachedEncryptionPassword('family-123')).toBe('my-secret-password');
+    expect(store.getCachedFamilyKey('family-123')).toBe('my-secret-password');
 
     // Explicit clear
-    await store.clearCachedEncryptionPassword('family-123');
-    expect(store.getCachedEncryptionPassword('family-123')).toBeNull();
+    await store.clearCachedFamilyKey('family-123');
+    expect(store.getCachedFamilyKey('family-123')).toBeNull();
   });
 });
 
@@ -174,10 +174,6 @@ vi.mock('@/services/indexeddb/database', () => ({
 vi.mock('@/services/registry/registryService', () => ({
   registerFamily: vi.fn(async () => {}),
   removeFamily: vi.fn(async () => {}),
-}));
-
-vi.mock('@/services/auth/passkeyService', () => ({
-  invalidatePasskeysForPasswordChange: vi.fn(async () => {}),
 }));
 
 describe('Password Cache - syncStore integration', () => {
@@ -211,10 +207,9 @@ describe('Password Cache - syncStore integration', () => {
   it.todo('should cache family key after successful decryption on trusted device');
   it.todo('should NOT cache family key after decryption on untrusted device');
 
-  it('should report currentSessionPassword as null in V4 (family key replaces password)', () => {
+  it('should report hasSessionPassword as false when no family key loaded', () => {
     const syncStore = useSyncStore();
-    // V4: currentSessionPassword always returns null; hasSessionPassword checks familyKey
-    expect(syncStore.currentSessionPassword).toBeNull();
+    // V4: hasSessionPassword checks for familyKey in memory
     expect(syncStore.hasSessionPassword).toBe(false);
   });
 
@@ -224,14 +219,14 @@ describe('Password Cache - syncStore integration', () => {
 
     // Trust and cache a password
     await settingsStore.setTrustedDevice(true);
-    await settingsStore.cacheEncryptionPassword('cached-pw', 'family-123');
-    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBe('cached-pw');
+    await settingsStore.cacheFamilyKey('cached-pw', 'family-123');
+    expect(settingsStore.getCachedFamilyKey('family-123')).toBe('cached-pw');
 
     // Disconnect
     await syncStore.disconnect();
 
     // Cached password should be cleared for the active family
-    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBeNull();
+    expect(settingsStore.getCachedFamilyKey('family-123')).toBeNull();
   });
 
   // TODO: Rewrite for V4 format — enableEncryption now creates a family key

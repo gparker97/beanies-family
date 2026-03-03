@@ -44,8 +44,6 @@ const confirmPassword = ref('');
 // Step 2 state
 const storageSaved = ref(false);
 const isSavingStorage = ref(false);
-const podPassword = ref('');
-const confirmPodPassword = ref('');
 const storageType = ref<'local' | 'google_drive' | null>(null);
 const showDriveResultModal = ref(false);
 const driveResultError = ref<string | null>(null);
@@ -164,28 +162,13 @@ async function handleStep2Next() {
     return;
   }
 
-  // Pod password is required
-  if (!podPassword.value) {
-    formError.value = t('auth.passwordMinLength');
-    return;
-  }
-
-  if (podPassword.value.length < 8) {
-    formError.value = t('auth.passwordMinLength');
-    return;
-  }
-  if (podPassword.value !== confirmPodPassword.value) {
-    formError.value = t('auth.passwordsDoNotMatch');
-    return;
-  }
-
   // Initialize the Automerge document, generate keys, and write V4 envelope to the provider.
-  // This must happen before any code tries to read/write the doc (e.g. saveSettings, syncNow).
+  // Uses the member password from Step 1 to derive the wrapping key for the family key.
   if (syncStore.isConfigured && authStore.currentUser) {
     const podFileName = `${familyName.value || 'my-family'}.beanpod`;
     const success = await syncStore.createNewFile(
       podFileName,
-      podPassword.value,
+      password.value,
       authStore.currentUser.memberId,
       familyContextStore.activeFamilyId ?? '',
       familyName.value
@@ -648,33 +631,7 @@ function handleBack() {
         </div>
       </div>
 
-      <!-- Pod file encryption password (below storage box) -->
-      <div class="mt-5 space-y-3">
-        <div>
-          <BaseInput
-            v-model="podPassword"
-            :label="t('loginV6.encryptionPasswordLabel')"
-            type="password"
-            :placeholder="t('auth.passwordPlaceholder')"
-          />
-          <p class="mt-1 text-xs text-gray-400">
-            {{ t('loginV6.passwordHint') }}
-          </p>
-        </div>
-        <BaseInput
-          v-if="podPassword"
-          v-model="confirmPodPassword"
-          :label="t('loginV6.confirmPodPassword')"
-          type="password"
-          :placeholder="t('auth.confirmPasswordPlaceholder')"
-        />
-      </div>
-
-      <BaseButton
-        class="mt-6 w-full"
-        :disabled="!storageSaved || !podPassword"
-        @click="handleStep2Next"
-      >
+      <BaseButton class="mt-6 w-full" :disabled="!storageSaved" @click="handleStep2Next">
         {{ t('loginV6.createNext') }}
       </BaseButton>
     </div>

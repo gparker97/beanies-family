@@ -163,6 +163,55 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * Sign in on a trusted device — bypasses password verification.
+   * Only allowed when the device is marked trusted and has a cached family key.
+   */
+  async function signInTrusted(memberId: string): Promise<{ success: boolean; error?: string }> {
+    isLoading.value = true;
+    error.value = null;
+
+    try {
+      const settingsStore = useSettingsStore();
+      if (!settingsStore.isTrustedDevice) {
+        return { success: false, error: 'Device is not trusted' };
+      }
+
+      const familyStore = useFamilyStore();
+      const member = familyStore.members.find((m) => m.id === memberId);
+      if (!member) {
+        return { success: false, error: 'Member not found' };
+      }
+
+      if (!member.passwordHash) {
+        return { success: false, error: 'Member has no password set' };
+      }
+
+      const familyContextStore = useFamilyContextStore();
+      const user: AuthUser = {
+        memberId: member.id,
+        email: member.email,
+        familyId: familyContextStore.activeFamilyId ?? undefined,
+        role: member.role,
+      };
+      currentUser.value = user;
+      isAuthenticated.value = true;
+      freshSignIn.value = true;
+      persistSession(user);
+      familyStore.setCurrentMember(member.id);
+
+      const now = toISODateString(new Date());
+      familyStore.updateMember(member.id, { lastLoginAt: now });
+
+      return { success: true };
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Sign in failed';
+      return { success: false, error: error.value };
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /**
    * Sign up: create a new family + owner member with password.
    * This is the owner-only "Create Pod" flow.
    */
@@ -332,14 +381,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Sign in using a registered passkey (biometric).
-   * Returns cachedPassword for file decryption.
+   * Returns familyKey for file decryption if available via PRF or trusted device cache.
    */
   async function signInWithPasskey(
     familyId: string,
     passkeySecrets?: PasskeySecret[]
   ): Promise<{
     success: boolean;
-    cachedPassword?: string;
+    familyKey?: CryptoKey;
     credentialId?: string;
     error?: string;
   }> {
@@ -349,19 +398,6 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const result = await authenticateWithPasskey({ familyId, passkeySecrets });
       if (!result.success || !result.memberId) {
-        // For CROSS_DEVICE_NO_CACHE, create a partial session so the
-        // member is already identified after file decryption
-        if (result.error === 'CROSS_DEVICE_NO_CACHE' && result.memberId) {
-          const user: AuthUser = {
-            memberId: result.memberId,
-            email: '',
-            familyId,
-            role: undefined,
-          };
-          currentUser.value = user;
-          isAuthenticated.value = true;
-          persistSession(user);
-        }
         error.value = result.error ?? 'Passkey authentication failed';
         return { success: false, credentialId: result.credentialId, error: error.value };
       }
@@ -382,7 +418,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       return {
         success: true,
-        cachedPassword: result.cachedPassword,
+        familyKey: result.familyKey,
       };
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Passkey sign in failed';
@@ -440,11 +476,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Register a passkey for the current user.
+   * Uses the active family key from the sync store.
    */
-  async function registerPasskeyForCurrentUser(
-    encryptionPassword: string,
-    label?: string
-  ): Promise<RegisterPasskeyResult> {
+  async function registerPasskeyForCurrentUser(label?: string): Promise<RegisterPasskeyResult> {
     if (!currentUser.value) {
       return { success: false, error: 'Not signed in' };
     }
@@ -455,12 +489,19 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: 'Member not found' };
     }
 
+    // Get family key from sync store
+    const { useSyncStore } = await import('./syncStore');
+    const syncStore = useSyncStore();
+    if (!syncStore.familyKey) {
+      return { success: false, error: 'No family key available — data file must be loaded' };
+    }
+
     return registerPasskeyForMember({
       memberId: member.id,
       memberName: member.name,
       memberEmail: member.email,
       familyId: currentUser.value.familyId ?? '',
-      encryptionPassword,
+      familyKey: syncStore.familyKey,
       label,
     });
   }
@@ -534,10 +575,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
-    // Clear trust flag and cached encryption password
+    // Clear trust flag and cached family key
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
-    await settingsStore.clearCachedEncryptionPassword();
+    await settingsStore.clearCachedFamilyKey();
 
     // Clear auth state
     currentUser.value = null;
@@ -559,6 +600,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     initializeAuth,
     signIn,
+    signInTrusted,
     signInWithPasskey,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,

@@ -70,10 +70,13 @@ const passkeyPromptDismissed = ref(false);
 
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
-  // If there's already a session password, cache it for the newly trusted device
+  // If there's a family key in memory, cache it for the newly trusted device
   const familyId = familyContextStore.activeFamilyId;
-  if (syncStore.currentSessionPassword && familyId) {
-    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword, familyId);
+  if (familyId) {
+    const exportedKey = await syncStore.getExportedFamilyKey();
+    if (exportedKey) {
+      await settingsStore.cacheFamilyKey(exportedKey, familyId);
+    }
   }
   showTrustPrompt.value = false;
 }
@@ -87,18 +90,11 @@ async function handleEnablePasskey() {
   showPasskeyPrompt.value = false;
   passkeyPromptDismissed.value = true;
 
-  const password = syncStore.currentSessionPassword;
-  if (!password) {
-    console.warn('[passkey] No session password available for passkey registration');
-    showToast('error', t('passkey.registerError'));
-    return;
-  }
-
   try {
-    const result = await authStore.registerPasskeyForCurrentUser(password);
+    const result = await authStore.registerPasskeyForCurrentUser();
     if (result.success) {
       if (result.passkeySecret) {
-        // Store PRF-wrapped password in the .beanpod envelope for cross-device access
+        // Store PRF-wrapped family key in the .beanpod envelope for cross-device access
         syncStore.addPasskeySecret(result.passkeySecret);
         await syncStore.syncNow(true);
       }
@@ -175,25 +171,29 @@ async function loadFamilyData() {
       return;
     }
 
-    // File needs password — try cached password from trusted device
+    // File needs password — try cached family key from trusted device
     if (loadResult.needsPassword) {
       const activeFamilyId = familyContextStore.activeFamilyId;
-      const cachedPw = activeFamilyId
-        ? settingsStore.getCachedEncryptionPassword(activeFamilyId)
-        : null;
-      if (cachedPw) {
-        const decryptResult = await syncStore.decryptPendingFile(cachedPw);
-        if (decryptResult.success) {
-          memberFilterStore.initialize();
-          const result = await processRecurringItems();
-          if (result.processed > 0) {
-            await transactionsStore.loadTransactions();
+      const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+      if (cachedKeyB64) {
+        try {
+          const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+          const { base64ToBuffer } = await import('@/utils/encoding');
+          const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+          const decryptResult = await syncStore.decryptPendingFileWithKey(fk);
+          if (decryptResult.success) {
+            memberFilterStore.initialize();
+            const result = await processRecurringItems();
+            if (result.processed > 0) {
+              await transactionsStore.loadTransactions();
+            }
+            return;
           }
-          return;
+        } catch {
+          // Cached key was invalid — clear it
         }
-        // Cached password was wrong — clear it
         if (activeFamilyId) {
-          await settingsStore.clearCachedEncryptionPassword(activeFamilyId);
+          await settingsStore.clearCachedFamilyKey(activeFamilyId);
         }
       }
     }
@@ -203,12 +203,10 @@ async function loadFamilyData() {
   if (syncStore.isConfigured && syncStore.needsPermission) {
     console.log('[loadFamilyData] File needs permission — trying persistence cache');
     const activeFamilyId = familyContextStore.activeFamilyId;
-    const cachedPw = activeFamilyId
-      ? settingsStore.getCachedEncryptionPassword(activeFamilyId)
-      : null;
-    if (activeFamilyId && cachedPw) {
+    const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+    if (activeFamilyId && cachedKeyB64) {
       try {
-        const cacheResult = await syncStore.loadFromPersistenceCache(cachedPw, activeFamilyId);
+        const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId);
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');
           memberFilterStore.initialize();
