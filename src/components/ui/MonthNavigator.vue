@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { useTranslation } from '@/composables/useTranslation';
 import { addMonths, formatMonthYearShort } from '@/utils/date';
+
+const { t } = useTranslation();
 
 const props = defineProps<{
   modelValue: Date;
@@ -10,12 +14,24 @@ const emit = defineEmits<{
   'update:modelValue': [value: Date];
 }>();
 
+const isCurrentMonth = computed(() => {
+  const now = new Date();
+  return (
+    props.modelValue.getFullYear() === now.getFullYear() &&
+    props.modelValue.getMonth() === now.getMonth()
+  );
+});
+
 function prev() {
   emit('update:modelValue', addMonths(props.modelValue, -1));
 }
 
 function next() {
   emit('update:modelValue', addMonths(props.modelValue, 1));
+}
+
+function goToToday() {
+  emit('update:modelValue', new Date());
 }
 </script>
 
@@ -43,6 +59,14 @@ function next() {
       @click="next"
     >
       <BeanieIcon name="chevron-right" size="sm" />
+    </button>
+    <button
+      v-if="!isCurrentMonth"
+      type="button"
+      class="font-outfit ml-1 rounded-[10px] bg-[var(--color-primary)] px-2 py-0.5 text-xs font-semibold text-white transition-opacity hover:opacity-85"
+      @click="goToToday"
+    >
+      {{ t('date.today') }}
     </button>
   </div>
 </template>
