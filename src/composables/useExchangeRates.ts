@@ -47,6 +47,7 @@ export function useExchangeRates() {
 
       // Reload settings to get updated rates
       await settingsStore.loadSettings();
+      await settingsStore.loadGlobalSettings();
       isStale.value = false;
       return true;
     } catch (e) {
@@ -75,6 +76,7 @@ export function useExchangeRates() {
       // Only reload if rates were actually updated
       if (result.ratesUpdated > 0) {
         await settingsStore.loadSettings();
+        await settingsStore.loadGlobalSettings();
       }
 
       isStale.value = false;
