@@ -1,5 +1,6 @@
 import { SUPPORTED_CURRENCY_CODES } from '@/constants/currencies';
 import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
+import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type { CurrencyCode, ExchangeRate } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -187,6 +188,7 @@ export async function forceUpdateRates(): Promise<UpdateResult> {
 
   try {
     await settingsRepo.updateExchangeRates(result.rates);
+    await globalSettingsRepo.updateGlobalExchangeRates(result.rates);
 
     return {
       success: true,
