@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
-import { useTombstoneStore } from './tombstoneStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
-import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
+import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import type { Asset, CreateAssetInput, UpdateAssetInput } from '@/types/models';
 
 export const useAssetsStore = defineStore('assets', () => {
@@ -122,7 +121,6 @@ export const useAssetsStore = defineStore('assets', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await assetRepo.deleteAsset(id);
       if (success) {
-        useTombstoneStore().recordDeletion('asset', id);
         assets.value = assets.value.filter((a) => a.id !== id);
       }
       return success;

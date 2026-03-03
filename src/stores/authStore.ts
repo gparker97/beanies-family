@@ -16,7 +16,7 @@ import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { flushPendingSave } from '@/services/sync/syncService';
-import { clearAllSettingsWAL } from '@/services/sync/settingsWAL';
+import { initDoc } from '@/services/automerge/docService';
 
 export interface AuthUser {
   memberId: string;
@@ -29,15 +29,15 @@ const SESSION_KEY = 'beanies_auth_session';
 
 function persistSession(user: AuthUser): void {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   } catch {
-    // sessionStorage unavailable (e.g. private browsing) — silent fail
+    // localStorage unavailable (e.g. private browsing) — silent fail
   }
 }
 
 function clearSession(): void {
   try {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
   } catch {
     // silent fail
   }
@@ -45,7 +45,7 @@ function clearSession(): void {
 
 function restoreSession(): AuthUser | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY);
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
     return null;
@@ -183,6 +183,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (!family) {
         return { success: false, error: 'Failed to create family' };
       }
+
+      // Initialize Automerge document — must happen before any changeDoc() calls
+      // (createMember and setOnboardingCompleted both write to the doc)
+      initDoc();
 
       // Hash the password
       const passwordHashValue = await hashPassword(params.password);
@@ -534,9 +538,6 @@ export const useAuthStore = defineStore('auth', () => {
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
     await settingsStore.clearCachedEncryptionPassword();
-
-    // Clear all settings WAL entries (full data wipe)
-    clearAllSettingsWAL();
 
     // Clear auth state
     currentUser.value = null;

@@ -1,5 +1,38 @@
-import { getDatabase } from '../database';
+import { openDB, type IDBPDatabase } from 'idb';
 import type { LanguageCode, TranslationCacheEntry } from '@/types/models';
+
+/**
+ * Dedicated IndexedDB for translation caching.
+ * This is separate from the main data layer (which uses Automerge).
+ * Translations are a local cache that doesn't need to sync.
+ */
+interface TranslationCacheDB {
+  translations: {
+    key: string;
+    value: TranslationCacheEntry;
+    indexes: { 'by-language': string };
+  };
+}
+
+const DB_NAME = 'beanies-translations';
+const DB_VERSION = 1;
+
+let dbInstance: IDBPDatabase<TranslationCacheDB> | null = null;
+
+async function getDatabase(): Promise<IDBPDatabase<TranslationCacheDB>> {
+  if (dbInstance) return dbInstance;
+
+  dbInstance = await openDB<TranslationCacheDB>(DB_NAME, DB_VERSION, {
+    upgrade(db) {
+      if (!db.objectStoreNames.contains('translations')) {
+        const store = db.createObjectStore('translations', { keyPath: 'id' });
+        store.createIndex('by-language', 'language', { unique: false });
+      }
+    },
+  });
+
+  return dbInstance;
+}
 
 /**
  * Get all cached translations for a specific language and version.

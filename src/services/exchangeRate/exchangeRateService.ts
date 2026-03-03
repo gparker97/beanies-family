@@ -1,5 +1,5 @@
 import { SUPPORTED_CURRENCY_CODES } from '@/constants/currencies';
-import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
+import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type { CurrencyCode, ExchangeRate } from '@/types/models';
 import { toISODateString } from '@/utils/date';

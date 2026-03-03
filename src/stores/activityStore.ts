@@ -1,9 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
-import { useTombstoneStore } from './tombstoneStore';
 import { wrapAsync } from '@/composables/useStoreActions';
-import * as activityRepo from '@/services/indexeddb/repositories/activityRepository';
+import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 import { toDateInputValue } from '@/utils/date';
 import type {
   FamilyActivity,
@@ -204,7 +203,6 @@ export const useActivityStore = defineStore('activities', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await activityRepo.deleteActivity(id);
       if (success) {
-        useTombstoneStore().recordDeletion('familyActivity', id);
         activities.value = activities.value.filter((a) => a.id !== id);
       }
       return success;

@@ -1,10 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
-import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
+import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
-import { useTombstoneStore } from '@/stores/tombstoneStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import type {
@@ -303,7 +302,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
       const success = await transactionRepo.deleteTransaction(id);
       if (success) {
-        useTombstoneStore().recordDeletion('transaction', id);
         transactions.value = transactions.value.filter((t) => t.id !== id);
 
         // Reverse the transaction's effect on account balance
@@ -334,7 +332,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
       for (const tx of toDelete) {
         const success = await transactionRepo.deleteTransaction(tx.id);
         if (success) {
-          useTombstoneStore().recordDeletion('transaction', tx.id);
           // Reverse balance
           const adjustment = calculateBalanceAdjustment(tx.type, tx.amount, true);
           await adjustAccountBalance(tx.accountId, -adjustment);
