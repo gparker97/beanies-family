@@ -190,16 +190,18 @@ export const useBudgetStore = defineStore('budget', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       // Deactivate other budgets when creating a new active one
       if (input.isActive) {
-        for (const existing of budgets.value.filter((b) => b.isActive)) {
-          await budgetRepo.updateBudget(existing.id, { isActive: false });
-          const idx = budgets.value.findIndex((b) => b.id === existing.id);
-          if (idx !== -1) {
-            budgets.value[idx] = { ...budgets.value[idx]!, isActive: false };
-          }
+        const activeIds = new Set(budgets.value.filter((b) => b.isActive).map((b) => b.id));
+        for (const existingId of activeIds) {
+          await budgetRepo.updateBudget(existingId, { isActive: false });
         }
+        // Immutable update: deactivate all previously-active budgets
+        budgets.value = budgets.value.map((b) =>
+          activeIds.has(b.id) ? { ...b, isActive: false } : b
+        );
       }
       const budget = await budgetRepo.createBudget(input);
-      budgets.value.push(budget);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      budgets.value = [...budgets.value, budget];
       return budget;
     });
     return result ?? null;
@@ -209,20 +211,21 @@ export const useBudgetStore = defineStore('budget', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       // Deactivate other budgets when setting this one active
       if (input.isActive) {
-        for (const existing of budgets.value.filter((b) => b.isActive && b.id !== id)) {
-          await budgetRepo.updateBudget(existing.id, { isActive: false });
-          const idx = budgets.value.findIndex((b) => b.id === existing.id);
-          if (idx !== -1) {
-            budgets.value[idx] = { ...budgets.value[idx]!, isActive: false };
-          }
+        const activeIds = new Set(
+          budgets.value.filter((b) => b.isActive && b.id !== id).map((b) => b.id)
+        );
+        for (const existingId of activeIds) {
+          await budgetRepo.updateBudget(existingId, { isActive: false });
         }
+        // Immutable update: deactivate all previously-active budgets
+        budgets.value = budgets.value.map((b) =>
+          activeIds.has(b.id) ? { ...b, isActive: false } : b
+        );
       }
       const updated = await budgetRepo.updateBudget(id, input);
       if (updated) {
-        const index = budgets.value.findIndex((b) => b.id === id);
-        if (index !== -1) {
-          budgets.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        budgets.value = budgets.value.map((b) => (b.id === id ? updated : b));
       }
       return updated;
     });

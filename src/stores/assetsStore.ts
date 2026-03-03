@@ -99,7 +99,8 @@ export const useAssetsStore = defineStore('assets', () => {
   async function createAsset(input: CreateAssetInput): Promise<Asset | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const asset = await assetRepo.createAsset(input);
-      assets.value.push(asset);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      assets.value = [...assets.value, asset];
       return asset;
     });
     return result ?? null;
@@ -109,10 +110,8 @@ export const useAssetsStore = defineStore('assets', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const updated = await assetRepo.updateAsset(id, input);
       if (updated) {
-        const index = assets.value.findIndex((a) => a.id === id);
-        if (index !== -1) {
-          assets.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        assets.value = assets.value.map((a) => (a.id === id ? updated : a));
       }
       return updated;
     });

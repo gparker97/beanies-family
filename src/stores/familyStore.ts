@@ -39,7 +39,8 @@ export const useFamilyStore = defineStore('family', () => {
   async function createMember(input: CreateFamilyMemberInput): Promise<FamilyMember | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const member = await familyRepo.createFamilyMember(input);
-      members.value.push(member);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      members.value = [...members.value, member];
       return member;
     });
     return result ?? null;
@@ -52,10 +53,8 @@ export const useFamilyStore = defineStore('family', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const updated = await familyRepo.updateFamilyMember(id, input);
       if (updated) {
-        const index = members.value.findIndex((m) => m.id === id);
-        if (index !== -1) {
-          members.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        members.value = members.value.map((m) => (m.id === id ? updated : m));
       }
       return updated;
     });

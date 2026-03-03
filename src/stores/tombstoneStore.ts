@@ -20,11 +20,11 @@ export const useTombstoneStore = defineStore('tombstones', () => {
   function recordDeletion(entityType: EntityType, id: string): void {
     // Avoid duplicates
     if (tombstones.value.some((t) => t.id === id && t.entityType === entityType)) return;
-    tombstones.value.push({
-      id,
-      entityType,
-      deletedAt: toISODateString(new Date()),
-    });
+    // Immutable update: assign a new array so downstream computeds re-evaluate
+    tombstones.value = [
+      ...tombstones.value,
+      { id, entityType, deletedAt: toISODateString(new Date()) },
+    ];
   }
 
   /**

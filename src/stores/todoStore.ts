@@ -61,7 +61,8 @@ export const useTodoStore = defineStore('todos', () => {
   async function createTodo(input: CreateTodoInput): Promise<TodoItem | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const todo = await todoRepo.createTodo(input);
-      todos.value.push(todo);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      todos.value = [...todos.value, todo];
       return todo;
     });
     return result ?? null;
@@ -71,10 +72,8 @@ export const useTodoStore = defineStore('todos', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const updated = await todoRepo.updateTodo(id, input);
       if (updated) {
-        const index = todos.value.findIndex((t) => t.id === id);
-        if (index !== -1) {
-          todos.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        todos.value = todos.value.map((t) => (t.id === id ? updated : t));
       }
       return updated;
     });

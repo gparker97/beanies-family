@@ -178,7 +178,8 @@ export const useActivityStore = defineStore('activities', () => {
   async function createActivity(input: CreateFamilyActivityInput): Promise<FamilyActivity | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const activity = await activityRepo.createActivity(input);
-      activities.value.push(activity);
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      activities.value = [...activities.value, activity];
       return activity;
     });
     return result ?? null;
@@ -191,10 +192,8 @@ export const useActivityStore = defineStore('activities', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const updated = await activityRepo.updateActivity(id, input);
       if (updated) {
-        const index = activities.value.findIndex((a) => a.id === id);
-        if (index !== -1) {
-          activities.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        activities.value = activities.value.map((a) => (a.id === id ? updated : a));
       }
       return updated;
     });

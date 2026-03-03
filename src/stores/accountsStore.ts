@@ -128,8 +128,10 @@ export const useAccountsStore = defineStore('accounts', () => {
   async function createAccount(input: CreateAccountInput): Promise<Account | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const account = await accountRepo.createAccount(input);
-      accounts.value.push(account);
-      if (accounts.value.length === 1) {
+      const isFirst = accounts.value.length === 0;
+      // Immutable update: assign a new array so downstream computeds re-evaluate
+      accounts.value = [...accounts.value, account];
+      if (isFirst) {
         celebrate('first-account');
       }
       return account;
@@ -141,10 +143,8 @@ export const useAccountsStore = defineStore('accounts', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const updated = await accountRepo.updateAccount(id, input);
       if (updated) {
-        const index = accounts.value.findIndex((a) => a.id === id);
-        if (index !== -1) {
-          accounts.value[index] = updated;
-        }
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        accounts.value = accounts.value.map((a) => (a.id === id ? updated : a));
       }
       return updated;
     });
