@@ -11,11 +11,11 @@ import type { Transaction, Account, FamilyMember, RecurringItem } from '@/types/
 import { toISODateString, addMonths, toDateInputValue } from '@/utils/date';
 
 // Import mocked repos for setting up mockImplementation in save-flow tests
-import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
-import * as recurringItemRepo from '@/services/indexeddb/repositories/recurringItemRepository';
+import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
+import * as recurringItemRepo from '@/services/automerge/repositories/recurringItemRepository';
 
 // Mock repositories
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
   getTransactionById: vi.fn(),
   createTransaction: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
   deleteTransaction: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn(),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
   updateAccountBalance: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/familyMemberRepository', () => ({
+vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
   getAllFamilyMembers: vi.fn(),
   getFamilyMemberById: vi.fn(),
   createFamilyMember: vi.fn(),
@@ -40,7 +40,7 @@ vi.mock('@/services/indexeddb/repositories/familyMemberRepository', () => ({
   deleteFamilyMember: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
+vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getAllRecurringItems: vi.fn().mockResolvedValue([]),
   getRecurringItemById: vi.fn(),
   createRecurringItem: vi.fn().mockImplementation((input: any) => ({
@@ -53,7 +53,7 @@ vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
   deleteRecurringItem: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   getDefaultSettings: vi.fn(() => ({

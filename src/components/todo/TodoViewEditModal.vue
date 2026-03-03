@@ -285,14 +285,14 @@ async function handleDelete() {
     @delete="handleDelete"
   >
     <!-- 1. Task name — extra large -->
-    <div>
+    <FormFieldGroup :label="t('modal.whatNeedsDoing')" required>
       <input
         v-model="editForm.title"
         type="text"
         class="font-outfit w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.whatNeedsDoing')"
       />
-    </div>
+    </FormFieldGroup>
 
     <!-- 2. Date + Time -->
     <div>

@@ -6,7 +6,7 @@ import { useMemberFilterStore } from './memberFilterStore';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
 // Mock the activity repository
-vi.mock('@/services/indexeddb/repositories/activityRepository', () => ({
+vi.mock('@/services/automerge/repositories/activityRepository', () => ({
   getAllActivities: vi.fn(),
   getActivityById: vi.fn(),
   getActivitiesByDate: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('@/services/indexeddb/repositories/activityRepository', () => ({
   deleteActivity: vi.fn(),
 }));
 
-import * as activityRepo from '@/services/indexeddb/repositories/activityRepository';
+import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 
 const NOW = '2026-02-28T00:00:00.000Z';
 

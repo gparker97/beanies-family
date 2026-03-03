@@ -50,7 +50,7 @@ let dragCounter = 0;
  */
 async function tryAutoDecrypt(): Promise<boolean> {
   // Use familyId from pending encrypted file's raw data for per-family cache lookup
-  const pendingFamilyId = syncStore.pendingEncryptedFile?.rawSyncData?.familyId;
+  const pendingFamilyId = syncStore.pendingEncryptedFile?.envelope?.familyId;
 
   // Try sessionStorage first (current session), then trusted device cache (persistent)
   const passwords = [
@@ -97,7 +97,7 @@ async function checkBiometricForFamily(familyId: string, familyName?: string): P
  * Extract familyId/familyName from the pending encrypted file's raw sync data.
  */
 function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
-  const raw = syncStore.pendingEncryptedFile?.rawSyncData;
+  const raw = syncStore.pendingEncryptedFile?.envelope;
   return { familyId: raw?.familyId, familyName: raw?.familyName };
 }
 

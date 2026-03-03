@@ -18,7 +18,21 @@ export interface OAuthError {
 }
 
 function getApiBaseUrl(): string {
-  return import.meta.env.VITE_REGISTRY_API_URL ?? '';
+  const url = import.meta.env.VITE_REGISTRY_API_URL;
+  if (!url) {
+    throw new Error('VITE_REGISTRY_API_URL is not configured. Add it to your .env.local file.');
+  }
+  return url;
+}
+
+/**
+ * Safely parse JSON from a fetch response, returning null if the body is
+ * empty or not valid JSON (e.g. HTML error page, 502 gateway timeout).
+ */
+async function safeJsonParse(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  return JSON.parse(text);
 }
 
 /**
@@ -43,11 +57,20 @@ export async function exchangeCodeForTokens(params: {
     }),
   });
 
-  const body = await res.json();
+  let body: unknown;
+  try {
+    body = await safeJsonParse(res);
+  } catch {
+    throw new Error('Token exchange failed');
+  }
 
   if (!res.ok) {
-    const err = body as OAuthError;
+    const err = (body ?? {}) as OAuthError;
     throw new Error(err.error_description ?? err.error ?? 'Token exchange failed');
+  }
+
+  if (!body) {
+    throw new Error('Token exchange failed');
   }
 
   return body as TokenResponse;
@@ -71,11 +94,20 @@ export async function refreshAccessToken(params: {
     }),
   });
 
-  const body = await res.json();
+  let body: unknown;
+  try {
+    body = await safeJsonParse(res);
+  } catch {
+    throw new Error('Token refresh failed');
+  }
 
   if (!res.ok) {
-    const err = body as OAuthError;
+    const err = (body ?? {}) as OAuthError;
     throw new Error(err.error_description ?? err.error ?? 'Token refresh failed');
+  }
+
+  if (!body) {
+    throw new Error('Token refresh failed');
   }
 
   return body as TokenResponse;

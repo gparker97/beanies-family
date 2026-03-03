@@ -38,6 +38,8 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
+import { showToast } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
 import { saveNow } from '@/services/sync/syncService';
 
 const route = useRoute();
@@ -57,6 +59,7 @@ const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
 const authStore = useAuthStore();
+const { t } = useTranslation();
 const { isMobile, isDesktop } = useBreakpoint();
 
 const isInitializing = ref(true);
@@ -87,20 +90,25 @@ async function handleEnablePasskey() {
   const password = syncStore.currentSessionPassword;
   if (!password) {
     console.warn('[passkey] No session password available for passkey registration');
+    showToast('error', t('passkey.registerError'));
     return;
   }
 
   try {
     const result = await authStore.registerPasskeyForCurrentUser(password);
-    if (!result.success) {
-      console.warn('[passkey] Registration failed:', result.error);
-    } else if (result.passkeySecret) {
-      // Store PRF-wrapped password in the .beanpod envelope for cross-device access
-      syncStore.addPasskeySecret(result.passkeySecret);
-      await syncStore.syncNow(true);
+    if (result.success) {
+      if (result.passkeySecret) {
+        // Store PRF-wrapped password in the .beanpod envelope for cross-device access
+        syncStore.addPasskeySecret(result.passkeySecret);
+        await syncStore.syncNow(true);
+      }
+      showToast('success', t('passkey.registerSuccess'));
+    } else {
+      showToast('error', result.error ?? t('passkey.registerError'));
     }
   } catch (e) {
     console.warn('[passkey] Unexpected error during passkey registration:', e);
+    showToast('error', t('passkey.registerError'));
   }
 }
 
@@ -132,21 +140,18 @@ const showLayout = computed(() => {
 });
 
 /**
- * Load all family data. The data file is the source of truth.
+ * Load all family data. The data file (.beanpod V4) is the source of truth.
  *
  * Priority:
- * 1. File handle exists + permission → load from file
- * 2. File handle exists + needs permission → fallback to IndexedDB cache with warning
- * 3. No file handle → load from IndexedDB if available
+ * 1. File handle exists + permission → load from file (V4 envelope + family key decrypt)
+ * 2. File handle exists + needs permission → try Automerge persistence cache
+ * 3. No file handle → initialize empty Automerge doc
  */
 
 /* eslint-disable no-console -- debug logging for sync diagnostics */
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
-
-  // Load per-family settings (needed for encryption state, etc.)
-  await settingsStore.loadSettings();
 
   // Initialize sync service (restores file handle if configured)
   await syncStore.initialize();
@@ -166,7 +171,6 @@ async function loadFamilyData() {
       if (result.processed > 0) {
         await transactionsStore.loadTransactions();
       }
-      // Auto-sync is always on when file is configured + has permission
       syncStore.setupAutoSync();
       return;
     }
@@ -195,17 +199,42 @@ async function loadFamilyData() {
     }
   }
 
-  // Path 2: File configured but needs permission → IndexedDB cache as read-only fallback
+  // Path 2: File configured but needs permission → try Automerge persistence cache
   if (syncStore.isConfigured && syncStore.needsPermission) {
-    console.log('[loadFamilyData] File needs permission — using IndexedDB cache as fallback');
-    await loadFromIndexedDBCache();
+    console.log('[loadFamilyData] File needs permission — trying persistence cache');
+    const activeFamilyId = familyContextStore.activeFamilyId;
+    const cachedPw = activeFamilyId
+      ? settingsStore.getCachedEncryptionPassword(activeFamilyId)
+      : null;
+    if (activeFamilyId && cachedPw) {
+      try {
+        const cacheResult = await syncStore.loadFromPersistenceCache(cachedPw, activeFamilyId);
+        if (cacheResult.success) {
+          console.log('[loadFamilyData] Loaded from persistence cache');
+          memberFilterStore.initialize();
+          const result = await processRecurringItems();
+          if (result.processed > 0) {
+            await transactionsStore.loadTransactions();
+          }
+          return;
+        }
+      } catch {
+        console.warn('[loadFamilyData] Failed to load from persistence cache');
+      }
+    }
+    // Fall through — user needs to grant permission
     return;
   }
 
-  // Path 3: No file configured → check if data exists in IndexedDB (existing/migrated user)
+  // Path 3: No file configured → initialize empty Automerge doc
+  // This path is for first-time users or users without a sync file
+  const { initDoc } = await import('@/services/automerge/docService');
+  initDoc();
+
+  // Load stores from the (empty) Automerge doc
+  await settingsStore.loadSettings();
   await familyStore.loadMembers();
 
-  // Existing user with IndexedDB data but no file configured — load normally
   if (familyStore.isSetupComplete) {
     memberFilterStore.initialize();
 
@@ -227,33 +256,6 @@ async function loadFamilyData() {
   }
 }
 /* eslint-enable no-console */
-
-/**
- * Fallback: load from IndexedDB cache when file permission is not yet granted.
- */
-async function loadFromIndexedDBCache() {
-  await familyStore.loadMembers();
-
-  if (familyStore.isSetupComplete) {
-    memberFilterStore.initialize();
-
-    await Promise.all([
-      accountsStore.loadAccounts(),
-      transactionsStore.loadTransactions(),
-      assetsStore.loadAssets(),
-      goalsStore.loadGoals(),
-      recurringStore.loadRecurringItems(),
-      todoStore.loadTodos(),
-      activityStore.loadActivities(),
-      budgetStore.loadBudgets(),
-    ]);
-
-    const result = await processRecurringItems();
-    if (result.processed > 0) {
-      await transactionsStore.loadTransactions();
-    }
-  }
-}
 
 onMounted(async () => {
   try {
