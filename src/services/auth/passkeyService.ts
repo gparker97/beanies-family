@@ -1,7 +1,7 @@
 /**
- * WebAuthn/Passkey service for biometric authentication and file decryption.
+ * WebAuthn/Passkey service for biometric authentication and family key access.
  *
- * Flow: Passkey authenticates member → cached password used to decrypt file.
+ * Flow: Passkey authenticates member → family key unwrapped via PRF or envelope.
  *
  * Challenge generation is client-side via crypto.getRandomValues().
  * Acceptable for local-first — no network replay threat.
@@ -11,13 +11,16 @@ import {
   isPRFSupported,
   getPRFOutput,
   buildPRFExtension,
-  wrapPassword,
-  unwrapPassword,
+  deriveWrappingKey,
+  generateHKDFSalt,
+  wrapDEK,
+  unwrapDEK,
 } from './passkeyCrypto';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 import type { PasskeyRegistration, PasskeySecret } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 import { getGlobalSettings } from '@/services/indexeddb/repositories/globalSettingsRepository';
+import { importFamilyKey } from '@/services/crypto/familyKeyService';
 
 const RP_NAME = 'beanies.family';
 
@@ -47,7 +50,7 @@ export interface RegisterPasskeyParams {
   memberName: string;
   memberEmail: string;
   familyId: string;
-  encryptionPassword: string;
+  familyKey: CryptoKey;
   label?: string;
 }
 
@@ -65,7 +68,7 @@ export async function registerPasskeyForMember(
     return { success: false, error: 'WebAuthn is not supported in this browser' };
   }
 
-  const { memberId, memberName, memberEmail, familyId, encryptionPassword } = params;
+  const { memberId, memberName, memberEmail, familyId, familyKey } = params;
 
   // Generate client-side challenge
   const challenge = crypto.getRandomValues(new Uint8Array(32));
@@ -128,28 +131,26 @@ export async function registerPasskeyForMember(
     createdAt: toISODateString(new Date()),
   };
 
-  // Cache the password for file decryption during biometric login
-  registration.cachedPassword = encryptionPassword;
-
   await passkeyRepo.savePasskeyRegistration(registration);
 
-  // If PRF is available, wrap the file password for cross-device access
+  // If PRF is available, wrap the family key for cross-device access
   let passkeySecret: PasskeySecret | undefined;
   if (prfAvailable) {
     const prfOutput = getPRFOutput(extensionResults);
     if (prfOutput) {
       try {
-        const wrapped = await wrapPassword(encryptionPassword, prfOutput);
+        const hkdfSalt = generateHKDFSalt();
+        const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
+        const wrappedFamilyKey = await wrapDEK(familyKey, wrappingKey);
         passkeySecret = {
           credentialId: registration.credentialId,
           memberId,
-          wrappedPassword: wrapped.wrappedPassword,
-          hkdfSalt: wrapped.hkdfSalt,
-          iv: wrapped.iv,
+          wrappedFamilyKey,
+          hkdfSalt: bufferToBase64(hkdfSalt.buffer as ArrayBuffer),
           createdAt: toISODateString(new Date()),
         };
       } catch {
-        // PRF wrap failed — non-critical, fall back to Level 1
+        // PRF wrap failed — non-critical, fall back to password-based unlock
       }
     }
   }
@@ -172,7 +173,7 @@ export interface AuthenticatePasskeyResult {
   success: boolean;
   memberId?: string;
   credentialId?: string; // Credential ID (for cross-device registration)
-  cachedPassword?: string; // Encryption password for file decryption
+  familyKey?: CryptoKey; // Family key for file decryption
   error?: string;
 }
 
@@ -194,11 +195,6 @@ export async function authenticateWithPasskey(
   const prfExtension = buildPRFExtension();
 
   // Discoverable credential mode: omit allowCredentials entirely.
-  // All passkeys are registered with residentKey: 'required', so the browser
-  // discovers them by rpId alone — searching Windows Hello, Chrome passkey
-  // manager, iCloud Keychain, etc. This avoids Chrome 130+ falling back to
-  // the QR-code cross-device flow when credential IDs don't match the
-  // current credential resolver.
   const publicKeyOptions: PublicKeyCredentialRequestOptions = {
     challenge,
     rpId,
@@ -228,74 +224,54 @@ export async function authenticateWithPasskey(
 
   // Match credential to registration using multiple signals
   const credentialId = bufferToBase64url(assertion.rawId);
+  const extensionResults = assertion.getClientExtensionResults();
   const registration = registrations.find((r) => r.credentialId === credentialId);
 
   if (!registration) {
-    // Credential ID not found locally — this is likely a synced passkey from
-    // another device (iCloud Keychain, Google Password Manager, Windows Hello).
-    // Check userHandle to identify the member and attempt auto-registration.
+    // Credential ID not found locally — likely a synced passkey from another device.
+    // Check userHandle to identify the member.
     const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
     const userHandle = assertionResponse.userHandle;
     if (userHandle && userHandle.byteLength > 0) {
       const memberIdFromHandle = new TextDecoder().decode(userHandle);
       const memberMatch = registrations.find((r) => r.memberId === memberIdFromHandle);
       if (memberMatch) {
-        // Member is known — try to auto-register the synced credential locally
-        // using the family's cached encryption password.
-        const cachedPassword = await getCachedPasswordForFamily(params.familyId);
-        if (cachedPassword) {
-          // Auto-register: create a local registration for the synced credential
+        // Try to unwrap family key via PRF from passkeyWrappedKeys in envelope
+        const familyKeyResult = await tryUnwrapFamilyKeyFromPRF(
+          extensionResults,
+          params.passkeySecrets,
+          memberIdFromHandle
+        );
+        if (familyKeyResult) {
+          // Auto-register the synced credential locally
           await registerSyncedCredential({
             credentialId,
             sourceRegistration: memberMatch,
-            cachedPassword,
           });
-
           return {
             success: true,
-            memberId: memberMatch.memberId,
-            cachedPassword,
+            memberId: memberIdFromHandle,
+            familyKey: familyKeyResult,
           };
         }
 
-        // No cached password — try PRF unwrap from passkeySecrets in the .beanpod envelope
-        if (params.passkeySecrets && params.passkeySecrets.length > 0) {
-          const extensionResults = assertion.getClientExtensionResults();
-          const prfOutput = getPRFOutput(extensionResults);
-          if (prfOutput) {
-            const memberSecrets = params.passkeySecrets.filter(
-              (s) => s.memberId === memberIdFromHandle
-            );
-            for (const secret of memberSecrets) {
-              try {
-                const password = await unwrapPassword(
-                  secret.wrappedPassword,
-                  secret.hkdfSalt,
-                  secret.iv,
-                  prfOutput
-                );
-                // PRF unwrap succeeded — auto-register synced credential
-                await registerSyncedCredential({
-                  credentialId,
-                  sourceRegistration: memberMatch,
-                  cachedPassword: password,
-                });
-                return {
-                  success: true,
-                  memberId: memberIdFromHandle,
-                  cachedPassword: password,
-                };
-              } catch {
-                // Wrong PRF output or corrupt secret — try next
-              }
-            }
-          }
+        // Try cached family key from trusted device settings
+        const cachedFamilyKey = await getCachedFamilyKeyForFamily(params.familyId);
+        if (cachedFamilyKey) {
+          await registerSyncedCredential({
+            credentialId,
+            sourceRegistration: memberMatch,
+          });
+          return {
+            success: true,
+            memberId: memberMatch.memberId,
+            familyKey: cachedFamilyKey,
+          };
         }
 
-        // PRF unwrap unavailable or failed — user must enter password manually
+        // Family key not available — user must enter password to derive it
         return {
-          success: false,
-          error: 'CROSS_DEVICE_NO_CACHE',
+          success: true,
           memberId: memberMatch.memberId,
           credentialId,
         };
@@ -310,19 +286,62 @@ export async function authenticateWithPasskey(
     lastUsedAt: toISODateString(new Date()),
   });
 
-  // Use cached password for file decryption
-  if (registration.cachedPassword) {
+  // Try PRF unwrap from passkeyWrappedKeys
+  const familyKeyResult = await tryUnwrapFamilyKeyFromPRF(
+    extensionResults,
+    params.passkeySecrets,
+    registration.memberId
+  );
+  if (familyKeyResult) {
     return {
       success: true,
       memberId: registration.memberId,
-      cachedPassword: registration.cachedPassword,
+      familyKey: familyKeyResult,
     };
   }
 
+  // Try cached family key from trusted device settings
+  const cachedFamilyKey = await getCachedFamilyKeyForFamily(params.familyId);
+  if (cachedFamilyKey) {
+    return {
+      success: true,
+      memberId: registration.memberId,
+      familyKey: cachedFamilyKey,
+    };
+  }
+
+  // Passkey verified the member but we can't get the family key without PRF or cache.
+  // Caller should prompt for password to derive the family key from the envelope.
   return {
-    success: false,
-    error: 'Passkey verified but cannot decrypt file. Please re-register in Settings.',
+    success: true,
+    memberId: registration.memberId,
+    credentialId,
   };
+}
+
+// --- PRF family key unwrapping ---
+
+async function tryUnwrapFamilyKeyFromPRF(
+  extensionResults: AuthenticationExtensionsClientOutputs,
+  passkeySecrets: PasskeySecret[] | undefined,
+  memberId: string
+): Promise<CryptoKey | null> {
+  if (!passkeySecrets || passkeySecrets.length === 0) return null;
+  const prfOutput = getPRFOutput(extensionResults);
+  if (!prfOutput) return null;
+
+  const memberSecrets = passkeySecrets.filter((s) => s.memberId === memberId);
+  for (const secret of memberSecrets) {
+    try {
+      const hkdfSalt = new Uint8Array(base64ToBuffer(secret.hkdfSalt));
+      const wrappingKey = await deriveWrappingKey(prfOutput, hkdfSalt);
+      const fk = await unwrapDEK(secret.wrappedFamilyKey, wrappingKey);
+      return fk;
+    } catch {
+      // Wrong PRF output or corrupt secret — try next
+    }
+  }
+  return null;
 }
 
 // --- Synced credential registration ---
@@ -334,7 +353,6 @@ export async function authenticateWithPasskey(
 export async function registerSyncedCredential(params: {
   credentialId: string;
   sourceRegistration: PasskeyRegistration;
-  cachedPassword: string;
 }): Promise<void> {
   const syncedRegistration: PasskeyRegistration = {
     credentialId: params.credentialId,
@@ -343,7 +361,6 @@ export async function registerSyncedCredential(params: {
     publicKey: params.sourceRegistration.publicKey,
     transports: params.sourceRegistration.transports,
     prfSupported: params.sourceRegistration.prfSupported,
-    cachedPassword: params.cachedPassword,
     label: params.sourceRegistration.label + ' (synced)',
     createdAt: params.sourceRegistration.createdAt,
     lastUsedAt: toISODateString(new Date()),
@@ -377,10 +394,6 @@ export async function removeAllPasskeysForMember(memberId: string): Promise<void
 /**
  * Signal to the platform authenticator that the given credential IDs are no
  * longer valid. Uses the WebAuthn Signal API (Chrome/Edge 132+, Safari 26+).
- * This causes Windows Hello / iCloud Keychain / Google Password Manager to
- * stop showing these credentials in the passkey picker.
- *
- * Silently no-ops if the Signal API is not supported.
  */
 export async function signalCredentialsRemoved(credentialIds: string[]): Promise<void> {
   if (
@@ -407,23 +420,6 @@ export async function signalCredentialsRemoved(credentialIds: string[]): Promise
   }
 }
 
-/**
- * Update cached password for all passkey registrations in a family.
- * Called when the encryption password changes.
- */
-export async function invalidatePasskeysForPasswordChange(
-  familyId: string,
-  newPassword?: string
-): Promise<void> {
-  if (!newPassword) return;
-  const registrations = await passkeyRepo.getPasskeysByFamily(familyId);
-  for (const reg of registrations) {
-    await passkeyRepo.updatePasskey(reg.credentialId, {
-      cachedPassword: newPassword,
-    });
-  }
-}
-
 export async function renamePasskey(credentialId: string, label: string): Promise<void> {
   await passkeyRepo.updatePasskey(credentialId, { label });
 }
@@ -431,13 +427,16 @@ export async function renamePasskey(credentialId: string, label: string): Promis
 // --- Helpers ---
 
 /**
- * Look up the cached encryption password for a family from global settings.
- * This is stored per-family in the registry DB and survives sign-out.
+ * Look up the cached family key for a family from global settings.
+ * Stored per-family on trusted devices in the registry DB.
  */
-async function getCachedPasswordForFamily(familyId: string): Promise<string | null> {
+async function getCachedFamilyKeyForFamily(familyId: string): Promise<CryptoKey | null> {
   try {
     const gs = await getGlobalSettings();
-    return gs.cachedEncryptionPasswords?.[familyId] ?? null;
+    const cached = gs.cachedFamilyKeys?.[familyId];
+    if (!cached) return null;
+    const raw = new Uint8Array(base64ToBuffer(cached));
+    return importFamilyKey(raw);
   } catch {
     return null;
   }
