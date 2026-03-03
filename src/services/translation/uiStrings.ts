@@ -1249,22 +1249,12 @@ const STRING_DEFS = {
   'join.title': { en: 'Join Family', beanie: 'join the pod' },
 
   // Login — Invite / Join
-  'login.inviteAsParent': { en: 'Parent', beanie: 'big bean' },
-  'login.inviteAsChild': { en: 'Child', beanie: 'little bean' },
-  'login.inviteRoleLabel': { en: 'Inviting as', beanie: 'inviting as' },
-  'login.familyCodePlaceholder': {
-    en: 'Enter the code from your family',
-    beanie: 'enter the code from your family',
-  },
   'login.inviteTitle': { en: 'Invite family member', beanie: 'invite your beanies' },
   'login.inviteDesc': {
-    en: 'Share this code with family members so they can join your pod',
-    beanie: 'share this code with family members so they can join your pod',
+    en: 'Share this magic link with your family member so they can join your pod',
+    beanie: 'share this magic link with your family member so they can join your pod',
   },
-  'login.inviteCode': { en: 'Family code', beanie: 'family code' },
-  'login.inviteLink': { en: 'Or share this link', beanie: 'or share this link' },
   'login.copied': { en: 'Copied!', beanie: 'copied!' },
-  'login.copyCode': { en: 'Copy code', beanie: 'copy code' },
   'login.copyLink': { en: 'Copy link', beanie: 'copy link' },
 
   // Login v6 redesign
@@ -1380,23 +1370,7 @@ const STRING_DEFS = {
   'loginV6.addMember': { en: 'Add Member', beanie: 'add beanie' },
   'loginV6.finish': { en: 'Finish', beanie: 'finish' },
   'loginV6.skip': { en: 'Skip for now', beanie: 'skip for now' },
-  'loginV6.joinInput': { en: 'Family code or magic link', beanie: 'family code or magic link' },
-  'loginV6.whatsNext': { en: 'What happens next?', beanie: 'what happens next?' },
-  'loginV6.joinStep1': {
-    en: "We'll verify your family and load the data file",
-    beanie: "we'll verify your family and load the data file",
-  },
-  'loginV6.joinStep2': {
-    en: "You'll pick your profile and create a password",
-    beanie: "you'll pick your profile and create a password",
-  },
-  'loginV6.joinStep3': { en: "Then you're in!", beanie: "then you're a beanie!" },
   'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'join your pod!' },
-  'loginV6.joinNotAvailable': {
-    en: 'Joining a pod isn\'t available yet. Ask your family to share their .beanpod file with you and use "Sign in to your pod" instead.',
-    beanie:
-      'joining a pod isn\'t available yet. ask your family to share their .beanpod file with you and use "sign in to your pod" instead.',
-  },
   'loginV6.wantYourOwn': { en: 'Want your own?', beanie: 'want your own?' },
   'loginV6.createLink': { en: 'Create a new pod', beanie: 'create a new pod' },
   'loginV6.acceptsBeanpod': { en: 'Accepts .beanpod files', beanie: 'accepts .beanpod files' },
@@ -1465,7 +1439,10 @@ const STRING_DEFS = {
 
   // Join flow (magic link invites)
   'join.verifyTitle': { en: 'Join your family', beanie: 'join your family pod!' },
-  'join.verifySubtitle': { en: "Let's find your family", beanie: "let's find your family" },
+  'join.verifySubtitle': {
+    en: 'You need a magic joining link from a family member',
+    beanie: 'you need a magic joining link from a family member',
+  },
   'join.lookingUp': { en: 'Looking up your family...', beanie: 'finding your pod...' },
   'join.familyFound': { en: 'Family found!', beanie: 'found your pod!' },
   'join.familyNotFound': {
@@ -1531,7 +1508,7 @@ const STRING_DEFS = {
   'join.shareFileNoteCloud': {
     en: 'Your family member will be prompted to sign in with Google to access the shared file automatically.',
     beanie:
-      'your family member will be prompted to sign in with google to access the shared file automatically.',
+      'Your family member will be prompted to sign in with your cloud provider to access the shared file. Please ensure they have access to the file with their account',
   },
   'join.cloudLoadFailed': {
     en: "Couldn't load the file from cloud storage. You can load it manually below.",
@@ -1541,16 +1518,23 @@ const STRING_DEFS = {
     en: 'Loading family data from Google Drive...',
     beanie: 'fetching your beans from the cloud...',
   },
-  'join.enterCodeManually': {
-    en: 'Or enter a family code manually',
-    beanie: 'or enter a family code manually',
+  'join.howToJoinTitle': { en: 'How to join', beanie: 'how to join' },
+  'join.howToJoinStep1': {
+    en: 'Ask a parent or family admin to open the Family page',
+    beanie: 'ask a big bean to open the family page',
   },
-  'join.codeInputLabel': { en: 'Family code', beanie: 'family code' },
-  'join.codeInputHint': {
-    en: 'Paste the family code or invite link shared by your family member',
-    beanie: 'paste the family pod code or invite link shared by your family member',
+  'join.howToJoinStep2': {
+    en: "They'll tap Invite to generate a magic link",
+    beanie: "they'll tap invite to make a magic link",
   },
-  'join.next': { en: 'Next', beanie: 'next' },
+  'join.howToJoinStep3': {
+    en: "Open the link on your device — that's it!",
+    beanie: "open the link on your device — that's it!",
+  },
+  'join.linkExpiryNote': {
+    en: 'Invite links expire after 24 hours for security',
+    beanie: 'invite links expire after 24 hours for security',
+  },
 
   // PWA / Offline / Install
   'pwa.offlineBanner': {

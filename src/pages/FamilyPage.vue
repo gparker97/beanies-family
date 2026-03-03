@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -34,17 +34,14 @@ const editingMember = ref<FamilyMember | null>(null);
 const isEditingFamilyName = ref(false);
 const editFamilyName = ref('');
 const showInviteModal = ref(false);
-const inviteCopiedCode = ref(false);
 const inviteCopiedLink = ref(false);
 const isGeneratingInvite = ref(false);
 const inviteLinkError = ref<string | null>(null);
-
-const inviteCode = computed(() => familyContextStore.activeFamilyId ?? '');
 const inviteLink = ref('');
 
 /** Build the base join URL (without token) for display/fallback. */
 function buildBaseJoinUrl(): string {
-  const fam = inviteCode.value;
+  const fam = familyContextStore.activeFamilyId ?? '';
   const p = syncStore.storageProviderType ?? 'local';
   const fileRef = syncStore.fileName ? btoa(syncStore.fileName) : '';
   let url = `${window.location.origin}/join?fam=${fam}&p=${p}&ref=${fileRef}`;
@@ -78,7 +75,6 @@ async function generateInviteLink(): Promise<string> {
 }
 
 async function openInviteModal() {
-  inviteCopiedCode.value = false;
   inviteCopiedLink.value = false;
   inviteLinkError.value = null;
   showInviteModal.value = true;
@@ -92,18 +88,6 @@ async function openInviteModal() {
     inviteLink.value = buildBaseJoinUrl();
   } finally {
     isGeneratingInvite.value = false;
-  }
-}
-
-async function copyInviteCode() {
-  try {
-    await navigator.clipboard.writeText(inviteCode.value);
-    inviteCopiedCode.value = true;
-    setTimeout(() => {
-      inviteCopiedCode.value = false;
-    }, 2000);
-  } catch {
-    // fallback — select text for manual copy
   }
 }
 
@@ -388,11 +372,8 @@ function cancelEditFamilyName() {
           {{ t('login.inviteDesc') }}
         </p>
 
-        <!-- Shareable Link -->
+        <!-- Magic invite link -->
         <div>
-          <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('login.inviteLink') }}
-          </label>
           <div v-if="isGeneratingInvite" class="flex items-center gap-2 py-2.5">
             <div
               class="border-t-primary-500 h-4 w-4 animate-spin rounded-full border-2 border-gray-300"
@@ -409,23 +390,6 @@ function cancelEditFamilyName() {
             </code>
             <BaseButton variant="secondary" @click="copyInviteLink">
               {{ inviteCopiedLink ? t('login.copied') : t('login.copyLink') }}
-            </BaseButton>
-          </div>
-        </div>
-
-        <!-- Family Code (manual fallback) -->
-        <div>
-          <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('login.inviteCode') }}
-          </label>
-          <div class="flex items-center gap-2">
-            <code
-              class="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-sm text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
-            >
-              {{ inviteCode }}
-            </code>
-            <BaseButton variant="secondary" @click="copyInviteCode">
-              {{ inviteCopiedCode ? t('login.copied') : t('login.copyCode') }}
             </BaseButton>
           </div>
         </div>
