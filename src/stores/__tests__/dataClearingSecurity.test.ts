@@ -440,9 +440,9 @@ describe('Sensitive Data Clearing Security', () => {
       expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123');
     });
 
-    it('clears sessionStorage auth session', async () => {
+    it('clears localStorage auth session', async () => {
       const { auth } = populateAllStores();
-      const removeItemSpy = vi.spyOn(sessionStorage, 'removeItem');
+      const removeItemSpy = vi.spyOn(localStorage, 'removeItem');
 
       await auth.signOutAndClearData();
 
@@ -486,9 +486,9 @@ describe('Sensitive Data Clearing Security', () => {
       expect(auth.isAuthenticated).toBe(false);
     });
 
-    it('clears sessionStorage', async () => {
+    it('clears localStorage auth session', async () => {
       const { auth } = populateAllStores();
-      const removeItemSpy = vi.spyOn(sessionStorage, 'removeItem');
+      const removeItemSpy = vi.spyOn(localStorage, 'removeItem');
 
       await auth.signOut();
 
@@ -528,10 +528,10 @@ describe('Sensitive Data Clearing Security', () => {
       expect(auth.isAuthenticated).toBe(false);
     });
 
-    it('still clears sessionStorage', async () => {
+    it('still clears localStorage auth session', async () => {
       const { auth, settings } = populateAllStores();
       await settings.setTrustedDevice(true);
-      const removeItemSpy = vi.spyOn(sessionStorage, 'removeItem');
+      const removeItemSpy = vi.spyOn(localStorage, 'removeItem');
 
       await auth.signOut();
 
