@@ -29,15 +29,15 @@ const SESSION_KEY = 'beanies_auth_session';
 
 function persistSession(user: AuthUser): void {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   } catch {
-    // sessionStorage unavailable (e.g. private browsing) — silent fail
+    // localStorage unavailable (e.g. private browsing) — silent fail
   }
 }
 
 function clearSession(): void {
   try {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
   } catch {
     // silent fail
   }
@@ -45,7 +45,7 @@ function clearSession(): void {
 
 function restoreSession(): AuthUser | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY);
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
     return null;

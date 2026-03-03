@@ -585,6 +585,7 @@ export const useSyncStore = defineStore('sync', () => {
       envelope.value = cachedEnvelope;
       sessionPassword.value = password;
       syncService.setFamilyKey(fk, cachedEnvelope);
+      isConfigured.value = true; // Data is loaded — show configured UI
       needsPermission.value = true; // Still need file permission for future saves
       lastSync.value = toISODateString(new Date());
 
