@@ -45,7 +45,10 @@ export async function saveSettings(
   settings: Partial<Settings>,
   options?: { preserveTimestamp?: boolean }
 ): Promise<Settings> {
-  const existing = await getSettings();
+  // Deep-clone to strip Automerge proxy wrappers — spreading a proxy only
+  // shallow-copies, leaving nested arrays/objects as proxy references which
+  // Automerge rejects with "Cannot create a reference to an existing document object".
+  const existing = structuredClone(await getSettings());
 
   const updated: Settings = {
     ...existing,

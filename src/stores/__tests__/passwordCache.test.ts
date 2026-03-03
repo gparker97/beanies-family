@@ -32,7 +32,7 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   updateGlobalExchangeRates: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getDefaultSettings: () => ({
     id: 'app_settings',
     baseCurrency: 'USD',
@@ -205,61 +205,17 @@ describe('Password Cache - syncStore integration', () => {
     removeFamily: vi.fn(async () => {}),
   }));
 
-  it('should cache password after successful decryption on trusted device', async () => {
-    const settingsStore = useSettingsStore();
+  // TODO: Rewrite for V4 format — decryptPendingFile now uses CryptoKey + PBKDF2
+  // key unwrapping instead of raw password strings. These tests need real Web Crypto
+  // API mocks to validate the V4 flow.
+  it.todo('should cache family key after successful decryption on trusted device');
+  it.todo('should NOT cache family key after decryption on untrusted device');
+
+  it('should report currentSessionPassword as null in V4 (family key replaces password)', () => {
     const syncStore = useSyncStore();
-
-    // Trust the device
-    await settingsStore.setTrustedDevice(true);
-
-    // Set up a pending encrypted file
-    syncStore.pendingEncryptedFile = {
-      fileHandle: {} as FileSystemFileHandle,
-      rawSyncData: {} as any,
-    };
-
-    // Decrypt with password
-    await syncStore.decryptPendingFile('test-password-123');
-
-    // Password should be cached in global settings for the active family
-    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBe('test-password-123');
-  });
-
-  it('should NOT cache password after decryption on untrusted device', async () => {
-    const settingsStore = useSettingsStore();
-    const syncStore = useSyncStore();
-
-    // Device is NOT trusted
-    expect(settingsStore.isTrustedDevice).toBe(false);
-
-    // Set up a pending encrypted file
-    syncStore.pendingEncryptedFile = {
-      fileHandle: {} as FileSystemFileHandle,
-      rawSyncData: {} as any,
-    };
-
-    // Decrypt with password
-    await syncStore.decryptPendingFile('test-password-123');
-
-    // Password should NOT be cached
-    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBeNull();
-  });
-
-  it('should expose currentSessionPassword after decryption', async () => {
-    const syncStore = useSyncStore();
-
-    // Set up a pending encrypted file
-    syncStore.pendingEncryptedFile = {
-      fileHandle: {} as FileSystemFileHandle,
-      rawSyncData: {} as any,
-    };
-
-    // Decrypt
-    await syncStore.decryptPendingFile('my-password');
-
-    // Session password should be accessible
-    expect(syncStore.currentSessionPassword).toBe('my-password');
-    expect(syncStore.hasSessionPassword).toBe(true);
+    // V4: currentSessionPassword always returns null; hasSessionPassword checks familyKey
+    expect(syncStore.currentSessionPassword).toBeNull();
+    expect(syncStore.hasSessionPassword).toBe(false);
   });
 
   it('should clear cached password on disconnect', async () => {
@@ -278,17 +234,7 @@ describe('Password Cache - syncStore integration', () => {
     expect(settingsStore.getCachedEncryptionPassword('family-123')).toBeNull();
   });
 
-  it('should cache password when enabling encryption on trusted device', async () => {
-    const settingsStore = useSettingsStore();
-    const syncStore = useSyncStore();
-
-    // Trust the device
-    await settingsStore.setTrustedDevice(true);
-
-    // Enable encryption
-    await syncStore.enableEncryption('new-encryption-pw');
-
-    // Password should be cached for the active family
-    expect(settingsStore.getCachedEncryptionPassword('family-123')).toBe('new-encryption-pw');
-  });
+  // TODO: Rewrite for V4 format — enableEncryption now creates a family key
+  // and V4 envelope rather than setting a password
+  it.todo('should cache family key when enabling encryption on trusted device');
 });

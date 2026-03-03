@@ -2,9 +2,9 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
-import { useSyncStore } from '@/stores/syncStore';
 import { requestAccessToken } from '@/services/google/googleAuth';
-import { exportToFile } from '@/services/sync/fileSync';
+import { reEncryptEnvelope, downloadAsFile } from '@/services/sync/fileSync';
+import { getFamilyKey, getEnvelope } from '@/services/sync/syncService';
 
 const props = defineProps<{
   show: boolean;
@@ -13,7 +13,6 @@ const props = defineProps<{
 
 const { t } = useTranslation();
 const router = useRouter();
-const syncStore = useSyncStore();
 const isReconnecting = ref(false);
 const isDownloading = ref(false);
 
@@ -36,10 +35,12 @@ async function handleReconnect() {
 async function handleDownloadBackup() {
   isDownloading.value = true;
   try {
-    const password = syncStore.isEncryptionEnabled
-      ? (syncStore.currentSessionPassword ?? undefined)
-      : undefined;
-    await exportToFile('beanies-backup', password);
+    const fk = getFamilyKey();
+    const env = getEnvelope();
+    if (fk && env) {
+      const envelopeJson = await reEncryptEnvelope(env, fk);
+      downloadAsFile(envelopeJson, 'beanies-backup');
+    }
   } catch {
     // Best-effort — user can retry
   } finally {

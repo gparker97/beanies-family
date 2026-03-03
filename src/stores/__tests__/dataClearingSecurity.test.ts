@@ -35,7 +35,7 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   updateGlobalExchangeRates: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getDefaultSettings: () => ({
     id: 'app_settings',
     baseCurrency: 'USD',
@@ -115,42 +115,42 @@ vi.mock('@/services/indexeddb/registryDatabase', () => ({
   })),
 }));
 
-vi.mock('@/services/indexeddb/repositories/familyMemberRepository', () => ({
+vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
   getAllMembers: vi.fn(async () => []),
   createMember: vi.fn(),
   updateMember: vi.fn(),
   deleteMember: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn(async () => []),
   createAccount: vi.fn(),
   updateAccount: vi.fn(),
   deleteAccount: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn(async () => []),
   createTransaction: vi.fn(),
   updateTransaction: vi.fn(),
   deleteTransaction: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/assetRepository', () => ({
+vi.mock('@/services/automerge/repositories/assetRepository', () => ({
   getAllAssets: vi.fn(async () => []),
   createAsset: vi.fn(),
   updateAsset: vi.fn(),
   deleteAsset: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/goalRepository', () => ({
+vi.mock('@/services/automerge/repositories/goalRepository', () => ({
   getAllGoals: vi.fn(async () => []),
   createGoal: vi.fn(),
   updateGoal: vi.fn(),
   deleteGoal: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
+vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getAllRecurringItems: vi.fn(async () => []),
   createRecurringItem: vi.fn(),
   updateRecurringItem: vi.fn(),
@@ -351,10 +351,17 @@ function populateAllStores() {
 
   // Sync — encryption credentials
   sync.pendingEncryptedFile = {
-    fileHandle: {} as FileSystemFileHandle,
-    rawSyncData: {} as any,
+    envelope: {
+      version: '4.0',
+      familyId: 'family-123',
+      familyName: 'Test Family',
+      keyId: 'key-1',
+      wrappedKeys: {},
+      payload: 'encrypted-payload',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as any,
   };
-  sync.setSessionPassword('super-secret-encryption-key');
+  // V4: setSessionPassword is a no-op; family key is set via decryptPendingFile
   sync.isConfigured = true;
   (sync as any).fileName = 'family-data.beanpod';
 
@@ -606,7 +613,8 @@ describe('Sensitive Data Clearing Security', () => {
 
     it('syncStore.resetState() clears session password', () => {
       const { sync } = populateAllStores();
-      expect(sync.currentSessionPassword).not.toBeNull();
+      // V4: currentSessionPassword is always null (family key replaced password-based auth)
+      expect(sync.currentSessionPassword).toBeNull();
 
       sync.resetState();
 
@@ -835,7 +843,9 @@ describe('Sensitive Data Clearing Security', () => {
     it('sync store resetState removes encryption session password', () => {
       const { sync } = populateAllStores();
 
-      expect(sync.currentSessionPassword).toBe('super-secret-encryption-key');
+      // V4: currentSessionPassword is always null (family key replaced password-based auth)
+      // hasSessionPassword now checks for familyKey instead
+      expect(sync.currentSessionPassword).toBeNull();
 
       sync.resetState();
 

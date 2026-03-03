@@ -1,11 +1,11 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useRecurringStore } from './recurringStore';
-import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
+import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import type { RecurringItem } from '@/types/models';
 
 // Mock the recurring item repository
-vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
+vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getAllRecurringItems: vi.fn(),
   getRecurringItemById: vi.fn(),
   createRecurringItem: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
 }));
 
 // Mock transaction repository (needed for splitRecurringItem which uses transactionsStore)
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
   getTransactionById: vi.fn(),
   createTransaction: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
 }));
 
 // Mock account repository (needed by transactionsStore → accountsStore)
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn().mockResolvedValue([]),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -33,7 +33,7 @@ vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
 }));
 
 // Mock settings repository (needed by accountsStore)
-vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getSettings: vi.fn(),
   updateSettings: vi.fn(),
   getDefaultSettings: vi.fn(() => ({

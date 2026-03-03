@@ -16,7 +16,7 @@ import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { flushPendingSave } from '@/services/sync/syncService';
-import { clearAllSettingsWAL } from '@/services/sync/settingsWAL';
+import { initDoc } from '@/services/automerge/docService';
 
 export interface AuthUser {
   memberId: string;
@@ -183,6 +183,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (!family) {
         return { success: false, error: 'Failed to create family' };
       }
+
+      // Initialize Automerge document — must happen before any changeDoc() calls
+      // (createMember and setOnboardingCompleted both write to the doc)
+      initDoc();
 
       // Hash the password
       const passwordHashValue = await hashPassword(params.password);
@@ -534,9 +538,6 @@ export const useAuthStore = defineStore('auth', () => {
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
     await settingsStore.clearCachedEncryptionPassword();
-
-    // Clear all settings WAL entries (full data wipe)
-    clearAllSettingsWAL();
 
     // Clear auth state
     currentUser.value = null;
