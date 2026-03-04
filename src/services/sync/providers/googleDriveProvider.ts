@@ -202,7 +202,11 @@ export class GoogleDriveProvider implements StorageProvider {
    * Authenticates, creates/finds the app folder, and creates the file.
    */
   static async createNew(fileName: string): Promise<GoogleDriveProvider> {
-    const token = await requestAccessToken();
+    // Clear cached folder ID — prevents cross-account folder leak when switching Google accounts
+    clearFolderCache();
+
+    // Always force fresh consent for new family creation to ensure all scopes are granted
+    const token = await requestAccessToken({ forceConsent: true });
 
     // Capture account email (best-effort, non-blocking for provider creation)
     const email = await fetchGoogleUserEmail(token);

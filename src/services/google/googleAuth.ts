@@ -184,6 +184,14 @@ async function performPopupAuth(
     clientId,
   });
 
+  // Validate that Drive file scope was granted (Google granular consent lets users deselect it)
+  if (tokens.scope && !tokens.scope.includes('drive.file')) {
+    clearTokenState();
+    throw new Error(
+      'Google Drive file access was not granted. Please allow file access when prompted.'
+    );
+  }
+
   // Update in-memory state
   accessToken = tokens.access_token;
   expiresAt = Date.now() + tokens.expires_in * 1000;
