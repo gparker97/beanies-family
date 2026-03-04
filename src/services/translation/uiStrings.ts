@@ -880,6 +880,15 @@ const STRING_DEFS = {
     en: 'Copy and share your magic link with your family member',
     beanie: 'copy the magic bean link for this beanie',
   },
+  'family.memberAdded': { en: 'Member Added!', beanie: 'new beanie added!' },
+  'family.scanOrShare': {
+    en: 'Scan QR code or share the link',
+    beanie: 'scan the magic code or share the link',
+  },
+  'family.linkExpiry': {
+    en: 'This link expires in 24 hours',
+    beanie: 'this magic link expires in 24 hours',
+  },
   'family.inviteSection.title': {
     en: 'Invite to join',
     beanie: 'invite this beanie',
@@ -961,21 +970,19 @@ const STRING_DEFS = {
     en: 'Data loaded successfully!',
     beanie: 'data loaded successfully!',
   },
-  'settings.encryptDataFile': { en: 'Encrypt data file', beanie: 'encrypt data file' },
-  'settings.encrypted': { en: 'Encrypted', beanie: 'encrypted' },
-  'settings.unencrypted': { en: 'Unencrypted', beanie: 'unencrypted' },
-  'settings.encryptionDescription': {
-    en: 'Protect your data with password encryption',
-    beanie: 'lock your beans with a password',
+  'settings.familyKeyStatus': { en: 'Family Key', beanie: 'family key' },
+  'settings.familyKeyActive': {
+    en: 'End-to-End Encrypted',
+    beanie: 'end-to-end encrypted',
   },
-  'settings.disableEncryptionWarning': {
-    en: 'Disabling encryption means your financial data will be stored as clear text and could be read by anyone with access to the file. Are you sure?',
-    beanie:
-      'disabling encryption means your financial data will be stored as clear text and could be read by anyone with access to the file. are you sure?',
+  'settings.familyKeyDescription': {
+    en: 'Your data is protected with AES-256 encryption',
+    beanie: 'your beans are locked with aes-256 encryption',
   },
-  'settings.yesDisableEncryption': {
-    en: 'Yes, Disable Encryption',
-    beanie: 'yes, disable encryption',
+  'settings.exportAsJson': { en: 'Export as JSON', beanie: 'export as json' },
+  'settings.exportAsJsonDesc': {
+    en: 'Download all your data as a human-readable JSON file',
+    beanie: 'download all your beans as a readable json file',
   },
   'settings.noAutoSyncWarning': {
     en: "Your browser doesn't support automatic file saving. Use manual export/import instead. For automatic saving, use Chrome or Edge.",
@@ -1004,13 +1011,6 @@ const STRING_DEFS = {
   'settings.exportTranslations': { en: 'Export Translations', beanie: 'export translations' },
 
   // Password modal
-  'password.setPassword': { en: 'Set Encryption Password', beanie: 'set encryption password' },
-  'password.setPasswordDescription': {
-    en: "Choose a strong password to encrypt your data file. You'll need this password each time you open the app.",
-    beanie:
-      "choose a strong password to encrypt your data file. you'll need this password each time you open the app.",
-  },
-  'password.enableEncryption': { en: 'Enable Encryption', beanie: 'enable encryption' },
   'password.enterPassword': { en: 'Enter Password', beanie: 'enter password' },
   'password.enterPasswordDescription': {
     en: 'This file is encrypted. Enter your password to decrypt and load the data.',

@@ -4,14 +4,18 @@ import { useRoute } from 'vue-router';
 import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
+import { useClipboard } from '@/composables/useClipboard';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
+import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { timeAgo } from '@/utils/date';
 import { isTemporaryEmail } from '@/utils/email';
+import { generateInviteQR } from '@/utils/qrCode';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -34,10 +38,10 @@ const editingMember = ref<FamilyMember | null>(null);
 const isEditingFamilyName = ref(false);
 const editFamilyName = ref('');
 const showInviteModal = ref(false);
-const inviteCopiedLink = ref(false);
 const isGeneratingInvite = ref(false);
 const inviteLinkError = ref<string | null>(null);
 const inviteLink = ref('');
+const inviteQrUrl = ref('');
 
 /** Build the base join URL (without token) for display/fallback. */
 function buildBaseJoinUrl(): string {
@@ -75,14 +79,15 @@ async function generateInviteLink(): Promise<string> {
 }
 
 async function openInviteModal() {
-  inviteCopiedLink.value = false;
   inviteLinkError.value = null;
+  inviteQrUrl.value = '';
   showInviteModal.value = true;
 
-  // Generate a fresh invite link with crypto token
+  // Generate a fresh invite link with crypto token + QR code
   isGeneratingInvite.value = true;
   try {
     inviteLink.value = await generateInviteLink();
+    inviteQrUrl.value = await generateInviteQR(inviteLink.value);
   } catch (e) {
     inviteLinkError.value = (e as Error).message;
     inviteLink.value = buildBaseJoinUrl();
@@ -91,34 +96,27 @@ async function openInviteModal() {
   }
 }
 
-async function copyInviteLink() {
-  try {
-    await navigator.clipboard.writeText(inviteLink.value);
-    inviteCopiedLink.value = true;
-    setTimeout(() => {
-      inviteCopiedLink.value = false;
-    }, 2000);
-  } catch {
-    // fallback
-  }
-}
-
 // Per-member invite copy feedback
 const copiedMemberId = ref<string | null>(null);
+const { copy: copyMemberLink } = useClipboard();
 
 async function copyMemberInviteLink(memberId: string) {
-  try {
-    // Generate a fresh invite link if we don't have one yet
-    if (!inviteLink.value) {
+  // Generate a fresh invite link if we don't have one yet
+  if (!inviteLink.value) {
+    try {
       inviteLink.value = await generateInviteLink();
+    } catch {
+      openInviteModal();
+      return;
     }
-    await navigator.clipboard.writeText(inviteLink.value);
+  }
+  const ok = await copyMemberLink(inviteLink.value);
+  if (ok) {
     copiedMemberId.value = memberId;
     setTimeout(() => {
       copiedMemberId.value = null;
     }, 2000);
-  } catch {
-    // fallback — open the invite modal instead
+  } else {
     openInviteModal();
   }
 }
@@ -156,8 +154,13 @@ async function handleMemberSave(
     await familyStore.updateMember(data.id, data.data);
     closeEditModal();
   } else {
+    const memberName = data.name;
     await familyStore.createMember(data);
     showAddModal.value = false;
+
+    // Show success toast and auto-open invite modal
+    showToast('success', t('family.memberAdded'), memberName);
+    await openInviteModal();
   }
 }
 
@@ -372,27 +375,8 @@ function cancelEditFamilyName() {
           {{ t('login.inviteDesc') }}
         </p>
 
-        <!-- Magic invite link -->
-        <div>
-          <div v-if="isGeneratingInvite" class="flex items-center gap-2 py-2.5">
-            <div
-              class="border-t-primary-500 h-4 w-4 animate-spin rounded-full border-2 border-gray-300"
-            ></div>
-            <span class="text-sm text-gray-500 dark:text-gray-400">{{
-              t('join.generatingLink')
-            }}</span>
-          </div>
-          <div v-else class="flex items-center gap-2">
-            <code
-              class="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
-            >
-              {{ inviteLink }}
-            </code>
-            <BaseButton variant="secondary" @click="copyInviteLink">
-              {{ inviteCopiedLink ? t('login.copied') : t('login.copyLink') }}
-            </BaseButton>
-          </div>
-        </div>
+        <!-- Invite link + QR code -->
+        <InviteLinkCard :link="inviteLink" :qr-url="inviteQrUrl" :loading="isGeneratingInvite" />
 
         <!-- File sharing info card -->
         <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 dark:bg-amber-900/20">
