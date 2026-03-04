@@ -370,19 +370,13 @@ onUnmounted(() => {
 });
 
 // Show passkey or trust device prompt after fresh sign-in.
-// Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
+// Passkey prompt takes priority when platform authenticator is available.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
-// Watches freshSignIn, route.path, isEncryptionEnabled, and isConfigured so the prompt
+// Watches freshSignIn, route.path, and isConfigured so the prompt
 // re-evaluates when any of these reactive values change (avoids race conditions where
-// encryption/config state settles after the route change).
+// config state settles after the route change).
 watch(
-  () =>
-    [
-      authStore.freshSignIn,
-      route.path,
-      syncStore.isEncryptionEnabled,
-      syncStore.isConfigured,
-    ] as const,
+  () => [authStore.freshSignIn, route.path, syncStore.isConfigured] as const,
   async ([isFresh, path], oldVal) => {
     if (
       !isFresh ||
@@ -407,8 +401,8 @@ watch(
       return;
     }
 
-    // Try passkey prompt first (per-family check, encryption must be enabled)
-    if (!passkeyPromptDismissed.value && syncStore.isEncryptionEnabled && syncStore.isConfigured) {
+    // Try passkey prompt first (per-family check)
+    if (!passkeyPromptDismissed.value && syncStore.isConfigured) {
       const familyId = authStore.currentUser?.familyId;
       if (familyId) {
         const hasPasskeys = await authStore.checkHasRegisteredPasskeys(familyId);

@@ -228,8 +228,4 @@ describe('Password Cache - syncStore integration', () => {
     // Cached password should be cleared for the active family
     expect(settingsStore.getCachedFamilyKey('family-123')).toBeNull();
   });
-
-  // TODO: Rewrite for V4 format — enableEncryption now creates a family key
-  // and V4 envelope rather than setting a password
-  it.todo('should cache family key when enabling encryption on trusted device');
 });

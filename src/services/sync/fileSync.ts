@@ -91,13 +91,12 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
 
 /**
  * Detect the file format version from a raw JSON string.
- * Returns '4.0' for V4, '3.0' for V3, or null if unrecognised.
+ * Returns '4.0' for V4, or null if unrecognised.
  */
-export function detectFileVersion(jsonString: string): '4.0' | '3.0' | null {
+export function detectFileVersion(jsonString: string): '4.0' | null {
   try {
     const parsed = JSON.parse(jsonString) as Record<string, unknown>;
     if (parsed.version === '4.0') return '4.0';
-    if (parsed.version === '3.0') return '3.0';
     return null;
   } catch {
     return null;
