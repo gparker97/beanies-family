@@ -8,8 +8,10 @@ import NookTodoWidget from '@/components/nook/NookTodoWidget.vue';
 import MilestonesCard from '@/components/nook/MilestonesCard.vue';
 import PiggyBankCard from '@/components/nook/PiggyBankCard.vue';
 import RecentActivityCard from '@/components/nook/RecentActivityCard.vue';
+import { usePermissions } from '@/composables/usePermissions';
 
 const router = useRouter();
+const { canViewFinances } = usePermissions();
 </script>
 
 <template>
@@ -35,7 +37,7 @@ const router = useRouter();
     <!-- Milestones + Piggy Bank -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <MilestonesCard />
-      <PiggyBankCard />
+      <PiggyBankCard v-if="canViewFinances" />
     </div>
 
     <!-- Recent Activity (full width) -->

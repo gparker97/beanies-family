@@ -2,14 +2,19 @@
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
+import { FINANCE_ROUTES } from '@/composables/usePermissions';
 import { MOBILE_TAB_ITEMS } from '@/constants/navigation';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+const { canViewFinances } = usePermissions();
 
 const tabs = computed(() =>
-  MOBILE_TAB_ITEMS.map((item) => ({
+  MOBILE_TAB_ITEMS.filter(
+    (item) => canViewFinances.value || !FINANCE_ROUTES.includes(item.path)
+  ).map((item) => ({
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,

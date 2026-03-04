@@ -8,6 +8,7 @@ interface ChipOption {
 interface Props {
   modelValue: string;
   options: ChipOption[];
+  disabled?: boolean;
 }
 
 defineProps<Props>();
@@ -29,6 +30,7 @@ const emit = defineEmits<{
           ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
           : 'border-2 border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
       "
+      :disabled="disabled"
       @click="emit('update:modelValue', opt.value)"
     >
       <span v-if="opt.icon" class="mr-1">{{ opt.icon }}</span>

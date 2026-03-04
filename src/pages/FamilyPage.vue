@@ -16,6 +16,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { timeAgo } from '@/utils/date';
 import { isTemporaryEmail } from '@/utils/email';
 import { generateInviteQR } from '@/utils/qrCode';
+import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -30,6 +31,7 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const { t } = useTranslation();
+const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
 
 const showAddModal = ref(false);
@@ -236,7 +238,7 @@ function cancelEditFamilyName() {
           </button>
         </div>
         <button
-          v-if="!isEditingFamilyName && familyContextStore.activeFamilyName"
+          v-if="!isEditingFamilyName && familyContextStore.activeFamilyName && canManagePod"
           class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
           :title="t('family.editFamilyName')"
           @click="startEditFamilyName"
@@ -244,7 +246,7 @@ function cancelEditFamilyName() {
           <BeanieIcon name="edit" size="sm" />
         </button>
       </div>
-      <div class="flex gap-2">
+      <div v-if="canManagePod" class="flex gap-2">
         <BaseButton
           v-if="familyContextStore.activeFamilyId"
           variant="secondary"
@@ -280,6 +282,7 @@ function cancelEditFamilyName() {
               <MemberRoleManager
                 :current-role="member.role"
                 :member-id="member.id"
+                :disabled="!canManagePod"
                 @change="handleRoleChange(member.id, $event)"
               />
             </div>
@@ -321,7 +324,7 @@ function cancelEditFamilyName() {
           </div>
           <div class="flex flex-shrink-0 gap-1">
             <button
-              v-if="member.requiresPassword"
+              v-if="member.requiresPassword && canManagePod"
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
               :title="t('family.copyInviteLinkHint')"
               @click="copyMemberInviteLink(member.id)"
@@ -336,7 +339,7 @@ function cancelEditFamilyName() {
               <BeanieIcon name="edit" size="md" />
             </button>
             <button
-              v-if="member.role !== 'owner'"
+              v-if="member.role !== 'owner' && canManagePod"
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
               @click="deleteMember(member.id)"
             >
@@ -349,6 +352,7 @@ function cancelEditFamilyName() {
 
     <!-- Add Member Modal -->
     <FamilyMemberModal
+      v-if="canManagePod"
       :open="showAddModal"
       @close="showAddModal = false"
       @save="handleMemberSave"
@@ -359,6 +363,7 @@ function cancelEditFamilyName() {
     <FamilyMemberModal
       :open="showEditModal"
       :member="editingMember"
+      :read-only="!canManagePod"
       @close="closeEditModal"
       @save="handleMemberSave"
       @delete="handleMemberDelete"

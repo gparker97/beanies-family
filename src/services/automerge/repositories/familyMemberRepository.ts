@@ -12,6 +12,9 @@ function applyDefaults(member: FamilyMember): FamilyMember {
     gender: member.gender ?? 'other',
     ageGroup: member.ageGroup ?? 'adult',
     requiresPassword: !member.passwordHash,
+    canViewFinances: member.canViewFinances ?? true,
+    canEditActivities: member.canEditActivities ?? true,
+    canManagePod: member.canManagePod ?? (member.role === 'owner' || member.role === 'admin'),
   };
 }
 

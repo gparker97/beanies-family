@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ColorCircleSelector from '@/components/ui/ColorCircleSelector.vue';
@@ -23,6 +23,7 @@ import type {
 const props = defineProps<{
   open: boolean;
   member?: FamilyMember | null;
+  readOnly?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -115,6 +116,9 @@ const { isEditing, isSubmitting } = useFormModal(
       dobMonth.value = member.dateOfBirth?.month?.toString() ?? '1';
       dobDay.value = member.dateOfBirth?.day?.toString() ?? '1';
       dobYear.value = member.dateOfBirth?.year?.toString() ?? '';
+      canViewFinances.value = member.canViewFinances ?? true;
+      canEditActivities.value = member.canEditActivities ?? true;
+      canManagePod.value = member.canManagePod ?? false;
     },
     onNew: () => {
       const randomColor =
@@ -133,6 +137,14 @@ const { isEditing, isSubmitting } = useFormModal(
     },
   }
 );
+
+// When canManagePod is toggled ON, auto-enable finance + activities
+watch(canManagePod, (val) => {
+  if (val) {
+    canViewFinances.value = true;
+    canEditActivities.value = true;
+  }
+});
 
 const canSave = computed(() => name.value.trim().length > 0);
 
@@ -155,6 +167,9 @@ function handleSave() {
       role: 'member' as const,
       color: color.value,
       requiresPassword: true,
+      canViewFinances: canViewFinances.value,
+      canEditActivities: canEditActivities.value,
+      canManagePod: canManagePod.value,
     };
 
     // Attach date of birth
@@ -190,12 +205,12 @@ function handleDelete() {
     icon="🫘"
     icon-bg="var(--tint-orange-8)"
     size="narrow"
-    :save-label="saveLabel"
-    :save-disabled="!canSave"
+    :save-label="readOnly ? t('action.close') : saveLabel"
+    :save-disabled="readOnly ? false : !canSave"
     :is-submitting="isSubmitting"
-    :show-delete="isEditing"
+    :show-delete="isEditing && !readOnly"
     @close="emit('close')"
-    @save="handleSave"
+    @save="readOnly ? emit('close') : handleSave()"
     @delete="handleDelete"
   >
     <!-- 1. Bean avatar preview -->
@@ -204,7 +219,7 @@ function handleDelete() {
     </div>
 
     <!-- 2. Color selector -->
-    <div class="flex justify-center">
+    <div v-if="!readOnly" class="flex justify-center">
       <ColorCircleSelector v-model="color" :colors="MEMBER_COLORS" />
     </div>
 
@@ -216,6 +231,7 @@ function handleDelete() {
         <input
           v-model="name"
           type="text"
+          :disabled="readOnly"
           class="font-outfit w-full border-none bg-transparent text-center text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-40 dark:text-gray-100"
           :placeholder="t('modal.memberName')"
         />
@@ -224,30 +240,30 @@ function handleDelete() {
 
     <!-- 4. Role chips (parent/child only) -->
     <FormFieldGroup :label="t('modal.role')">
-      <FrequencyChips v-model="beanRole" :options="roleOptions" />
+      <FrequencyChips v-model="beanRole" :options="roleOptions" :disabled="readOnly" />
     </FormFieldGroup>
 
     <!-- 5. Gender chips -->
     <FormFieldGroup :label="t('family.gender')">
-      <FrequencyChips v-model="gender" :options="genderChipOptions" />
+      <FrequencyChips v-model="gender" :options="genderChipOptions" :disabled="readOnly" />
     </FormFieldGroup>
 
     <!-- 6. Email -->
     <FormFieldGroup :label="t('family.email')" optional>
-      <BaseInput v-model="email" type="email" placeholder="bean@example.com" />
+      <BaseInput v-model="email" type="email" placeholder="bean@example.com" :disabled="readOnly" />
     </FormFieldGroup>
 
     <!-- 7. Birthday -->
     <FormFieldGroup :label="t('modal.birthday')" optional>
       <div class="grid grid-cols-3 gap-2">
-        <BaseSelect v-model="dobMonth" :options="monthOptions" />
-        <BaseSelect v-model="dobDay" :options="dayOptions" />
-        <BaseInput v-model="dobYear" type="number" placeholder="Year" />
+        <BaseSelect v-model="dobMonth" :options="monthOptions" :disabled="readOnly" />
+        <BaseSelect v-model="dobDay" :options="dayOptions" :disabled="readOnly" />
+        <BaseInput v-model="dobYear" type="number" placeholder="Year" :disabled="readOnly" />
       </div>
     </FormFieldGroup>
 
-    <!-- 8. Permissions (at bottom) -->
-    <FormFieldGroup :label="t('modal.permissions')">
+    <!-- 8. Permissions (at bottom) — hidden in readOnly mode -->
+    <FormFieldGroup v-if="!readOnly" :label="t('modal.permissions')">
       <div class="space-y-3">
         <div
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"

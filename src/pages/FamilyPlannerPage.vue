@@ -11,6 +11,7 @@ import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { confirm } from '@/composables/useConfirm';
 import type {
   FamilyActivity,
@@ -20,6 +21,7 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const activityStore = useActivityStore();
 const memberFilterStore = useMemberFilterStore();
 
@@ -123,6 +125,7 @@ function openTodoViewModal(todo: TodoItem) {
         {{ headerSubtitle }}
       </p>
       <button
+        v-if="canEditActivities"
         type="button"
         class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
         @click="openAddModal()"
@@ -208,6 +211,7 @@ function openTodoViewModal(todo: TodoItem) {
       :activity="editingActivity"
       :default-date="selectedDate"
       :default-start-time="defaultStartTime"
+      :read-only="!canEditActivities"
       @close="
         showModal = false;
         defaultStartTime = undefined;
