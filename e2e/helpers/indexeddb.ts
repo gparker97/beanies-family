@@ -1,5 +1,28 @@
 import { Page } from '@playwright/test';
-import type { ExportedData } from '@/services/indexeddb/database';
+import type {
+  FamilyMember,
+  Account,
+  Transaction,
+  Asset,
+  Goal,
+  RecurringItem,
+  TodoItem,
+  FamilyActivity,
+  Settings,
+} from '@/types/models';
+
+/** Shape of data exported/seeded via the E2E IndexedDB helper. */
+export interface ExportedData {
+  familyMembers: FamilyMember[];
+  accounts: Account[];
+  transactions: Transaction[];
+  assets: Asset[];
+  goals: Goal[];
+  recurringItems: RecurringItem[];
+  todos: TodoItem[];
+  activities: FamilyActivity[];
+  settings: Settings | undefined;
+}
 
 export class IndexedDBHelper {
   constructor(private page: Page) {}

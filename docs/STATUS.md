@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-04
-> **Updated by:** Claude (#114 + #115 completed and merged to feature/automerge-migration)
+> **Updated by:** Claude (#116 cleanup completed on feature/automerge-migration)
 
 ## Current Phase
 
@@ -27,7 +27,7 @@
 - Exchange rate auto-fetching from free currency API
 - Recurring transaction processor (daily/monthly/yearly)
 - Multilingual support (English + Chinese) via MyMemory API with IndexedDB caching
-- Project documentation: `docs/ARCHITECTURE.md`, `docs/adr/` (10 ADRs)
+- Project documentation: `docs/ARCHITECTURE.md`, `docs/adr/` (13 ADRs)
 - Generic IndexedDB repository factory (`createRepository.ts`) — shared CRUD for 8 entity stores
 - Toast notification system (`useToast.ts` + `ToastContainer.vue`) — error/success/warning/info toasts
 - Store action helper (`wrapAsync()`) — centralized try/catch/finally for all store CRUD operations
@@ -638,7 +638,7 @@ Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + 
 
 **Phase 4 — Cleanup:**
 
-- [ ] #116 — Dead code removal, documentation updates, final verification
+- [x] #116 — Dead code removal, documentation updates, final verification. Completed on `feature/automerge-migration`. Includes: removed 6 orphaned V3 types from models.ts, deleted legacy migration module (legacyMigration.ts + related imports), removed V3 encryption wrappers, cleaned up stale comments, fixed broken E2E import, rewrote ARCHITECTURE.md for Automerge architecture, updated CLAUDE.md and SECURITY_GUIDE.md, added supersession notes to 6 existing ADRs, created ADRs 018/019/020
 
 **Follow-up:**
 

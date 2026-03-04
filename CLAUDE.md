@@ -50,9 +50,10 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **Routing**: Vue Router 4.4+
 - **Styling**: Tailwind CSS 4.0
 - **Charts**: Chart.js 4.4+ / vue-chartjs 5.3+
-- **Local Storage**: IndexedDB (via idb 8.0+)
+- **CRDT**: Automerge 2.x (primary data layer — `@automerge/automerge`)
+- **Local Cache**: IndexedDB (via idb 8.0+) — ephemeral encrypted cache for Automerge binary
 - **PWA**: vite-plugin-pwa 0.20+
-- **Encryption**: Web Crypto API (native)
+- **Encryption**: Web Crypto API (native) — AES-GCM payload encryption, AES-KW key wrapping
 
 ## Project Structure
 
@@ -215,7 +216,7 @@ npm run lint
 
 ## Key Implementation Details
 
-1. **File-First Architecture**: Encrypted `.beanpod` file is the source of truth. IndexedDB is a temporary cache deleted on sign-out
+1. **Automerge-First Architecture**: Automerge CRDT document in memory is the source of truth. Encrypted `.beanpod` V4 file is the durable copy. IndexedDB is an ephemeral encrypted cache deleted on sign-out
 2. **Multi-Currency**: Amounts stored with original currency, converted on-demand for display
 3. **Family Profiles**: Each member has their own accounts/transactions, with shared family goals
 4. **PWA Ready**: Service worker and manifest configured for offline support
@@ -348,7 +349,7 @@ Implementation plans created during plan mode must be saved to `docs/plans/` **b
 ## Notes for AI Assistants
 
 - This is a Phase 1 MVP - prioritize core functionality
-- All data operations go through Pinia stores -> IndexedDB repositories
+- All data operations go through Pinia stores -> Automerge repositories
 - Use existing UI components from `src/components/ui/`
 - **UI theme**: Always read `.claude/skills/beanies-theme.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
 - Follow Vue 3 Composition API patterns

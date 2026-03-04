@@ -74,7 +74,7 @@ export const useSyncStore = defineStore('sync', () => {
   const lastSync = ref<string | null>(null);
   const needsPermission = ref(false);
 
-  // Family key state (replaces sessionPassword / pendingEncryptedFile)
+  // Family key state — the unwrapped AES-GCM key for the active .beanpod envelope
   const familyKey = shallowRef<CryptoKey | null>(null);
   const envelope = shallowRef<BeanpodFileV4 | null>(null);
 

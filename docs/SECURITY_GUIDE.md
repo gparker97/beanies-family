@@ -250,34 +250,46 @@ Vue automatically escapes HTML content to prevent XSS:
 
 ## Authentication — Passkey / Biometric (ADR-015)
 
-### Architecture
+### Family Key Model
+
+A random 256-bit AES-GCM **family key** encrypts the Automerge document (the `.beanpod` file). The family key is never stored in plaintext — it is wrapped (encrypted) per-member using AES-KW, with the wrapping key derived from one of three paths:
+
+| Path             | Wrapping key derivation                      | Use case                                          |
+| ---------------- | -------------------------------------------- | ------------------------------------------------- |
+| **Password**     | PBKDF2 from member password → AES-KW key     | Standard sign-in                                  |
+| **Passkey PRF**  | Authenticator PRF output → HKDF → AES-KW key | True passwordless (Chrome, Edge, Safari with PRF) |
+| **Invite token** | PBKDF2 from invite token → AES-KW key        | New member onboarding                             |
+
+On sign-in, the appropriate wrapping key unwraps the family key, which then decrypts the Automerge document. Password changes only re-wrap the family key with the new password-derived key — there is no need to re-encrypt the entire file.
+
+### Passkey Architecture
 
 The app uses WebAuthn passkeys for biometric login. Passkey registrations are stored in a device-level registry IndexedDB (not the per-family database) so they survive sign-out.
 
-**Two paths:**
+**How passkeys work with the family key:**
 
-- **PRF path** (Chrome, Edge): Derives encryption key from biometric via HKDF — true passwordless
-- **Cached password path** (Firefox, fallback): Passkey authenticates the member; encryption password is cached locally
+1. User authenticates via platform biometric (fingerprint, Face ID, Windows Hello)
+2. The authenticator returns a PRF output (a deterministic secret derived from the credential)
+3. PRF output is fed through HKDF to derive a stable AES-KW wrapping key
+4. The wrapping key unwraps the family key directly — no password involved
 
-### Cross-Device Passkey Sync
+**No cached password fallback.** Browsers that do not support the PRF extension (notably Firefox as of early 2026) cannot use passkey-based decryption. On those browsers, users sign in with their password. There is no hybrid mode that caches the password behind a passkey.
 
-Modern platform authenticators (iCloud Keychain, Google Password Manager, Windows Hello) sync passkeys across devices. When a user registers on Device A and Device B, either credential may be presented on either device.
+### Cross-Device Behavior
 
-**How it works:**
+Modern platform authenticators (iCloud Keychain, Google Password Manager, Windows Hello) sync passkeys across devices. When a user registers a passkey on Device A, the credential may be available on Device B via platform sync.
 
-1. Browser returns a synced credential whose ID isn't in the local registry
-2. The `userHandle` identifies the member (set during registration as `TextEncoder.encode(memberId)`)
-3. If a cached encryption password exists for the family, the synced credential is auto-registered locally
-4. If no cached password exists, user is prompted to enter their password once
+**First sign-in on a new device always requires a password.** The password-derived wrapping key unwraps the family key and bootstraps the local session. After that initial sign-in, the user can register a passkey on the new device for future passwordless access.
 
 **Trust model:**
 
 - Platform authenticator verifies the user biometrically before returning an assertion
-- `userHandle` confirms the credential belongs to a known family member
-- Cached password is already present on trusted devices
+- `userHandle` confirms the credential belongs to a known family member (set during registration as `TextEncoder.encode(memberId)`)
 - No server-side signature verification (challenge is client-generated for local-first architecture)
 
-**Limitation:** First sign-in on a new device always requires a password. Synced passkeys only work after the password has been cached at least once (trusted device model).
+### Trusted Device Mode
+
+When trusted device mode is enabled, the family key is cached in `globalSettings` (persistent IndexedDB outside the per-family database). This allows passwordless re-entry without a passkey — the cached family key decrypts the file directly on return visits. The cached key is cleared on explicit sign-out when trusted device mode is disabled.
 
 ### Session Management
 
@@ -285,7 +297,7 @@ Modern platform authenticators (iCloud Keychain, Google Password Manager, Window
 
 - Session stored in `sessionStorage` (cleared on tab close)
 - Re-authentication required after sign-out
-- IndexedDB cache deleted on sign-out (unless trusted device)
+- IndexedDB cache deleted on sign-out (unless trusted device mode is enabled)
 
 ## Secrets Management
 
@@ -500,6 +512,6 @@ test('should mask sensitive data in privacy mode', async ({ page }) => {
 
 ---
 
-Last Updated: 2026-02-13
+Last Updated: 2026-03-04
 
 **Remember:** Security is an ongoing process, not a one-time task. Stay vigilant!
