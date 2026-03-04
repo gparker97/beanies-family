@@ -1410,10 +1410,6 @@ const STRING_DEFS = {
     beanie:
       'onboarded beans can sign in with their password. new beans need to create a password first.',
   },
-  'loginV6.pickBeanInfoTrusted': {
-    en: 'This is a trusted device. Just tap your bean to sign in — no password needed.',
-    beanie: 'this is a trusted device. just tap your bean to sign in — no password needed.',
-  },
   'loginV6.growPodTitle': { en: 'Grow a brand-new pod', beanie: 'grow a brand-new pod' },
   'loginV6.growPodSubtitle': {
     en: 'Name your family pod and create your sign-in password.',

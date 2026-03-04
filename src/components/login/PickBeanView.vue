@@ -10,7 +10,6 @@ import { isTemporaryEmail } from '@/utils/email';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import type { FamilyMember } from '@/types/models';
 
@@ -18,7 +17,6 @@ const { t } = useTranslation();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
-const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 
 const emit = defineEmits<{
@@ -38,24 +36,11 @@ const formError = ref<string | null>(null);
 const allMembers = computed(() => familyStore.members);
 const podName = computed(() => familyContextStore.activeFamilyName);
 
-const isTrusted = computed(() => settingsStore.isTrustedDevice);
 const isCreatingPassword = computed(
   () => selectedMember.value && !selectedMember.value.passwordHash
 );
 
-async function selectMember(member: FamilyMember) {
-  // On trusted devices, sign in directly for members who already have a password
-  if (isTrusted.value && member.passwordHash) {
-    formError.value = null;
-    const result = await authStore.signInTrusted(member.id);
-    if (result.success) {
-      emit('signed-in', '/nook');
-      return;
-    }
-    // Fall through to password form if trusted sign-in fails
-    formError.value = result.error ?? null;
-  }
-
+function selectMember(member: FamilyMember) {
   selectedMember.value = member;
   password.value = '';
   confirmPassword.value = '';
@@ -253,7 +238,7 @@ async function handleSignIn() {
         </svg>
       </div>
       <p class="text-xs font-semibold opacity-50">
-        {{ isTrusted ? t('loginV6.pickBeanInfoTrusted') : t('loginV6.pickBeanInfoText') }}
+        {{ t('loginV6.pickBeanInfoText') }}
       </p>
     </div>
 
