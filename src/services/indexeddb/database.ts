@@ -9,12 +9,10 @@
  * - Active family tracking (used by familyContextStore and sync guards)
  * - Database name utilities
  * - deleteFamilyDatabase for sign-out cleanup
- * - Legacy DB access for migration
  */
 
 import { clearCache, closeCacheDB } from '@/services/automerge/persistenceService';
 
-const LEGACY_DB_NAME = 'beanies-data';
 const DB_NAME_PREFIX = 'beanies-data-';
 const AUTOMERGE_DB_PREFIX = 'beanies-automerge-';
 
@@ -72,13 +70,6 @@ export async function deleteFamilyDatabase(familyId: string): Promise<void> {
   if (currentFamilyId === familyId) {
     currentFamilyId = null;
   }
-}
-
-/**
- * Get the legacy database name.
- */
-export function getLegacyDatabaseName(): string {
-  return LEGACY_DB_NAME;
 }
 
 /** Helper to delete an IndexedDB by name. */
