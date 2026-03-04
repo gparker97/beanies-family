@@ -61,7 +61,7 @@ test.describe('Magic Link Invite System', () => {
       // Fill out form — find name input in the dialog
       const dialog = page.getByRole('dialog');
       await expect(dialog).toBeVisible();
-      const nameInput = dialog.getByLabel(/name/i);
+      const nameInput = dialog.getByPlaceholder(/name/i);
       await nameInput.fill('Test Beanie');
 
       // Save
@@ -69,9 +69,13 @@ test.describe('Magic Link Invite System', () => {
       await saveButton.click();
 
       // Verify invite modal opens automatically with QR + link
-      const inviteModal = page.getByRole('dialog');
+      // Target the invite modal specifically (add member dialog may still be closing)
+      const inviteQr = page.locator('[data-testid="invite-qr"]');
+      await expect(inviteQr).toBeVisible({ timeout: 5000 });
+      const inviteModal = page
+        .locator('[data-testid="invite-qr"]')
+        .locator('xpath=ancestor::div[@role="dialog"]');
       await expect(inviteModal).toBeVisible({ timeout: 5000 });
-      await expect(inviteModal.locator('[data-testid="invite-qr"]')).toBeVisible({ timeout: 5000 });
       await expect(inviteModal.locator('[data-testid="invite-link-code"]')).toBeVisible();
     });
 
