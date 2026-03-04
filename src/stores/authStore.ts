@@ -163,55 +163,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Sign in on a trusted device — bypasses password verification.
-   * Only allowed when the device is marked trusted and has a cached family key.
-   */
-  async function signInTrusted(memberId: string): Promise<{ success: boolean; error?: string }> {
-    isLoading.value = true;
-    error.value = null;
-
-    try {
-      const settingsStore = useSettingsStore();
-      if (!settingsStore.isTrustedDevice) {
-        return { success: false, error: 'Device is not trusted' };
-      }
-
-      const familyStore = useFamilyStore();
-      const member = familyStore.members.find((m) => m.id === memberId);
-      if (!member) {
-        return { success: false, error: 'Member not found' };
-      }
-
-      if (!member.passwordHash) {
-        return { success: false, error: 'Member has no password set' };
-      }
-
-      const familyContextStore = useFamilyContextStore();
-      const user: AuthUser = {
-        memberId: member.id,
-        email: member.email,
-        familyId: familyContextStore.activeFamilyId ?? undefined,
-        role: member.role,
-      };
-      currentUser.value = user;
-      isAuthenticated.value = true;
-      freshSignIn.value = true;
-      persistSession(user);
-      familyStore.setCurrentMember(member.id);
-
-      const now = toISODateString(new Date());
-      familyStore.updateMember(member.id, { lastLoginAt: now });
-
-      return { success: true };
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Sign in failed';
-      return { success: false, error: error.value };
-    } finally {
-      isLoading.value = false;
-    }
-  }
-
-  /**
    * Sign up: create a new family + owner member with password.
    * This is the owner-only "Create Pod" flow.
    */
@@ -600,7 +551,6 @@ export const useAuthStore = defineStore('auth', () => {
     // Actions
     initializeAuth,
     signIn,
-    signInTrusted,
     signInWithPasskey,
     createSessionForVerifiedMember,
     updateSessionWithMemberData,
