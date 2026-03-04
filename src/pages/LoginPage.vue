@@ -463,6 +463,7 @@ function handleSignedIn(destination: string) {
         :provider-hint="loadErrorProviderHint"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"
+        @signed-in="handleSignedIn"
         @biometric-available="handleBiometricAvailable"
       />
 

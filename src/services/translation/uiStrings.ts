@@ -1302,12 +1302,20 @@ const STRING_DEFS = {
     beanie: 'zero servers, zero tracking',
   },
   'loginV6.fileLoaded': { en: 'loaded', beanie: 'loaded' },
-  'loginV6.unlockTitle': { en: 'Unlock your pod', beanie: 'unlock your pod' },
-  'loginV6.unlockSubtitle': {
-    en: 'Enter your pod password to decrypt your family data',
-    beanie: 'enter your pod password to decrypt your family data',
+  'loginV6.unlockTitle': { en: 'Sign In', beanie: 'sign in' },
+  'loginV6.unlockTitleWithFamily': {
+    en: 'Sign In to {familyName}',
+    beanie: 'sign in to {familyName}',
   },
-  'loginV6.unlockButton': { en: 'Unlock Your Pod', beanie: 'unlock your pod' },
+  'loginV6.unlockSubtitle': {
+    en: "Enter your password and we'll find your account",
+    beanie: "enter your password and we'll find your account",
+  },
+  'loginV6.unlockButton': { en: 'Sign In', beanie: 'sign in' },
+  'loginV6.unlockMemberCount': {
+    en: '{count} members in this family',
+    beanie: '{count} beans in this pod',
+  },
   'loginV6.unlockFooter': {
     en: "This password decrypts your local data. We don't store or recover it.",
     beanie: "this password decrypts your local data. we don't store or recover it.",
