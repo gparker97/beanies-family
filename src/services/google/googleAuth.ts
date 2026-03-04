@@ -274,8 +274,19 @@ export async function attemptSilentRefresh(): Promise<string | null> {
 }
 
 /**
+ * Check whether we currently hold a refresh token (in memory).
+ * Used by other modules to decide whether to force consent on re-auth.
+ */
+export function hasRefreshToken(): boolean {
+  return !!refreshToken;
+}
+
+/**
  * Get a valid access token, refreshing if needed.
  * Attempts silent refresh first; falls back to interactive auth.
+ *
+ * When falling back to interactive auth without a refresh token,
+ * forces consent so Google issues a new refresh token.
  */
 export async function getValidToken(): Promise<string> {
   if (isTokenValid()) return accessToken!;
@@ -284,8 +295,10 @@ export async function getValidToken(): Promise<string> {
   const silentToken = await attemptSilentRefresh();
   if (silentToken) return silentToken;
 
-  // Fall back to interactive auth
-  return requestAccessToken();
+  // Fall back to interactive auth.
+  // Force consent when we have no refresh token — Google only issues
+  // refresh tokens with prompt=consent, not prompt=select_account.
+  return requestAccessToken({ forceConsent: !refreshToken });
 }
 
 /**

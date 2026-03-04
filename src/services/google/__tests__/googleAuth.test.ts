@@ -152,6 +152,40 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  describe('hasRefreshToken', () => {
+    it('returns false when no refresh token loaded', () => {
+      expect(googleAuth.hasRefreshToken()).toBe(false);
+    });
+
+    it('returns true after initializeAuth loads a stored token', async () => {
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+      expect(googleAuth.hasRefreshToken()).toBe(true);
+    });
+
+    it('returns false after revokeToken clears state', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce('rt');
+      await googleAuth.initializeAuth('family-123');
+      expect(googleAuth.hasRefreshToken()).toBe(true);
+
+      await googleAuth.revokeToken();
+      expect(googleAuth.hasRefreshToken()).toBe(false);
+
+      vi.unstubAllEnvs();
+    });
+  });
+
   describe('getValidToken', () => {
     it('attempts silent refresh when no cached token', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
