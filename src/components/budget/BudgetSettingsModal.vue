@@ -169,7 +169,7 @@ watch(mode, () => {
 
     <!-- Percentage input -->
     <div v-if="mode === 'percentage'">
-      <FormFieldGroup :label="t('budget.settings.percentageLabel')">
+      <FormFieldGroup :label="t('budget.settings.percentageLabel')" required>
         <div class="flex items-center gap-3">
           <BaseInput v-model.number="percentage" type="number" min="1" max="100" class="w-24" />
           <span class="text-sm text-slate-500 dark:text-slate-400">%</span>
@@ -185,7 +185,7 @@ watch(mode, () => {
 
     <!-- Fixed amount input -->
     <div v-else>
-      <FormFieldGroup :label="t('budget.settings.fixedLabel')">
+      <FormFieldGroup :label="t('budget.settings.fixedLabel')" required>
         <AmountInput v-model="totalAmount" :currency-symbol="currSymbol" />
       </FormFieldGroup>
     </div>

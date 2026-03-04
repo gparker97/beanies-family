@@ -23,8 +23,6 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 
-const SESSION_PASSWORD_KEY = 'beanies-file-password';
-
 type LoginView = 'create';
 type JoinStep = 'verify' | 'pick-member' | 'set-password';
 
@@ -42,15 +40,16 @@ const targetFamilyId = ref('');
 const targetProvider = ref('local');
 const targetFileRef = ref('');
 const targetDriveFileId = ref('');
+const inviteToken = ref('');
 const registryEntry = ref<RegistryEntry | null>(null);
 const isLookingUp = ref(false);
 const lookupDone = ref(false);
-const manualCode = ref('');
 const formError = ref<string | null>(null);
 
 // File loading (inline within verify step)
 const fileLoaded = ref(false);
 const needsManualFileLoad = ref(false);
+const cloudLoadFailed = ref(false);
 const isLoadingFile = ref(false);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
@@ -87,11 +86,15 @@ function getMemberRole(member: FamilyMember): string {
 
 // --- Step 1: Verify & Load ---
 onMounted(async () => {
-  // Parse query params
-  const fam = (route.query.fam as string) || (route.query.code as string) || '';
+  // Parse query params — invite links use t= and f=, magic links use fam= and code=
+  const fam =
+    (route.query.fam as string) || (route.query.code as string) || (route.query.f as string) || '';
   const p = (route.query.p as string) || 'local';
   const fileRef = (route.query.ref as string) || '';
   const fileIdParam = (route.query.fileId as string) || '';
+  const token = (route.query.t as string) || '';
+
+  if (token) inviteToken.value = token;
 
   if (fam) {
     targetFamilyId.value = fam;
@@ -138,47 +141,6 @@ async function performLookup(familyId: string) {
   }
 }
 
-function parseMagicLink(
-  input: string
-): { fam: string; p?: string; ref?: string; fileId?: string } | null {
-  try {
-    const url = new URL(input);
-    const fam = url.searchParams.get('fam') || url.searchParams.get('code');
-    if (fam)
-      return {
-        fam,
-        p: url.searchParams.get('p') || undefined,
-        ref: url.searchParams.get('ref') || undefined,
-        fileId: url.searchParams.get('fileId') || undefined,
-      };
-  } catch {
-    // Not a URL — return null
-  }
-  return null;
-}
-
-async function handleManualCodeSubmit() {
-  formError.value = null;
-  const raw = manualCode.value.trim();
-  if (!raw) {
-    formError.value = t('auth.fillAllFields');
-    return;
-  }
-
-  // Check if the input is a magic link URL
-  const parsed = parseMagicLink(raw);
-  if (parsed) {
-    targetFamilyId.value = parsed.fam;
-    targetProvider.value = parsed.p || 'local';
-    targetFileRef.value = parsed.ref || '';
-    targetDriveFileId.value = parsed.fileId || '';
-  } else {
-    targetFamilyId.value = raw;
-  }
-
-  await performLookup(targetFamilyId.value);
-}
-
 async function attemptFileLoad() {
   // For local provider, we can't load the file automatically
   if (targetProvider.value === 'local') {
@@ -201,13 +163,19 @@ async function attemptFileLoad() {
       if (result.success) {
         await onFileLoaded();
       } else if (result.needsPassword) {
-        showDecryptModal.value = true;
+        if (await tryInviteTokenDecrypt()) {
+          await onFileLoaded();
+        } else if (!inviteToken.value) {
+          showDecryptModal.value = true;
+        }
+        // If invite token was present but failed, formError is already set
       } else {
-        formError.value = syncStore.error || t('auth.fileLoadFailed');
+        // Cloud load failed — fall back to manual file load
+        cloudLoadFailed.value = true;
         needsManualFileLoad.value = true;
       }
     } catch {
-      formError.value = t('join.cloudLoadFailed');
+      cloudLoadFailed.value = true;
       needsManualFileLoad.value = true;
     } finally {
       isLoadingFile.value = false;
@@ -228,7 +196,11 @@ async function handleLoadFile() {
     if (result.success) {
       await onFileLoaded();
     } else if (result.needsPassword) {
-      showDecryptModal.value = true;
+      if (await tryInviteTokenDecrypt()) {
+        await onFileLoaded();
+      } else if (!inviteToken.value) {
+        showDecryptModal.value = true;
+      }
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -300,7 +272,11 @@ async function handleDrop(e: DragEvent) {
     if (result.success) {
       await onFileLoaded();
     } else if (result.needsPassword) {
-      showDecryptModal.value = true;
+      if (await tryInviteTokenDecrypt()) {
+        await onFileLoaded();
+      } else if (!inviteToken.value) {
+        showDecryptModal.value = true;
+      }
     } else if (syncStore.error) {
       formError.value = syncStore.error;
     } else {
@@ -325,7 +301,6 @@ async function handleDecrypt() {
   try {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
-      sessionStorage.setItem(SESSION_PASSWORD_KEY, decryptPassword.value);
       showDecryptModal.value = false;
       decryptPassword.value = '';
       await onFileLoaded();
@@ -339,9 +314,52 @@ async function handleDecrypt() {
   }
 }
 
+/**
+ * Try to decrypt the pending V4 file using the invite token.
+ * Returns true if decryption succeeded, false if it should fall back to the password modal.
+ */
+async function tryInviteTokenDecrypt(): Promise<boolean> {
+  if (!inviteToken.value) return false;
+
+  const pending = syncStore.pendingEncryptedFile;
+  if (!pending?.envelope?.inviteKeys) return false;
+
+  try {
+    const { hashInviteToken, redeemInviteToken, isInviteExpired } =
+      await import('@/services/crypto/inviteService');
+
+    const tokenHash = await hashInviteToken(inviteToken.value);
+    const pkg = pending.envelope.inviteKeys[tokenHash];
+
+    if (!pkg) {
+      formError.value = t('join.inviteTokenInvalid');
+      return false;
+    }
+
+    if (isInviteExpired(pkg.expiresAt)) {
+      formError.value = t('join.inviteTokenExpired');
+      return false;
+    }
+
+    const fk = await redeemInviteToken(pkg.wrapped, pkg.salt, inviteToken.value);
+    const result = await syncStore.decryptPendingFileWithKey(fk);
+
+    if (result.success) return true;
+
+    formError.value = result.error ?? t('join.inviteTokenInvalid');
+    return false;
+  } catch {
+    formError.value = t('join.inviteTokenInvalid');
+    return false;
+  }
+}
+
 async function onFileLoaded() {
-  // Validate familyId matches if we have a target
-  if (targetFamilyId.value && familyContextStore.activeFamilyId !== targetFamilyId.value) {
+  // Validate familyId matches if we have a target.
+  // Use the V4 envelope's familyId (always available after decrypt) with fallback
+  // to the context store (which may be null in a fresh browser).
+  const loadedFamilyId = syncStore.envelope?.familyId ?? familyContextStore.activeFamilyId;
+  if (targetFamilyId.value && loadedFamilyId && loadedFamilyId !== targetFamilyId.value) {
     formError.value = t('join.fileMismatch');
     fileLoaded.value = false;
     return;
@@ -448,8 +466,13 @@ function handleBack() {
     <!-- STEP 1: Verify & Load                        -->
     <!-- ============================================ -->
     <template v-if="currentStep === 'verify'">
-      <!-- Header -->
+      <!-- Header with beanie family image -->
       <div class="mb-6 text-center">
+        <img
+          src="/brand/beanies_family_icon_transparent_384x384.png"
+          alt=""
+          class="mx-auto mb-3 h-24 w-24"
+        />
         <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
           {{ t('join.verifyTitle') }}
         </h2>
@@ -515,7 +538,7 @@ function handleBack() {
         <!-- File guidance card -->
         <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
           <p class="mb-3 text-sm font-semibold text-white">
-            {{ t('join.needsFile') }}
+            {{ cloudLoadFailed ? t('join.cloudLoadFailed') : t('join.needsFile') }}
           </p>
           <p class="mb-4 text-sm text-white/70">
             {{ t('join.needsFileDesc') }}
@@ -611,56 +634,66 @@ function handleBack() {
         </div>
       </template>
 
-      <!-- No link params — manual code entry -->
+      <!-- No link params — show instructions to get a magic link -->
       <template v-else-if="!isLookingUp && !lookupDone">
-        <form @submit.prevent="handleManualCodeSubmit">
-          <BaseInput
-            v-model="manualCode"
-            :label="t('join.codeInputLabel')"
-            :placeholder="t('login.familyCodePlaceholder')"
-            required
-          />
-          <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-            {{ t('join.codeInputHint') }}
+        <!-- How to join card -->
+        <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+          <p class="mb-3 text-sm font-semibold text-white">
+            {{ t('join.howToJoinTitle') }}
           </p>
-
-          <!-- What happens next card -->
-          <div class="bg-secondary-500 mt-6 rounded-2xl p-5 dark:bg-slate-700">
-            <p class="mb-3 text-sm font-semibold text-white">
-              {{ t('loginV6.whatsNext') }}
-            </p>
-            <div class="space-y-2.5">
-              <div class="flex items-start gap-3">
-                <div
-                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-                >
-                  1
-                </div>
-                <p class="text-sm text-white/80">{{ t('loginV6.joinStep1') }}</p>
+          <div class="space-y-2.5">
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+              >
+                1
               </div>
-              <div class="flex items-start gap-3">
-                <div
-                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-                >
-                  2
-                </div>
-                <p class="text-sm text-white/80">{{ t('loginV6.joinStep2') }}</p>
+              <p class="text-sm text-white/80">{{ t('join.howToJoinStep1') }}</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+              >
+                2
               </div>
-              <div class="flex items-start gap-3">
-                <div
-                  class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
-                >
-                  3
-                </div>
-                <p class="text-sm text-white/80">{{ t('loginV6.joinStep3') }}</p>
+              <p class="text-sm text-white/80">{{ t('join.howToJoinStep2') }}</p>
+            </div>
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white"
+              >
+                3
               </div>
+              <p class="text-sm text-white/80">{{ t('join.howToJoinStep3') }}</p>
             </div>
           </div>
+        </div>
 
-          <BaseButton type="submit" class="mt-6 w-full" :disabled="isLookingUp">
-            {{ t('join.next') }}
-          </BaseButton>
-        </form>
+        <!-- Expiry note -->
+        <div
+          class="mt-4 flex items-start gap-3 rounded-2xl bg-gray-50 p-[14px_18px] dark:bg-slate-700/50"
+        >
+          <div
+            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#6EE7B7]/[0.12]"
+          >
+            <svg
+              class="h-4 w-4 text-[#6EE7B7]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <p class="text-xs font-semibold opacity-50">
+            {{ t('join.linkExpiryNote') }}
+          </p>
+        </div>
       </template>
 
       <!-- Footer link -->

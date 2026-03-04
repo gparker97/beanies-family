@@ -3,25 +3,25 @@ import { processRecurringItems } from './recurringProcessor';
 import type { RecurringItem, Account } from '@/types/models';
 
 // Mock the repositories
-vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
+vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getActiveRecurringItems: vi.fn(),
   updateRecurringItem: vi.fn(),
   updateLastProcessedDate: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
   createTransaction: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAccountById: vi.fn(),
   updateAccountBalance: vi.fn(),
 }));
 
-import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
-import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
+import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
+import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
+import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 
 const mockAccount: Account = {
   id: 'test-account-1',
