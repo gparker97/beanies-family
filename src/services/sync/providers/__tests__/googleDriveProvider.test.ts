@@ -14,7 +14,7 @@ vi.mock('@/services/google/googleAuth', () => ({
 }));
 
 const mockUpdateFile = vi.fn();
-const mockReadFile = vi.fn().mockResolvedValue('{"version":"2.0"}');
+const mockReadFile = vi.fn().mockResolvedValue('{"version":"4.0"}');
 const mockGetFileModifiedTime = vi.fn().mockResolvedValue('2026-02-26T12:00:00Z');
 const mockGetOrCreateAppFolder = vi.fn().mockResolvedValue('folder-id');
 const mockCreateFile = vi.fn().mockResolvedValue({ fileId: 'new-file-id', name: 'test.beanpod' });
@@ -70,7 +70,7 @@ describe('GoogleDriveProvider', () => {
   describe('read', () => {
     it('calls readFile with valid token', async () => {
       const content = await provider.read();
-      expect(content).toBe('{"version":"2.0"}');
+      expect(content).toBe('{"version":"4.0"}');
       expect(mockReadFile).toHaveBeenCalledWith('mock-token', 'file-123');
     });
   });
@@ -225,14 +225,14 @@ describe('GoogleDriveProvider', () => {
       (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce('silent-token');
 
       // Second read succeeds
-      mockReadFile.mockResolvedValueOnce('{"version":"2.0"}');
+      mockReadFile.mockResolvedValueOnce('{"version":"4.0"}');
 
       const content = await provider.read();
 
       expect(attemptSilentRefresh).toHaveBeenCalled();
       expect(requestAccessToken).not.toHaveBeenCalled();
       expect(mockReadFile).toHaveBeenCalledWith('silent-token', 'file-123');
-      expect(content).toBe('{"version":"2.0"}');
+      expect(content).toBe('{"version":"4.0"}');
     });
 
     it('falls back to interactive auth when silent refresh fails', async () => {
@@ -247,14 +247,14 @@ describe('GoogleDriveProvider', () => {
       (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
 
       // Second read succeeds
-      mockReadFile.mockResolvedValueOnce('{"version":"2.0"}');
+      mockReadFile.mockResolvedValueOnce('{"version":"4.0"}');
 
       const content = await provider.read();
 
       expect(attemptSilentRefresh).toHaveBeenCalled();
       expect(requestAccessToken).toHaveBeenCalled();
       expect(mockReadFile).toHaveBeenCalledWith('refreshed-token', 'file-123');
-      expect(content).toBe('{"version":"2.0"}');
+      expect(content).toBe('{"version":"4.0"}');
     });
   });
 

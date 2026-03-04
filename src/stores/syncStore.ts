@@ -109,7 +109,6 @@ export const useSyncStore = defineStore('sync', () => {
   const isGoogleDriveAvailable = computed(() => supportsGoogleDrive());
 
   // Encryption is always on in V4 — backward compat computed
-  const isEncryptionEnabled = computed(() => true);
   const hasSessionPassword = computed(() => familyKey.value !== null);
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
 
@@ -682,21 +681,6 @@ export const useSyncStore = defineStore('sync', () => {
       error.value = (e as Error).message;
       return false;
     }
-  }
-
-  /**
-   * Enable encryption — no-op in V4 (always encrypted).
-   * Kept for backward compat with UI that calls this.
-   */
-  async function enableEncryption(_password: string): Promise<boolean> {
-    return true; // V4 is always encrypted
-  }
-
-  /**
-   * Disable encryption — no-op in V4 (always encrypted).
-   */
-  async function disableEncryption(): Promise<boolean> {
-    return false; // Cannot disable encryption in V4
   }
 
   /**
@@ -1347,7 +1331,6 @@ export const useSyncStore = defineStore('sync', () => {
     capabilities,
     supportsAutoSync,
     syncStatus,
-    isEncryptionEnabled,
     hasSessionPassword,
     hasPendingEncryptedFile,
     storageProviderType,
@@ -1378,8 +1361,6 @@ export const useSyncStore = defineStore('sync', () => {
     loadFromPersistenceCache,
     clearPendingEncryptedFile,
     createNewFile,
-    enableEncryption,
-    disableEncryption,
     clearSessionPassword,
     getExportedFamilyKey,
     decryptPendingFileWithKey,

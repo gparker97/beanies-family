@@ -2596,12 +2596,7 @@
       "hash": "7dqurh",
       "lastUpdated": "2026-02-24"
     },
-    "auth.fileNotEncryptedWarning": {
-      "translation": "此数据文件未加密。任何有权访问该文件的人都可以查看您的家庭数据。您可以在“设置”中启用加密。",
-      "hash": "sgxyta",
-      "lastUpdated": "2026-02-24"
-    },
-    "auth.password": {
+    “auth.password”: {
       "translation": "密码",
       "hash": "l71ry3",
       "lastUpdated": "2026-03-03"
@@ -3406,17 +3401,7 @@
       "hash": "kbgu1x",
       "lastUpdated": "2026-02-25"
     },
-    "passkey.dekAndPasswordFailed": {
-      "translation": "您的加密密码已更改。请使用您的密码登录，然后在“设置”中重新注册生物识别。",
-      "hash": "9jy7g3",
-      "lastUpdated": "2026-02-25"
-    },
-    "passkey.passwordChanged": {
-      "translation": "自生物识别设置以来，您的加密密码已更改。请使用您的密码登录，然后在“设置”中重新注册生物识别。",
-      "hash": "9i1n0f",
-      "lastUpdated": "2026-02-25"
-    },
-    "passkey.prfFull": {
+    “passkey.prfFull”: {
       "translation": "完全解锁",
       "hash": "aq2lzp",
       "lastUpdated": "2026-03-03"

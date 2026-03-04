@@ -1151,16 +1151,6 @@ const STRING_DEFS = {
     beanie:
       'your encryption key has changed since biometric was set up. please sign in with your password and re-register biometric in settings.',
   },
-  'passkey.dekAndPasswordFailed': {
-    en: 'Your encryption password has changed. Please sign in with your password and re-register biometric in Settings.',
-    beanie:
-      'your encryption password has changed. please sign in with your password and re-register biometric in settings.',
-  },
-  'passkey.passwordChanged': {
-    en: 'Your encryption password has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
-    beanie:
-      'your encryption password has changed since biometric was set up. please sign in with your password and re-register biometric in settings.',
-  },
   'passkey.fileLoadError': {
     en: 'Could not load your data file. Please sign in with your password.',
     beanie: 'could not load your data file. please sign in with your password.',
@@ -1226,11 +1216,6 @@ const STRING_DEFS = {
   'auth.fileLoadFailed': {
     en: 'Failed to load file. Please try again.',
     beanie: 'failed to load file. please try again.',
-  },
-  'auth.fileNotEncryptedWarning': {
-    en: 'This data file is not encrypted. Anyone with access to the file can view your family data. You can enable encryption in Settings.',
-    beanie:
-      'this data file is not encrypted. anyone with access to the file can view your family data. you can enable encryption in settings.',
   },
   'auth.password': { en: 'Password', beanie: 'password' },
   'auth.enterYourPassword': { en: 'Enter your password', beanie: 'enter your password' },

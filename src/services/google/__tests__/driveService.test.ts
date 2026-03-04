@@ -177,11 +177,11 @@ describe('driveService', () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => '{"version":"2.0","data":{}}',
+        text: async () => '{"version":"4.0","data":{}}',
       });
 
       const content = await readFile(mockToken, 'file-1');
-      expect(content).toBe('{"version":"2.0","data":{}}');
+      expect(content).toBe('{"version":"4.0","data":{}}');
 
       const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('alt=media');

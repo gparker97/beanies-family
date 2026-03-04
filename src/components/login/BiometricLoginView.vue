@@ -16,7 +16,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   'signed-in': [destination: string];
   'use-password': [];
-  'cross-device-password': [payload: { memberId: string; credentialId: string }];
   back: [];
 }>();
 

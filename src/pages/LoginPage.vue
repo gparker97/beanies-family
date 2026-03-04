@@ -44,7 +44,6 @@ const props = withDefaults(defineProps<{ initialView?: LoginView }>(), {
 const activeView = ref<LoginView>(props.initialView);
 const needsPermissionGrant = ref(false);
 const autoLoadPod = ref(false);
-const fileUnencrypted = ref(false);
 const isInitializing = ref(true);
 const biometricFamilyId = ref('');
 const biometricFamilyName = ref<string | undefined>();
@@ -53,8 +52,6 @@ const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 const isSingleFamilyAutoSelect = ref(false);
-const crossDeviceCredentialId = ref<string | undefined>();
-const crossDeviceMemberId = ref<string | undefined>();
 
 onMounted(async () => {
   if (familyStore.members.length === 0) {
@@ -82,7 +79,6 @@ onMounted(async () => {
   } else {
     // Members already loaded (e.g. navigated back) — go to pick-bean
     activeView.value = 'pick-bean';
-    fileUnencrypted.value = !syncStore.isEncryptionEnabled;
   }
 
   isInitializing.value = false;
@@ -158,12 +154,12 @@ async function activateFamilyForBiometric(
     // but hasPendingEncryptedFile is somehow false (defensive)
     if (!(await tryAutoDecrypt(familyId))) {
       // File was genuinely unencrypted or already decrypted — go to pick-bean
-      fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+
       activeView.value = 'pick-bean';
       return;
     }
     // Auto-decrypt succeeded — go to pick-bean
-    fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+
     activeView.value = 'pick-bean';
     return;
   }
@@ -240,12 +236,11 @@ async function handleFamilySelected(payload: {
       const loadResult = await syncStore.loadFromFile();
       if (loadResult.success) {
         // Loaded successfully — go to pick-bean
-        fileUnencrypted.value = !syncStore.isEncryptionEnabled;
+
         activeView.value = 'pick-bean';
       } else if (loadResult.needsPassword) {
         // Encrypted — try auto-decrypt
         if (await tryAutoDecrypt(payload.id)) {
-          fileUnencrypted.value = !syncStore.isEncryptionEnabled;
           activeView.value = 'pick-bean';
         } else {
           // Can't auto-decrypt — fall back to LoadPodView with decrypt modal
@@ -332,33 +327,6 @@ function handleBiometricAvailable(payload: { familyId: string; familyName?: stri
 }
 
 function handleFileLoaded() {
-  fileUnencrypted.value = !syncStore.isEncryptionEnabled;
-
-  if (crossDeviceMemberId.value) {
-    // Cross-device flow: passkey already verified this member, auto-sign-in
-    authStore.createSessionForVerifiedMember(
-      crossDeviceMemberId.value,
-      familyContextStore.activeFamilyId ?? ''
-    );
-
-    // Register the synced credential now that family key is available
-    if (crossDeviceCredentialId.value) {
-      registerSyncedCredentialFromFamilyKey(
-        crossDeviceCredentialId.value,
-        crossDeviceMemberId.value,
-        familyContextStore.activeFamilyId ?? ''
-      );
-    }
-
-    // Clear cross-device state
-    crossDeviceMemberId.value = undefined;
-    crossDeviceCredentialId.value = undefined;
-
-    // Navigate — member already identified, skip pick-bean
-    handleSignedIn('/nook');
-    return;
-  }
-
   activeView.value = 'pick-bean';
 }
 
@@ -368,34 +336,6 @@ function handleBiometricFallback() {
   autoLoadPod.value = syncStore.isConfigured && !syncStore.needsPermission;
   needsPermissionGrant.value = syncStore.isConfigured && syncStore.needsPermission;
   activeView.value = 'load-pod';
-}
-
-function handleCrossDevicePassword(payload: { memberId: string; credentialId: string }) {
-  crossDeviceMemberId.value = payload.memberId;
-  crossDeviceCredentialId.value = payload.credentialId;
-  // Fall through to password entry
-  handleBiometricFallback();
-}
-
-async function registerSyncedCredentialFromFamilyKey(
-  credentialId: string,
-  memberId: string,
-  familyId: string
-) {
-  try {
-    const { listRegisteredPasskeys, registerSyncedCredential } =
-      await import('@/services/auth/passkeyService');
-    const registrations = await listRegisteredPasskeys(memberId);
-    const sourceReg = registrations.find((r) => r.familyId === familyId);
-    if (sourceReg) {
-      await registerSyncedCredential({
-        credentialId,
-        sourceRegistration: sourceReg,
-      });
-    }
-  } catch {
-    // Non-critical — user can still log in with password next time
-  }
 }
 
 function handleSignedIn(destination: string) {
@@ -429,7 +369,6 @@ function handleSignedIn(destination: string) {
         :show-not-you-link="isSingleFamilyAutoSelect"
         @signed-in="handleSignedIn"
         @use-password="handleBiometricFallback"
-        @cross-device-password="handleCrossDevicePassword"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
       />
 
@@ -469,7 +408,6 @@ function handleSignedIn(destination: string) {
 
       <PickBeanView
         v-else-if="activeView === 'pick-bean'"
-        :file-unencrypted="fileUnencrypted"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @signed-in="handleSignedIn"
       />

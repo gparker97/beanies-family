@@ -17,7 +17,7 @@ function createMockHandle(
 ): FileSystemFileHandle {
   const {
     name = 'test.beanpod',
-    fileText = '{"version":"2.0","exportedAt":"2026-01-01T00:00:00Z","encrypted":false,"data":{}}',
+    fileText = '{"version":"4.0","exportedAt":"2026-01-01T00:00:00Z","encrypted":false,"data":{}}',
     permission = 'granted',
   } = options;
 
