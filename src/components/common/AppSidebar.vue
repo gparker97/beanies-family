@@ -14,6 +14,7 @@ import {
   PINNED_ITEMS,
   type NavItemDef,
 } from '@/constants/navigation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -25,6 +26,7 @@ const familyStore = useFamilyStore();
 const goalsStore = useGoalsStore();
 const syncStore = useSyncStore();
 const { isOpen, toggle } = useSidebarAccordion();
+const { canViewFinances } = usePermissions();
 
 const badges = computed<Record<string, number>>(() => ({
   activeGoals: goalsStore.activeGoals.length,
@@ -66,13 +68,15 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 const sections = computed(() =>
-  NAV_SECTIONS.map((section) => ({
-    id: section.id,
-    label: t(section.labelKey),
-    emoji: section.emoji,
-    color: SECTION_COLORS[section.id] ?? 'text-white/50',
-    items: section.id === 'treehouse' ? treehouseItems.value : piggyBankItems.value,
-  }))
+  NAV_SECTIONS.filter((section) => section.id !== 'piggyBank' || canViewFinances.value).map(
+    (section) => ({
+      id: section.id,
+      label: t(section.labelKey),
+      emoji: section.emoji,
+      color: SECTION_COLORS[section.id] ?? 'text-white/50',
+      items: section.id === 'treehouse' ? treehouseItems.value : piggyBankItems.value,
+    })
+  )
 );
 </script>
 

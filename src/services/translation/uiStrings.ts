@@ -704,6 +704,18 @@ const STRING_DEFS = {
   },
   'notFound.goHome': { en: 'Back to Dashboard', beanie: 'back to dashboard' },
 
+  // No Access (permission denied)
+  'noAccess.title': { en: 'No Access', beanie: 'no access' },
+  'noAccess.heading': {
+    en: 'This area is off-limits, little bean',
+    beanie: 'this area is off-limits, little bean',
+  },
+  'noAccess.description': {
+    en: "You don't have permission to view this page. Ask a pod manager to update your access.",
+    beanie: "you don't have permission to view this page. ask a pod manager to update your access.",
+  },
+  'noAccess.backToNook': { en: 'Back to the Nook', beanie: 'back to the nook' },
+
   // Empty states
   'empty.noData': { en: 'No data available', beanie: 'no beans here yet' },
   'empty.noResults': { en: 'No results found', beanie: 'no beans matched your search' },

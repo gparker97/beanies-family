@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useTranslationStore } from '@/stores/translationStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const routes: RouteRecordRaw[] = [
@@ -30,43 +31,43 @@ const routes: RouteRecordRaw[] = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('@/pages/DashboardPage.vue'),
-    meta: { titleKey: 'nav.dashboard', requiresAuth: true },
+    meta: { titleKey: 'nav.dashboard', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/accounts',
     name: 'Accounts',
     component: () => import('@/pages/AccountsPage.vue'),
-    meta: { titleKey: 'nav.accounts', requiresAuth: true },
+    meta: { titleKey: 'nav.accounts', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/transactions',
     name: 'Transactions',
     component: () => import('@/pages/TransactionsPage.vue'),
-    meta: { titleKey: 'nav.transactions', requiresAuth: true },
+    meta: { titleKey: 'nav.transactions', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/assets',
     name: 'Assets',
     component: () => import('@/pages/AssetsPage.vue'),
-    meta: { titleKey: 'nav.assets', requiresAuth: true },
+    meta: { titleKey: 'nav.assets', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/goals',
     name: 'Goals',
     component: () => import('@/pages/GoalsPage.vue'),
-    meta: { titleKey: 'nav.goals', requiresAuth: true },
+    meta: { titleKey: 'nav.goals', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/reports',
     name: 'Reports',
     component: () => import('@/pages/ReportsPage.vue'),
-    meta: { titleKey: 'nav.reports', requiresAuth: true },
+    meta: { titleKey: 'nav.reports', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/forecast',
     name: 'Forecast',
     component: () => import('@/pages/ForecastPage.vue'),
-    meta: { titleKey: 'nav.forecast', requiresAuth: true },
+    meta: { titleKey: 'nav.forecast', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/family',
@@ -96,7 +97,7 @@ const routes: RouteRecordRaw[] = [
     path: '/budgets',
     name: 'Budgets',
     component: () => import('@/pages/BudgetPage.vue'),
-    meta: { titleKey: 'nav.budgets', requiresAuth: true },
+    meta: { titleKey: 'nav.budgets', requiresAuth: true, requiresFinance: true },
   },
   {
     path: '/settings',
@@ -111,6 +112,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false },
   },
   {
+    path: '/no-access',
+    name: 'NoAccess',
+    component: () => import('@/pages/NoAccessPage.vue'),
+    meta: { titleKey: 'noAccess.title' },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),
@@ -121,6 +128,22 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+});
+
+// Permission guard: redirect to /no-access if finance permission is missing
+router.beforeEach((to) => {
+  if (to.meta.requiresFinance) {
+    const familyStore = useFamilyStore();
+    const member = familyStore.currentMember;
+    if (member) {
+      const isOwner = member.role === 'owner';
+      const hasManagePod = !!member.canManagePod;
+      const hasFinance = !!member.canViewFinances;
+      if (!isOwner && !hasManagePod && !hasFinance) {
+        return { name: 'NoAccess' };
+      }
+    }
+  }
 });
 
 // Update document title on route change

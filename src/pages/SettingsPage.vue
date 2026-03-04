@@ -8,6 +8,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
@@ -26,6 +27,7 @@ const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
 const { canInstall, isInstalled, installApp } = usePWA();
+const { canManagePod } = usePermissions();
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
@@ -329,8 +331,8 @@ function formatLastSync(timestamp: string | null): string {
         </div>
       </BaseCard>
 
-      <!-- Family Data Options -->
-      <BaseCard :title="t('settings.familyDataOptions')">
+      <!-- Family Data Options (admin only) -->
+      <BaseCard v-if="canManagePod" :title="t('settings.familyDataOptions')">
         <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
           {{ t('settings.familyDataDescription') }}
         </p>
@@ -616,8 +618,8 @@ function formatLastSync(timestamp: string | null): string {
 
     <!-- Second Row: AI Settings and About side by side on wide screens -->
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <!-- AI Settings -->
-      <BaseCard :title="t('settings.aiInsights')">
+      <!-- AI Settings (admin only) -->
+      <BaseCard v-if="canManagePod" :title="t('settings.aiInsights')">
         <div class="py-8 text-center text-gray-500 dark:text-gray-400">
           <BeanieIcon name="light-bulb" size="xl" class="mx-auto mb-4 h-12 w-12 text-gray-400" />
           <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
@@ -696,11 +698,11 @@ function formatLastSync(timestamp: string | null): string {
       <PasskeySettings />
     </div>
 
-    <!-- Exchange Rate Settings (full width, rarely changed) -->
-    <ExchangeRateSettings />
+    <!-- Exchange Rate Settings (admin only, full width) -->
+    <ExchangeRateSettings v-if="canManagePod" />
 
-    <!-- Data Management (full width) -->
-    <BaseCard :title="t('settings.dataManagement')">
+    <!-- Data Management (admin only, full width) -->
+    <BaseCard v-if="canManagePod" :title="t('settings.dataManagement')">
       <div class="space-y-4">
         <div
           class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"

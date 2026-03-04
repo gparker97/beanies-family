@@ -82,6 +82,9 @@ export interface FamilyMember {
   ageGroup: AgeGroup;
   dateOfBirth?: DateOfBirth;
   role: 'owner' | 'admin' | 'member';
+  canViewFinances?: boolean;
+  canEditActivities?: boolean;
+  canManagePod?: boolean;
   color: string; // UI differentiation
   passwordHash?: string; // PBKDF2 hash in "salt:hash" format
   requiresPassword: boolean; // true when member needs to set a password

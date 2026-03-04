@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-03",
-    "translationCount": 1126
+    "lastUpdated": "2026-03-04",
+    "translationCount": 1112
   },
   "translations": {
     "app.name": {
@@ -2186,41 +2186,6 @@
       "hash": "mn74et",
       "lastUpdated": "2026-03-03"
     },
-    "settings.encryptDataFile": {
-      "translation": "加密数据文件",
-      "hash": "3uryv",
-      "lastUpdated": "2026-03-03"
-    },
-    "settings.encrypted": {
-      "translation": "已加密",
-      "hash": "b77azg",
-      "lastUpdated": "2026-03-03"
-    },
-    "settings.unencrypted": {
-      "translation": "未加密",
-      "hash": "fmk6ol",
-      "lastUpdated": "2026-03-03"
-    },
-    "settings.encryptionDescription": {
-      "translation": "使用密码加密保护您的数据",
-      "hash": "efg87s",
-      "lastUpdated": "2026-02-24"
-    },
-    "settings.disableEncryptionWarning": {
-      "translation": "禁用加密意味着您的财务数据将以明文形式存储，任何人都可以读取该文件。您确定吗？",
-      "hash": "5mzufr",
-      "lastUpdated": "2026-02-24"
-    },
-    "settings.yesDisableEncryption": {
-      "translation": "禁用加密",
-      "hash": "uogs3u",
-      "lastUpdated": "2026-03-03"
-    },
-    "settings.passwordNote": {
-      "translation": "注意：返回访问数据时，您需要输入密码。",
-      "hash": "hhs5u",
-      "lastUpdated": "2026-02-24"
-    },
     "settings.noAutoSyncWarning": {
       "translation": "您的浏览器不支持自动保存文件。改用手动导出/导入。要自动保存，请使用Chrome或Edge。",
       "hash": "miiip9",
@@ -2264,21 +2229,6 @@
     "settings.exportTranslations": {
       "translation": "导出翻译",
       "hash": "sitb1u",
-      "lastUpdated": "2026-03-03"
-    },
-    "password.setPassword": {
-      "translation": "加密密码",
-      "hash": "es4koq",
-      "lastUpdated": "2026-03-03"
-    },
-    "password.setPasswordDescription": {
-      "translation": "选择一个强密码来加密您的数据文件。每次打开应用时，您都需要输入此密码。",
-      "hash": "e5zsdn",
-      "lastUpdated": "2026-02-24"
-    },
-    "password.enableEncryption": {
-      "translation": "启用加密",
-      "hash": "vblkg0",
       "lastUpdated": "2026-03-03"
     },
     "password.enterPassword": {
@@ -2596,7 +2546,7 @@
       "hash": "7dqurh",
       "lastUpdated": "2026-02-24"
     },
-    “auth.password”: {
+    "auth.password": {
       "translation": "密码",
       "hash": "l71ry3",
       "lastUpdated": "2026-03-03"
@@ -2631,54 +2581,19 @@
       "hash": "7k2ifu",
       "lastUpdated": "2026-03-03"
     },
-    "login.inviteAsParent": {
-      "translation": "同上级",
-      "hash": "vm3ara",
-      "lastUpdated": "2026-03-03"
-    },
-    "login.inviteAsChild": {
-      "translation": "子",
-      "hash": "12quws",
-      "lastUpdated": "2026-03-03"
-    },
-    "login.inviteRoleLabel": {
-      "translation": "邀请为",
-      "hash": "4twzjg",
-      "lastUpdated": "2026-03-03"
-    },
-    "login.familyCodePlaceholder": {
-      "translation": "请输入家庭成员提供的代码",
-      "hash": "1pux6f",
-      "lastUpdated": "2026-03-03"
-    },
     "login.inviteTitle": {
       "translation": "邀请家庭成员",
       "hash": "v7kych",
       "lastUpdated": "2026-03-03"
     },
     "login.inviteDesc": {
-      "translation": "与家人分享此代码，以便他们加入您的Pod",
-      "hash": "i5urn5",
-      "lastUpdated": "2026-02-24"
-    },
-    "login.inviteCode": {
-      "translation": "《家庭法典》",
-      "hash": "a3o1l5",
-      "lastUpdated": "2026-03-03"
-    },
-    "login.inviteLink": {
-      "translation": "分享该链接",
-      "hash": "bp3rhe",
-      "lastUpdated": "2026-03-03"
+      "translation": "与您的家人分享此神奇链接，以便他们加入您的Pod",
+      "hash": "32sy4b",
+      "lastUpdated": "2026-03-04"
     },
     "login.copied": {
       "translation": "已复制！",
       "hash": "rqllj7",
-      "lastUpdated": "2026-03-03"
-    },
-    "login.copyCode": {
-      "translation": "复制代码",
-      "hash": "dyi1yg",
       "lastUpdated": "2026-03-03"
     },
     "login.copyLink": {
@@ -2787,19 +2702,19 @@
       "lastUpdated": "2026-02-24"
     },
     "loginV6.unlockTitle": {
-      "translation": "解锁您的Pod",
-      "hash": "6trm5o",
-      "lastUpdated": "2026-03-03"
+      "translation": "登入",
+      "hash": "8yrcew",
+      "lastUpdated": "2026-03-04"
     },
     "loginV6.unlockSubtitle": {
-      "translation": "输入您的Pod密码以解密您的家庭数据",
-      "hash": "b1fjp0",
-      "lastUpdated": "2026-03-03"
+      "translation": "输入您的密码，我们会找到您的账号",
+      "hash": "3ei4if",
+      "lastUpdated": "2026-03-04"
     },
     "loginV6.unlockButton": {
-      "translation": "解锁您的Pod",
-      "hash": "5raq5o",
-      "lastUpdated": "2026-03-03"
+      "translation": "登入",
+      "hash": "8yrcew",
+      "lastUpdated": "2026-03-04"
     },
     "loginV6.unlockFooter": {
       "translation": "此密码可解密您的本地数据。我们不会存储或恢复它。",
@@ -2871,11 +2786,6 @@
       "hash": "x3hdol",
       "lastUpdated": "2026-03-03"
     },
-    "loginV6.passwordHint": {
-      "translation": "这会加密您的数据文件",
-      "hash": "erkyln",
-      "lastUpdated": "2026-03-03"
-    },
     "loginV6.storageTitle": {
       "translation": "我们应该将您的Pod保存在哪里？",
       "hash": "m246ci",
@@ -2916,40 +2826,10 @@
       "hash": "r83laa",
       "lastUpdated": "2026-03-03"
     },
-    "loginV6.joinInput": {
-      "translation": "家庭代码或魔术链接",
-      "hash": "zhztnx",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.whatsNext": {
-      "translation": "接下来会发生什么？",
-      "hash": "3ebjz3",
-      "lastUpdated": "2026-03-03"
-    },
-    "loginV6.joinStep1": {
-      "translation": "我们将验证您的家庭成员并加载数据文件",
-      "hash": "vij2cf",
-      "lastUpdated": "2026-02-24"
-    },
-    "loginV6.joinStep2": {
-      "translation": "您将选择您的个人资料并创建密码",
-      "hash": "qvxbp4",
-      "lastUpdated": "2026-02-24"
-    },
-    "loginV6.joinStep3": {
-      "translation": "登录成功！",
-      "hash": "ndf84a",
-      "lastUpdated": "2026-02-24"
-    },
     "loginV6.joinButton": {
       "translation": "加入我家人的Pod",
       "hash": "nikpcd",
       "lastUpdated": "2026-03-03"
-    },
-    "loginV6.joinNotAvailable": {
-      "translation": "加入pod尚不可用。请您的家人与您共享他们的.beanpod文件，并改用“登录您的pod”。",
-      "hash": "e0ztid",
-      "lastUpdated": "2026-02-24"
     },
     "loginV6.wantYourOwn": {
       "translation": "想要订购自己的餐点吗？",
@@ -2996,11 +2876,6 @@
       "hash": "qmufhz",
       "lastUpdated": "2026-02-24"
     },
-    "loginV6.encryptionPasswordLabel": {
-      "translation": "Pod数据文件加密密码",
-      "hash": "bqsff5",
-      "lastUpdated": "2026-03-03"
-    },
     "loginV6.signInPasswordLabel": {
       "translation": "您的登录密码",
       "hash": "csyyj7",
@@ -3027,19 +2902,9 @@
       "lastUpdated": "2026-03-03"
     },
     "loginV6.step2Subtitle": {
-      "translation": "选择存储加密数据文件的位置，并设置密码进行保护。",
-      "hash": "umwod3",
-      "lastUpdated": "2026-02-24"
-    },
-    "loginV6.podPasswordOptional": {
-      "translation": "可选\\ u2014您可以稍后在“设置”中启用加密",
-      "hash": "593trh",
-      "lastUpdated": "2026-02-24"
-    },
-    "loginV6.confirmPodPassword": {
-      "translation": "确认Pod密码",
-      "hash": "5zu846",
-      "lastUpdated": "2026-03-03"
+      "translation": "选择存储加密数据文件的位置。",
+      "hash": "5vu5jx",
+      "lastUpdated": "2026-03-04"
     },
     "loginV6.addMemberFailed": {
       "translation": "添加失败请重试",
@@ -3062,9 +2927,9 @@
       "lastUpdated": "2026-03-03"
     },
     "join.verifySubtitle": {
-      "translation": "让我们帮您找到家人",
-      "hash": "93ayzn",
-      "lastUpdated": "2026-02-24"
+      "translation": "您需要来自家庭成员的神奇加入链接",
+      "hash": "orywt8",
+      "lastUpdated": "2026-03-04"
     },
     "join.lookingUp": {
       "translation": "正在查找您的家人...",
@@ -3155,26 +3020,6 @@
       "translation": "重要提示：还与他们共享.beanpod文件（电子邮件、云文件夹或USB ）",
       "hash": "t3gf3d",
       "lastUpdated": "2026-02-24"
-    },
-    "join.enterCodeManually": {
-      "translation": "或手动输入家庭代码",
-      "hash": "9fvg5q",
-      "lastUpdated": "2026-03-03"
-    },
-    "join.codeInputLabel": {
-      "translation": "《家庭法典》",
-      "hash": "a3o1l5",
-      "lastUpdated": "2026-03-03"
-    },
-    "join.codeInputHint": {
-      "translation": "粘贴家庭代码或家庭成员共享的邀请链接",
-      "hash": "vrbtao",
-      "lastUpdated": "2026-02-24"
-    },
-    "join.next": {
-      "translation": "下一頁",
-      "hash": "1fytv",
-      "lastUpdated": "2026-03-03"
     },
     "pwa.offlineBanner": {
       "translation": "您处于离线状态—更改将保存在本地",
@@ -3401,7 +3246,7 @@
       "hash": "kbgu1x",
       "lastUpdated": "2026-02-25"
     },
-    “passkey.prfFull”: {
+    "passkey.prfFull": {
       "translation": "完全解锁",
       "hash": "aq2lzp",
       "lastUpdated": "2026-03-03"
@@ -3441,11 +3286,6 @@
       "hash": "ezysm9",
       "lastUpdated": "2026-02-25"
     },
-    "passkey.enterEncryptionPassword": {
-      "translation": "输入您的加密密码进行注册",
-      "hash": "5ysb6j",
-      "lastUpdated": "2026-03-03"
-    },
     "passkey.noPasskeys": {
       "translation": "尚未注册生物识别登录。",
       "hash": "lg3ggb",
@@ -3454,11 +3294,6 @@
     "passkey.unsupported": {
       "translation": "您的浏览器不支持生物识别登录(WebAuthn)。",
       "hash": "e5z6v4",
-      "lastUpdated": "2026-02-25"
-    },
-    "passkey.needsEncryption": {
-      "translation": "生物识别登录需要启用文件加密。",
-      "hash": "fnfxgx",
       "lastUpdated": "2026-02-25"
     },
     "passkey.rename": {
@@ -5620,6 +5455,116 @@
       "translation": "到期日",
       "hash": "vzfc7u",
       "lastUpdated": "2026-03-03"
+    },
+    "noAccess.title": {
+      "translation": "无权限",
+      "hash": "k7bdlv",
+      "lastUpdated": "2026-03-04"
+    },
+    "noAccess.heading": {
+      "translation": "这个区域是禁止进入的，小豆子",
+      "hash": "jvnia3",
+      "lastUpdated": "2026-03-04"
+    },
+    "noAccess.description": {
+      "translation": "您没有查看此页面的权限。请Pod管理员更新您的访问权限。",
+      "hash": "9d23za",
+      "lastUpdated": "2026-03-04"
+    },
+    "noAccess.backToNook": {
+      "translation": "回到角落",
+      "hash": "pw973s",
+      "lastUpdated": "2026-03-04"
+    },
+    "family.memberAdded": {
+      "translation": "成员添加：",
+      "hash": "ys547t",
+      "lastUpdated": "2026-03-04"
+    },
+    "family.scanOrShare": {
+      "translation": "扫描二维码或分享链接",
+      "hash": "ddpjao",
+      "lastUpdated": "2026-03-04"
+    },
+    "family.linkExpiry": {
+      "translation": "此链接将在24小时后过期",
+      "hash": "d0cdi4",
+      "lastUpdated": "2026-03-04"
+    },
+    "settings.familyKeyStatus": {
+      "translation": "家庭密钥",
+      "hash": "ovn87x",
+      "lastUpdated": "2026-03-04"
+    },
+    "settings.familyKeyActive": {
+      "translation": "端到端加密",
+      "hash": "fwfdz5",
+      "lastUpdated": "2026-03-04"
+    },
+    "settings.familyKeyDescription": {
+      "translation": "您的数据受到AES-256加密的保护",
+      "hash": "1lnufr",
+      "lastUpdated": "2026-03-04"
+    },
+    "settings.exportAsJson": {
+      "translation": "导出为JSON",
+      "hash": "qq1kga",
+      "lastUpdated": "2026-03-04"
+    },
+    "settings.exportAsJsonDesc": {
+      "translation": "将您的所有数据下载为人类可读的JSON文件",
+      "hash": "fopzgx",
+      "lastUpdated": "2026-03-04"
+    },
+    "loginV6.unlockTitleWithFamily": {
+      "translation": "登录{familyName}",
+      "hash": "qcor0g",
+      "lastUpdated": "2026-03-04"
+    },
+    "loginV6.unlockMemberCount": {
+      "translation": "此家庭中的{count}个成员",
+      "hash": "b2ajgp",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.inviteTokenInvalid": {
+      "translation": "此邀请链接无效。向家庭主人要一个新的。",
+      "hash": "p44a43",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.inviteTokenExpired": {
+      "translation": "此邀请链接已过期。向家庭主人要一个新的。",
+      "hash": "5iya29",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.generatingLink": {
+      "translation": "正在生成安全邀请链接...",
+      "hash": "6o3nfc",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.howToJoinTitle": {
+      "translation": "如何加入？",
+      "hash": "twya4f",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.howToJoinStep1": {
+      "translation": "请家长或家庭管理员打开家庭页面",
+      "hash": "esiblh",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.howToJoinStep2": {
+      "translation": "他们会轻点邀请以生成魔术链接",
+      "hash": "ra02d",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.howToJoinStep3": {
+      "translation": "在您的设备上打开链接—就是这样！",
+      "hash": "e3n1zi",
+      "lastUpdated": "2026-03-04"
+    },
+    "join.linkExpiryNote": {
+      "translation": "出于安全考虑，邀请链接将在24小时后过期",
+      "hash": "kongf3",
+      "lastUpdated": "2026-03-04"
     }
   }
 }
