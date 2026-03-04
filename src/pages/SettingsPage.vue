@@ -11,7 +11,9 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
+import { getDoc } from '@/services/automerge/docService';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
+import { downloadAsFile } from '@/services/sync/fileSync';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -27,12 +29,10 @@ const { canInstall, isInstalled, installApp } = usePWA();
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
-const showDisableEncryptionConfirm = ref(false);
 const importError = ref<string | null>(null);
 const importSuccess = ref(false);
 
-// Encryption modal state
-const showEnableEncryptionModal = ref(false);
+// Decrypt-file modal state (for loading encrypted files)
 const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
 const isProcessingEncryption = ref(false);
@@ -148,41 +148,6 @@ function handleDecryptModalClose() {
   encryptionError.value = null;
 }
 
-function handleEncryptionToggle() {
-  if (syncStore.isEncryptionEnabled) {
-    showDisableEncryptionConfirm.value = true;
-  } else {
-    showEnableEncryptionModal.value = true;
-  }
-}
-
-async function handleEnableEncryption(password: string) {
-  isProcessingEncryption.value = true;
-  encryptionError.value = null;
-
-  const success = await syncStore.enableEncryption(password);
-
-  isProcessingEncryption.value = false;
-
-  if (success) {
-    showEnableEncryptionModal.value = false;
-  } else {
-    encryptionError.value = syncStore.error ?? 'Failed to enable encryption';
-  }
-}
-
-async function handleDisableEncryptionConfirmed() {
-  showDisableEncryptionConfirm.value = false;
-  isProcessingEncryption.value = true;
-  await syncStore.disableEncryption();
-  isProcessingEncryption.value = false;
-}
-
-function handleEnableEncryptionModalClose() {
-  showEnableEncryptionModal.value = false;
-  encryptionError.value = null;
-}
-
 async function handleManualExport() {
   await syncStore.manualExport();
 }
@@ -203,6 +168,31 @@ async function handleManualImport() {
 
 async function handleExportTranslations() {
   await translationStore.exportCacheToFile();
+}
+
+function handleExportAsJson() {
+  const doc = getDoc();
+  const collections = [
+    'familyMembers',
+    'accounts',
+    'transactions',
+    'assets',
+    'goals',
+    'budgets',
+    'recurringItems',
+    'todos',
+    'activities',
+  ] as const;
+
+  const data: Record<string, unknown> = {};
+  for (const key of collections) {
+    data[key] = Object.values(doc[key] ?? {});
+  }
+  data.settings = doc.settings ?? null;
+
+  const json = JSON.stringify(data, null, 2);
+  const date = new Date().toISOString().split('T')[0];
+  downloadAsFile(json, `beanies-export-${date}.json`);
 }
 
 async function handleClearData() {
@@ -548,71 +538,26 @@ function formatLastSync(timestamp: string | null): string {
                 </p>
               </div>
 
-              <!-- Encryption toggle -->
+              <!-- Family key status -->
               <div class="mt-4 border-t border-gray-200 pt-4 dark:border-slate-700">
-                <label class="flex cursor-pointer items-center gap-3">
-                  <input
-                    type="checkbox"
-                    :checked="syncStore.isEncryptionEnabled"
-                    :disabled="isProcessingEncryption"
-                    class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded"
-                    @click.prevent="handleEncryptionToggle"
-                  />
+                <div class="flex items-center gap-3">
+                  <div
+                    class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[14px] bg-green-100 dark:bg-green-900/30"
+                  >
+                    <BeanieIcon name="lock" size="md" class="text-green-600 dark:text-green-400" />
+                  </div>
                   <div>
                     <p class="font-medium text-gray-900 dark:text-gray-100">
-                      {{ t('settings.encryptDataFile') }}
+                      {{ t('settings.familyKeyStatus') }}
                       <span
-                        v-if="syncStore.isEncryptionEnabled"
-                        class="ml-2 inline-flex items-center rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        class="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
                       >
-                        <img
-                          src="/brand/beanies_covering_eyes_transparent_512x512.png"
-                          alt=""
-                          class="mr-1 h-3 w-3"
-                        />
-                        {{ t('settings.encrypted') }}
-                      </span>
-                      <span
-                        v-else
-                        class="ml-2 inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                      >
-                        <img
-                          src="/brand/beanies_open_eyes_transparent_512x512.png"
-                          alt=""
-                          class="mr-1 h-3 w-3"
-                        />
-                        {{ t('settings.unencrypted') }}
+                        {{ t('settings.familyKeyActive') }}
                       </span>
                     </p>
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                      {{ t('settings.encryptionDescription') }}
+                      {{ t('settings.familyKeyDescription') }}
                     </p>
-                  </div>
-                </label>
-
-                <!-- Disable encryption confirmation -->
-                <div
-                  v-if="showDisableEncryptionConfirm"
-                  class="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20"
-                >
-                  <p class="mb-3 text-sm text-red-800 dark:text-red-200">
-                    {{ t('settings.disableEncryptionWarning') }}
-                  </p>
-                  <div class="flex gap-2">
-                    <BaseButton
-                      variant="danger"
-                      size="sm"
-                      @click="handleDisableEncryptionConfirmed"
-                    >
-                      {{ t('settings.yesDisableEncryption') }}
-                    </BaseButton>
-                    <BaseButton
-                      variant="ghost"
-                      size="sm"
-                      @click="showDisableEncryptionConfirm = false"
-                    >
-                      {{ t('action.cancel') }}
-                    </BaseButton>
                   </div>
                 </div>
               </div>
@@ -777,6 +722,21 @@ function formatLastSync(timestamp: string | null): string {
         >
           <div>
             <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.exportAsJson') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.exportAsJsonDesc') }}
+            </p>
+          </div>
+          <BaseButton variant="ghost" size="sm" @click="handleExportAsJson">
+            {{ t('action.export') }}
+          </BaseButton>
+        </div>
+        <div
+          class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
+        >
+          <div>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
               {{ t('settings.exportTranslationCache') }}
             </p>
             <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -822,17 +782,6 @@ function formatLastSync(timestamp: string | null): string {
         </div>
       </div>
     </BaseCard>
-
-    <!-- Enable Encryption Password Modal -->
-    <PasswordModal
-      :open="showEnableEncryptionModal"
-      :title="t('password.setPassword')"
-      :description="t('password.setPasswordDescription')"
-      :confirm-label="t('password.enableEncryption')"
-      :require-confirmation="true"
-      @close="handleEnableEncryptionModalClose"
-      @confirm="handleEnableEncryption"
-    />
 
     <!-- Decrypt File Password Modal -->
     <PasswordModal
