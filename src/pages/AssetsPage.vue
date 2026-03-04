@@ -266,6 +266,19 @@ async function handleRemoveCustomInstitution(name: string) {
   await removeCustomInstitution(name);
 }
 
+/** Strip undefined values from loan data (Automerge rejects undefined). */
+function cleanLoan(loan: AssetLoan | undefined): AssetLoan {
+  if (!loan?.hasLoan) return { hasLoan: false };
+  const raw = toRaw(loan);
+  const cleaned: Partial<AssetLoan> = { hasLoan: true };
+  for (const [k, v] of Object.entries(raw)) {
+    if (v !== undefined && k !== 'hasLoan') {
+      (cleaned as Record<string, unknown>)[k] = v;
+    }
+  }
+  return cleaned as AssetLoan;
+}
+
 async function createAsset() {
   if (!newAsset.value.name.trim()) return;
 
@@ -275,12 +288,8 @@ async function createAsset() {
     const rawData = toRaw(newAsset.value);
     const assetData: CreateAssetInput = {
       ...rawData,
-      loan: rawData.loan ? { ...toRaw(rawData.loan) } : { hasLoan: false },
+      loan: cleanLoan(rawData.loan),
     };
-    // Clean up loan data if no loan
-    if (!assetData.loan?.hasLoan) {
-      assetData.loan = { hasLoan: false };
-    }
     await assetsStore.createAsset(assetData);
     await persistCustomInstitutionIfNeeded(rawData.loan?.lender);
     showAddModal.value = false;
@@ -298,12 +307,8 @@ async function saveEdit() {
     const rawData = toRaw(editingAsset.value);
     const assetData: UpdateAssetInput = {
       ...rawData,
-      loan: rawData.loan ? { ...toRaw(rawData.loan) } : { hasLoan: false },
+      loan: cleanLoan(rawData.loan),
     };
-    // Clean up loan data if no loan
-    if (!assetData.loan?.hasLoan) {
-      assetData.loan = { hasLoan: false };
-    }
     await assetsStore.updateAsset(editingAssetId.value, assetData);
     await persistCustomInstitutionIfNeeded(rawData.loan?.lender);
     closeEditModal();
