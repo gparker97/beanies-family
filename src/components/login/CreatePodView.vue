@@ -14,6 +14,7 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
+import { clearFolderCache } from '@/services/google/driveService';
 import type { FamilyMember, Gender, AgeGroup } from '@/types/models';
 
 const { t } = useTranslation();
@@ -147,6 +148,8 @@ async function handleChooseGoogleDriveStorage() {
     storageType.value = 'google_drive';
   } catch (e) {
     driveResultError.value = (e as Error).message || t('googleDrive.authFailed');
+    // Clear stale folder cache so retry starts fresh (prevents cross-account 404)
+    clearFolderCache();
   } finally {
     isSavingStorage.value = false;
     showDriveResultModal.value = true;
