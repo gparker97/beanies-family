@@ -13,7 +13,8 @@ import {
   unwrapFamilyKey,
   SALT_LENGTH,
 } from '@/services/crypto/familyKeyService';
-import { saveDoc, loadDoc } from '@/services/automerge/docService';
+import * as Automerge from '@automerge/automerge';
+import { saveDoc } from '@/services/automerge/docService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
 import type {
@@ -22,7 +23,6 @@ import type {
   WrappedPasskeyKey,
   InviteKeyPackage,
 } from '@/types/syncFileV4';
-import type * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 
 /**
@@ -113,7 +113,10 @@ export async function decryptBeanpodPayload(
 ): Promise<Automerge.Doc<FamilyDocument>> {
   const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
   const binary = await decryptPayload(familyKey, encrypted);
-  return loadDoc(binary);
+  // Use Automerge.load() directly — NOT loadDoc() which has the side effect
+  // of replacing the in-memory currentDoc singleton. Callers that need to
+  // replace (replaceDoc) or merge (mergeDoc) do so explicitly after this returns.
+  return Automerge.load<FamilyDocument>(binary);
 }
 
 /**
