@@ -449,7 +449,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function decryptPendingFile(
     password: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; memberId?: string }> {
     const pending = pendingEncryptedFile.value;
     if (!pending) {
       return { success: false, error: 'No pending encrypted file' };
@@ -457,7 +457,7 @@ export const useSyncStore = defineStore('sync', () => {
 
     try {
       // Try to unwrap the family key using the password
-      const { familyKey: fk } = await tryUnwrapFamilyKey(pending.envelope, password);
+      const { familyKey: fk, memberId } = await tryUnwrapFamilyKey(pending.envelope, password);
 
       // Decrypt the Automerge payload
       const doc = await decryptBeanpodPayload(pending.envelope, fk);
@@ -543,7 +543,7 @@ export const useSyncStore = defineStore('sync', () => {
       // Arm auto-sync
       setupAutoSync();
 
-      return { success: true };
+      return { success: true, memberId };
     } catch (e) {
       const errorMessage = (e as Error).message;
       if (errorMessage.includes('Incorrect password')) {
