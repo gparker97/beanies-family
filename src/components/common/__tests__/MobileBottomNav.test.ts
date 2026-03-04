@@ -17,6 +17,22 @@ vi.mock('@/composables/useTranslation', () => ({
   }),
 }));
 
+vi.mock('@/composables/usePermissions', () => ({
+  usePermissions: () => ({
+    canViewFinances: { value: true },
+  }),
+  FINANCE_ROUTES: [
+    '/dashboard',
+    '/accounts',
+    '/budgets',
+    '/transactions',
+    '/goals',
+    '/assets',
+    '/reports',
+    '/forecast',
+  ],
+}));
+
 describe('MobileBottomNav', () => {
   beforeEach(() => {
     mockPush.mockClear();
