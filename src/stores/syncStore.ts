@@ -470,9 +470,17 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Adopt family identity if needed
       const { getActiveFamilyId } = await import('@/services/indexeddb/database');
-      const activeFamilyId = getActiveFamilyId();
+      let activeFamilyId = getActiveFamilyId();
       const familyCtx = useFamilyContextStore();
-      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+
+      if (!activeFamilyId && pending.envelope.familyId) {
+        // No active family — create/adopt from the file's familyId
+        await familyCtx.createFamilyWithId(
+          pending.envelope.familyId,
+          pending.envelope.familyName ?? 'My Family'
+        );
+        activeFamilyId = pending.envelope.familyId;
+      } else if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
         await familyCtx.switchFamily(activeFamilyId);
       }
 
@@ -719,9 +727,17 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Adopt family identity if needed
       const { getActiveFamilyId } = await import('@/services/indexeddb/database');
-      const activeFamilyId = getActiveFamilyId();
+      let activeFamilyId = getActiveFamilyId();
       const familyCtx = useFamilyContextStore();
-      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+
+      if (!activeFamilyId && pending.envelope.familyId) {
+        // No active family — create/adopt from the file's familyId
+        await familyCtx.createFamilyWithId(
+          pending.envelope.familyId,
+          pending.envelope.familyName ?? 'My Family'
+        );
+        activeFamilyId = pending.envelope.familyId;
+      } else if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
         await familyCtx.switchFamily(activeFamilyId);
       }
 
