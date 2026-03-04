@@ -95,6 +95,7 @@ const dobYear = ref('');
 const canViewFinances = ref(true);
 const canEditActivities = ref(true);
 const canManagePod = ref(false);
+const showPermissions = ref(false);
 
 // Derived ageGroup from beanRole
 const ageGroup = computed<AgeGroup>(() => (beanRole.value === 'child' ? 'child' : 'adult'));
@@ -116,9 +117,9 @@ const { isEditing, isSubmitting } = useFormModal(
       dobMonth.value = member.dateOfBirth?.month?.toString() ?? '1';
       dobDay.value = member.dateOfBirth?.day?.toString() ?? '1';
       dobYear.value = member.dateOfBirth?.year?.toString() ?? '';
-      canViewFinances.value = member.canViewFinances ?? true;
-      canEditActivities.value = member.canEditActivities ?? true;
-      canManagePod.value = member.canManagePod ?? false;
+      canViewFinances.value = member.role === 'owner' ? true : (member.canViewFinances ?? true);
+      canEditActivities.value = member.role === 'owner' ? true : (member.canEditActivities ?? true);
+      canManagePod.value = member.role === 'owner' ? true : (member.canManagePod ?? false);
     },
     onNew: () => {
       const randomColor =
@@ -134,6 +135,7 @@ const { isEditing, isSubmitting } = useFormModal(
       canViewFinances.value = true;
       canEditActivities.value = true;
       canManagePod.value = false;
+      showPermissions.value = false;
     },
   }
 );
@@ -145,6 +147,8 @@ watch(canManagePod, (val) => {
     canEditActivities.value = true;
   }
 });
+
+const isOwnerMember = computed(() => props.member?.role === 'owner');
 
 const canSave = computed(() => name.value.trim().length > 0);
 
@@ -262,9 +266,22 @@ function handleDelete() {
       </div>
     </FormFieldGroup>
 
-    <!-- 8. Permissions (at bottom) — hidden in readOnly mode -->
-    <FormFieldGroup v-if="!readOnly" :label="t('modal.permissions')">
-      <div class="space-y-3">
+    <!-- 8. Permissions (collapsible, hidden in readOnly mode) -->
+    <div v-if="!readOnly">
+      <button
+        type="button"
+        class="font-outfit text-primary-500 text-sm font-semibold transition-colors hover:underline"
+        @click="showPermissions = !showPermissions"
+      >
+        {{ t('modal.permissions') }}
+        <span
+          class="ml-1 inline-block transition-transform"
+          :class="{ 'rotate-180': showPermissions }"
+          >&#9662;</span
+        >
+      </button>
+
+      <div v-if="showPermissions" class="mt-3 space-y-3">
         <div
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
         >
@@ -273,7 +290,7 @@ function handleDelete() {
           >
             {{ t('modal.canViewFinances') }}
           </span>
-          <ToggleSwitch v-model="canViewFinances" size="sm" />
+          <ToggleSwitch v-model="canViewFinances" size="sm" :disabled="isOwnerMember" />
         </div>
         <div
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
@@ -283,7 +300,7 @@ function handleDelete() {
           >
             {{ t('modal.canEditActivities') }}
           </span>
-          <ToggleSwitch v-model="canEditActivities" size="sm" />
+          <ToggleSwitch v-model="canEditActivities" size="sm" :disabled="isOwnerMember" />
         </div>
         <div
           class="flex items-center justify-between rounded-[12px] bg-[var(--tint-slate-5)] px-3 py-2.5 dark:bg-slate-700"
@@ -293,9 +310,9 @@ function handleDelete() {
           >
             {{ t('modal.canManagePod') }}
           </span>
-          <ToggleSwitch v-model="canManagePod" size="sm" />
+          <ToggleSwitch v-model="canManagePod" size="sm" :disabled="isOwnerMember" />
         </div>
       </div>
-    </FormFieldGroup>
+    </div>
   </BeanieFormModal>
 </template>

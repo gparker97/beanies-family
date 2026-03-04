@@ -265,7 +265,9 @@ function cancelEditFamilyName() {
         v-for="member in familyStore.members"
         :key="member.id"
         :hoverable="true"
+        class="cursor-pointer"
         :class="syncHighlightClass(member.id)"
+        @click="openEditModal(member)"
       >
         <div class="flex items-start gap-4">
           <BeanieAvatar
@@ -279,12 +281,14 @@ function cancelEditFamilyName() {
               <h3 class="truncate font-medium text-gray-900 dark:text-gray-100">
                 {{ member.name }}
               </h3>
-              <MemberRoleManager
-                :current-role="member.role"
-                :member-id="member.id"
-                :disabled="!canManagePod"
-                @change="handleRoleChange(member.id, $event)"
-              />
+              <span @click.stop>
+                <MemberRoleManager
+                  :current-role="member.role"
+                  :member-id="member.id"
+                  :disabled="!canManagePod"
+                  @change="handleRoleChange(member.id, $event)"
+                />
+              </span>
             </div>
             <p class="truncate text-sm text-gray-500 dark:text-gray-400">
               {{ isTemporaryEmail(member.email) ? t('family.emailNotSet') : member.email }}
@@ -327,21 +331,14 @@ function cancelEditFamilyName() {
               v-if="member.requiresPassword && canManagePod"
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
               :title="t('family.copyInviteLinkHint')"
-              @click="copyMemberInviteLink(member.id)"
+              @click.stop="copyMemberInviteLink(member.id)"
             >
               <BeanieIcon name="copy" size="md" />
             </button>
             <button
-              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-slate-700"
-              :title="t('family.editMember')"
-              @click="openEditModal(member)"
-            >
-              <BeanieIcon name="edit" size="md" />
-            </button>
-            <button
               v-if="member.role !== 'owner' && canManagePod"
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-              @click="deleteMember(member.id)"
+              @click.stop="deleteMember(member.id)"
             >
               <BeanieIcon name="trash" size="md" />
             </button>
