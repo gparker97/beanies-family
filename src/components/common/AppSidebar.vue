@@ -57,8 +57,7 @@ function navigateTo(path: string) {
 
 const encryptionTitle = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFileConfigured');
-  if (syncStore.isEncryptionEnabled) return t('sidebar.dataEncryptedFull');
-  return t('sidebar.dataFileNotEncrypted');
+  return t('sidebar.dataEncryptedFull');
 });
 
 const SECTION_COLORS: Record<string, string> = {
@@ -215,7 +214,7 @@ const sections = computed(() =>
       <!-- Encryption status -->
       <div class="flex items-center gap-1.5" :title="encryptionTitle">
         <svg
-          v-if="syncStore.isConfigured && syncStore.isEncryptionEnabled"
+          v-if="syncStore.isConfigured"
           class="h-3 w-3 flex-shrink-0 text-[#6EE7B7]/30"
           fill="none"
           stroke="currentColor"
@@ -226,19 +225,6 @@ const sections = computed(() =>
         >
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-        <svg
-          v-else-if="syncStore.isConfigured"
-          class="h-3 w-3 flex-shrink-0 text-amber-400/30"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 9.9-1" />
         </svg>
         <svg
           v-else
@@ -257,21 +243,9 @@ const sections = computed(() =>
         </svg>
         <span
           class="text-xs"
-          :class="
-            !syncStore.isConfigured
-              ? 'text-white/30'
-              : syncStore.isEncryptionEnabled
-                ? 'text-[#6EE7B7]/30'
-                : 'text-amber-400/30'
-          "
+          :class="syncStore.isConfigured ? 'text-[#6EE7B7]/30' : 'text-white/30'"
         >
-          {{
-            !syncStore.isConfigured
-              ? t('sidebar.noDataFile')
-              : syncStore.isEncryptionEnabled
-                ? t('sidebar.dataEncrypted')
-                : t('sidebar.notEncrypted')
-          }}
+          {{ syncStore.isConfigured ? t('sidebar.dataEncrypted') : t('sidebar.noDataFile') }}
         </span>
       </div>
 

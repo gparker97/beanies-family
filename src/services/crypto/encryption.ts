@@ -256,17 +256,3 @@ export function extractSaltFromEncrypted(encryptedBase64: string): Uint8Array {
 
   return combined.slice(ENCRYPTED_HEADER.length, ENCRYPTED_HEADER.length + SALT_LENGTH);
 }
-
-/**
- * Encrypt a sync file's data section
- */
-export async function encryptSyncData(jsonData: string, password: string): Promise<string> {
-  return encryptData(jsonData, password);
-}
-
-/**
- * Decrypt a sync file's data section
- */
-export async function decryptSyncData(encryptedData: string, password: string): Promise<string> {
-  return decryptData(encryptedData, password);
-}

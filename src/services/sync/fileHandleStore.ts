@@ -5,7 +5,6 @@ import type { StorageProviderType } from './storageProvider';
 const HANDLE_DB_NAME = 'beanies-file-handles';
 const HANDLE_DB_VERSION = 1;
 const HANDLE_STORE = 'handles';
-const LEGACY_SYNC_FILE_KEY = 'syncFile';
 
 // Provider config persistence — stores which backend a family uses
 export interface PersistedProviderConfig {
@@ -42,11 +41,11 @@ async function getHandleDatabase(): Promise<IDBPDatabase<HandleDB>> {
 
 /**
  * Get the storage key for the current family's sync file handle.
- * Falls back to legacy key if no family is active.
  */
 function getSyncFileKey(): string {
   const familyId = getActiveFamilyId();
-  return familyId ? `syncFile-${familyId}` : LEGACY_SYNC_FILE_KEY;
+  if (!familyId) throw new Error('No active family — cannot access sync file handle');
+  return `syncFile-${familyId}`;
 }
 
 /**
@@ -70,23 +69,6 @@ export async function getFileHandle(): Promise<FileSystemFileHandle | null> {
     return handle ?? null;
   } catch {
     return null;
-  }
-}
-
-/**
- * Migrate the legacy sync file handle to a specific family.
- * Called during legacy DB migration only.
- */
-export async function migrateLegacyFileHandle(familyId: string): Promise<void> {
-  try {
-    const db = await getHandleDatabase();
-    const legacyHandle = await db.get(HANDLE_STORE, LEGACY_SYNC_FILE_KEY);
-    if (legacyHandle) {
-      await db.put(HANDLE_STORE, legacyHandle, `syncFile-${familyId}`);
-      await db.delete(HANDLE_STORE, LEGACY_SYNC_FILE_KEY);
-    }
-  } catch {
-    // Non-critical — sync can be reconfigured manually
   }
 }
 

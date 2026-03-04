@@ -24,11 +24,20 @@ const USERINFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke';
 
+// Key used to temporarily store a refresh token before a family is active
+const PENDING_FAMILY_KEY = '__pending__';
+
 // In-memory token state
 let accessToken: string | null = null;
 let expiresAt: number = 0;
 let refreshToken: string | null = null;
 let currentFamilyId: string | null = null;
+
+// Deduplication: only one popup auth flow runs at a time.
+// Without this, concurrent calls each open the same popup (same window name),
+// but generate different PKCE verifiers — the first listener catches the code
+// meant for the second verifier, causing "Invalid code verifier" errors.
+let pendingAuthPromise: Promise<string> | null = null;
 
 // Cached Google account email
 let cachedEmail: string | null = null;
@@ -67,6 +76,28 @@ export async function initializeAuth(familyId: string): Promise<void> {
 }
 
 /**
+ * Migrate a pending refresh token to a real family-scoped key.
+ *
+ * During login-page OAuth (no family yet), the refresh token is stored under
+ * a temporary pending key. Once a family is adopted/created from the Drive
+ * file, call this to move the token to the family-scoped key and update
+ * in-memory state.
+ */
+export async function migratePendingRefreshToken(familyId: string): Promise<void> {
+  const pending = await getGoogleRefreshToken(PENDING_FAMILY_KEY);
+  if (!pending) return;
+
+  // Move to the family-scoped key
+  await storeGoogleRefreshToken(familyId, pending);
+  await clearGoogleRefreshToken(PENDING_FAMILY_KEY);
+
+  // Update in-memory state
+  currentFamilyId = familyId;
+  refreshToken = pending;
+  console.warn('[googleAuth] Migrated pending refresh token to family', familyId);
+}
+
+/**
  * Backward compatibility — no-op. Previously loaded the GIS script.
  * Consumers can safely call this; it does nothing in the PKCE flow.
  */
@@ -81,9 +112,14 @@ export async function loadGIS(): Promise<void> {
  * If a refresh token is available, tries silent refresh first.
  * Otherwise, opens the Google consent popup.
  *
+ * Concurrent calls are deduplicated — only one popup auth flow runs at a time.
+ * Additional callers receive the same promise. This prevents PKCE verifier
+ * mismatches when the same popup window is reused by a second call.
+ *
  * @param options.forceConsent - Force the account chooser / consent screen.
  */
 export async function requestAccessToken(options?: { forceConsent?: boolean }): Promise<string> {
+  // Fast paths that don't need deduplication
   const clientId = getClientId();
   if (!clientId) {
     throw new Error(
@@ -107,11 +143,37 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
     if (silentToken) return silentToken;
   }
 
-  // Full popup auth flow
+  // Deduplicate concurrent popup auth flows
+  if (pendingAuthPromise) {
+    console.warn('[googleAuth] Auth flow already in progress — joining existing request');
+    return pendingAuthPromise;
+  }
+
+  const promise = performPopupAuth(clientId, options);
+  pendingAuthPromise = promise;
+
+  try {
+    return await promise;
+  } finally {
+    // Only clear if this is still the active promise
+    if (pendingAuthPromise === promise) {
+      pendingAuthPromise = null;
+    }
+  }
+}
+
+/**
+ * Internal: perform the actual popup OAuth flow. Callers should go through
+ * requestAccessToken() which handles caching, silent refresh, and deduplication.
+ */
+async function performPopupAuth(
+  clientId: string,
+  options?: { forceConsent?: boolean }
+): Promise<string> {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  const prompt = options?.forceConsent ? 'consent' : 'consent';
+  const prompt = options?.forceConsent ? 'consent' : 'select_account';
   const authUrl = buildAuthUrl(clientId, codeChallenge, prompt);
   const code = await openAuthPopup(authUrl);
 
@@ -126,12 +188,13 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
   accessToken = tokens.access_token;
   expiresAt = Date.now() + tokens.expires_in * 1000;
 
-  // Store refresh token if provided (Google only sends it on first consent)
+  // Store refresh token if provided (Google only sends it on first consent).
+  // When no family is active yet (login page), store under a pending key so
+  // the token survives page refresh and can be migrated once a family is adopted.
   if (tokens.refresh_token) {
     refreshToken = tokens.refresh_token;
-    if (currentFamilyId) {
-      await storeGoogleRefreshToken(currentFamilyId, tokens.refresh_token);
-    }
+    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
+    await storeGoogleRefreshToken(storageKey, tokens.refresh_token);
   }
 
   // Schedule auto-refresh

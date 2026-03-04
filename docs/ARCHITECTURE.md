@@ -1,49 +1,55 @@
 # Architecture Overview
 
-> **Last updated:** 2026-02-24
+> **Last updated:** 2026-03-04
 
 ## High-Level Architecture
 
-beanies.family is a **local-first, single-page application** (SPA) built with Vue 3. All data is stored client-side in IndexedDB with an encrypted local file as source of truth. File-based authentication uses PBKDF2 password hashes stored in the data file itself — no cloud auth dependencies.
+beanies.family is a **local-first, single-page application** (SPA) built with Vue 3. All family data lives in an **Automerge CRDT document** (in memory), encrypted with a per-family AES-256-GCM key and persisted to both a local IndexedDB cache and a cloud `.beanpod` V4 file. Authentication uses the family key model — each member's password (or passkey PRF) unwraps the shared family key via AES-KW.
 
 ```
-┌──────────────────────────────────────────────────┐
-│                   Browser                        │
-│                                                  │
-│  ┌──────────┐   ┌──────────┐   ┌──────────────┐ │
-│  │ Vue 3    │──▶│ Pinia    │──▶│ IndexedDB    │ │
-│  │ Pages    │   │ Stores   │   │ Repositories │ │
-│  └──────────┘   └──────────┘   └──────────────┘ │
-│       │                             │            │
-│       ▼                             ▼            │
-│  ┌──────────┐              ┌──────────────────┐  │
-│  │ Vue      │              │ Sync Service     │  │
-│  │ Router   │              │ (File System     │  │
-│  └──────────┘              │  Access API)     │  │
-│                            └────────┬─────────┘  │
-│                                     │            │
-│                            ┌────────▼─────────┐  │
-│                            │ Encryption       │  │
-│                            │ (Web Crypto API) │  │
-│                            └──────────────────┘  │
-└──────────────────────────────────────────────────┘
-                      │
-          ┌───────────┼───────────┬───────────┐
-          ▼           ▼           ▼           ▼
-    ┌──────────┐ ┌─────────┐ ┌──────────┐
-    │ Local    │ │ Exchange │ │ MyMemory │
-    │ .beanpod │ │ Rate API │ │ Translate│
-    │ File     │ │ (CDN)    │ │ API      │
-    └──────────┘ └─────────┘ └──────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                         Browser                              │
+│                                                              │
+│  ┌──────────┐   ┌──────────┐   ┌──────────────────────────┐ │
+│  │ Vue 3    │──▶│ Pinia    │──▶│ Automerge Repository     │ │
+│  │ Pages    │   │ Stores   │   │ Factory (CRDT in RAM)    │ │
+│  └──────────┘   └──────────┘   └────────────┬─────────────┘ │
+│       │                                      │               │
+│       ▼                          ┌───────────┴────────────┐  │
+│  ┌──────────┐                    │  Doc Service           │  │
+│  │ Vue      │                    │  (docVersion shallowRef│  │
+│  │ Router   │                    │   + changeDoc/mergeDoc)│  │
+│  └──────────┘                    └───────────┬────────────┘  │
+│                                   ┌──────────┴──────────┐    │
+│                                   ▼                     ▼    │
+│                          ┌──────────────┐   ┌─────────────┐  │
+│                          │ Persistence  │   │ Sync Service │  │
+│                          │ Cache (IDB)  │   │ (File/Drive) │  │
+│                          └──────────────┘   └──────┬──────┘  │
+│                                                    │         │
+│                                       ┌────────────▼───────┐ │
+│                                       │ Family Key Service │ │
+│                                       │ (AES-GCM + AES-KW)│ │
+│                                       └────────────────────┘ │
+└──────────────────────────────────────────────────────────────┘
+                          │
+          ┌───────────────┼───────────────┬───────────────┐
+          ▼               ▼               ▼               ▼
+    ┌──────────┐    ┌──────────┐    ┌─────────┐    ┌──────────┐
+    │ Local    │    │ Google   │    │Exchange │    │ MyMemory │
+    │ .beanpod │    │ Drive    │    │Rate API │    │ Translate│
+    │ File     │    │ (PKCE)   │    │ (CDN)   │    │ API      │
+    └──────────┘    └──────────┘    └─────────┘    └──────────┘
 ```
 
 ## Data Flow
 
 1. **User actions** trigger Vue component methods
-2. Components call **Pinia store actions** (never IndexedDB directly)
-3. Stores call **IndexedDB repository** methods for persistence
-4. Stores hold reactive state for the UI layer
-5. If sync is enabled, data changes trigger **debounced saves** to local `.beanpod` file
+2. Components call **Pinia store actions** (never repositories directly)
+3. Stores call **Automerge repository** methods which mutate the in-memory CRDT document
+4. Mutations bump `docVersion` (a `shallowRef`), triggering Vue reactivity
+5. A debounced persist callback (500ms) encrypts the Automerge binary with the family key and writes to the IndexedDB cache
+6. If sync is enabled, data changes trigger **debounced saves** (2s) to the `.beanpod` V4 file (local or Google Drive)
 
 ## Layer Responsibilities
 
@@ -59,17 +65,19 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 - Pinia stores using Composition API style
 - Single source of truth for reactive state
 - Orchestrate business logic (e.g., updating account balance on transaction)
-- Call repository methods for CRUD
+- Call Automerge repository methods for CRUD
 
 ### Services (`src/services/`)
 
-- **indexeddb/**: Database initialization and entity-specific repositories
-- **sync/**: File System Access API integration, file handle persistence, sync coordination
-- **crypto/**: AES-GCM encryption with PBKDF2 key derivation
+- **automerge/**: Document service (singleton CRDT), repository factory, persistence cache
+- **sync/**: File System Access API integration, Google Drive storage, file handle persistence, sync coordination
+- **crypto/**: AES-GCM encryption with PBKDF2 key derivation, family key service (AES-KW wrapping), invite token service
+- **auth/**: Password hashing (`passwordService.ts`), passkey/WebAuthn support (`passkeyService.ts`)
+- **google/**: OAuth PKCE proxy client (`oauthProxy.ts`), Drive API client (`driveService.ts`)
 - **exchangeRate/**: Free currency API integration with fallback
 - **recurring/**: Recurring transaction processor (runs on app startup)
 - **translation/**: MyMemory API integration for i18n
-- **auth/**: PBKDF2 password hashing service (`passwordService.ts`) and passkey/WebAuthn support (`passkeyService.ts`)
+- **indexeddb/**: Registry database, active family tracking, database cleanup utilities
 
 ### Composables (`src/composables/`)
 
@@ -84,6 +92,7 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 - `useSounds`: Web Audio API synthesised sound effects (zero bundle size)
 - `useInstitutionOptions`: Merges predefined + custom institutions for combobox
 - `useMemberAvatar`: Maps member gender/age to avatar variant + PNG path
+- `useClipboard`: Cross-browser clipboard write with fallback
 
 ### Constants (`src/constants/`)
 
@@ -100,23 +109,28 @@ beanies.family is a **local-first, single-page application** (SPA) built with Vu
 - Brand components: BeanieIcon, BeanieAvatar, BeanieSpinner, ConfirmModal, CelebrationOverlay, EmptyStateIllustration
 - Consistent styling via Tailwind CSS 4 utility classes with brand design tokens
 
-## Database Schema
+## Data Storage
 
-### Per-Family Databases
+### Automerge Document (`FamilyDocument`)
 
-Each family gets its own IndexedDB: `beanies-data-{familyId}` (version 6). This provides clean tenant isolation — no `familyId` columns needed on records.
+All family data lives in a single Automerge CRDT document per family. Collections use `Record<string, Entity>` maps (not arrays) for clean CRDT merge semantics:
 
-| Object Store   | Key         | Indexes                            |
-| -------------- | ----------- | ---------------------------------- |
-| familyMembers  | id (UUID)   | by-email (unique)                  |
-| accounts       | id (UUID)   | by-memberId, by-type               |
-| transactions   | id (UUID)   | by-accountId, by-date, by-category |
-| assets         | id (UUID)   | by-memberId, by-type               |
-| goals          | id (UUID)   | by-memberId                        |
-| recurringItems | id (UUID)   | by-accountId, by-type, by-isActive |
-| settings       | id (string) | _(none)_                           |
-| syncQueue      | id (UUID)   | by-synced, by-timestamp            |
-| translations   | id (string) | by-language                        |
+| Collection     | Entity Type    | Notes                       |
+| -------------- | -------------- | --------------------------- |
+| familyMembers  | FamilyMember   | Keyed by member UUID        |
+| accounts       | Account        | Keyed by account UUID       |
+| transactions   | Transaction    | Keyed by transaction UUID   |
+| assets         | Asset          | Keyed by asset UUID         |
+| goals          | Goal           | Keyed by goal UUID          |
+| budgets        | Budget         | Keyed by budget UUID        |
+| recurringItems | RecurringItem  | Keyed by item UUID          |
+| todos          | TodoItem       | Keyed by todo UUID          |
+| activities     | FamilyActivity | Keyed by activity UUID      |
+| settings       | Settings       | Singleton (direct property) |
+
+### Automerge Persistence Cache
+
+Each family's Automerge binary is encrypted and cached in IndexedDB: `beanies-automerge-{familyId}`. This cache is ephemeral — deleted on sign-out. It enables fast startup without re-reading the cloud file.
 
 ### Registry Database
 
@@ -126,7 +140,7 @@ A shared `beanies-registry` database stores cross-family metadata:
 | ------------------ | ---------------------------------------------------------------- |
 | families           | Family list (id, name, createdAt)                                |
 | userFamilyMappings | Maps auth users to families                                      |
-| globalSettings     | Device-level prefs (theme, language, rates)                      |
+| globalSettings     | Device-level prefs (theme, language, rates, cached family keys)  |
 | passkeys           | WebAuthn passkey registrations (device-level, survives sign-out) |
 
 ### File Handle Database
@@ -162,17 +176,15 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Exchange rates fetched from free API, cached in settings, refreshed every 24h
 - Multi-hop conversion supported (e.g., SGD→USD→EUR via base currencies)
 
-### File-First Architecture
+### Automerge-First Architecture
 
-- **Encrypted local file is the source of truth** — IndexedDB is an ephemeral cache deleted on sign-out
-- File handle persisted in a per-family IndexedDB database across sessions
-- Sync file format v3.0: versioned JSON with `familyId`, optional AES-GCM encryption, `data.deletions` tombstone array
-- **Record-level merge** for cross-device reload: merges by record ID + `updatedAt` timestamps (see [ADR-017](adr/017-record-level-merge-sync.md))
-- **Full replace** for initial load (empty local → load from file)
-- Deletion tombstones (`DeletionTombstone`) propagate deletions across devices, pruned after 30 days
-- Auto-sync uses debounced saves (2-second delay) after data changes
-- Manual export/import fallback for browsers without File System Access API
+- **Automerge CRDT in memory is the source of truth** — IndexedDB is an encrypted ephemeral cache, deleted on sign-out
+- The `.beanpod` V4 file is the durable encrypted copy (local file or Google Drive)
+- **V4 beanpod format**: JSON envelope with `version: '4.0'`, `familyId`, `familyName`, `keyId`, per-member `wrappedKeys`, `passkeyWrappedKeys`, `inviteKeys`, and `encryptedPayload` (AES-GCM encrypted Automerge binary)
+- **CRDT merge** for cross-device sync: Automerge handles all conflict resolution automatically
+- Debounced persistence (500ms for cache, 2s for file save) after mutations
 - Sync guards validate `familyId` on save, load, and decrypt to prevent cross-family data leakage
+- See [ADR-018](adr/018-automerge-crdt-migration.md) for the migration decision
 
 ### Recurring Transactions
 
@@ -192,18 +204,19 @@ FamilyMember (0..1) ───▶ (N) Goal
 
 ### Authentication
 
-- **File-based auth**: PBKDF2 password hashes stored directly in the family data file alongside `FamilyMember` records
-- **Two-layer security**: (1) AES-GCM file encryption password protects data at rest, (2) per-member PBKDF2 password proves identity within the family
-- **Biometric login (passkeys)**: WebAuthn replaces both passwords with a single biometric gesture. Two paths:
-  - **PRF path**: Authenticator PRF output → HKDF → AES-KW unwraps the file DEK directly (true passwordless)
-  - **Cached password path**: Passkey authenticates member, cached encryption password decrypts the file (Firefox fallback)
+- **Family key model**: A random 256-bit AES-GCM family key encrypts the Automerge document. Each member's key is wrapped individually via AES-KW (see [ADR-019](adr/019-family-key-encryption.md)):
+  - **Password path**: PBKDF2 (100k iterations) derives an AES-KW wrapping key → unwraps the family key
+  - **Passkey PRF path**: Authenticator PRF output → HKDF → AES-KW key → unwraps family key directly (true passwordless)
+  - **Invite token path**: PBKDF2 from one-time token → AES-KW key → unwraps family key for new members (24h expiry)
+- **Single password**: Member password both proves identity and unwraps the family key — no separate file decrypt step
+- **Biometric login (passkeys)**: WebAuthn with PRF extension replaces password entirely on supported platforms
   - Passkey registrations stored in registry DB (device-level, survives sign-out)
-  - Password changes invalidate PRF-wrapped DEKs and update cached passwords
-  - See ADR-015 for the full decision record
-- **Member lifecycle**: Owner creates member → shares invite → member claims record and sets password during joiner onboarding
+  - Password changes re-wrap the family key (no need to re-encrypt entire document)
+  - See [ADR-015](adr/015-passkey-biometric-authentication.md) for the passkey decision
+- **Trusted device mode**: Family key cached in `globalSettings.cachedFamilyKeys` for passwordless re-entry on personal devices
+- **Member lifecycle**: Owner creates member → generates invite link (magic link + QR) → new member redeems token and sets password
 - Per-family database isolation prevents cross-user data leakage
-- No cloud auth dependencies — the data file IS the auth database
-- See ADR-014 for the decision to move from Cognito to file-based auth
+- No cloud auth dependencies — the `.beanpod` file IS the auth database
 
 ## Testing
 

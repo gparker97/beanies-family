@@ -1,5 +1,7 @@
 # ADR-015: Passkey / Biometric Authentication
 
+> **Updated by [ADR-019](019-family-key-encryption.md)** — passkey PRF now unwraps the family key directly via AES-KW instead of caching a file password.
+
 **Status:** Accepted
 **Date:** 2026-02-24
 

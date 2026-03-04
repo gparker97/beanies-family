@@ -24,10 +24,6 @@ const emit = defineEmits<{
   'signed-in': [destination: string];
 }>();
 
-defineProps<{
-  fileUnencrypted?: boolean;
-}>();
-
 const password = ref('');
 const confirmPassword = ref('');
 const selectedMember = ref<FamilyMember | null>(null);
@@ -159,23 +155,6 @@ async function handleSignIn() {
       class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
     >
       {{ formError }}
-    </div>
-
-    <!-- Unencrypted file warning -->
-    <div
-      v-if="fileUnencrypted"
-      class="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
-    >
-      <div class="flex items-start gap-2">
-        <img
-          src="/brand/beanies_open_eyes_transparent_512x512.png"
-          alt=""
-          class="mt-0.5 h-4 w-4 flex-shrink-0"
-        />
-        <p class="text-sm text-amber-800 dark:text-amber-200">
-          {{ t('auth.fileNotEncryptedWarning') }}
-        </p>
-      </div>
     </div>
 
     <!-- No members -->

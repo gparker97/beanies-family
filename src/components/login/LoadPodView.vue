@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /* global FileSystemFileHandle, FileSystemHandle */
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseModal from '@/components/ui/BaseModal.vue';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useAuthStore } from '@/stores/authStore';
 import { getGoogleAccountEmail } from '@/services/google/googleAuth';
 import {
   isPlatformAuthenticatorAvailable,
@@ -17,8 +17,7 @@ import {
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
-
-const SESSION_PASSWORD_KEY = 'beanies-file-password';
+const authStore = useAuthStore();
 
 const props = defineProps<{
   needsPermissionGrant?: boolean;
@@ -32,6 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   back: [];
   'file-loaded': [];
+  'signed-in': [destination: string];
   'biometric-available': [payload: { familyId: string; familyName?: string }];
 }>();
 
@@ -44,34 +44,39 @@ const isDragging = ref(false);
 const selectedSource = ref<'google_drive' | 'dropbox' | 'icloud' | 'local' | null>(null);
 let dragCounter = 0;
 
+/** Family name from the pending encrypted envelope (available before decryption). */
+const pendingFamilyName = computed(() => syncStore.pendingEncryptedFile?.envelope?.familyName);
+
+/** Number of members with wrapped keys in the pending envelope. */
+const pendingMemberCount = computed(() => {
+  const keys = syncStore.pendingEncryptedFile?.envelope?.wrappedKeys;
+  return keys ? Object.keys(keys).length : 0;
+});
+
 /**
- * Try to auto-decrypt using a cached sessionStorage password.
+ * Try to auto-decrypt using a cached family key from trusted device settings.
  * Returns true if decryption succeeded.
  */
 async function tryAutoDecrypt(): Promise<boolean> {
-  // Use familyId from pending encrypted file's raw data for per-family cache lookup
-  const pendingFamilyId = syncStore.pendingEncryptedFile?.rawSyncData?.familyId;
+  const pendingFamilyId = syncStore.pendingEncryptedFile?.envelope?.familyId;
+  if (!pendingFamilyId) return false;
 
-  // Try sessionStorage first (current session), then trusted device cache (persistent)
-  const passwords = [
-    sessionStorage.getItem(SESSION_PASSWORD_KEY),
-    pendingFamilyId ? settingsStore.getCachedEncryptionPassword(pendingFamilyId) : null,
-  ].filter(Boolean) as string[];
-
-  for (const pw of passwords) {
+  // Try cached family key from trusted device
+  const cachedKey = settingsStore.getCachedFamilyKey(pendingFamilyId);
+  if (cachedKey) {
     try {
-      const result = await syncStore.decryptPendingFile(pw);
+      const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+      const { base64ToBuffer } = await import('@/utils/encoding');
+      const raw = new Uint8Array(base64ToBuffer(cachedKey));
+      const fk = await importFamilyKey(raw);
+      const result = await syncStore.decryptPendingFileWithKey(fk);
       if (result.success) return true;
     } catch {
-      // Try next password
+      // Cached key invalid — clear it
     }
+    await settingsStore.clearCachedFamilyKey(pendingFamilyId);
   }
 
-  // All attempts failed — clear stale caches
-  sessionStorage.removeItem(SESSION_PASSWORD_KEY);
-  if (pendingFamilyId) {
-    await settingsStore.clearCachedEncryptionPassword(pendingFamilyId);
-  }
   return false;
 }
 
@@ -97,7 +102,7 @@ async function checkBiometricForFamily(familyId: string, familyName?: string): P
  * Extract familyId/familyName from the pending encrypted file's raw sync data.
  */
 function getPendingFamilyInfo(): { familyId?: string; familyName?: string } {
-  const raw = syncStore.pendingEncryptedFile?.rawSyncData;
+  const raw = syncStore.pendingEncryptedFile?.envelope;
   return { familyId: raw?.familyId, familyName: raw?.familyName };
 }
 
@@ -229,9 +234,19 @@ async function handleDecrypt() {
   try {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
-      sessionStorage.setItem(SESSION_PASSWORD_KEY, decryptPassword.value);
-      // decryptPendingFile already caches on trusted devices via syncStore
       showDecryptModal.value = false;
+
+      // If we got a memberId back, try auto-sign-in to skip PickBeanView
+      if (result.memberId) {
+        const signInResult = await authStore.signIn(result.memberId, decryptPassword.value);
+        decryptPassword.value = '';
+        if (signInResult.success) {
+          emit('signed-in', '/nook');
+          return;
+        }
+        // Sign-in failed (edge case: password changed after wrapping) — fall back
+      }
+
       decryptPassword.value = '';
       emit('file-loaded');
     } else {
@@ -454,426 +469,19 @@ async function handleDriveRefresh() {
       {{ t('action.back') }}
     </button>
 
-    <!-- Header -->
-    <div class="mb-6 text-center">
-      <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
-        {{ t('loginV6.loadPodTitle') }}
-      </h2>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('loginV6.loadPodSubtitle') }}
-      </p>
-    </div>
-
-    <!-- Error -->
-    <div
-      v-if="formError"
-      class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
-    >
-      {{ formError }}
-    </div>
-
-    <!-- Loading state (only for auto-load and permission grant) -->
-    <div v-if="isLoadingFile" class="py-12 text-center">
-      <div
-        class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
-      ></div>
-      <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
-    </div>
-
-    <!-- Permission reconnect state -->
-    <div v-else-if="needsPermissionGrant" class="space-y-4">
-      <div
-        class="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center dark:border-slate-600"
-      >
-        <div
-          class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30"
-        >
-          <svg
-            class="h-7 w-7 text-amber-600 dark:text-amber-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
-        </div>
-        <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-          {{ t('auth.reconnectFile') }}
-        </p>
-        <BaseButton class="w-full" @click="handleGrantPermission">
-          {{ t('auth.reconnectButton') }}
-        </BaseButton>
-      </div>
-    </div>
-
-    <!-- Storage source cards -->
-    <template v-else>
-      <div class="grid grid-cols-2 gap-3">
-        <!-- Google Drive card (always enabled) -->
-        <button
-          class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
-          :class="
-            selectedSource === 'google_drive'
-              ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
-              : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
-          "
-          :disabled="isDriveLoading"
-          @click="handleLoadFromGoogleDrive"
-        >
-          <span
-            class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
-          >
-            {{ t('loginV6.recommended') }}
-          </span>
-          <div
-            class="bg-primary-500/10 dark:bg-primary-500/20 mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
-          >
-            <svg
-              v-if="isDriveLoading"
-              class="text-primary-500 h-5 w-5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              />
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            <svg v-else class="text-primary-500 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
-              />
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {{ t('googleDrive.storageLabel') }}
-          </p>
-          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('loginV6.googleDriveCardDesc') }}
-          </p>
-        </button>
-
-        <!-- Dropbox card (coming soon) -->
-        <div
-          class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
-        >
-          <span
-            class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
-          >
-            {{ t('loginV6.cloudComingSoon') }}
-          </span>
-          <div
-            class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20"
-          >
-            <svg class="h-5 w-5 text-[#0061FF]" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.707 7.293l-1.414 1.414L12 7.414l-3.293 3.293-1.414-1.414L12 4.586l4.707 4.707z"
-              />
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {{ t('storage.dropbox') }}
-          </p>
-          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('loginV6.dropboxCardDesc') }}
-          </p>
-        </div>
-
-        <!-- iCloud card (coming soon) -->
-        <div
-          class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
-        >
-          <span
-            class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
-          >
-            {{ t('loginV6.cloudComingSoon') }}
-          </span>
-          <div
-            class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-700"
-          >
-            <svg class="h-5 w-5 text-gray-500" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"
-              />
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {{ t('storage.iCloud') }}
-          </p>
-          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('loginV6.iCloudCardDesc') }}
-          </p>
-        </div>
-
-        <!-- Local File card -->
-        <button
-          class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
-          :class="
-            selectedSource === 'local'
-              ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
-              : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
-          "
-          @click="selectedSource = selectedSource === 'local' ? null : 'local'"
-        >
-          <div
-            class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
-            :class="
-              selectedSource === 'local'
-                ? 'bg-primary-500/15 dark:bg-primary-500/20'
-                : 'bg-gray-100 dark:bg-slate-700'
-            "
-          >
-            <svg
-              class="h-5 w-5"
-              :class="
-                selectedSource === 'local' ? 'text-primary-500' : 'text-gray-400 dark:text-gray-500'
-              "
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-          </div>
-          <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {{ t('storage.localFile') }}
-          </p>
-          <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('loginV6.localFileCardDesc') }}
-          </p>
-        </button>
-      </div>
-
-      <!-- Local file drop zone (appears when Local File selected) -->
-      <div
-        v-if="selectedSource === 'local'"
-        role="button"
-        tabindex="0"
-        class="group mt-3 w-full cursor-pointer rounded-2xl border-[3px] border-dashed px-6 py-8 text-center transition-all"
-        :class="
-          isDragging
-            ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40'
-            : 'border-primary-500/20 from-primary-500/[0.02] to-sky-silk-300/[0.04] hover:border-primary-500/40 dark:border-primary-500/15 dark:from-primary-500/[0.03] dark:to-sky-silk-300/[0.02] dark:hover:border-primary-500/30 bg-gradient-to-br hover:bg-[#FEF0E8]/30'
-        "
-        @click="handleLoadFile"
-        @keydown.enter="handleLoadFile"
-        @dragenter="handleDragEnter"
-        @dragleave="handleDragLeave"
-        @dragover="handleDragOver"
-        @drop="handleDrop"
-      >
-        <div
-          class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl transition-colors"
-          :class="
-            isDragging
-              ? 'bg-primary-500/15 dark:bg-primary-500/20'
-              : 'group-hover:bg-primary-500/10 bg-gray-100 dark:bg-slate-700'
-          "
-        >
-          <svg
-            class="h-7 w-7 transition-colors"
-            :class="
-              isDragging
-                ? 'text-primary-500'
-                : 'group-hover:text-primary-500 text-gray-400 dark:text-gray-500'
-            "
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-            />
-          </svg>
-        </div>
-        <p class="font-medium text-gray-700 dark:text-gray-300">
-          {{ t('loginV6.dropZoneText') }}
-        </p>
-        <p class="text-primary-500 mt-1 text-sm">
-          {{ t('loginV6.dropZoneBrowse') }}
-        </p>
-        <p class="text-primary-500/70 mt-2 text-xs font-semibold">
-          {{ t('loginV6.acceptsBeanpod') }}
-        </p>
-      </div>
-
-      <!-- Google Drive empty state with retry/switch actions -->
-      <div
-        v-if="showDriveEmptyState"
-        class="mt-3 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/50 p-6 text-center dark:border-amber-600/40 dark:bg-amber-900/10"
-      >
-        <div
-          class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30"
-        >
-          <svg
-            class="h-6 w-6 text-amber-600 dark:text-amber-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-            />
-          </svg>
-        </div>
-        <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
-          {{ t('googleDrive.noFilesFound') }}
-        </p>
-        <p v-if="getGoogleAccountEmail()" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          {{ t('googleDrive.connectedAs').replace('{email}', getGoogleAccountEmail()!) }}
-        </p>
-        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          {{ t('googleDrive.noFilesHint') }}
-        </p>
-        <div class="mt-4 flex gap-2">
-          <BaseButton
-            variant="secondary"
-            class="flex-1"
-            :disabled="isDriveLoading"
-            @click="handleDriveRetry"
-          >
-            {{ t('googleDrive.retrySearch') }}
-          </BaseButton>
-          <BaseButton
-            variant="secondary"
-            class="flex-1"
-            :disabled="isDriveLoading"
-            @click="handleDriveSwitchAccount"
-          >
-            {{ t('googleDrive.switchAccount') }}
-          </BaseButton>
-        </div>
-      </div>
-
-      <!-- Google Drive File Picker Modal -->
-      <GoogleDriveFilePicker
-        :open="showDrivePicker"
-        :files="driveFiles"
-        :is-loading="isDriveLoading"
-        @close="showDrivePicker = false"
-        @select="handleDriveFileSelected"
-        @refresh="handleDriveRefresh"
-      />
-
-      <!-- Security messaging -->
-      <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <!-- Card 1: Your Data, Your Cloud -->
-        <div
-          class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
-        >
-          <div
-            class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#6EE7B7]/[0.12]"
-          >
-            <svg
-              class="h-5 w-5 text-[#10b981]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-              />
-            </svg>
-          </div>
-          <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
-            {{ t('loginV6.securityYourData') }}
-          </p>
-          <p class="mt-0.5 text-xs opacity-35">
-            {{ t('loginV6.securityYourDataDesc') }}
-          </p>
-        </div>
-
-        <!-- Card 2: AES-256 Encrypted -->
-        <div
-          class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
-        >
-          <div
-            class="bg-primary-500/10 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
-          >
-            <svg
-              class="text-primary-500 h-5 w-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-          </div>
-          <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
-            {{ t('loginV6.securityEncrypted') }}
-          </p>
-          <p class="mt-0.5 text-xs opacity-35">
-            {{ t('loginV6.securityEncryptedDesc') }}
-          </p>
-        </div>
-
-        <!-- Card 3: Zero Servers -->
-        <div
-          class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
-        >
-          <div
-            class="bg-sky-silk-300/20 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
-          >
-            <svg
-              class="h-5 w-5 text-[#3498db]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              />
-            </svg>
-          </div>
-          <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
-            {{ t('loginV6.securityZeroServers') }}
-          </p>
-          <p class="mt-0.5 text-xs opacity-35">
-            {{ t('loginV6.securityZeroServersDesc') }}
-          </p>
-        </div>
-      </div>
-    </template>
-
-    <!-- Decrypt Modal -->
-    <BaseModal :open="showDecryptModal" @close="showDecryptModal = false">
+    <!-- ═══════════════════════════════════════════════════════════
+         Inline Sign-In form (when file is loaded and needs password)
+         Replaces the storage cards entirely — no modal overlay.
+         ═══════════════════════════════════════════════════════════ -->
+    <template v-if="showDecryptModal">
       <div class="text-center">
+        <!-- Beanie icon -->
+        <img
+          src="/brand/beanies_family_icon_transparent_384x384.png"
+          alt=""
+          class="mx-auto mb-3 h-24 w-24"
+        />
+
         <!-- File loaded badge -->
         <div
           v-if="loadedFileName"
@@ -907,7 +515,11 @@ async function handleDriveRefresh() {
 
         <!-- Heading -->
         <h3 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
-          {{ t('loginV6.unlockTitle') }}
+          {{
+            pendingFamilyName
+              ? t('loginV6.unlockTitleWithFamily').replace('{familyName}', pendingFamilyName)
+              : t('loginV6.unlockTitle')
+          }}
         </h3>
         <p class="mt-1 text-xs opacity-40">
           {{ t('loginV6.unlockSubtitle') }}
@@ -939,10 +551,442 @@ async function handleDriveRefresh() {
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
 
-        <p class="mt-3 text-center text-xs opacity-30">
+        <p
+          v-if="pendingMemberCount > 0"
+          class="mt-3 text-center text-xs text-gray-400 dark:text-gray-500"
+        >
+          {{ t('loginV6.unlockMemberCount').replace('{count}', String(pendingMemberCount)) }}
+        </p>
+
+        <p class="mt-2 text-center text-xs opacity-30">
           {{ t('loginV6.unlockFooter') }}
         </p>
       </form>
-    </BaseModal>
+    </template>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         Standard LoadPodView (storage selection, loading, etc.)
+         Only shown when no file is pending password entry.
+         ═══════════════════════════════════════════════════════════ -->
+    <template v-else>
+      <!-- Header -->
+      <div class="mb-6 text-center">
+        <h2 class="font-outfit text-xl font-bold text-gray-900 dark:text-gray-100">
+          {{ t('loginV6.loadPodTitle') }}
+        </h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('loginV6.loadPodSubtitle') }}
+        </p>
+      </div>
+
+      <!-- Error -->
+      <div
+        v-if="formError"
+        class="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400"
+      >
+        {{ formError }}
+      </div>
+
+      <!-- Loading state (only for auto-load and permission grant) -->
+      <div v-if="isLoadingFile" class="py-12 text-center">
+        <div
+          class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
+        ></div>
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
+      </div>
+
+      <!-- Permission reconnect state -->
+      <div v-else-if="needsPermissionGrant" class="space-y-4">
+        <div
+          class="rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center dark:border-slate-600"
+        >
+          <div
+            class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/30"
+          >
+            <svg
+              class="h-7 w-7 text-amber-600 dark:text-amber-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+          </div>
+          <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+            {{ t('auth.reconnectFile') }}
+          </p>
+          <BaseButton class="w-full" @click="handleGrantPermission">
+            {{ t('auth.reconnectButton') }}
+          </BaseButton>
+        </div>
+      </div>
+
+      <!-- Storage source cards -->
+      <template v-else>
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Google Drive card (always enabled) -->
+          <button
+            class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            :class="
+              selectedSource === 'google_drive'
+                ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
+                : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
+            "
+            :disabled="isDriveLoading"
+            @click="handleLoadFromGoogleDrive"
+          >
+            <span
+              class="from-primary-500 to-terracotta-400 absolute -top-2.5 right-3 rounded-full bg-gradient-to-r px-2.5 py-0.5 text-xs font-bold text-white shadow-sm"
+            >
+              {{ t('loginV6.recommended') }}
+            </span>
+            <div
+              class="bg-primary-500/10 dark:bg-primary-500/20 mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
+            >
+              <svg
+                v-if="isDriveLoading"
+                class="text-primary-500 h-5 w-5 animate-spin"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                />
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              <svg v-else class="text-primary-500 h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"
+                />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {{ t('googleDrive.storageLabel') }}
+            </p>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('loginV6.googleDriveCardDesc') }}
+            </p>
+          </button>
+
+          <!-- Dropbox card (coming soon) -->
+          <div
+            class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
+          >
+            <span
+              class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
+            >
+              {{ t('loginV6.cloudComingSoon') }}
+            </span>
+            <div
+              class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20"
+            >
+              <svg class="h-5 w-5 text-[#0061FF]" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.707 7.293l-1.414 1.414L12 7.414l-3.293 3.293-1.414-1.414L12 4.586l4.707 4.707z"
+                />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {{ t('storage.dropbox') }}
+            </p>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('loginV6.dropboxCardDesc') }}
+            </p>
+          </div>
+
+          <!-- iCloud card (coming soon) -->
+          <div
+            class="relative cursor-not-allowed rounded-2xl border-2 border-gray-200 bg-white p-5 text-left opacity-50 dark:border-slate-600 dark:bg-slate-700/50"
+          >
+            <span
+              class="absolute -top-2.5 right-3 rounded-full bg-gray-400 px-2.5 py-0.5 text-xs font-bold text-white"
+            >
+              {{ t('loginV6.cloudComingSoon') }}
+            </span>
+            <div
+              class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-slate-700"
+            >
+              <svg class="h-5 w-5 text-gray-500" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"
+                />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {{ t('storage.iCloud') }}
+            </p>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('loginV6.iCloudCardDesc') }}
+            </p>
+          </div>
+
+          <!-- Local File card -->
+          <button
+            class="relative rounded-2xl border-2 p-5 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg"
+            :class="
+              selectedSource === 'local'
+                ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40 shadow-md'
+                : 'hover:border-primary-500/40 dark:hover:border-primary-500/30 border-gray-200 bg-white dark:border-slate-600 dark:bg-slate-700/50'
+            "
+            @click="selectedSource = selectedSource === 'local' ? null : 'local'"
+          >
+            <div
+              class="mb-2.5 flex h-10 w-10 items-center justify-center rounded-xl"
+              :class="
+                selectedSource === 'local'
+                  ? 'bg-primary-500/15 dark:bg-primary-500/20'
+                  : 'bg-gray-100 dark:bg-slate-700'
+              "
+            >
+              <svg
+                class="h-5 w-5"
+                :class="
+                  selectedSource === 'local'
+                    ? 'text-primary-500'
+                    : 'text-gray-400 dark:text-gray-500'
+                "
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
+              </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {{ t('storage.localFile') }}
+            </p>
+            <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              {{ t('loginV6.localFileCardDesc') }}
+            </p>
+          </button>
+        </div>
+
+        <!-- Local file drop zone (appears when Local File selected) -->
+        <div
+          v-if="selectedSource === 'local'"
+          role="button"
+          tabindex="0"
+          class="group mt-3 w-full cursor-pointer rounded-2xl border-[3px] border-dashed px-6 py-8 text-center transition-all"
+          :class="
+            isDragging
+              ? 'border-primary-500 dark:border-primary-500/60 dark:bg-primary-500/10 bg-[#FEF0E8]/40'
+              : 'border-primary-500/20 from-primary-500/[0.02] to-sky-silk-300/[0.04] hover:border-primary-500/40 dark:border-primary-500/15 dark:from-primary-500/[0.03] dark:to-sky-silk-300/[0.02] dark:hover:border-primary-500/30 bg-gradient-to-br hover:bg-[#FEF0E8]/30'
+          "
+          @click="handleLoadFile"
+          @keydown.enter="handleLoadFile"
+          @dragenter="handleDragEnter"
+          @dragleave="handleDragLeave"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+        >
+          <div
+            class="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl transition-colors"
+            :class="
+              isDragging
+                ? 'bg-primary-500/15 dark:bg-primary-500/20'
+                : 'group-hover:bg-primary-500/10 bg-gray-100 dark:bg-slate-700'
+            "
+          >
+            <svg
+              class="h-7 w-7 transition-colors"
+              :class="
+                isDragging
+                  ? 'text-primary-500'
+                  : 'group-hover:text-primary-500 text-gray-400 dark:text-gray-500'
+              "
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+              />
+            </svg>
+          </div>
+          <p class="font-medium text-gray-700 dark:text-gray-300">
+            {{ t('loginV6.dropZoneText') }}
+          </p>
+          <p class="text-primary-500 mt-1 text-sm">
+            {{ t('loginV6.dropZoneBrowse') }}
+          </p>
+          <p class="text-primary-500/70 mt-2 text-xs font-semibold">
+            {{ t('loginV6.acceptsBeanpod') }}
+          </p>
+        </div>
+
+        <!-- Google Drive empty state with retry/switch actions -->
+        <div
+          v-if="showDriveEmptyState"
+          class="mt-3 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/50 p-6 text-center dark:border-amber-600/40 dark:bg-amber-900/10"
+        >
+          <div
+            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30"
+          >
+            <svg
+              class="h-6 w-6 text-amber-600 dark:text-amber-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+          </div>
+          <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            {{ t('googleDrive.noFilesFound') }}
+          </p>
+          <p v-if="getGoogleAccountEmail()" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('googleDrive.connectedAs').replace('{email}', getGoogleAccountEmail()!) }}
+          </p>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('googleDrive.noFilesHint') }}
+          </p>
+          <div class="mt-4 flex gap-2">
+            <BaseButton
+              variant="secondary"
+              class="flex-1"
+              :disabled="isDriveLoading"
+              @click="handleDriveRetry"
+            >
+              {{ t('googleDrive.retrySearch') }}
+            </BaseButton>
+            <BaseButton
+              variant="secondary"
+              class="flex-1"
+              :disabled="isDriveLoading"
+              @click="handleDriveSwitchAccount"
+            >
+              {{ t('googleDrive.switchAccount') }}
+            </BaseButton>
+          </div>
+        </div>
+
+        <!-- Google Drive File Picker Modal -->
+        <GoogleDriveFilePicker
+          :open="showDrivePicker"
+          :files="driveFiles"
+          :is-loading="isDriveLoading"
+          @close="showDrivePicker = false"
+          @select="handleDriveFileSelected"
+          @refresh="handleDriveRefresh"
+        />
+
+        <!-- Security messaging -->
+        <div class="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <!-- Card 1: Your Data, Your Cloud -->
+          <div
+            class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+          >
+            <div
+              class="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[#6EE7B7]/[0.12]"
+            >
+              <svg
+                class="h-5 w-5 text-[#10b981]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+                />
+              </svg>
+            </div>
+            <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {{ t('loginV6.securityYourData') }}
+            </p>
+            <p class="mt-0.5 text-xs opacity-35">
+              {{ t('loginV6.securityYourDataDesc') }}
+            </p>
+          </div>
+
+          <!-- Card 2: AES-256 Encrypted -->
+          <div
+            class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+          >
+            <div
+              class="bg-primary-500/10 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
+            >
+              <svg
+                class="text-primary-500 h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                />
+              </svg>
+            </div>
+            <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {{ t('loginV6.securityEncrypted') }}
+            </p>
+            <p class="mt-0.5 text-xs opacity-35">
+              {{ t('loginV6.securityEncryptedDesc') }}
+            </p>
+          </div>
+
+          <!-- Card 3: Zero Servers -->
+          <div
+            class="rounded-[18px] bg-white p-4 text-center shadow-[0_4px_16px_rgba(44,62,80,0.04)] dark:bg-slate-700/50 dark:shadow-none"
+          >
+            <div
+              class="bg-sky-silk-300/20 mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
+            >
+              <svg
+                class="h-5 w-5 text-[#3498db]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+            </div>
+            <p class="text-xs font-bold text-gray-700 dark:text-gray-300">
+              {{ t('loginV6.securityZeroServers') }}
+            </p>
+            <p class="mt-0.5 text-xs opacity-35">
+              {{ t('loginV6.securityZeroServersDesc') }}
+            </p>
+          </div>
+        </div>
+      </template>
+    </template>
   </div>
 </template>

@@ -17,7 +17,19 @@ vi.mock('@/services/indexeddb/repositories/passkeyRepository', () => ({
 // --- Mock passkeyCrypto ---
 vi.mock('../passkeyCrypto', () => ({
   isPRFSupported: vi.fn(() => false),
+  getPRFOutput: vi.fn(() => null),
   buildPRFExtension: vi.fn(() => ({ prf: { eval: { first: new Uint8Array(32) } } })),
+  deriveWrappingKey: vi.fn(async () => ({}) as CryptoKey),
+  generateHKDFSalt: vi.fn(() => new Uint8Array(32)),
+  wrapDEK: vi.fn(async () => 'wrapped-base64'),
+  unwrapDEK: vi.fn(async () => ({}) as CryptoKey),
+}));
+
+// --- Mock familyKeyService ---
+const mockImportedFamilyKey = {} as CryptoKey;
+
+vi.mock('@/services/crypto/familyKeyService', () => ({
+  importFamilyKey: vi.fn(async () => mockImportedFamilyKey),
 }));
 
 // --- Mock globalSettingsRepository ---
@@ -36,7 +48,6 @@ import {
   guessAuthenticatorLabel,
   authenticateWithPasskey,
   registerPasskeyForMember,
-  invalidatePasskeysForPasswordChange,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
 
@@ -52,7 +63,6 @@ function makeRegistration(overrides: Partial<PasskeyRegistration> = {}): Passkey
     prfSupported: false,
     label: 'Windows Hello',
     createdAt: '2026-01-01',
-    cachedPassword: 'test-password',
     ...overrides,
   };
 }
@@ -133,13 +143,14 @@ describe('registerPasskeyForMember', () => {
     });
   });
 
-  it('stores correct fields including credentialId, memberId, familyId, transports, label, cachedPassword', async () => {
+  it('stores correct fields including credentialId, memberId, familyId, transports, label', async () => {
+    const mockFamilyKey = {} as CryptoKey;
     const result = await registerPasskeyForMember({
       memberId: 'member-1',
       memberName: 'Test User',
       memberEmail: 'test@example.com',
       familyId: 'family-1',
-      encryptionPassword: 'secret-pw',
+      familyKey: mockFamilyKey,
       label: 'My Device',
     });
 
@@ -151,8 +162,9 @@ describe('registerPasskeyForMember', () => {
     expect(saved.familyId).toBe('family-1');
     expect(saved.transports).toEqual(['internal']);
     expect(saved.label).toBe('My Device');
-    expect(saved.cachedPassword).toBe('secret-pw');
     expect(saved.credentialId).toBeTruthy();
+    // V4: no cachedPassword field on registration
+    expect('cachedPassword' in saved).toBe(false);
   });
 });
 
@@ -190,8 +202,8 @@ describe('authenticateWithPasskey', () => {
     expect(callArgs[0].publicKey.allowCredentials).toBeUndefined();
   });
 
-  it('matches credential to correct registration by ID', async () => {
-    mockRegistrations.push(makeRegistration({ cachedPassword: 'pw-123' }));
+  it('matches credential to correct registration by ID and returns success without familyKey when no PRF/cache', async () => {
+    mockRegistrations.push(makeRegistration());
 
     vi.stubGlobal('navigator', {
       ...navigator,
@@ -209,10 +221,76 @@ describe('authenticateWithPasskey', () => {
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
     expect(result.success).toBe(true);
     expect(result.memberId).toBe('member-1');
-    expect(result.cachedPassword).toBe('pw-123');
+    // No PRF, no cache → no familyKey, but credentialId returned for password fallback
+    expect(result.familyKey).toBeUndefined();
+    expect(result.credentialId).toBeTruthy();
   });
 
-  it('returns CROSS_DEVICE_NO_CACHE when userHandle matches but no cached password exists', async () => {
+  it('returns familyKey from cache when PRF not supported', async () => {
+    mockRegistrations.push(makeRegistration({ prfSupported: false }));
+    // Set up cached family key in global settings
+    mockGlobalSettings = {
+      cachedFamilyKeys: { 'family-1': 'dGVzdC1rZXk=' },
+    };
+
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        get: vi.fn(async () =>
+          makeFakeAssertion({
+            rawId: base64urlToBuffer('dGVzdC1jcmVkZW50aWFs'),
+          })
+        ),
+        create: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(result.success).toBe(true);
+    expect(result.familyKey).toBe(mockImportedFamilyKey);
+  });
+
+  it('auto-registers synced credential when cached family key exists for family', async () => {
+    mockRegistrations.push(
+      makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
+    );
+    mockGlobalSettings = {
+      cachedFamilyKeys: { 'family-1': 'dGVzdC1rZXk=' },
+    };
+
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      credentials: {
+        get: vi.fn(async () =>
+          makeFakeAssertion({
+            rawId: new TextEncoder().encode('synced-cred').buffer,
+            userHandle: new TextEncoder().encode('member-1').buffer,
+          })
+        ),
+        create: vi.fn(),
+      },
+      userAgent: navigator.userAgent,
+    });
+
+    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    expect(result.success).toBe(true);
+    expect(result.memberId).toBe('member-1');
+    expect(result.familyKey).toBe(mockImportedFamilyKey);
+
+    // Verify the synced credential was saved to the local registry
+    expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credentialId: bufferToBase64url(
+          new TextEncoder().encode('synced-cred').buffer as ArrayBuffer
+        ),
+        memberId: 'member-1',
+        familyId: 'family-1',
+      })
+    );
+  });
+
+  it('returns success without familyKey for cross-device credential when no cache', async () => {
     mockRegistrations.push(
       makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
     );
@@ -233,48 +311,11 @@ describe('authenticateWithPasskey', () => {
     });
 
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
-    expect(result.success).toBe(false);
-    expect(result.error).toBe('CROSS_DEVICE_NO_CACHE');
-  });
-
-  it('auto-registers synced credential when cached password exists for family', async () => {
-    mockRegistrations.push(
-      makeRegistration({ credentialId: 'other-cred-id', memberId: 'member-1' })
-    );
-    mockGlobalSettings = {
-      cachedEncryptionPasswords: { 'family-1': 'cached-pw' },
-    };
-
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      credentials: {
-        get: vi.fn(async () =>
-          makeFakeAssertion({
-            rawId: new TextEncoder().encode('synced-cred').buffer,
-            userHandle: new TextEncoder().encode('member-1').buffer,
-          })
-        ),
-        create: vi.fn(),
-      },
-      userAgent: navigator.userAgent,
-    });
-
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
+    // V4: returns success with memberId but no familyKey — caller prompts for password
     expect(result.success).toBe(true);
     expect(result.memberId).toBe('member-1');
-    expect(result.cachedPassword).toBe('cached-pw');
-
-    // Verify the synced credential was saved to the local registry
-    expect(passkeyRepo.savePasskeyRegistration).toHaveBeenCalledWith(
-      expect.objectContaining({
-        credentialId: bufferToBase64url(
-          new TextEncoder().encode('synced-cred').buffer as ArrayBuffer
-        ),
-        memberId: 'member-1',
-        familyId: 'family-1',
-        cachedPassword: 'cached-pw',
-      })
-    );
+    expect(result.familyKey).toBeUndefined();
+    expect(result.credentialId).toBeTruthy();
   });
 
   it('returns WRONG_FAMILY_CREDENTIAL when neither credential ID nor userHandle matches', async () => {
@@ -319,93 +360,6 @@ describe('authenticateWithPasskey', () => {
     const result = await authenticateWithPasskey({ familyId: 'family-1' });
     expect(result.success).toBe(false);
     expect(result.error).toBe('WRONG_FAMILY_CREDENTIAL');
-  });
-
-  it('returns cachedPassword when PRF not supported', async () => {
-    mockRegistrations.push(
-      makeRegistration({
-        prfSupported: false,
-        cachedPassword: 'my-cached-pw',
-      })
-    );
-
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      credentials: {
-        get: vi.fn(async () =>
-          makeFakeAssertion({
-            rawId: base64urlToBuffer('dGVzdC1jcmVkZW50aWFs'),
-          })
-        ),
-        create: vi.fn(),
-      },
-      userAgent: navigator.userAgent,
-    });
-
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
-    expect(result.success).toBe(true);
-    expect(result.cachedPassword).toBe('my-cached-pw');
-  });
-
-  it('no decryption materials returns descriptive error', async () => {
-    mockRegistrations.push(
-      makeRegistration({
-        prfSupported: false,
-        cachedPassword: undefined,
-      })
-    );
-
-    vi.stubGlobal('navigator', {
-      ...navigator,
-      credentials: {
-        get: vi.fn(async () =>
-          makeFakeAssertion({
-            rawId: base64urlToBuffer('dGVzdC1jcmVkZW50aWFs'),
-          })
-        ),
-        create: vi.fn(),
-      },
-      userAgent: navigator.userAgent,
-    });
-
-    const result = await authenticateWithPasskey({ familyId: 'family-1' });
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('re-register');
-  });
-});
-
-describe('invalidatePasskeysForPasswordChange', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRegistrations.length = 0;
-  });
-
-  it('updates cachedPassword for all registrations', async () => {
-    mockRegistrations.push(
-      makeRegistration({
-        credentialId: 'cred-1',
-        prfSupported: true,
-        cachedPassword: 'old-pw',
-      }),
-      makeRegistration({
-        credentialId: 'cred-2',
-        prfSupported: false,
-        cachedPassword: 'old-pw',
-      })
-    );
-
-    await invalidatePasskeysForPasswordChange('family-1', 'new-pw');
-
-    const updateCalls = vi.mocked(passkeyRepo.updatePasskey).mock.calls;
-
-    // Both registrations get cachedPassword updated
-    const cred1Update = updateCalls.find((c) => c[0] === 'cred-1');
-    expect(cred1Update).toBeTruthy();
-    expect(cred1Update![1].cachedPassword).toBe('new-pw');
-
-    const cred2Update = updateCalls.find((c) => c[0] === 'cred-2');
-    expect(cred2Update).toBeTruthy();
-    expect(cred2Update![1].cachedPassword).toBe('new-pw');
   });
 });
 

@@ -1,11 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
-import { useTombstoneStore } from './tombstoneStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useRecurringStore } from './recurringStore';
 import { wrapAsync } from '@/composables/useStoreActions';
-import * as budgetRepo from '@/services/indexeddb/repositories/budgetRepository';
+import * as budgetRepo from '@/services/automerge/repositories/budgetRepository';
 import { getCategoryById } from '@/constants/categories';
 import { toDateInputValue } from '@/utils/date';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput } from '@/types/models';
@@ -236,7 +235,6 @@ export const useBudgetStore = defineStore('budget', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await budgetRepo.deleteBudget(id);
       if (success) {
-        useTombstoneStore().recordDeletion('budget', id);
         budgets.value = budgets.value.filter((b) => b.id !== id);
       }
       return success;

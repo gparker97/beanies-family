@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, shallowRef, nextTick } from 'vue';
 
-// Import other stores for auto-sync watching
+// Import stores for auto-sync and reload
 import { useAccountsStore } from './accountsStore';
 import { useAssetsStore } from './assetsStore';
 import { useFamilyStore } from './familyStore';
@@ -10,25 +10,23 @@ import { useRecurringStore } from './recurringStore';
 import { useTodoStore } from './todoStore';
 import { useActivityStore } from './activityStore';
 import { useBudgetStore } from './budgetStore';
-import { useTombstoneStore } from './tombstoneStore';
-import { useSettingsStore, suppressSettingsWAL, resumeSettingsWAL } from './settingsStore';
+import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
-import { saveSettings } from '@/services/indexeddb/repositories/settingsRepository';
-import { invalidatePasskeysForPasswordChange } from '@/services/auth/passkeyService';
+import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import {
   getSyncCapabilities,
   canAutoSync,
   supportsGoogleDrive,
 } from '@/services/sync/capabilities';
-import { exportToFile, importFromFile } from '@/services/sync/fileSync';
-import { readSettingsWAL, clearSettingsWAL, isWALStale } from '@/services/sync/settingsWAL';
+import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import {
   initializeAuth,
+  migratePendingRefreshToken,
   requestAccessToken,
   onTokenExpired,
   fetchGoogleUserEmail,
@@ -41,7 +39,29 @@ import {
   DriveApiError,
 } from '@/services/google/driveService';
 import { clearQueue } from '@/services/sync/offlineQueue';
-import type { SyncFileData, PasskeySecret } from '@/types/models';
+import {
+  createBeanpodV4,
+  parseBeanpodV4,
+  tryUnwrapFamilyKey,
+  decryptBeanpodPayload,
+  reEncryptEnvelope,
+  detectFileVersion,
+} from '@/services/sync/fileSync';
+import {
+  generateFamilyKey,
+  deriveMemberKey,
+  wrapFamilyKey,
+} from '@/services/crypto/familyKeyService';
+import { replaceDoc, mergeDoc } from '@/services/automerge/docService';
+import {
+  initPersistenceDB,
+  persistDoc,
+  persistEnvelope,
+  loadCachedDoc,
+  loadCachedEnvelope,
+} from '@/services/automerge/persistenceService';
+import { bufferToBase64 } from '@/utils/encoding';
+import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 
@@ -55,18 +75,19 @@ export const useSyncStore = defineStore('sync', () => {
   const lastSync = ref<string | null>(null);
   const needsPermission = ref(false);
 
-  // Encryption state
-  const sessionPassword = ref<string | null>(null);
+  // Family key state — the unwrapped AES-GCM key for the active .beanpod envelope
+  const familyKey = shallowRef<CryptoKey | null>(null);
+  const envelope = shallowRef<BeanpodFileV4 | null>(null);
+
+  // Pending encrypted file — V4 envelope that needs password to unlock
   const pendingEncryptedFile = ref<{
-    fileHandle: FileSystemFileHandle;
-    rawSyncData: SyncFileData;
+    envelope: BeanpodFileV4;
+    fileHandle?: FileSystemFileHandle;
+    provider?: import('@/services/sync/storageProvider').StorageProvider;
     driveFileId?: string;
     driveFileName?: string;
     driveAccountEmail?: string;
   } | null>(null);
-
-  // PRF-wrapped password secrets (stored in .beanpod envelope, outside encryption)
-  const passkeySecrets = ref<PasskeySecret[]>([]);
 
   // Google Drive state
   const storageProviderType = ref<StorageProviderType | null>(null);
@@ -77,7 +98,7 @@ export const useSyncStore = defineStore('sync', () => {
   const showGoogleReconnect = ref(false);
   const driveFileNotFound = ref(false);
 
-  // Save failure state (mirrors syncService failure tracking)
+  // Save failure state
   const saveFailureLevel = ref<'none' | 'warning' | 'critical'>('none');
   const lastSaveError = ref<string | null>(null);
   const showSaveFailureBanner = ref(false);
@@ -87,27 +108,9 @@ export const useSyncStore = defineStore('sync', () => {
   const supportsAutoSync = computed(() => canAutoSync());
   const isGoogleDriveAvailable = computed(() => supportsGoogleDrive());
 
-  // Encryption computed
-  const isEncryptionEnabled = computed(() => {
-    const settingsStore = useSettingsStore();
-    return settingsStore.settings.encryptionEnabled;
-  });
-
-  const hasSessionPassword = computed(() => sessionPassword.value !== null);
-  const currentSessionPassword = computed(() => sessionPassword.value);
-
+  // Encryption is always on in V4 — backward compat computed
+  const hasSessionPassword = computed(() => familyKey.value !== null);
   const hasPendingEncryptedFile = computed(() => pendingEncryptedFile.value !== null);
-
-  /**
-   * Extract passkeySecrets from a raw sync file envelope (if present).
-   * Called whenever a file is loaded, before decryption.
-   */
-  function extractPasskeySecrets(rawSyncData: SyncFileData | undefined): void {
-    if (rawSyncData?.passkeySecrets && rawSyncData.passkeySecrets.length > 0) {
-      passkeySecrets.value = rawSyncData.passkeySecrets;
-      syncPasskeySecretsToService();
-    }
-  }
 
   // Getters
   const syncStatus = computed(() => {
@@ -129,12 +132,12 @@ export const useSyncStore = defineStore('sync', () => {
     error.value = state.lastError;
   });
 
-  // Subscribe to save-complete to keep lastSync accurate without manual updates
+  // Subscribe to save-complete
   syncService.onSaveComplete((timestamp) => {
     lastSync.value = timestamp;
   });
 
-  // Subscribe to save failure level changes for UI escalation
+  // Subscribe to save failure level changes
   syncService.onSaveFailureChange((level, failError) => {
     saveFailureLevel.value = level;
     lastSaveError.value = failError;
@@ -145,18 +148,11 @@ export const useSyncStore = defineStore('sync', () => {
     }
   });
 
-  // Register encryption check callback so syncService can guard against plaintext writes
-  syncService.setEncryptionRequiredCallback(() => isEncryptionEnabled.value);
+  // Register docService persist callback → triggers debounced save
+  syncService.registerDocPersistCallback();
 
   /**
    * Initialize sync - restore file handle if available.
-   *
-   * For local files: checks File System Access API permission (needs user gesture).
-   * For Google Drive: attempts silent token re-acquisition. The `needsPermission`
-   * flag is NOT set for Google Drive because token refresh happens automatically
-   * inside read()/write() via getValidToken(). Setting it would cause loadFamilyData()
-   * to skip the file-load path and fall to an IndexedDB cache fallback, potentially
-   * loading stale or wrong-family data.
    */
   async function initialize(): Promise<void> {
     const restored = await syncService.initialize();
@@ -165,13 +161,7 @@ export const useSyncStore = defineStore('sync', () => {
       const providerType = syncService.getProviderType();
 
       if (providerType === 'google_drive') {
-        // Google Drive: don't set needsPermission — that flag is only for
-        // local File System Access API permission grants (user gesture required).
         needsPermission.value = false;
-
-        // Initialize PKCE auth — loads stored refresh token from IndexedDB.
-        // Does NOT trigger any interactive popups. Token acquisition happens
-        // on-demand in provider.read()/write() or via silent refresh.
         try {
           const ctx = useFamilyContextStore();
           if (ctx.activeFamilyId) {
@@ -180,10 +170,8 @@ export const useSyncStore = defineStore('sync', () => {
         } catch {
           console.warn('[syncStore] Failed to initialize Google auth');
         }
-        // Set up token expiry handler for auto-refresh fallback
         setupTokenExpiryHandler();
       } else {
-        // Local file: check if we have File System Access API permission
         const hasPermission = await syncService.hasPermission();
         needsPermission.value = !hasPermission;
       }
@@ -191,35 +179,17 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Request permission to access the sync file (must be called from user gesture)
-   * If permission is granted, automatically loads from file and sets up auto-sync
+   * Request permission to access the sync file (user gesture required).
+   * If permission is granted, automatically loads from file and sets up auto-sync.
    */
   async function requestPermission(): Promise<boolean> {
     const granted = await syncService.requestPermission();
     needsPermission.value = !granted;
 
     if (granted) {
-      // Permission granted - load from file to get latest data
-      const loadResult = await syncService.loadAndImport();
+      const loadResult = await loadFromFile();
       if (loadResult.success) {
-        lastSync.value = toISODateString(new Date());
-        await reloadAllStores();
-        // Only set up auto-sync after data is fully loaded (password not needed)
         setupAutoSync();
-      } else if (loadResult.needsPassword && loadResult.rawSyncData) {
-        // File is encrypted — store for later decryption.
-        // Do NOT set up auto-sync yet — we don't have the password,
-        // and any store changes would trigger a plaintext write.
-        // fileHandle may be undefined for Google Drive — use placeholder
-        const provider = syncService.getProvider();
-        pendingEncryptedFile.value = {
-          fileHandle: loadResult.fileHandle ?? ({} as FileSystemFileHandle),
-          rawSyncData: loadResult.rawSyncData,
-          driveFileId: provider?.getFileId() ?? undefined,
-          driveFileName: provider?.getDisplayName(),
-          driveAccountEmail: provider?.getAccountEmail() ?? undefined,
-        };
-        extractPasskeySecrets(loadResult.rawSyncData);
       }
     }
 
@@ -227,23 +197,20 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Configure a sync file (opens file picker)
+   * Configure a sync file (opens file picker).
+   * Creates a new V4 file with the current family key.
    */
   async function configureSyncFile(): Promise<boolean> {
     const success = await syncService.selectSyncFile();
     if (success) {
       needsPermission.value = false;
-      // Save initial data to the file
       await syncNow();
-      // Update settings to reflect sync is enabled
-      await saveSettings({
+      await settingsRepo.saveSettings({
         syncEnabled: true,
         syncFilePath: fileName.value ?? undefined,
         lastSyncTimestamp: toISODateString(new Date()),
       });
-      // Arm auto-sync so future changes are saved to the file
       setupAutoSync();
-      // Fire-and-forget: register family in cloud registry
       const ctx = useFamilyContextStore();
       if (ctx.activeFamilyId) {
         registry
@@ -260,7 +227,6 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Check if the sync file has newer data than our last sync
-   * Returns: { hasConflict, fileTimestamp, localTimestamp }
    */
   async function checkForConflicts(): Promise<{
     hasConflict: boolean;
@@ -270,18 +236,14 @@ export const useSyncStore = defineStore('sync', () => {
     const fileTimestamp = await syncService.getFileTimestamp();
     const localTimestamp = lastSync.value;
 
-    // If no file timestamp, no conflict (file might be empty/new)
     if (!fileTimestamp) {
       return { hasConflict: false, fileTimestamp: null, localTimestamp };
     }
 
-    // If no local sync, we should load from file, not save
     if (!localTimestamp) {
       return { hasConflict: true, fileTimestamp, localTimestamp: null };
     }
 
-    // Compare timestamps with 2-second tolerance to avoid false positives
-    // from upload latency (file timestamp may lag slightly behind local save)
     const TOLERANCE_MS = 2000;
     const hasConflict =
       new Date(fileTimestamp).getTime() > new Date(localTimestamp).getTime() + TOLERANCE_MS;
@@ -290,11 +252,8 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Sync now - save current data to file
-   * Uses encryption if enabled and session password is set
-   * @param force - If true, skip conflict detection and force save
    */
   async function syncNow(force = false): Promise<boolean> {
-    // Check for conflicts unless forced
     if (!force) {
       const { hasConflict } = await checkForConflicts();
       if (hasConflict) {
@@ -303,11 +262,12 @@ export const useSyncStore = defineStore('sync', () => {
       }
     }
 
-    const password = isEncryptionEnabled.value ? (sessionPassword.value ?? undefined) : undefined;
-    const success = await syncService.save(password);
+    const success = await syncService.save();
     if (success) {
-      // lastSync is updated by the onSaveComplete callback
-      await saveSettings({ lastSyncTimestamp: lastSync.value ?? undefined });
+      await settingsRepo.saveSettings(
+        { lastSyncTimestamp: lastSync.value ?? undefined },
+        { preserveTimestamp: true }
+      );
     }
     return success;
   }
@@ -321,77 +281,92 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Load data from the currently configured sync file.
-   * @param options.merge - If true, merge with local data instead of full replace.
+   * For V4 files: parses envelope, tries to unlock with cached FK or password.
+   * @param options.merge - If true, CRDT merge remote doc with local doc.
    */
   async function loadFromFile(
     options: { merge?: boolean } = {}
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
     const merging = !!options.merge;
 
-    // When merging, suppress the auto-sync watcher BEFORE loadAndImport
-    // so that tombstone mutations inside importSyncFileData don't trigger
-    // a save with half-loaded state.
     if (merging) {
       isReloading = true;
       syncService.cancelPendingSave();
     }
 
     try {
-      const result = await syncService.loadAndImport({ merge: options.merge });
-
-      // If file needs password, store it for later decryption
-      // fileHandle may be undefined for Google Drive — use placeholder (consistent with loadFromNewFile)
-      if (result.needsPassword && result.rawSyncData) {
-        const provider = syncService.getProvider();
-        pendingEncryptedFile.value = {
-          fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
-          rawSyncData: result.rawSyncData,
-          driveFileId: provider?.getFileId() ?? undefined,
-          driveFileName: provider?.getDisplayName(),
-          driveAccountEmail: provider?.getAccountEmail() ?? undefined,
-        };
-        extractPasskeySecrets(result.rawSyncData);
-        return { success: false, needsPassword: true };
-      }
-
-      if (result.success) {
-        // Use the file's exportedAt (not new Date()) so that checkForConflicts
-        // compares against the file's own timestamp. Using new Date() inflates
-        // lastSync beyond the file timestamp, causing the 2-second tolerance
-        // to mask subsequent saves from the other browser.
-        lastSync.value = result.fileExportedAt ?? toISODateString(new Date());
-        // Reload all stores after import (sets isReloading=true again, then false at end)
-        await reloadAllStores();
-        // Only save-back if merge produced data the file doesn't have.
-        // This prevents the ping-pong echo loop where two devices each
-        // create a "newer" timestamp that triggers the other to merge again.
-        if (merging && result.hasLocalChanges) {
-          syncService.triggerDebouncedSave();
+      const text = await syncService.load();
+      if (!text) {
+        const lastError = syncService.getState().lastError;
+        if (lastError?.startsWith('DriveApiError:404:')) {
+          if (syncService.getProviderType() === 'google_drive') {
+            driveFileNotFound.value = true;
+            showSaveFailureBanner.value = true;
+            stopFilePolling();
+          }
+          return { success: false };
         }
-        // For Google Drive: set up token expiry handler now that we have a valid token
-        if (syncService.getProviderType() === 'google_drive') {
-          setupTokenExpiryHandler();
-          // Update account email after fire-and-forget fetchGoogleUserEmail completes
-          updateProviderEmailAfterLoad();
-        }
-        // Ensure auto-sync is armed after loading from file, regardless of caller.
-        // setupAutoSync guards against double-setup internally.
-        setupAutoSync();
-      } else if (!result.needsPassword && syncService.getProviderType() === 'google_drive') {
-        if (result.fileNotFound) {
-          // File was deleted/moved on Drive — show file-not-found banner
-          driveFileNotFound.value = true;
-          showSaveFailureBanner.value = true;
-          stopFilePolling();
-        } else {
-          // Google Drive read failed (e.g., expired token after force-close) —
-          // show reconnect toast so user can re-authenticate when ready.
+        if (!text && syncService.getProviderType() === 'google_drive') {
           showGoogleReconnect.value = true;
         }
+        return { success: false };
       }
-      return { success: result.success };
+
+      const version = detectFileVersion(text);
+      if (version !== '4.0') {
+        error.value = `Unsupported file version: ${version ?? 'unknown'}`;
+        return { success: false };
+      }
+
+      const remoteEnvelope = parseBeanpodV4(text);
+
+      // If we already have a family key, try to decrypt directly
+      if (familyKey.value) {
+        try {
+          const remoteDoc = await decryptBeanpodPayload(remoteEnvelope, familyKey.value);
+
+          if (merging) {
+            // CRDT merge
+            mergeDoc(remoteDoc);
+          } else {
+            // Replace local doc
+            replaceDoc(remoteDoc);
+          }
+
+          // Update envelope with remote's key material
+          envelope.value = remoteEnvelope;
+          syncService.setEnvelope(remoteEnvelope);
+
+          lastSync.value = toISODateString(new Date());
+          await reloadAllStores();
+
+          if (merging) {
+            // After merge, save back to persist our local changes
+            syncService.triggerDebouncedSave();
+          }
+
+          if (syncService.getProviderType() === 'google_drive') {
+            setupTokenExpiryHandler();
+            updateProviderEmailAfterLoad();
+          }
+
+          setupAutoSync();
+          return { success: true };
+        } catch (e) {
+          console.warn('[syncStore] Failed to decrypt with current FK, may need re-auth:', e);
+        }
+      }
+
+      // No family key or decryption failed — store as pending
+      const provider = syncService.getProvider();
+      pendingEncryptedFile.value = {
+        envelope: remoteEnvelope,
+        driveFileId: provider?.getFileId() ?? undefined,
+        driveFileName: provider?.getDisplayName(),
+        driveAccountEmail: provider?.getAccountEmail() ?? undefined,
+      };
+      return { success: false, needsPassword: true };
     } finally {
-      // Safety reset for failure paths where reloadAllStores() wasn't called
       if (merging && isReloading) {
         isReloading = false;
       }
@@ -400,32 +375,24 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * Open file picker to select a new file, load its data, and set it as sync target.
-   * This replaces both local data AND the sync file connection.
-   * Returns: { success, needsPassword } - if needsPassword is true, call decryptPendingFile with password
    */
   async function loadFromNewFile(): Promise<{ success: boolean; needsPassword?: boolean }> {
     const result = await syncService.openAndLoadFile();
 
-    // If file needs password, store it for later decryption
-    // On mobile there's no fileHandle, so we use an empty placeholder
-    if (result.needsPassword && result.rawSyncData) {
+    if (result.needsPassword && result.envelope) {
       pendingEncryptedFile.value = {
-        fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
-        rawSyncData: result.rawSyncData,
+        envelope: result.envelope,
+        fileHandle: result.fileHandle,
+        provider: result.provider,
       };
-      extractPasskeySecrets(result.rawSyncData);
       return { success: false, needsPassword: true };
     }
 
     if (result.success) {
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
-
-      // Reload all stores after import
       await reloadAllStores();
-
-      // Update sync metadata — housekeeping only, don't bump updatedAt
-      await saveSettings(
+      await settingsRepo.saveSettings(
         {
           syncEnabled: true,
           syncFilePath: fileName.value ?? undefined,
@@ -433,8 +400,6 @@ export const useSyncStore = defineStore('sync', () => {
         },
         { preserveTimestamp: true }
       );
-
-      // Arm auto-sync so future changes are saved to the file
       setupAutoSync();
     }
     return { success: result.success };
@@ -449,12 +414,12 @@ export const useSyncStore = defineStore('sync', () => {
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
     const result = await syncService.loadDroppedFile(file, fileHandle);
 
-    if (result.needsPassword && result.rawSyncData) {
+    if (result.needsPassword && result.envelope) {
       pendingEncryptedFile.value = {
-        fileHandle: result.fileHandle ?? ({} as FileSystemFileHandle),
-        rawSyncData: result.rawSyncData,
+        envelope: result.envelope,
+        fileHandle: result.fileHandle,
+        provider: result.provider,
       };
-      extractPasskeySecrets(result.rawSyncData);
       return { success: false, needsPassword: true };
     }
 
@@ -462,8 +427,7 @@ export const useSyncStore = defineStore('sync', () => {
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
       await reloadAllStores();
-      // Update sync metadata — housekeeping only, don't bump updatedAt
-      await saveSettings(
+      await settingsRepo.saveSettings(
         {
           syncEnabled: true,
           syncFilePath: fileName.value ?? undefined,
@@ -471,76 +435,110 @@ export const useSyncStore = defineStore('sync', () => {
         },
         { preserveTimestamp: true }
       );
-      // Arm auto-sync so future changes are saved to the file
       setupAutoSync();
     }
     return { success: result.success };
   }
 
   /**
-   * Decrypt and load the pending encrypted file
+   * Unlock a pending encrypted file with a password.
+   * This is the V4 equivalent of decryptPendingFile.
+   *
+   * The password is used to derive a member wrapping key, which unwraps the
+   * family key. The family key then decrypts the Automerge binary payload.
    */
   async function decryptPendingFile(
     password: string
-  ): Promise<{ success: boolean; error?: string }> {
-    if (!pendingEncryptedFile.value) {
+  ): Promise<{ success: boolean; error?: string; memberId?: string }> {
+    const pending = pendingEncryptedFile.value;
+    if (!pending) {
       return { success: false, error: 'No pending encrypted file' };
     }
 
-    const { fileHandle, rawSyncData, driveFileId, driveFileName, driveAccountEmail } =
-      pendingEncryptedFile.value;
-    const result = await syncService.decryptAndImport(fileHandle, rawSyncData, password);
+    try {
+      // Try to unwrap the family key using the password
+      const { familyKey: fk, memberId } = await tryUnwrapFamilyKey(pending.envelope, password);
 
-    if (result.success) {
-      // decryptAndImport may have adopted a new family identity at the DB level
-      // (via createFamilyWithId) without updating the Pinia store. Sync them now
-      // so that authStore.signIn() later captures the correct familyId in the session.
+      // Decrypt the Automerge payload
+      const doc = await decryptBeanpodPayload(pending.envelope, fk);
+      replaceDoc(doc);
+
+      // Set the family key and envelope
+      familyKey.value = fk;
+      envelope.value = pending.envelope;
+      syncService.setFamilyKey(fk, pending.envelope);
+
+      // Adopt family identity — ensure the file's family is registered and active
       const { getActiveFamilyId } = await import('@/services/indexeddb/database');
-      const activeFamilyId = getActiveFamilyId();
+      let activeFamilyId = getActiveFamilyId();
       const familyCtx = useFamilyContextStore();
-      if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+      const fileFamilyId = pending.envelope.familyId;
+
+      if (fileFamilyId) {
+        // Register the family if it's not yet in the local registry
+        const isKnown = familyCtx.allFamilies.some((f) => f.id === fileFamilyId);
+        if (!isKnown) {
+          await familyCtx.createFamilyWithId(
+            fileFamilyId,
+            pending.envelope.familyName ?? 'My Family'
+          );
+        } else if (fileFamilyId !== familyCtx.activeFamilyId) {
+          await familyCtx.switchFamily(fileFamilyId);
+        }
+        activeFamilyId = fileFamilyId;
+      } else if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
         await familyCtx.switchFamily(activeFamilyId);
       }
 
-      // If loaded from Google Drive, persist the config directly here.
-      // We do this explicitly because the provider reference doesn't survive
-      // Vue's reactive Proxy or LoginPage re-mounts that reset syncService.
-      if (driveFileId && driveFileName) {
+      // Bind Google Auth to this family and migrate any pending refresh token
+      if (activeFamilyId && pending.driveFileId) {
+        await initializeAuth(activeFamilyId);
+        await migratePendingRefreshToken(activeFamilyId);
+      }
+
+      // If loaded from Google Drive, persist the config
+      if (pending.driveFileId && pending.driveFileName) {
         const { storeProviderConfig, clearFileHandleForFamily } =
           await import('@/services/sync/fileHandleStore');
         if (activeFamilyId) {
           await clearFileHandleForFamily(activeFamilyId);
           await storeProviderConfig(activeFamilyId, {
             type: 'google_drive',
-            driveFileId,
-            driveFileName,
-            driveAccountEmail,
+            driveFileId: pending.driveFileId,
+            driveFileName: pending.driveFileName,
+            driveAccountEmail: pending.driveAccountEmail,
           });
-          console.warn('[syncStore] Persisted Google Drive config for family', activeFamilyId);
         }
-        // Re-establish the Google Drive provider in syncService
         const provider = GoogleDriveProvider.fromExisting(
-          driveFileId,
-          driveFileName,
-          driveAccountEmail
+          pending.driveFileId,
+          pending.driveFileName,
+          pending.driveAccountEmail
         );
         syncService.setProvider(provider);
       }
 
-      // Clear pending file
+      // If file was opened with a provider (local file picker), persist it
+      if (pending.provider) {
+        if (activeFamilyId) {
+          await pending.provider.persist(activeFamilyId);
+        }
+        syncService.setProvider(pending.provider);
+      }
+
+      // Clear pending
       pendingEncryptedFile.value = null;
       needsPermission.value = false;
       lastSync.value = toISODateString(new Date());
 
-      // Set the session password for future saves BEFORE reloading stores
-      // so auto-sync (if armed) will have the password available
-      sessionPassword.value = password;
-      syncService.setSessionPassword(password);
+      // Initialize persistence cache (doc + envelope)
+      if (familyCtx.activeFamilyId) {
+        await initPersistenceDB(familyCtx.activeFamilyId);
+        persistDoc(fk).catch(console.warn);
+        persistEnvelope(pending.envelope).catch(console.warn);
+      }
 
-      // Update settings to reflect sync is enabled with encryption
-      // Do this BEFORE reloading stores to ensure encryptionEnabled is true
-      // before any auto-sync watcher fires. Housekeeping — don't bump updatedAt.
-      await saveSettings(
+      // Update settings
+      await settingsRepo.saveSettings(
         {
           syncEnabled: true,
           encryptionEnabled: true,
@@ -550,20 +548,69 @@ export const useSyncStore = defineStore('sync', () => {
         { preserveTimestamp: true }
       );
 
-      // Cache password on trusted devices so it survives page refresh
+      // Cache exported family key on trusted devices
       const settingsStore = useSettingsStore();
-      if (familyCtx.activeFamilyId) {
-        await settingsStore.cacheEncryptionPassword(password, familyCtx.activeFamilyId);
+      if (familyCtx.activeFamilyId && fk) {
+        const exported = await getExportedFamilyKey();
+        if (exported) {
+          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId);
+        }
       }
 
-      // Reload all stores after import
+      // Reload all stores
       await reloadAllStores();
 
-      // Now that password is set and encryption is enabled, arm auto-sync
+      // Arm auto-sync
       setupAutoSync();
-    }
 
-    return result;
+      return { success: true, memberId };
+    } catch (e) {
+      const errorMessage = (e as Error).message;
+      if (errorMessage.includes('Incorrect password')) {
+        return { success: false, error: 'Incorrect password' };
+      }
+      return { success: false, error: errorMessage };
+    }
+  }
+
+  /**
+   * Load data from the local persistence cache (IndexedDB).
+   * Used as a fallback when the beanpod file needs permission on page refresh.
+   * Derives the family key from the cached password + cached envelope.
+   */
+  async function loadFromPersistenceCache(
+    password: string,
+    activeFamilyId: string
+  ): Promise<{ success: boolean }> {
+    try {
+      await initPersistenceDB(activeFamilyId);
+
+      // Load cached envelope (needed to derive the family key)
+      const cachedEnvelope = await loadCachedEnvelope();
+      if (!cachedEnvelope) return { success: false };
+
+      // Derive family key from password + envelope's wrapped keys
+      const { familyKey: fk } = await tryUnwrapFamilyKey(cachedEnvelope, password);
+
+      // Load cached Automerge doc
+      const doc = await loadCachedDoc(fk);
+      if (!doc) return { success: false };
+
+      // Set up state
+      replaceDoc(doc);
+      familyKey.value = fk;
+      envelope.value = cachedEnvelope;
+      syncService.setFamilyKey(fk, cachedEnvelope);
+      isConfigured.value = true; // Data is loaded — show configured UI
+      needsPermission.value = true; // Still need file permission for future saves
+      lastSync.value = toISODateString(new Date());
+
+      await reloadAllStores();
+      return { success: true };
+    } catch (e) {
+      console.warn('[syncStore] loadFromPersistenceCache failed:', e);
+      return { success: false };
+    }
   }
 
   /**
@@ -574,92 +621,247 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Enable encryption with the given password
-   * Immediately re-saves the file encrypted
+   * Create a new V4 beanpod file.
+   * Called by CreatePodView when setting up a new family.
    */
-  async function enableEncryption(password: string): Promise<boolean> {
-    // Set session password
-    sessionPassword.value = password;
-    syncService.setSessionPassword(password);
+  async function createNewFile(
+    _podFileName: string,
+    password: string,
+    memberId: string,
+    familyId: string,
+    familyName: string
+  ): Promise<boolean> {
+    try {
+      // 1. Generate family key
+      const fk = await generateFamilyKey();
 
-    // Update settings in DB
-    await saveSettings({ encryptionEnabled: true });
+      // 2. Derive member wrapping key from password
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const memberKey = await deriveMemberKey(password, salt);
 
-    // Also update the settings store so isEncryptionEnabled reflects the change
-    const settingsStore = useSettingsStore();
-    await settingsStore.loadSettings();
+      // 3. Wrap the family key
+      const wrapped = await wrapFamilyKey(fk, memberKey);
 
-    // Re-save the file encrypted - pass password directly to ensure encryption happens
-    const success = await syncService.save(password);
-    if (success) {
-      // lastSync is updated by the onSaveComplete callback
-      await saveSettings({ lastSyncTimestamp: lastSync.value ?? undefined });
-      // Cache password on trusted devices
-      const familyContextStore = useFamilyContextStore();
-      if (familyContextStore.activeFamilyId) {
-        await settingsStore.cacheEncryptionPassword(password, familyContextStore.activeFamilyId);
+      // 4. Build wrappedKeys record
+      const wrappedKeys: Record<string, WrappedMemberKey> = {
+        [memberId]: {
+          salt: bufferToBase64(salt),
+          wrapped,
+        },
+      };
+
+      // 5. Automerge doc is already initialized by authStore.signUp() (which calls
+      // initDoc before creating the owner member). Do NOT call initDoc() here —
+      // it would wipe the member data already written to the doc.
+
+      // 6. Create V4 envelope
+      const envelopeJson = await createBeanpodV4(familyId, familyName, fk, wrappedKeys);
+
+      // 7. Write to provider
+      const provider = syncService.getProvider();
+      if (provider) {
+        await provider.write(envelopeJson);
       }
 
-      // Update cached password in passkey registrations
-      if (familyContextStore.activeFamilyId) {
-        await invalidatePasskeysForPasswordChange(familyContextStore.activeFamilyId, password);
-      }
+      // 8. Set state
+      const env = parseBeanpodV4(envelopeJson);
+      familyKey.value = fk;
+      envelope.value = env;
+      syncService.setFamilyKey(fk, env);
 
-      // Invalidate PRF-wrapped secrets — they're encrypted with the old password.
-      // Devices with stale secrets will fall back to Level 1 (password entry).
-      clearAllPasskeySecrets();
-    } else {
-      // Rollback on failure
-      sessionPassword.value = null;
-      syncService.setSessionPassword(null);
-      await saveSettings({ encryptionEnabled: false });
-      await settingsStore.loadSettings();
+      // 9. Initialize persistence cache (doc + envelope)
+      await initPersistenceDB(familyId);
+      persistDoc(fk).catch(console.warn);
+      persistEnvelope(env).catch(console.warn);
+
+      lastSync.value = toISODateString(new Date());
+
+      return true;
+    } catch (e) {
+      error.value = (e as Error).message;
+      return false;
     }
-    return success;
   }
 
   /**
-   * Disable encryption
-   * Immediately re-saves the file unencrypted
-   */
-  async function disableEncryption(): Promise<boolean> {
-    // Clear session password and passkey secrets (no password = nothing to wrap)
-    sessionPassword.value = null;
-    syncService.setSessionPassword(null);
-    clearAllPasskeySecrets();
-
-    // Update settings in DB
-    await saveSettings({ encryptionEnabled: false });
-
-    // Also update the settings store
-    const settingsStore = useSettingsStore();
-    await settingsStore.loadSettings();
-
-    // Re-save the file unencrypted (no password = unencrypted)
-    const success = await syncService.save(undefined);
-    if (success) {
-      // lastSync is updated by the onSaveComplete callback
-      await saveSettings({ lastSyncTimestamp: lastSync.value ?? undefined });
-    }
-    // Note: We don't rollback here - the setting is disabled even if save fails
-    // User can manually sync later
-    return success;
-  }
-
-  /**
-   * Set session password (for when user enters password to access encrypted file)
-   */
-  function setSessionPassword(password: string): void {
-    sessionPassword.value = password;
-    syncService.setSessionPassword(password);
-  }
-
-  /**
-   * Clear session password (e.g., on logout or session end)
+   * Clear session key material
    */
   function clearSessionPassword(): void {
-    sessionPassword.value = null;
-    syncService.setSessionPassword(null);
+    familyKey.value = null;
+    envelope.value = null;
+  }
+
+  /**
+   * Export the current family key as base64 string.
+   * Used for trusted device caching and passkey registration.
+   */
+  async function getExportedFamilyKey(): Promise<string | null> {
+    if (!familyKey.value) return null;
+    const { exportFamilyKey } = await import('@/services/crypto/familyKeyService');
+    const { bufferToBase64 } = await import('@/utils/encoding');
+    const raw = await exportFamilyKey(familyKey.value);
+    return bufferToBase64(raw);
+  }
+
+  /**
+   * Decrypt a pending file using a pre-obtained family key (skips password derivation).
+   * Used by passkey/biometric flows that already have the family key.
+   */
+  async function decryptPendingFileWithKey(
+    fk: CryptoKey
+  ): Promise<{ success: boolean; error?: string }> {
+    const pending = pendingEncryptedFile.value;
+    if (!pending) return { success: false, error: 'No pending file' };
+
+    try {
+      // Decrypt the Automerge payload with the family key
+      const doc = await decryptBeanpodPayload(pending.envelope, fk);
+      replaceDoc(doc);
+      familyKey.value = fk;
+      envelope.value = pending.envelope;
+      syncService.setFamilyKey(fk, pending.envelope);
+      isConfigured.value = true;
+
+      // Adopt family identity — ensure the file's family is registered and active
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      let activeFamilyId = getActiveFamilyId();
+      const familyCtx = useFamilyContextStore();
+      const fileFamilyId = pending.envelope.familyId;
+
+      if (fileFamilyId) {
+        // Register the family if it's not yet in the local registry
+        const isKnown = familyCtx.allFamilies.some((f) => f.id === fileFamilyId);
+        if (!isKnown) {
+          await familyCtx.createFamilyWithId(
+            fileFamilyId,
+            pending.envelope.familyName ?? 'My Family'
+          );
+        } else if (fileFamilyId !== familyCtx.activeFamilyId) {
+          await familyCtx.switchFamily(fileFamilyId);
+        }
+        activeFamilyId = fileFamilyId;
+      } else if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
+        await familyCtx.switchFamily(activeFamilyId);
+      }
+
+      // Bind Google Auth to this family and migrate any pending refresh token
+      if (activeFamilyId && pending.driveFileId) {
+        await initializeAuth(activeFamilyId);
+        await migratePendingRefreshToken(activeFamilyId);
+      }
+
+      // If loaded from Google Drive, persist the config
+      if (pending.driveFileId && pending.driveFileName) {
+        const { storeProviderConfig, clearFileHandleForFamily } =
+          await import('@/services/sync/fileHandleStore');
+        if (activeFamilyId) {
+          await clearFileHandleForFamily(activeFamilyId);
+          await storeProviderConfig(activeFamilyId, {
+            type: 'google_drive',
+            driveFileId: pending.driveFileId,
+            driveFileName: pending.driveFileName,
+            driveAccountEmail: pending.driveAccountEmail,
+          });
+        }
+        const provider = GoogleDriveProvider.fromExisting(
+          pending.driveFileId,
+          pending.driveFileName,
+          pending.driveAccountEmail
+        );
+        syncService.setProvider(provider);
+      }
+
+      // If file was opened with a provider (local file picker), persist it
+      if (pending.provider) {
+        if (activeFamilyId) {
+          await pending.provider.persist(activeFamilyId);
+        }
+        syncService.setProvider(pending.provider);
+      }
+
+      // Clear pending
+      pendingEncryptedFile.value = null;
+      needsPermission.value = false;
+      lastSync.value = toISODateString(new Date());
+
+      // Initialize persistence cache
+      if (familyCtx.activeFamilyId) {
+        await initPersistenceDB(familyCtx.activeFamilyId);
+        persistDoc(fk).catch(console.warn);
+        persistEnvelope(pending.envelope).catch(console.warn);
+      }
+
+      await settingsRepo.saveSettings(
+        {
+          syncEnabled: true,
+          encryptionEnabled: true,
+          syncFilePath: fileName.value ?? undefined,
+          lastSyncTimestamp: lastSync.value ?? undefined,
+        },
+        { preserveTimestamp: true }
+      );
+
+      // Cache exported family key on trusted devices
+      const settingsStore = useSettingsStore();
+      if (familyCtx.activeFamilyId) {
+        const exported = await getExportedFamilyKey();
+        if (exported) {
+          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId);
+        }
+      }
+
+      await reloadAllStores();
+      setupAutoSync();
+
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: (e as Error).message };
+    }
+  }
+
+  /**
+   * Add a wrapped key entry to the envelope for a new member (joinFamily flow).
+   */
+  async function addMemberWrappedKey(
+    memberId: string,
+    wrappedKey: { wrapped: string; salt: string }
+  ): Promise<void> {
+    if (!envelope.value) throw new Error('No envelope loaded');
+    const env = { ...envelope.value };
+    env.wrappedKeys = {
+      ...env.wrappedKeys,
+      [memberId]: { wrapped: wrappedKey.wrapped, salt: wrappedKey.salt },
+    };
+    envelope.value = env;
+
+    // Persist updated envelope
+    if (familyKey.value) {
+      persistEnvelope(env).catch(console.warn);
+    }
+  }
+
+  /**
+   * Add an invite key package to the envelope and persist.
+   * Returns the token hash (storage key) so the caller can verify storage.
+   */
+  async function addInvitePackage(
+    tokenHash: string,
+    pkg: { salt: string; wrapped: string; expiresAt: string }
+  ): Promise<void> {
+    if (!envelope.value) throw new Error('No envelope loaded');
+    const env = { ...envelope.value };
+    env.inviteKeys = {
+      ...env.inviteKeys,
+      [tokenHash]: { salt: pkg.salt, wrapped: pkg.wrapped, expiresAt: pkg.expiresAt },
+    };
+    envelope.value = env;
+    syncService.setEnvelope(env);
+
+    // Persist updated envelope and sync
+    if (familyKey.value) {
+      persistEnvelope(env).catch(console.warn);
+    }
+    await syncNow(true);
   }
 
   /**
@@ -668,14 +870,11 @@ export const useSyncStore = defineStore('sync', () => {
   async function disconnect(): Promise<void> {
     stopFilePolling();
 
-    // Fire-and-forget: remove family from cloud registry before clearing state
     const ctx = useFamilyContextStore();
     if (ctx.activeFamilyId) {
-      clearSettingsWAL(ctx.activeFamilyId);
       registry.removeFamily(ctx.activeFamilyId).catch(() => {});
     }
 
-    // Clear offline queue if disconnecting from Google Drive
     if (storageProviderType.value === 'google_drive') {
       clearQueue();
       clearFolderCache();
@@ -684,20 +883,16 @@ export const useSyncStore = defineStore('sync', () => {
     await syncService.disconnect();
     needsPermission.value = false;
     lastSync.value = null;
-    sessionPassword.value = null;
+    familyKey.value = null;
+    envelope.value = null;
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
     driveFileNotFound.value = false;
-    syncService.setSessionPassword(null);
 
-    // Clear cached encryption password for this family
     const settingsStore = useSettingsStore();
-    await settingsStore.clearCachedEncryptionPassword(ctx.activeFamilyId ?? undefined);
-    // Do NOT reset encryptionEnabled — it should persist as a user preference.
-    // When reconnecting to the same or a new encrypted file, the setting
-    // will already be correct and won't cause a plaintext write window.
-    await saveSettings({
+    await settingsStore.clearCachedFamilyKey(ctx.activeFamilyId ?? undefined);
+    await settingsRepo.saveSettings({
       syncEnabled: false,
       syncFilePath: undefined,
       lastSyncTimestamp: undefined,
@@ -708,44 +903,43 @@ export const useSyncStore = defineStore('sync', () => {
    * Manual export (fallback for browsers without File System Access API)
    */
   async function manualExport(): Promise<void> {
-    const password = isEncryptionEnabled.value ? (sessionPassword.value ?? undefined) : undefined;
-    await exportToFile(undefined, password);
+    if (!familyKey.value || !envelope.value) {
+      error.value = 'No family key — cannot export';
+      return;
+    }
+    const envelopeJson = await reEncryptEnvelope(envelope.value, familyKey.value);
+    downloadAsFile(envelopeJson);
     lastSync.value = toISODateString(new Date());
   }
 
   /**
-   * Manual import (fallback for browsers without File System Access API)
+   * Manual import — opens picker, validates V4, prompts for password
    */
   async function manualImport(): Promise<{ success: boolean; error?: string }> {
-    const result = await importFromFile();
-    if (result.success) {
-      lastSync.value = toISODateString(new Date());
-      await reloadAllStores();
+    const result = await loadFromNewFile();
+    if (result.needsPassword) {
+      return { success: false, error: 'Encrypted file requires password' };
     }
-    return result;
+    return { success: result.success };
   }
 
-  // Guard: suppress auto-sync watcher triggers during store reloads.
-  // Without this, each store's loadX() fires the deep watcher → triggerDebouncedSave(),
-  // which can capture a half-loaded snapshot (empty arrays) and write it to file.
+  // Guard: suppress auto-sync during store reloads
   let isReloading = false;
 
   /**
-   * Reload all stores after data import
+   * Reload all stores from the in-memory Automerge document.
    */
   async function reloadAllStores(): Promise<void> {
     isReloading = true;
-    suppressSettingsWAL();
     syncService.cancelPendingSave();
 
-    // Snapshot current IDs before reload so we can detect new/modified items
     const highlightStore = useSyncHighlightStore();
     if (isCrossDeviceReload) {
       highlightStore.snapshotBeforeReload();
     }
 
     try {
-      const familyStore = useFamilyStore();
+      const familyStoreInst = useFamilyStore();
       const accountsStore = useAccountsStore();
       const transactionsStore = useTransactionsStore();
       const assetsStore = useAssetsStore();
@@ -757,7 +951,7 @@ export const useSyncStore = defineStore('sync', () => {
       const budgetStore = useBudgetStore();
 
       await Promise.all([
-        familyStore.loadMembers(),
+        familyStoreInst.loadMembers(),
         accountsStore.loadAccounts(),
         transactionsStore.loadTransactions(),
         assetsStore.loadAssets(),
@@ -768,83 +962,29 @@ export const useSyncStore = defineStore('sync', () => {
         activityStore.loadActivities(),
         budgetStore.loadBudgets(),
       ]);
-
-      // WAL recovery: if there's a WAL entry newer than what the file had,
-      // apply it so preferred currencies (etc.) survive refresh.
-      await applySettingsWAL();
     } finally {
-      resumeSettingsWAL();
-      // Flush deferred watcher callbacks while isReloading is still true,
-      // so the auto-sync watcher sees the guard and no-ops.
       await nextTick();
       isReloading = false;
     }
 
-    // Detect which items are new/modified after stores have reloaded
     if (isCrossDeviceReload) {
-      highlightStore.detectChanges();
-    }
-  }
-
-  /**
-   * Apply settings from the WAL if available and valid.
-   * Called after reloadAllStores to recover settings that were lost
-   * because the async file write didn't complete before unload.
-   */
-  async function applySettingsWAL(): Promise<void> {
-    const ctx = useFamilyContextStore();
-    const familyId = ctx.activeFamilyId;
-    if (!familyId) return;
-
-    const walEntry = readSettingsWAL(familyId);
-    if (!walEntry) return;
-
-    // Reject stale entries (>24h) to avoid overriding file changes from another device
-    if (isWALStale(walEntry)) {
-      clearSettingsWAL(familyId);
-      return;
-    }
-
-    // Compare WAL timestamp with the file's exportedAt.
-    // Only apply WAL if it's newer than the file's last save.
-    const fileTimestamp = await syncService.getFileTimestamp();
-    if (fileTimestamp) {
-      const fileTime = new Date(fileTimestamp).getTime();
-      if (walEntry.timestamp <= fileTime) {
-        // File is newer or equal — WAL is outdated, clear it
-        clearSettingsWAL(familyId);
-        return;
-      }
-    }
-
-    // Apply WAL settings to IndexedDB
-    try {
-      await saveSettings(walEntry.settings);
-      const settingsStore = useSettingsStore();
-      await settingsStore.loadSettings();
-      // Trigger a save so the recovery is persisted to the file
-      syncService.triggerDebouncedSave();
-    } catch (e) {
-      console.warn('[syncStore] Failed to apply settings WAL:', e);
+      useSyncHighlightStore().detectChanges();
     }
   }
 
   // Track the stop handle so we never register duplicate watchers
-  let autoSyncStopHandle: ReturnType<typeof watch> | null = null;
+  let autoSyncStopHandle: (() => void) | null = null;
 
   // File polling for cross-device sync detection
-  const FILE_POLL_INTERVAL = 10_000; // 10 seconds
+  const FILE_POLL_INTERVAL = 10_000;
   let filePollingTimer: ReturnType<typeof setInterval> | null = null;
   let isCheckingFile = false;
   let isCrossDeviceReload = false;
 
   /**
    * Check if the sync file has been modified externally and reload if so.
-   * Used by both visibility-change detection and background polling.
-   * Returns true if data was reloaded.
    */
   async function reloadIfFileChanged(): Promise<boolean> {
-    // Guards: skip if not ready, already checking, or mid-reload
     if (!isConfigured.value || needsPermission.value || isReloading || isCheckingFile) return false;
 
     isCheckingFile = true;
@@ -852,8 +992,6 @@ export const useSyncStore = defineStore('sync', () => {
       const { hasConflict } = await checkForConflicts();
       if (!hasConflict) return false;
 
-      // File is newer — cancel any pending local save to avoid overwriting
-      // the newer remote data. Merge preserves unique records from both sides.
       syncService.cancelPendingSave();
 
       isCrossDeviceReload = true;
@@ -861,27 +999,39 @@ export const useSyncStore = defineStore('sync', () => {
         const loadResult = await loadFromFile({ merge: true });
         if (loadResult.success) return true;
 
-        // Handle encrypted file — try session password, then cached password.
-        // Keep isCrossDeviceReload true so decryptPendingFile → reloadAllStores
-        // correctly triggers sync highlight detection.
         if (loadResult.needsPassword) {
-          // Try session password (set during initial sign-in)
-          if (sessionPassword.value) {
-            const result = await decryptPendingFile(sessionPassword.value);
-            return result.success;
+          // Try existing family key first (should work unless key was rotated)
+          if (familyKey.value && pendingEncryptedFile.value) {
+            try {
+              const doc = await decryptBeanpodPayload(
+                pendingEncryptedFile.value.envelope,
+                familyKey.value
+              );
+              mergeDoc(doc);
+              envelope.value = pendingEncryptedFile.value.envelope;
+              syncService.setEnvelope(pendingEncryptedFile.value.envelope);
+              pendingEncryptedFile.value = null;
+              await reloadAllStores();
+              syncService.triggerDebouncedSave();
+              return true;
+            } catch {
+              // Family key doesn't work — try cached password
+            }
           }
 
-          // Try cached password from trusted device
+          // Try cached password
           const familyCtx = useFamilyContextStore();
           const settingsStore = useSettingsStore();
-          const familyId = familyCtx.activeFamilyId;
-          const cachedPw = familyId ? settingsStore.getCachedEncryptionPassword(familyId) : null;
-          if (cachedPw) {
-            const result = await decryptPendingFile(cachedPw);
+          const famId = familyCtx.activeFamilyId;
+          const cachedKeyB64 = famId ? settingsStore.getCachedFamilyKey(famId) : null;
+          if (cachedKeyB64) {
+            const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+            const { base64ToBuffer } = await import('@/utils/encoding');
+            const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+            const result = await decryptPendingFileWithKey(fk);
             return result.success;
           }
 
-          // Can't auto-decrypt — clear the pending file to avoid stale state
           pendingEncryptedFile.value = null;
         }
 
@@ -890,7 +1040,6 @@ export const useSyncStore = defineStore('sync', () => {
         isCrossDeviceReload = false;
       }
     } catch (e) {
-      // 404 from Drive — file was deleted/moved
       if (e instanceof DriveApiError && e.status === 404) {
         driveFileNotFound.value = true;
         showSaveFailureBanner.value = true;
@@ -905,9 +1054,7 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Start polling the sync file for external changes (cross-device sync).
-   * Polls every 10 seconds using the lightweight getFileTimestamp() check.
-   * Safe to call multiple times — duplicate timers are prevented.
+   * Start polling the sync file for external changes.
    */
   function startFilePolling(): void {
     if (filePollingTimer) return;
@@ -916,9 +1063,6 @@ export const useSyncStore = defineStore('sync', () => {
     }, FILE_POLL_INTERVAL);
   }
 
-  /**
-   * Stop file polling (called on sign-out / disconnect).
-   */
   function stopFilePolling(): void {
     if (filePollingTimer) {
       clearInterval(filePollingTimer);
@@ -926,16 +1070,10 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  /**
-   * Pause file polling while the tab is hidden to avoid wasted API calls.
-   */
   function pauseFilePolling(): void {
     stopFilePolling();
   }
 
-  /**
-   * Resume file polling when the tab becomes visible again.
-   */
   function resumeFilePolling(): void {
     if (isConfigured.value && !needsPermission.value && autoSyncStopHandle) {
       startFilePolling();
@@ -943,44 +1081,17 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Setup auto-sync watchers for all data stores.
-   * Auto-sync is always on when file is configured + has permission.
-   * Safe to call multiple times — duplicate watchers are prevented.
+   * Setup auto-sync.
+   * In V4, the docService persist callback drives saves automatically.
+   * We only need file polling for cross-device sync detection.
    */
   function setupAutoSync(): void {
     if (!supportsAutoSync.value) return;
-
-    // Guard: don't register a second watcher if one is already active
     if (autoSyncStopHandle) return;
 
-    // Watch for changes in all data stores (including tombstones)
-    autoSyncStopHandle = watch(
-      () => [
-        useFamilyStore().members,
-        useAccountsStore().accounts,
-        useTransactionsStore().transactions,
-        useAssetsStore().assets,
-        useGoalsStore().goals,
-        useRecurringStore().recurringItems,
-        useTodoStore().todos,
-        useActivityStore().activities,
-        useBudgetStore().budgets,
-        useTombstoneStore().tombstones,
-        useSettingsStore().settings,
-      ],
-      () => {
-        // Skip auto-save while stores are being reloaded from file import
-        // to prevent capturing half-loaded snapshots
-        if (isReloading) return;
-        // Auto-save whenever file is configured and accessible
-        if (isConfigured.value && !needsPermission.value) {
-          syncService.triggerDebouncedSave();
-        }
-      },
-      { deep: true }
-    );
+    // Mark as set up (the actual save triggering comes from docService's persist callback)
+    autoSyncStopHandle = () => {};
 
-    // Start polling for external file changes (cross-device sync)
     startFilePolling();
   }
 
@@ -988,20 +1099,12 @@ export const useSyncStore = defineStore('sync', () => {
    * Reset all sync state (used on sign-out)
    */
   function resetState() {
-    // Clear WAL for the current family before tearing down
-    const ctx = useFamilyContextStore();
-    if (ctx.activeFamilyId) {
-      clearSettingsWAL(ctx.activeFamilyId);
-    }
-
-    // Tear down auto-sync watcher so it can be re-armed for the next session/family
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
     }
     stopFilePolling();
     syncService.reset();
-    useTombstoneStore().resetState();
     useSyncHighlightStore().clearHighlights();
     isInitialized.value = false;
     isConfigured.value = false;
@@ -1010,7 +1113,8 @@ export const useSyncStore = defineStore('sync', () => {
     error.value = null;
     lastSync.value = null;
     needsPermission.value = false;
-    sessionPassword.value = null;
+    familyKey.value = null;
+    envelope.value = null;
     storageProviderType.value = null;
     providerAccountEmail.value = null;
     showGoogleReconnect.value = false;
@@ -1022,23 +1126,15 @@ export const useSyncStore = defineStore('sync', () => {
     clearQueue();
   }
 
-  /**
-   * Clear any error state
-   */
   function clearError(): void {
     error.value = null;
   }
 
   /**
    * Handle successful Google Drive reconnection.
-   * Resets failure state, triggers an immediate save to flush pending data,
-   * and reloads data from Drive.
    */
   async function handleGoogleReconnected(): Promise<void> {
-    // If file was deleted/moved, reconnecting won't help — leave banner visible
-    if (driveFileNotFound.value) {
-      return;
-    }
+    if (driveFileNotFound.value) return;
 
     showGoogleReconnect.value = false;
     showSaveFailureBanner.value = false;
@@ -1046,26 +1142,18 @@ export const useSyncStore = defineStore('sync', () => {
     saveFailureLevel.value = 'none';
     lastSaveError.value = null;
 
-    // Reload data from Drive and re-arm auto-sync
     await reloadIfFileChanged();
     setupAutoSync();
-
-    // Flush any pending data to Drive immediately
     syncService.triggerDebouncedSave();
   }
 
   // --- Google Drive actions ---
 
-  /**
-   * Configure Google Drive as the storage backend for a new pod.
-   * Creates a new .beanpod file on Google Drive.
-   */
   async function configureSyncFileGoogleDrive(podFileName: string): Promise<boolean> {
     try {
       const provider = await GoogleDriveProvider.createNew(podFileName);
       syncService.setProvider(provider);
 
-      // Persist provider config
       const ctx = useFamilyContextStore();
       if (ctx.activeFamilyId) {
         await provider.persist(ctx.activeFamilyId);
@@ -1074,14 +1162,11 @@ export const useSyncStore = defineStore('sync', () => {
       needsPermission.value = false;
       storageProviderType.value = 'google_drive';
 
-      // Save initial data
       await syncNow();
 
-      // Update settings — suppress auto-sync watcher during setup to avoid
-      // redundant writes (auto-sync is armed later by the caller)
       isReloading = true;
       try {
-        await saveSettings({
+        await settingsRepo.saveSettings({
           syncEnabled: true,
           syncFilePath: provider.getDisplayName(),
           lastSyncTimestamp: toISODateString(new Date()),
@@ -1090,7 +1175,6 @@ export const useSyncStore = defineStore('sync', () => {
         isReloading = false;
       }
 
-      // Register with cloud registry
       if (ctx.activeFamilyId) {
         registry
           .registerFamily(ctx.activeFamilyId, {
@@ -1102,9 +1186,7 @@ export const useSyncStore = defineStore('sync', () => {
           .catch(() => {});
       }
 
-      // Subscribe to token expiry
       setupTokenExpiryHandler();
-
       return true;
     } catch (e) {
       error.value = (e as Error).message;
@@ -1112,128 +1194,44 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  /**
-   * Load an existing .beanpod file from Google Drive.
-   */
   async function loadFromGoogleDrive(
     fileId: string,
     driveFileName: string
   ): Promise<{ success: boolean; needsPassword?: boolean }> {
     try {
-      // Authenticate if needed
       const token = await requestAccessToken();
-
-      // Fetch account email before creating provider so it's available immediately
       await fetchGoogleUserEmail(token);
 
       const provider = GoogleDriveProvider.fromExisting(fileId, driveFileName);
-
-      // Read file content
       const text = await provider.read();
       if (!text) {
         error.value = 'File is empty';
         return { success: false };
       }
 
-      // Parse and validate
-      let data: unknown;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        error.value = 'Invalid JSON file';
+      const version = detectFileVersion(text);
+      if (version !== '4.0') {
+        error.value = `Unsupported file version: ${version ?? 'unknown'}`;
         return { success: false };
       }
 
-      const obj = data as Record<string, unknown>;
-      if (
-        typeof obj.version !== 'string' ||
-        typeof obj.exportedAt !== 'string' ||
-        typeof obj.encrypted !== 'boolean'
-      ) {
-        error.value = 'Invalid sync file format';
-        return { success: false };
-      }
+      const env = parseBeanpodV4(text);
 
-      // If encrypted, store for later decryption
-      if (obj.encrypted === true) {
-        pendingEncryptedFile.value = {
-          fileHandle: {} as FileSystemFileHandle, // Placeholder — not used for Drive
-          rawSyncData: data as SyncFileData,
-          driveFileId: fileId,
-          driveFileName,
-          driveAccountEmail: provider.getAccountEmail() ?? undefined,
-        };
-        extractPasskeySecrets(data as SyncFileData);
-        storageProviderType.value = 'google_drive';
-        return { success: false, needsPassword: true };
-      }
-
-      // Import unencrypted data
-      const { importSyncFileData, validateSyncFileData } = await import('@/services/sync/fileSync');
-      if (!validateSyncFileData(data)) {
-        error.value = 'Invalid sync file format';
-        return { success: false };
-      }
-
-      const syncData = data as SyncFileData;
-
-      // Adopt family identity
-      const { createFamilyWithId } = await import('@/services/familyContext');
-      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
-      let activeFamilyId = getActiveFamilyId();
-      if (syncData.familyId) {
-        if (syncData.familyId !== activeFamilyId) {
-          await createFamilyWithId(syncData.familyId, syncData.familyName ?? 'My Family');
-          activeFamilyId = syncData.familyId;
-        }
-      }
-
-      await importSyncFileData(syncData);
-
-      // Set as current provider
-      syncService.setProvider(provider);
+      // Store as pending — needs password
+      pendingEncryptedFile.value = {
+        envelope: env,
+        driveFileId: fileId,
+        driveFileName,
+        driveAccountEmail: provider.getAccountEmail() ?? undefined,
+      };
       storageProviderType.value = 'google_drive';
-      if (activeFamilyId) {
-        await provider.persist(activeFamilyId);
-      }
-
-      needsPermission.value = false;
-      lastSync.value = toISODateString(new Date());
-
-      // Reload stores and setup auto-sync
-      await reloadAllStores();
-      await saveSettings({
-        syncEnabled: true,
-        syncFilePath: provider.getDisplayName(),
-        lastSyncTimestamp: lastSync.value ?? undefined,
-      });
-      setupAutoSync();
-      setupTokenExpiryHandler();
-
-      // Register with cloud registry
-      if (activeFamilyId) {
-        registry
-          .registerFamily(activeFamilyId, {
-            provider: 'google_drive',
-            fileId,
-            displayPath: driveFileName,
-            familyName: syncData.familyName,
-          })
-          .catch(() => {});
-      }
-
-      return { success: true };
+      return { success: false, needsPassword: true };
     } catch (e) {
       error.value = (e as Error).message;
       return { success: false };
     }
   }
 
-  /**
-   * List .beanpod files available on Google Drive.
-   * Auto-retries once with cleared folder cache if the first attempt returns empty.
-   * @param options.forceNewAccount - When true, forces Google's account chooser
-   */
   async function listGoogleDriveFiles(options?: {
     forceNewAccount?: boolean;
   }): Promise<Array<{ fileId: string; name: string; modifiedTime: string }>> {
@@ -1245,24 +1243,14 @@ export const useSyncStore = defineStore('sync', () => {
 
     if (files.length > 0) return files;
 
-    // First attempt returned empty — clear folder cache and retry once
-    // (listBeanpodFiles already tried Drive-wide fallback, so this retries
-    // the entire folder discovery from scratch)
     console.warn('[syncStore] No files found, retrying with cleared folder cache...');
     clearFolderCache();
     const retryFolderId = await getOrCreateAppFolder(token);
     return listBeanpodFiles(token, retryFolderId);
   }
 
-  /**
-   * Subscribe to Google OAuth token expiry notifications.
-   */
   let tokenExpiryUnsub: (() => void) | null = null;
 
-  /**
-   * After a Google Drive load, the email fetch is fire-and-forget.
-   * Poll briefly for the email to become available, then update refs and re-persist.
-   */
   function updateProviderEmailAfterLoad(): void {
     let attempts = 0;
     const interval = setInterval(async () => {
@@ -1290,34 +1278,28 @@ export const useSyncStore = defineStore('sync', () => {
     });
   }
 
-  // --- Passkey secret management ---
+  // --- Passkey secret management (V4: stored in envelope, not separate) ---
+  // Kept as stubs for backward compat — #114 will redesign
 
-  function syncPasskeySecretsToService(): void {
-    syncService.setPasskeySecrets(passkeySecrets.value);
-  }
+  const passkeySecrets = ref<import('@/types/models').PasskeySecret[]>([]);
 
-  function addPasskeySecret(secret: PasskeySecret): void {
-    // Replace existing secret for same credentialId
+  function addPasskeySecret(secret: import('@/types/models').PasskeySecret): void {
     passkeySecrets.value = [
       ...passkeySecrets.value.filter((s) => s.credentialId !== secret.credentialId),
       secret,
     ];
-    syncPasskeySecretsToService();
   }
 
   function removePasskeySecretsForCredential(credentialId: string): void {
     passkeySecrets.value = passkeySecrets.value.filter((s) => s.credentialId !== credentialId);
-    syncPasskeySecretsToService();
   }
 
   function clearAllPasskeySecrets(): void {
     passkeySecrets.value = [];
-    syncPasskeySecretsToService();
   }
 
   /**
    * Ensure the current family is registered in the cloud registry.
-   * Idempotent PUT — safe to call on every sign-in. Fire-and-forget.
    */
   function ensureRegistered(): void {
     const ctx = useFamilyContextStore();
@@ -1343,13 +1325,13 @@ export const useSyncStore = defineStore('sync', () => {
     lastSync,
     needsPermission,
     pendingEncryptedFile,
+    familyKey,
+    envelope,
     // Computed
     capabilities,
     supportsAutoSync,
     syncStatus,
-    isEncryptionEnabled,
     hasSessionPassword,
-    currentSessionPassword,
     hasPendingEncryptedFile,
     storageProviderType,
     providerAccountEmail,
@@ -1376,11 +1358,14 @@ export const useSyncStore = defineStore('sync', () => {
     loadFromGoogleDrive,
     listGoogleDriveFiles,
     decryptPendingFile,
+    loadFromPersistenceCache,
     clearPendingEncryptedFile,
-    enableEncryption,
-    disableEncryption,
-    setSessionPassword,
+    createNewFile,
     clearSessionPassword,
+    getExportedFamilyKey,
+    decryptPendingFileWithKey,
+    addMemberWrappedKey,
+    addInvitePackage,
     disconnect,
     manualExport,
     manualImport,

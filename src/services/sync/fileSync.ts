@@ -1,167 +1,202 @@
+/**
+ * File Sync — V4 beanpod file format operations.
+ *
+ * V4 uses a family key (AES-256-GCM) to encrypt the Automerge binary payload.
+ * Each family member has their own password-derived wrapping key (AES-KW)
+ * that can unwrap the family key. This replaces the V3 single-password model.
+ */
+
 import {
-  exportAllData,
-  importAllData,
-  getActiveFamilyId,
-  type ExportedData,
-} from '@/services/indexeddb/database';
-import { getFamilyById } from '@/services/familyContext';
-import { getSettings } from '@/services/indexeddb/repositories/settingsRepository';
-import { mergeData } from '@/services/sync/mergeService';
-import { useTombstoneStore } from '@/stores/tombstoneStore';
-import type { SyncFileData, DeletionTombstone, PasskeySecret } from '@/types/models';
-import { SYNC_FILE_VERSION } from '@/types/models';
-import { toISODateString } from '@/utils/date';
-
-interface MergeableRecord {
-  id: string;
-  updatedAt: string;
-}
-
-/**
- * Compares the merged result against the file data to determine if the merge
- * incorporated any local data that the file doesn't already have.
- * Used to decide whether a save-back is needed after merge (avoids echo loops).
- */
-function detectMergeChanges(
-  mergedData: ExportedData,
-  fileData: ExportedData,
-  mergedTombstones: DeletionTombstone[],
-  fileTombstones: DeletionTombstone[]
-): boolean {
-  const collections = [
-    'familyMembers',
-    'accounts',
-    'transactions',
-    'assets',
-    'goals',
-    'recurringItems',
-    'todos',
-    'activities',
-    'budgets',
-  ] as const;
-
-  for (const key of collections) {
-    const merged = (mergedData[key] ?? []) as unknown as MergeableRecord[];
-    const file = (fileData[key] ?? []) as unknown as MergeableRecord[];
-    if (merged.length !== file.length) return true;
-
-    const fileMap = new Map(file.map((r) => [r.id, r.updatedAt]));
-    for (const r of merged) {
-      if (fileMap.get(r.id) !== r.updatedAt) return true;
-    }
-  }
-
-  if (mergedTombstones.length !== fileTombstones.length) return true;
-
-  // Settings are intentionally excluded — settings differences (e.g. from
-  // saveSettings calls or WAL recovery) should NOT trigger a save-back.
-  // Settings-triggered save-backs create a near-permanent echo loop where
-  // each browser's save updates lastSync, masking the other browser's edits
-  // within the checkForConflicts tolerance window.
-
-  return false;
-}
+  encryptPayload,
+  decryptPayload,
+  deriveMemberKey,
+  unwrapFamilyKey,
+  SALT_LENGTH,
+} from '@/services/crypto/familyKeyService';
+import { saveDoc, loadDoc } from '@/services/automerge/docService';
+import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
+import { generateUUID } from '@/utils/id';
+import type {
+  BeanpodFileV4,
+  WrappedMemberKey,
+  WrappedPasskeyKey,
+  InviteKeyPackage,
+} from '@/types/syncFileV4';
+import type * as Automerge from '@automerge/automerge';
+import type { FamilyDocument } from '@/types/automerge';
 
 /**
- * Creates a SyncFileData object from current database state
+ * Create a V4 beanpod file envelope from the current Automerge document.
+ *
+ * Serializes the doc to binary, encrypts with the family key,
+ * and wraps the result in a V4 JSON envelope.
  */
-export async function createSyncFileData(
-  encrypted = false,
-  passkeySecrets?: PasskeySecret[]
-): Promise<SyncFileData> {
-  const data = await exportAllData();
+export async function createBeanpodV4(
+  familyId: string,
+  familyName: string,
+  familyKey: CryptoKey,
+  wrappedKeys: Record<string, WrappedMemberKey>,
+  passkeyWrappedKeys: Record<string, WrappedPasskeyKey> = {},
+  inviteKeys: Record<string, InviteKeyPackage> = {}
+): Promise<string> {
+  const binary = saveDoc();
+  const encrypted = await encryptPayload(familyKey, binary);
 
-  // Inject tombstones from the in-memory store into the export
-  const tombstoneStore = useTombstoneStore();
-  data.deletions = tombstoneStore.getTombstones();
-
-  const syncData: SyncFileData = {
-    version: SYNC_FILE_VERSION,
-    exportedAt: toISODateString(new Date()),
-    encrypted,
-    data,
+  const envelope: BeanpodFileV4 = {
+    version: '4.0',
+    familyId,
+    familyName,
+    keyId: generateUUID(),
+    wrappedKeys,
+    passkeyWrappedKeys,
+    inviteKeys,
+    encryptedPayload: bufferToBase64(encrypted),
   };
 
-  // Include family identity
-  const familyId = getActiveFamilyId();
-  if (familyId) {
-    syncData.familyId = familyId;
-    const family = await getFamilyById(familyId);
-    if (family) {
-      syncData.familyName = family.name;
+  return JSON.stringify(envelope, null, 2);
+}
+
+/**
+ * Parse and validate a JSON string as a V4 beanpod envelope.
+ * Throws if the format is invalid.
+ */
+export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonString);
+  } catch {
+    throw new Error('Invalid JSON in beanpod file');
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid beanpod file: not an object');
+  }
+
+  const obj = parsed as Record<string, unknown>;
+
+  if (obj.version !== '4.0') {
+    throw new Error(`Unsupported beanpod version: ${obj.version}. Expected 4.0.`);
+  }
+
+  if (typeof obj.familyId !== 'string') throw new Error('Invalid beanpod: missing familyId');
+  if (typeof obj.familyName !== 'string') throw new Error('Invalid beanpod: missing familyName');
+  if (typeof obj.keyId !== 'string') throw new Error('Invalid beanpod: missing keyId');
+  if (typeof obj.encryptedPayload !== 'string')
+    throw new Error('Invalid beanpod: missing encryptedPayload');
+  if (!obj.wrappedKeys || typeof obj.wrappedKeys !== 'object')
+    throw new Error('Invalid beanpod: missing wrappedKeys');
+
+  return parsed as BeanpodFileV4;
+}
+
+/**
+ * Detect the file format version from a raw JSON string.
+ * Returns '4.0' for V4, or null if unrecognised.
+ */
+export function detectFileVersion(jsonString: string): '4.0' | null {
+  try {
+    const parsed = JSON.parse(jsonString) as Record<string, unknown>;
+    if (parsed.version === '4.0') return '4.0';
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Decrypt the encrypted payload from a V4 envelope using the family key.
+ * Returns the loaded Automerge document.
+ */
+export async function decryptBeanpodPayload(
+  envelope: BeanpodFileV4,
+  familyKey: CryptoKey
+): Promise<Automerge.Doc<FamilyDocument>> {
+  const encrypted = new Uint8Array(base64ToBuffer(envelope.encryptedPayload));
+  const binary = await decryptPayload(familyKey, encrypted);
+  return loadDoc(binary);
+}
+
+/**
+ * Try to unwrap the family key using a password.
+ *
+ * Iterates over all wrapped keys in the envelope and tries to derive
+ * the member wrapping key from the password + salt. Returns the first
+ * successful unwrap.
+ *
+ * @returns { familyKey, memberId } on success
+ * @throws Error('Incorrect password') if no wrapped key matches
+ */
+export async function tryUnwrapFamilyKey(
+  envelope: BeanpodFileV4,
+  password: string
+): Promise<{ familyKey: CryptoKey; memberId: string }> {
+  const entries = Object.entries(envelope.wrappedKeys);
+
+  if (entries.length === 0) {
+    throw new Error('No wrapped keys in beanpod file — cannot unlock');
+  }
+
+  for (const [memberId, wrappedKey] of entries) {
+    try {
+      const salt = new Uint8Array(base64ToBuffer(wrappedKey.salt));
+      if (salt.length !== SALT_LENGTH) continue;
+
+      const memberKey = await deriveMemberKey(password, salt);
+      const familyKey = await unwrapFamilyKey(wrappedKey.wrapped, memberKey);
+      return { familyKey, memberId };
+    } catch {
+      // Wrong password for this member — try the next one
+      continue;
     }
   }
 
-  // Include PRF-wrapped password secrets in the envelope (outside encryption)
-  if (passkeySecrets && passkeySecrets.length > 0) {
-    syncData.passkeySecrets = passkeySecrets;
-  }
-
-  return syncData;
+  throw new Error('Incorrect password');
 }
 
 /**
- * Validates that the data has the correct structure for import
+ * Re-encrypt the current Automerge document and update the envelope's payload.
+ * Returns the updated envelope as a JSON string.
+ * Does NOT modify wrappedKeys/passkeyWrappedKeys/inviteKeys — caller handles those.
  */
-export function validateSyncFileData(data: unknown): data is SyncFileData {
-  if (!data || typeof data !== 'object') {
-    return false;
-  }
+export async function reEncryptEnvelope(
+  envelope: BeanpodFileV4,
+  familyKey: CryptoKey
+): Promise<string> {
+  const binary = saveDoc();
+  const encrypted = await encryptPayload(familyKey, binary);
 
-  const obj = data as Record<string, unknown>;
+  const updated: BeanpodFileV4 = {
+    ...envelope,
+    encryptedPayload: bufferToBase64(encrypted),
+  };
 
-  // Check required top-level fields
-  if (typeof obj.version !== 'string') return false;
-  if (typeof obj.exportedAt !== 'string') return false;
-  if (typeof obj.encrypted !== 'boolean') return false;
+  return JSON.stringify(updated, null, 2);
+}
 
-  // For encrypted files, the data field is a base64 string (not an object)
-  if (obj.encrypted === true) {
-    return typeof obj.data === 'string';
-  }
+// ── Utilities kept from V3 (file picker, download) ──────────────────
 
-  // Reject v2.0 and older files — v3.0 is a clean break (no prod data to migrate)
-  if (obj.version !== '3.0') {
-    console.warn(
-      `[fileSync] Unsupported sync file version "${obj.version}". Please re-create your data file with the current app version.`
-    );
-    return false;
-  }
-
-  // For unencrypted files, validate the full data structure
-  if (!obj.data || typeof obj.data !== 'object') return false;
-
-  const innerData = obj.data as Record<string, unknown>;
-
-  // Check data arrays exist
-  if (!Array.isArray(innerData.familyMembers)) return false;
-  if (!Array.isArray(innerData.accounts)) return false;
-  if (!Array.isArray(innerData.transactions)) return false;
-  if (!Array.isArray(innerData.assets)) return false;
-  if (!Array.isArray(innerData.goals)) return false;
-  // deletions required in v3.0
-  if (!Array.isArray(innerData.deletions)) return false;
-  // settings can be null or object
-  if (innerData.settings !== null && typeof innerData.settings !== 'object') return false;
-  // recurringItems is optional for backward compatibility with older sync files
-  if (innerData.recurringItems !== undefined && !Array.isArray(innerData.recurringItems))
-    return false;
-  // todos is optional for backward compatibility with older sync files
-  if (innerData.todos !== undefined && !Array.isArray(innerData.todos)) return false;
-  // activities is optional for backward compatibility with older sync files
-  if (innerData.activities !== undefined && !Array.isArray(innerData.activities)) return false;
-  // budgets is optional for backward compatibility with older sync files
-  if (innerData.budgets !== undefined && !Array.isArray(innerData.budgets)) return false;
-
-  return true;
+/**
+ * Opens a file picker for selecting a .beanpod file (fallback for mobile)
+ */
+export function openFilePicker(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '';
+    input.onchange = () => {
+      const file = input.files?.[0] ?? null;
+      resolve(file);
+    };
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
 }
 
 /**
- * Downloads data as a .beanpod file (fallback for browsers without File System Access API)
+ * Downloads a beanpod envelope as a .beanpod file
  */
-export function downloadAsFile(data: SyncFileData, filename?: string): void {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
+export function downloadAsFile(envelopeJson: string, filename?: string): void {
+  const blob = new Blob([envelopeJson], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
   const date = new Date().toISOString().split('T')[0];
@@ -174,170 +209,4 @@ export function downloadAsFile(data: SyncFileData, filename?: string): void {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-}
-
-/**
- * Reads and parses a JSON file selected by the user
- */
-export async function readFileAsJson(file: File): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const json = JSON.parse(reader.result as string);
-        resolve(json);
-      } catch {
-        reject(new Error('Invalid JSON file'));
-      }
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsText(file);
-  });
-}
-
-/**
- * Imports data from a SyncFileData object into the database.
- * @param options.merge - If true, merge file data with local data by record ID.
- *   Used for cross-device reload (polling/visibility). If false (default),
- *   full-replace for initial load (empty local → load from file).
- */
-export async function importSyncFileData(
-  syncFile: SyncFileData,
-  options: { merge?: boolean } = {}
-): Promise<{ hasLocalChanges: boolean }> {
-  if (!validateSyncFileData(syncFile)) {
-    throw new Error('Invalid sync file format');
-  }
-
-  // Read local-only preferences before import overwrites them
-  const localSettings = await getSettings();
-
-  // Clean incoming settings to preserve local sync config
-  const cleanedFileData: ExportedData = {
-    ...syncFile.data,
-    settings: syncFile.data.settings
-      ? {
-          ...syncFile.data.settings,
-          // Preserve these fields from local settings (don't overwrite sync config)
-          syncFilePath: undefined,
-          lastSyncTimestamp: undefined,
-          // Preserve local encryption setting — never import this from the file,
-          // as it could propagate a corrupted false value from a buggy session
-          encryptionEnabled: localSettings.encryptionEnabled,
-        }
-      : null,
-  };
-
-  if (options.merge) {
-    // Record-level merge: export local data, merge with file data, import result
-    const localData = await exportAllData();
-    const tombstoneStore = useTombstoneStore();
-    const localTombstones = tombstoneStore.getTombstones();
-    const fileTombstones = syncFile.data.deletions ?? [];
-
-    const { data: mergedData, tombstones: mergedTombstones } = mergeData(
-      localData,
-      cleanedFileData,
-      localTombstones,
-      fileTombstones
-    );
-
-    // Preserve local sync-specific settings in the merged result
-    if (mergedData.settings && localSettings) {
-      mergedData.settings.syncFilePath = undefined;
-      mergedData.settings.lastSyncTimestamp = undefined;
-      mergedData.settings.encryptionEnabled = localSettings.encryptionEnabled;
-    }
-
-    // Check if the merge incorporated any local data the file doesn't have
-    const hasLocalChanges = detectMergeChanges(
-      mergedData,
-      cleanedFileData,
-      mergedTombstones,
-      fileTombstones
-    );
-
-    await importAllData(mergedData);
-    tombstoneStore.setTombstones(mergedTombstones);
-    return { hasLocalChanges };
-  } else {
-    // Full replace: initial load path
-    await importAllData(cleanedFileData);
-
-    // Hydrate tombstone store from file
-    const tombstoneStore = useTombstoneStore();
-    tombstoneStore.setTombstones(syncFile.data.deletions ?? []);
-    return { hasLocalChanges: false };
-  }
-}
-
-/**
- * Opens a file picker for selecting a .beanpod or .json file (fallback)
- */
-export function openFilePicker(): Promise<File | null> {
-  return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    // Mobile browsers don't recognise .beanpod (no registered MIME type),
-    // so we accept all files and validate the extension at runtime instead.
-    input.accept = '';
-    input.onchange = () => {
-      const file = input.files?.[0] ?? null;
-      resolve(file);
-    };
-    input.oncancel = () => resolve(null);
-    input.click();
-  });
-}
-
-/**
- * Full export flow: create sync data and download as file.
- * If a password is provided, the exported file will be encrypted.
- */
-export async function exportToFile(filename?: string, password?: string): Promise<void> {
-  if (password) {
-    const syncData = await createSyncFileData(true);
-    const dataJson = JSON.stringify(syncData.data);
-    const { encryptSyncData } = await import('@/services/crypto/encryption');
-    const encryptedData = await encryptSyncData(dataJson, password);
-    const encryptedSyncData: SyncFileData = {
-      version: syncData.version,
-      exportedAt: syncData.exportedAt,
-      encrypted: true,
-      data: encryptedData as unknown as ExportedData,
-      familyId: syncData.familyId,
-      familyName: syncData.familyName,
-    };
-    downloadAsFile(encryptedSyncData, filename);
-  } else {
-    const syncData = await createSyncFileData(false);
-    downloadAsFile(syncData, filename);
-  }
-}
-
-/**
- * Full import flow: open picker, read file, validate, import
- */
-export async function importFromFile(): Promise<{ success: boolean; error?: string }> {
-  try {
-    const file = await openFilePicker();
-    if (!file) {
-      return { success: false, error: 'No file selected' };
-    }
-
-    const data = await readFileAsJson(file);
-
-    if (!validateSyncFileData(data)) {
-      return { success: false, error: 'Invalid sync file format' };
-    }
-
-    if (data.encrypted) {
-      return { success: false, error: 'Encrypted files not supported in basic import' };
-    }
-
-    await importSyncFileData(data);
-    return { success: true };
-  } catch (e) {
-    return { success: false, error: (e as Error).message };
-  }
 }
