@@ -26,6 +26,7 @@ import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import {
   initializeAuth,
+  migratePendingRefreshToken,
   requestAccessToken,
   onTokenExpired,
   fetchGoogleUserEmail,
@@ -468,20 +469,32 @@ export const useSyncStore = defineStore('sync', () => {
       envelope.value = pending.envelope;
       syncService.setFamilyKey(fk, pending.envelope);
 
-      // Adopt family identity if needed
+      // Adopt family identity — ensure the file's family is registered and active
       const { getActiveFamilyId } = await import('@/services/indexeddb/database');
       let activeFamilyId = getActiveFamilyId();
       const familyCtx = useFamilyContextStore();
+      const fileFamilyId = pending.envelope.familyId;
 
-      if (!activeFamilyId && pending.envelope.familyId) {
-        // No active family — create/adopt from the file's familyId
-        await familyCtx.createFamilyWithId(
-          pending.envelope.familyId,
-          pending.envelope.familyName ?? 'My Family'
-        );
-        activeFamilyId = pending.envelope.familyId;
+      if (fileFamilyId) {
+        // Register the family if it's not yet in the local registry
+        const isKnown = familyCtx.allFamilies.some((f) => f.id === fileFamilyId);
+        if (!isKnown) {
+          await familyCtx.createFamilyWithId(
+            fileFamilyId,
+            pending.envelope.familyName ?? 'My Family'
+          );
+        } else if (fileFamilyId !== familyCtx.activeFamilyId) {
+          await familyCtx.switchFamily(fileFamilyId);
+        }
+        activeFamilyId = fileFamilyId;
       } else if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
         await familyCtx.switchFamily(activeFamilyId);
+      }
+
+      // Bind Google Auth to this family and migrate any pending refresh token
+      if (activeFamilyId && pending.driveFileId) {
+        await initializeAuth(activeFamilyId);
+        await migratePendingRefreshToken(activeFamilyId);
       }
 
       // If loaded from Google Drive, persist the config
@@ -725,20 +738,32 @@ export const useSyncStore = defineStore('sync', () => {
       syncService.setFamilyKey(fk, pending.envelope);
       isConfigured.value = true;
 
-      // Adopt family identity if needed
+      // Adopt family identity — ensure the file's family is registered and active
       const { getActiveFamilyId } = await import('@/services/indexeddb/database');
       let activeFamilyId = getActiveFamilyId();
       const familyCtx = useFamilyContextStore();
+      const fileFamilyId = pending.envelope.familyId;
 
-      if (!activeFamilyId && pending.envelope.familyId) {
-        // No active family — create/adopt from the file's familyId
-        await familyCtx.createFamilyWithId(
-          pending.envelope.familyId,
-          pending.envelope.familyName ?? 'My Family'
-        );
-        activeFamilyId = pending.envelope.familyId;
+      if (fileFamilyId) {
+        // Register the family if it's not yet in the local registry
+        const isKnown = familyCtx.allFamilies.some((f) => f.id === fileFamilyId);
+        if (!isKnown) {
+          await familyCtx.createFamilyWithId(
+            fileFamilyId,
+            pending.envelope.familyName ?? 'My Family'
+          );
+        } else if (fileFamilyId !== familyCtx.activeFamilyId) {
+          await familyCtx.switchFamily(fileFamilyId);
+        }
+        activeFamilyId = fileFamilyId;
       } else if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
         await familyCtx.switchFamily(activeFamilyId);
+      }
+
+      // Bind Google Auth to this family and migrate any pending refresh token
+      if (activeFamilyId && pending.driveFileId) {
+        await initializeAuth(activeFamilyId);
+        await migratePendingRefreshToken(activeFamilyId);
       }
 
       // If loaded from Google Drive, persist the config
