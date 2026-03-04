@@ -66,11 +66,13 @@ export async function exchangeCodeForTokens(params: {
 
   if (!res.ok) {
     const err = (body ?? {}) as OAuthError;
-    throw new Error(err.error_description ?? err.error ?? 'Token exchange failed');
+    const detail = err.error_description ?? err.error ?? 'unknown';
+    console.warn(`[oauthProxy] Token exchange failed: HTTP ${res.status} — ${detail}`);
+    throw new Error(`Token exchange failed: ${detail}`);
   }
 
   if (!body) {
-    throw new Error('Token exchange failed');
+    throw new Error('Token exchange failed: empty response');
   }
 
   return body as TokenResponse;
@@ -103,11 +105,13 @@ export async function refreshAccessToken(params: {
 
   if (!res.ok) {
     const err = (body ?? {}) as OAuthError;
-    throw new Error(err.error_description ?? err.error ?? 'Token refresh failed');
+    const detail = err.error_description ?? err.error ?? 'unknown';
+    console.warn(`[oauthProxy] Token refresh failed: HTTP ${res.status} — ${detail}`);
+    throw new Error(`Token refresh failed: ${detail}`);
   }
 
   if (!body) {
-    throw new Error('Token refresh failed');
+    throw new Error('Token refresh failed: empty response');
   }
 
   return body as TokenResponse;
