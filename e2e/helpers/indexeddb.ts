@@ -84,6 +84,7 @@ export class IndexedDBHelper {
           .filter(
             (db) =>
               db.name?.startsWith('beanies-data') ||
+              db.name?.startsWith('beanies-automerge') ||
               db.name === 'beanies-registry' ||
               db.name === 'beanies-file-handles'
           )
@@ -121,204 +122,16 @@ export class IndexedDBHelper {
   }
 
   async seedData(data: Partial<ExportedData>) {
-    // Find the active per-family database name
-    const dbName = await this.getActiveFamilyDbName();
-
     await this.page.evaluate(
-      ({ testData, familyDbName }) => {
-        return new Promise<void>((resolve, reject) => {
-          // Use the per-family DB name, or fall back to legacy name for migration
-          const targetDb = familyDbName || 'beanies-data';
-          const request = indexedDB.open(targetDb, 6);
-
-          request.onsuccess = () => {
-            const db = request.result;
-
-            try {
-              const storeNames: string[] = [];
-              if (testData.familyMembers) storeNames.push('familyMembers');
-              if (testData.accounts) storeNames.push('accounts');
-              if (testData.transactions) storeNames.push('transactions');
-              if (testData.assets) storeNames.push('assets');
-              if (testData.goals) storeNames.push('goals');
-              if (testData.recurringItems) storeNames.push('recurringItems');
-              if (testData.todos) storeNames.push('todos');
-              if (testData.activities) storeNames.push('activities');
-              if (testData.settings) storeNames.push('settings');
-
-              const tx = db.transaction(storeNames, 'readwrite');
-
-              if (testData.familyMembers) {
-                const store = tx.objectStore('familyMembers');
-                testData.familyMembers.forEach((member: unknown) => store.add(member));
-              }
-              if (testData.accounts) {
-                const store = tx.objectStore('accounts');
-                testData.accounts.forEach((account: unknown) => store.add(account));
-              }
-              if (testData.transactions) {
-                const store = tx.objectStore('transactions');
-                testData.transactions.forEach((transaction: unknown) => store.add(transaction));
-              }
-              if (testData.assets) {
-                const store = tx.objectStore('assets');
-                testData.assets.forEach((asset: unknown) => store.add(asset));
-              }
-              if (testData.goals) {
-                const store = tx.objectStore('goals');
-                testData.goals.forEach((goal: unknown) => store.add(goal));
-              }
-              if (testData.recurringItems) {
-                const store = tx.objectStore('recurringItems');
-                testData.recurringItems.forEach((item: unknown) => store.add(item));
-              }
-              if (testData.todos) {
-                const store = tx.objectStore('todos');
-                testData.todos.forEach((item: unknown) => store.add(item));
-              }
-              if (testData.activities) {
-                const store = tx.objectStore('activities');
-                testData.activities.forEach((item: unknown) => store.add(item));
-              }
-              if (testData.settings) {
-                const store = tx.objectStore('settings');
-                store.put(testData.settings);
-              }
-
-              tx.oncomplete = () => {
-                db.close();
-                resolve();
-              };
-
-              tx.onerror = () => {
-                db.close();
-                reject(tx.error);
-              };
-            } catch (error) {
-              db.close();
-              reject(error);
-            }
-          };
-
-          request.onerror = () => {
-            reject(request.error);
-          };
-        });
-      },
-      { testData: data, familyDbName: dbName }
+      (d) => (window as unknown as Record<string, any>).__e2eDataBridge.seedData(d),
+      data
     );
     await this.page.reload();
   }
 
   async exportData(): Promise<ExportedData> {
-    // Find the active per-family database name
-    const dbName = await this.getActiveFamilyDbName();
-
-    return await this.page.evaluate((familyDbName) => {
-      return new Promise<ExportedData>((resolve, reject) => {
-        const targetDb = familyDbName || 'beanies-data';
-        const request = indexedDB.open(targetDb, 6);
-
-        request.onsuccess = () => {
-          const db = request.result;
-
-          try {
-            const tx = db.transaction(
-              [
-                'familyMembers',
-                'accounts',
-                'transactions',
-                'assets',
-                'goals',
-                'recurringItems',
-                'todos',
-                'activities',
-                'settings',
-              ],
-              'readonly'
-            );
-
-            const data: ExportedData = {
-              familyMembers: [],
-              accounts: [],
-              transactions: [],
-              assets: [],
-              goals: [],
-              recurringItems: [],
-              todos: [],
-              activities: [],
-              settings: undefined,
-            };
-
-            const requests = [
-              tx.objectStore('familyMembers').getAll(),
-              tx.objectStore('accounts').getAll(),
-              tx.objectStore('transactions').getAll(),
-              tx.objectStore('assets').getAll(),
-              tx.objectStore('goals').getAll(),
-              tx.objectStore('recurringItems').getAll(),
-              tx.objectStore('todos').getAll(),
-              tx.objectStore('activities').getAll(),
-              tx.objectStore('settings').get('app_settings'),
-            ];
-
-            let completed = 0;
-            const total = requests.length;
-
-            requests.forEach((req, index) => {
-              req.onsuccess = () => {
-                switch (index) {
-                  case 0:
-                    data.familyMembers = req.result || [];
-                    break;
-                  case 1:
-                    data.accounts = req.result || [];
-                    break;
-                  case 2:
-                    data.transactions = req.result || [];
-                    break;
-                  case 3:
-                    data.assets = req.result || [];
-                    break;
-                  case 4:
-                    data.goals = req.result || [];
-                    break;
-                  case 5:
-                    data.recurringItems = req.result || [];
-                    break;
-                  case 6:
-                    data.todos = req.result || [];
-                    break;
-                  case 7:
-                    data.activities = req.result || [];
-                    break;
-                  case 8:
-                    data.settings = req.result || undefined;
-                    break;
-                }
-
-                completed++;
-                if (completed === total) {
-                  db.close();
-                  resolve(data);
-                }
-              };
-            });
-
-            tx.onerror = () => {
-              db.close();
-              reject(tx.error);
-            };
-          } catch (error) {
-            db.close();
-            reject(error);
-          }
-        };
-
-        request.onerror = () => {
-          reject(request.error);
-        };
-      });
-    }, dbName);
+    return await this.page.evaluate(() =>
+      (window as unknown as Record<string, any>).__e2eDataBridge.exportData()
+    );
   }
 }
