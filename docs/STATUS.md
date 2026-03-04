@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-04
-> **Updated by:** Claude (V4 sign-in modal UX improvements)
+> **Updated by:** Claude (#114 + #115 completed and merged to feature/automerge-migration)
 
 ## Current Phase
 
@@ -578,25 +578,6 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 
 ## In Progress
 
-### Auth & Family Key Flows (Issue #114) — Testing
-
-- **Branch:** `feature/114-auth-family-key-flows` (off `feature/automerge-migration`)
-- **Status:** Implementation complete, manual testing in progress before merge
-- Replaced pod encryption password with automatic family key (AES-256-GCM) wrapping per member
-- Invite links now include crypto token — joiners can decrypt the file without knowing any password
-- FamilyPage generates token-wrapped invite packages (24h expiry) on link creation
-- JoinPodView redeems invite tokens automatically, skipping the decrypt password modal
-- Fixed family ID mismatch validation in fresh browsers (uses V4 envelope ID)
-- Fixed cloud load error UX (no raw API errors, contextual fallback messaging)
-- syncStore: `addInvitePackage()`, `decryptPendingFileWithKey()` helpers
-- Simplified join flow: removed manual family code/UUID entry, magic link only
-- Invite modal shows only magic link (family code section removed)
-- JoinPodView shows "How to join" instructions with beanie family image when opened without URL params
-- Cleaned up 11 unused i18n strings
-- V4 decrypt modal UX: "Unlock your pod" → "Sign In to {familyName}" with beanie icon, member count hint, inline form (no modal overlay on storage cards)
-- Auto-sign-in after password decrypt: `decryptPendingFile()` returns `memberId`, LoadPodView calls `authStore.signIn()` → skips PickBeanView → navigates to /nook
-- 622 tests pass, build clean
-
 - **Multi-Family with File-Based Auth** — Per-family databases, file-based authentication (Cognito removed), passkey/biometric login implemented
 
 ### Completed Goals Section (Issue #55)
@@ -652,8 +633,8 @@ Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + 
 
 **Phase 3 — Auth & UI:**
 
-- [ ] #114 — Auth and onboarding flows for family key model (includes #108 code cleanup)
-- [ ] #115 — UI updates for family key model and invite flow
+- [x] #114 — Auth and onboarding flows for family key model (includes #108 code cleanup). Merged to `feature/automerge-migration`. Includes: family key generation/wrapping, single-password sign-in (no separate file decrypt), passkey PRF-based key unwrapping, magic link invites with crypto tokens, trusted device file caching (passwordless shortcut removed), auto-sign-in after decrypt, inline sign-in form UX. 622 tests passing.
+- [x] #115 — UI updates for family key model and invite flow. Merged to `feature/automerge-migration`. Includes: encryption toggle removed from Settings, family key status section, InviteMemberModal (magic link + QR), InviteLinkCard component, JoinPodView invite redemption, CreatePodView/LoadPodView/BiometricLoginView/PasskeySettings updated, useClipboard composable, JSON export. 622 tests passing.
 
 **Phase 4 — Cleanup:**
 
