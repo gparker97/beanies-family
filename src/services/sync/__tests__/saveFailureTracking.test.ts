@@ -13,19 +13,10 @@ vi.mock('../fileHandleStore', () => ({
   getProviderConfig: vi.fn(async () => null),
 }));
 vi.mock('../fileSync', () => ({
-  createSyncFileData: vi.fn(async () => ({
-    version: '3.0',
-    exportedAt: '2026-02-28T12:00:00Z',
-    encrypted: false,
-    data: {},
-  })),
-  validateSyncFileData: vi.fn(() => true),
-  importSyncFileData: vi.fn(async () => ({})),
+  reEncryptEnvelope: vi.fn(async () => '{"version":"4.0"}'),
+  parseBeanpodV4: vi.fn(() => ({})),
+  detectFileVersion: vi.fn(() => 4),
   openFilePicker: vi.fn(async () => null),
-}));
-vi.mock('@/services/crypto/encryption', () => ({
-  encryptSyncData: vi.fn(async () => 'encrypted'),
-  decryptSyncData: vi.fn(async () => '{}'),
 }));
 vi.mock('@/services/indexeddb/database', () => ({
   getActiveFamilyId: vi.fn(() => 'test-family-id'),
@@ -33,14 +24,29 @@ vi.mock('@/services/indexeddb/database', () => ({
 vi.mock('@/services/familyContext', () => ({
   createFamilyWithId: vi.fn(async () => {}),
 }));
-vi.mock('@/services/sync/settingsWAL', () => ({
-  clearSettingsWAL: vi.fn(),
+vi.mock('@/services/automerge/docService', () => ({
+  onDocPersistNeeded: vi.fn(() => vi.fn()),
 }));
+
+// Fake CryptoKey for tests (never actually used for encryption because reEncryptEnvelope is mocked)
+const fakeFamilyKey = {} as CryptoKey;
+const fakeEnvelope = {
+  version: '4.0' as const,
+  familyId: 'test-family',
+  familyName: 'Test',
+  keyId: 'k1',
+  wrappedKeys: {},
+  passkeyWrappedKeys: {},
+  inviteKeys: {},
+  encryptedPayload: '',
+};
 
 describe('syncService — save failure tracking', () => {
   beforeEach(async () => {
     vi.resetModules();
     syncService = await import('../syncService');
+    // V4 save() requires family key and envelope to be set
+    syncService.setFamilyKey(fakeFamilyKey, fakeEnvelope);
   });
 
   describe('getSaveFailureLevel', () => {

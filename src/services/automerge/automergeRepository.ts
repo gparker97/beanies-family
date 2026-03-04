@@ -4,6 +4,14 @@ import { toISODateString } from '@/utils/date';
 import { generateUUID } from '@/utils/id';
 
 /**
+ * Strip keys whose value is `undefined` from a plain object.
+ * Automerge rejects `undefined` — only valid JSON types are allowed.
+ */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+}
+
+/**
  * Generic Automerge repository factory.
  * Mirrors the IndexedDB `createRepository` API exactly:
  * same function signatures, same async return types, same auto-ID + timestamps.
@@ -42,12 +50,12 @@ export function createAutomergeRepository<
 
   async function create(input: CreateInput): Promise<Entity> {
     const now = toISODateString(new Date());
-    const entity = {
-      ...input,
+    const entity = stripUndefined({
+      ...(input as Record<string, unknown>),
       id: generateUUID(),
       createdAt: now,
       updatedAt: now,
-    } as unknown as Entity;
+    }) as unknown as Entity;
 
     const id = (entity as unknown as { id: string }).id;
     changeDoc((d) => {
@@ -66,10 +74,11 @@ export function createAutomergeRepository<
     if (!existing) return undefined;
 
     const now = toISODateString(new Date());
+    const cleanInput = stripUndefined(input as Record<string, unknown>);
     changeDoc((d) => {
       const col = d[collectionName] as Record<string, Entity>;
       const target = col[id];
-      if (target) Object.assign(target, input, { updatedAt: now });
+      if (target) Object.assign(target, cleanInput, { updatedAt: now });
     });
 
     // Return the updated entity from the new doc state

@@ -21,7 +21,6 @@ import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
-import { needsLegacyMigration, runLegacyMigration } from '@/services/migration/legacyMigration';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -38,6 +37,8 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
+import { showToast } from '@/composables/useToast';
+import { useTranslation } from '@/composables/useTranslation';
 import { saveNow } from '@/services/sync/syncService';
 
 const route = useRoute();
@@ -57,6 +58,7 @@ const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();
 const memberFilterStore = useMemberFilterStore();
 const authStore = useAuthStore();
+const { t } = useTranslation();
 const { isMobile, isDesktop } = useBreakpoint();
 
 const isInitializing = ref(true);
@@ -67,10 +69,13 @@ const passkeyPromptDismissed = ref(false);
 
 async function handleTrustDevice() {
   await settingsStore.setTrustedDevice(true);
-  // If there's already a session password, cache it for the newly trusted device
+  // If there's a family key in memory, cache it for the newly trusted device
   const familyId = familyContextStore.activeFamilyId;
-  if (syncStore.currentSessionPassword && familyId) {
-    await settingsStore.cacheEncryptionPassword(syncStore.currentSessionPassword, familyId);
+  if (familyId) {
+    const exportedKey = await syncStore.getExportedFamilyKey();
+    if (exportedKey) {
+      await settingsStore.cacheFamilyKey(exportedKey, familyId);
+    }
   }
   showTrustPrompt.value = false;
 }
@@ -84,23 +89,21 @@ async function handleEnablePasskey() {
   showPasskeyPrompt.value = false;
   passkeyPromptDismissed.value = true;
 
-  const password = syncStore.currentSessionPassword;
-  if (!password) {
-    console.warn('[passkey] No session password available for passkey registration');
-    return;
-  }
-
   try {
-    const result = await authStore.registerPasskeyForCurrentUser(password);
-    if (!result.success) {
-      console.warn('[passkey] Registration failed:', result.error);
-    } else if (result.passkeySecret) {
-      // Store PRF-wrapped password in the .beanpod envelope for cross-device access
-      syncStore.addPasskeySecret(result.passkeySecret);
-      await syncStore.syncNow(true);
+    const result = await authStore.registerPasskeyForCurrentUser();
+    if (result.success) {
+      if (result.passkeySecret) {
+        // Store PRF-wrapped family key in the .beanpod envelope for cross-device access
+        syncStore.addPasskeySecret(result.passkeySecret);
+        await syncStore.syncNow(true);
+      }
+      showToast('success', t('passkey.registerSuccess'));
+    } else {
+      showToast('error', result.error ?? t('passkey.registerError'));
     }
   } catch (e) {
     console.warn('[passkey] Unexpected error during passkey registration:', e);
+    showToast('error', t('passkey.registerError'));
   }
 }
 
@@ -132,21 +135,18 @@ const showLayout = computed(() => {
 });
 
 /**
- * Load all family data. The data file is the source of truth.
+ * Load all family data. The data file (.beanpod V4) is the source of truth.
  *
  * Priority:
- * 1. File handle exists + permission → load from file
- * 2. File handle exists + needs permission → fallback to IndexedDB cache with warning
- * 3. No file handle → load from IndexedDB if available
+ * 1. File handle exists + permission → load from file (V4 envelope + family key decrypt)
+ * 2. File handle exists + needs permission → try Automerge persistence cache
+ * 3. No file handle → initialize empty Automerge doc
  */
 
 /* eslint-disable no-console -- debug logging for sync diagnostics */
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
   console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
-
-  // Load per-family settings (needed for encryption state, etc.)
-  await settingsStore.loadSettings();
 
   // Initialize sync service (restores file handle if configured)
   await syncStore.initialize();
@@ -166,20 +166,48 @@ async function loadFamilyData() {
       if (result.processed > 0) {
         await transactionsStore.loadTransactions();
       }
-      // Auto-sync is always on when file is configured + has permission
       syncStore.setupAutoSync();
       return;
     }
 
-    // File needs password — try cached password from trusted device
+    // File needs password — try cached family key from trusted device
     if (loadResult.needsPassword) {
       const activeFamilyId = familyContextStore.activeFamilyId;
-      const cachedPw = activeFamilyId
-        ? settingsStore.getCachedEncryptionPassword(activeFamilyId)
-        : null;
-      if (cachedPw) {
-        const decryptResult = await syncStore.decryptPendingFile(cachedPw);
-        if (decryptResult.success) {
+      const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+      if (cachedKeyB64) {
+        try {
+          const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+          const { base64ToBuffer } = await import('@/utils/encoding');
+          const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+          const decryptResult = await syncStore.decryptPendingFileWithKey(fk);
+          if (decryptResult.success) {
+            memberFilterStore.initialize();
+            const result = await processRecurringItems();
+            if (result.processed > 0) {
+              await transactionsStore.loadTransactions();
+            }
+            return;
+          }
+        } catch {
+          // Cached key was invalid — clear it
+        }
+        if (activeFamilyId) {
+          await settingsStore.clearCachedFamilyKey(activeFamilyId);
+        }
+      }
+    }
+  }
+
+  // Path 2: File configured but needs permission → try Automerge persistence cache
+  if (syncStore.isConfigured && syncStore.needsPermission) {
+    console.log('[loadFamilyData] File needs permission — trying persistence cache');
+    const activeFamilyId = familyContextStore.activeFamilyId;
+    const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+    if (activeFamilyId && cachedKeyB64) {
+      try {
+        const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId);
+        if (cacheResult.success) {
+          console.log('[loadFamilyData] Loaded from persistence cache');
           memberFilterStore.initialize();
           const result = await processRecurringItems();
           if (result.processed > 0) {
@@ -187,25 +215,23 @@ async function loadFamilyData() {
           }
           return;
         }
-        // Cached password was wrong — clear it
-        if (activeFamilyId) {
-          await settingsStore.clearCachedEncryptionPassword(activeFamilyId);
-        }
+      } catch {
+        console.warn('[loadFamilyData] Failed to load from persistence cache');
       }
     }
-  }
-
-  // Path 2: File configured but needs permission → IndexedDB cache as read-only fallback
-  if (syncStore.isConfigured && syncStore.needsPermission) {
-    console.log('[loadFamilyData] File needs permission — using IndexedDB cache as fallback');
-    await loadFromIndexedDBCache();
+    // Fall through — user needs to grant permission
     return;
   }
 
-  // Path 3: No file configured → check if data exists in IndexedDB (existing/migrated user)
+  // Path 3: No file configured → initialize empty Automerge doc
+  // This path is for first-time users or users without a sync file
+  const { initDoc } = await import('@/services/automerge/docService');
+  initDoc();
+
+  // Load stores from the (empty) Automerge doc
+  await settingsStore.loadSettings();
   await familyStore.loadMembers();
 
-  // Existing user with IndexedDB data but no file configured — load normally
   if (familyStore.isSetupComplete) {
     memberFilterStore.initialize();
 
@@ -227,33 +253,6 @@ async function loadFamilyData() {
   }
 }
 /* eslint-enable no-console */
-
-/**
- * Fallback: load from IndexedDB cache when file permission is not yet granted.
- */
-async function loadFromIndexedDBCache() {
-  await familyStore.loadMembers();
-
-  if (familyStore.isSetupComplete) {
-    memberFilterStore.initialize();
-
-    await Promise.all([
-      accountsStore.loadAccounts(),
-      transactionsStore.loadTransactions(),
-      assetsStore.loadAssets(),
-      goalsStore.loadGoals(),
-      recurringStore.loadRecurringItems(),
-      todoStore.loadTodos(),
-      activityStore.loadActivities(),
-      budgetStore.loadBudgets(),
-    ]);
-
-    const result = await processRecurringItems();
-    if (result.processed > 0) {
-      await transactionsStore.loadTransactions();
-    }
-  }
-}
 
 onMounted(async () => {
   try {
@@ -296,12 +295,7 @@ onMounted(async () => {
       }
     }
 
-    // Step 3: Run legacy migration if needed (old single-DB → per-family DB)
-    if (await needsLegacyMigration()) {
-      await runLegacyMigration();
-    }
-
-    // Step 4: Resolve active family
+    // Step 3: Resolve active family
     const authFamilyId = authStore.currentUser?.familyId;
 
     if (authFamilyId) {
@@ -376,19 +370,13 @@ onUnmounted(() => {
 });
 
 // Show passkey or trust device prompt after fresh sign-in.
-// Passkey prompt takes priority when platform authenticator is available and encryption is enabled.
+// Passkey prompt takes priority when platform authenticator is available.
 // Not triggered on session restore (page refresh) since freshSignIn stays false.
-// Watches freshSignIn, route.path, isEncryptionEnabled, and isConfigured so the prompt
+// Watches freshSignIn, route.path, and isConfigured so the prompt
 // re-evaluates when any of these reactive values change (avoids race conditions where
-// encryption/config state settles after the route change).
+// config state settles after the route change).
 watch(
-  () =>
-    [
-      authStore.freshSignIn,
-      route.path,
-      syncStore.isEncryptionEnabled,
-      syncStore.isConfigured,
-    ] as const,
+  () => [authStore.freshSignIn, route.path, syncStore.isConfigured] as const,
   async ([isFresh, path], oldVal) => {
     if (
       !isFresh ||
@@ -413,8 +401,8 @@ watch(
       return;
     }
 
-    // Try passkey prompt first (per-family check, encryption must be enabled)
-    if (!passkeyPromptDismissed.value && syncStore.isEncryptionEnabled && syncStore.isConfigured) {
+    // Try passkey prompt first (per-family check)
+    if (!passkeyPromptDismissed.value && syncStore.isConfigured) {
       const familyId = authStore.currentUser?.familyId;
       if (familyId) {
         const hasPasskeys = await authStore.checkHasRegisteredPasskeys(familyId);

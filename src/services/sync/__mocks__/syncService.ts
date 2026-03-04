@@ -27,6 +27,15 @@ export const getProviderType = vi.fn(() => null);
 export const getProvider = vi.fn(() => null);
 export const setProvider = vi.fn();
 
+// Family key / envelope (V4)
+export const setFamilyKey = vi.fn();
+export const getFamilyKey = vi.fn(() => null);
+export const getEnvelope = vi.fn(() => null);
+export const setEnvelope = vi.fn();
+
+// Doc persistence callback (Automerge → sync)
+export const registerDocPersistCallback = vi.fn();
+
 // Save failure tracking
 export const getSaveFailureLevel = vi.fn(() => 'none');
 export const getLastSaveError = vi.fn(() => null);
@@ -49,7 +58,9 @@ export const flushPendingSave = vi.fn(async () => {});
 
 // Load operations
 export const getFileTimestamp = vi.fn(async () => null);
+export const load = vi.fn(async () => null);
 export const loadAndImport = vi.fn(async () => ({ success: true }));
+export const loadAndParseV4 = vi.fn(async () => ({ success: false }));
 export const openAndLoadFile = vi.fn(async () => ({ success: true }));
 export const loadDroppedFile = vi.fn(async () => ({ success: true }));
 export const decryptAndImport = vi.fn(async () => ({ success: true }));

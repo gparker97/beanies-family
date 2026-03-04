@@ -177,8 +177,7 @@ watch(
 
 const encryptionLabel = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFile');
-  if (syncStore.isEncryptionEnabled) return t('sidebar.dataEncrypted');
-  return t('sidebar.notEncrypted');
+  return t('sidebar.dataEncrypted');
 });
 </script>
 
@@ -476,13 +475,7 @@ const encryptionLabel = computed(() => {
               <div class="flex items-center gap-1.5">
                 <svg
                   class="h-3 w-3 flex-shrink-0"
-                  :class="
-                    syncStore.isConfigured && syncStore.isEncryptionEnabled
-                      ? 'text-[#6EE7B7]/30'
-                      : syncStore.isConfigured
-                        ? 'text-amber-400/30'
-                        : 'text-white/30'
-                  "
+                  :class="syncStore.isConfigured ? 'text-[#6EE7B7]/30' : 'text-white/30'"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

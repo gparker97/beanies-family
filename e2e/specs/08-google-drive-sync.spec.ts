@@ -20,7 +20,7 @@ const MOCK_FILE_NAME = 'test-family.beanpod';
 const MOCK_REFRESH_TOKEN = 'mock-e2e-refresh-token';
 
 const MOCK_BEANPOD_CONTENT = JSON.stringify({
-  version: '2.0',
+  version: '4.0',
   exportedAt: new Date().toISOString(),
   encrypted: false,
   familyId: 'e2e-drive-family-id',
@@ -300,7 +300,7 @@ test.describe('Google Drive Sync', () => {
     }, MOCK_FILE_ID);
 
     const parsed = JSON.parse(content);
-    expect(parsed.version).toBe('2.0');
+    expect(parsed.version).toBe('4.0');
     expect(parsed.familyName).toBe('Drive Test Family');
     expect(parsed.data.familyMembers).toHaveLength(1);
   });

@@ -5,7 +5,7 @@ import { useSettingsStore } from './settingsStore';
 import type { Asset, AssetLoan } from '@/types/models';
 
 // Mock the asset repository
-vi.mock('@/services/indexeddb/repositories/assetRepository', () => ({
+vi.mock('@/services/automerge/repositories/assetRepository', () => ({
   getAllAssets: vi.fn(),
   getAssetById: vi.fn(),
   createAsset: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('@/services/indexeddb/repositories/assetRepository', () => ({
 }));
 
 // Mock the settings repository to prevent actual DB calls
-vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
+vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   getDefaultSettings: vi.fn(() => ({
     id: 'app_settings',
     baseCurrency: 'USD',
@@ -36,7 +36,7 @@ vi.mock('@/services/indexeddb/repositories/settingsRepository', () => ({
   saveSettings: vi.fn().mockResolvedValue(undefined),
 }));
 
-import * as assetRepo from '@/services/indexeddb/repositories/assetRepository';
+import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 
 // Helper to create a mock asset
 function createMockAsset(overrides: Partial<Asset> = {}): Asset {

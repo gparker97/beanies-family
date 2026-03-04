@@ -880,6 +880,15 @@ const STRING_DEFS = {
     en: 'Copy and share your magic link with your family member',
     beanie: 'copy the magic bean link for this beanie',
   },
+  'family.memberAdded': { en: 'Member Added!', beanie: 'new beanie added!' },
+  'family.scanOrShare': {
+    en: 'Scan QR code or share the link',
+    beanie: 'scan the magic code or share the link',
+  },
+  'family.linkExpiry': {
+    en: 'This link expires in 24 hours',
+    beanie: 'this magic link expires in 24 hours',
+  },
   'family.inviteSection.title': {
     en: 'Invite to join',
     beanie: 'invite this beanie',
@@ -961,25 +970,19 @@ const STRING_DEFS = {
     en: 'Data loaded successfully!',
     beanie: 'data loaded successfully!',
   },
-  'settings.encryptDataFile': { en: 'Encrypt data file', beanie: 'encrypt data file' },
-  'settings.encrypted': { en: 'Encrypted', beanie: 'encrypted' },
-  'settings.unencrypted': { en: 'Unencrypted', beanie: 'unencrypted' },
-  'settings.encryptionDescription': {
-    en: 'Protect your data with password encryption',
-    beanie: 'lock your beans with a password',
+  'settings.familyKeyStatus': { en: 'Family Key', beanie: 'family key' },
+  'settings.familyKeyActive': {
+    en: 'End-to-End Encrypted',
+    beanie: 'end-to-end encrypted',
   },
-  'settings.disableEncryptionWarning': {
-    en: 'Disabling encryption means your financial data will be stored as clear text and could be read by anyone with access to the file. Are you sure?',
-    beanie:
-      'disabling encryption means your financial data will be stored as clear text and could be read by anyone with access to the file. are you sure?',
+  'settings.familyKeyDescription': {
+    en: 'Your data is protected with AES-256 encryption',
+    beanie: 'your beans are locked with aes-256 encryption',
   },
-  'settings.yesDisableEncryption': {
-    en: 'Yes, Disable Encryption',
-    beanie: 'yes, disable encryption',
-  },
-  'settings.passwordNote': {
-    en: "Note: You'll need to enter your password when you return to access your data.",
-    beanie: "note: you'll need to enter your password when you return to access your data.",
+  'settings.exportAsJson': { en: 'Export as JSON', beanie: 'export as json' },
+  'settings.exportAsJsonDesc': {
+    en: 'Download all your data as a human-readable JSON file',
+    beanie: 'download all your beans as a readable json file',
   },
   'settings.noAutoSyncWarning': {
     en: "Your browser doesn't support automatic file saving. Use manual export/import instead. For automatic saving, use Chrome or Edge.",
@@ -1008,13 +1011,6 @@ const STRING_DEFS = {
   'settings.exportTranslations': { en: 'Export Translations', beanie: 'export translations' },
 
   // Password modal
-  'password.setPassword': { en: 'Set Encryption Password', beanie: 'set encryption password' },
-  'password.setPasswordDescription': {
-    en: "Choose a strong password to encrypt your data file. You'll need this password each time you open the app.",
-    beanie:
-      "choose a strong password to encrypt your data file. you'll need this password each time you open the app.",
-  },
-  'password.enableEncryption': { en: 'Enable Encryption', beanie: 'enable encryption' },
   'password.enterPassword': { en: 'Enter Password', beanie: 'enter password' },
   'password.enterPasswordDescription': {
     en: 'This file is encrypted. Enter your password to decrypt and load the data.',
@@ -1155,16 +1151,6 @@ const STRING_DEFS = {
     beanie:
       'your encryption key has changed since biometric was set up. please sign in with your password and re-register biometric in settings.',
   },
-  'passkey.dekAndPasswordFailed': {
-    en: 'Your encryption password has changed. Please sign in with your password and re-register biometric in Settings.',
-    beanie:
-      'your encryption password has changed. please sign in with your password and re-register biometric in settings.',
-  },
-  'passkey.passwordChanged': {
-    en: 'Your encryption password has changed since biometric was set up. Please sign in with your password and re-register biometric in Settings.',
-    beanie:
-      'your encryption password has changed since biometric was set up. please sign in with your password and re-register biometric in settings.',
-  },
   'passkey.fileLoadError': {
     en: 'Could not load your data file. Please sign in with your password.',
     beanie: 'could not load your data file. please sign in with your password.',
@@ -1183,10 +1169,6 @@ const STRING_DEFS = {
     en: 'Sign in with your fingerprint, face, or device PIN instead of a password.',
     beanie: 'sign in with your fingerprint, face, or device pin instead of a password.',
   },
-  'passkey.enterEncryptionPassword': {
-    en: 'Enter your encryption password to register',
-    beanie: 'enter your encryption password to register',
-  },
   'passkey.noPasskeys': {
     en: 'No biometric logins registered yet.',
     beanie: 'no biometric logins registered yet.',
@@ -1194,10 +1176,6 @@ const STRING_DEFS = {
   'passkey.unsupported': {
     en: 'Your browser does not support biometric login (WebAuthn).',
     beanie: 'your browser does not support biometric login (webauthn).',
-  },
-  'passkey.needsEncryption': {
-    en: 'Biometric login requires file encryption to be enabled.',
-    beanie: 'biometric login requires file encryption to be enabled.',
   },
   'passkey.rename': { en: 'Rename', beanie: 'rename' },
   'passkey.renameLabel': { en: 'Device name', beanie: 'device name' },
@@ -1239,11 +1217,6 @@ const STRING_DEFS = {
     en: 'Failed to load file. Please try again.',
     beanie: 'failed to load file. please try again.',
   },
-  'auth.fileNotEncryptedWarning': {
-    en: 'This data file is not encrypted. Anyone with access to the file can view your family data. You can enable encryption in Settings.',
-    beanie:
-      'this data file is not encrypted. anyone with access to the file can view your family data. you can enable encryption in settings.',
-  },
   'auth.password': { en: 'Password', beanie: 'password' },
   'auth.enterYourPassword': { en: 'Enter your password', beanie: 'enter your password' },
   'auth.signInFailed': { en: 'Sign in failed', beanie: 'sign in failed' },
@@ -1261,22 +1234,12 @@ const STRING_DEFS = {
   'join.title': { en: 'Join Family', beanie: 'join the pod' },
 
   // Login — Invite / Join
-  'login.inviteAsParent': { en: 'Parent', beanie: 'big bean' },
-  'login.inviteAsChild': { en: 'Child', beanie: 'little bean' },
-  'login.inviteRoleLabel': { en: 'Inviting as', beanie: 'inviting as' },
-  'login.familyCodePlaceholder': {
-    en: 'Enter the code from your family',
-    beanie: 'enter the code from your family',
-  },
   'login.inviteTitle': { en: 'Invite family member', beanie: 'invite your beanies' },
   'login.inviteDesc': {
-    en: 'Share this code with family members so they can join your pod',
-    beanie: 'share this code with family members so they can join your pod',
+    en: 'Share this magic link with your family member so they can join your pod',
+    beanie: 'share this magic link with your family member so they can join your pod',
   },
-  'login.inviteCode': { en: 'Family code', beanie: 'family code' },
-  'login.inviteLink': { en: 'Or share this link', beanie: 'or share this link' },
   'login.copied': { en: 'Copied!', beanie: 'copied!' },
-  'login.copyCode': { en: 'Copy code', beanie: 'copy code' },
   'login.copyLink': { en: 'Copy link', beanie: 'copy link' },
 
   // Login v6 redesign
@@ -1324,12 +1287,20 @@ const STRING_DEFS = {
     beanie: 'zero servers, zero tracking',
   },
   'loginV6.fileLoaded': { en: 'loaded', beanie: 'loaded' },
-  'loginV6.unlockTitle': { en: 'Unlock your pod', beanie: 'unlock your pod' },
-  'loginV6.unlockSubtitle': {
-    en: 'Enter your pod password to decrypt your family data',
-    beanie: 'enter your pod password to decrypt your family data',
+  'loginV6.unlockTitle': { en: 'Sign In', beanie: 'sign in' },
+  'loginV6.unlockTitleWithFamily': {
+    en: 'Sign In to {familyName}',
+    beanie: 'sign in to {familyName}',
   },
-  'loginV6.unlockButton': { en: 'Unlock Your Pod', beanie: 'unlock your pod' },
+  'loginV6.unlockSubtitle': {
+    en: "Enter your password and we'll find your account",
+    beanie: "enter your password and we'll find your account",
+  },
+  'loginV6.unlockButton': { en: 'Sign In', beanie: 'sign in' },
+  'loginV6.unlockMemberCount': {
+    en: '{count} members in this family',
+    beanie: '{count} beans in this pod',
+  },
   'loginV6.unlockFooter': {
     en: "This password decrypts your local data. We don't store or recover it.",
     beanie: "this password decrypts your local data. we don't store or recover it.",
@@ -1375,10 +1346,6 @@ const STRING_DEFS = {
   'loginV6.createButton': { en: 'Create Pod', beanie: 'create pod' },
   'loginV6.alreadyHavePod': { en: 'Already have a pod?', beanie: 'already have a pod?' },
   'loginV6.loadItLink': { en: 'Load it', beanie: 'load it' },
-  'loginV6.passwordHint': {
-    en: 'This encrypts your data file',
-    beanie: 'this encrypts your data file',
-  },
   'loginV6.storageTitle': {
     en: 'Where should we save your pod?',
     beanie: 'where should we save your pod?',
@@ -1396,23 +1363,7 @@ const STRING_DEFS = {
   'loginV6.addMember': { en: 'Add Member', beanie: 'add beanie' },
   'loginV6.finish': { en: 'Finish', beanie: 'finish' },
   'loginV6.skip': { en: 'Skip for now', beanie: 'skip for now' },
-  'loginV6.joinInput': { en: 'Family code or magic link', beanie: 'family code or magic link' },
-  'loginV6.whatsNext': { en: 'What happens next?', beanie: 'what happens next?' },
-  'loginV6.joinStep1': {
-    en: "We'll verify your family and load the data file",
-    beanie: "we'll verify your family and load the data file",
-  },
-  'loginV6.joinStep2': {
-    en: "You'll pick your profile and create a password",
-    beanie: "you'll pick your profile and create a password",
-  },
-  'loginV6.joinStep3': { en: "Then you're in!", beanie: "then you're a beanie!" },
   'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'join your pod!' },
-  'loginV6.joinNotAvailable': {
-    en: 'Joining a pod isn\'t available yet. Ask your family to share their .beanpod file with you and use "Sign in to your pod" instead.',
-    beanie:
-      'joining a pod isn\'t available yet. ask your family to share their .beanpod file with you and use "sign in to your pod" instead.',
-  },
   'loginV6.wantYourOwn': { en: 'Want your own?', beanie: 'want your own?' },
   'loginV6.createLink': { en: 'Create a new pod', beanie: 'create a new pod' },
   'loginV6.acceptsBeanpod': { en: 'Accepts .beanpod files', beanie: 'accepts .beanpod files' },
@@ -1449,10 +1400,6 @@ const STRING_DEFS = {
     en: 'Name your family pod and create your sign-in password.',
     beanie: 'name your family pod and create your sign-in password.',
   },
-  'loginV6.encryptionPasswordLabel': {
-    en: 'Pod data file encryption password',
-    beanie: 'pod data file encryption password',
-  },
   'loginV6.signInPasswordLabel': { en: 'Your sign-in password', beanie: 'your sign-in password' },
   'loginV6.signInPasswordHint': {
     en: "You'll use this password to sign into your bean profile",
@@ -1469,14 +1416,9 @@ const STRING_DEFS = {
   },
   'loginV6.step2Title': { en: 'Save & secure your pod', beanie: 'save & secure your pod' },
   'loginV6.step2Subtitle': {
-    en: 'Choose where to store your encrypted data file and set a password to protect it.',
-    beanie: 'choose where to store your encrypted data file and set a password to protect it.',
+    en: 'Choose where to store your encrypted data file.',
+    beanie: 'choose where to store your encrypted data file.',
   },
-  'loginV6.podPasswordOptional': {
-    en: 'Optional \u2014 you can enable encryption later in Settings',
-    beanie: 'optional \u2014 you can enable encryption later in settings',
-  },
-  'loginV6.confirmPodPassword': { en: 'Confirm pod password', beanie: 'confirm pod password' },
   'loginV6.addMemberFailed': {
     en: 'Failed to add member. Please try again.',
     beanie: 'failed to add member. please try again.',
@@ -1486,7 +1428,10 @@ const STRING_DEFS = {
 
   // Join flow (magic link invites)
   'join.verifyTitle': { en: 'Join your family', beanie: 'join your family pod!' },
-  'join.verifySubtitle': { en: "Let's find your family", beanie: "let's find your family" },
+  'join.verifySubtitle': {
+    en: 'You need a magic joining link from a family member',
+    beanie: 'you need a magic joining link from a family member',
+  },
   'join.lookingUp': { en: 'Looking up your family...', beanie: 'finding your pod...' },
   'join.familyFound': { en: 'Family found!', beanie: 'found your pod!' },
   'join.familyNotFound': {
@@ -1526,6 +1471,18 @@ const STRING_DEFS = {
     en: 'No unclaimed profiles found. Ask the family owner to create your profile first.',
     beanie: 'no unclaimed beanies found. ask your pod owner to create your profile first.',
   },
+  'join.inviteTokenInvalid': {
+    en: 'This invite link is invalid. Ask the family owner for a new one.',
+    beanie: 'this invite link is no good. ask your pod owner for a new one.',
+  },
+  'join.inviteTokenExpired': {
+    en: 'This invite link has expired. Ask the family owner for a new one.',
+    beanie: 'this invite link has expired. ask your pod owner for a new one.',
+  },
+  'join.generatingLink': {
+    en: 'Generating secure invite link...',
+    beanie: 'generating secure invite link...',
+  },
   'join.setPasswordTitle': { en: 'Create your password', beanie: 'create your password' },
   'join.setPasswordSubtitle': {
     en: 'This password is just for you to sign in',
@@ -1540,7 +1497,7 @@ const STRING_DEFS = {
   'join.shareFileNoteCloud': {
     en: 'Your family member will be prompted to sign in with Google to access the shared file automatically.',
     beanie:
-      'your family member will be prompted to sign in with google to access the shared file automatically.',
+      'Your family member will be prompted to sign in with your cloud provider to access the shared file. Please ensure they have access to the file with their account',
   },
   'join.cloudLoadFailed': {
     en: "Couldn't load the file from cloud storage. You can load it manually below.",
@@ -1550,16 +1507,23 @@ const STRING_DEFS = {
     en: 'Loading family data from Google Drive...',
     beanie: 'fetching your beans from the cloud...',
   },
-  'join.enterCodeManually': {
-    en: 'Or enter a family code manually',
-    beanie: 'or enter a family code manually',
+  'join.howToJoinTitle': { en: 'How to join', beanie: 'how to join' },
+  'join.howToJoinStep1': {
+    en: 'Ask a parent or family admin to open the Family page',
+    beanie: 'ask a big bean to open the family page',
   },
-  'join.codeInputLabel': { en: 'Family code', beanie: 'family code' },
-  'join.codeInputHint': {
-    en: 'Paste the family code or invite link shared by your family member',
-    beanie: 'paste the family pod code or invite link shared by your family member',
+  'join.howToJoinStep2': {
+    en: "They'll tap Invite to generate a magic link",
+    beanie: "they'll tap invite to make a magic link",
   },
-  'join.next': { en: 'Next', beanie: 'next' },
+  'join.howToJoinStep3': {
+    en: "Open the link on your device — that's it!",
+    beanie: "open the link on your device — that's it!",
+  },
+  'join.linkExpiryNote': {
+    en: 'Invite links expire after 24 hours for security',
+    beanie: 'invite links expire after 24 hours for security',
+  },
 
   // PWA / Offline / Install
   'pwa.offlineBanner': {

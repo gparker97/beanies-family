@@ -16,7 +16,7 @@ import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { flushPendingSave } from '@/services/sync/syncService';
-import { clearAllSettingsWAL } from '@/services/sync/settingsWAL';
+import { initDoc } from '@/services/automerge/docService';
 
 export interface AuthUser {
   memberId: string;
@@ -29,15 +29,15 @@ const SESSION_KEY = 'beanies_auth_session';
 
 function persistSession(user: AuthUser): void {
   try {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   } catch {
-    // sessionStorage unavailable (e.g. private browsing) — silent fail
+    // localStorage unavailable (e.g. private browsing) — silent fail
   }
 }
 
 function clearSession(): void {
   try {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
   } catch {
     // silent fail
   }
@@ -45,7 +45,7 @@ function clearSession(): void {
 
 function restoreSession(): AuthUser | null {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(SESSION_KEY);
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
     return null;
@@ -183,6 +183,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (!family) {
         return { success: false, error: 'Failed to create family' };
       }
+
+      // Initialize Automerge document — must happen before any changeDoc() calls
+      // (createMember and setOnboardingCompleted both write to the doc)
+      initDoc();
 
       // Hash the password
       const passwordHashValue = await hashPassword(params.password);
@@ -328,14 +332,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Sign in using a registered passkey (biometric).
-   * Returns cachedPassword for file decryption.
+   * Returns familyKey for file decryption if available via PRF or trusted device cache.
    */
   async function signInWithPasskey(
     familyId: string,
     passkeySecrets?: PasskeySecret[]
   ): Promise<{
     success: boolean;
-    cachedPassword?: string;
+    familyKey?: CryptoKey;
     credentialId?: string;
     error?: string;
   }> {
@@ -345,19 +349,6 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const result = await authenticateWithPasskey({ familyId, passkeySecrets });
       if (!result.success || !result.memberId) {
-        // For CROSS_DEVICE_NO_CACHE, create a partial session so the
-        // member is already identified after file decryption
-        if (result.error === 'CROSS_DEVICE_NO_CACHE' && result.memberId) {
-          const user: AuthUser = {
-            memberId: result.memberId,
-            email: '',
-            familyId,
-            role: undefined,
-          };
-          currentUser.value = user;
-          isAuthenticated.value = true;
-          persistSession(user);
-        }
         error.value = result.error ?? 'Passkey authentication failed';
         return { success: false, credentialId: result.credentialId, error: error.value };
       }
@@ -378,7 +369,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       return {
         success: true,
-        cachedPassword: result.cachedPassword,
+        familyKey: result.familyKey,
       };
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Passkey sign in failed';
@@ -436,11 +427,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * Register a passkey for the current user.
+   * Uses the active family key from the sync store.
    */
-  async function registerPasskeyForCurrentUser(
-    encryptionPassword: string,
-    label?: string
-  ): Promise<RegisterPasskeyResult> {
+  async function registerPasskeyForCurrentUser(label?: string): Promise<RegisterPasskeyResult> {
     if (!currentUser.value) {
       return { success: false, error: 'Not signed in' };
     }
@@ -451,12 +440,19 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: 'Member not found' };
     }
 
+    // Get family key from sync store
+    const { useSyncStore } = await import('./syncStore');
+    const syncStore = useSyncStore();
+    if (!syncStore.familyKey) {
+      return { success: false, error: 'No family key available — data file must be loaded' };
+    }
+
     return registerPasskeyForMember({
       memberId: member.id,
       memberName: member.name,
       memberEmail: member.email,
       familyId: currentUser.value.familyId ?? '',
-      encryptionPassword,
+      familyKey: syncStore.familyKey,
       label,
     });
   }
@@ -530,13 +526,10 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
 
-    // Clear trust flag and cached encryption password
+    // Clear trust flag and cached family key
     const settingsStore = useSettingsStore();
     await settingsStore.setTrustedDevice(false);
-    await settingsStore.clearCachedEncryptionPassword();
-
-    // Clear all settings WAL entries (full data wipe)
-    clearAllSettingsWAL();
+    await settingsStore.clearCachedFamilyKey();
 
     // Clear auth state
     currentUser.value = null;

@@ -96,7 +96,9 @@ const { isEditing, isSubmitting } = useFormModal(
   }
 );
 
-const canSave = computed(() => name.value.trim().length > 0 && type.value !== '');
+const canSave = computed(
+  () => name.value.trim().length > 0 && type.value !== '' && memberId.value !== ''
+);
 
 const modalTitle = computed(() =>
   isEditing.value ? t('accounts.editAccount') : t('accounts.addAccount')
@@ -173,7 +175,7 @@ function handleDelete() {
     @delete="handleDelete"
   >
     <!-- 1. Account Owner -->
-    <FormFieldGroup :label="t('modal.accountOwner')">
+    <FormFieldGroup :label="t('modal.accountOwner')" required>
       <FamilyChipPicker v-model="memberId" mode="single" />
     </FormFieldGroup>
 
@@ -214,7 +216,7 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 4. Category / Type (two-level picker) -->
-    <FormFieldGroup :label="t('modal.selectCategory')">
+    <FormFieldGroup :label="t('modal.selectCategory')" required>
       <AccountCategoryPicker v-model="type" />
     </FormFieldGroup>
 

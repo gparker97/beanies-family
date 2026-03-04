@@ -4,7 +4,7 @@ import { useAccountsStore } from './accountsStore';
 import type { Account } from '@/types/models';
 
 // Mock the account repository
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn(),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
   deleteAccount: vi.fn(),
 }));
 
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
+import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 
 const mockAccount: Account = {
   id: 'test-account-1',

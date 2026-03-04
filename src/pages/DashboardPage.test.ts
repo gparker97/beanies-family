@@ -5,7 +5,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import type { Transaction, RecurringItem } from '@/types/models';
 
 // Mock the repositories
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn(),
   getTransactionById: vi.fn(),
   createTransaction: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
   deleteTransaction: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
+vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getAllRecurringItems: vi.fn(),
   getRecurringItemById: vi.fn(),
   createRecurringItem: vi.fn(),
@@ -21,7 +21,7 @@ vi.mock('@/services/indexeddb/repositories/recurringItemRepository', () => ({
   deleteRecurringItem: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn(),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),

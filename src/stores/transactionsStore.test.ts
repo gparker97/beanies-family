@@ -5,7 +5,7 @@ import { useTransactionsStore } from './transactionsStore';
 import type { Transaction, Account } from '@/types/models';
 
 // Mock the transaction repository
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn(),
   getTransactionById: vi.fn(),
   createTransaction: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
 }));
 
 // Mock the account repository
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn(),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -23,8 +23,8 @@ vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
   updateAccountBalance: vi.fn(),
 }));
 
-import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
+import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
+import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 
 const mockAccount: Account = {
   id: 'test-account-1',

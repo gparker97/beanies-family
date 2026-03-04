@@ -1,6 +1,6 @@
-import * as accountRepo from '@/services/indexeddb/repositories/accountRepository';
-import * as recurringRepo from '@/services/indexeddb/repositories/recurringItemRepository';
-import * as transactionRepo from '@/services/indexeddb/repositories/transactionRepository';
+import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
+import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import type { RecurringItem, CreateTransactionInput } from '@/types/models';
 import {
   toDateInputValue,

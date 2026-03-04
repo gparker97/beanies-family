@@ -16,7 +16,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   'signed-in': [destination: string];
   'use-password': [];
-  'cross-device-password': [payload: { memberId: string; credentialId: string }];
   back: [];
 }>();
 
@@ -36,13 +35,7 @@ async function handleBiometricLogin() {
     const result = await authStore.signInWithPasskey(props.familyId, syncStore.passkeySecrets);
 
     if (!result.success) {
-      if (result.error === 'CROSS_DEVICE_NO_CACHE') {
-        emit('cross-device-password', {
-          memberId: authStore.currentUser?.memberId ?? '',
-          credentialId: result.credentialId ?? '',
-        });
-        return;
-      } else if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
+      if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
         errorMessage.value = t('passkey.wrongFamilyError');
       } else {
         errorMessage.value = result.error ?? t('passkey.signInError');
@@ -50,23 +43,23 @@ async function handleBiometricLogin() {
       return;
     }
 
-    // Decrypt with cached password
+    // Decrypt with family key if available, otherwise fall back to password prompt
     let decryptSuccess = false;
 
-    if (result.cachedPassword) {
-      const pwResult = await syncStore.decryptPendingFile(result.cachedPassword);
-      decryptSuccess = pwResult.success;
+    if (result.familyKey) {
+      const fkResult = await syncStore.decryptPendingFileWithKey(result.familyKey);
+      decryptSuccess = fkResult.success;
       if (!decryptSuccess) {
-        console.warn('[BiometricLoginView] decryptPendingFile failed:', pwResult.error);
-        // Distinguish: file never loaded vs wrong password
-        if (pwResult.error?.includes('No pending')) {
+        console.warn('[BiometricLoginView] decryptPendingFileWithKey failed:', fkResult.error);
+        if (fkResult.error?.includes('No pending')) {
           errorMessage.value = t('passkey.fileLoadError');
         } else {
-          errorMessage.value = t('passkey.passwordChanged');
+          errorMessage.value = t('passkey.signInError');
         }
       }
     } else {
-      errorMessage.value = t('passkey.signInError');
+      // Passkey verified member but no family key — prompt for password
+      emit('use-password');
       return;
     }
 

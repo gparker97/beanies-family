@@ -174,29 +174,31 @@ function handleDelete() {
     </FormFieldGroup>
 
     <!-- 2. Goal name -->
-    <div>
+    <FormFieldGroup :label="t('modal.goalName')" required>
       <input
         v-model="name"
         type="text"
         class="font-outfit w-full border-none bg-transparent text-lg font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
         :placeholder="t('modal.goalName')"
       />
-    </div>
+    </FormFieldGroup>
 
     <!-- 3. Amounts side by side -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <AmountInput
-        v-model="targetAmount"
-        :currency-symbol="currency || settingsStore.displayCurrency"
-        font-size="1.2rem"
-        :label="t('modal.targetAmount')"
-      />
-      <AmountInput
-        v-model="currentAmount"
-        :currency-symbol="currency || settingsStore.displayCurrency"
-        font-size="1.2rem"
-        :label="t('modal.currentAmount')"
-      />
+      <FormFieldGroup :label="t('modal.targetAmount')" required>
+        <AmountInput
+          v-model="targetAmount"
+          :currency-symbol="currency || settingsStore.displayCurrency"
+          font-size="1.2rem"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('modal.currentAmount')">
+        <AmountInput
+          v-model="currentAmount"
+          :currency-symbol="currency || settingsStore.displayCurrency"
+          font-size="1.2rem"
+        />
+      </FormFieldGroup>
     </div>
 
     <!-- 4. Currency -->

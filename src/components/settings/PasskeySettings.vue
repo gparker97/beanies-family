@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
@@ -25,8 +24,6 @@ const platformAvailable = ref(false);
 const passkeys = ref<PasskeyRegistration[]>([]);
 const statusMessage = ref<{ text: string; type: 'success' | 'error' } | null>(null);
 const isRegistering = ref(false);
-const showPasswordInput = ref(false);
-const registrationPassword = ref('');
 const editingId = ref<string | null>(null);
 const editLabel = ref('');
 
@@ -44,34 +41,20 @@ async function loadPasskeys() {
   }
 }
 
-function handleStartRegister() {
-  if (!syncStore.isEncryptionEnabled) {
-    statusMessage.value = { text: t('passkey.needsEncryption'), type: 'error' };
-    return;
-  }
-  showPasswordInput.value = true;
-  registrationPassword.value = '';
-  statusMessage.value = null;
-}
-
 async function handleRegister() {
-  if (!registrationPassword.value) return;
-
   isRegistering.value = true;
   statusMessage.value = null;
 
   try {
-    const result = await authStore.registerPasskeyForCurrentUser(registrationPassword.value);
+    const result = await authStore.registerPasskeyForCurrentUser();
 
     if (result.success) {
-      // Store PRF-wrapped password in the .beanpod envelope for cross-device access
+      // Store PRF-wrapped family key in the .beanpod envelope for cross-device access
       if (result.passkeySecret) {
         syncStore.addPasskeySecret(result.passkeySecret);
         await syncStore.syncNow(true);
       }
       statusMessage.value = { text: t('passkey.registerSuccess'), type: 'success' };
-      showPasswordInput.value = false;
-      registrationPassword.value = '';
       await loadPasskeys();
     } else {
       statusMessage.value = { text: result.error ?? t('passkey.registerError'), type: 'error' };
@@ -266,39 +249,13 @@ function formatDate(dateStr: string): string {
         {{ t('passkey.noPasskeys') }}
       </div>
 
-      <!-- Registration form -->
-      <div v-if="showPasswordInput" class="space-y-3">
-        <p class="text-sm text-gray-600 dark:text-gray-400">
-          {{ t('passkey.enterEncryptionPassword') }}
-        </p>
-        <form class="flex gap-2" @submit.prevent="handleRegister">
-          <BaseInput
-            v-model="registrationPassword"
-            type="password"
-            :placeholder="t('passkey.enterEncryptionPassword')"
-            class="flex-1"
-          />
-          <BaseButton
-            type="submit"
-            variant="primary"
-            :disabled="!registrationPassword || isRegistering"
-          >
-            {{ isRegistering ? t('passkey.authenticating') : t('action.confirm') }}
-          </BaseButton>
-          <BaseButton variant="ghost" @click="showPasswordInput = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
-        </form>
-      </div>
-
       <!-- Register button -->
       <BaseButton
-        v-else
         variant="secondary"
-        :disabled="!platformAvailable"
-        @click="handleStartRegister"
+        :disabled="!platformAvailable || isRegistering"
+        @click="handleRegister"
       >
-        {{ t('passkey.registerButton') }}
+        {{ isRegistering ? t('passkey.authenticating') : t('passkey.registerButton') }}
       </BaseButton>
 
       <!-- Status message -->

@@ -362,16 +362,18 @@ function handleSave() {
     </FormFieldGroup>
 
     <!-- 3. Activity title (styled wrapper) -->
-    <div
-      class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
-    >
-      <input
-        v-model="title"
-        type="text"
-        class="font-outfit w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
-        :placeholder="t('modal.whatsTheActivity')"
-      />
-    </div>
+    <FormFieldGroup :label="t('modal.whatsTheActivity')" required>
+      <div
+        class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
+      >
+        <input
+          v-model="title"
+          type="text"
+          class="font-outfit w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30 dark:text-gray-100"
+          :placeholder="t('modal.whatsTheActivity')"
+        />
+      </div>
+    </FormFieldGroup>
 
     <!-- 4. Cost + Fee Schedule -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -387,7 +389,7 @@ function handleSave() {
     </div>
 
     <!-- 5. Who Pays? (required if cost > 0) -->
-    <FormFieldGroup v-if="hasCost" :label="t('planner.field.feePayer')">
+    <FormFieldGroup v-if="hasCost" :label="t('planner.field.feePayer')" required>
       <FamilyChipPicker v-model="feePayerId" mode="single" compact />
     </FormFieldGroup>
 
@@ -417,7 +419,7 @@ function handleSave() {
 
     <!-- 8. Date + Start / End time -->
     <div class="grid grid-cols-3 gap-4">
-      <FormFieldGroup :label="t('planner.field.date')">
+      <FormFieldGroup :label="t('planner.field.date')" required>
         <BaseInput v-model="date" type="date" required />
       </FormFieldGroup>
 

@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-03
-> **Updated by:** Claude (projected recurring transactions, store reactivity fixes, Today button — deployed)
+> **Last updated:** 2026-03-04
+> **Updated by:** Claude (#116 cleanup completed on feature/automerge-migration)
 
 ## Current Phase
 
@@ -27,7 +27,7 @@
 - Exchange rate auto-fetching from free currency API
 - Recurring transaction processor (daily/monthly/yearly)
 - Multilingual support (English + Chinese) via MyMemory API with IndexedDB caching
-- Project documentation: `docs/ARCHITECTURE.md`, `docs/adr/` (10 ADRs)
+- Project documentation: `docs/ARCHITECTURE.md`, `docs/adr/` (13 ADRs)
 - Generic IndexedDB repository factory (`createRepository.ts`) — shared CRUD for 8 entity stores
 - Toast notification system (`useToast.ts` + `ToastContainer.vue`) — error/success/warning/info toasts
 - Store action helper (`wrapAsync()`) — centralized try/catch/finally for all store CRUD operations
@@ -629,16 +629,16 @@ Major data layer migration from IndexedDB + file-based sync to Automerge CRDT + 
 
 **Phase 2 — Core Migration:**
 
-- [ ] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal (note: `gp-` → `beanies-` DB rename already completed in #112)
+- [x] #113 — Data layer switchover: IndexedDB → Automerge, sync rewrite, old code removal. Merged to `feature/automerge-migration`. Includes: all 10 stores switched to Automerge repos, sync/persistence layer rewritten for V4 beanpod, 15 deprecated files deleted, regression fixes (Automerge proxy cloning, auth session persistence, passkey lifecycle, exchange rate save). 615 tests passing.
 
 **Phase 3 — Auth & UI:**
 
-- [ ] #114 — Auth and onboarding flows for family key model (includes #108 code cleanup)
-- [ ] #115 — UI updates for family key model and invite flow
+- [x] #114 — Auth and onboarding flows for family key model (includes #108 code cleanup). Merged to `feature/automerge-migration`. Includes: family key generation/wrapping, single-password sign-in (no separate file decrypt), passkey PRF-based key unwrapping, magic link invites with crypto tokens, trusted device file caching (passwordless shortcut removed), auto-sign-in after decrypt, inline sign-in form UX. 622 tests passing.
+- [x] #115 — UI updates for family key model and invite flow. Merged to `feature/automerge-migration`. Includes: encryption toggle removed from Settings, family key status section, InviteMemberModal (magic link + QR), InviteLinkCard component, JoinPodView invite redemption, CreatePodView/LoadPodView/BiometricLoginView/PasskeySettings updated, useClipboard composable, JSON export. 622 tests passing.
 
 **Phase 4 — Cleanup:**
 
-- [ ] #116 — Dead code removal, documentation updates, final verification
+- [x] #116 — Dead code removal, documentation updates, final verification. Completed on `feature/automerge-migration`. Includes: removed 6 orphaned V3 types from models.ts, deleted legacy migration module (legacyMigration.ts + related imports), removed V3 encryption wrappers, cleaned up stale comments, fixed broken E2E import, rewrote ARCHITECTURE.md for Automerge architecture, updated CLAUDE.md and SECURITY_GUIDE.md, added supersession notes to 6 existing ADRs, created ADRs 018/019/020
 
 **Follow-up:**
 
@@ -768,7 +768,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 
 ## Known Issues
 
-_(None currently tracked)_
+- **Single-family re-login shows LoadPodView instead of auto-decrypting:** When a single family exists and the user clicks "Sign In" after sign-out, `tryAutoDecrypt` fails because `cacheFamilyKey()` only stores the key on trusted devices (`isTrustedDevice === true`). On non-trusted devices, the cached family key is empty, so auto-decrypt falls through to the LoadPodView password form. Needs investigation: either always cache the family key after explicit password entry, or prompt for trusted device earlier in the flow.
 
 ## Decision Log
 

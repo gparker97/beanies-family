@@ -1,5 +1,7 @@
 # ADR-017: Record-Level Merge Sync
 
+> **Superseded by [ADR-018](018-automerge-crdt-migration.md)** — this ADR describes the original design; the superseding ADR documents the current architecture.
+
 **Status:** Accepted
 **Date:** 2026-02-27
 **Supersedes:** Full-replace strategy from ADR-002, ADR-011

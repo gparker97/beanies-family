@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import * as familyRepo from '@/services/indexeddb/repositories/familyMemberRepository';
-import { useTombstoneStore } from './tombstoneStore';
+import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
 import { wrapAsync } from '@/composables/useStoreActions';
 import type {
   FamilyMember,
@@ -65,7 +64,6 @@ export const useFamilyStore = defineStore('family', () => {
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await familyRepo.deleteFamilyMember(id);
       if (success) {
-        useTombstoneStore().recordDeletion('familyMember', id);
         members.value = members.value.filter((m) => m.id !== id);
         if (currentMemberId.value === id) {
           currentMemberId.value = owner.value?.id ?? null;

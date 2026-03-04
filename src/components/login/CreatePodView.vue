@@ -10,12 +10,16 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
+import * as syncService from '@/services/sync/syncService';
+import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import type { FamilyMember, Gender, AgeGroup } from '@/types/models';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
+const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 
 type LoginView = 'load-pod';
@@ -40,8 +44,6 @@ const confirmPassword = ref('');
 // Step 2 state
 const storageSaved = ref(false);
 const isSavingStorage = ref(false);
-const podPassword = ref('');
-const confirmPodPassword = ref('');
 const storageType = ref<'local' | 'google_drive' | null>(null);
 const showDriveResultModal = ref(false);
 const driveResultError = ref<string | null>(null);
@@ -104,7 +106,9 @@ async function handleChooseLocalStorage() {
   formError.value = null;
 
   try {
-    const success = await syncStore.configureSyncFile();
+    // Only select the file/set up the provider — don't save yet.
+    // createNewFile() in handleStep2Next will initialize the doc and write the V4 envelope.
+    const success = await syncService.selectSyncFile();
     if (success) {
       storageSaved.value = true;
       storageType.value = 'local';
@@ -128,14 +132,19 @@ async function handleChooseGoogleDriveStorage() {
   driveResultError.value = null;
 
   try {
+    // Only create the Drive provider — don't save yet.
+    // createNewFile() in handleStep2Next will initialize the doc and write the V4 envelope.
     const podFileName = `${familyName.value || 'my-family'}.beanpod`;
-    const success = await syncStore.configureSyncFileGoogleDrive(podFileName);
-    if (success) {
-      storageSaved.value = true;
-      storageType.value = 'google_drive';
-    } else {
-      driveResultError.value = syncStore.error || t('googleDrive.authFailed');
+    const provider = await GoogleDriveProvider.createNew(podFileName);
+    syncService.setProvider(provider);
+
+    const familyId = familyContextStore.activeFamilyId;
+    if (familyId) {
+      await provider.persist(familyId);
     }
+
+    storageSaved.value = true;
+    storageType.value = 'google_drive';
   } catch (e) {
     driveResultError.value = (e as Error).message || t('googleDrive.authFailed');
   } finally {
@@ -153,24 +162,21 @@ async function handleStep2Next() {
     return;
   }
 
-  // Pod password is required
-  if (!podPassword.value) {
-    formError.value = t('auth.passwordMinLength');
-    return;
-  }
-
-  if (podPassword.value.length < 8) {
-    formError.value = t('auth.passwordMinLength');
-    return;
-  }
-  if (podPassword.value !== confirmPodPassword.value) {
-    formError.value = t('auth.passwordsDoNotMatch');
-    return;
-  }
-
-  // Enable encryption with the pod password
-  if (syncStore.isConfigured) {
-    await syncStore.enableEncryption(podPassword.value);
+  // Initialize the Automerge document, generate keys, and write V4 envelope to the provider.
+  // Uses the member password from Step 1 to derive the wrapping key for the family key.
+  if (syncStore.isConfigured && authStore.currentUser) {
+    const podFileName = `${familyName.value || 'my-family'}.beanpod`;
+    const success = await syncStore.createNewFile(
+      podFileName,
+      password.value,
+      authStore.currentUser.memberId,
+      familyContextStore.activeFamilyId ?? '',
+      familyName.value
+    );
+    if (!success) {
+      formError.value = syncStore.error ?? t('setup.fileCreateFailed');
+      return;
+    }
   }
 
   currentStep.value = 3;
@@ -218,10 +224,11 @@ function getNextColor(): string {
 }
 
 async function handleFinish() {
-  // Save to file if configured
+  // Save to file if configured — the doc + family key are initialized by createNewFile() in Step 2
   if (syncStore.isConfigured) {
-    syncStore.setupAutoSync();
     await syncStore.syncNow(true);
+    syncStore.setupAutoSync();
+    syncStore.ensureRegistered();
   }
   emit('signed-in', '/nook');
 }
@@ -624,33 +631,7 @@ function handleBack() {
         </div>
       </div>
 
-      <!-- Pod file encryption password (below storage box) -->
-      <div class="mt-5 space-y-3">
-        <div>
-          <BaseInput
-            v-model="podPassword"
-            :label="t('loginV6.encryptionPasswordLabel')"
-            type="password"
-            :placeholder="t('auth.passwordPlaceholder')"
-          />
-          <p class="mt-1 text-xs text-gray-400">
-            {{ t('loginV6.passwordHint') }}
-          </p>
-        </div>
-        <BaseInput
-          v-if="podPassword"
-          v-model="confirmPodPassword"
-          :label="t('loginV6.confirmPodPassword')"
-          type="password"
-          :placeholder="t('auth.confirmPasswordPlaceholder')"
-        />
-      </div>
-
-      <BaseButton
-        class="mt-6 w-full"
-        :disabled="!storageSaved || !podPassword"
-        @click="handleStep2Next"
-      >
+      <BaseButton class="mt-6 w-full" :disabled="!storageSaved" @click="handleStep2Next">
         {{ t('loginV6.createNext') }}
       </BaseButton>
     </div>

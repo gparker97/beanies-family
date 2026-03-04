@@ -1,5 +1,7 @@
 # ADR-014: File-Based Authentication (Cognito Removal)
 
+> **Superseded by [ADR-019](019-family-key-encryption.md)** — this ADR describes the original design; the superseding ADR documents the current architecture.
+
 **Status:** Accepted
 **Date:** 2026-02-22
 

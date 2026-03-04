@@ -45,11 +45,16 @@ export async function saveSettings(
   settings: Partial<Settings>,
   options?: { preserveTimestamp?: boolean }
 ): Promise<Settings> {
-  const existing = await getSettings();
+  // Deep-clone both existing AND incoming settings to strip Automerge proxy
+  // wrappers — spreading a proxy only shallow-copies, leaving nested arrays/objects
+  // as proxy references which Automerge rejects with
+  // "Cannot create a reference to an existing document object".
+  const existing = structuredClone(await getSettings());
+  const incoming = structuredClone(settings) as Partial<Settings>;
 
   const updated: Settings = {
     ...existing,
-    ...settings,
+    ...incoming,
     id: SETTINGS_ID,
     updatedAt: options?.preserveTimestamp ? existing.updatedAt : toISODateString(new Date()),
   };
@@ -110,10 +115,14 @@ export async function updateExchangeRates(rates: ExchangeRate[]): Promise<Settin
   const settings = await getSettings();
   const now = toISODateString(new Date());
 
-  // Merge new rates with existing, replacing duplicates
+  // Merge new rates with existing, replacing duplicates.
+  // structuredClone existing rates to strip Automerge proxy wrappers —
+  // passing proxy objects back into changeDoc causes
+  // "Cannot create a reference to an existing document object".
   const rateMap = new Map<string, ExchangeRate>();
 
-  for (const rate of settings.exchangeRates) {
+  const existingRates = structuredClone(settings.exchangeRates) as ExchangeRate[];
+  for (const rate of existingRates) {
     rateMap.set(`${rate.from}-${rate.to}`, rate);
   }
 

@@ -107,10 +107,12 @@ function handleSave() {
     <TogglePillGroup v-model="direction" :options="directionOptions" />
 
     <!-- Amount (hero size) -->
-    <AmountInput v-model="amount" :currency-symbol="currSymbol" font-size="2rem" />
+    <FormFieldGroup :label="t('budget.quickAdd.amount')" required>
+      <AmountInput v-model="amount" :currency-symbol="currSymbol" font-size="2rem" />
+    </FormFieldGroup>
 
     <!-- Category -->
-    <FormFieldGroup :label="t('budget.quickAdd.category')">
+    <FormFieldGroup :label="t('budget.quickAdd.category')" required>
       <CategoryChipPicker v-model="category" :type="direction" />
     </FormFieldGroup>
 
@@ -121,11 +123,11 @@ function handleSave() {
 
     <!-- Date + Account row -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <FormFieldGroup :label="t('budget.quickAdd.date')">
+      <FormFieldGroup :label="t('budget.quickAdd.date')" required>
         <BaseInput v-model="date" type="date" />
       </FormFieldGroup>
 
-      <FormFieldGroup :label="t('budget.quickAdd.account')">
+      <FormFieldGroup :label="t('budget.quickAdd.account')" required>
         <BaseSelect v-model="accountId" :options="accountOptions" />
       </FormFieldGroup>
     </div>

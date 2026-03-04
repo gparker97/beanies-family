@@ -1,6 +1,15 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { exchangeCodeForTokens, refreshAccessToken } from '../oauthProxy';
 
+/** Helper: create a mock Response with text() method (used by safeJsonParse). */
+function mockResponse(ok: boolean, body: unknown, status = ok ? 200 : 400) {
+  return {
+    ok,
+    status,
+    text: async () => (body === null ? '' : JSON.stringify(body)),
+  };
+}
+
 describe('oauthProxy', () => {
   const originalFetch = globalThis.fetch;
 
@@ -15,15 +24,14 @@ describe('oauthProxy', () => {
 
   describe('exchangeCodeForTokens', () => {
     it('sends correct request to Lambda proxy', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(true, {
           access_token: 'ya29.access',
           refresh_token: '1//refresh',
           expires_in: 3600,
           token_type: 'Bearer',
-        }),
-      });
+        })
+      );
 
       const result = await exchangeCodeForTokens({
         code: 'auth-code',
@@ -50,13 +58,12 @@ describe('oauthProxy', () => {
     });
 
     it('throws on error response', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(false, {
           error: 'invalid_grant',
           error_description: 'Code expired',
-        }),
-      });
+        })
+      );
 
       await expect(
         exchangeCodeForTokens({
@@ -69,10 +76,7 @@ describe('oauthProxy', () => {
     });
 
     it('throws generic error when no description', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'server_error' }),
-      });
+      globalThis.fetch = vi.fn().mockResolvedValue(mockResponse(false, { error: 'server_error' }));
 
       await expect(
         exchangeCodeForTokens({
@@ -83,18 +87,68 @@ describe('oauthProxy', () => {
         })
       ).rejects.toThrow('server_error');
     });
+
+    it('handles empty response body without raw JSON parse error', async () => {
+      // Reproduces the real bug: Lambda proxy returns empty body (e.g. 502, timeout)
+      // → res.json() throws "Unexpected end of JSON input" which leaks to the user.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        text: async () => '',
+      });
+
+      await expect(
+        exchangeCodeForTokens({
+          code: 'c',
+          codeVerifier: 'v',
+          redirectUri: 'https://beanies.family/oauth/callback',
+          clientId: 'cid',
+        })
+      ).rejects.toThrow('Token exchange failed');
+      // Must NOT throw "Unexpected end of JSON input" — that's a raw leak
+    });
+
+    it('handles HTML error page response without raw JSON parse error', async () => {
+      // Lambda/API Gateway can return HTML error pages (e.g. 503 Service Unavailable)
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => '<html><body>Service Unavailable</body></html>',
+      });
+
+      await expect(
+        exchangeCodeForTokens({
+          code: 'c',
+          codeVerifier: 'v',
+          redirectUri: 'https://beanies.family/oauth/callback',
+          clientId: 'cid',
+        })
+      ).rejects.toThrow('Token exchange failed');
+    });
+
+    it('throws clear error when VITE_REGISTRY_API_URL is not configured', async () => {
+      vi.stubEnv('VITE_REGISTRY_API_URL', '');
+
+      await expect(
+        exchangeCodeForTokens({
+          code: 'c',
+          codeVerifier: 'v',
+          redirectUri: 'https://beanies.family/oauth/callback',
+          clientId: 'cid',
+        })
+      ).rejects.toThrow('VITE_REGISTRY_API_URL is not configured');
+    });
   });
 
   describe('refreshAccessToken', () => {
     it('sends correct request to Lambda proxy', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(true, {
           access_token: 'ya29.new-access',
           expires_in: 3600,
           token_type: 'Bearer',
-        }),
-      });
+        })
+      );
 
       const result = await refreshAccessToken({
         refreshToken: '1//my-refresh',
@@ -116,13 +170,12 @@ describe('oauthProxy', () => {
     });
 
     it('throws on error response', async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        mockResponse(false, {
           error: 'invalid_grant',
           error_description: 'Token revoked',
-        }),
-      });
+        })
+      );
 
       await expect(
         refreshAccessToken({
@@ -130,6 +183,21 @@ describe('oauthProxy', () => {
           clientId: 'cid',
         })
       ).rejects.toThrow('Token revoked');
+    });
+
+    it('handles empty response body without raw JSON parse error', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        text: async () => '',
+      });
+
+      await expect(
+        refreshAccessToken({
+          refreshToken: 'r',
+          clientId: 'cid',
+        })
+      ).rejects.toThrow('Token refresh failed');
     });
   });
 });

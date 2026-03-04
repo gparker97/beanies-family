@@ -4,7 +4,7 @@ import { toDateInputValue } from '@/utils/date';
 import type { Transaction, Budget } from '@/types/models';
 
 // Mock repositories
-vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
+vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn(),
   getTransactionById: vi.fn(),
   createTransaction: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('@/services/indexeddb/repositories/transactionRepository', () => ({
   deleteTransaction: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAllAccounts: vi.fn(),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -21,14 +21,14 @@ vi.mock('@/services/indexeddb/repositories/accountRepository', () => ({
   updateAccountBalance: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/budgetRepository', () => ({
+vi.mock('@/services/automerge/repositories/budgetRepository', () => ({
   getAllBudgets: vi.fn().mockResolvedValue([]),
   createBudget: vi.fn(),
   updateBudget: vi.fn(),
   deleteBudget: vi.fn(),
 }));
 
-vi.mock('@/services/indexeddb/repositories/recurringRepository', () => ({
+vi.mock('@/services/automerge/repositories/recurringRepository', () => ({
   getAllRecurringItems: vi.fn().mockResolvedValue([]),
 }));
 

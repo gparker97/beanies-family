@@ -35,7 +35,7 @@ export interface GlobalSettings {
   soundEnabled?: boolean;
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
-  cachedEncryptionPasswords?: Record<string, string>;
+  cachedFamilyKeys?: Record<string, string>;
   passkeyPromptShown?: boolean;
 }
 
@@ -47,19 +47,17 @@ export interface PasskeyRegistration {
   publicKey: string; // base64 public key
   transports?: string[]; // AuthenticatorTransport hints
   prfSupported: boolean; // PRF available during registration?
-  cachedPassword?: string; // Cached encryption password for file decryption
   label: string; // e.g. "MacBook Touch ID"
   createdAt: ISODateString;
   lastUsedAt?: ISODateString;
 }
 
-// PasskeySecret - PRF-wrapped file password stored in .beanpod envelope
+// PasskeySecret - PRF-wrapped family key stored in .beanpod envelope
 export interface PasskeySecret {
   credentialId: string; // Which passkey credential created this
   memberId: UUID; // Which member this belongs to
-  wrappedPassword: string; // AES-GCM encrypted file password
+  wrappedFamilyKey: string; // AES-KW wrapped family key
   hkdfSalt: string; // HKDF salt (base64)
-  iv: string; // AES-GCM IV (base64)
   createdAt: ISODateString;
 }
 
@@ -392,30 +390,6 @@ export interface TranslationCacheEntry {
   hash?: string; // Hash of source text, used to detect when translation is outdated
 }
 
-// Sync queue item for tracking changes
-export type SyncOperation = 'create' | 'update' | 'delete';
-export type EntityType =
-  | 'familyMember'
-  | 'account'
-  | 'transaction'
-  | 'asset'
-  | 'goal'
-  | 'budget'
-  | 'recurringItem'
-  | 'todo'
-  | 'familyActivity'
-  | 'settings';
-
-export interface SyncQueueItem {
-  id: UUID;
-  entityType: EntityType;
-  entityId: UUID;
-  operation: SyncOperation;
-  data?: Record<string, unknown>;
-  timestamp: ISODateString;
-  synced: boolean;
-}
-
 // Google Auth state
 export interface GoogleAuthState {
   isAuthenticated: boolean;
@@ -458,38 +432,6 @@ export type CreateRecurringItemInput = Omit<RecurringItem, 'id' | 'createdAt' | 
 export type UpdateRecurringItemInput = Partial<
   Omit<RecurringItem, 'id' | 'createdAt' | 'updatedAt'>
 >;
-
-// Deletion tombstone for merge-based sync
-export interface DeletionTombstone {
-  id: UUID;
-  entityType: EntityType;
-  deletedAt: ISODateString;
-}
-
-// Sync file format
-export const SYNC_FILE_VERSION = '3.0';
-
-export interface SyncFileData {
-  version: string;
-  exportedAt: ISODateString;
-  encrypted: boolean;
-  familyId?: UUID; // v2.0: identifies which family this data belongs to
-  familyName?: string; // v2.0: human-readable family name
-  passkeySecrets?: PasskeySecret[]; // PRF-wrapped passwords (outside encryption envelope)
-  data: {
-    familyMembers: FamilyMember[];
-    accounts: Account[];
-    transactions: Transaction[];
-    assets: Asset[];
-    goals: Goal[];
-    recurringItems: RecurringItem[];
-    todos?: TodoItem[];
-    activities?: FamilyActivity[];
-    budgets?: Budget[];
-    deletions: DeletionTombstone[];
-    settings: Settings | null;
-  };
-}
 
 export interface SyncStatus {
   isConfigured: boolean;

@@ -218,6 +218,62 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  describe('migratePendingRefreshToken', () => {
+    it('moves pending refresh token to family-scoped key', async () => {
+      const { getGoogleRefreshToken, storeGoogleRefreshToken, clearGoogleRefreshToken } =
+        await import('@/services/sync/fileHandleStore');
+
+      // Simulate a pending token stored during login-page OAuth
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'pending-refresh-token'
+      );
+
+      await googleAuth.migratePendingRefreshToken('family-456');
+
+      // Should read from the pending key
+      expect(getGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
+      // Should store under the family key
+      expect(storeGoogleRefreshToken).toHaveBeenCalledWith('family-456', 'pending-refresh-token');
+      // Should clear the pending key
+      expect(clearGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
+    });
+
+    it('does nothing when no pending token exists', async () => {
+      const { storeGoogleRefreshToken, clearGoogleRefreshToken } =
+        await import('@/services/sync/fileHandleStore');
+
+      await googleAuth.migratePendingRefreshToken('family-456');
+
+      // getGoogleRefreshToken returns null by default, so no migration
+      expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
+      expect(clearGoogleRefreshToken).not.toHaveBeenCalled();
+    });
+
+    it('enables silent refresh after migration', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      // Mock fetch for userinfo email call
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      // First call: migratePendingRefreshToken reads the pending token
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'pending-refresh-token'
+      );
+
+      await googleAuth.migratePendingRefreshToken('family-456');
+
+      // Now silent refresh should work (in-memory refreshToken was set)
+      const result = await googleAuth.attemptSilentRefresh();
+      expect(result).toBe('mock-refreshed-token');
+
+      vi.unstubAllEnvs();
+    });
+  });
+
   describe('email caching', () => {
     it('caches and returns Google account email', () => {
       expect(googleAuth.getGoogleAccountEmail()).toBeNull();

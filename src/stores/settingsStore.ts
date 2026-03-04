@@ -1,9 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
-import * as settingsRepo from '@/services/indexeddb/repositories/settingsRepository';
+import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
-import { writeSettingsWAL } from '@/services/sync/settingsWAL';
-import { getActiveFamilyId } from '@/services/indexeddb/database';
 import type {
   Settings,
   GlobalSettings,
@@ -12,18 +10,6 @@ import type {
   ExchangeRate,
   LanguageCode,
 } from '@/types/models';
-
-// WAL suppression: prevents spurious WAL writes during store reloads
-// (e.g. reloadAllStores importing data that mutates settings.value).
-let _suppressWAL = false;
-
-export function suppressSettingsWAL(): void {
-  _suppressWAL = true;
-}
-
-export function resumeSettingsWAL(): void {
-  _suppressWAL = false;
-}
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -87,21 +73,6 @@ export const useSettingsStore = defineStore('settings', () => {
       }
     },
     { immediate: true }
-  );
-
-  // Write-ahead log: persist settings to localStorage on every mutation
-  // so they survive page refresh even if the async file write hasn't completed.
-  // Suppressed during reloadAllStores() to avoid capturing imported data as WAL entries.
-  watch(
-    settings,
-    (newSettings) => {
-      if (_suppressWAL) return;
-      const familyId = getActiveFamilyId();
-      if (familyId) {
-        writeSettingsWAL(familyId, newSettings);
-      }
-    },
-    { deep: true }
   );
 
   // Actions
@@ -389,38 +360,38 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
-   * Cache the encryption password for a specific family on trusted devices.
+   * Cache the exported family key for a specific family on trusted devices.
    * Only stores when isTrustedDevice is true.
    */
-  async function cacheEncryptionPassword(password: string, familyId: string): Promise<void> {
+  async function cacheFamilyKey(exportedKey: string, familyId: string): Promise<void> {
     if (!isTrustedDevice.value) return;
-    const existing = globalSettings.value.cachedEncryptionPasswords ?? {};
+    const existing = globalSettings.value.cachedFamilyKeys ?? {};
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-      cachedEncryptionPasswords: { ...existing, [familyId]: password },
+      cachedFamilyKeys: { ...existing, [familyId]: exportedKey },
     });
   }
 
   /**
-   * Retrieve the cached encryption password for a specific family.
+   * Retrieve the cached family key for a specific family.
    */
-  function getCachedEncryptionPassword(familyId: string): string | null {
-    return globalSettings.value.cachedEncryptionPasswords?.[familyId] ?? null;
+  function getCachedFamilyKey(familyId: string): string | null {
+    return globalSettings.value.cachedFamilyKeys?.[familyId] ?? null;
   }
 
   /**
-   * Clear the cached encryption password.
+   * Clear the cached family key.
    * With familyId: clear one entry. Without: clear all.
    */
-  async function clearCachedEncryptionPassword(familyId?: string): Promise<void> {
+  async function clearCachedFamilyKey(familyId?: string): Promise<void> {
     if (familyId) {
-      const existing = { ...(globalSettings.value.cachedEncryptionPasswords ?? {}) };
+      const existing = { ...(globalSettings.value.cachedFamilyKeys ?? {}) };
       delete existing[familyId];
       globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-        cachedEncryptionPasswords: existing,
+        cachedFamilyKeys: existing,
       });
     } else {
       globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
-        cachedEncryptionPasswords: {},
+        cachedFamilyKeys: {},
       });
     }
   }
@@ -488,9 +459,9 @@ export const useSettingsStore = defineStore('settings', () => {
     setTrustedDevice,
     setTrustedDevicePromptShown,
     setPasskeyPromptShown,
-    cacheEncryptionPassword,
-    getCachedEncryptionPassword,
-    clearCachedEncryptionPassword,
+    cacheFamilyKey,
+    getCachedFamilyKey,
+    clearCachedFamilyKey,
     convertAmount,
     resetState,
   };
