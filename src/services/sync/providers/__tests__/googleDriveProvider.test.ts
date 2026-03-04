@@ -7,6 +7,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   isTokenValid: vi.fn(() => true),
   requestAccessToken: vi.fn(async () => 'refreshed-token'),
   attemptSilentRefresh: vi.fn(async () => null),
+  hasRefreshToken: vi.fn(() => false),
   revokeToken: vi.fn(async () => {}),
   fetchGoogleUserEmail: vi.fn(async () => 'test@example.com'),
   getGoogleAccountEmail: vi.fn(() => null),
@@ -180,25 +181,52 @@ describe('GoogleDriveProvider', () => {
       expect(mockUpdateFile).toHaveBeenCalledWith('silent-token', 'file-123', '{"data":"test"}');
     });
 
-    it('falls back to interactive auth when silent refresh fails', async () => {
+    it('falls back to interactive auth with forceConsent when no refresh token', async () => {
       const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
-      const { attemptSilentRefresh, requestAccessToken } =
-        await import('@/services/google/googleAuth');
+      const {
+        attemptSilentRefresh,
+        requestAccessToken,
+        hasRefreshToken: hasRT,
+      } = await import('@/services/google/googleAuth');
 
       // First write fails with 401
       mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
 
       // Silent refresh fails
       (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+      // No refresh token available
+      (hasRT as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
       await provider.write('{"data":"test"}');
 
       // Should have tried silent refresh
       expect(attemptSilentRefresh).toHaveBeenCalled();
-      // Should have fallen back to interactive auth
-      expect(requestAccessToken).toHaveBeenCalled();
+      // Should have fallen back to interactive auth with forceConsent
+      expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: true });
       // Should have retried with the interactive token
       expect(mockUpdateFile).toHaveBeenCalledWith('refreshed-token', 'file-123', '{"data":"test"}');
+    });
+
+    it('falls back to interactive auth without forceConsent when refresh token exists', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const {
+        attemptSilentRefresh,
+        requestAccessToken,
+        hasRefreshToken: hasRT,
+      } = await import('@/services/google/googleAuth');
+
+      // First write fails with 401
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+
+      // Silent refresh fails
+      (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+      // Refresh token exists (just failed to refresh)
+      (hasRT as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+      await provider.write('{"data":"test"}');
+
+      // forceConsent should be false when we already have a refresh token
+      expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: false });
     });
 
     it('queues for offline on network error', async () => {
@@ -235,16 +263,21 @@ describe('GoogleDriveProvider', () => {
       expect(content).toBe('{"version":"4.0"}');
     });
 
-    it('falls back to interactive auth when silent refresh fails', async () => {
+    it('falls back to interactive auth with forceConsent when no refresh token', async () => {
       const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
-      const { attemptSilentRefresh, requestAccessToken } =
-        await import('@/services/google/googleAuth');
+      const {
+        attemptSilentRefresh,
+        requestAccessToken,
+        hasRefreshToken: hasRT,
+      } = await import('@/services/google/googleAuth');
 
       // First read fails with 401
       mockReadFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
 
       // Silent refresh fails
       (attemptSilentRefresh as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+      // No refresh token available
+      (hasRT as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
       // Second read succeeds
       mockReadFile.mockResolvedValueOnce('{"version":"4.0"}');
@@ -252,7 +285,7 @@ describe('GoogleDriveProvider', () => {
       const content = await provider.read();
 
       expect(attemptSilentRefresh).toHaveBeenCalled();
-      expect(requestAccessToken).toHaveBeenCalled();
+      expect(requestAccessToken).toHaveBeenCalledWith({ forceConsent: true });
       expect(mockReadFile).toHaveBeenCalledWith('refreshed-token', 'file-123');
       expect(content).toBe('{"version":"4.0"}');
     });

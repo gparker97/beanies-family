@@ -290,6 +290,14 @@ onMounted(async () => {
       translationStore.loadTranslations(settingsStore.language).catch(console.error);
     }
 
+    // Request persistent storage so the browser won't evict IndexedDB
+    // (tokens, file handles). Installed PWAs are almost always granted.
+    if (navigator.storage?.persist) {
+      navigator.storage.persist().then((granted) => {
+        if (granted) console.warn('[storage] Persistent storage granted');
+      });
+    }
+
     // Step 2: Initialize auth (checks registry for existing families)
     await authStore.initializeAuth();
 

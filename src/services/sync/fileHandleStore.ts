@@ -172,9 +172,16 @@ export async function clearProviderConfig(familyId: string): Promise<void> {
 }
 
 // --- Google OAuth refresh token persistence ---
+// Dual-write: IndexedDB (primary) + localStorage (fallback).
+// On PWA/mobile, IndexedDB can be evicted under storage pressure or
+// iOS Safari's 7-day eviction policy. localStorage has different eviction
+// characteristics and serves as a redundant backup.
+
+const LS_REFRESH_TOKEN_PREFIX = 'beanies_grt_';
 
 /**
  * Store a Google OAuth refresh token for a family.
+ * Writes to both IndexedDB (primary) and localStorage (fallback).
  */
 export async function storeGoogleRefreshToken(
   familyId: string,
@@ -186,16 +193,29 @@ export async function storeGoogleRefreshToken(
     refreshToken as unknown as FileSystemFileHandle,
     `googleRefreshToken-${familyId}`
   );
+  // localStorage fallback — best-effort (may fail in private browsing or quota)
+  try {
+    localStorage.setItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`, refreshToken);
+  } catch {
+    // Ignore — IndexedDB is the primary store
+  }
 }
 
 /**
  * Retrieve the stored Google OAuth refresh token for a family.
+ * Tries IndexedDB first, falls back to localStorage if IndexedDB was evicted.
  */
 export async function getGoogleRefreshToken(familyId: string): Promise<string | null> {
   try {
     const db = await getHandleDatabase();
     const token = await db.get(HANDLE_STORE, `googleRefreshToken-${familyId}`);
-    return typeof token === 'string' ? token : null;
+    if (typeof token === 'string') return token;
+  } catch {
+    // IndexedDB failed — fall through to localStorage
+  }
+  // Fallback: try localStorage
+  try {
+    return localStorage.getItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`);
   } catch {
     return null;
   }
@@ -203,8 +223,14 @@ export async function getGoogleRefreshToken(familyId: string): Promise<string | 
 
 /**
  * Clear the stored Google OAuth refresh token for a family.
+ * Removes from both IndexedDB and localStorage.
  */
 export async function clearGoogleRefreshToken(familyId: string): Promise<void> {
   const db = await getHandleDatabase();
   await db.delete(HANDLE_STORE, `googleRefreshToken-${familyId}`);
+  try {
+    localStorage.removeItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`);
+  } catch {
+    // Ignore
+  }
 }

@@ -17,6 +17,7 @@ import {
   revokeToken,
   requestAccessToken,
   attemptSilentRefresh,
+  hasRefreshToken,
   fetchGoogleUserEmail,
   getGoogleAccountEmail,
   setGoogleAccountEmail,
@@ -61,8 +62,9 @@ export class GoogleDriveProvider implements StorageProvider {
           await updateFile(silentToken, this.fileId, content);
           return;
         }
-        // Silent refresh failed — fall back to interactive auth
-        const newToken = await requestAccessToken();
+        // Silent refresh failed — fall back to interactive auth.
+        // Force consent when we have no refresh token so Google issues one.
+        const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
         await updateFile(newToken, this.fileId, content);
         return;
       }
@@ -96,7 +98,8 @@ export class GoogleDriveProvider implements StorageProvider {
         if (silentToken) {
           return await readFile(silentToken, this.fileId);
         }
-        const newToken = await requestAccessToken();
+        // Force consent when we have no refresh token so Google issues one.
+        const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
         return await readFile(newToken, this.fileId);
       }
       throw e;
