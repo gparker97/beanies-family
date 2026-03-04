@@ -21,7 +21,6 @@ import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
-import { needsLegacyMigration, runLegacyMigration } from '@/services/migration/legacyMigration';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -296,12 +295,7 @@ onMounted(async () => {
       }
     }
 
-    // Step 3: Run legacy migration if needed (old single-DB → per-family DB)
-    if (await needsLegacyMigration()) {
-      await runLegacyMigration();
-    }
-
-    // Step 4: Resolve active family
+    // Step 3: Resolve active family
     const authFamilyId = authStore.currentUser?.familyId;
 
     if (authFamilyId) {

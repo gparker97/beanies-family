@@ -1,5 +1,7 @@
 # ADR-009: Per-Family Database Architecture (Multi-Tenancy)
 
+> **Superseded by [ADR-018](018-automerge-crdt-migration.md)** — this ADR describes the original design; the superseding ADR documents the current architecture.
+
 **Status:** Accepted
 **Date:** 2026-02-17
 
