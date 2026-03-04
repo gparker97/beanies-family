@@ -223,10 +223,19 @@ async function loadFamilyData() {
     return;
   }
 
-  // Path 3: No file configured → initialize empty Automerge doc
+  // Path 3: No file configured → initialize Automerge doc
   // This path is for first-time users or users without a sync file
-  const { initDoc } = await import('@/services/automerge/docService');
-  initDoc();
+  // E2E seed: if the data bridge saved a binary to sessionStorage, load it
+  if (import.meta.env.DEV && sessionStorage.getItem('__e2eSeedDoc')) {
+    const { loadDoc } = await import('@/services/automerge/docService');
+    const { base64ToBuffer } = await import('@/utils/encoding');
+    const b64 = sessionStorage.getItem('__e2eSeedDoc')!;
+    sessionStorage.removeItem('__e2eSeedDoc');
+    loadDoc(new Uint8Array(base64ToBuffer(b64)));
+  } else {
+    const { initDoc } = await import('@/services/automerge/docService');
+    initDoc();
+  }
 
   // Load stores from the (empty) Automerge doc
   await settingsStore.loadSettings();
