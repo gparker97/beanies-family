@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { BaseCard, BaseButton, BaseModal } from '@/components/ui';
+import { BaseCard, BaseButton, BaseInput, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
@@ -14,8 +14,10 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { timeAgo } from '@/utils/date';
-import { isTemporaryEmail } from '@/utils/email';
+import { isTemporaryEmail, isValidEmail } from '@/utils/email';
 import { generateInviteQR } from '@/utils/qrCode';
+import { shareFileWithEmail } from '@/services/google/driveService';
+import { getValidToken } from '@/services/google/googleAuth';
 import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -44,6 +46,9 @@ const isGeneratingInvite = ref(false);
 const inviteLinkError = ref<string | null>(null);
 const inviteLink = ref('');
 const inviteQrUrl = ref('');
+const shareEmail = ref('');
+const isSharing = ref(false);
+const shareResult = ref<'success' | 'error' | null>(null);
 
 /** Build the base join URL (without token) for display/fallback. */
 function buildBaseJoinUrl(): string {
@@ -120,6 +125,25 @@ async function copyMemberInviteLink(memberId: string) {
     }, 2000);
   } else {
     openInviteModal();
+  }
+}
+
+async function handleShareWithEmail() {
+  if (!isValidEmail(shareEmail.value)) return;
+  isSharing.value = true;
+  shareResult.value = null;
+  try {
+    const token = await getValidToken();
+    await shareFileWithEmail(token, syncStore.driveFileId!, shareEmail.value, 'writer');
+    shareResult.value = 'success';
+    shareEmail.value = '';
+    setTimeout(() => {
+      shareResult.value = null;
+    }, 3000);
+  } catch {
+    shareResult.value = 'error';
+  } finally {
+    isSharing.value = false;
   }
 }
 
@@ -379,6 +403,40 @@ function cancelEditFamilyName() {
 
         <!-- Invite link + QR code -->
         <InviteLinkCard :link="inviteLink" :qr-url="inviteQrUrl" :loading="isGeneratingInvite" />
+
+        <!-- Optional email sharing (Google Drive only) -->
+        <div v-if="syncStore.storageProviderType === 'google_drive'" class="space-y-2">
+          <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {{ t('invite.shareEmail.label') }}
+          </p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ t('invite.shareEmail.description') }}
+          </p>
+          <div class="flex gap-2">
+            <BaseInput
+              v-model="shareEmail"
+              type="email"
+              :placeholder="t('invite.shareEmail.placeholder')"
+              class="flex-1"
+            />
+            <BaseButton
+              :loading="isSharing"
+              :disabled="!isValidEmail(shareEmail)"
+              @click="handleShareWithEmail"
+            >
+              {{ t('invite.shareEmail.button') }}
+            </BaseButton>
+          </div>
+          <p
+            v-if="shareResult === 'success'"
+            class="text-xs text-emerald-600 dark:text-emerald-400"
+          >
+            {{ t('invite.shareEmail.success') }}
+          </p>
+          <p v-if="shareResult === 'error'" class="text-xs text-red-500">
+            {{ t('invite.shareEmail.error') }}
+          </p>
+        </div>
 
         <!-- File sharing info card -->
         <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 dark:bg-amber-900/20">

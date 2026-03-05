@@ -7,6 +7,7 @@ import {
   getFileModifiedTime,
   listBeanpodFiles,
   deleteFile,
+  shareFileWithEmail,
   clearFolderCache,
   DriveApiError,
 } from '../driveService';
@@ -314,6 +315,56 @@ describe('driveService', () => {
       const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('file-to-delete');
       expect(call[1]?.method).toBe('DELETE');
+    });
+  });
+
+  describe('shareFileWithEmail', () => {
+    it('calls correct endpoint with POST', async () => {
+      globalThis.fetch = mockFetch({ id: 'perm-1' });
+
+      await shareFileWithEmail(mockToken, 'file-123', 'user@example.com');
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      expect(call[0]).toContain('/files/file-123/permissions');
+      expect(call[1]?.method).toBe('POST');
+      const body = JSON.parse(call[1]?.body as string);
+      expect(body).toEqual({
+        type: 'user',
+        role: 'writer',
+        emailAddress: 'user@example.com',
+      });
+    });
+
+    it('default role is writer', async () => {
+      globalThis.fetch = mockFetch({ id: 'perm-2' });
+
+      await shareFileWithEmail(mockToken, 'file-123', 'user@example.com');
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      const body = JSON.parse(call[1]?.body as string);
+      expect(body.role).toBe('writer');
+    });
+
+    it('throws DriveApiError on failure', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: { message: 'Forbidden' } }),
+      });
+
+      await expect(shareFileWithEmail(mockToken, 'file-123', 'user@example.com')).rejects.toThrow(
+        DriveApiError
+      );
+    });
+
+    it('trims email whitespace', async () => {
+      globalThis.fetch = mockFetch({ id: 'perm-3' });
+
+      await shareFileWithEmail(mockToken, 'file-123', '  user@example.com  ');
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      const body = JSON.parse(call[1]?.body as string);
+      expect(body.emailAddress).toBe('user@example.com');
     });
   });
 

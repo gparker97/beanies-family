@@ -1551,6 +1551,50 @@ const STRING_DEFS = {
     beanie: 'invite links expire after 24 hours for security',
   },
 
+  // Google Picker join flow
+  'join.pickerPrompt.description': {
+    en: 'Select the shared .beanpod file from your Google Drive',
+    beanie: "pick your family's bean pod from google drive",
+  },
+  'join.pickerPrompt.button': {
+    en: 'Select File from Drive',
+    beanie: 'pick from drive',
+  },
+  'join.pickerPrompt.orManual': {
+    en: 'Or load a file from your device',
+    beanie: 'or load from your device',
+  },
+  'join.pickerPrompt.error': {
+    en: "Couldn't open file picker. Try loading the file manually.",
+    beanie: "couldn't open the picker. try loading the file yourself",
+  },
+
+  // Invite modal — email sharing
+  'invite.shareEmail.label': {
+    en: 'Share File with Family Member',
+    beanie: 'share the pod',
+  },
+  'invite.shareEmail.description': {
+    en: 'Optionally enter their Google account email to give them Editor access to your family data file. If you skip this, share the file manually from Google Drive.',
+    beanie: 'drop their email to share your bean pod, or share it yourself from google drive',
+  },
+  'invite.shareEmail.placeholder': {
+    en: 'family.member@gmail.com',
+    beanie: 'bean@example.com',
+  },
+  'invite.shareEmail.button': {
+    en: 'Share',
+    beanie: 'share',
+  },
+  'invite.shareEmail.success': {
+    en: "File shared! They'll get an email from Google.",
+    beanie: 'pod shared! google will email them',
+  },
+  'invite.shareEmail.error': {
+    en: "Couldn't share the file. You can share it manually from Google Drive.",
+    beanie: "couldn't share the pod. try sharing from google drive",
+  },
+
   // PWA / Offline / Install
   'pwa.offlineBanner': {
     en: "You're offline — changes are saved locally",

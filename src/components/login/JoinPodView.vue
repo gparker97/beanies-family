@@ -9,6 +9,8 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { isTemporaryEmail } from '@/utils/email';
+import { pickBeanpodFile } from '@/services/google/drivePicker';
+import { requestAccessToken } from '@/services/google/googleAuth';
 import { lookupFamily, isRegistryConfigured } from '@/services/registry/registryService';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -51,6 +53,7 @@ const fileLoaded = ref(false);
 const needsManualFileLoad = ref(false);
 const cloudLoadFailed = ref(false);
 const isLoadingFile = ref(false);
+const isPickerLoading = ref(false);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
 const isDragging = ref(false);
@@ -185,6 +188,25 @@ async function attemptFileLoad() {
 
   // Unknown provider — fall back to manual
   needsManualFileLoad.value = true;
+}
+
+// --- Google Picker fallback ---
+async function handlePickFromDrive() {
+  isPickerLoading.value = true;
+  formError.value = null;
+  try {
+    const token = await requestAccessToken();
+    const result = await pickBeanpodFile(token);
+    if (!result) return; // User cancelled — manual upload still available
+
+    targetDriveFileId.value = result.fileId;
+    cloudLoadFailed.value = false;
+    await attemptFileLoad();
+  } catch {
+    formError.value = t('join.pickerPrompt.error');
+  } finally {
+    isPickerLoading.value = false;
+  }
 }
 
 // --- File picker / drop zone ---
@@ -533,6 +555,22 @@ function handleBack() {
               </p>
             </div>
           </div>
+        </div>
+
+        <!-- Google Picker option when cloud load failed -->
+        <div
+          v-if="cloudLoadFailed && targetProvider === 'google_drive'"
+          class="mb-4 space-y-2 text-center"
+        >
+          <p class="text-sm text-slate-600 dark:text-slate-400">
+            {{ t('join.pickerPrompt.description') }}
+          </p>
+          <BaseButton :loading="isPickerLoading" @click="handlePickFromDrive">
+            {{ t('join.pickerPrompt.button') }}
+          </BaseButton>
+          <p class="text-xs text-slate-400 dark:text-slate-500">
+            {{ t('join.pickerPrompt.orManual') }}
+          </p>
         </div>
 
         <!-- File guidance card -->

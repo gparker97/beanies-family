@@ -214,6 +214,22 @@ export async function deleteFile(token: string, fileId: string): Promise<void> {
 }
 
 /**
+ * Share a file with another user via email (Google Drive permissions API).
+ */
+export async function shareFileWithEmail(
+  token: string,
+  fileId: string,
+  email: string,
+  role: 'reader' | 'writer' = 'writer'
+): Promise<void> {
+  await driveRequest(token, `${DRIVE_API}/files/${fileId}/permissions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'user', role, emailAddress: email.trim() }),
+  });
+}
+
+/**
  * Get the cached app folder ID (null if not yet resolved).
  */
 export function getAppFolderId(): string | null {

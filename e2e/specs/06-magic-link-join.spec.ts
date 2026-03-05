@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/test';
+import type { Route } from '@playwright/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 
@@ -181,6 +182,56 @@ test.describe('Magic Link Invite System', () => {
       await page.waitForTimeout(2000);
       const result = page.getByText(/family not found|load .beanpod file/i).first();
       await expect(result).toBeVisible({ timeout: 10000 });
+    });
+
+    test('should show Google Picker prompt when Drive cloud load fails', async ({
+      page,
+      context,
+    }) => {
+      const fakeFamilyId = '12345678-dddd-eeee-ffff-123456789abc';
+      const fakeFileId = 'fake-drive-file-id';
+
+      // Mock the OAuth popup: when the app opens the Google auth window,
+      // simulate a successful code exchange by intercepting the callback
+      context.on('page', async (popup) => {
+        // Close the popup immediately — the error from popup closing will trigger
+        // the catch path in attemptFileLoad(), setting cloudLoadFailed = true
+        await popup.close();
+      });
+
+      // Mock Drive API routes (in case OAuth somehow succeeds)
+      await page.route(/googleapis\.com/, async (route: Route) => {
+        const url = route.request().url();
+        if (url.includes('userinfo')) {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ email: 'test@example.com' }),
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { message: 'File not found' } }),
+        });
+      });
+
+      // Navigate to join with google_drive provider — triggers attemptFileLoad()
+      await page.goto(
+        `/join?fam=${fakeFamilyId}&p=google_drive&ref=dGVzdC5iZWFucG9k&fileId=${fakeFileId}`
+      );
+
+      // Wait for cloud load to fail (popup closes → error → cloudLoadFailed = true)
+      // and show the picker prompt
+      const pickerButton = page.getByRole('button', { name: /select file from drive/i });
+      await expect(pickerButton).toBeVisible({ timeout: 15000 });
+
+      // Should also show the "or manual" fallback text
+      await expect(page.getByText(/or load a file from your device/i)).toBeVisible();
+
+      // The manual file drop zone should also be available below
+      await expect(page.getByText(/drop.*beanpod|load.*beanpod/i).first()).toBeVisible();
     });
   });
 });
