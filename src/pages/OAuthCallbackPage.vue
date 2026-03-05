@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /**
- * OAuth callback page — receives authorization code from Google and sends it
- * to the parent window via postMessage. This page runs inside a popup.
+ * OAuth callback page — receives authorization code from Google.
+ *
+ * Popup mode: sends code to parent window via postMessage, then closes.
+ * Redirect mode (mobile): saves code to sessionStorage and redirects back
+ * to the original page so completeRedirectAuth() can finish the exchange.
  */
 import { onMounted } from 'vue';
 
@@ -11,11 +14,30 @@ onMounted(() => {
   const error = params.get('error');
 
   if (window.opener) {
+    // Popup mode — send code to parent and close
     window.opener.postMessage({ type: 'oauth-callback', code, error }, window.location.origin);
+    setTimeout(() => window.close(), 300);
+    return;
   }
 
-  // Close the popup after a short delay to ensure message is sent
-  setTimeout(() => window.close(), 300);
+  // Redirect mode — save code and redirect back to the original page
+  const stateJson = sessionStorage.getItem('beanies_redirect_auth');
+  if (stateJson && code) {
+    sessionStorage.setItem('beanies_redirect_auth_code', code);
+    try {
+      const state = JSON.parse(stateJson);
+      window.location.href = state.returnPath || '/';
+    } catch {
+      window.location.href = '/';
+    }
+    return;
+  }
+
+  // Error or unexpected state — redirect home
+  if (error) {
+    sessionStorage.removeItem('beanies_redirect_auth');
+  }
+  window.location.href = '/';
 });
 </script>
 
