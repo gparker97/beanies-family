@@ -62,6 +62,9 @@ const { t } = useTranslation();
 const { isMobile, isDesktop } = useBreakpoint();
 
 const isInitializing = ref(true);
+const initError = ref<string | null>(null);
+const initErrorDetail = ref<string | null>(null);
+const showClearConfirm = ref(false);
 const isMenuOpen = ref(false);
 const showTrustPrompt = ref(false);
 const showPasskeyPrompt = ref(false);
@@ -159,42 +162,50 @@ async function loadFamilyData() {
 
   // Path 1: File configured + we have permission → load from file (source of truth)
   if (syncStore.isConfigured && !syncStore.needsPermission) {
-    const loadResult = await syncStore.loadFromFile();
-    if (loadResult.success) {
-      memberFilterStore.initialize();
-      const result = await processRecurringItems();
-      if (result.processed > 0) {
-        await transactionsStore.loadTransactions();
+    try {
+      const loadResult = await syncStore.loadFromFile();
+      if (loadResult.success) {
+        memberFilterStore.initialize();
+        const result = await processRecurringItems();
+        if (result.processed > 0) {
+          await transactionsStore.loadTransactions();
+        }
+        syncStore.setupAutoSync();
+        return;
       }
-      syncStore.setupAutoSync();
-      return;
-    }
 
-    // File needs password — try cached family key from trusted device
-    if (loadResult.needsPassword) {
-      const activeFamilyId = familyContextStore.activeFamilyId;
-      const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
-      if (cachedKeyB64) {
-        try {
-          const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
-          const { base64ToBuffer } = await import('@/utils/encoding');
-          const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
-          const decryptResult = await syncStore.decryptPendingFileWithKey(fk);
-          if (decryptResult.success) {
-            memberFilterStore.initialize();
-            const result = await processRecurringItems();
-            if (result.processed > 0) {
-              await transactionsStore.loadTransactions();
+      // File needs password — try cached family key from trusted device
+      if (loadResult.needsPassword) {
+        const activeFamilyId = familyContextStore.activeFamilyId;
+        const cachedKeyB64 = activeFamilyId
+          ? settingsStore.getCachedFamilyKey(activeFamilyId)
+          : null;
+        if (cachedKeyB64) {
+          try {
+            const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+            const { base64ToBuffer } = await import('@/utils/encoding');
+            const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+            const decryptResult = await syncStore.decryptPendingFileWithKey(fk);
+            if (decryptResult.success) {
+              memberFilterStore.initialize();
+              const result = await processRecurringItems();
+              if (result.processed > 0) {
+                await transactionsStore.loadTransactions();
+              }
+              return;
             }
-            return;
+          } catch {
+            // Cached key was invalid — clear it
           }
-        } catch {
-          // Cached key was invalid — clear it
-        }
-        if (activeFamilyId) {
-          await settingsStore.clearCachedFamilyKey(activeFamilyId);
+          if (activeFamilyId) {
+            await settingsStore.clearCachedFamilyKey(activeFamilyId);
+          }
         }
       }
+    } catch (err) {
+      throw new Error(
+        `Failed to load data from sync file: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 
@@ -215,50 +226,57 @@ async function loadFamilyData() {
           }
           return;
         }
-      } catch {
-        console.warn('[loadFamilyData] Failed to load from persistence cache');
+      } catch (err) {
+        console.warn('[loadFamilyData] Failed to load from persistence cache:', err);
       }
     }
     // Fall through — user needs to grant permission
+    console.log('[loadFamilyData] User needs to grant file permission — returning early');
     return;
   }
 
   // Path 3: No file configured → initialize Automerge doc
   // This path is for first-time users or users without a sync file
-  // E2E seed: if the data bridge saved a binary to sessionStorage, load it
-  if (import.meta.env.DEV && sessionStorage.getItem('__e2eSeedDoc')) {
-    const { loadDoc } = await import('@/services/automerge/docService');
-    const { base64ToBuffer } = await import('@/utils/encoding');
-    const b64 = sessionStorage.getItem('__e2eSeedDoc')!;
-    sessionStorage.removeItem('__e2eSeedDoc');
-    loadDoc(new Uint8Array(base64ToBuffer(b64)));
-  } else {
-    const { initDoc } = await import('@/services/automerge/docService');
-    initDoc();
-  }
-
-  // Load stores from the (empty) Automerge doc
-  await settingsStore.loadSettings();
-  await familyStore.loadMembers();
-
-  if (familyStore.isSetupComplete) {
-    memberFilterStore.initialize();
-
-    await Promise.all([
-      accountsStore.loadAccounts(),
-      transactionsStore.loadTransactions(),
-      assetsStore.loadAssets(),
-      goalsStore.loadGoals(),
-      recurringStore.loadRecurringItems(),
-      todoStore.loadTodos(),
-      activityStore.loadActivities(),
-      budgetStore.loadBudgets(),
-    ]);
-
-    const result = await processRecurringItems();
-    if (result.processed > 0) {
-      await transactionsStore.loadTransactions();
+  try {
+    // E2E seed: if the data bridge saved a binary to sessionStorage, load it
+    if (import.meta.env.DEV && sessionStorage.getItem('__e2eSeedDoc')) {
+      const { loadDoc } = await import('@/services/automerge/docService');
+      const { base64ToBuffer } = await import('@/utils/encoding');
+      const b64 = sessionStorage.getItem('__e2eSeedDoc')!;
+      sessionStorage.removeItem('__e2eSeedDoc');
+      loadDoc(new Uint8Array(base64ToBuffer(b64)));
+    } else {
+      const { initDoc } = await import('@/services/automerge/docService');
+      initDoc();
     }
+
+    // Load stores from the (empty) Automerge doc
+    await settingsStore.loadSettings();
+    await familyStore.loadMembers();
+
+    if (familyStore.isSetupComplete) {
+      memberFilterStore.initialize();
+
+      await Promise.all([
+        accountsStore.loadAccounts(),
+        transactionsStore.loadTransactions(),
+        assetsStore.loadAssets(),
+        goalsStore.loadGoals(),
+        recurringStore.loadRecurringItems(),
+        todoStore.loadTodos(),
+        activityStore.loadActivities(),
+        budgetStore.loadBudgets(),
+      ]);
+
+      const result = await processRecurringItems();
+      if (result.processed > 0) {
+        await transactionsStore.loadTransactions();
+      }
+    }
+  } catch (err) {
+    throw new Error(
+      `Failed to initialize document: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 }
 /* eslint-enable no-console */
@@ -351,11 +369,47 @@ onMounted(async () => {
     if (settingsStore.exchangeRateAutoUpdate) {
       updateRatesIfStale().catch(console.error);
     }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    initError.value = message;
+    initErrorDetail.value = err instanceof Error ? (err.stack ?? null) : null;
+    console.error('[App] Initialization failed:', err);
   } finally {
     // Always dismiss the loading overlay, even on early return or error
     isInitializing.value = false;
   }
 });
+
+function getDeviceDiagnostics(): string {
+  return [
+    `UA: ${navigator.userAgent}`,
+    `WASM: ${typeof WebAssembly !== 'undefined'}`,
+    `Crypto: ${typeof crypto?.subtle !== 'undefined'}`,
+    `IDB: ${typeof indexedDB !== 'undefined'}`,
+    `SW: ${'serviceWorker' in navigator}`,
+  ].join('\n');
+}
+
+function handleReload() {
+  window.location.reload();
+}
+
+async function handleClearDataAndSignOut() {
+  showClearConfirm.value = false;
+  try {
+    // Clear all IndexedDB databases for the active family
+    const { closeDatabase, deleteFamilyDatabase, getActiveFamilyId } =
+      await import('@/services/indexeddb/database');
+    await closeDatabase();
+    const familyId = getActiveFamilyId();
+    if (familyId) {
+      await deleteFamilyDatabase(familyId);
+    }
+  } catch {
+    // Best effort — continue with reload
+  }
+  window.location.reload();
+}
 
 // Save data when going hidden; check for external file changes when becoming visible.
 // visibilitychange → hidden is the primary save point (fires reliably on tab close,
@@ -459,6 +513,108 @@ watch(
         <BeanieSpinner size="xl" label />
       </div>
     </Transition>
+
+    <!-- Initialization error recovery screen -->
+    <div
+      v-if="initError"
+      class="fixed inset-0 z-[300] flex items-center justify-center bg-[#2C3E50] p-4"
+    >
+      <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-800">
+        <div class="mb-4 text-center">
+          <div
+            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30"
+          >
+            <svg
+              class="h-6 w-6 text-[#F15D22]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5Z"
+              />
+            </svg>
+          </div>
+          <h2 class="font-outfit text-xl font-semibold text-[#2C3E50] dark:text-white">
+            {{ t('app.initError.title') }}
+          </h2>
+          <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {{ t('app.initError.description') }}
+          </p>
+        </div>
+
+        <!-- Error message -->
+        <div class="mb-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+          <p class="text-sm font-medium text-red-800 dark:text-red-300">{{ initError }}</p>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="mb-4 flex gap-3">
+          <button
+            class="flex-1 rounded-xl bg-[#F15D22] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#d9521e]"
+            @click="handleReload"
+          >
+            {{ t('app.initError.reload') }}
+          </button>
+          <button
+            class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-[#2C3E50] transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-slate-700"
+            @click="showClearConfirm = true"
+          >
+            {{ t('app.initError.clearData') }}
+          </button>
+        </div>
+
+        <!-- Clear data confirmation -->
+        <div
+          v-if="showClearConfirm"
+          class="mb-4 rounded-lg border border-orange-300 bg-orange-50 p-3 dark:border-orange-700 dark:bg-orange-900/20"
+        >
+          <p class="mb-2 text-sm text-orange-800 dark:text-orange-200">
+            {{ t('app.initError.clearConfirm') }}
+          </p>
+          <div class="flex gap-2">
+            <button
+              class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
+              @click="handleClearDataAndSignOut"
+            >
+              {{ t('app.initError.clearData') }}
+            </button>
+            <button
+              class="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-slate-700"
+              @click="showClearConfirm = false"
+            >
+              {{ t('common.cancel') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Expandable technical details -->
+        <details class="group">
+          <summary
+            class="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+          >
+            {{ t('app.initError.details') }}
+          </summary>
+          <pre
+            v-if="initErrorDetail"
+            class="mt-2 max-h-32 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
+            >{{ initErrorDetail }}</pre
+          >
+          <div class="mt-2">
+            <p class="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+              {{ t('app.initError.diagnostics') }}
+            </p>
+            <pre
+              class="max-h-24 overflow-auto rounded-lg bg-gray-100 p-2 text-xs text-gray-700 dark:bg-slate-900 dark:text-gray-300"
+              >{{ getDeviceDiagnostics() }}</pre
+            >
+          </div>
+        </details>
+      </div>
+    </div>
 
     <!-- PWA banners -->
     <OfflineBanner />
