@@ -18,6 +18,7 @@ declare namespace google.picker {
     constructor(viewId?: ViewId);
     setQuery(query: string): this;
     setMimeTypes(mimeTypes: string): this;
+    setOwnedByMe(ownedByMe: boolean): this;
   }
 
   interface Picker {
