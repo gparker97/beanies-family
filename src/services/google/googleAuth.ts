@@ -490,3 +490,82 @@ export function getGoogleAccountEmail(): string | null {
 export function setGoogleAccountEmail(email: string | null): void {
   cachedEmail = email;
 }
+
+// --- Redirect-based OAuth (mobile fallback) ---
+
+const REDIRECT_AUTH_KEY = 'beanies_redirect_auth';
+
+interface RedirectAuthState {
+  codeVerifier: string;
+  returnPath: string;
+}
+
+/**
+ * Start a redirect-based OAuth flow (for mobile where popups are blocked).
+ * Saves PKCE state to sessionStorage and redirects the full page to Google.
+ * After auth, OAuthCallbackPage redirects back to `returnPath`.
+ */
+export async function startRedirectAuth(returnPath: string): Promise<void> {
+  const clientId = getClientId();
+  if (!clientId) throw new Error('Google Client ID not configured');
+
+  const codeVerifier = generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  // Save state for when we come back
+  sessionStorage.setItem(
+    REDIRECT_AUTH_KEY,
+    JSON.stringify({ codeVerifier, returnPath } satisfies RedirectAuthState)
+  );
+
+  const authUrl = buildAuthUrl(clientId, codeChallenge, 'select_account');
+  window.location.href = authUrl;
+}
+
+/**
+ * Complete a redirect-based OAuth flow. Call on page mount to check if we're
+ * returning from a redirect auth. Returns the access token if a pending auth
+ * was completed, or null if there was no pending auth.
+ */
+export async function completeRedirectAuth(): Promise<string | null> {
+  const code = sessionStorage.getItem('beanies_redirect_auth_code');
+  const stateJson = sessionStorage.getItem(REDIRECT_AUTH_KEY);
+
+  if (!code || !stateJson) return null;
+
+  // Clean up immediately to prevent re-processing
+  sessionStorage.removeItem('beanies_redirect_auth_code');
+  sessionStorage.removeItem(REDIRECT_AUTH_KEY);
+
+  const clientId = getClientId();
+  if (!clientId) throw new Error('Google Client ID not configured');
+
+  const state: RedirectAuthState = JSON.parse(stateJson);
+
+  const tokens = await exchangeCodeForTokens({
+    code,
+    codeVerifier: state.codeVerifier,
+    redirectUri: getRedirectUri(),
+    clientId,
+  });
+
+  if (tokens.scope && !tokens.scope.includes('drive.file')) {
+    throw new Error('Google Drive file access was not granted.');
+  }
+
+  // Update in-memory state
+  accessToken = tokens.access_token;
+  expiresAt = Date.now() + tokens.expires_in * 1000;
+
+  if (tokens.refresh_token) {
+    refreshToken = tokens.refresh_token;
+    const storageKey = currentFamilyId ?? PENDING_FAMILY_KEY;
+    await storeGoogleRefreshToken(storageKey, tokens.refresh_token);
+  }
+
+  scheduleAutoRefresh(tokens.expires_in);
+  fetchGoogleUserEmail(tokens.access_token).catch(() => {});
+
+  console.warn(`[googleAuth] Token acquired via redirect PKCE, expires in ${tokens.expires_in}s`);
+  return tokens.access_token;
+}

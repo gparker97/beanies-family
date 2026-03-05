@@ -10,7 +10,11 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { isTemporaryEmail } from '@/utils/email';
 import { pickBeanpodFile } from '@/services/google/drivePicker';
-import { requestAccessToken } from '@/services/google/googleAuth';
+import {
+  requestAccessToken,
+  startRedirectAuth,
+  completeRedirectAuth,
+} from '@/services/google/googleAuth';
 import { lookupFamily, isRegistryConfigured } from '@/services/registry/registryService';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -104,6 +108,18 @@ onMounted(async () => {
     targetProvider.value = p;
     targetFileRef.value = fileRef;
     targetDriveFileId.value = fileIdParam;
+
+    // Check if we're returning from a redirect-based OAuth flow (mobile)
+    const redirectToken = await completeRedirectAuth().catch((e) => {
+      console.error('[JoinPodView] Redirect auth failed:', e);
+      return null;
+    });
+    if (redirectToken && p === 'google_drive') {
+      // We have a token from redirect auth — go straight to Picker
+      await handlePickFromDriveWithToken(redirectToken);
+      return;
+    }
+
     await performLookup(fam);
   }
 });
@@ -193,21 +209,53 @@ async function attemptFileLoad() {
 // --- Google Picker fallback ---
 const showManualFallback = ref(false);
 
-async function handlePickFromDrive() {
+/** Open Picker with an already-acquired OAuth token. */
+async function handlePickFromDriveWithToken(token: string) {
   isPickerLoading.value = true;
   formError.value = null;
+  needsManualFileLoad.value = true; // ensure the Picker UI is visible
   try {
-    const token = await requestAccessToken();
     const result = await pickBeanpodFile(token);
-    if (!result) return; // User cancelled — manual upload still available
+    if (!result) return; // User cancelled
 
     targetDriveFileId.value = result.fileId;
     cloudLoadFailed.value = false;
     await attemptFileLoad();
   } catch (e) {
     console.error('[JoinPodView] Picker failed:', e);
-    formError.value = t('join.pickerPrompt.error');
-    // Auto-expand manual fallback so user has an alternative
+    const detail = e instanceof Error ? e.message : String(e);
+    formError.value = `${t('join.pickerPrompt.error')} (${detail})`;
+    showManualFallback.value = true;
+  } finally {
+    isPickerLoading.value = false;
+  }
+}
+
+async function handlePickFromDrive() {
+  isPickerLoading.value = true;
+  formError.value = null;
+  try {
+    const token = await requestAccessToken();
+    await handlePickFromDriveWithToken(token);
+  } catch (e) {
+    console.error('[JoinPodView] Picker auth failed:', e);
+    const detail = e instanceof Error ? e.message : String(e);
+
+    // If popup was blocked, fall back to redirect-based OAuth
+    if (detail.includes('Popup blocked') || detail.includes('popup')) {
+      console.warn('[JoinPodView] Popup blocked — falling back to redirect auth');
+      try {
+        // Build return URL preserving all current query params
+        const returnPath = `${window.location.pathname}${window.location.search}`;
+        await startRedirectAuth(returnPath);
+        // Page will redirect — don't update state
+        return;
+      } catch (redirectErr) {
+        console.error('[JoinPodView] Redirect auth failed:', redirectErr);
+      }
+    }
+
+    formError.value = `${t('join.pickerPrompt.error')} (${detail})`;
     showManualFallback.value = true;
   } finally {
     isPickerLoading.value = false;
