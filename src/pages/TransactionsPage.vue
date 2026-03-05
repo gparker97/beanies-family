@@ -19,6 +19,7 @@ import { useProjectedTransactions } from '@/composables/useProjectedTransactions
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { useGoalsStore } from '@/stores/goalsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -40,6 +41,7 @@ import {
 } from '@/utils/date';
 
 const transactionsStore = useTransactionsStore();
+const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
 const { getMemberNameByAccountId, getMemberColorByAccountId } = useMemberInfo();
@@ -326,7 +328,7 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
     await transactionsStore.deleteTransaction(editingTransaction.value.id);
     const result = await processRecurringItems();
     if (result.processed > 0) {
-      await transactionsStore.loadTransactions();
+      await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
     }
     closeEditModal();
   } else {
@@ -335,7 +337,7 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
     if (!created) return; // creation failed — keep modal open
     const result = await processRecurringItems();
     if (result.processed > 0) {
-      await transactionsStore.loadTransactions();
+      await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
     }
     closeAddModal();
   }
