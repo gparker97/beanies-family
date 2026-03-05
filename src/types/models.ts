@@ -144,6 +144,10 @@ export interface Transaction {
   accountId: UUID;
   toAccountId?: UUID; // For transfers
   activityId?: UUID; // Link transaction to an activity
+  goalId?: UUID; // Link transaction to a goal for progress tracking
+  goalAllocMode?: 'percentage' | 'fixed'; // How to compute allocation
+  goalAllocValue?: number; // 20 for 20%, or 200 for $200 fixed
+  goalAllocApplied?: number; // Actual amount credited to goal (after guardrail)
   type: TransactionType;
   amount: number;
   currency: CurrencyCode;
@@ -173,6 +177,9 @@ export interface RecurringItem {
   monthOfYear?: number; // 1-12, only for yearly frequency
   startDate: ISODateString;
   endDate?: ISODateString;
+  goalId?: UUID; // Link to a goal for progress tracking
+  goalAllocMode?: 'percentage' | 'fixed'; // How to compute allocation
+  goalAllocValue?: number; // 20 for 20%, or 200 for $200 fixed
   lastProcessedDate?: ISODateString;
   isActive: boolean;
   createdAt: ISODateString;

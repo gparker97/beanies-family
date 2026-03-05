@@ -1,4 +1,5 @@
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import type { RecurringItem, CreateTransactionInput } from '@/types/models';
@@ -11,6 +12,7 @@ import {
   parseLocalDate,
   extractDatePart,
 } from '@/utils/date';
+import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
 
 export interface ProcessResult {
   processed: number;
@@ -202,24 +204,6 @@ function getNextDueDate(item: RecurringItem, afterDate: Date): Date {
 }
 
 /**
- * Calculate the balance adjustment for an account based on transaction type.
- * Income adds to balance, expense subtracts from balance.
- */
-function calculateBalanceAdjustment(
-  type: 'income' | 'expense' | 'transfer',
-  amount: number
-): number {
-  switch (type) {
-    case 'income':
-      return amount;
-    case 'expense':
-      return -amount;
-    default:
-      return 0;
-  }
-}
-
-/**
  * Create a transaction from a recurring item.
  */
 async function createTransactionFromRecurring(item: RecurringItem, date: Date): Promise<boolean> {
@@ -235,6 +219,22 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     recurringItemId: item.id,
   };
 
+  // Goal allocation (compute at generation time with guardrail)
+  if (item.goalId && item.goalAllocMode && item.goalAllocValue) {
+    const goal = await goalRepo.getGoalById(item.goalId);
+    if (goal && !goal.isCompleted) {
+      const raw = computeGoalAllocRaw(item.goalAllocMode, item.goalAllocValue, item.amount);
+      const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
+      const applied = Math.min(raw, remaining);
+      if (applied > 0) {
+        input.goalId = item.goalId;
+        input.goalAllocMode = item.goalAllocMode;
+        input.goalAllocValue = item.goalAllocValue;
+        input.goalAllocApplied = applied;
+      }
+    }
+  }
+
   try {
     await transactionRepo.createTransaction(input);
 
@@ -243,6 +243,17 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     if (account) {
       const adjustment = calculateBalanceAdjustment(item.type, item.amount);
       await accountRepo.updateAccountBalance(item.accountId, account.balance + adjustment);
+    }
+
+    // Credit goal progress
+    if (input.goalAllocApplied && input.goalId) {
+      const goal = await goalRepo.getGoalById(input.goalId);
+      if (goal) {
+        await goalRepo.updateGoalProgress(
+          input.goalId,
+          goal.currentAmount + input.goalAllocApplied
+        );
+      }
     }
 
     return true;

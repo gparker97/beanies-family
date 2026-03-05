@@ -8,11 +8,14 @@ import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityLinkDropdown from '@/components/ui/ActivityLinkDropdown.vue';
+import EntityLinkDropdown from '@/components/ui/EntityLinkDropdown.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useFormModal } from '@/composables/useFormModal';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import type {
@@ -24,6 +27,7 @@ import type {
   RecurringFrequency,
 } from '@/types/models';
 import { toDateInputValue } from '@/utils/date';
+import { computeGoalAllocRaw } from '@/utils/finance';
 
 const props = defineProps<{
   open: boolean;
@@ -41,6 +45,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const accountsStore = useAccountsStore();
+const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { currencyOptions } = useCurrencyOptions();
 
@@ -56,6 +61,9 @@ const startDate = ref(todayStr());
 const endDate = ref('');
 const accountId = ref('');
 const activityId = ref<string | undefined>(undefined);
+const goalId = ref<string | undefined>(undefined);
+const goalAllocMode = ref<'percentage' | 'fixed'>('percentage');
+const goalAllocValue = ref<number | undefined>(undefined);
 const currency = ref(settingsStore.displayCurrency);
 const dayOfMonth = ref(1);
 const monthOfYear = ref(1);
@@ -117,6 +125,9 @@ const { isEditing, isSubmitting } = useFormModal(
         endDate.value = item.endDate ? item.endDate.substring(0, 10) : '';
         accountId.value = item.accountId;
         activityId.value = undefined;
+        goalId.value = item.goalId;
+        goalAllocMode.value = item.goalAllocMode || 'percentage';
+        goalAllocValue.value = item.goalAllocValue;
         currency.value = item.currency;
         isActive.value = item.isActive;
       } else {
@@ -130,6 +141,9 @@ const { isEditing, isSubmitting } = useFormModal(
         date.value = transaction.date;
         accountId.value = transaction.accountId;
         activityId.value = transaction.activityId;
+        goalId.value = transaction.goalId;
+        goalAllocMode.value = transaction.goalAllocMode || 'percentage';
+        goalAllocValue.value = transaction.goalAllocValue;
         currency.value = transaction.currency;
         // Initialize recurring fields from the transaction date so that
         // switching to recurring mode pre-fills sensible defaults
@@ -155,6 +169,9 @@ const { isEditing, isSubmitting } = useFormModal(
       endDate.value = '';
       accountId.value = iv?.accountId ?? getLastAccountId();
       activityId.value = undefined;
+      goalId.value = undefined;
+      goalAllocMode.value = 'percentage';
+      goalAllocValue.value = undefined;
       currency.value = iv?.currency ?? settingsStore.displayCurrency;
       dayOfMonth.value = new Date().getDate();
       monthOfYear.value = new Date().getMonth() + 1;
@@ -215,6 +232,54 @@ const effectiveType = computed<'income' | 'expense'>(() =>
   direction.value === 'in' ? 'income' : 'expense'
 );
 
+// Goal linking
+const goalItems = computed(() =>
+  goalsStore.activeGoals
+    .filter((g) => g.currency === currency.value)
+    .map((g) => ({
+      id: g.id,
+      icon: '🎯',
+      label: g.name,
+      secondary: `${formatCurrencyWithCode(g.currentAmount, g.currency)} / ${formatCurrencyWithCode(g.targetAmount, g.currency)}`,
+    }))
+);
+
+const allocModeOptions = computed(() => [
+  { value: 'percentage', label: t('goalLink.percentage') },
+  { value: 'fixed', label: t('goalLink.fixedAmount') },
+]);
+
+const goalAllocPreview = computed(() => {
+  if (!goalId.value || !goalAllocValue.value || !amount.value) return null;
+  const goal = goalsStore.goals.find((g) => g.id === goalId.value);
+  if (!goal) return null;
+  const raw = computeGoalAllocRaw(goalAllocMode.value, goalAllocValue.value, amount.value);
+  const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
+  return {
+    amount: Math.min(raw, remaining),
+    remaining,
+    capped: raw > remaining,
+    currency: goal.currency,
+  };
+});
+
+// Clear goal fields when switching to expense
+watch(direction, (newDir) => {
+  if (newDir === 'out') {
+    goalId.value = undefined;
+    goalAllocMode.value = 'percentage';
+    goalAllocValue.value = undefined;
+  }
+});
+
+// Reset allocation when goal is cleared
+watch(goalId, (newId) => {
+  if (!newId) {
+    goalAllocMode.value = 'percentage';
+    goalAllocValue.value = undefined;
+  }
+});
+
 function handleSave() {
   if (!canSave.value) return;
   isSubmitting.value = true;
@@ -237,6 +302,9 @@ function handleSave() {
         endDate: endDate.value || undefined,
         isActive: isActive.value,
         lastProcessedDate: props.recurringItem?.lastProcessedDate,
+        goalId: goalId.value || undefined,
+        goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
+        goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
       };
       emit('save-recurring', recurringData);
       return;
@@ -258,6 +326,9 @@ function handleSave() {
         startDate: startDate.value || toDateInputValue(new Date()),
         endDate: endDate.value || undefined,
         isActive: true,
+        goalId: goalId.value || undefined,
+        goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
+        goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
       };
       emit('save-recurring', recurringData);
       return;
@@ -267,6 +338,9 @@ function handleSave() {
     const data = {
       accountId: accountId.value,
       activityId: activityId.value || undefined,
+      goalId: goalId.value || undefined,
+      goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
+      goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
       type: effectiveType.value,
       amount: amount.value!,
       currency: currency.value,
@@ -412,6 +486,63 @@ function handleDelete() {
     <FormFieldGroup :label="t('form.category')" required>
       <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
     </FormFieldGroup>
+
+    <!-- 5b. Goal link (income only) -->
+    <ConditionalSection :show="direction === 'in' && goalItems.length > 0">
+      <div class="space-y-3">
+        <FormFieldGroup :label="t('goalLink.title')" optional>
+          <EntityLinkDropdown
+            v-model="goalId"
+            :items="goalItems"
+            :placeholder="t('goalLink.selectGoal')"
+            :empty-text="t('goalLink.noGoals')"
+            default-icon="🎯"
+          />
+        </FormFieldGroup>
+        <ConditionalSection :show="!!goalId">
+          <div class="space-y-3">
+            <FormFieldGroup :label="t('goalLink.allocMode')">
+              <TogglePillGroup v-model="goalAllocMode" :options="allocModeOptions" />
+            </FormFieldGroup>
+            <FormFieldGroup
+              :label="
+                goalAllocMode === 'percentage'
+                  ? t('goalLink.percentage')
+                  : t('goalLink.fixedAmount')
+              "
+              required
+            >
+              <div v-if="goalAllocMode === 'percentage'" class="flex items-center gap-3">
+                <BaseInput
+                  v-model.number="goalAllocValue"
+                  type="number"
+                  :min="1"
+                  :max="100"
+                  placeholder="20"
+                  class="w-24"
+                />
+                <span class="font-outfit text-sm font-semibold text-[var(--color-text-muted)]"
+                  >%</span
+                >
+              </div>
+              <AmountInput
+                v-else
+                v-model="goalAllocValue"
+                :currency-symbol="currency || settingsStore.displayCurrency"
+              />
+            </FormFieldGroup>
+            <p v-if="goalAllocPreview" class="font-outfit text-xs text-[var(--color-text-muted)]">
+              → {{ formatCurrencyWithCode(goalAllocPreview.amount, goalAllocPreview.currency) }} of
+              {{ formatCurrencyWithCode(goalAllocPreview.remaining, goalAllocPreview.currency) }}
+              remaining
+              <span v-if="goalAllocPreview.capped" class="text-orange-500">
+                ({{ t('goalLink.capped') }})
+              </span>
+            </p>
+          </div>
+        </ConditionalSection>
+      </div>
+    </ConditionalSection>
 
     <!-- 6. Recurring / One-time toggle (hidden when editing a recurring item) -->
     <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.schedule')">

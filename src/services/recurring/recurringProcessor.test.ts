@@ -19,9 +19,15 @@ vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   updateAccountBalance: vi.fn(),
 }));
 
+vi.mock('@/services/automerge/repositories/goalRepository', () => ({
+  getGoalById: vi.fn(),
+  updateGoalProgress: vi.fn(),
+}));
+
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -198,5 +204,186 @@ describe('recurringProcessor - Account Balance Sync', () => {
     // Assert
     expect(result.processed).toBe(2);
     expect(accountRepo.updateAccountBalance).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('recurringProcessor - Goal Allocation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should apply goal allocation when processing recurring income', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringIncome: RecurringItem = {
+      id: 'recurring-goal-1',
+      accountId: 'test-account-1',
+      type: 'income',
+      amount: 1000,
+      currency: 'USD',
+      category: 'salary',
+      description: 'Monthly Salary',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 20,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+      ...mockAccount,
+      balance: 2000,
+    });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+    vi.mocked(goalRepo.getGoalById).mockResolvedValue({
+      id: 'goal-1',
+      name: 'Buy a Car',
+      type: 'savings',
+      targetAmount: 10000,
+      currentAmount: 0,
+      currency: 'USD',
+      priority: 'high',
+      isCompleted: false,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    });
+    vi.mocked(goalRepo.updateGoalProgress).mockResolvedValue(undefined as any);
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(1);
+    // Transaction should include goal allocation fields
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goalId: 'goal-1',
+        goalAllocMode: 'percentage',
+        goalAllocValue: 20,
+        goalAllocApplied: 200, // 20% of 1000
+      })
+    );
+    // Goal progress should be updated
+    expect(goalRepo.updateGoalProgress).toHaveBeenCalledWith('goal-1', 200);
+  });
+
+  it('should cap goal allocation to remaining amount', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringIncome: RecurringItem = {
+      id: 'recurring-goal-2',
+      accountId: 'test-account-1',
+      type: 'income',
+      amount: 1000,
+      currency: 'USD',
+      category: 'salary',
+      description: 'Monthly Salary',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 50, // 50% = $500
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+      ...mockAccount,
+      balance: 2000,
+    });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+    vi.mocked(goalRepo.getGoalById).mockResolvedValue({
+      id: 'goal-1',
+      name: 'Buy a Car',
+      type: 'savings',
+      targetAmount: 10000,
+      currentAmount: 9900, // Only $100 remaining
+      currency: 'USD',
+      priority: 'high',
+      isCompleted: false,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    });
+    vi.mocked(goalRepo.updateGoalProgress).mockResolvedValue(undefined as any);
+
+    await processRecurringItems();
+
+    // Should cap at $100 (remaining), not $500 (50% of 1000)
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goalAllocApplied: 100,
+      })
+    );
+    expect(goalRepo.updateGoalProgress).toHaveBeenCalledWith('goal-1', 10000);
+  });
+
+  it('should skip allocation for completed goals', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringIncome: RecurringItem = {
+      id: 'recurring-goal-3',
+      accountId: 'test-account-1',
+      type: 'income',
+      amount: 1000,
+      currency: 'USD',
+      category: 'salary',
+      description: 'Monthly Salary',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 20,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+      ...mockAccount,
+      balance: 2000,
+    });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+    vi.mocked(goalRepo.getGoalById).mockResolvedValue({
+      id: 'goal-1',
+      name: 'Buy a Car',
+      type: 'savings',
+      targetAmount: 10000,
+      currentAmount: 10000,
+      currency: 'USD',
+      priority: 'high',
+      isCompleted: true, // Goal already completed
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    });
+
+    await processRecurringItems();
+
+    // Transaction should NOT include goal allocation
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        goalAllocApplied: expect.any(Number),
+      })
+    );
+    // Goal progress should NOT be updated
+    expect(goalRepo.updateGoalProgress).not.toHaveBeenCalled();
   });
 });

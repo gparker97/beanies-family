@@ -53,13 +53,32 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
       displayCurrency: 'USD',
     }),
   }),
+  formatCurrencyWithCode: (amount: number, code: string) => `${code} $${amount.toFixed(2)}`,
 }));
 
 // Mock activity store (used by ActivityLinkDropdown)
 vi.mock('@/stores/activityStore', () => ({
   useActivityStore: () => ({
     activities: [],
+    activeActivities: [],
     loadActivities: vi.fn(),
+  }),
+}));
+
+// Mock member info (used by ActivityLinkDropdown)
+vi.mock('@/composables/useMemberInfo', () => ({
+  useMemberInfo: () => ({
+    getMemberName: () => '',
+  }),
+}));
+
+// Mock goals store (used by goal linking)
+vi.mock('@/stores/goalsStore', () => ({
+  useGoalsStore: () => ({
+    goals: [],
+    activeGoals: [],
+    loadGoals: vi.fn(),
+    updateProgress: vi.fn(),
   }),
 }));
 
