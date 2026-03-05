@@ -12,7 +12,7 @@ const E2E_PASSWORD = 'test1234';
  * already set, so the app skips login automatically.
  */
 export async function bypassLoginIfNeeded(page: Page): Promise<void> {
-  const createPodButton = page.getByRole('button', { name: 'Create a new pod' });
+  const createPodButton = page.getByTestId('create-pod-button');
 
   const isOnWelcome = await createPodButton
     .waitFor({ state: 'visible', timeout: 5000 })

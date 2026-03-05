@@ -31,7 +31,11 @@ export const useSettingsStore = defineStore('settings', () => {
   const exchangeRates = computed(() => globalSettings.value.exchangeRates);
   const exchangeRateAutoUpdate = computed(() => globalSettings.value.exchangeRateAutoUpdate);
   const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
-  const beanieMode = computed(() => globalSettings.value.beanieMode ?? true);
+  const beanieMode = computed(() => {
+    // E2E tests inject this flag to force standard English for stable text selectors
+    if (typeof window !== 'undefined' && (window as any).__e2e_beanie_off) return false;
+    return globalSettings.value.beanieMode ?? true;
+  });
   const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
   const preferredCurrencies = computed(() => settings.value.preferredCurrencies ?? []);
   const effectiveDisplayCurrencies = computed(() => {

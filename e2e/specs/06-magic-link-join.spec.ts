@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 
@@ -160,7 +160,7 @@ test.describe('Magic Link Invite System', () => {
       await page.getByRole('button', { name: /back/i }).click();
 
       // Should return to welcome gate
-      await expect(page.getByRole('button', { name: 'Create a new pod' })).toBeVisible();
+      await expect(page.getByTestId('create-pod-button')).toBeVisible();
     });
 
     test('should navigate to create pod from join page', async ({ page }) => {

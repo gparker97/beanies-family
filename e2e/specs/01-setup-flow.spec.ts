@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 
@@ -29,7 +29,7 @@ test.describe('Setup Flow', () => {
     await page.goto('/');
 
     // Click "Create a new pod" on WelcomeGate
-    await page.getByRole('button', { name: 'Create a new pod' }).click();
+    await page.getByTestId('create-pod-button').click();
 
     // Fill some fields but leave password empty to bypass native required
     // validation on the first field and trigger the JS-level check
