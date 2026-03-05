@@ -29,6 +29,16 @@ export const CURRENCIES: CurrencyInfo[] = [
   { code: 'HKD', name: 'Hong Kong Dollar', symbol: 'HK$', symbolPosition: 'before', decimals: 2 },
   { code: 'NZD', name: 'New Zealand Dollar', symbol: 'NZ$', symbolPosition: 'before', decimals: 2 },
   { code: 'ZAR', name: 'South African Rand', symbol: 'R', symbolPosition: 'before', decimals: 2 },
+
+  // Cryptocurrencies
+  { code: 'BTC', name: 'Bitcoin', symbol: '₿', symbolPosition: 'before', decimals: 8 },
+  { code: 'ETH', name: 'Ethereum', symbol: 'Ξ', symbolPosition: 'before', decimals: 8 },
+  { code: 'USDT', name: 'Tether', symbol: '₮', symbolPosition: 'before', decimals: 2 },
+  { code: 'USDC', name: 'USD Coin', symbol: 'USDC', symbolPosition: 'before', decimals: 2 },
+  { code: 'SOL', name: 'Solana', symbol: 'SOL', symbolPosition: 'before', decimals: 8 },
+  { code: 'XRP', name: 'Ripple', symbol: 'XRP', symbolPosition: 'before', decimals: 6 },
+  { code: 'ADA', name: 'Cardano', symbol: '₳', symbolPosition: 'before', decimals: 6 },
+  { code: 'DOGE', name: 'Dogecoin', symbol: 'Ð', symbolPosition: 'before', decimals: 8 },
 ];
 
 export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
