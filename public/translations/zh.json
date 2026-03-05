@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-04",
-    "translationCount": 1112
+    "lastUpdated": "2026-03-05",
+    "translationCount": 1119
   },
   "translations": {
     "app.name": {
@@ -5565,6 +5565,41 @@
       "translation": "出于安全考虑，邀请链接将在24小时后过期",
       "hash": "kongf3",
       "lastUpdated": "2026-03-04"
+    },
+    "app.initError.title": {
+      "translation": "出了些问题",
+      "hash": "lgauhl",
+      "lastUpdated": "2026-03-05"
+    },
+    "app.initError.description": {
+      "translation": "应用无法正常启动。您可以尝试重新加载，或清除数据并重新开始。",
+      "hash": "h95562",
+      "lastUpdated": "2026-03-05"
+    },
+    "app.initError.reload": {
+      "translation": "重新加载",
+      "hash": "ulwifb",
+      "lastUpdated": "2026-03-05"
+    },
+    "app.initError.clearData": {
+      "translation": "注销并清除数据",
+      "hash": "i2sq7g",
+      "lastUpdated": "2026-03-05"
+    },
+    "app.initError.details": {
+      "translation": "技术细节",
+      "hash": "2pgt33",
+      "lastUpdated": "2026-03-05"
+    },
+    "app.initError.diagnostics": {
+      "translation": "设备信息",
+      "hash": "130g1k",
+      "lastUpdated": "2026-03-05"
+    },
+    "app.initError.clearConfirm": {
+      "translation": "这将使您注销并删除所有本地数据。您的云数据（如有）不会受到影响。您确定吗？",
+      "hash": "p0dzwj",
+      "lastUpdated": "2026-03-05"
     }
   }
 }
