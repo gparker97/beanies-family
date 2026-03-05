@@ -59,8 +59,8 @@ export class TransactionsPage {
     // Description
     await dialog.getByPlaceholder('Description').fill(data.description);
 
-    // Amount (AmountInput — number input)
-    await dialog.locator('input[type="number"]').fill(data.amount.toString());
+    // Amount (AmountInput — number input, use placeholder to avoid ambiguity with goal allocation input)
+    await dialog.getByPlaceholder('0.00').fill(data.amount.toString());
 
     // Category — two-level CategoryChipPicker
     if (data.category) {
