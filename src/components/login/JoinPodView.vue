@@ -193,7 +193,10 @@ async function attemptFileLoad() {
         cloudLoadFailed.value = true;
         needsManualFileLoad.value = true;
       }
-    } catch {
+    } catch (e) {
+      console.error('[JoinPodView] attemptFileLoad failed:', e);
+      const detail = e instanceof Error ? e.message : String(e);
+      formError.value = `Failed to load file: ${detail}`;
       cloudLoadFailed.value = true;
       needsManualFileLoad.value = true;
     } finally {
@@ -218,8 +221,10 @@ async function handlePickFromDriveWithToken(token: string) {
     const result = await pickBeanpodFile(token);
     if (!result) return; // User cancelled
 
+    console.warn('[JoinPodView] Picker selected file:', result.fileId, result.fileName);
     targetDriveFileId.value = result.fileId;
     cloudLoadFailed.value = false;
+    needsManualFileLoad.value = false;
     await attemptFileLoad();
   } catch (e) {
     console.error('[JoinPodView] Picker failed:', e);
