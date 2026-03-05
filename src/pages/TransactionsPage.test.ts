@@ -775,7 +775,7 @@ describe('TransactionsPage — Unified Ledger', () => {
       expect(wrapper.vm.monthNet).toBe(3000);
     });
 
-    it('should not show projected transactions for current month', () => {
+    it('should show projected transactions for current month', () => {
       recurringStore.recurringItems = [
         createRecurringItem({
           id: 'r1',
@@ -787,11 +787,12 @@ describe('TransactionsPage — Unified Ledger', () => {
 
       wrapper = mount(TransactionsPage);
 
-      // Current month should have no projected transactions
+      // Current month should show projected transactions for unmaterialized dates
       const projected = wrapper.vm.monthTransactions.filter(
         (tx: { isProjected?: boolean }) => tx.isProjected
       );
-      expect(projected).toHaveLength(0);
+      expect(projected).toHaveLength(1);
+      expect(projected[0].amount).toBe(500);
     });
 
     it('should not show projected transactions for past months', async () => {
@@ -853,7 +854,7 @@ describe('TransactionsPage — Unified Ledger', () => {
       const thisMonth = new Date(now.getFullYear(), now.getMonth(), 15);
 
       recurringStore.recurringItems = [
-        createRecurringItem({ id: 'r1', amount: 100, description: 'Old amount' }),
+        createRecurringItem({ id: 'r1', amount: 100, description: 'Old amount', dayOfMonth: 15 }),
       ];
       transactionsStore.transactions = [
         createTransaction(thisMonth, {
