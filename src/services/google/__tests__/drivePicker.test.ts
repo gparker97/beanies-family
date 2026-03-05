@@ -26,6 +26,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
   const mockDocsView = {
     setQuery: vi.fn().mockReturnThis(),
     setMimeTypes: vi.fn().mockReturnThis(),
+    setOwnedByMe: vi.fn().mockReturnThis(),
   };
 
   (globalThis as Record<string, unknown>).google = {
@@ -86,6 +87,7 @@ describe('drivePicker', () => {
     const mockDocsView = {
       setQuery: vi.fn().mockReturnThis(),
       setMimeTypes: vi.fn().mockReturnThis(),
+      setOwnedByMe: vi.fn().mockReturnThis(),
     };
 
     (globalThis as Record<string, unknown>).google = {
@@ -120,7 +122,8 @@ describe('drivePicker', () => {
     expect(mockBuilder.setDeveloperKey).toHaveBeenCalledWith('test-api-key');
     expect(mockBuilder.setOrigin).toHaveBeenCalledWith(window.location.origin);
     expect(mockDocsView.setQuery).toHaveBeenCalledWith('*.beanpod');
-    expect(mockDocsView.setMimeTypes).toHaveBeenCalledWith('application/octet-stream');
+    // Two views added: shared files (ownedByMe=false) + my drive (ownedByMe=true)
+    expect(mockBuilder.addView).toHaveBeenCalledTimes(2);
   });
 
   it('returns file on selection', async () => {

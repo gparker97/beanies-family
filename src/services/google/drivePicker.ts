@@ -54,12 +54,20 @@ export async function pickBeanpodFile(
 
   return new Promise((resolve, reject) => {
     try {
-      const view = new google.picker.DocsView(google.picker.ViewId.DOCS);
-      view.setQuery('*.beanpod');
-      view.setMimeTypes('application/octet-stream');
+      // "My Drive" view filtered to .beanpod files
+      const myDriveView = new google.picker.DocsView(google.picker.ViewId.DOCS);
+      myDriveView.setQuery('*.beanpod');
+      myDriveView.setOwnedByMe(true);
+
+      // "Shared with me" view — files shared by another user won't appear
+      // in "My Drive" until explicitly added, so we need a separate view
+      const sharedView = new google.picker.DocsView(google.picker.ViewId.DOCS);
+      sharedView.setQuery('*.beanpod');
+      sharedView.setOwnedByMe(false);
 
       const picker = new google.picker.PickerBuilder()
-        .addView(view)
+        .addView(sharedView) // Show shared files first (most likely for join flow)
+        .addView(myDriveView)
         .setOAuthToken(accessToken)
         .setDeveloperKey(apiKey)
         .setOrigin(window.location.origin)
