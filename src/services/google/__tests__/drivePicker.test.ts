@@ -25,7 +25,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
 
   const mockDocsView = {
     setQuery: vi.fn().mockReturnThis(),
-    setSelectableMimeTypes: vi.fn().mockReturnThis(),
+    setMimeTypes: vi.fn().mockReturnThis(),
   };
 
   (globalThis as Record<string, unknown>).google = {
@@ -85,7 +85,7 @@ describe('drivePicker', () => {
     };
     const mockDocsView = {
       setQuery: vi.fn().mockReturnThis(),
-      setSelectableMimeTypes: vi.fn().mockReturnThis(),
+      setMimeTypes: vi.fn().mockReturnThis(),
     };
 
     (globalThis as Record<string, unknown>).google = {
@@ -120,7 +120,7 @@ describe('drivePicker', () => {
     expect(mockBuilder.setDeveloperKey).toHaveBeenCalledWith('test-api-key');
     expect(mockBuilder.setOrigin).toHaveBeenCalledWith(window.location.origin);
     expect(mockDocsView.setQuery).toHaveBeenCalledWith('*.beanpod');
-    expect(mockDocsView.setSelectableMimeTypes).toHaveBeenCalledWith('application/octet-stream');
+    expect(mockDocsView.setMimeTypes).toHaveBeenCalledWith('application/octet-stream');
   });
 
   it('returns file on selection', async () => {
