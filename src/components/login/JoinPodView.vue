@@ -178,18 +178,24 @@ async function attemptFileLoad() {
 
     isLoadingFile.value = true;
     try {
+      console.warn('[JoinPodView] attemptFileLoad: loading', fileId);
       const result = await syncStore.loadFromGoogleDrive(fileId, fileName);
+      console.warn('[JoinPodView] loadFromGoogleDrive result:', JSON.stringify(result));
       if (result.success) {
         await onFileLoaded();
       } else if (result.needsPassword) {
+        console.warn('[JoinPodView] File needs password, invite token:', !!inviteToken.value);
         if (await tryInviteTokenDecrypt()) {
           await onFileLoaded();
         } else if (!inviteToken.value) {
           showDecryptModal.value = true;
+        } else {
+          formError.value = 'Invite token could not decrypt the file. Ask for a new invite link.';
         }
-        // If invite token was present but failed, formError is already set
       } else {
         // Cloud load failed — fall back to manual file load
+        console.warn('[JoinPodView] loadFromGoogleDrive returned failure:', result);
+        formError.value = 'Could not load the file from Google Drive. Please try again.';
         cloudLoadFailed.value = true;
         needsManualFileLoad.value = true;
       }
