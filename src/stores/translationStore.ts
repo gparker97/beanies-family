@@ -21,7 +21,7 @@ export const useTranslationStore = defineStore('translation', () => {
   const error = ref<string | null>(null);
   const loadProgress = ref(0); // 0-100
   const translationFile = ref<translationFiles.TranslationFile | null>(null);
-  const beanieMode = ref(false);
+  const beanieMode = ref(true);
 
   // Getters
   const isEnglish = computed(() => currentLanguage.value === 'en');

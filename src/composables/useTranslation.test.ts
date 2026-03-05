@@ -92,8 +92,8 @@ describe('translationStore beanie mode', () => {
     expect(store.t('dashboard.netWorth')).toBe('Family Net Worth');
   });
 
-  it('beanieMode defaults to false', () => {
+  it('beanieMode defaults to true', () => {
     const store = useTranslationStore();
-    expect(store.beanieMode).toBe(false);
+    expect(store.beanieMode).toBe(true);
   });
 });

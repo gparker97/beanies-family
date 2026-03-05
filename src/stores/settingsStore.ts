@@ -31,7 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const exchangeRates = computed(() => globalSettings.value.exchangeRates);
   const exchangeRateAutoUpdate = computed(() => globalSettings.value.exchangeRateAutoUpdate);
   const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
-  const beanieMode = computed(() => globalSettings.value.beanieMode ?? false);
+  const beanieMode = computed(() => globalSettings.value.beanieMode ?? true);
   const soundEnabled = computed(() => globalSettings.value.soundEnabled ?? true);
   const preferredCurrencies = computed(() => settings.value.preferredCurrencies ?? []);
   const effectiveDisplayCurrencies = computed(() => {

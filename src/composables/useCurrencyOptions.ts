@@ -16,13 +16,13 @@ export function useCurrencyOptions() {
     const displayCurrency = settingsStore.displayCurrency;
 
     if (preferred.length === 0) {
-      // No preferred currencies: put the display currency first, then the rest
-      const sorted = [...CURRENCIES].sort((a, b) => {
-        if (a.code === displayCurrency) return -1;
-        if (b.code === displayCurrency) return 1;
-        return 0;
-      });
-      return sorted.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
+      // No preferred currencies: put the display currency first, then the rest alphabetically
+      const rest = [...CURRENCIES]
+        .filter((c) => c.code !== displayCurrency)
+        .sort((a, b) => a.code.localeCompare(b.code));
+      const display = CURRENCIES.find((c) => c.code === displayCurrency);
+      const items = display ? [display, ...rest] : rest;
+      return items.map((c) => ({ value: c.code, label: `${c.code} - ${c.name}` }));
     }
 
     const preferredSet = new Set(preferred);
@@ -37,10 +37,12 @@ export function useCurrencyOptions() {
       .filter(Boolean)
       .map((c) => ({ value: c!.code, label: `${c!.code} - ${c!.name}` }));
 
-    const rest = CURRENCIES.filter((c) => !preferredSet.has(c.code)).map((c) => ({
-      value: c.code,
-      label: `${c.code} - ${c.name}`,
-    }));
+    const rest = CURRENCIES.filter((c) => !preferredSet.has(c.code))
+      .sort((a, b) => a.code.localeCompare(b.code))
+      .map((c) => ({
+        value: c.code,
+        label: `${c.code} - ${c.name}`,
+      }));
 
     return [...preferredItems, { value: '', label: '───', disabled: true }, ...rest];
   });
