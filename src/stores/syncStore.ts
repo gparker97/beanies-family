@@ -244,9 +244,7 @@ export const useSyncStore = defineStore('sync', () => {
       return { hasConflict: true, fileTimestamp, localTimestamp: null };
     }
 
-    const TOLERANCE_MS = 2000;
-    const hasConflict =
-      new Date(fileTimestamp).getTime() > new Date(localTimestamp).getTime() + TOLERANCE_MS;
+    const hasConflict = new Date(fileTimestamp).getTime() > new Date(localTimestamp).getTime();
     return { hasConflict, fileTimestamp, localTimestamp };
   }
 
@@ -374,6 +372,10 @@ export const useSyncStore = defineStore('sync', () => {
           // Update envelope with remote's key material
           envelope.value = remoteEnvelope;
           syncService.setEnvelope(remoteEnvelope);
+
+          // Prevent next doSave() from re-fetching what we just loaded
+          const loadedTs = await syncService.getFileTimestamp();
+          if (loadedTs) syncService.setLastKnownFileTimestamp(loadedTs);
 
           lastSync.value = toISODateString(new Date());
           await reloadAllStores();

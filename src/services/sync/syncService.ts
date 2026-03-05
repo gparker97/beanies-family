@@ -12,7 +12,14 @@
 import { supportsFileSystemAccess } from './capabilities';
 import { getFileHandle, verifyPermission, getProviderConfig } from './fileHandleStore';
 import { GoogleDriveProvider } from './providers/googleDriveProvider';
-import { parseBeanpodV4, reEncryptEnvelope, openFilePicker, detectFileVersion } from './fileSync';
+import {
+  parseBeanpodV4,
+  reEncryptEnvelope,
+  openFilePicker,
+  detectFileVersion,
+  decryptBeanpodPayload,
+} from './fileSync';
+import { mergeDoc } from '@/services/automerge/docService';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import { onDocPersistNeeded } from '@/services/automerge/docService';
@@ -54,6 +61,13 @@ let currentProviderFamilyId: string | null = null;
 // Family key + envelope — set by syncStore after unlock
 let currentFamilyKey: CryptoKey | null = null;
 let currentEnvelope: BeanpodFileV4 | null = null;
+
+// Drive-reported modifiedTime of the last file we read or wrote
+let lastKnownFileTimestamp: string | null = null;
+
+// When true, mergeDoc → schedulePersist → triggerDebouncedSave is suppressed
+// (we're already inside doSave, so scheduling another save would be redundant)
+let suppressAutoSave = false;
 
 // Callbacks for state changes
 type StateCallback = (state: SyncServiceState) => void;
@@ -227,6 +241,14 @@ export function setEnvelope(envelope: BeanpodFileV4): void {
 }
 
 /**
+ * Set the last known file timestamp (called by syncStore after loading).
+ * Prevents the next doSave() from re-fetching what was just loaded.
+ */
+export function setLastKnownFileTimestamp(timestamp: string | null): void {
+  lastKnownFileTimestamp = timestamp;
+}
+
+/**
  * Get the current session file handle (for reading encrypted blob during passkey registration).
  */
 export function getSessionFileHandle(): FileSystemFileHandle | null {
@@ -245,6 +267,7 @@ export function reset(): void {
   currentProviderFamilyId = null;
   currentFamilyKey = null;
   currentEnvelope = null;
+  lastKnownFileTimestamp = null;
   resetSaveFailures();
   updateState({
     isInitialized: false,
@@ -416,6 +439,45 @@ export async function save(): Promise<boolean> {
 }
 
 /**
+ * Fetch remote file from Drive and merge into local doc if it has changed.
+ * Called by doSave() before writing to prevent overwriting remote changes.
+ * Only applies to Google Drive provider (local files don't have this race).
+ */
+async function fetchAndMergeRemote(): Promise<void> {
+  if (!currentProvider || currentProvider.type !== 'google_drive') return;
+  if (!currentFamilyKey || !currentEnvelope) return;
+
+  // Fast path: check if remote has changed since we last read/wrote
+  const remoteTimestamp = await currentProvider.getLastModified();
+  if (
+    !remoteTimestamp ||
+    (lastKnownFileTimestamp &&
+      new Date(remoteTimestamp).getTime() <= new Date(lastKnownFileTimestamp).getTime())
+  ) {
+    return; // No change — skip the full read
+  }
+
+  // Remote has newer data — fetch, decrypt, and merge
+  const text = await currentProvider.read();
+  if (!text) return;
+
+  const remoteEnvelope = parseBeanpodV4(text);
+  const remoteDoc = await decryptBeanpodPayload(remoteEnvelope, currentFamilyKey);
+
+  // Suppress auto-save during merge to avoid re-entrant save scheduling
+  suppressAutoSave = true;
+  try {
+    mergeDoc(remoteDoc);
+  } finally {
+    suppressAutoSave = false;
+  }
+
+  // Update envelope with remote's key material (may have new wrapped keys)
+  currentEnvelope = remoteEnvelope;
+  lastKnownFileTimestamp = remoteTimestamp;
+}
+
+/**
  * Internal save implementation
  */
 async function doSave(): Promise<boolean> {
@@ -452,11 +514,29 @@ async function doSave(): Promise<boolean> {
       }
     }
 
+    // Fetch-merge-save: merge any remote changes before writing to prevent overwrites.
+    // Non-fatal — if merge fails, we still save local state (better than losing it).
+    try {
+      await fetchAndMergeRemote();
+    } catch (e) {
+      console.warn('[syncService] fetchAndMergeRemote failed (non-fatal):', e);
+    }
+
     // Re-encrypt the Automerge doc with the family key and update the envelope
     const fileContent = await reEncryptEnvelope(currentEnvelope, currentFamilyKey);
 
     // Write via the storage provider abstraction
     await currentProvider.write(fileContent);
+
+    // Update timestamp after successful write
+    try {
+      const postWriteTimestamp = await currentProvider.getLastModified();
+      if (postWriteTimestamp) {
+        lastKnownFileTimestamp = postWriteTimestamp;
+      }
+    } catch {
+      // Non-critical — worst case we re-fetch on next save
+    }
 
     updateState({ isSyncing: false, lastError: null });
 
@@ -514,6 +594,14 @@ export async function load(): Promise<string | null> {
     if (!text) {
       updateState({ isSyncing: false, lastError: null });
       return null;
+    }
+
+    // Track the file's timestamp so doSave() can detect remote changes
+    try {
+      const fileTs = await currentProvider.getLastModified();
+      if (fileTs) lastKnownFileTimestamp = fileTs;
+    } catch {
+      // Non-critical
     }
 
     updateState({ isSyncing: false, lastError: null });
@@ -752,6 +840,9 @@ export function registerDocPersistCallback(): void {
  * Trigger a debounced save (for auto-sync).
  */
 export function triggerDebouncedSave(): void {
+  // When merging inside doSave(), suppress redundant save scheduling
+  if (suppressAutoSave) return;
+
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer);
   }

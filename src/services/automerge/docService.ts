@@ -108,6 +108,7 @@ export function mergeDoc(remote: Automerge.Doc<FamilyDocument>): Automerge.Doc<F
     throw new Error('No Automerge document loaded. Call initDoc() or loadDoc() first.');
   currentDoc = Automerge.merge(Automerge.clone(currentDoc), remote);
   bumpVersion();
+  schedulePersist();
   return currentDoc;
 }
 
