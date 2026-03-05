@@ -64,9 +64,15 @@ export class GoogleDriveProvider implements StorageProvider {
         }
         // Silent refresh failed — fall back to interactive auth.
         // Force consent when we have no refresh token so Google issues one.
-        const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
-        await updateFile(newToken, this.fileId, content);
-        return;
+        try {
+          const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
+          await updateFile(newToken, this.fileId, content);
+          return;
+        } catch {
+          // Interactive auth failed (popup blocked, dismissed, etc.) — queue for retry
+          enqueueOfflineSave(content);
+          return;
+        }
       }
 
       // 404 — file gone (deleted/moved), let caller handle

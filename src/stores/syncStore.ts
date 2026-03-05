@@ -280,6 +280,39 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Replace the in-memory doc with a remote doc, merging any unsynced
+   * changes from the local IndexedDB cache to prevent data loss.
+   *
+   * If the cache has changes not present in the remote doc (e.g. the
+   * previous save to Drive failed), Automerge CRDT merge preserves both.
+   * If the cache matches the remote, the merge is a no-op.
+   */
+  async function replaceDocWithCacheRecovery(
+    remoteDoc: Parameters<typeof replaceDoc>[0],
+    fk: CryptoKey,
+    familyId: string
+  ): Promise<void> {
+    await initPersistenceDB(familyId);
+
+    let cachedDoc: Awaited<ReturnType<typeof loadCachedDoc>> = null;
+    try {
+      cachedDoc = await loadCachedDoc(fk);
+    } catch {
+      // Cache unavailable or corrupted — proceed with remote only
+    }
+
+    replaceDoc(remoteDoc);
+
+    if (cachedDoc) {
+      mergeDoc(cachedDoc);
+      // Persist merged result so the cache reflects the merge
+      persistDoc(fk).catch(console.warn);
+      // Save merged result back to remote file (debounced)
+      syncService.triggerDebouncedSave();
+    }
+  }
+
+  /**
    * Load data from the currently configured sync file.
    * For V4 files: parses envelope, tries to unlock with cached FK or password.
    * @param options.merge - If true, CRDT merge remote doc with local doc.
@@ -329,8 +362,13 @@ export const useSyncStore = defineStore('sync', () => {
             // CRDT merge
             mergeDoc(remoteDoc);
           } else {
-            // Replace local doc
-            replaceDoc(remoteDoc);
+            // Replace local doc, merging any unsynced cache to prevent data loss
+            const famId = useFamilyContextStore().activeFamilyId;
+            if (famId && familyKey.value) {
+              await replaceDocWithCacheRecovery(remoteDoc, familyKey.value, famId);
+            } else {
+              replaceDoc(remoteDoc);
+            }
           }
 
           // Update envelope with remote's key material
@@ -461,7 +499,14 @@ export const useSyncStore = defineStore('sync', () => {
 
       // Decrypt the Automerge payload
       const doc = await decryptBeanpodPayload(pending.envelope, fk);
-      replaceDoc(doc);
+
+      // Replace doc with cache recovery to prevent data loss from failed saves
+      const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      if (famId) {
+        await replaceDocWithCacheRecovery(doc, fk, famId);
+      } else {
+        replaceDoc(doc);
+      }
 
       // Set the family key and envelope
       familyKey.value = fk;
@@ -716,7 +761,15 @@ export const useSyncStore = defineStore('sync', () => {
     try {
       // Decrypt the Automerge payload with the family key
       const doc = await decryptBeanpodPayload(pending.envelope, fk);
-      replaceDoc(doc);
+
+      // Replace doc with cache recovery to prevent data loss from failed saves
+      const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      if (famId) {
+        await replaceDocWithCacheRecovery(doc, fk, famId);
+      } else {
+        replaceDoc(doc);
+      }
+
       familyKey.value = fk;
       envelope.value = pending.envelope;
       syncService.setFamilyKey(fk, pending.envelope);
