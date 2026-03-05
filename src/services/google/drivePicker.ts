@@ -56,7 +56,7 @@ export async function pickBeanpodFile(
     try {
       const view = new google.picker.DocsView(google.picker.ViewId.DOCS);
       view.setQuery('*.beanpod');
-      view.setSelectableMimeTypes('application/octet-stream');
+      view.setMimeTypes('application/octet-stream');
 
       const picker = new google.picker.PickerBuilder()
         .addView(view)

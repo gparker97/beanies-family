@@ -17,7 +17,7 @@ declare namespace google.picker {
   class DocsView {
     constructor(viewId?: ViewId);
     setQuery(query: string): this;
-    setSelectableMimeTypes(mimeTypes: string): this;
+    setMimeTypes(mimeTypes: string): this;
   }
 
   interface Picker {
