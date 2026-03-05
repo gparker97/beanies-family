@@ -33,9 +33,11 @@ const showCompletedSection = ref(false);
 // Ref to QuickAddBar for auto-focus
 const quickAddBar = ref<InstanceType<typeof QuickAddBar> | null>(null);
 
-// View/edit modal
-const selectedTodo = ref<TodoItem | null>(null);
-const startInEditMode = ref(false);
+// View/edit modal — store ID, derive live object from store for reactivity
+const selectedTodoId = ref<string | null>(null);
+const selectedTodo = computed(() =>
+  selectedTodoId.value ? (todoStore.todos.find((t) => t.id === selectedTodoId.value) ?? null) : null
+);
 
 // Sorted members for chip filter
 const sortedMembers = computed(() =>
@@ -104,14 +106,8 @@ async function handleToggle(id: string) {
   await todoStore.toggleComplete(id, currentMemberId.value);
 }
 
-function openViewModal(todo: TodoItem) {
-  startInEditMode.value = false;
-  selectedTodo.value = todo;
-}
-
-function openEditModal(todo: TodoItem) {
-  startInEditMode.value = true;
-  selectedTodo.value = todo;
+function openModal(todo: { id: string }) {
+  selectedTodoId.value = todo.id;
 }
 
 // Open view modal from query param (e.g. navigated from Family Nook)
@@ -119,7 +115,7 @@ onMounted(async () => {
   const viewId = route.query.view as string | undefined;
   if (viewId) {
     const todo = todoStore.todos.find((t) => t.id === viewId);
-    if (todo) openViewModal(todo);
+    if (todo) openModal(todo);
   }
 
   // Auto-focus the quick add bar
@@ -223,8 +219,8 @@ async function handleDelete(id: string) {
             <TodoItemCard
               :todo="todo"
               @toggle="handleToggle"
-              @view="openViewModal"
-              @edit="openEditModal"
+              @view="openModal"
+              @edit="openModal"
               @delete="handleDelete"
             />
           </div>
@@ -252,8 +248,8 @@ async function handleDelete(id: string) {
             <TodoItemCard
               :todo="todo"
               @toggle="handleToggle"
-              @view="openViewModal"
-              @edit="openEditModal"
+              @view="openModal"
+              @edit="openModal"
               @delete="handleDelete"
             />
           </div>
@@ -261,10 +257,6 @@ async function handleDelete(id: string) {
       </div>
     </template>
 
-    <TodoViewEditModal
-      :todo="selectedTodo"
-      :start-in-edit-mode="startInEditMode"
-      @close="selectedTodo = null"
-    />
+    <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
   </div>
 </template>
