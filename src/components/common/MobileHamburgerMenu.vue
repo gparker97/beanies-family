@@ -18,6 +18,7 @@ import {
   PINNED_ITEMS,
   type NavItemDef,
 } from '@/constants/navigation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -49,6 +50,7 @@ const translationStore = useTranslationStore();
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
 const { isOpen, toggle: toggleSection } = useSidebarAccordion();
+const { canViewFinances } = usePermissions();
 
 const ownerRef = computed(() => familyStore.owner ?? null);
 const { variant: ownerVariant, color: ownerColor } = useMemberAvatar(ownerRef);
@@ -74,13 +76,15 @@ const SECTION_COLORS: Record<string, string> = {
 };
 
 const sections = computed(() =>
-  NAV_SECTIONS.map((section) => ({
-    id: section.id,
-    label: t(section.labelKey),
-    emoji: section.emoji,
-    color: SECTION_COLORS[section.id] ?? 'text-white/50',
-    items: section.id === 'treehouse' ? mapItems(TREEHOUSE_ITEMS) : mapItems(PIGGY_BANK_ITEMS),
-  }))
+  NAV_SECTIONS.filter((section) => section.id !== 'piggyBank' || canViewFinances.value).map(
+    (section) => ({
+      id: section.id,
+      label: t(section.labelKey),
+      emoji: section.emoji,
+      color: SECTION_COLORS[section.id] ?? 'text-white/50',
+      items: section.id === 'treehouse' ? mapItems(TREEHOUSE_ITEMS) : mapItems(PIGGY_BANK_ITEMS),
+    })
+  )
 );
 
 const pinnedItems = computed(() => mapItems(PINNED_ITEMS));
