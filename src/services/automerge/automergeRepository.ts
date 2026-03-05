@@ -63,7 +63,7 @@ export function createAutomergeRepository<
       collection[id] = entity;
     });
 
-    return entity;
+    return transform(entity);
   }
 
   async function update(id: string, input: UpdateInput): Promise<Entity | undefined> {
