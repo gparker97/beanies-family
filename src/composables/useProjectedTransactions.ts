@@ -5,8 +5,10 @@ import type { DisplayTransaction } from '@/types/models';
 import { getStartOfMonth, getEndOfMonth, getStartOfDay, toDateInputValue } from '@/utils/date';
 
 /**
- * Generates ephemeral projected transactions for future months
+ * Generates ephemeral projected transactions for the current and future months
  * from active recurring items. Projections are never written to IndexedDB.
+ * The page-level dedup in TransactionsPage filters out projections that
+ * already have a real (materialized) transaction for the same date.
  */
 export function useProjectedTransactions(selectedMonth: Ref<Date>) {
   const recurringStore = useRecurringStore();
@@ -17,8 +19,14 @@ export function useProjectedTransactions(selectedMonth: Ref<Date>) {
     return monthStart > today;
   });
 
+  const isCurrentOrFutureMonth = computed(() => {
+    const monthEnd = getEndOfMonth(selectedMonth.value);
+    const today = getStartOfDay(new Date());
+    return monthEnd >= today;
+  });
+
   const projectedTransactions = computed<DisplayTransaction[]>(() => {
-    if (!isFutureMonth.value) return [];
+    if (!isCurrentOrFutureMonth.value) return [];
 
     const start = getStartOfMonth(selectedMonth.value);
     const end = getEndOfMonth(selectedMonth.value);

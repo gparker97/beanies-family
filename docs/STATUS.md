@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-05
-> **Updated by:** Claude (implement permission roles — finance, activities, admin)
+> **Updated by:** Claude (income-to-goal linking, currency dropdown DRY refactor)
 
 ## Current Phase
 
@@ -548,6 +548,25 @@ Comprehensive review of 243 source files (~49,700 lines) identified and consolid
 - **Today button on MonthNavigator** — Heritage Orange pill button appears next to month arrows when viewing a non-current month; clicking it jumps back to the current month
 - 5 new TDD tests for startDate→dayOfMonth sync, all 659 tests passing
 
+### Income-to-Goal Linking
+
+- **Income transactions can be linked to financial goals** with automatic progress tracking — percentage or fixed-amount allocation with guardrail (auto-cap to remaining amount)
+- `goalId`, `goalAllocMode`, `goalAllocValue`, `goalAllocApplied` fields added to `Transaction`; `goalId`, `goalAllocMode`, `goalAllocValue` added to `RecurringItem`
+- `EntityLinkDropdown.vue` — generic dropdown extracted from `ActivityLinkDropdown.vue` (same mechanism, prop-driven data source); `ActivityLinkDropdown` simplified to thin wrapper
+- Goal link section in `TransactionModal` — visible for income transactions only, with goal dropdown (currency-filtered), percentage/fixed toggle, allocation preview with capped indicator
+- Store-level goal progress: `applyGoalAllocation()` and `adjustGoalProgress()` in `transactionsStore.ts` — mirrors `adjustAccountBalance` pattern; integrated into create/update/delete flows
+- Recurring processor goal allocation — computes and applies allocation at transaction generation time (repo-level, outside Vue reactivity)
+- Goals store reload after `processRecurringItems()` in `TransactionsPage.vue` (2 sites) and `App.vue` (4 sites) to fix stale reactive state
+- 7 `goalLink.*` translation keys with beanie overrides
+- Plan: `docs/plans/2026-03-05-income-to-goal-linking.md`
+
+### CurrencyAmountInput Reusable Component
+
+- **`CurrencyAmountInput.vue`** — extracted inline currency dropdown + `AmountInput` pattern used in 4 modals (Transaction, Account, Goal, Activity) into single reusable component with `v-model:amount` and `v-model:currency` two-way bindings
+- Added currency dropdown to `ActivityModal` (was previously locked to base currency with no UI selector); changed default from `baseCurrency` to `displayCurrency`
+- Restyled `GoalModal` currency dropdown to match Transaction/Account inline pattern (replaced separate `BaseSelect`)
+- Net -64 lines across all modals
+
 ### Recent Fixes
 
 - **Google OAuth re-consent loop fix** — Three-layer fix preventing PWA users from being forced to re-consent on every page refresh:
@@ -847,3 +866,6 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | 2026-03-04 | Fix CRDT merge data loss (`decryptBeanpodPayload`)          | `decryptBeanpodPayload()` called `loadDoc()` which replaced the singleton doc before `mergeDoc()` ran, losing local changes. Fixed to use `Automerge.load()` directly                           |
 | 2026-03-04 | Plan: CRDT merge safety unit tests                          | Test plan saved at `docs/plans/2026-03-04-crdt-merge-safety-tests.md` — regression guard for the singleton side-effect bug, V4 round-trip, and merge preservation                               |
 | 2026-03-04 | CRDT merge safety unit tests implemented                    | 11 tests in `fileSync.test.ts`: singleton isolation guard, standalone doc validity, full merge simulation, V4 encrypt/decrypt round-trip, input validation, version detection (636 total tests) |
+| 2026-03-05 | Income-to-goal linking                                      | Income transactions allocate percentage or fixed amount to a goal; guardrail caps allocation at remaining goal amount; flat fields on Transaction/RecurringItem (mirrors activityId pattern)    |
+| 2026-03-05 | EntityLinkDropdown generalization                           | Extracted ActivityLinkDropdown mechanism into generic EntityLinkDropdown; same UI, prop-driven data source; ActivityLinkDropdown becomes thin wrapper                                           |
+| 2026-03-05 | CurrencyAmountInput reusable component                      | Inline currency dropdown + AmountInput extracted from 4 modals into single component; net -64 lines; added currency selector to ActivityModal                                                   |
