@@ -2,6 +2,12 @@ name: Deploy beanies PROD
 
 on:
   workflow_dispatch:
+    inputs:
+      skip_gate:
+        description: 'Skip CI/Security gate (for config-only changes verified locally)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,6 +20,7 @@ env:
 jobs:
   gate:
     name: Verify CI & Security passed
+    if: ${{ !inputs.skip_gate }}
     runs-on: ubuntu-latest
 
     steps:
@@ -110,6 +117,7 @@ jobs:
   build:
     name: Build for production
     needs: gate
+    if: ${{ always() && (needs.gate.result == 'success' || needs.gate.result == 'skipped') }}
     runs-on: ubuntu-latest
 
     steps:
