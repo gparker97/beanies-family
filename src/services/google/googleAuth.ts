@@ -137,19 +137,31 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
     return accessToken!;
   }
 
-  // Try silent refresh first (if we have a refresh token)
-  if (refreshToken) {
-    const silentToken = await attemptSilentRefresh();
-    if (silentToken) return silentToken;
-  }
-
-  // Deduplicate concurrent popup auth flows
+  // Deduplicate concurrent popup auth flows (check before opening popup)
   if (pendingAuthPromise) {
     console.warn('[googleAuth] Auth flow already in progress — joining existing request');
     return pendingAuthPromise;
   }
 
-  const promise = performPopupAuth(clientId, options);
+  // Open a blank popup IMMEDIATELY — before any async work — to preserve
+  // the user-gesture context. Mobile browsers block window.open() calls
+  // that happen inside async callbacks (the gesture is "consumed" by the
+  // microtask). If silent refresh succeeds, we close the unused popup.
+  // Only open when there's no cached token (checked above) and we may need
+  // interactive auth. Throws synchronously if popup is blocked.
+  const popup = openBlankPopup();
+
+  // Try silent refresh first (if we have a refresh token)
+  if (refreshToken) {
+    const silentToken = await attemptSilentRefresh();
+    if (silentToken) {
+      // Don't need the popup after all — close it
+      if (!popup.closed) popup.close();
+      return silentToken;
+    }
+  }
+
+  const promise = performPopupAuth(clientId, popup, options);
   pendingAuthPromise = promise;
 
   try {
@@ -168,6 +180,7 @@ export async function requestAccessToken(options?: { forceConsent?: boolean }): 
  */
 async function performPopupAuth(
   clientId: string,
+  popup: Window,
   options?: { forceConsent?: boolean }
 ): Promise<string> {
   const codeVerifier = generateCodeVerifier();
@@ -175,7 +188,7 @@ async function performPopupAuth(
 
   const prompt = options?.forceConsent ? 'consent' : 'select_account';
   const authUrl = buildAuthUrl(clientId, codeChallenge, prompt);
-  const code = await openAuthPopup(authUrl);
+  const code = await waitForAuthCode(popup, authUrl);
 
   const tokens = await exchangeCodeForTokens({
     code,
@@ -371,27 +384,35 @@ function buildAuthUrl(clientId: string, codeChallenge: string, prompt: string): 
 }
 
 /**
- * Open a centered popup for Google OAuth and wait for the auth code.
+ * Open a blank centered popup synchronously. Must be called in the direct
+ * call stack of a user gesture (click/tap) — before any `await` — so that
+ * mobile browsers don't block it.
+ */
+function openBlankPopup(): Window {
+  const width = 500;
+  const height = 600;
+  const left = window.screenX + (window.outerWidth - width) / 2;
+  const top = window.screenY + (window.outerHeight - height) / 2;
+  const features = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+
+  const popup = window.open('about:blank', 'beanies-oauth', features);
+
+  if (!popup) {
+    throw new Error('Popup blocked — please allow popups for this site');
+  }
+
+  return popup;
+}
+
+/**
+ * Navigate an already-open popup to the auth URL and wait for the auth code.
  * Returns the authorization code received via postMessage from the callback page.
  */
-function openAuthPopup(url: string): Promise<string> {
+function waitForAuthCode(popup: Window, url: string): Promise<string> {
+  // Navigate the pre-opened blank popup to Google's auth URL
+  popup.location.href = url;
+
   return new Promise((resolve, reject) => {
-    const width = 500;
-    const height = 600;
-    const left = window.screenX + (window.outerWidth - width) / 2;
-    const top = window.screenY + (window.outerHeight - height) / 2;
-    const features = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
-
-    const popup = window.open(url, 'beanies-oauth', features);
-
-    if (!popup) {
-      reject(new Error('Popup blocked — please allow popups for this site'));
-      return;
-    }
-
-    // Non-null reference for closures (popup is confirmed non-null above)
-    const win = popup;
-
     // Listen for the callback message
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
@@ -414,7 +435,7 @@ function openAuthPopup(url: string): Promise<string> {
 
     // Poll for popup close (user closed it without completing)
     const pollTimer = setInterval(() => {
-      if (win.closed) {
+      if (popup.closed) {
         cleanup();
         reject(new Error('Authentication cancelled'));
       }
@@ -423,7 +444,7 @@ function openAuthPopup(url: string): Promise<string> {
     function cleanup() {
       window.removeEventListener('message', onMessage);
       clearInterval(pollTimer);
-      if (!win.closed) win.close();
+      if (!popup.closed) popup.close();
     }
 
     window.addEventListener('message', onMessage);
