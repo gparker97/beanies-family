@@ -487,63 +487,6 @@ function handleDelete() {
       <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
     </FormFieldGroup>
 
-    <!-- 5b. Goal link (income only) -->
-    <ConditionalSection :show="direction === 'in' && goalItems.length > 0">
-      <div class="space-y-3">
-        <FormFieldGroup :label="t('goalLink.title')" optional>
-          <EntityLinkDropdown
-            v-model="goalId"
-            :items="goalItems"
-            :placeholder="t('goalLink.selectGoal')"
-            :empty-text="t('goalLink.noGoals')"
-            default-icon="🎯"
-          />
-        </FormFieldGroup>
-        <ConditionalSection :show="!!goalId">
-          <div class="space-y-3">
-            <FormFieldGroup :label="t('goalLink.allocMode')">
-              <TogglePillGroup v-model="goalAllocMode" :options="allocModeOptions" />
-            </FormFieldGroup>
-            <FormFieldGroup
-              :label="
-                goalAllocMode === 'percentage'
-                  ? t('goalLink.percentage')
-                  : t('goalLink.fixedAmount')
-              "
-              required
-            >
-              <div v-if="goalAllocMode === 'percentage'" class="flex items-center gap-3">
-                <BaseInput
-                  v-model.number="goalAllocValue"
-                  type="number"
-                  :min="1"
-                  :max="100"
-                  placeholder="20"
-                  class="w-24"
-                />
-                <span class="font-outfit text-sm font-semibold text-[var(--color-text-muted)]"
-                  >%</span
-                >
-              </div>
-              <AmountInput
-                v-else
-                v-model="goalAllocValue"
-                :currency-symbol="currency || settingsStore.displayCurrency"
-              />
-            </FormFieldGroup>
-            <p v-if="goalAllocPreview" class="font-outfit text-xs text-[var(--color-text-muted)]">
-              → {{ formatCurrencyWithCode(goalAllocPreview.amount, goalAllocPreview.currency) }} of
-              {{ formatCurrencyWithCode(goalAllocPreview.remaining, goalAllocPreview.currency) }}
-              remaining
-              <span v-if="goalAllocPreview.capped" class="text-orange-500">
-                ({{ t('goalLink.capped') }})
-              </span>
-            </p>
-          </div>
-        </ConditionalSection>
-      </div>
-    </ConditionalSection>
-
     <!-- 6. Recurring / One-time toggle (hidden when editing a recurring item) -->
     <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.schedule')">
       <TogglePillGroup
@@ -627,7 +570,11 @@ function handleDelete() {
           </div>
           <BaseInput v-model="endDate" :label="`${t('form.endDate')} (optional)`" type="date" />
         </div>
-        <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.linkToActivity')" optional>
+        <FormFieldGroup
+          v-if="!isEditingRecurring && direction === 'out'"
+          :label="t('modal.linkToActivity')"
+          optional
+        >
           <ActivityLinkDropdown v-model="activityId" />
         </FormFieldGroup>
       </div>
@@ -639,9 +586,66 @@ function handleDelete() {
         <FormFieldGroup :label="t('form.date')">
           <BaseInput v-model="date" type="date" required />
         </FormFieldGroup>
-        <FormFieldGroup :label="t('modal.linkToActivity')" optional>
+        <FormFieldGroup v-if="direction === 'out'" :label="t('modal.linkToActivity')" optional>
           <ActivityLinkDropdown v-model="activityId" />
         </FormFieldGroup>
+      </div>
+    </ConditionalSection>
+
+    <!-- 8b. Goal link (income only, after date/schedule section) -->
+    <ConditionalSection :show="direction === 'in' && goalItems.length > 0">
+      <div class="space-y-3">
+        <FormFieldGroup :label="t('goalLink.title')" optional>
+          <EntityLinkDropdown
+            v-model="goalId"
+            :items="goalItems"
+            :placeholder="t('goalLink.selectGoal')"
+            :empty-text="t('goalLink.noGoals')"
+            default-icon="🎯"
+          />
+        </FormFieldGroup>
+        <ConditionalSection :show="!!goalId">
+          <div class="space-y-3">
+            <FormFieldGroup :label="t('goalLink.allocMode')">
+              <TogglePillGroup v-model="goalAllocMode" :options="allocModeOptions" />
+            </FormFieldGroup>
+            <FormFieldGroup
+              :label="
+                goalAllocMode === 'percentage'
+                  ? t('goalLink.percentage')
+                  : t('goalLink.fixedAmount')
+              "
+              required
+            >
+              <div v-if="goalAllocMode === 'percentage'" class="flex items-center gap-3">
+                <BaseInput
+                  v-model.number="goalAllocValue"
+                  type="number"
+                  :min="1"
+                  :max="100"
+                  placeholder="20"
+                  class="w-24"
+                />
+                <span class="font-outfit text-sm font-semibold text-[var(--color-text-muted)]"
+                  >%</span
+                >
+              </div>
+              <AmountInput
+                v-else
+                v-model="goalAllocValue"
+                :currency-symbol="currency || settingsStore.displayCurrency"
+              />
+            </FormFieldGroup>
+            <p v-if="goalAllocPreview" class="font-outfit text-xs text-[var(--color-text-muted)]">
+              → {{ formatCurrencyWithCode(goalAllocPreview.amount, goalAllocPreview.currency) }} of
+              {{ formatCurrencyWithCode(goalAllocPreview.remaining, goalAllocPreview.currency) }}
+              remaining
+              <span v-if="goalAllocPreview.capped" class="text-orange-500">
+                ({{ t('goalLink.capped') }})
+              </span>
+            </p>
+          </div>
+        </ConditionalSection>
       </div>
     </ConditionalSection>
 
