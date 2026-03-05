@@ -191,6 +191,8 @@ async function attemptFileLoad() {
 }
 
 // --- Google Picker fallback ---
+const showManualFallback = ref(false);
+
 async function handlePickFromDrive() {
   isPickerLoading.value = true;
   formError.value = null;
@@ -202,8 +204,11 @@ async function handlePickFromDrive() {
     targetDriveFileId.value = result.fileId;
     cloudLoadFailed.value = false;
     await attemptFileLoad();
-  } catch {
+  } catch (e) {
+    console.error('[JoinPodView] Picker failed:', e);
     formError.value = t('join.pickerPrompt.error');
+    // Auto-expand manual fallback so user has an alternative
+    showManualFallback.value = true;
   } finally {
     isPickerLoading.value = false;
   }
@@ -557,24 +562,91 @@ function handleBack() {
           </div>
         </div>
 
-        <!-- Google Picker option when cloud load failed -->
-        <div
-          v-if="cloudLoadFailed && targetProvider === 'google_drive'"
-          class="mb-4 space-y-2 text-center"
-        >
-          <p class="text-sm text-slate-600 dark:text-slate-400">
-            {{ t('join.pickerPrompt.description') }}
-          </p>
-          <BaseButton :loading="isPickerLoading" @click="handlePickFromDrive">
-            {{ t('join.pickerPrompt.button') }}
-          </BaseButton>
-          <p class="text-xs text-slate-400 dark:text-slate-500">
-            {{ t('join.pickerPrompt.orManual') }}
-          </p>
-        </div>
+        <!-- Google Picker (primary option when cloud load failed for Drive) -->
+        <template v-if="cloudLoadFailed && targetProvider === 'google_drive'">
+          <div class="space-y-3 text-center">
+            <p class="text-sm text-slate-600 dark:text-slate-400">
+              {{ t('join.pickerPrompt.description') }}
+            </p>
+            <BaseButton :loading="isPickerLoading" class="w-full" @click="handlePickFromDrive">
+              {{ t('join.pickerPrompt.button') }}
+            </BaseButton>
+          </div>
 
-        <!-- File guidance card -->
-        <div class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
+          <!-- Manual file fallback (collapsed by default, expands on click or Picker error) -->
+          <div class="mt-4">
+            <button
+              v-if="!showManualFallback"
+              type="button"
+              class="text-primary-500 hover:text-terracotta-400 mx-auto block text-xs font-medium"
+              @click="showManualFallback = true"
+            >
+              {{ t('join.pickerPrompt.orManual') }}
+            </button>
+            <div
+              v-if="showManualFallback"
+              class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700"
+            >
+              <p class="mb-3 text-sm font-semibold text-white">
+                {{ t('join.cloudLoadFailed') }}
+              </p>
+              <p class="mb-4 text-sm text-white/70">
+                {{ t('join.needsFileDesc') }}
+              </p>
+              <div v-if="expectedFileName" class="mb-4 rounded-xl bg-white/10 px-3 py-2">
+                <p class="text-xs text-white/50">{{ t('join.expectedFile') }}</p>
+                <p class="font-mono text-sm font-medium text-white">{{ expectedFileName }}</p>
+              </div>
+              <div
+                role="button"
+                tabindex="0"
+                class="w-full cursor-pointer rounded-2xl border-2 border-dashed px-5 py-6 text-center transition-all"
+                :class="
+                  isDragging
+                    ? 'border-primary-500 bg-primary-500/10'
+                    : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
+                "
+                @click="handleLoadFile"
+                @keydown.enter="handleLoadFile"
+                @dragenter="handleDragEnter"
+                @dragleave="handleDragLeave"
+                @dragover="handleDragOver"
+                @drop="handleDrop"
+              >
+                <div v-if="isLoadingFile" class="py-2">
+                  <div
+                    class="border-t-primary-500 mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white/30"
+                  ></div>
+                  <p class="text-xs text-white/60">{{ t('auth.loadingFile') }}</p>
+                </div>
+                <template v-else>
+                  <svg
+                    class="mx-auto mb-2 h-8 w-8 text-white/40"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                    />
+                  </svg>
+                  <p class="text-sm font-medium text-white/80">
+                    {{ t('join.dropZoneText') }}
+                  </p>
+                  <p class="text-primary-500 mt-1 text-xs">
+                    {{ t('join.loadFileButton') }}
+                  </p>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- File guidance card (non-Drive providers or no cloud failure) -->
+        <div v-else class="bg-secondary-500 rounded-2xl p-5 dark:bg-slate-700">
           <p class="mb-3 text-sm font-semibold text-white">
             {{ cloudLoadFailed ? t('join.cloudLoadFailed') : t('join.needsFile') }}
           </p>
