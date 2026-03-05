@@ -227,10 +227,11 @@ test.describe('Magic Link Invite System', () => {
       const pickerButton = page.getByRole('button', { name: /select file from drive/i });
       await expect(pickerButton).toBeVisible({ timeout: 15000 });
 
-      // Should also show the "or manual" fallback text
+      // Should show the "or manual" fallback link
       await expect(page.getByText(/or load a file from your device/i)).toBeVisible();
 
-      // The manual file drop zone should also be available below
+      // Click the manual fallback link to expand the drop zone
+      await page.getByText(/or load a file from your device/i).click();
       await expect(page.getByText(/drop.*beanpod|load.*beanpod/i).first()).toBeVisible();
     });
   });
