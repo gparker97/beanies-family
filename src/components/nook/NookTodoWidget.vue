@@ -23,7 +23,10 @@ const hasMore = computed(() => todoStore.filteredOpenTodos.length > MAX_VISIBLE)
 const remainingCount = computed(() => todoStore.filteredOpenTodos.length - MAX_VISIBLE);
 
 // ── View/edit modal ─────────────────────────────────────────────────────────
-const selectedTodo = ref<TodoItem | null>(null);
+const selectedTodoId = ref<string | null>(null);
+const selectedTodo = computed(() =>
+  selectedTodoId.value ? (todoStore.todos.find((t) => t.id === selectedTodoId.value) ?? null) : null
+);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function getMember(id: string) {
@@ -210,7 +213,7 @@ async function toggleComplete(todoId: string) {
             ? 'border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50'
             : 'border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-700 dark:hover:bg-slate-600'
         "
-        @click="selectedTodo = todo"
+        @click="selectedTodoId = todo.id"
       >
         <button
           type="button"
@@ -273,7 +276,7 @@ async function toggleComplete(todoId: string) {
     </router-link>
   </div>
 
-  <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
+  <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
 </template>
 
 <style scoped>
