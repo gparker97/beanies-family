@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
+import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -9,7 +10,6 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
-import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import type {
   Goal,
   GoalType,
@@ -31,7 +31,6 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
-const { currencyOptions } = useCurrencyOptions();
 
 // Goal type icon chip options
 const GOAL_ICON_OPTIONS = [
@@ -184,40 +183,7 @@ function handleDelete() {
 
     <!-- 3. Target amount + Currency (inline row) -->
     <FormFieldGroup :label="t('modal.targetAmount')" required>
-      <div class="flex items-stretch gap-2">
-        <div class="relative flex-shrink-0">
-          <select
-            v-model="currency"
-            class="focus:border-primary-500 font-outfit h-full w-[82px] cursor-pointer appearance-none rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-3 pr-7 text-center text-sm font-bold text-[var(--color-text)] transition-all duration-200 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-100"
-          >
-            <option v-for="opt in currencyOptions" :key="opt.value" :value="opt.value">
-              {{ opt.value }}
-            </option>
-          </select>
-          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-            <svg
-              class="h-3 w-3 text-[var(--color-text)] opacity-35"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </div>
-        </div>
-        <div class="min-w-0 flex-1">
-          <AmountInput
-            v-model="targetAmount"
-            :currency-symbol="currency || settingsStore.displayCurrency"
-            font-size="1.8rem"
-          />
-        </div>
-      </div>
+      <CurrencyAmountInput v-model:amount="targetAmount" v-model:currency="currency" />
     </FormFieldGroup>
 
     <!-- 4. Current amount -->
