@@ -229,6 +229,7 @@ async function loadFamilyData() {
     if (activeFamilyId && cachedKeyB64) {
       try {
         const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId);
+        initBreadcrumbs.push(`path2: cacheResult=${cacheResult.success}`);
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');
           memberFilterStore.initialize();
@@ -239,13 +240,17 @@ async function loadFamilyData() {
           return;
         }
       } catch (err) {
+        initBreadcrumbs.push(
+          `path2: cache threw: ${err instanceof Error ? err.message : String(err)}`
+        );
         console.warn('[loadFamilyData] Failed to load from persistence cache:', err);
       }
     }
-    // Fall through — user needs to grant permission
-    initBreadcrumbs.push('path2: returning early — user must grant file permission');
-    console.log('[loadFamilyData] User needs to grant file permission — returning early');
-    return;
+    // Cache failed or unavailable — fall through to Path 3 so the app
+    // at least renders with an empty doc. User can grant file permission
+    // from Settings to reload their data.
+    initBreadcrumbs.push('path2: cache unavailable, falling through to path3');
+    console.log('[loadFamilyData] Cache unavailable — falling through to init empty doc');
   }
 
   // Path 3: No file configured → initialize Automerge doc
@@ -452,14 +457,8 @@ function handleReload() {
 async function handleClearDataAndSignOut() {
   showClearConfirm.value = false;
   try {
-    // Clear all IndexedDB databases for the active family
-    const { closeDatabase, deleteFamilyDatabase, getActiveFamilyId } =
-      await import('@/services/indexeddb/database');
-    await closeDatabase();
-    const familyId = getActiveFamilyId();
-    if (familyId) {
-      await deleteFamilyDatabase(familyId);
-    }
+    // Use the full sign-out flow: clears family DB, auth session, trust flag, cached keys
+    await authStore.signOutAndClearData();
   } catch {
     // Best effort — continue with reload
   }
