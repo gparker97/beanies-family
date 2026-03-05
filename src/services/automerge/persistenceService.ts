@@ -11,9 +11,9 @@
 
 import { openDB, type IDBPDatabase } from 'idb';
 import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyService';
-import { saveDoc, loadDoc } from './docService';
+import { saveDoc } from './docService';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
-import type * as Automerge from '@automerge/automerge';
+import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 
@@ -86,7 +86,7 @@ export async function loadCachedDoc(
 
   const encrypted = new Uint8Array(base64ToBuffer(entry.payload));
   const binary = await decryptPayload(familyKey, encrypted);
-  return loadDoc(binary);
+  return Automerge.load<FamilyDocument>(binary);
 }
 
 /**
