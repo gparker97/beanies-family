@@ -264,6 +264,14 @@ const goalAllocPreview = computed(() => {
 });
 
 // Clear goal fields when switching to expense
+watch(direction, (newDir) => {
+  if (newDir === 'out') {
+    goalId.value = undefined;
+    goalAllocMode.value = 'percentage';
+    goalAllocValue.value = undefined;
+  }
+});
+
 // Reset allocation when goal is cleared
 watch(goalId, (newId) => {
   if (!newId) {
@@ -584,8 +592,8 @@ function handleDelete() {
       </div>
     </ConditionalSection>
 
-    <!-- 8b. Goal link (after date/schedule section) -->
-    <ConditionalSection :show="goalItems.length > 0">
+    <!-- 8b. Goal link (income only, after date/schedule section) -->
+    <ConditionalSection :show="direction === 'in' && goalItems.length > 0">
       <div class="space-y-3">
         <FormFieldGroup :label="t('goalLink.title')" optional>
           <EntityLinkDropdown
