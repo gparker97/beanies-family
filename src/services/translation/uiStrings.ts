@@ -2072,6 +2072,23 @@ const STRING_DEFS = {
   'budget.upcoming.tomorrow': { en: 'Tomorrow', beanie: 'tomorrow' },
   'budget.upcoming.inDays': { en: 'In {days} days', beanie: 'in {days} days' },
   'budget.upcoming.recurring': { en: 'recurring', beanie: 'recurring' },
+
+  // Initialization error recovery
+  'app.initError.title': { en: 'Something Went Wrong', beanie: 'oh no, the beans spilled' },
+  'app.initError.description': {
+    en: 'The app failed to start properly. You can try reloading, or clear your data and start fresh.',
+    beanie:
+      'the app failed to start properly. you can try reloading, or clear your data and start fresh.',
+  },
+  'app.initError.reload': { en: 'Reload', beanie: 'reload' },
+  'app.initError.clearData': { en: 'Sign Out & Clear Data', beanie: 'sign out & clear data' },
+  'app.initError.details': { en: 'Technical Details', beanie: 'technical details' },
+  'app.initError.diagnostics': { en: 'Device Info', beanie: 'device info' },
+  'app.initError.clearConfirm': {
+    en: 'This will sign you out and delete all local data. Your cloud data (if any) will not be affected. Are you sure?',
+    beanie:
+      'this will sign you out and delete all local data. your cloud data (if any) will not be affected. are you sure?',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**
