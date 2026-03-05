@@ -65,6 +65,7 @@ const isInitializing = ref(true);
 const initError = ref<string | null>(null);
 const initErrorDetail = ref<string | null>(null);
 const showClearConfirm = ref(false);
+const initBreadcrumbs: string[] = [];
 const isMenuOpen = ref(false);
 const showTrustPrompt = ref(false);
 const showPasskeyPrompt = ref(false);
@@ -149,10 +150,15 @@ const showLayout = computed(() => {
 /* eslint-disable no-console -- debug logging for sync diagnostics */
 async function loadFamilyData() {
   const { getActiveFamilyId: getActiveIdInner } = await import('@/services/indexeddb/database');
-  console.log('[loadFamilyData] activeFamily:', getActiveIdInner());
+  const activeFamilyIdStr = getActiveIdInner();
+  initBreadcrumbs.push(`loadFamilyData: activeFamily=${activeFamilyIdStr ?? 'null'}`);
+  console.log('[loadFamilyData] activeFamily:', activeFamilyIdStr);
 
   // Initialize sync service (restores file handle if configured)
   await syncStore.initialize();
+  initBreadcrumbs.push(
+    `syncInit: configured=${syncStore.isConfigured}, needsPermission=${syncStore.needsPermission}`
+  );
   console.log(
     '[loadFamilyData] sync configured:',
     syncStore.isConfigured,
@@ -162,8 +168,10 @@ async function loadFamilyData() {
 
   // Path 1: File configured + we have permission → load from file (source of truth)
   if (syncStore.isConfigured && !syncStore.needsPermission) {
+    initBreadcrumbs.push('path1: loading from sync file');
     try {
       const loadResult = await syncStore.loadFromFile();
+      initBreadcrumbs.push(`path1: loadFromFile result=${loadResult.success}`);
       if (loadResult.success) {
         memberFilterStore.initialize();
         const result = await processRecurringItems();
@@ -211,9 +219,13 @@ async function loadFamilyData() {
 
   // Path 2: File configured but needs permission → try Automerge persistence cache
   if (syncStore.isConfigured && syncStore.needsPermission) {
+    initBreadcrumbs.push('path2: file needs permission, trying cache');
     console.log('[loadFamilyData] File needs permission — trying persistence cache');
     const activeFamilyId = familyContextStore.activeFamilyId;
     const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+    initBreadcrumbs.push(
+      `path2: familyId=${activeFamilyId ?? 'null'}, hasCachedKey=${!!cachedKeyB64}`
+    );
     if (activeFamilyId && cachedKeyB64) {
       try {
         const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId);
@@ -231,12 +243,14 @@ async function loadFamilyData() {
       }
     }
     // Fall through — user needs to grant permission
+    initBreadcrumbs.push('path2: returning early — user must grant file permission');
     console.log('[loadFamilyData] User needs to grant file permission — returning early');
     return;
   }
 
   // Path 3: No file configured → initialize Automerge doc
   // This path is for first-time users or users without a sync file
+  initBreadcrumbs.push('path3: no file configured, initializing empty doc');
   try {
     // E2E seed: if the data bridge saved a binary to sessionStorage, load it
     if (import.meta.env.DEV && sessionStorage.getItem('__e2eSeedDoc')) {
@@ -285,9 +299,11 @@ onMounted(async () => {
   try {
     // Ensure initial route is resolved before checking route names
     await router.isReady();
+    initBreadcrumbs.push(`route: ${String(route.name ?? route.path)}`);
 
     // Step 1: Load global settings (theme, language) — works before any family is active
     await settingsStore.loadGlobalSettings();
+    initBreadcrumbs.push('settings: global settings loaded');
 
     // Sync beanie mode from settings to translation store
     watch(
@@ -317,12 +333,17 @@ onMounted(async () => {
     }
 
     // Step 2: Initialize auth (checks registry for existing families)
+    initBreadcrumbs.push('auth: initializing');
     await authStore.initializeAuth();
+    initBreadcrumbs.push(
+      `auth: needsAuth=${authStore.needsAuth}, user=${authStore.currentUser?.email ?? 'none'}`
+    );
 
     // If not authenticated, redirect to login (unless already on login page)
     if (authStore.needsAuth) {
       // E2E auto-auth: restore from sessionStorage (dev mode only)
       if (!authStore.restoreE2EAuth()) {
+        initBreadcrumbs.push('auth: redirecting to welcome (not authenticated)');
         if (route.name !== 'Welcome' && route.name !== 'Login' && route.name !== 'JoinFamily') {
           router.replace('/welcome');
         }
@@ -332,6 +353,7 @@ onMounted(async () => {
 
     // Step 3: Resolve active family
     const authFamilyId = authStore.currentUser?.familyId;
+    initBreadcrumbs.push(`family: authFamilyId=${authFamilyId ?? 'none'}`);
 
     if (authFamilyId) {
       // Auth resolved a family — switch to it
@@ -339,31 +361,51 @@ onMounted(async () => {
       await closeDatabase();
       const switched = await familyContextStore.switchFamily(authFamilyId);
       await familyContextStore.reload();
+      initBreadcrumbs.push(`family: switchFamily=${switched}`);
 
       if (!switched) {
         const family = await familyContextStore.createFamilyWithId(authFamilyId, 'My Family');
         if (!family) {
-          console.error('Failed to create family');
-          return;
+          initBreadcrumbs.push('family: createFamilyWithId FAILED');
+          throw new Error('Failed to create family context for id: ' + authFamilyId);
         }
+        initBreadcrumbs.push('family: created new family entry');
       }
     } else {
       // No auth family — use lastActiveFamilyId or create new
       const activeFamily = await familyContextStore.initialize();
+      initBreadcrumbs.push(`family: initialize=${!!activeFamily}`);
 
       if (!activeFamily) {
         const family = await familyContextStore.createFamily('My Family');
         if (!family) {
-          console.error('Failed to create default family');
-          return;
+          initBreadcrumbs.push('family: createFamily FAILED');
+          throw new Error('Failed to create default family context');
         }
+        initBreadcrumbs.push('family: created default family');
       }
     }
 
     // Step 5: Load family data from the active per-family DB
+    initBreadcrumbs.push('data: loading family data');
     const { closeDatabase: closeDb } = await import('@/services/indexeddb/database');
     await closeDb();
     await loadFamilyData();
+    initBreadcrumbs.push('data: loadFamilyData completed');
+
+    // Post-init health check: verify the Automerge doc is loaded
+    try {
+      const { getDoc } = await import('@/services/automerge/docService');
+      getDoc(); // throws if currentDoc is null
+      initBreadcrumbs.push('health: automerge doc OK');
+    } catch {
+      // Doc not loaded — initialization completed but data is missing
+      initBreadcrumbs.push('health: NO automerge doc loaded');
+      const breadcrumbLog = initBreadcrumbs.join('\n');
+      initError.value = 'Initialization completed but no data was loaded';
+      initErrorDetail.value = breadcrumbLog;
+      console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
+    }
 
     // Auto-update exchange rates if enabled (non-blocking)
     if (settingsStore.exchangeRateAutoUpdate) {
@@ -372,8 +414,10 @@ onMounted(async () => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     initError.value = message;
-    initErrorDetail.value = err instanceof Error ? (err.stack ?? null) : null;
-    console.error('[App] Initialization failed:', err);
+    const stack = err instanceof Error ? (err.stack ?? '') : '';
+    const breadcrumbLog = initBreadcrumbs.join('\n');
+    initErrorDetail.value = `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`;
+    console.error('[App] Initialization failed:', err, '\nBreadcrumbs:', breadcrumbLog);
   } finally {
     // Always dismiss the loading overlay, even on early return or error
     isInitializing.value = false;
