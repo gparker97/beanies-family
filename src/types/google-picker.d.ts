@@ -19,6 +19,12 @@ declare namespace google.picker {
     setQuery(query: string): this;
     setMimeTypes(mimeTypes: string): this;
     setOwnedByMe(ownedByMe: boolean): this;
+    setMode(mode: DocsViewMode): this;
+  }
+
+  enum DocsViewMode {
+    LIST = 'list',
+    GRID = 'grid',
   }
 
   interface Picker {

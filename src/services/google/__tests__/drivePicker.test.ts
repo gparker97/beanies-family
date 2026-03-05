@@ -27,6 +27,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
     setQuery: vi.fn().mockReturnThis(),
     setMimeTypes: vi.fn().mockReturnThis(),
     setOwnedByMe: vi.fn().mockReturnThis(),
+    setMode: vi.fn().mockReturnThis(),
   };
 
   (globalThis as Record<string, unknown>).google = {
@@ -39,6 +40,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
       }),
       ViewId: { DOCS: 'all' },
       Action: { PICKED: 'picked', CANCEL: 'cancel' },
+      DocsViewMode: { LIST: 'list', GRID: 'grid' },
     },
   };
 
@@ -88,6 +90,7 @@ describe('drivePicker', () => {
       setQuery: vi.fn().mockReturnThis(),
       setMimeTypes: vi.fn().mockReturnThis(),
       setOwnedByMe: vi.fn().mockReturnThis(),
+      setMode: vi.fn().mockReturnThis(),
     };
 
     (globalThis as Record<string, unknown>).google = {
@@ -100,6 +103,7 @@ describe('drivePicker', () => {
         }),
         ViewId: { DOCS: 'all' },
         Action: { PICKED: 'picked', CANCEL: 'cancel' },
+        DocsViewMode: { LIST: 'list', GRID: 'grid' },
       },
     };
 
