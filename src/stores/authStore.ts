@@ -233,6 +233,7 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = true;
       freshSignIn.value = true;
       persistSession(user);
+      familyStore.setCurrentMember(member!.id);
 
       return { success: true };
     } catch (e) {
