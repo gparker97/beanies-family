@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAuthStore } from '@/stores/authStore';
 
 /** Routes that require canViewFinances permission */
 export const FINANCE_ROUTES = [
@@ -15,8 +16,17 @@ export const FINANCE_ROUTES = [
 
 export function usePermissions() {
   const familyStore = useFamilyStore();
+  const authStore = useAuthStore();
 
-  const isOwner = computed(() => familyStore.currentMember?.role === 'owner');
+  // When currentMember is resolved, use its role and permission flags.
+  // Fallback: if currentMember is transiently null (e.g. during signup before
+  // stores finish loading), check authStore.currentUser.role so the owner
+  // isn't locked out of the UI.
+  const isOwner = computed(
+    () =>
+      familyStore.currentMember?.role === 'owner' ||
+      (!familyStore.currentMember && authStore.currentUser?.role === 'owner')
+  );
 
   const canManagePod = computed(() => isOwner.value || !!familyStore.currentMember?.canManagePod);
 

@@ -435,37 +435,6 @@ onMounted(async () => {
   }
 });
 
-// When auth transitions from unauthenticated → authenticated (e.g. after signUp
-// completes on the login page), onMounted has already returned early. This watch
-// runs the same family data initialization that onMounted would have performed.
-// Guard: skip during onMounted (isInitializing is true) to avoid double-loading on refresh.
-watch(
-  () => authStore.isAuthenticated,
-  async (isAuth, wasAuth) => {
-    if (!isAuth || wasAuth) return; // Only react to false → true transitions
-    if (isInitializing.value) return; // onMounted is handling initialization
-
-    const authFamilyId = authStore.currentUser?.familyId;
-    if (!authFamilyId) return;
-
-    try {
-      const { closeDatabase } = await import('@/services/indexeddb/database');
-      await closeDatabase();
-      const switched = await familyContextStore.switchFamily(authFamilyId);
-      await familyContextStore.reload();
-
-      if (!switched) {
-        await familyContextStore.createFamilyWithId(authFamilyId, 'My Family');
-      }
-
-      await closeDatabase();
-      await loadFamilyData();
-    } catch (err) {
-      console.error('[App] Post-auth initialization failed:', err);
-    }
-  }
-);
-
 function getDeviceDiagnostics(): string {
   return [
     `UA: ${navigator.userAgent}`,
