@@ -176,7 +176,7 @@ async function loadFamilyData() {
         memberFilterStore.initialize();
         const result = await processRecurringItems();
         if (result.processed > 0) {
-          await transactionsStore.loadTransactions();
+          await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
         }
         syncStore.setupAutoSync();
         return;
@@ -198,7 +198,7 @@ async function loadFamilyData() {
               memberFilterStore.initialize();
               const result = await processRecurringItems();
               if (result.processed > 0) {
-                await transactionsStore.loadTransactions();
+                await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
               }
               return;
             }
@@ -234,7 +234,7 @@ async function loadFamilyData() {
           memberFilterStore.initialize();
           const result = await processRecurringItems();
           if (result.processed > 0) {
-            await transactionsStore.loadTransactions();
+            await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
           }
           return;
         }
@@ -295,7 +295,7 @@ async function loadFamilyData() {
 
       const result = await processRecurringItems();
       if (result.processed > 0) {
-        await transactionsStore.loadTransactions();
+        await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
       }
     }
   } catch (err) {
