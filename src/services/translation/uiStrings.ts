@@ -427,6 +427,18 @@ const STRING_DEFS = {
   'goals.noCompletedGoals': { en: 'No completed goals yet.', beanie: 'no goals completed yet.' },
   'goals.completedOn': { en: 'Completed', beanie: 'done' },
 
+  // Goal Link (transaction-to-goal allocation)
+  'goalLink.title': { en: 'Link to Goal', beanie: 'link to goal' },
+  'goalLink.selectGoal': { en: 'Select Goal', beanie: 'pick a goal' },
+  'goalLink.allocMode': { en: 'Contribution', beanie: 'contribution' },
+  'goalLink.percentage': { en: 'Percentage', beanie: 'percentage' },
+  'goalLink.fixedAmount': { en: 'Fixed Amount', beanie: 'fixed amount' },
+  'goalLink.capped': { en: 'Reduced to meet goal', beanie: 'reduced to meet goal' },
+  'goalLink.noGoals': {
+    en: 'No active goals in this currency',
+    beanie: 'no active goals in this currency',
+  },
+
   // Family
   'family.title': { en: 'Family', beanie: 'the pod' },
   'family.addMember': { en: 'Add Member', beanie: 'add a beanie' },

@@ -3,9 +3,11 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
+import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
 import type {
   Transaction,
   CreateTransactionInput,
@@ -176,28 +178,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
   });
 
   /**
-   * Calculate the balance adjustment for an account based on transaction type.
-   * Income adds to balance, expense subtracts from balance.
-   * For transfers: source account is debited, destination account is credited.
-   */
-  function calculateBalanceAdjustment(
-    type: 'income' | 'expense' | 'transfer',
-    amount: number,
-    isSourceAccount: boolean = true
-  ): number {
-    switch (type) {
-      case 'income':
-        return amount;
-      case 'expense':
-        return -amount;
-      case 'transfer':
-        return isSourceAccount ? -amount : amount;
-      default:
-        return 0;
-    }
-  }
-
-  /**
    * Update account balance in both store and database.
    */
   async function adjustAccountBalance(accountId: string, adjustment: number): Promise<void> {
@@ -207,6 +187,47 @@ export const useTransactionsStore = defineStore('transactions', () => {
       const newBalance = account.balance + adjustment;
       await accountsStore.updateAccount(accountId, { balance: newBalance });
     }
+  }
+
+  /**
+   * Adjust a linked goal's progress. Mirrors adjustAccountBalance pattern.
+   */
+  async function adjustGoalProgress(
+    goalId: string | undefined,
+    appliedAmount: number | undefined,
+    reverse = false
+  ): Promise<void> {
+    if (!goalId || !appliedAmount) return;
+    const goalsStore = useGoalsStore();
+    const goal = goalsStore.goals.find((g) => g.id === goalId);
+    if (!goal) return;
+    const delta = reverse ? -appliedAmount : appliedAmount;
+    const newAmount = Math.max(0, goal.currentAmount + delta);
+    await goalsStore.updateProgress(goal.id, newAmount);
+  }
+
+  /**
+   * Compute and apply goal allocation for a transaction, with guardrail.
+   * Returns the applied amount (0 if no allocation).
+   */
+  async function applyGoalAllocation(transaction: Transaction): Promise<number> {
+    if (!transaction.goalId || !transaction.goalAllocMode || !transaction.goalAllocValue) return 0;
+    const goalsStore = useGoalsStore();
+    const goal = goalsStore.goals.find((g) => g.id === transaction.goalId);
+    if (!goal) return 0;
+    const raw = computeGoalAllocRaw(
+      transaction.goalAllocMode,
+      transaction.goalAllocValue,
+      transaction.amount
+    );
+    const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
+    const applied = Math.min(raw, remaining);
+    if (applied > 0) {
+      await transactionRepo.updateTransaction(transaction.id, { goalAllocApplied: applied });
+      transaction.goalAllocApplied = applied;
+      await adjustGoalProgress(transaction.goalId, applied);
+    }
+    return applied;
   }
 
   // Actions
@@ -235,6 +256,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
         const destAdjustment = calculateBalanceAdjustment(input.type, input.amount, false);
         await adjustAccountBalance(input.toAccountId, destAdjustment);
       }
+
+      // Apply goal allocation (if linked)
+      await applyGoalAllocation(transaction);
 
       return transaction;
     });
@@ -288,7 +312,13 @@ export const useTransactionsStore = defineStore('transactions', () => {
             const newDestAdjustment = calculateBalanceAdjustment(newType, newAmount, false);
             await adjustAccountBalance(newToAccountId, newDestAdjustment);
           }
+
+          // Reverse old goal allocation
+          await adjustGoalProgress(original.goalId, original.goalAllocApplied, true);
         }
+
+        // Apply new goal allocation (if linked)
+        await applyGoalAllocation(updated);
       }
       return updated;
     });
@@ -318,6 +348,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
             );
             await adjustAccountBalance(transaction.toAccountId, -destAdjustment);
           }
+
+          // Reverse goal allocation
+          await adjustGoalProgress(transaction.goalId, transaction.goalAllocApplied, true);
         }
       }
       return success;
@@ -335,6 +368,8 @@ export const useTransactionsStore = defineStore('transactions', () => {
           // Reverse balance
           const adjustment = calculateBalanceAdjustment(tx.type, tx.amount, true);
           await adjustAccountBalance(tx.accountId, -adjustment);
+          // Reverse goal allocation
+          await adjustGoalProgress(tx.goalId, tx.goalAllocApplied, true);
           count++;
         }
       }

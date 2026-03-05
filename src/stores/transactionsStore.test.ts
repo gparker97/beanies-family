@@ -1,8 +1,9 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAccountsStore } from './accountsStore';
+import { useGoalsStore } from './goalsStore';
 import { useTransactionsStore } from './transactionsStore';
-import type { Transaction, Account } from '@/types/models';
+import type { Transaction, Account, Goal } from '@/types/models';
 
 // Mock the transaction repository
 vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
@@ -21,6 +22,20 @@ vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   updateAccount: vi.fn(),
   deleteAccount: vi.fn(),
   updateAccountBalance: vi.fn(),
+}));
+
+// Mock the goal repository
+vi.mock('@/services/automerge/repositories/goalRepository', () => ({
+  getAllGoals: vi.fn().mockResolvedValue([]),
+  getGoalById: vi.fn(),
+  createGoal: vi.fn(),
+  updateGoal: vi.fn(),
+  deleteGoal: vi.fn(),
+  updateGoalProgress: vi.fn(),
+  getGoalProgress: vi.fn(),
+  getActiveGoals: vi.fn().mockResolvedValue([]),
+  getFamilyGoals: vi.fn().mockResolvedValue([]),
+  getGoalsByMemberId: vi.fn().mockResolvedValue([]),
 }));
 
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
@@ -782,5 +797,277 @@ describe('transactionsStore - Summary Card Calculations', () => {
       // Balance should be reversed: expense of 500 reversed = +500
       expect(accountRepo.updateAccount).toHaveBeenCalledWith('test-account-1', { balance: 1500 });
     });
+  });
+});
+
+// --- Goal Allocation Sync ---
+
+const mockGoal: Goal = {
+  id: 'goal-1',
+  name: 'Buy a Car',
+  type: 'savings',
+  targetAmount: 10000,
+  currentAmount: 0,
+  currency: 'USD',
+  priority: 'high',
+  isCompleted: false,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+import * as goalRepo from '@/services/automerge/repositories/goalRepository';
+
+describe('transactionsStore - Goal Allocation Sync', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  function seedStores() {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+    const goalsStore = useGoalsStore();
+
+    accountsStore.accounts.push({ ...mockAccount });
+    goalsStore.goals.push({ ...mockGoal });
+
+    return { transactionsStore, accountsStore, goalsStore };
+  }
+
+  it('should update goal progress with percentage allocation on create', async () => {
+    const { transactionsStore, goalsStore } = seedStores();
+
+    const createdTx: Transaction = {
+      ...mockTransaction,
+      type: 'income',
+      amount: 1000,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 20,
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
+      ...createdTx,
+      goalAllocApplied: 200,
+    });
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 2000 });
+    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
+      ...mockGoal,
+      currentAmount: 200,
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'income',
+      amount: 1000,
+      currency: 'USD',
+      category: 'salary',
+      date: '2024-01-15',
+      description: 'Salary',
+      isReconciled: false,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 20,
+    });
+
+    // Should store applied amount on transaction
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith(createdTx.id, {
+      goalAllocApplied: 200,
+    });
+    // Should update goal progress: 0 + 200 = 200
+    expect(goalsStore.goals[0]!.currentAmount).toBe(200);
+  });
+
+  it('should update goal progress with fixed allocation on create', async () => {
+    const { transactionsStore, goalsStore } = seedStores();
+
+    const createdTx: Transaction = {
+      ...mockTransaction,
+      type: 'income',
+      amount: 1000,
+      goalId: 'goal-1',
+      goalAllocMode: 'fixed',
+      goalAllocValue: 300,
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
+      ...createdTx,
+      goalAllocApplied: 300,
+    });
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 2000 });
+    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
+      ...mockGoal,
+      currentAmount: 300,
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'income',
+      amount: 1000,
+      currency: 'USD',
+      category: 'salary',
+      date: '2024-01-15',
+      description: 'Salary',
+      isReconciled: false,
+      goalId: 'goal-1',
+      goalAllocMode: 'fixed',
+      goalAllocValue: 300,
+    });
+
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith(createdTx.id, {
+      goalAllocApplied: 300,
+    });
+    expect(goalsStore.goals[0]!.currentAmount).toBe(300);
+  });
+
+  it('should cap allocation to remaining goal amount', async () => {
+    const { transactionsStore, goalsStore } = seedStores();
+    goalsStore.goals[0]!.currentAmount = 9900; // Only 100 remaining
+
+    const createdTx: Transaction = {
+      ...mockTransaction,
+      type: 'income',
+      amount: 1000,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 50, // 50% = $500, but only $100 remaining
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
+      ...createdTx,
+      goalAllocApplied: 100,
+    });
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 2000 });
+    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
+      ...mockGoal,
+      currentAmount: 10000,
+      isCompleted: true,
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'income',
+      amount: 1000,
+      currency: 'USD',
+      category: 'salary',
+      date: '2024-01-15',
+      description: 'Salary',
+      isReconciled: false,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 50,
+    });
+
+    // Should cap at remaining amount (100), not full 500
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith(createdTx.id, {
+      goalAllocApplied: 100,
+    });
+  });
+
+  it('should reverse goal progress on delete', async () => {
+    const { transactionsStore, goalsStore } = seedStores();
+    goalsStore.goals[0]!.currentAmount = 200;
+
+    // Seed a transaction with goal allocation
+    transactionsStore.transactions.push({
+      ...mockTransaction,
+      type: 'income',
+      amount: 1000,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 20,
+      goalAllocApplied: 200,
+    });
+
+    vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount, balance: 0 });
+    vi.mocked(goalRepo.updateGoal).mockResolvedValue({
+      ...mockGoal,
+      currentAmount: 0,
+    });
+
+    await transactionsStore.deleteTransaction(mockTransaction.id);
+
+    // Goal progress should be reversed: 200 - 200 = 0
+    expect(goalsStore.goals[0]!.currentAmount).toBe(0);
+  });
+
+  it('should reverse old and apply new allocation on update', async () => {
+    const { transactionsStore, goalsStore } = seedStores();
+    goalsStore.goals[0]!.currentAmount = 200;
+
+    // Seed a transaction with 20% allocation (applied = 200)
+    const originalTx: Transaction = {
+      ...mockTransaction,
+      type: 'income',
+      amount: 1000,
+      goalId: 'goal-1',
+      goalAllocMode: 'percentage',
+      goalAllocValue: 20,
+      goalAllocApplied: 200,
+    };
+    transactionsStore.transactions.push(originalTx);
+
+    const updatedTx: Transaction = {
+      ...originalTx,
+      goalAllocMode: 'percentage',
+      goalAllocValue: 50,
+    };
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTx);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount });
+    vi.mocked(goalRepo.updateGoal).mockImplementation(async (_id, input) => {
+      goalsStore.goals[0]!.currentAmount =
+        input.currentAmount ?? goalsStore.goals[0]!.currentAmount;
+      return { ...goalsStore.goals[0]! };
+    });
+
+    await transactionsStore.updateTransaction(mockTransaction.id, {
+      goalAllocMode: 'percentage',
+      goalAllocValue: 50,
+    });
+
+    // Old allocation reversed (200 → 0), new allocation applied (50% of 1000 = 500)
+    // Final goal currentAmount: 0 + 500 = 500
+    expect(goalsStore.goals[0]!.currentAmount).toBe(500);
+  });
+
+  it('should reverse goal progress for each tx in bulk recurring delete', async () => {
+    const { transactionsStore, goalsStore } = seedStores();
+    goalsStore.goals[0]!.currentAmount = 400;
+
+    // Two recurring transactions with goal allocation
+    transactionsStore.transactions.push(
+      {
+        ...mockTransaction,
+        id: 'tx-r1',
+        recurringItemId: 'recurring-1',
+        type: 'income',
+        amount: 1000,
+        goalId: 'goal-1',
+        goalAllocApplied: 200,
+      },
+      {
+        ...mockTransaction,
+        id: 'tx-r2',
+        recurringItemId: 'recurring-1',
+        type: 'income',
+        amount: 1000,
+        goalId: 'goal-1',
+        goalAllocApplied: 200,
+      }
+    );
+
+    vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({ ...mockAccount });
+    vi.mocked(goalRepo.updateGoal).mockImplementation(async (_id, input) => {
+      goalsStore.goals[0]!.currentAmount =
+        input.currentAmount ?? goalsStore.goals[0]!.currentAmount;
+      return { ...goalsStore.goals[0]! };
+    });
+
+    await transactionsStore.deleteTransactionsByRecurringItemId('recurring-1');
+
+    // 400 - 200 - 200 = 0
+    expect(goalsStore.goals[0]!.currentAmount).toBe(0);
   });
 });
