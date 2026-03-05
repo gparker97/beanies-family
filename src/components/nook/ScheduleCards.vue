@@ -2,10 +2,34 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { toDateInputValue } from '@/utils/date';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
+const activityStore = useActivityStore();
+
+const emit = defineEmits<{
+  'open-todo': [id: string];
+  'open-activity': [id: string];
+}>();
+
+interface ScheduleItem {
+  id: string;
+  type: 'todo' | 'activity';
+  title: string;
+  time: string;
+  icon: string;
+}
+
+const CATEGORY_FALLBACK_ICON: Record<string, string> = {
+  lesson: '📚',
+  sport: '⚽',
+  appointment: '🏥',
+  social: '👥',
+  pickup: '🚗',
+  other: '📌',
+};
 
 const todayStr = computed(() => toDateInputValue(new Date()));
 
@@ -13,29 +37,90 @@ const todayFormatted = computed(() =>
   new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 );
 
-const todayTodos = computed(() =>
-  todoStore.filteredOpenTodos.filter(
-    (todo) => todo.dueDate && todo.dueDate.split('T')[0] === todayStr.value
-  )
-);
-
-const weekTodos = computed(() => {
-  const today = new Date();
-  const start = todayStr.value;
-  const end = new Date(today);
-  end.setDate(end.getDate() + 7);
-  const endStr = toDateInputValue(end);
-  return todoStore.filteredOpenTodos.filter((todo) => {
-    if (!todo.dueDate) return false;
-    const dateStr = todo.dueDate.split('T')[0] ?? '';
-    return dateStr >= start && dateStr <= endStr;
-  });
-});
-
-function formatTodoTime(dueDate: string, dueTime?: string): string {
+function formatTime(dueDate: string, dueTime?: string): string {
   if (dueTime) return dueTime;
   const date = new Date(dueDate);
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// ── Today's items (todos + activities merged) ────────────────────────────────
+const todayItems = computed<ScheduleItem[]>(() => {
+  const items: ScheduleItem[] = [];
+
+  // Todos due today
+  for (const todo of todoStore.filteredOpenTodos) {
+    if (todo.dueDate && todo.dueDate.split('T')[0] === todayStr.value) {
+      items.push({
+        id: todo.id,
+        type: 'todo',
+        title: todo.title,
+        time: formatTime(todo.dueDate, todo.dueTime),
+        icon: '✅',
+      });
+    }
+  }
+
+  // Activities today (from upcomingActivities which already expands recurring)
+  for (const { activity, date } of activityStore.upcomingActivities) {
+    if (date === todayStr.value) {
+      items.push({
+        id: activity.id,
+        type: 'activity',
+        title: activity.title,
+        time: activity.startTime ?? formatTime(date),
+        icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
+      });
+    }
+  }
+
+  // Sort by time string (HH:mm sorts correctly, formatted dates sort after)
+  items.sort((a, b) => a.time.localeCompare(b.time));
+  return items;
+});
+
+// ── This week's items (todos + activities merged) ────────────────────────────
+const weekItems = computed<ScheduleItem[]>(() => {
+  const items: ScheduleItem[] = [];
+  const start = todayStr.value;
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + 7);
+  const endStr = toDateInputValue(endDate);
+
+  // Todos this week
+  for (const todo of todoStore.filteredOpenTodos) {
+    if (!todo.dueDate) continue;
+    const dateStr = todo.dueDate.split('T')[0] ?? '';
+    if (dateStr >= start && dateStr <= endStr) {
+      items.push({
+        id: todo.id,
+        type: 'todo',
+        title: todo.title,
+        time: formatTime(todo.dueDate, todo.dueTime),
+        icon: '📋',
+      });
+    }
+  }
+
+  // Activities this week
+  for (const { activity, date } of activityStore.upcomingActivities) {
+    if (date >= start && date <= endStr) {
+      items.push({
+        id: activity.id,
+        type: 'activity',
+        title: activity.title,
+        time: activity.startTime ?? formatTime(date),
+        icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
+      });
+    }
+  }
+
+  items.sort((a, b) => a.time.localeCompare(b.time));
+  return items;
+});
+
+function handleClick(item: ScheduleItem) {
+  if (item.type === 'todo') emit('open-todo', item.id);
+  else emit('open-activity', item.id);
 }
 </script>
 
@@ -63,21 +148,26 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
       </div>
 
       <!-- Content -->
-      <div v-if="todayTodos.length > 0" class="flex flex-col gap-3">
-        <div v-for="todo in todayTodos" :key="todo.id" class="flex items-center gap-3">
+      <div v-if="todayItems.length > 0" class="flex flex-col gap-3">
+        <div
+          v-for="item in todayItems"
+          :key="`${item.type}-${item.id}`"
+          class="flex cursor-pointer items-center gap-3 rounded-xl transition-colors hover:bg-[var(--tint-silk-20)]"
+          @click="handleClick(item)"
+        >
           <div
             class="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[12px] bg-[var(--tint-silk-20)]"
           >
-            <span class="text-sm">✅</span>
+            <span class="text-sm">{{ item.icon }}</span>
           </div>
           <div class="min-w-0">
             <div
               class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
             >
-              {{ todo.title }}
+              {{ item.title }}
             </div>
             <div class="text-xs opacity-35">
-              {{ formatTodoTime(todo.dueDate!, todo.dueTime) }}
+              {{ item.time }}
             </div>
           </div>
         </div>
@@ -107,21 +197,26 @@ function formatTodoTime(dueDate: string, dueTime?: string): string {
       </div>
 
       <!-- Content -->
-      <div v-if="weekTodos.length > 0" class="flex flex-col gap-3">
-        <div v-for="todo in weekTodos" :key="todo.id" class="flex items-center gap-3">
+      <div v-if="weekItems.length > 0" class="flex flex-col gap-3">
+        <div
+          v-for="item in weekItems"
+          :key="`${item.type}-${item.id}`"
+          class="flex cursor-pointer items-center gap-3 rounded-xl transition-colors hover:bg-[rgba(241,93,34,0.08)]"
+          @click="handleClick(item)"
+        >
           <div
             class="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[12px] bg-[rgba(241,93,34,0.08)]"
           >
-            <span class="text-sm">📋</span>
+            <span class="text-sm">{{ item.icon }}</span>
           </div>
           <div class="min-w-0">
             <div
               class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
             >
-              {{ todo.title }}
+              {{ item.title }}
             </div>
             <div class="text-xs opacity-35">
-              {{ formatTodoTime(todo.dueDate!, todo.dueTime) }}
+              {{ item.time }}
             </div>
           </div>
         </div>

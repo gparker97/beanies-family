@@ -5,6 +5,11 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatDateShort } from '@/utils/date';
 
+const emit = defineEmits<{
+  'open-todo': [id: string];
+  'open-transaction': [id: string];
+}>();
+
 const { t } = useTranslation();
 const todoStore = useTodoStore();
 const transactionsStore = useTransactionsStore();
@@ -83,7 +88,10 @@ const activityItems = computed<ActivityItem[]>(() => {
       <div
         v-for="item in activityItems"
         :key="item.id"
-        class="flex items-center gap-3 border-b border-[var(--tint-slate-5)] py-3 last:border-b-0"
+        class="flex cursor-pointer items-center gap-3 rounded-xl border-b border-[var(--tint-slate-5)] py-3 transition-colors last:border-b-0 hover:bg-[var(--tint-success-10)]"
+        @click="
+          item.type === 'todo' ? emit('open-todo', item.id) : emit('open-transaction', item.id)
+        "
       >
         <!-- Icon container -->
         <div
