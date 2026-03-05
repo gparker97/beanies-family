@@ -150,7 +150,8 @@ jobs:
 
   deploy:
     name: Deploy to PROD
-    needs: build
+    needs: [gate, build]
+    if: ${{ always() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
