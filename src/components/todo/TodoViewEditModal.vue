@@ -129,8 +129,7 @@ async function saveField(field: EditableField) {
   // Build update payload — only include the changed field.
   // Use `null` (not `undefined`) to clear optional fields, because the
   // Automerge repository's stripUndefined() treats `undefined` as "skip".
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const update: Record<string, any> = {};
+  const update: Record<string, string | boolean | null> = {};
   let changed = false;
 
   switch (field) {
