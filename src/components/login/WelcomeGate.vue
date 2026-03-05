@@ -46,6 +46,7 @@ const emit = defineEmits<{
 
       <!-- Create a new pod -->
       <button
+        data-testid="create-pod-button"
         class="from-primary-500 to-terracotta-400 flex-1 rounded-3xl bg-gradient-to-br p-6 text-left shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
         @click="emit('navigate', 'create')"
       >

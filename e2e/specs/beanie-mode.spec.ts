@@ -11,56 +11,56 @@ test.describe('Beanie Mode', () => {
     await bypassLoginIfNeeded(page);
   });
 
-  test('settings shows beanie mode toggle, off by default', async ({ page }) => {
+  test('settings shows beanie mode toggle, on by default', async ({ page }) => {
     await page.goto('/settings');
     const toggle = page.getByTestId('beanie-mode-toggle');
     await expect(toggle).toBeVisible();
-    await expect(toggle).not.toBeChecked();
+    await expect(toggle).toBeChecked();
   });
 
-  test('enabling beanie mode updates visible strings immediately', async ({ page }) => {
-    // Verify plain English is shown on dashboard first
+  test('disabling beanie mode updates visible strings immediately', async ({ page }) => {
+    // Verify beanie string is shown on dashboard first (default is ON)
+    await page.goto('/dashboard');
+    await expect(page.getByText('Alllllll Your Beans')).toBeVisible();
+
+    // Go to settings and disable beanie mode
+    await page.goto('/settings');
+    const toggle = page.getByTestId('beanie-mode-toggle');
+    await toggle.uncheck();
+    await expect(toggle).not.toBeChecked();
+
+    // Wait for IndexedDB write to complete
+    await page.waitForTimeout(500);
+
+    // Go to dashboard and verify plain English
     await page.goto('/dashboard');
     await expect(page.getByText('Family Net Worth')).toBeVisible();
-
-    // Go to settings and enable beanie mode
-    await page.goto('/settings');
-    const toggle = page.getByTestId('beanie-mode-toggle');
-    await toggle.check();
-    await expect(toggle).toBeChecked();
-
-    // Wait for IndexedDB write to complete
-    await page.waitForTimeout(500);
-
-    // Go to dashboard and verify beanie strings
-    await page.goto('/dashboard');
-    await expect(page.getByText('Alllllll Your Beans')).toBeVisible();
   });
 
-  test('disabling beanie mode reverts strings immediately', async ({ page }) => {
-    // Enable beanie mode
-    await page.goto('/settings');
-    const toggle = page.getByTestId('beanie-mode-toggle');
-    await toggle.check();
-
-    // Wait for IndexedDB write to complete
-    await page.waitForTimeout(500);
-
-    // Verify beanie string on dashboard
-    await page.goto('/dashboard');
-    await expect(page.getByText('Alllllll Your Beans')).toBeVisible();
-
+  test('re-enabling beanie mode restores beanie strings', async ({ page }) => {
     // Disable beanie mode
     await page.goto('/settings');
-    const toggleAgain = page.getByTestId('beanie-mode-toggle');
-    await toggleAgain.uncheck();
+    const toggle = page.getByTestId('beanie-mode-toggle');
+    await toggle.uncheck();
 
     // Wait for IndexedDB write to complete
     await page.waitForTimeout(500);
 
-    // Verify plain English restored
+    // Verify plain English on dashboard
     await page.goto('/dashboard');
     await expect(page.getByText('Family Net Worth')).toBeVisible();
+
+    // Re-enable beanie mode
+    await page.goto('/settings');
+    const toggleAgain = page.getByTestId('beanie-mode-toggle');
+    await toggleAgain.check();
+
+    // Wait for IndexedDB write to complete
+    await page.waitForTimeout(500);
+
+    // Verify beanie strings restored
+    await page.goto('/dashboard');
+    await expect(page.getByText('Alllllll Your Beans')).toBeVisible();
   });
 
   test('toggle is disabled when non-English language is active', async ({ page }) => {

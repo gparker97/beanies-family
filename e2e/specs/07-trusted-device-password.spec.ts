@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 

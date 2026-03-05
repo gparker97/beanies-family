@@ -1,4 +1,5 @@
-import { test, expect, type Page, type Route } from '@playwright/test';
+import { test, expect } from '../fixtures/test';
+import type { Page, Route } from '@playwright/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 
 /**

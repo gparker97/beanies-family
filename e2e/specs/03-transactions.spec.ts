@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/test';
 import { TransactionsPage } from '../page-objects/TransactionsPage';
 import { DashboardPage } from '../page-objects/DashboardPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
