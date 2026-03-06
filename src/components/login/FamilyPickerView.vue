@@ -94,7 +94,7 @@ async function deleteFamily(family: FamilyEntry) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[540px] rounded-3xl bg-white p-8 shadow-xl dark:bg-slate-800">
+  <div class="mx-auto max-w-[540px] rounded-3xl bg-white p-5 shadow-xl sm:p-8 dark:bg-slate-800">
     <!-- Back button -->
     <button
       class="mb-4 flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
@@ -164,7 +164,7 @@ async function deleteFamily(family: FamilyEntry) {
       <div v-else class="space-y-3">
         <div v-for="family in families" :key="family.id" class="flex items-center gap-2">
           <button
-            class="hover:border-primary-500/40 dark:hover:border-primary-500/30 flex flex-1 items-center gap-3 rounded-2xl border-2 border-gray-200 p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-slate-600"
+            class="hover:border-primary-500/40 dark:hover:border-primary-500/30 flex min-w-0 flex-1 items-center gap-3 rounded-2xl border-2 border-gray-200 p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-lg sm:p-4 dark:border-slate-600"
             @click="selectFamily(family)"
           >
             <div

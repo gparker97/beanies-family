@@ -183,6 +183,16 @@ export function parseLocalDate(dateStr: string): Date {
 }
 
 /**
+ * Add one hour to an HH:MM time string, capping at 23:xx.
+ * Returns empty string if input is empty.
+ */
+export function addHourToTime(time: string): string {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  return `${String(Math.min((h ?? 0) + 1, 23)).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
+}
+
+/**
  * Format a date for HTML date input (YYYY-MM-DD)
  */
 export function toDateInputValue(date: Date): string {
