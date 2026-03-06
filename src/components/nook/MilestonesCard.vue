@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
+import { formatNookDate } from '@/utils/date';
 import type { GoalType } from '@/types/models';
 
 const { t } = useTranslation();
@@ -15,6 +16,21 @@ interface Milestone {
   date?: string;
   icon: string;
   daysAway: number;
+}
+
+function formatOrdinal(n: number): string {
+  const rem = n % 100;
+  if (rem >= 11 && rem <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
 }
 
 function getGoalIcon(goalType: GoalType): string {
@@ -59,9 +75,18 @@ const milestones = computed<Milestone[]>(() => {
     if (!member.dateOfBirth) continue;
     const { date, daysAway } = getNextBirthday(member.dateOfBirth.month, member.dateOfBirth.day);
     if (daysAway <= 90) {
+      let label: string;
+      if (member.dateOfBirth.year) {
+        const age = date.getFullYear() - member.dateOfBirth.year;
+        label = t('nook.birthdayWithAge')
+          .replace('{name}', member.name)
+          .replace('{age}', formatOrdinal(age));
+      } else {
+        label = t('nook.birthday').replace('{name}', member.name) + '!';
+      }
       items.push({
         type: 'birthday',
-        name: t('nook.birthday').replace('{name}', member.name),
+        name: label,
         date: date.toISOString(),
         icon: '\u{1F382}',
         daysAway,
@@ -159,7 +184,9 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
           <div v-if="milestone.type === 'completed'" class="text-xs text-[#27AE60]">
             {{ t('nook.completedRecently') }}
           </div>
-          <div v-else class="text-xs opacity-40 dark:text-gray-500">
+          <div v-else class="font-outfit mt-0.5 text-xs font-medium opacity-50 dark:text-gray-400">
+            <span v-if="milestone.date">{{ formatNookDate(milestone.date) }}</span>
+            <span v-if="milestone.date"> · </span>
             {{ t('nook.daysAway').replace('{days}', String(milestone.daysAway)) }}
           </div>
         </div>

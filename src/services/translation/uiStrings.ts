@@ -1757,6 +1757,7 @@ const STRING_DEFS = {
   'nook.noMilestones': { en: 'No milestones yet', beanie: 'no milestones yet' },
   'nook.noActivity': { en: 'No recent activity', beanie: 'the beanies are resting' },
   'nook.birthday': { en: "{name}'s Birthday", beanie: "{name}'s bean day" },
+  'nook.birthdayWithAge': { en: "{name}'s {age} Birthday!", beanie: "{name}'s {age} bean day!" },
   'nook.taskCompleted': { en: 'completed a task', beanie: 'counted a bean' },
   'nook.spent': { en: 'Spent', beanie: 'spent' },
   'nook.received': { en: 'Received', beanie: 'received' },

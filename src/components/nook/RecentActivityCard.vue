@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
-import { formatDateShort } from '@/utils/date';
+import { formatNookDate } from '@/utils/date';
 
 const emit = defineEmits<{
   'open-todo': [id: string];
@@ -41,7 +41,7 @@ const activityItems = computed<ActivityItem[]>(() => {
         icon: '\u2705',
         iconTint: 'green',
         description: todo.title + ' \u2014 ' + t('nook.taskCompleted'),
-        time: formatDateShort(completedDate),
+        time: formatNookDate(completedDate),
         date: completedDate,
       });
     }
@@ -55,7 +55,7 @@ const activityItems = computed<ActivityItem[]>(() => {
       icon: tx.type === 'income' ? '\u{1F4B0}' : '\u{1F4B3}',
       iconTint: tx.type === 'income' ? 'green' : 'orange',
       description: tx.description,
-      time: formatDateShort(tx.date) + ' \u00B7 ' + tx.category,
+      time: formatNookDate(tx.date) + ' \u00B7 ' + tx.category,
       date: tx.date,
     });
   }
@@ -109,7 +109,9 @@ const activityItems = computed<ActivityItem[]>(() => {
           <div class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
             {{ item.description }}
           </div>
-          <div class="text-secondary-500/35 text-xs dark:text-gray-500">
+          <div
+            class="font-outfit text-secondary-500/50 mt-0.5 text-xs font-medium dark:text-gray-400"
+          >
             {{ item.time }}
           </div>
         </div>

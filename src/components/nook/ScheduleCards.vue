@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, formatNookDate } from '@/utils/date';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -18,7 +18,9 @@ interface ScheduleItem {
   id: string;
   type: 'todo' | 'activity';
   title: string;
-  time: string;
+  date: string; // YYYY-MM-DD for sorting
+  time: string; // HH:mm or '' for untimed
+  displayDate: string; // Formatted for display
   icon: string;
 }
 
@@ -33,15 +35,7 @@ const CATEGORY_FALLBACK_ICON: Record<string, string> = {
 
 const todayStr = computed(() => toDateInputValue(new Date()));
 
-const todayFormatted = computed(() =>
-  new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-);
-
-function formatTime(dueDate: string, dueTime?: string): string {
-  if (dueTime) return dueTime;
-  const date = new Date(dueDate);
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
+const todayFormatted = computed(() => formatNookDate(todayStr.value));
 
 // ── Today's items (todos + activities merged) ────────────────────────────────
 const todayItems = computed<ScheduleItem[]>(() => {
@@ -49,12 +43,15 @@ const todayItems = computed<ScheduleItem[]>(() => {
 
   // Todos due today
   for (const todo of todoStore.filteredOpenTodos) {
-    if (todo.dueDate && todo.dueDate.split('T')[0] === todayStr.value) {
+    const dateStr = todo.dueDate?.split('T')[0] ?? '';
+    if (dateStr === todayStr.value) {
       items.push({
         id: todo.id,
         type: 'todo',
         title: todo.title,
-        time: formatTime(todo.dueDate, todo.dueTime),
+        date: dateStr,
+        time: todo.dueTime ?? '',
+        displayDate: formatNookDate(dateStr),
         icon: '✅',
       });
     }
@@ -67,14 +64,21 @@ const todayItems = computed<ScheduleItem[]>(() => {
         id: activity.id,
         type: 'activity',
         title: activity.title,
-        time: activity.startTime ?? formatTime(date),
+        date,
+        time: activity.startTime ?? '',
+        displayDate: formatNookDate(date),
         icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
       });
     }
   }
 
-  // Sort by time string (HH:mm sorts correctly, formatted dates sort after)
-  items.sort((a, b) => a.time.localeCompare(b.time));
+  // Sort: timed items first (by time), then untimed
+  items.sort((a, b) => {
+    if (a.time && b.time) return a.time.localeCompare(b.time);
+    if (a.time && !b.time) return -1;
+    if (!a.time && b.time) return 1;
+    return 0;
+  });
   return items;
 });
 
@@ -95,7 +99,9 @@ const weekItems = computed<ScheduleItem[]>(() => {
         id: todo.id,
         type: 'todo',
         title: todo.title,
-        time: formatTime(todo.dueDate, todo.dueTime),
+        date: dateStr,
+        time: todo.dueTime ?? '',
+        displayDate: formatNookDate(dateStr),
         icon: '📋',
       });
     }
@@ -108,13 +114,23 @@ const weekItems = computed<ScheduleItem[]>(() => {
         id: activity.id,
         type: 'activity',
         title: activity.title,
-        time: activity.startTime ?? formatTime(date),
+        date,
+        time: activity.startTime ?? '',
+        displayDate: formatNookDate(date),
         icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
       });
     }
   }
 
-  items.sort((a, b) => a.time.localeCompare(b.time));
+  // Sort by date (earliest first), then by time within same day
+  items.sort((a, b) => {
+    const dateCmp = a.date.localeCompare(b.date);
+    if (dateCmp !== 0) return dateCmp;
+    if (a.time && b.time) return a.time.localeCompare(b.time);
+    if (a.time && !b.time) return -1;
+    if (!a.time && b.time) return 1;
+    return 0;
+  });
   return items;
 });
 
@@ -160,14 +176,14 @@ function handleClick(item: ScheduleItem) {
           >
             <span class="text-sm">{{ item.icon }}</span>
           </div>
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <div
               class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
             >
               {{ item.title }}
             </div>
-            <div class="text-xs opacity-35">
-              {{ item.time }}
+            <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
+              {{ item.time ? item.time + ' · ' : '' }}{{ item.displayDate }}
             </div>
           </div>
         </div>
@@ -209,14 +225,14 @@ function handleClick(item: ScheduleItem) {
           >
             <span class="text-sm">{{ item.icon }}</span>
           </div>
-          <div class="min-w-0">
+          <div class="min-w-0 flex-1">
             <div
               class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
             >
               {{ item.title }}
             </div>
-            <div class="text-xs opacity-35">
-              {{ item.time }}
+            <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
+              {{ item.time ? item.time + ' · ' : '' }}{{ item.displayDate }}
             </div>
           </div>
         </div>

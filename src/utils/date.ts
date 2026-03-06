@@ -25,6 +25,26 @@ export function formatDateShort(isoString: ISODateString, locale: string = 'en-U
   });
 }
 
+/**
+ * Standard date format for nook cards and similar compact displays.
+ * Shows "Wed, Mar 6" for current year, "Wed, Mar 6, 2027" for other years.
+ * Accepts ISO date strings or YYYY-MM-DD.
+ */
+export function formatNookDate(dateStr: string): string {
+  const date = parseLocalDate(dateStr);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  if (sameYear) {
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 export function getStartOfDay(date: Date): Date {
   const result = new Date(date);
   result.setHours(0, 0, 0, 0);
