@@ -140,6 +140,7 @@ jobs:
           VITE_REGISTRY_API_KEY: ${{ secrets.REGISTRY_API_KEY }}
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.GOOGLE_PROJECT_NUMBER }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7

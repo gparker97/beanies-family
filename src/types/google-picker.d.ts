@@ -10,6 +10,7 @@ declare namespace google.picker {
     setOAuthToken(token: string): this;
     setDeveloperKey(key: string): this;
     setOrigin(origin: string): this;
+    setAppId(appId: string): this;
     setCallback(callback: (data: PickerResponse) => void): this;
     build(): Picker;
   }
