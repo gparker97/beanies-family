@@ -595,12 +595,13 @@ export const useSyncStore = defineStore('sync', () => {
         { preserveTimestamp: true }
       );
 
-      // Cache exported family key on trusted devices
+      // Cache exported family key so auto-decrypt works after page refresh.
+      // Force-cache when decrypting a pending file (user entered password on this device).
       const settingsStore = useSettingsStore();
       if (familyCtx.activeFamilyId && fk) {
         const exported = await getExportedFamilyKey();
         if (exported) {
-          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId);
+          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId, { force: true });
         }
       }
 
@@ -856,12 +857,17 @@ export const useSyncStore = defineStore('sync', () => {
         { preserveTimestamp: true }
       );
 
-      // Cache exported family key on trusted devices
+      // Cache exported family key so auto-decrypt works after page refresh.
+      // Force-cache during join/decrypt flow (driveFileId present) since the user
+      // just created a password on this device — it's clearly their personal device.
       const settingsStore = useSettingsStore();
       if (familyCtx.activeFamilyId) {
         const exported = await getExportedFamilyKey();
         if (exported) {
-          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId);
+          const forceCache = !!pending.driveFileId || !!pending.provider;
+          await settingsStore.cacheFamilyKey(exported, familyCtx.activeFamilyId, {
+            force: forceCache,
+          });
         }
       }
 
