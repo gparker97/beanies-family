@@ -4,7 +4,8 @@ import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
-import type { Asset, CreateAssetInput, UpdateAssetInput } from '@/types/models';
+import { useAccountsStore } from './accountsStore';
+import type { Asset, CreateAssetInput, UpdateAssetInput, AccountType } from '@/types/models';
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
@@ -88,11 +89,61 @@ export const useAssetsStore = defineStore('assets', () => {
     () => filteredTotalAssetValue.value - filteredTotalLoanValue.value
   );
 
+  // ── Linked loan account sync ──────────────────────────────────────────────
+  async function syncLinkedLoanAccount(asset: Asset) {
+    const accountsStore = useAccountsStore();
+    const existing = accountsStore.accounts.find((a) => a.linkedAssetId === asset.id);
+
+    if (asset.loan?.hasLoan && asset.loan.outstandingBalance) {
+      const loanData = {
+        name: `${asset.name} Loan`,
+        type: 'loan' as AccountType,
+        memberId: asset.memberId,
+        currency: asset.currency,
+        balance: asset.loan.outstandingBalance,
+        institution: asset.loan.lender || '',
+        isActive: true,
+        includeInNetWorth: true,
+        linkedAssetId: asset.id,
+      };
+      if (existing) {
+        await accountsStore.updateAccount(existing.id, loanData);
+      } else {
+        await accountsStore.createAccount(loanData);
+      }
+    } else if (existing) {
+      await accountsStore.deleteAccount(existing.id);
+    }
+  }
+
+  async function deleteLinkedLoanAccount(assetId: string) {
+    const accountsStore = useAccountsStore();
+    const existing = accountsStore.accounts.find((a) => a.linkedAssetId === assetId);
+    if (existing) {
+      await accountsStore.deleteAccount(existing.id);
+    }
+  }
+
+  // One-time migration: create linked accounts for existing assets with loans
+  async function migrateLinkedLoanAccounts() {
+    const accountsStore = useAccountsStore();
+    for (const asset of assets.value) {
+      if (asset.loan?.hasLoan && asset.loan.outstandingBalance) {
+        const hasLinked = accountsStore.accounts.some((a) => a.linkedAssetId === asset.id);
+        if (!hasLinked) {
+          await syncLinkedLoanAccount(asset);
+        }
+      }
+    }
+  }
+
   // Actions
   async function loadAssets() {
     await wrapAsync(isLoading, error, async () => {
       assets.value = await assetRepo.getAllAssets();
     });
+    // Run migration after loading (creates linked loan accounts for existing assets)
+    await migrateLinkedLoanAccounts();
   }
 
   async function createAsset(input: CreateAssetInput): Promise<Asset | null> {
@@ -102,6 +153,7 @@ export const useAssetsStore = defineStore('assets', () => {
       assets.value = [...assets.value, asset];
       return asset;
     });
+    if (result) await syncLinkedLoanAccount(result);
     return result ?? null;
   }
 
@@ -114,10 +166,12 @@ export const useAssetsStore = defineStore('assets', () => {
       }
       return updated;
     });
+    if (result) await syncLinkedLoanAccount(result);
     return result ?? null;
   }
 
   async function deleteAsset(id: string): Promise<boolean> {
+    await deleteLinkedLoanAccount(id);
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await assetRepo.deleteAsset(id);
       if (success) {

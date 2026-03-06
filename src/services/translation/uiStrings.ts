@@ -2147,6 +2147,72 @@ const STRING_DEFS = {
     beanie:
       'this will sign you out and delete all local data. your cloud data (if any) will not be affected. are you sure?',
   },
+  // ── Info Hints (summary card popovers) ─────────────────────────────────────
+  'hints.transactionsIncome': {
+    en: 'Total income for this month, including one-time and recurring transactions.',
+    beanie: 'total income for this month, including one-time and recurring transactions.',
+  },
+  'hints.transactionsExpenses': {
+    en: 'Total expenses for this month, including one-time and recurring transactions.',
+    beanie: 'total expenses for this month, including one-time and recurring transactions.',
+  },
+  'hints.transactionsNet': {
+    en: 'Income minus expenses for this month. Positive means you saved money.',
+    beanie: 'income minus expenses for this month. positive means you saved money.',
+  },
+  'hints.dashboardIncome': {
+    en: 'Total income this month from all accounts, including recurring items.',
+    beanie: 'total income this month from all accounts, including recurring items.',
+  },
+  'hints.dashboardExpenses': {
+    en: 'Total expenses this month from all accounts, including recurring items.',
+    beanie: 'total expenses this month from all accounts, including recurring items.',
+  },
+  'hints.dashboardCashFlow': {
+    en: 'Income minus expenses. A positive number means your family is saving money this month.',
+    beanie: 'income minus expenses. a positive number means your family is saving this month.',
+  },
+  'hints.dashboardNetWorth': {
+    en: 'Total value of all accounts and assets minus all liabilities (loans and credit cards).',
+    beanie:
+      'total value of all accounts and assets minus all liabilities (loans and credit cards).',
+  },
+  'hints.accountsAssets': {
+    en: 'Sum of all non-liability accounts (checking, savings, investments, etc.) included in net worth.',
+    beanie:
+      'sum of all non-liability accounts (checking, savings, investments, etc.) included in net worth.',
+  },
+  'hints.accountsLiabilities': {
+    en: 'Sum of all credit card balances and loan accounts, including asset-linked loans.',
+    beanie: 'sum of all credit card balances and loan accounts, including asset-linked loans.',
+  },
+  'hints.assetsTotalValue': {
+    en: 'Current market value of all your physical assets (property, vehicles, etc.).',
+    beanie: 'current market value of all your physical assets (property, vehicles, etc.).',
+  },
+  'hints.assetsLoans': {
+    en: 'Outstanding loan balances on your assets. These also appear as loan accounts.',
+    beanie: 'outstanding loan balances on your assets. these also show up as loan accounts.',
+  },
+  'hints.assetsNetValue': {
+    en: 'Asset value minus outstanding loans. Your equity in physical assets.',
+    beanie: 'asset value minus outstanding loans. your equity in physical assets.',
+  },
+  'hints.assetsAppreciation': {
+    en: 'Difference between current value and purchase price across all assets.',
+    beanie: 'difference between current value and purchase price across all assets.',
+  },
+  'hints.nookNetWorth': {
+    en: 'Your family net worth: all accounts and assets minus all liabilities.',
+    beanie: 'your family net worth: all accounts and assets minus all liabilities.',
+  },
+
+  // Linked asset accounts
+  'accounts.linkedTo': { en: 'Linked to {asset}', beanie: 'linked to {asset}' },
+  'accounts.editOnAssetsPage': {
+    en: 'This loan is linked to an asset. Edit it on the Assets page.',
+    beanie: 'this loan is linked to an asset. edit it on the assets page.',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**

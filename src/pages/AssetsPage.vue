@@ -351,6 +351,7 @@ function getAppreciationPercent(asset: Asset): number {
         :label="t('common.totalValue')"
         :amount="totalAssetValue"
         :currency="baseCurrency"
+        :hint="t('hints.assetsTotalValue')"
         tint="green"
       >
         <template #icon>
@@ -362,6 +363,7 @@ function getAppreciationPercent(asset: Asset): number {
         :label="t('common.assetLoans')"
         :amount="totalLoanValue"
         :currency="baseCurrency"
+        :hint="t('hints.assetsLoans')"
         tint="orange"
       >
         <template #icon>
@@ -373,6 +375,7 @@ function getAppreciationPercent(asset: Asset): number {
         :label="t('common.netAssetValue')"
         :amount="netAssetValue"
         :currency="baseCurrency"
+        :hint="t('hints.assetsNetValue')"
         tint="slate"
         dark
       >
@@ -385,6 +388,7 @@ function getAppreciationPercent(asset: Asset): number {
         :label="totalAppreciation >= 0 ? t('common.appreciation') : t('common.depreciation')"
         :amount="Math.abs(totalAppreciation)"
         :currency="baseCurrency"
+        :hint="t('hints.assetsAppreciation')"
         :tint="totalAppreciation >= 0 ? 'green' : 'orange'"
       >
         <template #icon>

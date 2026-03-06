@@ -56,17 +56,15 @@ export const useAccountsStore = defineStore('accounts', () => {
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 
-  // Total liabilities including asset loans
+  // Total liabilities — all loan-type accounts (including asset-linked) + credit cards
   const totalLiabilities = computed(() => {
-    const assetsStore = useAssetsStore();
-    return accountLiabilities.value + assetsStore.totalLoanValue;
+    return accountLiabilities.value;
   });
 
-  // Combined net worth: accounts + assets - all liabilities
+  // Combined net worth: accounts + asset values (loans are already account-type liabilities)
   const combinedNetWorth = computed(() => {
     const assetsStore = useAssetsStore();
-    // totalBalance already subtracts account liabilities, so add net asset value (assets - asset loans)
-    return totalBalance.value + assetsStore.netAssetValue;
+    return totalBalance.value + assetsStore.totalAssetValue;
   });
 
   // ========== FILTERED GETTERS (by global member filter) ==========
@@ -105,16 +103,15 @@ export const useAccountsStore = defineStore('accounts', () => {
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 
-  // Filtered total liabilities including asset loans
+  // Filtered total liabilities — all loan-type accounts (including asset-linked) + credit cards
   const filteredTotalLiabilities = computed(() => {
-    const assetsStore = useAssetsStore();
-    return filteredAccountLiabilities.value + assetsStore.filteredTotalLoanValue;
+    return filteredAccountLiabilities.value;
   });
 
-  // Filtered combined net worth: filtered accounts + filtered assets - filtered liabilities
+  // Filtered combined net worth: filtered accounts + filtered asset values
   const filteredCombinedNetWorth = computed(() => {
     const assetsStore = useAssetsStore();
-    return filteredTotalBalance.value + assetsStore.filteredNetAssetValue;
+    return filteredTotalBalance.value + assetsStore.filteredTotalAssetValue;
   });
 
   // Actions

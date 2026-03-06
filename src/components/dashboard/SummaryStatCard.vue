@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useCountUp } from '@/composables/useCountUp';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import type { CurrencyCode } from '@/types/models';
 
 interface Props {
@@ -22,6 +23,10 @@ interface Props {
   dark?: boolean;
   /** Optional data-testid for the card root */
   testId?: string;
+  /** Info hint text — shows a ? badge that toggles a popover */
+  hint?: string;
+  /** Subtitle text below the label (e.g., month name) */
+  subtitle?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -130,11 +135,17 @@ const changeColor = computed(() => {
           </svg>
         </slot>
       </div>
-      <div
-        class="font-outfit text-xs font-semibold tracking-[0.08em] uppercase"
-        :class="dark ? 'opacity-50' : 'text-secondary-500 opacity-45 dark:text-gray-300'"
-      >
-        {{ label }}
+      <div class="flex items-center gap-1.5">
+        <div
+          class="font-outfit text-xs font-semibold tracking-[0.08em] uppercase"
+          :class="dark ? 'opacity-50' : 'text-secondary-500 opacity-45 dark:text-gray-300'"
+        >
+          {{ label }}
+        </div>
+        <InfoHintBadge v-if="hint" :text="hint" :dark="dark" />
+      </div>
+      <div v-if="subtitle" class="text-[10px] opacity-40" :class="dark ? '' : 'text-secondary-500'">
+        {{ subtitle }}
       </div>
     </div>
 

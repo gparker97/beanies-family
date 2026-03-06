@@ -470,6 +470,8 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         :amount="monthIncome"
         :currency="baseCurrency"
         :change-label="isFutureMonth ? t('transactions.projectedLabel') : ''"
+        :hint="t('hints.transactionsIncome')"
+        :subtitle="formatMonthYear(selectedMonth)"
         tint="green"
       >
         <template #icon>
@@ -482,6 +484,8 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         :amount="monthExpenses"
         :currency="baseCurrency"
         :change-label="isFutureMonth ? t('transactions.projectedLabel') : ''"
+        :hint="t('hints.transactionsExpenses')"
+        :subtitle="formatMonthYear(selectedMonth)"
         tint="orange"
       >
         <template #icon>
@@ -494,6 +498,8 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         :amount="monthNet"
         :currency="baseCurrency"
         :change-label="isFutureMonth ? t('transactions.projectedLabel') : ''"
+        :hint="t('hints.transactionsNet')"
+        :subtitle="formatMonthYear(selectedMonth)"
         tint="slate"
         :dark="monthNet >= 0"
       >

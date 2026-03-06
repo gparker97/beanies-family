@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
@@ -17,13 +18,17 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { showToast } from '@/composables/useToast';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
+const router = useRouter();
 const accountsStore = useAccountsStore();
+const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { t } = useTranslation();
@@ -169,6 +174,10 @@ const sections = computed<AccountSection[]>(() => {
 });
 
 // Helpers
+function getLinkedAssetName(assetId: string): string {
+  return assetsStore.getAssetById(assetId)?.name || '—';
+}
+
 function getAccountTypeLabel(type: AccountType): string {
   return accountTypes.value.find((t) => t.value === type)?.label || type;
 }
@@ -283,6 +292,11 @@ function openAddWithDefaults(defaults?: { memberId?: string; type?: AccountType 
 }
 
 function openEditModal(account: Account) {
+  if (account.linkedAssetId) {
+    showToast('info', t('accounts.editOnAssetsPage'));
+    router.push('/assets');
+    return;
+  }
   editingAccount.value = account;
   showEditModal.value = true;
 }
@@ -344,6 +358,7 @@ async function deleteAccount(id: string) {
         :label="t('common.totalAssets')"
         :amount="totalAssets"
         :currency="baseCurrency"
+        :hint="t('hints.accountsAssets')"
         tint="slate"
         dark
         class="lg:col-span-2"
@@ -377,6 +392,7 @@ async function deleteAccount(id: string) {
         :label="t('common.totalLiabilities')"
         :amount="totalLiabilities"
         :currency="baseCurrency"
+        :hint="t('hints.accountsLiabilities')"
         tint="orange"
       >
         <template #icon>
@@ -513,6 +529,14 @@ async function deleteAccount(id: string) {
                     }}<span v-if="account.institutionCountry">
                       &middot; {{ account.institutionCountry }}</span
                     >
+                  </p>
+                  <p v-if="account.linkedAssetId" class="text-primary-500 text-xs">
+                    {{
+                      t('accounts.linkedTo').replace(
+                        '{asset}',
+                        getLinkedAssetName(account.linkedAssetId)
+                      )
+                    }}
                   </p>
                 </div>
               </div>

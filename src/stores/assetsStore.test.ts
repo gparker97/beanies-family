@@ -668,6 +668,19 @@ describe('assetsStore Integration with accountsStore', () => {
         includeInNetWorth: true,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'acc-loan-1',
+        memberId: 'member-1',
+        name: 'House Loan',
+        type: 'loan',
+        currency: 'USD',
+        balance: 200000,
+        isActive: true,
+        includeInNetWorth: true,
+        linkedAssetId: 'asset-1',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
       }
     );
 
@@ -680,32 +693,47 @@ describe('assetsStore Integration with accountsStore', () => {
       })
     );
 
-    // Account net worth: 10000 - 2000 = 8000
-    // Asset net worth: 350000 - 200000 = 150000
-    // Combined: 8000 + 150000 = 158000
-    expect(accountsStore.totalBalance).toBe(8000);
-    expect(assetsStore.netAssetValue).toBe(150000);
+    // Account net worth: 10000 - 2000 - 200000 = -192000
+    // Asset value: 350000
+    // Combined: -192000 + 350000 = 158000
+    expect(accountsStore.totalBalance).toBe(-192000);
+    expect(assetsStore.totalAssetValue).toBe(350000);
     expect(accountsStore.combinedNetWorth).toBe(158000);
   });
 
-  it('should include asset loans in totalLiabilities', async () => {
+  it('should include linked loan accounts in totalLiabilities', async () => {
     const { useAccountsStore } = await import('./accountsStore');
     const accountsStore = useAccountsStore();
     const assetsStore = useAssetsStore();
 
     // Add account liability
-    accountsStore.accounts.push({
-      id: 'acc-1',
-      memberId: 'member-1',
-      name: 'Credit Card',
-      type: 'credit_card',
-      currency: 'USD',
-      balance: 5000,
-      isActive: true,
-      includeInNetWorth: true,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    });
+    accountsStore.accounts.push(
+      {
+        id: 'acc-1',
+        memberId: 'member-1',
+        name: 'Credit Card',
+        type: 'credit_card',
+        currency: 'USD',
+        balance: 5000,
+        isActive: true,
+        includeInNetWorth: true,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'acc-loan-1',
+        memberId: 'member-1',
+        name: 'House Loan',
+        type: 'loan',
+        currency: 'USD',
+        balance: 200000,
+        isActive: true,
+        includeInNetWorth: true,
+        linkedAssetId: 'asset-1',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      }
+    );
 
     // Add asset with loan
     assetsStore.assets.push(
@@ -715,11 +743,9 @@ describe('assetsStore Integration with accountsStore', () => {
       })
     );
 
-    // Account liabilities: 5000
-    // Asset loans: 200000
-    // Total: 205000
-    expect(accountsStore.accountLiabilities).toBe(5000);
-    expect(assetsStore.totalLoanValue).toBe(200000);
+    // Account liabilities now include linked loan accounts
+    // Credit card: 5000 + Linked loan: 200000 = 205000
+    expect(accountsStore.accountLiabilities).toBe(205000);
     expect(accountsStore.totalLiabilities).toBe(205000);
   });
 });
