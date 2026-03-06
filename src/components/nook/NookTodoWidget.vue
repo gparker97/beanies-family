@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { formatNookDate } from '@/utils/date';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import type { TodoItem } from '@/types/models';
 
@@ -18,7 +19,21 @@ const newTaskAssignee = ref('');
 // ── Display ─────────────────────────────────────────────────────────────────
 const MAX_VISIBLE = 8;
 const openCount = computed(() => todoStore.filteredOpenTodos.length);
-const displayTodos = computed(() => todoStore.filteredOpenTodos.slice(0, MAX_VISIBLE));
+const displayTodos = computed(() => {
+  const todos = [...todoStore.filteredOpenTodos];
+  // Sort: overdue first, then by due date (soonest first), undated last
+  todos.sort((a, b) => {
+    const aDate = a.dueDate?.split('T')[0] ?? '';
+    const bDate = b.dueDate?.split('T')[0] ?? '';
+    // Both have dates: sort ascending (soonest first)
+    if (aDate && bDate) return aDate.localeCompare(bDate);
+    // Dated before undated
+    if (aDate && !bDate) return -1;
+    if (!aDate && bDate) return 1;
+    return 0;
+  });
+  return todos.slice(0, MAX_VISIBLE);
+});
 const hasMore = computed(() => todoStore.filteredOpenTodos.length > MAX_VISIBLE);
 const remainingCount = computed(() => todoStore.filteredOpenTodos.length - MAX_VISIBLE);
 
@@ -47,11 +62,7 @@ function isOverdue(todo: TodoItem): boolean {
 }
 
 function formattedDate(dueDate: string): string {
-  const date = new Date(dueDate);
-  const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
-  const day = date.getDate();
-  const month = date.toLocaleDateString(undefined, { month: 'short' });
-  return `${weekday} ${day} ${month}`;
+  return formatNookDate(dueDate);
 }
 
 async function addTask() {
@@ -238,16 +249,16 @@ async function toggleComplete(todoId: string) {
           <div class="mt-1 flex flex-wrap items-center gap-2">
             <span
               v-if="todo.dueDate && isOverdue(todo)"
-              class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
+              class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
             >
-              ⏰{{ formattedDate(todo.dueDate) }}
+              ⏰ {{ formattedDate(todo.dueDate) }}
               <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
                 {{ t('todo.overdue') }}
               </span>
             </span>
             <span
               v-else-if="todo.dueDate"
-              class="text-xs font-semibold"
+              class="font-outfit text-xs font-semibold"
               :style="{ color: 'var(--color-primary-500)' }"
             >
               📅 {{ formattedDate(todo.dueDate) }}
