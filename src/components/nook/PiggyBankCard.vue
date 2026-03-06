@@ -5,6 +5,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useCountUp } from '@/composables/useCountUp';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -94,8 +95,11 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
 
     <!-- Net worth section -->
     <div>
-      <div class="font-outfit mb-1 text-xs font-semibold tracking-[0.1em] text-white/40 uppercase">
-        {{ t('nook.familyNetWorth') }}
+      <div class="mb-1 flex items-center gap-1.5">
+        <div class="font-outfit text-xs font-semibold tracking-[0.1em] text-white/40 uppercase">
+          {{ t('nook.familyNetWorth') }}
+        </div>
+        <InfoHintBadge :text="t('hints.nookNetWorth')" dark />
       </div>
       <div class="font-outfit text-3xl font-extrabold text-white">
         {{ formattedNetWorth }}

@@ -140,6 +140,7 @@ function getGoalIcon(type: string): string {
       :change-percent="periodComparison.changePercent"
       :selected-period="selectedPeriod"
       :history-data="chartData"
+      :hint="t('hints.dashboardNetWorth')"
       @update:selected-period="selectedPeriod = $event"
     />
 
@@ -150,6 +151,7 @@ function getGoalIcon(type: string): string {
         :amount="monthlyIncome"
         :currency="settingsStore.baseCurrency"
         :change-amount="incomeChange"
+        :hint="t('hints.dashboardIncome')"
         tint="green"
         test-id="stat-monthly-income"
       />
@@ -158,6 +160,7 @@ function getGoalIcon(type: string): string {
         :amount="monthlyExpenses"
         :currency="settingsStore.baseCurrency"
         :change-amount="expenseChange"
+        :hint="t('hints.dashboardExpenses')"
         tint="orange"
         test-id="stat-monthly-expenses"
       />
@@ -166,6 +169,7 @@ function getGoalIcon(type: string): string {
         :amount="netCashFlow"
         :currency="settingsStore.baseCurrency"
         :change-amount="cashFlowChange"
+        :hint="t('hints.dashboardCashFlow')"
         tint="slate"
         :dark="true"
         test-id="stat-net-cash-flow"
