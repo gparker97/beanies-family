@@ -1,4 +1,4 @@
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -37,6 +37,30 @@ export function usePermissions() {
   const canEditActivities = computed(
     () => isOwner.value || canManagePod.value || !!familyStore.currentMember?.canEditActivities
   );
+
+  // Diagnostic: log when canViewFinances changes to false unexpectedly
+  watch(canViewFinances, (newVal, oldVal) => {
+    if (oldVal === true && newVal === false) {
+      const member = familyStore.currentMember;
+      console.warn(
+        '[usePermissions] canViewFinances changed true→false!',
+        'currentMember:',
+        member ? `${member.id} (${member.name})` : 'UNDEFINED',
+        'currentMemberId:',
+        familyStore.currentMemberId,
+        'authUser:',
+        authStore.currentUser?.memberId,
+        'memberPerms:',
+        member
+          ? {
+              canViewFinances: member.canViewFinances,
+              canEditActivities: member.canEditActivities,
+              canManagePod: member.canManagePod,
+            }
+          : 'N/A'
+      );
+    }
+  });
 
   return { isOwner, canManagePod, canViewFinances, canEditActivities };
 }

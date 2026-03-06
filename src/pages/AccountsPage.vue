@@ -15,7 +15,7 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
-import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
@@ -36,6 +36,7 @@ const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { isUnlocked } = usePrivacyMode();
+const { formatInDisplayCurrency } = useCurrencyDisplay();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -373,7 +374,7 @@ async function deleteAccount(id: string) {
               {{ t('accounts.assetClass.cash') }}
             </div>
             <div class="font-outfit mt-0.5 text-sm font-semibold">
-              {{ formatCurrencyWithCode(assetBreakdown.cash, baseCurrency) }}
+              {{ formatInDisplayCurrency(assetBreakdown.cash, baseCurrency) }}
             </div>
           </div>
           <div>
@@ -381,7 +382,7 @@ async function deleteAccount(id: string) {
               {{ t('accounts.assetClass.investments') }}
             </div>
             <div class="font-outfit mt-0.5 text-sm font-semibold">
-              {{ formatCurrencyWithCode(assetBreakdown.investments, baseCurrency) }}
+              {{ formatInDisplayCurrency(assetBreakdown.investments, baseCurrency) }}
             </div>
           </div>
         </div>
@@ -408,7 +409,7 @@ async function deleteAccount(id: string) {
               {{ t('accounts.liabilityClass.creditCards') }}
             </span>
             <span class="font-outfit text-xs font-semibold text-gray-700 dark:text-gray-300">
-              {{ formatCurrencyWithCode(liabilityBreakdown.creditCards, baseCurrency) }}
+              {{ formatInDisplayCurrency(liabilityBreakdown.creditCards, baseCurrency) }}
             </span>
           </div>
           <div class="flex items-center justify-between">
@@ -416,7 +417,7 @@ async function deleteAccount(id: string) {
               {{ t('accounts.liabilityClass.loans') }}
             </span>
             <span class="font-outfit text-xs font-semibold text-gray-700 dark:text-gray-300">
-              {{ formatCurrencyWithCode(liabilityBreakdown.loans, baseCurrency) }}
+              {{ formatInDisplayCurrency(liabilityBreakdown.loans, baseCurrency) }}
             </span>
           </div>
         </div>
@@ -464,7 +465,7 @@ async function deleteAccount(id: string) {
             v-if="isUnlocked"
             class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-300"
           >
-            {{ formatCurrencyWithCode(sectionMemberTotal(section), baseCurrency) }}
+            {{ formatInDisplayCurrency(sectionMemberTotal(section), baseCurrency) }}
           </span>
         </div>
 
