@@ -218,7 +218,7 @@ test.describe('Family Planner', () => {
 
     // Click on the activity in the upcoming list — opens view modal first
     await page.getByText('Original Title').click();
-    await expect(page.getByText(/view activity/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click "Edit" button in view modal to open the full edit modal
     await page.getByRole('button', { name: /^edit$/i }).click();
@@ -258,7 +258,7 @@ test.describe('Family Planner', () => {
 
     // Click on the activity — opens view modal
     await page.getByText('To Delete').click();
-    await expect(page.getByText(/view activity/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click the delete button in the view modal footer (🗑️ with aria-label="delete")
     await page.getByLabel(/delete/i).click();
@@ -269,7 +269,7 @@ test.describe('Family Planner', () => {
     });
 
     // Wait for the view modal to fully close before clicking confirm
-    await expect(page.getByText(/view activity/i)).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/activity details/i)).not.toBeVisible({ timeout: 5000 });
 
     // Confirm deletion — the ConfirmModal uses t('action.delete') = "delete"
     await page.getByRole('button', { name: /^delete$/i }).click();
