@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-06",
-    "translationCount": 1138
+    "translationCount": 1154
   },
   "translations": {
     "app.name": {
@@ -5694,6 +5694,86 @@
     "invite.shareEmail.error": {
       "translation": "无法共享文件。您可以通过Google云端硬盘手动分享。",
       "hash": "dxoqyl",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.transactionsIncome": {
+      "translation": "本月总收入，包括一次性交易和经常性交易。",
+      "hash": "ffq6dc",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.transactionsExpenses": {
+      "translation": "本月总费用，包括一次性交易和经常性交易。",
+      "hash": "91xkhe",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.transactionsNet": {
+      "translation": "本月收入减去支出。正值表示您节省了资金。",
+      "hash": "hkezl0",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.dashboardIncome": {
+      "translation": "本月所有账户的总收入，包括定期项目。",
+      "hash": "qwdfjg",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.dashboardExpenses": {
+      "translation": "本月所有账户的支出总额，包括定期项目。",
+      "hash": "o5589q",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.dashboardCashFlow": {
+      "translation": "收入减去费用。正数表示您的家人本月正在省钱。",
+      "hash": "40sc1w",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.dashboardNetWorth": {
+      "translation": "所有账户和资产的总价值减去所有负债（贷款和信用卡）。",
+      "hash": "415k30",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.accountsAssets": {
+      "translation": "包含在净资产中的所有非负债账户（支票、储蓄、投资等）的总和。",
+      "hash": "5ohcd0",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.accountsLiabilities": {
+      "translation": "所有信用卡余额和贷款账户的总和，包括资产挂钩贷款。",
+      "hash": "nf604a",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.assetsTotalValue": {
+      "translation": "您所有实物资产（财产、车辆等）的当前市场价值。",
+      "hash": "ghhwm2",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.assetsLoans": {
+      "translation": "您的资产的未偿还贷款余额。这些也会显示为贷款账户。",
+      "hash": "krw4mh",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.assetsNetValue": {
+      "translation": "资产价值减去未偿贷款。您在实物资产中的权益。",
+      "hash": "moni3z",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.assetsAppreciation": {
+      "translation": "所有资产的当前价值和购买价格之间的差异。",
+      "hash": "2wf7yx",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.nookNetWorth": {
+      "translation": "您的家庭净资产：所有账户和资产减去所有负债。",
+      "hash": "7eiyfn",
+      "lastUpdated": "2026-03-06"
+    },
+    "accounts.linkedTo": {
+      "translation": "已链接到{asset}",
+      "hash": "hy70bu",
+      "lastUpdated": "2026-03-06"
+    },
+    "accounts.editOnAssetsPage": {
+      "translation": "此贷款与资产相关联。在“资源”页面上编辑它。",
+      "hash": "e84b5u",
       "lastUpdated": "2026-03-06"
     }
   }

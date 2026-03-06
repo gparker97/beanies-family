@@ -15,6 +15,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useTranslation } from '@/composables/useTranslation';
 import { getCurrencyInfo } from '@/constants/currencies';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import type { CurrencyCode } from '@/types/models';
 import type { PeriodKey, NetWorthDataPoint } from '@/composables/useNetWorthHistory';
 
@@ -35,6 +36,8 @@ interface Props {
   selectedPeriod?: PeriodKey;
   /** Chart data points */
   historyData?: NetWorthDataPoint[];
+  /** Info hint text */
+  hint?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -287,8 +290,11 @@ const periodLabel = computed(() => {
 
     <div class="relative z-10 flex items-start justify-between">
       <div>
-        <div class="font-outfit mb-2 text-xs font-semibold tracking-[0.15em] uppercase opacity-50">
-          {{ label }}
+        <div class="mb-2 flex items-center gap-1.5">
+          <div class="font-outfit text-xs font-semibold tracking-[0.15em] uppercase opacity-50">
+            {{ label }}
+          </div>
+          <InfoHintBadge v-if="hint" :text="hint" dark />
         </div>
         <div
           data-testid="hero-amount"

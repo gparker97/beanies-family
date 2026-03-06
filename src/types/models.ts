@@ -124,6 +124,7 @@ export interface Account {
   institutionCountry?: string;
   isActive: boolean;
   includeInNetWorth: boolean;
+  linkedAssetId?: UUID; // Links a loan account to its source asset
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
