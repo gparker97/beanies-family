@@ -67,12 +67,21 @@ export async function pickBeanpodFile(
       sharedView.setOwnedByMe(false);
       sharedView.setMode(google.picker.DocsViewMode.LIST);
 
-      const picker = new google.picker.PickerBuilder()
+      const appId = import.meta.env.VITE_GOOGLE_PROJECT_NUMBER;
+
+      const builder = new google.picker.PickerBuilder()
         .addView(sharedView) // Show shared files first (most likely for join flow)
         .addView(myDriveView)
         .setOAuthToken(accessToken)
         .setDeveloperKey(apiKey)
-        .setOrigin(window.location.origin)
+        .setOrigin(window.location.origin);
+
+      // AppId (numeric project number) is required for the Picker to grant
+      // drive.file scope access to the selected file. Without it, the Picker
+      // UI works but the OAuth token doesn't get file-level access.
+      if (appId) builder.setAppId(appId);
+
+      const picker = builder
         .setCallback((data: google.picker.PickerResponse) => {
           console.warn('[drivePicker] Picker callback:', data.action, data.docs?.[0]?.id);
           if (data.action === google.picker.Action.PICKED && data.docs?.[0]) {
