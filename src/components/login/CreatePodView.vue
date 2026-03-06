@@ -386,6 +386,7 @@ function handleBack() {
               type="password"
               :placeholder="t('auth.passwordPlaceholder')"
               required
+              @input="formError = null"
             />
             <p class="mt-1 text-xs text-gray-400">
               {{ t('loginV6.signInPasswordHint') }}
@@ -397,6 +398,7 @@ function handleBack() {
             type="password"
             :placeholder="t('auth.confirmPasswordPlaceholder')"
             required
+            @input="formError = null"
           />
         </div>
 
