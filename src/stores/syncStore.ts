@@ -910,6 +910,7 @@ export const useSyncStore = defineStore('sync', () => {
       [memberId]: { wrapped: wrappedKey.wrapped, salt: wrappedKey.salt },
     };
     envelope.value = env;
+    syncService.setEnvelope(env);
 
     // Persist updated envelope
     if (familyKey.value) {
