@@ -2048,14 +2048,17 @@ const STRING_DEFS = {
 
   // Budget — Settings modal
   'budget.settings.title': { en: 'Budget Settings', beanie: 'budget settings' },
-  'budget.settings.mode': { en: 'Budget Mode', beanie: 'budget mode' },
+  'budget.settings.mode': { en: 'Savings Goal', beanie: 'savings goal' },
   'budget.settings.percentageOfIncome': { en: '% of Income', beanie: '% of income' },
   'budget.settings.fixedAmount': { en: 'Fixed Amount', beanie: 'fixed amount' },
   'budget.settings.percentageLabel': {
-    en: 'Percentage of monthly income',
-    beanie: 'percentage of monthly income',
+    en: 'Savings goal (% of income)',
+    beanie: 'savings goal (% of income)',
   },
-  'budget.settings.fixedLabel': { en: 'Monthly budget amount', beanie: 'monthly budget amount' },
+  'budget.settings.fixedLabel': {
+    en: 'Savings goal (fixed amount)',
+    beanie: 'savings goal (fixed amount)',
+  },
   'budget.settings.categoryAllocations': {
     en: 'Category Allocations',
     beanie: 'category allocations',
@@ -2064,17 +2067,20 @@ const STRING_DEFS = {
     en: 'Set spending limits per category (optional)',
     beanie: 'set spending limits per category (optional)',
   },
-  'budget.settings.effectiveBudget': { en: 'Effective budget', beanie: 'effective budget' },
-  'budget.settings.owner': { en: 'Budget Owner', beanie: 'budget owner' },
+  'budget.settings.effectiveBudget': {
+    en: 'Spending budget',
+    beanie: 'spending budget',
+  },
   'budget.settings.perMonth': { en: 'per month', beanie: 'per month' },
   'budget.settings.infoPercentage': {
-    en: 'Your budget is set to {percentage}% of combined income. It auto-adjusts when income changes. The remaining {remaining}% flows to savings goals.',
+    en: 'Your savings goal is {savingsPercent}% of income. The remaining {spendingPercent}% ({amount}) is your spending budget, which auto-adjusts when income changes.',
     beanie:
-      'your bean budget uses {percentage}% of your harvest. it grows with your income! the other {remaining}% goes to your bean stash.',
+      'your bean stash goal is {savingsPercent}% of income. the other {spendingPercent}% ({amount}) is your spending budget, which grows with your harvest.',
   },
   'budget.settings.infoFixed': {
-    en: 'Your budget is set to a fixed amount of {amount} per month. Adjust anytime from the settings.',
-    beanie: 'your bean plan is a fixed pot of {amount} every month. tweak it whenever you like!',
+    en: 'Your spending budget is set to {amount} per month. Everything above this flows to savings. Adjust anytime from the settings.',
+    beanie:
+      'your spending budget is {amount} every month. everything above goes to your bean stash. tweak it whenever you like!',
   },
 
   // Budget — Empty state
@@ -2206,6 +2212,27 @@ const STRING_DEFS = {
   'hints.nookNetWorth': {
     en: 'Your family net worth: all accounts and assets minus all liabilities.',
     beanie: 'your family net worth: all accounts and assets minus all liabilities.',
+  },
+
+  'hints.budgetPaceIntro': {
+    en: 'Pace compares spending progress to time elapsed in the month.',
+    beanie: 'pace compares spending progress to time elapsed in the month.',
+  },
+  'hints.budgetPaceGreat': {
+    en: 'Great — spending is 15%+ below time elapsed.',
+    beanie: 'great — spending is 15%+ below time elapsed.',
+  },
+  'hints.budgetPaceOnTrack': {
+    en: 'On Track — spending is within 15% of time elapsed.',
+    beanie: 'on track — spending is within 15% of time elapsed.',
+  },
+  'hints.budgetPaceCaution': {
+    en: 'Caution — spending is 15%+ ahead of time elapsed.',
+    beanie: 'caution — spending is 15%+ ahead of time elapsed.',
+  },
+  'hints.budgetPaceOver': {
+    en: 'Over Budget — spending has exceeded 100% of budget.',
+    beanie: 'over budget — spending has exceeded 100% of budget.',
   },
 
   // Linked asset accounts

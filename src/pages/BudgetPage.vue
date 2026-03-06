@@ -5,6 +5,7 @@ import QuickAddTransactionModal from '@/components/budget/QuickAddTransactionMod
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import ActivityItem from '@/components/dashboard/ActivityItem.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -174,14 +175,16 @@ async function handleQuickAdd(data: CreateTransactionInput) {
     <template v-else>
       <!-- Hero Card -->
       <div
-        class="relative overflow-hidden rounded-[var(--sq)] bg-gradient-to-br from-[#2C3E50] to-[#3D5368] p-6 text-white shadow-lg"
+        class="relative rounded-[var(--sq)] bg-gradient-to-br from-[#2C3E50] to-[#3D5368] p-6 text-white shadow-lg"
         :class="syncHighlightClass(budgetStore.activeBudget.id)"
       >
-        <!-- Decorative radial glow -->
-        <div
-          class="pointer-events-none absolute -top-16 -right-16 h-48 w-48 rounded-full"
-          style="background: radial-gradient(circle, rgb(241 93 34 / 10%) 0%, transparent 70%)"
-        />
+        <!-- Decorative radial glow (overflow-hidden scoped to this wrapper) -->
+        <div class="pointer-events-none absolute inset-0 overflow-hidden rounded-[var(--sq)]">
+          <div
+            class="absolute -top-16 -right-16 h-48 w-48 rounded-full"
+            style="background: radial-gradient(circle, rgb(241 93 34 / 10%) 0%, transparent 70%)"
+          />
+        </div>
 
         <div class="relative flex flex-col gap-5 lg:flex-row lg:items-stretch">
           <!-- Left content -->
@@ -194,9 +197,21 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                 <BeanieIcon name="target" size="md" class="text-[var(--heritage-orange)]" />
               </div>
               <div>
-                <p class="font-outfit text-sm font-bold">
-                  {{ t('budget.hero.budgetProgress') }}
-                </p>
+                <div class="flex items-center gap-1.5">
+                  <p class="font-outfit text-sm font-bold">
+                    {{ t('budget.hero.budgetProgress') }}
+                  </p>
+                  <InfoHintBadge
+                    :text="t('hints.budgetPaceIntro')"
+                    :items="[
+                      t('hints.budgetPaceGreat'),
+                      t('hints.budgetPaceOnTrack'),
+                      t('hints.budgetPaceCaution'),
+                      t('hints.budgetPaceOver'),
+                    ]"
+                    dark
+                  />
+                </div>
                 <p class="text-xs text-white/50">
                   {{ t('budget.hero.dayLabel') }} {{ currentDay }} {{ t('budget.hero.daysOf') }}
                   {{ daysInMonth }}
@@ -504,7 +519,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
                     : 'text-slate-300 dark:text-slate-600'
                 "
               >
-                {{ isUnlocked ? `${budgetStore.activeBudget?.percentage ?? 70}%` : MASK }}
+                {{ isUnlocked ? `${budgetStore.activeBudget?.percentage ?? 20}%` : MASK }}
               </p>
               <p
                 class="text-xs"
@@ -572,11 +587,12 @@ async function handleQuickAdd(data: CreateTransactionInput) {
               <template v-if="budgetStore.activeBudget?.mode === 'percentage'">
                 {{
                   t('budget.settings.infoPercentage')
-                    .replace('{percentage}', String(budgetStore.activeBudget?.percentage ?? 70))
+                    .replace('{savingsPercent}', String(budgetStore.activeBudget?.percentage ?? 20))
                     .replace(
-                      '{remaining}',
-                      String(100 - (budgetStore.activeBudget?.percentage ?? 70))
+                      '{spendingPercent}',
+                      String(100 - (budgetStore.activeBudget?.percentage ?? 20))
                     )
+                    .replace('{amount}', budgetAmount)
                 }}
               </template>
               <template v-else>

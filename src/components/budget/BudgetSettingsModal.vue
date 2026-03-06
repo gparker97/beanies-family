@@ -4,11 +4,9 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
+import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
-import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useFormModal } from '@/composables/useFormModal';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -30,14 +28,12 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const transactionsStore = useTransactionsStore();
-const { currencyOptions } = useCurrencyOptions();
 
 // Form state
 const mode = ref<'percentage' | 'fixed'>('percentage');
-const percentage = ref(70);
+const percentage = ref(20);
 const totalAmount = ref<number | undefined>(undefined);
 const currency = ref(settingsStore.baseCurrency);
-const memberId = ref('__shared__');
 const categoryAllocations = ref<Record<string, number | undefined>>({});
 const showCategories = ref(false);
 
@@ -47,10 +43,9 @@ const { isEditing, isSubmitting } = useFormModal(
   {
     onEdit: (budget) => {
       mode.value = budget.mode;
-      percentage.value = budget.percentage ?? 70;
+      percentage.value = budget.percentage ?? 20;
       totalAmount.value = budget.totalAmount;
       currency.value = budget.currency;
-      memberId.value = budget.memberId ?? '__shared__';
       const allocs: Record<string, number | undefined> = {};
       for (const bc of budget.categories) {
         allocs[bc.categoryId] = bc.amount;
@@ -60,10 +55,9 @@ const { isEditing, isSubmitting } = useFormModal(
     },
     onNew: () => {
       mode.value = 'percentage';
-      percentage.value = 70;
+      percentage.value = 20;
       totalAmount.value = undefined;
       currency.value = settingsStore.baseCurrency;
-      memberId.value = '__shared__';
       categoryAllocations.value = {};
       showCategories.value = false;
     },
@@ -78,10 +72,12 @@ const saveLabel = computed(() => (isEditing.value ? t('common.save') : t('budget
 
 const currSymbol = computed(() => getCurrencyInfo(currency.value)?.symbol ?? '$');
 
-// Effective budget preview for percentage mode
+// Effective spending budget preview for percentage mode
+// percentage = savings goal, so spending budget = 100% - savings%
 const effectiveAmount = computed(() => {
   if (mode.value === 'percentage') {
-    return Math.round(transactionsStore.thisMonthIncome * (percentage.value / 100));
+    const spendingPercent = 100 - percentage.value;
+    return Math.round(transactionsStore.thisMonthIncome * (spendingPercent / 100));
   }
   return totalAmount.value ?? 0;
 });
@@ -124,7 +120,6 @@ function handleSave() {
     currency: currency.value,
     categories,
     isActive: true,
-    memberId: memberId.value === '__shared__' ? undefined : memberId.value,
   };
 
   if (isEditing.value && props.budget) {
@@ -143,7 +138,7 @@ function handleDelete() {
 // Reset percentage input when switching modes
 watch(mode, () => {
   if (mode.value === 'percentage' && !percentage.value) {
-    percentage.value = 70;
+    percentage.value = 20;
   }
 });
 </script>
@@ -186,19 +181,14 @@ watch(mode, () => {
     <!-- Fixed amount input -->
     <div v-else>
       <FormFieldGroup :label="t('budget.settings.fixedLabel')" required>
-        <AmountInput v-model="totalAmount" :currency-symbol="currSymbol" />
+        <CurrencyAmountInput
+          :amount="totalAmount"
+          :currency="currency"
+          @update:amount="totalAmount = $event"
+          @update:currency="currency = $event"
+        />
       </FormFieldGroup>
     </div>
-
-    <!-- Currency -->
-    <FormFieldGroup :label="t('form.currency')">
-      <BaseSelect v-model="currency" :options="currencyOptions" />
-    </FormFieldGroup>
-
-    <!-- Budget owner -->
-    <FormFieldGroup :label="t('budget.settings.owner')">
-      <FamilyChipPicker v-model="memberId" mode="single" show-shared />
-    </FormFieldGroup>
 
     <!-- Category allocations (collapsible) -->
     <div>

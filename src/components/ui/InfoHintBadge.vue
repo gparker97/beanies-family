@@ -2,8 +2,10 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 
 defineProps<{
-  /** Hint text to display in the popover */
-  text: string;
+  /** Hint text to display in the popover (plain text or array of bullet items) */
+  text?: string;
+  /** Array of bullet items — each rendered as a line with a marker */
+  items?: string[];
   /** Use light-on-dark styling for dark card backgrounds */
   dark?: boolean;
 }>();
@@ -43,7 +45,17 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
       "
       @click.stop
     >
-      {{ text }}
+      <!-- Plain text (or intro line before bullets) -->
+      <template v-if="text">{{ text }}</template>
+      <!-- Bulleted list mode -->
+      <template v-if="items">
+        <ul class="m-0 list-none space-y-1.5 p-0" :class="text ? 'mt-2' : ''">
+          <li v-for="(item, i) in items" :key="i" class="flex gap-2">
+            <span class="mt-px shrink-0 opacity-50">&#x2022;</span>
+            <span>{{ item }}</span>
+          </li>
+        </ul>
+      </template>
     </div>
   </span>
 </template>
