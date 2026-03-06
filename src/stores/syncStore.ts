@@ -1028,6 +1028,10 @@ export const useSyncStore = defineStore('sync', () => {
       const activityStore = useActivityStore();
       const budgetStore = useBudgetStore();
 
+      // Snapshot permission state before reload for diagnostics
+      const prevMember = familyStoreInst.currentMember;
+      const prevMemberId = familyStoreInst.currentMemberId;
+
       await Promise.all([
         familyStoreInst.loadMembers(),
         accountsStore.loadAccounts(),
@@ -1040,6 +1044,30 @@ export const useSyncStore = defineStore('sync', () => {
         activityStore.loadActivities(),
         budgetStore.loadBudgets(),
       ]);
+
+      // Diagnostic: detect permission changes after reload
+      const newMember = familyStoreInst.currentMember;
+      if (prevMember && prevMemberId === familyStoreInst.currentMemberId) {
+        if (prevMember.canViewFinances !== newMember?.canViewFinances) {
+          console.warn(
+            '[reloadAllStores] canViewFinances changed during reload:',
+            prevMember.canViewFinances,
+            '→',
+            newMember?.canViewFinances,
+            'member:',
+            prevMemberId,
+            'crossDevice:',
+            isCrossDeviceReload
+          );
+        }
+      } else if (prevMemberId !== familyStoreInst.currentMemberId) {
+        console.warn(
+          '[reloadAllStores] currentMemberId changed during reload:',
+          prevMemberId,
+          '→',
+          familyStoreInst.currentMemberId
+        );
+      }
     } finally {
       await nextTick();
       isReloading = false;

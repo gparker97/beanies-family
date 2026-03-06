@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
 import { wrapAsync } from '@/composables/useStoreActions';
 import type {
@@ -24,13 +24,98 @@ export const useFamilyStore = defineStore('family', () => {
 
   const isSetupComplete = computed(() => hasOwner.value || members.value.length > 0);
 
+  // Diagnostic: track permission changes on currentMember
+  watch(currentMember, (newMember, oldMember) => {
+    if (!oldMember || !newMember) return;
+    if (oldMember.id !== newMember.id) {
+      console.warn(
+        '[familyStore] currentMember changed identity:',
+        oldMember.id,
+        '→',
+        newMember.id
+      );
+    }
+    if (oldMember.canViewFinances !== newMember.canViewFinances) {
+      console.warn(
+        '[familyStore] canViewFinances changed:',
+        oldMember.canViewFinances,
+        '→',
+        newMember.canViewFinances,
+        'member:',
+        newMember.id,
+        newMember.name
+      );
+    }
+    if (oldMember.canEditActivities !== newMember.canEditActivities) {
+      console.warn(
+        '[familyStore] canEditActivities changed:',
+        oldMember.canEditActivities,
+        '→',
+        newMember.canEditActivities,
+        'member:',
+        newMember.id,
+        newMember.name
+      );
+    }
+    if (oldMember.canManagePod !== newMember.canManagePod) {
+      console.warn(
+        '[familyStore] canManagePod changed:',
+        oldMember.canManagePod,
+        '→',
+        newMember.canManagePod,
+        'member:',
+        newMember.id,
+        newMember.name
+      );
+    }
+  });
+
   // Actions
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
+      const prevMemberId = currentMemberId.value;
       members.value = await familyRepo.getAllFamilyMembers();
-      // Set current member to owner if not set
-      if (!currentMemberId.value && owner.value) {
-        currentMemberId.value = owner.value.id;
+
+      // Restore currentMemberId: prefer authStore session, then previous value, then owner
+      if (!currentMemberId.value) {
+        // Try restoring from authStore session (survives page refresh via localStorage)
+        try {
+          const { useAuthStore } = await import('@/stores/authStore');
+          const authStore = useAuthStore();
+          const sessionMemberId = authStore.currentUser?.memberId;
+          if (sessionMemberId && members.value.some((m) => m.id === sessionMemberId)) {
+            currentMemberId.value = sessionMemberId;
+            return;
+          }
+        } catch {
+          // authStore not available yet — fall through
+        }
+        // Fallback to owner
+        if (owner.value) {
+          currentMemberId.value = owner.value.id;
+        }
+      } else if (!members.value.some((m) => m.id === currentMemberId.value)) {
+        // currentMemberId no longer in members array — this shouldn't happen
+        console.warn(
+          '[familyStore] currentMemberId not found in members after reload:',
+          currentMemberId.value,
+          'members:',
+          members.value.map((m) => m.id)
+        );
+        // Try authStore session
+        try {
+          const { useAuthStore } = await import('@/stores/authStore');
+          const authStore = useAuthStore();
+          const sessionMemberId = authStore.currentUser?.memberId;
+          if (sessionMemberId && members.value.some((m) => m.id === sessionMemberId)) {
+            currentMemberId.value = sessionMemberId;
+            return;
+          }
+        } catch {
+          // fall through
+        }
+        // Last resort: owner
+        currentMemberId.value = owner.value?.id ?? prevMemberId;
       }
     });
   }

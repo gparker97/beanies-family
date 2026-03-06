@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAuthStore } from '@/stores/authStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const routes: RouteRecordRaw[] = [
@@ -134,6 +135,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   if (to.meta.requiresFinance) {
     const familyStore = useFamilyStore();
+    const authStore = useAuthStore();
     const member = familyStore.currentMember;
     if (member) {
       const isOwner = member.role === 'owner';
@@ -142,6 +144,10 @@ router.beforeEach((to) => {
       if (!isOwner && !hasManagePod && !hasFinance) {
         return { name: 'NoAccess' };
       }
+    } else if (authStore.isAuthenticated && authStore.currentUser?.role !== 'owner') {
+      // currentMember is undefined but user is authenticated and not owner —
+      // block access defensively (matches usePermissions fallback behavior)
+      return { name: 'NoAccess' };
     }
   }
 });
