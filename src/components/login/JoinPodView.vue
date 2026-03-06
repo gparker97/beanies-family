@@ -194,8 +194,12 @@ async function attemptFileLoad() {
         }
       } else {
         // Cloud load failed — fall back to manual file load
-        console.warn('[JoinPodView] loadFromGoogleDrive returned failure:', result);
-        formError.value = 'Could not load the file from Google Drive. Please try again.';
+        // syncStore.error has the actual reason (set in loadFromGoogleDrive's catch)
+        const storeError = syncStore.error as string | null;
+        console.warn('[JoinPodView] loadFromGoogleDrive failed:', storeError);
+        formError.value = storeError
+          ? `Could not load the file: ${storeError}`
+          : 'Could not load the file from Google Drive. Please try again.';
         cloudLoadFailed.value = true;
         needsManualFileLoad.value = true;
       }
