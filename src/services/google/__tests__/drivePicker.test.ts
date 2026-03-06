@@ -12,6 +12,7 @@ function mockPickerNamespace(onBuild?: (callback: (data: unknown) => void) => vo
     setOAuthToken: vi.fn().mockReturnThis(),
     setDeveloperKey: vi.fn().mockReturnThis(),
     setOrigin: vi.fn().mockReturnThis(),
+    setAppId: vi.fn().mockReturnThis(),
     setCallback: vi.fn().mockReturnThis(),
     build: vi.fn(() => {
       if (onBuild) {
@@ -55,6 +56,7 @@ describe('drivePicker', () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.stubEnv('VITE_GOOGLE_API_KEY', 'test-api-key');
+    vi.stubEnv('VITE_GOOGLE_PROJECT_NUMBER', '123456789');
     // Ensure gapi is defined so script loading is skipped
     (globalThis as Record<string, unknown>).gapi = {
       load: vi.fn((_api: string, cb: () => void) => cb()),
@@ -77,6 +79,7 @@ describe('drivePicker', () => {
       setOAuthToken: vi.fn().mockReturnThis(),
       setDeveloperKey: vi.fn().mockReturnThis(),
       setOrigin: vi.fn().mockReturnThis(),
+      setAppId: vi.fn().mockReturnThis(),
       setCallback: vi.fn().mockReturnThis(),
       build: vi.fn(function () {
         // Always resolve with cancel using the most recent callback
