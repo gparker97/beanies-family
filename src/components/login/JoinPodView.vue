@@ -100,6 +100,14 @@ onMounted(async () => {
   const fileRef = (route.query.ref as string) || '';
   const fileIdParam = (route.query.fileId as string) || '';
   const token = (route.query.t as string) || '';
+  console.warn('[JoinPodView] URL params:', {
+    fam: fam.slice(0, 8) + '...',
+    p,
+    fileId: fileIdParam ? fileIdParam.slice(0, 8) + '...' : '(none)',
+    tokenLength: token.length,
+    tokenPreview: token ? token.slice(0, 6) + '...' + token.slice(-4) : '(none)',
+    rawSearch: window.location.search.slice(0, 200),
+  });
 
   if (token) inviteToken.value = token;
 
@@ -190,7 +198,10 @@ async function attemptFileLoad() {
         } else if (!inviteToken.value) {
           showDecryptModal.value = true;
         } else {
-          formError.value = 'Invite token could not decrypt the file. Ask for a new invite link.';
+          // Preserve the specific error from tryInviteTokenDecrypt if set
+          if (!formError.value) {
+            formError.value = 'Invite token could not decrypt the file. Ask for a new invite link.';
+          }
         }
       } else {
         // Cloud load failed — fall back to manual file load
@@ -412,13 +423,25 @@ async function tryInviteTokenDecrypt(): Promise<boolean> {
   if (!inviteToken.value) return false;
 
   const pending = syncStore.pendingEncryptedFile;
-  if (!pending?.envelope?.inviteKeys) return false;
+  if (!pending?.envelope?.inviteKeys) {
+    console.warn('[JoinPodView] No inviteKeys in envelope');
+    return false;
+  }
 
   try {
     const { hashInviteToken, redeemInviteToken, isInviteExpired } =
       await import('@/services/crypto/inviteService');
 
     const tokenHash = await hashInviteToken(inviteToken.value);
+    const knownHashes = Object.keys(pending.envelope.inviteKeys);
+    console.warn('[JoinPodView] invite decrypt:', {
+      tokenLength: inviteToken.value.length,
+      tokenHash: tokenHash.slice(0, 8) + '...',
+      knownHashCount: knownHashes.length,
+      knownHashPrefixes: knownHashes.map((h) => h.slice(0, 8) + '...'),
+      match: knownHashes.includes(tokenHash),
+    });
+
     const pkg = pending.envelope.inviteKeys[tokenHash];
 
     if (!pkg) {
@@ -427,6 +450,7 @@ async function tryInviteTokenDecrypt(): Promise<boolean> {
     }
 
     if (isInviteExpired(pkg.expiresAt)) {
+      console.warn('[JoinPodView] Invite expired:', pkg.expiresAt);
       formError.value = t('join.inviteTokenExpired');
       return false;
     }
@@ -436,9 +460,11 @@ async function tryInviteTokenDecrypt(): Promise<boolean> {
 
     if (result.success) return true;
 
+    console.warn('[JoinPodView] decryptPendingFileWithKey failed:', result.error);
     formError.value = result.error ?? t('join.inviteTokenInvalid');
     return false;
-  } catch {
+  } catch (e) {
+    console.warn('[JoinPodView] invite decrypt exception:', e);
     formError.value = t('join.inviteTokenInvalid');
     return false;
   }
