@@ -1670,6 +1670,7 @@ const STRING_DEFS = {
   'todo.status': { en: 'Status', beanie: 'status' },
   'todo.status.open': { en: 'Open', beanie: 'open' },
   'todo.status.completed': { en: 'Completed', beanie: 'completed' },
+  'todo.reopenTask': { en: 'Reopen Task', beanie: 'reopen task' },
   'todo.noDueDate': { en: 'No due date', beanie: 'no due date' },
   'todo.noDateSet': { en: 'No date set', beanie: 'no date set' },
   'todo.addedToday': { en: 'Added today', beanie: 'added today' },
@@ -1982,6 +1983,20 @@ const STRING_DEFS = {
   'planner.day.thu': { en: 'Thu', beanie: 'thu' },
   'planner.day.fri': { en: 'Fri', beanie: 'fri' },
   'planner.day.sat': { en: 'Sat', beanie: 'sat' },
+
+  // Planner — View modal
+  'planner.viewActivity': { en: 'Activity Details', beanie: 'activity details' },
+  'planner.noLocation': { en: 'No location', beanie: 'no location' },
+  'planner.noNotes': { en: 'No notes', beanie: 'no notes' },
+  'planner.cost': { en: 'Cost', beanie: 'cost' },
+  'planner.transport': { en: 'Transport', beanie: 'transport' },
+  'planner.createdBy': { en: 'Created By', beanie: 'created by' },
+  'planner.oneOff': { en: 'One-off', beanie: 'one-off' },
+
+  // Transactions — View modal
+  'transactions.viewTransaction': { en: 'Transaction Details', beanie: 'transaction details' },
+  'transactions.reconciled': { en: 'Reconciled', beanie: 'reconciled' },
+  'transactions.status': { en: 'Status', beanie: 'status' },
 
   // ───── Budget Page ─────
   'budget.title': { en: 'Budget', beanie: 'bean budget' },

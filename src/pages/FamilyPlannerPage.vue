@@ -7,6 +7,7 @@ import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
+import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
 import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
@@ -58,11 +59,13 @@ function openAddModal(date?: string) {
   showModal.value = true;
 }
 
-function openEditModal(id: string) {
+// View modal for quick viewing + inline editing
+const viewingActivity = ref<FamilyActivity | null>(null);
+
+function openViewModal(id: string) {
   const activity = activityStore.activities.find((a) => a.id === id);
   if (activity) {
-    editingActivity.value = activity;
-    showModal.value = true;
+    viewingActivity.value = activity;
   }
 }
 
@@ -79,7 +82,13 @@ function handleSidebarAdd() {
 
 function handleSidebarEdit(id: string) {
   sidebarDate.value = null;
-  openEditModal(id);
+  openViewModal(id);
+}
+
+function handleViewOpenEdit(activity: FamilyActivity) {
+  viewingActivity.value = null;
+  editingActivity.value = activity;
+  showModal.value = true;
 }
 
 async function handleSave(
@@ -156,7 +165,7 @@ function openTodoViewModal(todo: TodoItem) {
 
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <UpcomingActivities @edit="openEditModal" />
+      <UpcomingActivities @edit="openViewModal" />
       <TodoPreview @view="openTodoViewModal" />
     </div>
 
@@ -181,7 +190,7 @@ function openTodoViewModal(todo: TodoItem) {
           type="button"
           class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white/60 px-3 py-2.5 text-left opacity-60 shadow-[0_2px_10px_rgba(44,62,80,0.03)] transition-all hover:opacity-100 hover:shadow-[0_4px_16px_rgba(44,62,80,0.06)] dark:bg-slate-800/60"
           style="border-left-color: #95a5a6"
-          @click="openEditModal(activity.id)"
+          @click="openViewModal(activity.id)"
         >
           <span class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full bg-gray-400" />
           <span
@@ -221,5 +230,11 @@ function openTodoViewModal(todo: TodoItem) {
     />
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
+
+    <ActivityViewEditModal
+      :activity="viewingActivity"
+      @close="viewingActivity = null"
+      @open-edit="handleViewOpenEdit"
+    />
   </div>
 </template>

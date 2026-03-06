@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-06",
-    "translationCount": 1154
+    "translationCount": 1169
   },
   "translations": {
     "app.name": {
@@ -4947,9 +4947,9 @@
       "lastUpdated": "2026-03-03"
     },
     "budget.settings.mode": {
-      "translation": "预算模式",
-      "hash": "s69bq6",
-      "lastUpdated": "2026-03-03"
+      "translation": "储蓄目标",
+      "hash": "1avh3u",
+      "lastUpdated": "2026-03-06"
     },
     "budget.settings.percentageOfIncome": {
       "translation": "占收入的百分比",
@@ -4962,14 +4962,14 @@
       "lastUpdated": "2026-03-03"
     },
     "budget.settings.percentageLabel": {
-      "translation": "占月收入的百分比",
-      "hash": "u47t0f",
-      "lastUpdated": "2026-03-03"
+      "translation": "储蓄目标（占收入的百分比）",
+      "hash": "p552s",
+      "lastUpdated": "2026-03-06"
     },
     "budget.settings.fixedLabel": {
-      "translation": "每月预算金额",
-      "hash": "u16uu8",
-      "lastUpdated": "2026-03-03"
+      "translation": "储蓄目标（固定金额）",
+      "hash": "y596eb",
+      "lastUpdated": "2026-03-06"
     },
     "budget.settings.categoryAllocations": {
       "translation": "类别分配",
@@ -4982,14 +4982,9 @@
       "lastUpdated": "2026-03-03"
     },
     "budget.settings.effectiveBudget": {
-      "translation": "有效的预算",
-      "hash": "3j6pz6",
-      "lastUpdated": "2026-03-03"
-    },
-    "budget.settings.owner": {
-      "translation": "预算所有人",
-      "hash": "l1xcew",
-      "lastUpdated": "2026-03-03"
+      "translation": "支出预算",
+      "hash": "yvoem7",
+      "lastUpdated": "2026-03-06"
     },
     "budget.settings.perMonth": {
       "translation": "每月",
@@ -4997,14 +4992,14 @@
       "lastUpdated": "2026-03-01"
     },
     "budget.settings.infoPercentage": {
-      "translation": "您的预算已设置为总收入的{percentage} %。它会在收入变化时自动调整。剩余的{remaining} %流向节约目标。",
-      "hash": "rd8m0l",
-      "lastUpdated": "2026-03-01"
+      "translation": "您的储蓄目标是收入的{savingsPercent} %。剩余的{spendingPercent} % （ {amount} ）是您的支出预算，当收入发生变化时会自动调整。",
+      "hash": "vlbtx",
+      "lastUpdated": "2026-03-06"
     },
     "budget.settings.infoFixed": {
-      "translation": "您的预算设置为每月{amount}的固定金额。您可以随时通过设置进行调整。",
-      "hash": "1tp8h2",
-      "lastUpdated": "2026-03-01"
+      "translation": "您的支出预算已设置为每月{amount}。以上的一切都流向了储蓄。您可以随时通过设置进行调整。",
+      "hash": "6zp0et",
+      "lastUpdated": "2026-03-06"
     },
     "budget.empty.title": {
       "translation": "无预算",
@@ -5774,6 +5769,86 @@
     "accounts.editOnAssetsPage": {
       "translation": "此贷款与资产相关联。在“资源”页面上编辑它。",
       "hash": "e84b5u",
+      "lastUpdated": "2026-03-06"
+    },
+    "nook.birthdayWithAge": {
+      "translation": "{name}的{age}生日！",
+      "hash": "o3fg80",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.viewActivity": {
+      "translation": "活动详情右滑窗",
+      "hash": "mnli5t",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.noLocation": {
+      "translation": "地点",
+      "hash": "ip5a1g",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.noNotes": {
+      "translation": "无备注",
+      "hash": "cehx6m",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.cost": {
+      "translation": "成本",
+      "hash": "1959p",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.transport": {
+      "translation": "运输",
+      "hash": "kh3do7",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.createdBy": {
+      "translation": "创建人",
+      "hash": "feti5t",
+      "lastUpdated": "2026-03-06"
+    },
+    "planner.oneOff": {
+      "translation": "一次性",
+      "hash": "5ns8ko",
+      "lastUpdated": "2026-03-06"
+    },
+    "transactions.viewTransaction": {
+      "translation": "交易详细信息",
+      "hash": "rhfgao",
+      "lastUpdated": "2026-03-06"
+    },
+    "transactions.reconciled": {
+      "translation": "已核销",
+      "hash": "rt2m16",
+      "lastUpdated": "2026-03-06"
+    },
+    "transactions.status": {
+      "translation": "状态",
+      "hash": "twsvse",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.budgetPaceIntro": {
+      "translation": "PACE将支出进度与当月经过的时间进行比较。",
+      "hash": "adlnx2",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.budgetPaceGreat": {
+      "translation": "太棒了—消费是15% +低于过去的时间。",
+      "hash": "9tqahl",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.budgetPaceOnTrack": {
+      "translation": "进展顺利-支出在已用时间的15%以内。",
+      "hash": "bda3gs",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.budgetPaceCaution": {
+      "translation": "注意—消费提前15%以上。",
+      "hash": "l1yaoa",
+      "lastUpdated": "2026-03-06"
+    },
+    "hints.budgetPaceOver": {
+      "translation": "超出预算—支出已超出预算的100%。",
+      "hash": "4yith6",
       "lastUpdated": "2026-03-06"
     }
   }

@@ -62,7 +62,7 @@ const isGoogleDrive = computed(() => props.providerType === 'google_drive');
 </script>
 
 <template>
-  <span class="inline-flex min-w-0 items-center gap-1" :title="tooltip">
+  <span class="inline-flex max-w-full min-w-0 items-center gap-1" :title="tooltip">
     <!-- Google Drive icon -->
     <svg
       v-if="isGoogleDrive"
