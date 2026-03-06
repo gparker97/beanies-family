@@ -90,10 +90,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: '9:00 AM' }).first().click();
     await page.getByRole('button', { name: '3:00 PM' }).click();
 
-    // Open end time dropdown (trigger shows "select a time") then select 4:00 PM
-    // Use .last() to avoid overlap with start time dropdown's leave transition
-    await page.getByRole('button', { name: /select a time/i }).click();
-    await page.getByRole('button', { name: '4:00 PM' }).last().click();
+    // End time auto-updates to startTime + 1hr = 4:00 PM — no action needed
 
     // Recurrence stays at default (Recurring + Weekly)
 
@@ -219,10 +216,12 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
 
-    // Click on the activity in the upcoming list to edit it
+    // Click on the activity in the upcoming list — opens view modal first
     await page.getByText('Original Title').click();
+    await expect(page.getByText(/view activity/i)).toBeVisible({ timeout: 5000 });
 
-    // Modal should open in edit mode
+    // Click "Edit" button in view modal to open the full edit modal
+    await page.getByRole('button', { name: /^edit$/i }).click();
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change the title
@@ -257,20 +256,20 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
 
-    // Click on the activity to open edit modal
+    // Click on the activity — opens view modal
     await page.getByText('To Delete').click();
-    await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/view activity/i)).toBeVisible({ timeout: 5000 });
 
-    // Click the delete button in the modal footer (🗑️ with aria-label="delete")
+    // Click the delete button in the view modal footer (🗑️ with aria-label="delete")
     await page.getByLabel(/delete/i).click();
 
-    // Activity modal closes first, then confirmation dialog appears
+    // View modal closes first, then confirmation dialog appears
     await expect(page.getByText('Are you sure you want to delete this activity?')).toBeVisible({
       timeout: 10000,
     });
 
-    // Wait for the edit modal to fully close before clicking confirm
-    await expect(page.getByText(/edit activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Wait for the view modal to fully close before clicking confirm
+    await expect(page.getByText(/view activity/i)).not.toBeVisible({ timeout: 5000 });
 
     // Confirm deletion — the ConfirmModal uses t('action.delete') = "delete"
     await page.getByRole('button', { name: /^delete$/i }).click();
@@ -323,10 +322,10 @@ test.describe('Family Planner', () => {
     await page.getByPlaceholder("What's the activity?").fill('Soccer Practice');
     await page.locator('input[type="date"]').fill('2026-03-02');
 
-    // Start time defaults to 9:00 AM — already correct, no action needed
+    // Start time defaults to 9:00 AM, end time auto-defaults to 10:00 AM
 
-    // Open end time dropdown (trigger shows "select a time") then select 10:30 AM
-    await page.getByRole('button', { name: /select a time/i }).click();
+    // Open end time dropdown (trigger shows "10:00 AM") then select 10:30 AM
+    await page.getByRole('button', { name: '10:00 AM' }).click();
     await page.getByRole('button', { name: '10:30 AM' }).click();
 
     // Recurrence defaults to Recurring + Weekly
