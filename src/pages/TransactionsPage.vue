@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
+import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import { BaseCard } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -58,6 +59,7 @@ const searchQuery = ref('');
 // Modal state
 const showAddModal = ref(false);
 const showEditModal = ref(false);
+const viewingTransaction = ref<Transaction | null>(null);
 const editingTransaction = ref<Transaction | null>(null);
 const editingRecurringItem = ref<RecurringItem | null>(null);
 
@@ -405,6 +407,11 @@ async function handleProjectedClick(tx: DisplayTransaction) {
   }
 }
 
+function handleViewOpenEdit(transaction: Transaction) {
+  viewingTransaction.value = null;
+  openEditModal(transaction);
+}
+
 function isRecurringItemInactive(tx: DisplayTransaction): boolean {
   if (!tx.recurringItemId) return false;
   const item = recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
@@ -573,7 +580,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                   if (ri) openEditRecurringModal(ri);
                   else openEditModal(tx);
                 } else {
-                  openEditModal(tx);
+                  viewingTransaction = tx;
                 }
               }
             "
@@ -734,7 +741,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                 <ActionButtons
                   size="sm"
                   @click.stop
-                  @edit="openEditModal(tx)"
+                  @edit="viewingTransaction = tx"
                   @delete="deleteTransaction(tx.id)"
                 />
               </template>
@@ -763,6 +770,13 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       @save="handleTransactionSave"
       @save-recurring="handleSaveRecurring"
       @delete="handleTransactionDelete"
+    />
+
+    <!-- View Transaction Modal (non-recurring) -->
+    <TransactionViewEditModal
+      :transaction="viewingTransaction"
+      @close="viewingTransaction = null"
+      @open-edit="handleViewOpenEdit"
     />
   </div>
 </template>

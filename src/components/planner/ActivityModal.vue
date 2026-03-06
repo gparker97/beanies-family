@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
@@ -17,6 +17,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { CATEGORY_COLORS } from '@/stores/activityStore';
+import { addHourToTime } from '@/utils/date';
 import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
 import type {
   FamilyActivity,
@@ -207,7 +208,7 @@ const { isEditing, isSubmitting } = useFormModal(
       description.value = '';
       date.value = props.defaultDate ?? todayStr();
       startTime.value = props.defaultStartTime ?? '09:00';
-      endTime.value = '';
+      endTime.value = addHourToTime(startTime.value);
       recurrenceMode.value = 'recurring';
       recurrenceFrequency.value = 'weekly';
       daysOfWeek.value = [];
@@ -246,6 +247,32 @@ watch(date, (newDate) => {
   if (newDate && daysOfWeek.value.length === 0 && recurrenceMode.value === 'recurring') {
     const d = new Date(newDate + 'T00:00:00');
     daysOfWeek.value = [d.getDay()];
+  }
+});
+
+// Sync endTime when startTime changes (skip during edit population)
+let suppressEndTimeSync = false;
+watch(
+  () => props.open,
+  (open) => {
+    if (open && props.activity) {
+      // Suppress the startTime watcher during edit population
+      suppressEndTimeSync = true;
+      nextTick(() => {
+        suppressEndTimeSync = false;
+      });
+    }
+  }
+);
+watch(startTime, (newStart) => {
+  if (suppressEndTimeSync || !newStart) return;
+  endTime.value = addHourToTime(newStart);
+});
+// Clamp endTime to not be before startTime
+watch(endTime, (newEnd) => {
+  if (!newEnd || !startTime.value) return;
+  if (newEnd < startTime.value) {
+    endTime.value = startTime.value;
   }
 });
 

@@ -10,7 +10,9 @@ import MilestonesCard from '@/components/nook/MilestonesCard.vue';
 import PiggyBankCard from '@/components/nook/PiggyBankCard.vue';
 import RecentActivityCard from '@/components/nook/RecentActivityCard.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
+import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
+import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import { usePermissions } from '@/composables/usePermissions';
 import { useTodoStore } from '@/stores/todoStore';
@@ -41,15 +43,21 @@ const selectedTodo = computed(() =>
 );
 
 // ── Activity modal ───────────────────────────────────────────────────────────
-const showActivityModal = ref(false);
+const viewingActivity = ref<FamilyActivity | null>(null);
+const showActivityEditModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 
 function openActivity(id: string) {
   const activity = activityStore.activities.find((a) => a.id === id);
   if (activity) {
-    editingActivity.value = activity;
-    showActivityModal.value = true;
+    viewingActivity.value = activity;
   }
+}
+
+function handleActivityOpenEdit(activity: FamilyActivity) {
+  viewingActivity.value = null;
+  editingActivity.value = activity;
+  showActivityEditModal.value = true;
 }
 
 async function handleActivitySave(
@@ -58,14 +66,14 @@ async function handleActivitySave(
   if ('id' in data && 'data' in data) {
     await activityStore.updateActivity(data.id, data.data);
   }
-  showActivityModal.value = false;
+  showActivityEditModal.value = false;
   editingActivity.value = null;
 }
 
 async function handleActivityDelete() {
   if (!editingActivity.value) return;
   const activityToDelete = editingActivity.value;
-  showActivityModal.value = false;
+  showActivityEditModal.value = false;
   const confirmed = await confirm({
     title: 'planner.deleteActivity',
     message: 'planner.deleteConfirm',
@@ -79,15 +87,21 @@ async function handleActivityDelete() {
 }
 
 // ── Transaction modal ────────────────────────────────────────────────────────
-const showTransactionModal = ref(false);
+const viewingTransaction = ref<Transaction | null>(null);
+const showTransactionEditModal = ref(false);
 const editingTransaction = ref<Transaction | null>(null);
 
 function openTransaction(id: string) {
   const tx = transactionsStore.transactions.find((t) => t.id === id);
   if (tx) {
-    editingTransaction.value = tx;
-    showTransactionModal.value = true;
+    viewingTransaction.value = tx;
   }
+}
+
+function handleTransactionOpenEdit(transaction: Transaction) {
+  viewingTransaction.value = null;
+  editingTransaction.value = transaction;
+  showTransactionEditModal.value = true;
 }
 
 async function handleTransactionSave(
@@ -96,12 +110,12 @@ async function handleTransactionSave(
   if ('id' in data) {
     await transactionsStore.updateTransaction(data.id, data.data);
   }
-  showTransactionModal.value = false;
+  showTransactionEditModal.value = false;
   editingTransaction.value = null;
 }
 
 async function handleTransactionDelete(id: string) {
-  showTransactionModal.value = false;
+  showTransactionEditModal.value = false;
   editingTransaction.value = null;
   const confirmed = await confirm({
     title: 'confirm.deleteTransactionTitle',
@@ -148,22 +162,34 @@ async function handleTransactionDelete(id: string) {
     <!-- Modals -->
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
 
+    <ActivityViewEditModal
+      :activity="viewingActivity"
+      @close="viewingActivity = null"
+      @open-edit="handleActivityOpenEdit"
+    />
+
     <ActivityModal
-      :open="showActivityModal"
+      :open="showActivityEditModal"
       :activity="editingActivity"
       @close="
-        showActivityModal = false;
+        showActivityEditModal = false;
         editingActivity = null;
       "
       @save="handleActivitySave"
       @delete="handleActivityDelete"
     />
 
+    <TransactionViewEditModal
+      :transaction="viewingTransaction"
+      @close="viewingTransaction = null"
+      @open-edit="handleTransactionOpenEdit"
+    />
+
     <TransactionModal
-      :open="showTransactionModal"
+      :open="showTransactionEditModal"
       :transaction="editingTransaction"
       @close="
-        showTransactionModal = false;
+        showTransactionEditModal = false;
         editingTransaction = null;
       "
       @save="handleTransactionSave"
