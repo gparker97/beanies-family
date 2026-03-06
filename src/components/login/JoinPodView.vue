@@ -540,7 +540,10 @@ async function handleCreatePassword() {
     });
 
     if (result.success) {
-      // Persist password hash to file before handing off to LoginPage
+      // Wrap the family key with the member's password so they can decrypt
+      // from any browser/device (e.g. Safari PWA after joining via Chrome)
+      await syncStore.wrapFamilyKeyForMember(selectedMember.value.id, password.value);
+      // Persist password hash + wrappedKey to file before handing off
       await syncStore.syncNow(true);
       emit('signed-in', '/nook');
     } else {

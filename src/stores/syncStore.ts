@@ -881,6 +881,22 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * Derive a wrapping key from a password and wrap the family key for a member.
+   * Adds the wrappedKey entry to the envelope so the member can decrypt from any browser/device.
+   */
+  async function wrapFamilyKeyForMember(memberId: string, password: string): Promise<void> {
+    if (!familyKey.value) throw new Error('No family key loaded');
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const memberKey = await deriveMemberKey(password, salt);
+    const wrapped = await wrapFamilyKey(familyKey.value, memberKey);
+    const { bufferToBase64 } = await import('@/utils/encoding');
+    await addMemberWrappedKey(memberId, {
+      wrapped,
+      salt: bufferToBase64(salt),
+    });
+  }
+
+  /**
    * Add a wrapped key entry to the envelope for a new member (joinFamily flow).
    */
   async function addMemberWrappedKey(
@@ -1425,6 +1441,7 @@ export const useSyncStore = defineStore('sync', () => {
     clearSessionPassword,
     getExportedFamilyKey,
     decryptPendingFileWithKey,
+    wrapFamilyKeyForMember,
     addMemberWrappedKey,
     addInvitePackage,
     disconnect,
