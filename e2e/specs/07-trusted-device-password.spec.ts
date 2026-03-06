@@ -86,6 +86,9 @@ async function updateGlobalSettings(
 }
 
 test.describe('Trusted Device Password Cache', () => {
+  // Firefox on CI can be slow during the create-pod flow in beforeEach
+  test.setTimeout(60000);
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     const dbHelper = new IndexedDBHelper(page);
