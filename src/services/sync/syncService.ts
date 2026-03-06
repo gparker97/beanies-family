@@ -472,7 +472,27 @@ async function fetchAndMergeRemote(): Promise<void> {
     suppressAutoSave = false;
   }
 
-  // Update envelope with remote's key material (may have new wrapped keys)
+  // Update envelope with remote's key material (may have new wrapped keys).
+  // Merge local-only envelope fields (inviteKeys, wrappedKeys, passkeySecrets)
+  // into the remote envelope to avoid losing locally-added keys when the remote
+  // file was written before the local change (e.g. invite generated between saves).
+  if (currentEnvelope) {
+    if (currentEnvelope.inviteKeys) {
+      remoteEnvelope.inviteKeys = { ...currentEnvelope.inviteKeys, ...remoteEnvelope.inviteKeys };
+    }
+    if (currentEnvelope.wrappedKeys) {
+      remoteEnvelope.wrappedKeys = {
+        ...currentEnvelope.wrappedKeys,
+        ...remoteEnvelope.wrappedKeys,
+      };
+    }
+    if (currentEnvelope.passkeyWrappedKeys) {
+      remoteEnvelope.passkeyWrappedKeys = {
+        ...currentEnvelope.passkeyWrappedKeys,
+        ...remoteEnvelope.passkeyWrappedKeys,
+      };
+    }
+  }
   currentEnvelope = remoteEnvelope;
   lastKnownFileTimestamp = remoteTimestamp;
 }

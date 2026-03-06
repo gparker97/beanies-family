@@ -100,14 +100,16 @@ onMounted(async () => {
   const fileRef = (route.query.ref as string) || '';
   const fileIdParam = (route.query.fileId as string) || '';
   const token = (route.query.t as string) || '';
-  console.warn('[JoinPodView] URL params:', {
-    fam: fam.slice(0, 8) + '...',
-    p,
-    fileId: fileIdParam ? fileIdParam.slice(0, 8) + '...' : '(none)',
-    tokenLength: token.length,
-    tokenPreview: token ? token.slice(0, 6) + '...' + token.slice(-4) : '(none)',
-    rawSearch: window.location.search.slice(0, 200),
-  });
+  console.warn(
+    '[JoinPodView] URL params:',
+    JSON.stringify({
+      fam: fam.slice(0, 8) + '...',
+      p,
+      fileId: fileIdParam ? fileIdParam.slice(0, 8) + '...' : '(none)',
+      tokenLength: token.length,
+      tokenPreview: token ? token.slice(0, 6) + '...' + token.slice(-4) : '(none)',
+    })
+  );
 
   if (token) inviteToken.value = token;
 
@@ -434,13 +436,16 @@ async function tryInviteTokenDecrypt(): Promise<boolean> {
 
     const tokenHash = await hashInviteToken(inviteToken.value);
     const knownHashes = Object.keys(pending.envelope.inviteKeys);
-    console.warn('[JoinPodView] invite decrypt:', {
-      tokenLength: inviteToken.value.length,
-      tokenHash: tokenHash.slice(0, 8) + '...',
-      knownHashCount: knownHashes.length,
-      knownHashPrefixes: knownHashes.map((h) => h.slice(0, 8) + '...'),
-      match: knownHashes.includes(tokenHash),
-    });
+    console.warn(
+      '[JoinPodView] invite decrypt:',
+      JSON.stringify({
+        tokenLength: inviteToken.value.length,
+        tokenHash: tokenHash.slice(0, 8) + '...',
+        knownHashCount: knownHashes.length,
+        knownHashPrefixes: knownHashes.map((h) => h.slice(0, 8) + '...'),
+        match: knownHashes.includes(tokenHash),
+      })
+    );
 
     const pkg = pending.envelope.inviteKeys[tokenHash];
 
