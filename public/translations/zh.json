@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-05",
-    "translationCount": 1119
+    "lastUpdated": "2026-03-06",
+    "translationCount": 1138
   },
   "translations": {
     "app.name": {
@@ -5600,6 +5600,101 @@
       "translation": "这将使您注销并删除所有本地数据。您的云数据（如有）不会受到影响。您确定吗？",
       "hash": "p0dzwj",
       "lastUpdated": "2026-03-05"
+    },
+    "modal.toSave": {
+      "translation": " 节省",
+      "hash": "k23gfy",
+      "lastUpdated": "2026-03-06"
+    },
+    "action.done": {
+      "translation": "完成",
+      "hash": "19s4i",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.title": {
+      "translation": "目标链接",
+      "hash": "f6ury",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.selectGoal": {
+      "translation": "您想要什么？",
+      "hash": "u5ui0n",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.allocMode": {
+      "translation": "贡献度",
+      "hash": "ph1ru8",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.percentage": {
+      "translation": "百分比",
+      "hash": "hq0sl6",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.fixedAmount": {
+      "translation": "固定金额",
+      "hash": "cavlmk",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.capped": {
+      "translation": "降低以实现目标",
+      "hash": "47yxih",
+      "lastUpdated": "2026-03-06"
+    },
+    "goalLink.noGoals": {
+      "translation": "没有此币种的有效目标",
+      "hash": "nevqz7",
+      "lastUpdated": "2026-03-06"
+    },
+    "join.pickerPrompt.description": {
+      "translation": "从您的Google云端硬盘中选择共享的.beanpod文件",
+      "hash": "8nmff1",
+      "lastUpdated": "2026-03-06"
+    },
+    "join.pickerPrompt.button": {
+      "translation": "从驱动器中选择文件",
+      "hash": "b6mido",
+      "lastUpdated": "2026-03-06"
+    },
+    "join.pickerPrompt.orManual": {
+      "translation": "或从您的设备加载文件",
+      "hash": "yiaomj",
+      "lastUpdated": "2026-03-06"
+    },
+    "join.pickerPrompt.error": {
+      "translation": "无法打开文件选取器。请尝试手动加载文件。",
+      "hash": "tq9f0j",
+      "lastUpdated": "2026-03-06"
+    },
+    "invite.shareEmail.label": {
+      "translation": "与家庭成员共享文件",
+      "hash": "ft0t5r",
+      "lastUpdated": "2026-03-06"
+    },
+    "invite.shareEmail.description": {
+      "translation": "（可选）输入他们的Google帐户电子邮件，以便编辑者访问您的家庭数据文件。如果跳过此操作，请从Google云端硬盘手动共享文件。",
+      "hash": "mz8r9v",
+      "lastUpdated": "2026-03-06"
+    },
+    "invite.shareEmail.placeholder": {
+      "translation": "family.member@gmail.com",
+      "hash": "7epkd1",
+      "lastUpdated": "2026-03-06"
+    },
+    "invite.shareEmail.button": {
+      "translation": "共享",
+      "hash": "1bjem7",
+      "lastUpdated": "2026-03-06"
+    },
+    "invite.shareEmail.success": {
+      "translation": "文件已共享！他们将收到来自Google的电子邮件。",
+      "hash": "u9k03h",
+      "lastUpdated": "2026-03-06"
+    },
+    "invite.shareEmail.error": {
+      "translation": "无法共享文件。您可以通过Google云端硬盘手动分享。",
+      "hash": "dxoqyl",
+      "lastUpdated": "2026-03-06"
     }
   }
 }
