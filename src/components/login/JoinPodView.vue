@@ -1058,6 +1058,7 @@ function handleBack() {
           type="password"
           :placeholder="t('auth.createPasswordPlaceholder')"
           required
+          @input="formError = null"
         />
         <div class="mt-3">
           <BaseInput
@@ -1066,6 +1067,7 @@ function handleBack() {
             type="password"
             :placeholder="t('auth.confirmPasswordPlaceholder')"
             required
+            @input="formError = null"
           />
         </div>
 
