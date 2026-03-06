@@ -62,11 +62,13 @@ export const useBudgetStore = defineStore('budget', () => {
   });
 
   // Effective budget amount (resolves percentage mode to actual amount)
+  // In percentage mode, `percentage` is the savings goal — spending budget = 100% - savings%
   const effectiveBudgetAmount = computed(() => {
     const budget = activeBudget.value;
     if (!budget) return 0;
     if (budget.mode === 'percentage') {
-      return Math.round(monthlyIncome.value * ((budget.percentage ?? 0) / 100));
+      const spendingPercent = 100 - (budget.percentage ?? 0);
+      return Math.round(monthlyIncome.value * (spendingPercent / 100));
     }
     return budget.totalAmount;
   });
