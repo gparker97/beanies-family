@@ -209,7 +209,21 @@ async function loadFamilyData() {
             await settingsStore.clearCachedFamilyKey(activeFamilyId);
           }
         }
+
+        // Can't auto-decrypt — redirect to login page for password/biometric entry
+        // instead of falling through to an empty doc (which shows blank Nook)
+        initBreadcrumbs.push('path1: needsPassword but no cached key — redirecting to login');
+        console.warn('[loadFamilyData] Cannot auto-decrypt — redirecting to login');
+        router.replace('/welcome');
+        return;
       }
+
+      // File load failed for non-password reasons (network error, 404, etc.)
+      // Redirect to login so user sees proper error handling instead of blank state
+      initBreadcrumbs.push('path1: loadFromFile failed — redirecting to login');
+      console.warn('[loadFamilyData] File load failed — redirecting to login');
+      router.replace('/welcome');
+      return;
     } catch (err) {
       throw new Error(
         `Failed to load data from sync file: ${err instanceof Error ? err.message : String(err)}`

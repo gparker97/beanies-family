@@ -364,11 +364,17 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
-   * Cache the exported family key for a specific family on trusted devices.
-   * Only stores when isTrustedDevice is true.
+   * Cache the exported family key for a specific family.
+   * By default only stores when isTrustedDevice is true.
+   * Pass `force: true` to bypass the trust check (e.g. during join flow
+   * when the user just created a password on this device).
    */
-  async function cacheFamilyKey(exportedKey: string, familyId: string): Promise<void> {
-    if (!isTrustedDevice.value) return;
+  async function cacheFamilyKey(
+    exportedKey: string,
+    familyId: string,
+    options?: { force?: boolean }
+  ): Promise<void> {
+    if (!options?.force && !isTrustedDevice.value) return;
     const existing = globalSettings.value.cachedFamilyKeys ?? {};
     globalSettings.value = await globalSettingsRepo.saveGlobalSettings({
       cachedFamilyKeys: { ...existing, [familyId]: exportedKey },
