@@ -49,6 +49,7 @@ const isSavingStorage = ref(false);
 const storageType = ref<'local' | 'google_drive' | null>(null);
 const showDriveResultModal = ref(false);
 const driveResultError = ref<string | null>(null);
+const showLocalFileWarning = ref(false);
 
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
@@ -133,7 +134,12 @@ async function handleStep1Next() {
   }
 }
 
+function handleLocalFileClick() {
+  showLocalFileWarning.value = true;
+}
+
 async function handleChooseLocalStorage() {
+  showLocalFileWarning.value = false;
   isSavingStorage.value = true;
   formError.value = null;
 
@@ -474,28 +480,26 @@ function handleBack() {
           {{ t('loginV6.storageDescription') }}
         </p>
 
-        <!-- Storage options row -->
-        <div class="flex gap-2">
+        <!-- Available storage options -->
+        <div class="grid grid-cols-2 gap-2">
           <!-- Google Drive -->
           <button
             v-if="syncStore.isGoogleDriveAvailable"
-            class="flex flex-1 flex-col items-center rounded-[14px] border-2 px-2.5 py-3.5 transition-all"
+            class="flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 px-2.5 transition-all"
             :class="
               storageType === 'google_drive'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
                 : isSavingStorage
                   ? 'border-blue-300 bg-blue-50/50 dark:border-blue-600/50 dark:bg-blue-900/15'
-                  : 'bg-sky-silk-300/15 border-transparent hover:border-blue-300 hover:bg-blue-50 dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
+                  : 'border-primary-500/40 bg-primary-500/[0.04] hover:border-primary-500 hover:bg-primary-500/[0.08] dark:border-primary-500/30 dark:bg-primary-500/[0.06] dark:hover:border-primary-500/50'
             "
             @click="handleChooseGoogleDriveStorage"
           >
-            <!-- Spinner while connecting -->
             <BeanieSpinner
               v-if="isSavingStorage && storageType !== 'google_drive'"
               size="sm"
               class="mb-1.5"
             />
-            <!-- Green check when connected -->
             <svg
               v-else-if="storageType === 'google_drive'"
               class="mb-1.5 h-6 w-6 text-green-600 dark:text-green-400"
@@ -510,7 +514,6 @@ function handleBack() {
                 d="M5 13l4 4L19 7"
               />
             </svg>
-            <!-- Full-color Google Drive logo -->
             <svg
               v-else
               class="mb-1.5 h-6 w-6"
@@ -556,10 +559,15 @@ function handleBack() {
                   : t('googleDrive.storageLabel')
               }}
             </span>
+            <span
+              v-if="storageType !== 'google_drive'"
+              class="bg-primary-500/15 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-xs font-bold"
+              >{{ t('storage.recommended') }}</span
+            >
           </button>
           <div
             v-else
-            class="bg-sky-silk-300/15 flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
+            class="flex h-[88px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50 px-2.5 opacity-50 dark:bg-slate-700/40"
           >
             <svg
               class="mb-1.5 h-6 w-6"
@@ -577,68 +585,20 @@ function handleBack() {
             >
             <span
               class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
-              >{{ t('loginV6.cloudComingSoon') }}</span
+              >{{ t('storage.comingSoon') }}</span
             >
           </div>
 
-          <!-- Dropbox (coming soon) -->
-          <div
-            class="bg-sky-silk-300/15 flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
-          >
-            <svg
-              class="mb-1.5 h-6 w-6"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              style="opacity: 0.5"
-            >
-              <path
-                d="M12 2L6 6.5l6 4.5-6 4.5L12 20l6-4.5-6-4.5 6-4.5L12 2zm0 13l-4-3 4-3 4 3-4 3z"
-              />
-            </svg>
-            <span
-              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
-              >{{ t('storage.dropbox') }}</span
-            >
-            <span
-              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
-              >{{ t('loginV6.cloudComingSoon') }}</span
-            >
-          </div>
-
-          <!-- iCloud (coming soon) -->
-          <div
-            class="bg-sky-silk-300/15 flex flex-1 cursor-not-allowed flex-col items-center rounded-[14px] border-2 border-transparent px-2.5 py-3.5 opacity-50 dark:bg-slate-700/40"
-          >
-            <svg
-              class="mb-1.5 h-6 w-6"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              style="opacity: 0.5"
-            >
-              <path
-                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"
-              />
-            </svg>
-            <span
-              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-600 dark:text-gray-400"
-              >{{ t('storage.iCloud') }}</span
-            >
-            <span
-              class="bg-primary-500/10 text-primary-500 mt-1 rounded-full px-2 py-0.5 text-center text-xs font-bold whitespace-nowrap"
-              >{{ t('loginV6.cloudComingSoon') }}</span
-            >
-          </div>
-
-          <!-- Local file (functional) -->
+          <!-- Local file (functional but muted) -->
           <button
-            class="flex flex-1 flex-col items-center rounded-[14px] border-2 px-2.5 py-3.5 transition-all"
+            class="flex h-[88px] flex-col items-center justify-center rounded-[14px] border-2 px-2.5 transition-all"
             :class="
               storageType === 'local'
                 ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
-                : 'bg-sky-silk-300/15 hover:border-primary-500/40 hover:bg-primary-500/5 border-transparent dark:bg-slate-700/40 dark:hover:bg-slate-600/40'
+                : 'border-gray-200 bg-gray-50/80 text-gray-400 hover:border-gray-300 hover:bg-gray-100/80 dark:border-slate-600/50 dark:bg-slate-700/30 dark:hover:border-slate-500/50'
             "
             :disabled="isSavingStorage"
-            @click="handleChooseLocalStorage"
+            @click="handleLocalFileClick"
           >
             <svg
               v-if="storageType === 'local'"
@@ -656,7 +616,7 @@ function handleBack() {
             </svg>
             <svg
               v-else
-              class="text-primary-500 mb-1.5 h-6 w-6"
+              class="mb-1.5 h-6 w-6 text-gray-400 dark:text-gray-500"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -672,11 +632,68 @@ function handleBack() {
               :class="
                 storageType === 'local'
                   ? 'text-green-700 dark:text-green-400'
-                  : 'text-gray-900 dark:text-gray-100'
+                  : 'text-gray-500 dark:text-gray-400'
               "
               >{{ t('storage.localFile') }}</span
             >
           </button>
+        </div>
+
+        <!-- Coming soon providers -->
+        <div class="mt-2 grid grid-cols-3 gap-2">
+          <!-- Dropbox (coming soon) -->
+          <div
+            class="flex h-[72px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50/60 px-2.5 opacity-40 dark:bg-slate-700/30"
+          >
+            <svg class="mb-1 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M12 2L6 6.5l6 4.5-6 4.5L12 20l6-4.5-6-4.5 6-4.5L12 2zm0 13l-4-3 4-3 4 3-4 3z"
+              />
+            </svg>
+            <span
+              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-500 dark:text-gray-500"
+              >{{ t('storage.dropbox') }}</span
+            >
+            <span class="mt-0.5 text-center text-xs text-gray-400 dark:text-gray-500">{{
+              t('storage.comingSoon')
+            }}</span>
+          </div>
+
+          <!-- iCloud (coming soon) -->
+          <div
+            class="flex h-[72px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50/60 px-2.5 opacity-40 dark:bg-slate-700/30"
+          >
+            <svg class="mb-1 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83z"
+              />
+            </svg>
+            <span
+              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-500 dark:text-gray-500"
+              >{{ t('storage.iCloud') }}</span
+            >
+            <span class="mt-0.5 text-center text-xs text-gray-400 dark:text-gray-500">{{
+              t('storage.comingSoon')
+            }}</span>
+          </div>
+
+          <!-- OneDrive (coming soon) -->
+          <div
+            class="flex h-[72px] cursor-not-allowed flex-col items-center justify-center rounded-[14px] border-2 border-transparent bg-gray-50/60 px-2.5 opacity-40 dark:bg-slate-700/30"
+          >
+            <svg class="mb-1 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+              <path
+                d="M10.5 18H18a4.5 4.5 0 0 0 .87-8.92A6 6 0 0 0 6.25 10.1 4 4 0 0 0 7 18h3.5z"
+              />
+            </svg>
+            <span
+              class="font-outfit text-center text-xs font-semibold whitespace-nowrap text-gray-500 dark:text-gray-500"
+              >OneDrive</span
+            >
+            <span class="mt-0.5 text-center text-xs text-gray-400 dark:text-gray-500">{{
+              t('storage.comingSoon')
+            }}</span>
+          </div>
         </div>
       </div>
 
@@ -863,6 +880,49 @@ function handleBack() {
         {{ t('loginV6.loadItLink') }}
       </button>
     </div>
+
+    <!-- Local file warning modal -->
+    <BaseModal :open="showLocalFileWarning" size="sm" @close="showLocalFileWarning = false">
+      <div class="p-5">
+        <div class="mb-3 flex items-center gap-2">
+          <svg
+            class="h-5 w-5 flex-shrink-0 text-amber-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+          <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+            {{ t('storage.localFile') }}
+          </h3>
+        </div>
+        <p class="mb-3 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+          {{ t('storage.localFileWarning') }}
+        </p>
+        <p class="mb-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
+          🔒 {{ t('storage.localFileWarningEncryption') }}
+        </p>
+        <div class="flex gap-2">
+          <BaseButton
+            variant="secondary"
+            size="sm"
+            class="flex-1"
+            @click="showLocalFileWarning = false"
+          >
+            {{ t('action.back') }}
+          </BaseButton>
+          <BaseButton size="sm" class="flex-1" @click="handleChooseLocalStorage">
+            {{ t('storage.localFileContinue') }}
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
 
     <!-- Google Drive result modal (success or failure) -->
     <BaseModal :open="showDriveResultModal" @close="showDriveResultModal = false">
