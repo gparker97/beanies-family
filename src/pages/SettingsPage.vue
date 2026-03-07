@@ -3,9 +3,13 @@ import { ref, computed, onMounted } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
-import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
+import ProfileHeader from '@/components/settings/ProfileHeader.vue';
+import SettingsCard from '@/components/settings/SettingsCard.vue';
+import { BaseSelect, BaseButton } from '@/components/ui';
+import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
@@ -33,28 +37,25 @@ const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod } = usePermissions();
 const { isReconnecting, reconnect } = useGoogleReconnect();
 
-async function handleSettingsReconnect() {
-  const success = await reconnect();
-  if (success) await syncStore.handleGoogleReconnected();
-}
+// ── Modal state ──────────────────────────────────────────────────────────────
+const showAppearance = ref(false);
+const showCurrency = ref(false);
+const showSecurity = ref(false);
+const showFamilyData = ref(false);
+const showDataManagement = ref(false);
 
-async function handleForceSave() {
-  await syncStore.forceSyncNow();
-}
-
+// ── Family Data state ────────────────────────────────────────────────────────
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
 const importError = ref<string | null>(null);
 const importSuccess = ref(false);
-
-// Decrypt-file modal state (for loading encrypted files)
 const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
 const isProcessingEncryption = ref(false);
 
+// ── Currency ─────────────────────────────────────────────────────────────────
 const { currencyOptions } = useCurrencyOptions();
 
-// Available currencies for preferred picker (exclude already-preferred ones)
 const availableForPreferred = computed(() =>
   CURRENCIES.filter((c) => !(settingsStore.preferredCurrencies || []).includes(c.code)).map(
     (c) => ({
@@ -75,30 +76,12 @@ function removePreferredCurrency(code: string) {
   settingsStore.setPreferredCurrencies(current.filter((c) => c !== code));
 }
 
+// ── Theme / Toggles ──────────────────────────────────────────────────────────
 const themeOptions = computed(() => [
   { value: 'light', label: t('settings.theme.light') },
   { value: 'dark', label: t('settings.theme.dark') },
   { value: 'system', label: t('settings.theme.system') },
 ]);
-
-onMounted(async () => {
-  await syncStore.initialize();
-});
-
-async function handleTrustedDeviceToggle(event: Event) {
-  const target = event.target as HTMLInputElement;
-  await settingsStore.setTrustedDevice(target.checked);
-}
-
-async function handleBeanieToggle(event: Event) {
-  const target = event.target as HTMLInputElement;
-  await settingsStore.setBeanieMode(target.checked);
-}
-
-async function handleSoundToggle(event: Event) {
-  const target = event.target as HTMLInputElement;
-  await settingsStore.setSoundEnabled(target.checked);
-}
 
 async function updateCurrency(value: string | number) {
   await settingsStore.setBaseCurrency(value as string);
@@ -106,6 +89,20 @@ async function updateCurrency(value: string | number) {
 
 async function updateTheme(value: string | number) {
   await settingsStore.setTheme(value as 'light' | 'dark' | 'system');
+}
+
+// ── Family Data handlers ─────────────────────────────────────────────────────
+onMounted(async () => {
+  await syncStore.initialize();
+});
+
+async function handleSettingsReconnect() {
+  const success = await reconnect();
+  if (success) await syncStore.handleGoogleReconnected();
+}
+
+async function handleForceSave() {
+  await syncStore.forceSyncNow();
 }
 
 async function handleConfigureSync() {
@@ -125,7 +122,6 @@ async function handleLoadFromFileConfirmed() {
   const result = await syncStore.loadFromNewFile();
 
   if (result.needsPassword) {
-    // File is encrypted, show password modal
     showDecryptFileModal.value = true;
     return;
   }
@@ -163,6 +159,13 @@ function handleDecryptModalClose() {
   encryptionError.value = null;
 }
 
+function formatLastSync(timestamp: string | null): string {
+  if (!timestamp) return t('settings.lastSyncNever');
+  const date = new Date(timestamp);
+  return date.toLocaleString();
+}
+
+// ── Data Management handlers ─────────────────────────────────────────────────
 async function handleManualExport() {
   await syncStore.manualExport();
 }
@@ -211,7 +214,6 @@ function handleExportAsJson() {
 }
 
 async function handleClearData() {
-  // Clear cached encryption password and trust flag from registry DB before wiping per-family data
   await settingsStore.clearCachedFamilyKey();
   await settingsStore.setTrustedDevice(false);
   const familyId = useFamilyContextStore().activeFamilyId;
@@ -221,152 +223,320 @@ async function handleClearData() {
   showClearConfirm.value = false;
   window.location.reload();
 }
-
-function formatLastSync(timestamp: string | null): string {
-  if (!timestamp) return t('settings.lastSyncNever');
-  const date = new Date(timestamp);
-  return date.toLocaleString();
-}
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- First Row: General Settings and File Sync side by side on wide screens -->
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <!-- General Settings -->
-      <BaseCard :title="t('settings.general')">
-        <div class="space-y-6">
-          <BaseSelect
-            :model-value="settingsStore.baseCurrency"
-            :options="currencyOptions"
-            :label="t('settings.baseCurrency')"
-            :hint="t('settings.baseCurrencyHint')"
-            @update:model-value="updateCurrency"
-          />
+    <!-- ── Profile Header ──────────────────────────────────────────────── -->
+    <ProfileHeader />
 
-          <!-- Preferred Currencies -->
+    <!-- ── Settings Card Grid ──────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <SettingsCard
+        icon="🔒"
+        :title="t('settings.card.security')"
+        :description="t('settings.card.securityDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="showSecurity = true"
+      />
+      <SettingsCard
+        icon="👨‍👩‍👧"
+        :title="t('settings.card.familyMembers')"
+        :description="t('settings.card.familyMembersDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="router.push('/family')"
+      />
+      <SettingsCard
+        icon="🎨"
+        :title="t('settings.card.appearance')"
+        :description="t('settings.card.appearanceDesc')"
+        icon-bg="var(--tint-slate-05)"
+        @click="showAppearance = true"
+      />
+      <SettingsCard
+        icon="💱"
+        :title="t('settings.card.currency')"
+        :description="t('settings.card.currencyDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="showCurrency = true"
+      />
+      <SettingsCard
+        v-if="canManagePod"
+        icon="💾"
+        :title="t('settings.card.familyData')"
+        :description="t('settings.card.familyDataDesc')"
+        icon-bg="var(--tint-silk-20)"
+        @click="showFamilyData = true"
+      />
+      <SettingsCard
+        v-if="canManagePod"
+        icon="📤"
+        :title="t('settings.card.dataManagement')"
+        :description="t('settings.card.dataManagementDesc')"
+        icon-bg="var(--tint-slate-05)"
+        @click="showDataManagement = true"
+      />
+    </div>
+
+    <!-- ── Install App Banner ──────────────────────────────────────────── -->
+    <div
+      v-if="canInstall || isInstalled"
+      class="flex items-center justify-between rounded-3xl bg-white p-5 shadow-[var(--card-shadow)] dark:bg-slate-800"
+    >
+      <div>
+        <p class="font-outfit text-sm font-bold text-slate-700 dark:text-slate-200">
+          {{ t('settings.installApp') }}
+        </p>
+        <p class="text-xs text-slate-400 dark:text-slate-500">
+          {{ isInstalled ? t('settings.appInstalled') : t('settings.installAppDesc') }}
+        </p>
+      </div>
+      <BaseButton
+        v-if="canInstall && !isInstalled"
+        variant="primary"
+        size="sm"
+        @click="installApp()"
+      >
+        {{ t('settings.installAppButton') }}
+      </BaseButton>
+      <span
+        v-else-if="isInstalled"
+        class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
+      >
+        &#x2713;
+      </span>
+    </div>
+
+    <!-- ── Quick Toggles ───────────────────────────────────────────────── -->
+    <div>
+      <p
+        class="font-outfit mb-4 text-[0.75rem] font-bold tracking-[0.1em] text-[var(--deep-slate)]/35 uppercase dark:text-slate-500"
+      >
+        {{ t('settings.quickToggles') }}
+      </p>
+      <div
+        class="rounded-[var(--sq)] bg-white px-6 shadow-[0_2px_12px_rgba(44,62,80,0.04)] dark:bg-slate-800"
+      >
+        <!-- Dark Mode -->
+        <div
+          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
+        >
           <div>
-            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('settings.preferredCurrencies') }}
-            </label>
-            <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('settings.preferredCurrenciesHint') }}
+            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+              {{ t('settings.darkMode') }}
             </p>
-
-            <!-- Selected chips -->
-            <div
-              v-if="(settingsStore.preferredCurrencies || []).length > 0"
-              class="mb-2 flex flex-wrap gap-1.5"
+            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
+              {{ t('settings.darkModeDescription') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            :model-value="settingsStore.theme === 'dark'"
+            @update:model-value="settingsStore.setTheme($event ? 'dark' : 'light')"
+          />
+        </div>
+        <!-- Beanie Mode -->
+        <div
+          class="flex items-center justify-between border-b border-[var(--tint-slate-05)] py-3.5 dark:border-slate-700"
+        >
+          <div>
+            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+              {{ t('settings.beanieMode') }}
+            </p>
+            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
+              {{ t('settings.beanieModeDescription') }}
+            </p>
+            <p
+              v-if="!translationStore.isEnglish"
+              class="text-[0.65rem] text-amber-600 dark:text-amber-400"
             >
-              <span
-                v-for="code in settingsStore.preferredCurrencies"
-                :key="code"
-                class="bg-primary-500/10 text-primary-500 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
-              >
-                {{ getCurrencyInfo(code)?.symbol }} {{ code }}
-                <button
-                  type="button"
-                  class="text-primary-500/60 hover:text-primary-500 ml-0.5 cursor-pointer"
-                  @click="removePreferredCurrency(code)"
-                >
-                  &times;
-                </button>
-              </span>
-            </div>
+              {{ t('settings.beanieModeDisabled') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            data-testid="beanie-mode-toggle"
+            :model-value="settingsStore.beanieMode"
+            :disabled="!translationStore.isEnglish"
+            @update:model-value="settingsStore.setBeanieMode($event)"
+          />
+        </div>
+        <!-- Sound Effects -->
+        <div class="flex items-center justify-between py-3.5">
+          <div>
+            <p class="text-[0.8rem] font-semibold text-[var(--deep-slate)] dark:text-slate-200">
+              {{ t('settings.soundEffects') }}
+            </p>
+            <p class="text-[0.65rem] leading-snug text-[var(--deep-slate)]/40 dark:text-slate-500">
+              {{ t('settings.soundEffectsDescription') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            data-testid="sound-toggle"
+            :model-value="settingsStore.soundEnabled"
+            @update:model-value="settingsStore.setSoundEnabled($event)"
+          />
+        </div>
+      </div>
+    </div>
 
-            <!-- Add dropdown -->
-            <BaseSelect
-              v-if="(settingsStore.preferredCurrencies || []).length < 4"
-              model-value=""
-              :options="availableForPreferred"
-              :placeholder="t('settings.addCurrency')"
-              @update:model-value="addPreferredCurrency"
-            />
+    <!-- ── About Footer ────────────────────────────────────────────────── -->
+    <div class="px-2 pb-4 text-center text-xs text-slate-400 dark:text-slate-500">
+      <p>
+        <strong class="text-slate-500 dark:text-slate-400">{{ t('settings.appName') }}</strong>
+        · {{ t('settings.version') }}
+      </p>
+      <p class="mt-1">{{ t('settings.privacyNote') }}</p>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+    <!-- ── MODALS ────────────────────────────────────────────────────── -->
+    <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Appearance Modal ────────────────────────────────────────────── -->
+    <BaseModal
+      :open="showAppearance"
+      :title="t('settings.card.appearance')"
+      size="lg"
+      @close="showAppearance = false"
+    >
+      <div class="space-y-6 p-6">
+        <BaseSelect
+          :model-value="settingsStore.theme"
+          :options="themeOptions"
+          :label="t('settings.theme')"
+          :hint="t('settings.themeHint')"
+          @update:model-value="updateTheme"
+        />
+
+        <!-- Restart Onboarding -->
+        <div
+          class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+        >
+          <div>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('onboarding.restartOnboarding') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('onboarding.restartOnboardingDescription') }}
+            </p>
+          </div>
+          <BaseButton
+            data-testid="restart-onboarding"
+            @click="
+              settingsStore.setOnboardingCompleted(false).then(() => {
+                showAppearance = false;
+                router.push('/nook');
+              })
+            "
+          >
+            {{ t('onboarding.restartOnboarding') }}
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
+
+    <!-- ── Currency & Rates Modal ──────────────────────────────────────── -->
+    <BaseModal
+      :open="showCurrency"
+      :title="t('settings.card.currency')"
+      size="xl"
+      @close="showCurrency = false"
+    >
+      <div class="space-y-6 p-6">
+        <BaseSelect
+          :model-value="settingsStore.baseCurrency"
+          :options="currencyOptions"
+          :label="t('settings.baseCurrency')"
+          :hint="t('settings.baseCurrencyHint')"
+          @update:model-value="updateCurrency"
+        />
+
+        <!-- Preferred Currencies -->
+        <div>
+          <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('settings.preferredCurrencies') }}
+          </label>
+          <p class="mb-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('settings.preferredCurrenciesHint') }}
+          </p>
+
+          <div
+            v-if="(settingsStore.preferredCurrencies || []).length > 0"
+            class="mb-2 flex flex-wrap gap-1.5"
+          >
+            <span
+              v-for="code in settingsStore.preferredCurrencies"
+              :key="code"
+              class="bg-primary-500/10 text-primary-500 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+            >
+              {{ getCurrencyInfo(code)?.symbol }} {{ code }}
+              <button
+                type="button"
+                class="text-primary-500/60 hover:text-primary-500 ml-0.5 cursor-pointer"
+                @click="removePreferredCurrency(code)"
+              >
+                &times;
+              </button>
+            </span>
           </div>
 
           <BaseSelect
-            :model-value="settingsStore.theme"
-            :options="themeOptions"
-            :label="t('settings.theme')"
-            :hint="t('settings.themeHint')"
-            @update:model-value="updateTheme"
+            v-if="(settingsStore.preferredCurrencies || []).length < 4"
+            model-value=""
+            :options="availableForPreferred"
+            :placeholder="t('settings.addCurrency')"
+            @update:model-value="addPreferredCurrency"
           />
-
-          <!-- Beanie Mode -->
-          <div
-            class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
-            :class="{ 'opacity-50': !translationStore.isEnglish }"
-          >
-            <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">
-                {{ t('settings.beanieMode') }}
-              </p>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ t('settings.beanieModeDescription') }}
-              </p>
-              <p
-                v-if="!translationStore.isEnglish"
-                class="mt-1 text-xs text-amber-600 dark:text-amber-400"
-              >
-                {{ t('settings.beanieModeDisabled') }}
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              data-testid="beanie-mode-toggle"
-              :checked="settingsStore.beanieMode"
-              :disabled="!translationStore.isEnglish"
-              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-              @change="handleBeanieToggle"
-            />
-          </div>
-
-          <!-- Sound Effects -->
-          <div
-            class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
-          >
-            <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">
-                {{ t('settings.soundEffects') }}
-              </p>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ t('settings.soundEffectsDescription') }}
-              </p>
-            </div>
-            <input
-              type="checkbox"
-              data-testid="sound-toggle"
-              :checked="settingsStore.soundEnabled"
-              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-              @change="handleSoundToggle"
-            />
-          </div>
-
-          <!-- Restart Onboarding -->
-          <div
-            class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
-          >
-            <div>
-              <p class="font-medium text-gray-900 dark:text-gray-100">
-                {{ t('onboarding.restartOnboarding') }}
-              </p>
-              <p class="text-sm text-gray-500 dark:text-gray-400">
-                {{ t('onboarding.restartOnboardingDescription') }}
-              </p>
-            </div>
-            <BaseButton
-              data-testid="restart-onboarding"
-              @click="settingsStore.setOnboardingCompleted(false).then(() => router.push('/nook'))"
-            >
-              {{ t('onboarding.restartOnboarding') }}
-            </BaseButton>
-          </div>
         </div>
-      </BaseCard>
 
-      <!-- Family Data Options (admin only) -->
-      <BaseCard v-if="canManagePod" :title="t('settings.familyDataOptions')">
-        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+        <!-- Exchange Rates (inline, no BaseCard wrapper) -->
+        <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
+          <ExchangeRateSettings :standalone="false" />
+        </div>
+      </div>
+    </BaseModal>
+
+    <!-- ── Security & Privacy Modal ────────────────────────────────────── -->
+    <BaseModal
+      v-if="authStore.isAuthenticated"
+      :open="showSecurity"
+      :title="t('settings.card.security')"
+      size="xl"
+      @close="showSecurity = false"
+    >
+      <div class="space-y-6 p-6">
+        <!-- Trusted device toggle -->
+        <div
+          class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+        >
+          <div>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('trust.settingsLabel') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('trust.settingsDesc') }}
+            </p>
+          </div>
+          <ToggleSwitch
+            :model-value="settingsStore.isTrustedDevice"
+            @update:model-value="settingsStore.setTrustedDevice($event)"
+          />
+        </div>
+
+        <!-- Passkey Settings -->
+        <PasskeySettings />
+      </div>
+    </BaseModal>
+
+    <!-- ── Family Data Modal ───────────────────────────────────────────── -->
+    <BaseModal
+      v-if="canManagePod"
+      :open="showFamilyData"
+      :title="t('settings.familyDataOptions')"
+      size="xl"
+      @close="showFamilyData = false"
+    >
+      <div class="space-y-4 p-6">
+        <p class="text-sm text-gray-500 dark:text-gray-400">
           {{ t('settings.familyDataDescription') }}
         </p>
 
@@ -394,7 +564,6 @@ function formatLastSync(timestamp: string | null): string {
               </BaseButton>
             </div>
 
-            <!-- Load file confirmation dialog (when not configured) -->
             <div
               v-if="showLoadFileConfirm"
               class="mt-4 rounded-lg bg-yellow-50 p-4 text-left dark:bg-yellow-900/20"
@@ -415,7 +584,6 @@ function formatLastSync(timestamp: string | null): string {
 
           <!-- Configured state -->
           <div v-else class="space-y-4">
-            <!-- Needs permission state -->
             <div
               v-if="syncStore.needsPermission"
               class="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
@@ -428,9 +596,8 @@ function formatLastSync(timestamp: string | null): string {
               </BaseButton>
             </div>
 
-            <!-- Ready state -->
             <div v-else>
-              <!-- Row 1: My Family's Data + filename + status -->
+              <!-- My Family's Data -->
               <div
                 class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
               >
@@ -474,16 +641,14 @@ function formatLastSync(timestamp: string | null): string {
                 </div>
               </div>
 
-              <!-- Google Drive info row -->
+              <!-- Google Drive info -->
               <div
                 v-if="syncStore.isGoogleDriveConnected"
                 class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
               >
-                <div>
-                  <p class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ t('googleDrive.fileLocation') }}
-                  </p>
-                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ t('googleDrive.fileLocation') }}
+                </p>
                 <a
                   :href="
                     syncStore.driveFolderId
@@ -506,7 +671,7 @@ function formatLastSync(timestamp: string | null): string {
                 </a>
               </div>
 
-              <!-- Row 2: Last Saved (read-only, no sync button) -->
+              <!-- Last Saved -->
               <div
                 class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
               >
@@ -520,7 +685,7 @@ function formatLastSync(timestamp: string | null): string {
                 </div>
               </div>
 
-              <!-- Row 3: Load another Family Data File -->
+              <!-- Load another file -->
               <div class="flex items-center justify-between py-3">
                 <div>
                   <p class="font-medium text-gray-900 dark:text-gray-100">
@@ -540,7 +705,7 @@ function formatLastSync(timestamp: string | null): string {
                 </BaseButton>
               </div>
 
-              <!-- Load file confirmation dialog -->
+              <!-- Load file confirmation -->
               <div
                 v-if="showLoadFileConfirm"
                 class="mt-4 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20"
@@ -558,7 +723,7 @@ function formatLastSync(timestamp: string | null): string {
                 </div>
               </div>
 
-              <!-- Error display with action buttons -->
+              <!-- Error display -->
               <div
                 v-if="syncStore.error"
                 class="mt-4 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
@@ -580,7 +745,7 @@ function formatLastSync(timestamp: string | null): string {
                 </div>
               </div>
 
-              <!-- Cache persistence warning -->
+              <!-- Cache persist warning -->
               <div
                 v-if="syncStore.cachePersistFailed"
                 class="mt-2 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
@@ -661,109 +826,27 @@ function formatLastSync(timestamp: string | null): string {
             </BaseButton>
           </div>
 
-          <!-- Import error -->
           <div v-if="importError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
             <p class="text-sm text-red-600 dark:text-red-400">{{ importError }}</p>
           </div>
-
-          <!-- Import success -->
           <div v-if="importSuccess" class="rounded-lg bg-green-50 p-3 dark:bg-green-900/20">
             <p class="text-sm text-green-600 dark:text-green-400">
               {{ t('settings.dataLoadedSuccess') }}
             </p>
           </div>
         </div>
-      </BaseCard>
-    </div>
-
-    <!-- Second Row: AI Settings and About side by side on wide screens -->
-    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <!-- AI Settings (admin only) -->
-      <BaseCard v-if="canManagePod" :title="t('settings.aiInsights')">
-        <div class="py-8 text-center text-gray-500 dark:text-gray-400">
-          <BeanieIcon name="light-bulb" size="xl" class="mx-auto mb-4 h-12 w-12 text-gray-400" />
-          <p class="font-medium">{{ t('settings.aiPoweredInsights') }}</p>
-          <p class="mt-1 text-sm">{{ t('settings.aiComingSoon') }}</p>
-        </div>
-      </BaseCard>
-
-      <!-- About -->
-      <BaseCard :title="t('settings.about')">
-        <div class="space-y-2 text-sm text-gray-500 dark:text-gray-400">
-          <p>
-            <strong class="text-gray-900 dark:text-gray-100">{{ t('settings.appName') }}</strong>
-          </p>
-          <p>{{ t('settings.version') }}</p>
-          <p>{{ t('settings.appDescription') }}</p>
-          <p class="pt-2">
-            {{ t('settings.privacyNote') }}
-          </p>
-        </div>
-      </BaseCard>
-    </div>
-
-    <!-- Install App (only when installable) -->
-    <BaseCard v-if="canInstall || isInstalled" :title="t('settings.installApp')">
-      <div class="flex items-center justify-between">
-        <div>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ isInstalled ? t('settings.appInstalled') : t('settings.installAppDesc') }}
-          </p>
-        </div>
-        <BaseButton
-          v-if="canInstall && !isInstalled"
-          variant="primary"
-          size="sm"
-          @click="installApp()"
-        >
-          {{ t('settings.installAppButton') }}
-        </BaseButton>
-        <span
-          v-else-if="isInstalled"
-          class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400"
-        >
-          &#x2713;
-        </span>
       </div>
-    </BaseCard>
+    </BaseModal>
 
-    <!-- Security Settings -->
-    <div v-if="authStore.isAuthenticated" class="space-y-4">
-      <h2 class="mb-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
-        {{ t('settings.security') }}
-      </h2>
-
-      <!-- Trusted device toggle -->
-      <BaseCard>
-        <div
-          class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
-        >
-          <div>
-            <p class="font-medium text-gray-900 dark:text-gray-100">
-              {{ t('trust.settingsLabel') }}
-            </p>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-              {{ t('trust.settingsDesc') }}
-            </p>
-          </div>
-          <input
-            type="checkbox"
-            :checked="settingsStore.isTrustedDevice"
-            class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-            @change="handleTrustedDeviceToggle"
-          />
-        </div>
-      </BaseCard>
-
-      <PasskeySettings />
-    </div>
-
-    <!-- Exchange Rate Settings (admin only, full width) -->
-    <ExchangeRateSettings v-if="canManagePod" />
-
-    <!-- Data Management (admin only, full width) -->
-    <BaseCard v-if="canManagePod" :title="t('settings.dataManagement')">
-      <div class="space-y-4">
+    <!-- ── Data Management Modal ───────────────────────────────────────── -->
+    <BaseModal
+      v-if="canManagePod"
+      :open="showDataManagement"
+      :title="t('settings.dataManagement')"
+      size="lg"
+      @close="showDataManagement = false"
+    >
+      <div class="space-y-4 p-6">
         <div
           class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
         >
@@ -827,25 +910,24 @@ function formatLastSync(timestamp: string | null): string {
             {{ t('settings.clearData') }}
           </BaseButton>
         </div>
-      </div>
 
-      <!-- Clear confirmation dialog -->
-      <div v-if="showClearConfirm" class="mt-4 rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
-        <p class="mb-3 text-sm text-red-800 dark:text-red-200">
-          {{ t('settings.clearDataConfirmation') }}
-        </p>
-        <div class="flex gap-2">
-          <BaseButton variant="danger" size="sm" @click="handleClearData">
-            {{ t('settings.yesDeleteEverything') }}
-          </BaseButton>
-          <BaseButton variant="ghost" size="sm" @click="showClearConfirm = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
+        <div v-if="showClearConfirm" class="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+          <p class="mb-3 text-sm text-red-800 dark:text-red-200">
+            {{ t('settings.clearDataConfirmation') }}
+          </p>
+          <div class="flex gap-2">
+            <BaseButton variant="danger" size="sm" @click="handleClearData">
+              {{ t('settings.yesDeleteEverything') }}
+            </BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="showClearConfirm = false">
+              {{ t('action.cancel') }}
+            </BaseButton>
+          </div>
         </div>
       </div>
-    </BaseCard>
+    </BaseModal>
 
-    <!-- Decrypt File Password Modal -->
+    <!-- ── Decrypt File Password Modal ─────────────────────────────────── -->
     <PasswordModal
       :open="showDecryptFileModal"
       :title="t('password.enterPassword')"
@@ -855,7 +937,7 @@ function formatLastSync(timestamp: string | null): string {
       @confirm="handleDecryptFile"
     />
 
-    <!-- Encryption error toast -->
+    <!-- ── Encryption error toast ──────────────────────────────────────── -->
     <div
       v-if="encryptionError"
       class="fixed right-4 bottom-4 max-w-sm rounded-lg border border-red-200 bg-red-50 p-4 shadow-lg dark:border-red-800 dark:bg-red-900/90"
