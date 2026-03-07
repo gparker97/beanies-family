@@ -345,7 +345,7 @@ function formatCurrency(val: number): string {
       <!-- Preset chips: income + expense -->
       <div class="ob-chip-groups">
         <div class="ob-chip-group">
-          <div class="ob-chip-group-label ob-chip-group-label--income">
+          <div class="ob-chip-group-label ob-chip-label-income">
             {{ t('onboarding.summaryIncome') }}
           </div>
           <div class="flex flex-wrap gap-1.5">
@@ -354,7 +354,7 @@ function formatCurrency(val: number): string {
               :key="preset.label"
               class="ob-chip ob-chip-income"
               :class="{
-                'ob-chip-selected ob-chip-selected--income': selectedPreset?.label === preset.label,
+                'ob-chip-active-income': selectedPreset?.label === preset.label,
               }"
               @click="selectRecurringPreset(preset)"
             >
@@ -364,7 +364,7 @@ function formatCurrency(val: number): string {
           </div>
         </div>
         <div class="ob-chip-group">
-          <div class="ob-chip-group-label ob-chip-group-label--expense">
+          <div class="ob-chip-group-label ob-chip-label-expense">
             {{ t('onboarding.summaryFixedCosts') }}
           </div>
           <div class="flex flex-wrap gap-1.5">
@@ -373,8 +373,7 @@ function formatCurrency(val: number): string {
               :key="preset.label"
               class="ob-chip ob-chip-expense"
               :class="{
-                'ob-chip-selected ob-chip-selected--expense':
-                  selectedPreset?.label === preset.label,
+                'ob-chip-active-expense': selectedPreset?.label === preset.label,
               }"
               @click="selectRecurringPreset(preset)"
             >
@@ -391,8 +390,8 @@ function formatCurrency(val: number): string {
         class="ob-recurring-card"
         data-testid="onboarding-recurring-card"
       >
-        <!-- Header: icon + description input -->
-        <div class="mb-3.5 flex items-center gap-3">
+        <!-- Header: icon + description + account -->
+        <div class="ob-recurring-header">
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-lg"
             :style="{
@@ -412,17 +411,15 @@ function formatCurrency(val: number): string {
               data-testid="onboarding-recurring-description"
             />
           </div>
-        </div>
-
-        <!-- Account selector -->
-        <div v-if="accountOptions.length > 0" class="mb-3">
-          <div class="ob-detail-label">{{ t('onboarding.account') }}</div>
-          <BaseSelect
-            :model-value="recurringAccountId"
-            :options="accountOptions"
-            :placeholder="t('form.selectAccount')"
-            @update:model-value="recurringAccountId = String($event)"
-          />
+          <div v-if="accountOptions.length > 0" class="ob-recurring-account-col">
+            <BaseSelect
+              :model-value="recurringAccountId"
+              :options="accountOptions"
+              :placeholder="t('form.selectAccount')"
+              class="ob-account-select"
+              @update:model-value="recurringAccountId = String($event)"
+            />
+          </div>
         </div>
 
         <!-- Amount + Frequency row -->
@@ -719,6 +716,34 @@ function formatCurrency(val: number): string {
 
 /* ── Section B: Recurring chips + inline card ──────────────────────────── */
 
+.ob-chip-groups {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.ob-chip-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.ob-chip-group-label {
+  font-family: Outfit, sans-serif;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.ob-chip-label-income {
+  color: #27ae60;
+}
+
+.ob-chip-label-expense {
+  color: var(--heritage-orange, #f15d22);
+}
+
 .ob-chip {
   align-items: center;
   background: white;
@@ -741,15 +766,66 @@ function formatCurrency(val: number): string {
   color: #e2e8f0;
 }
 
-.ob-chip:hover {
-  background: rgb(174 214 241 / 10%);
-  border-color: var(--sky-silk, #aed6f1);
+.ob-chip-income {
+  border-color: rgb(39 174 96 / 15%);
 }
 
-.ob-chip-selected {
+.ob-chip-income:hover {
+  background: rgb(39 174 96 / 6%);
+  border-color: rgb(39 174 96 / 40%);
+}
+
+.ob-chip-expense {
+  border-color: rgb(241 93 34 / 12%);
+}
+
+.ob-chip-expense:hover {
+  background: rgb(241 93 34 / 6%);
+  border-color: rgb(241 93 34 / 35%);
+}
+
+.ob-chip-active-income {
+  background: rgb(39 174 96 / 10%);
+  border-color: #27ae60;
+  color: #27ae60;
+}
+
+.ob-chip-active-expense {
   background: rgb(241 93 34 / 8%);
   border-color: var(--heritage-orange, #f15d22);
   color: var(--heritage-orange, #f15d22);
+}
+
+.ob-recurring-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.ob-recurring-account-col {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+@media (width >= 640px) {
+  .ob-recurring-account-col {
+    width: 180px;
+  }
+}
+
+.ob-account-select :deep(select) {
+  background: white !important;
+  border-color: rgb(44 62 80 / 8%);
+  box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.dark .ob-account-select :deep(select) {
+  background: #243342 !important;
+  border-color: rgb(255 255 255 / 8%);
 }
 
 .ob-recurring-card {

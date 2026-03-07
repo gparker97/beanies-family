@@ -134,6 +134,11 @@ const weekItems = computed<ScheduleItem[]>(() => {
   return items;
 });
 
+const MAX_WEEK_VISIBLE = 6;
+const visibleWeekItems = computed(() => weekItems.value.slice(0, MAX_WEEK_VISIBLE));
+const hasMoreWeekItems = computed(() => weekItems.value.length > MAX_WEEK_VISIBLE);
+const hiddenWeekCount = computed(() => weekItems.value.length - MAX_WEEK_VISIBLE);
+
 function handleClick(item: ScheduleItem) {
   if (item.type === 'todo') emit('open-todo', item.id);
   else emit('open-activity', item.id);
@@ -215,7 +220,7 @@ function handleClick(item: ScheduleItem) {
       <!-- Content -->
       <div v-if="weekItems.length > 0" class="flex flex-col gap-3">
         <div
-          v-for="item in weekItems"
+          v-for="item in visibleWeekItems"
           :key="`${item.type}-${item.id}`"
           class="flex cursor-pointer items-center gap-3 rounded-xl transition-colors hover:bg-[rgba(241,93,34,0.08)]"
           @click="handleClick(item)"
@@ -236,6 +241,13 @@ function handleClick(item: ScheduleItem) {
             </div>
           </div>
         </div>
+        <router-link
+          v-if="hasMoreWeekItems"
+          to="/planner"
+          class="text-primary-500 font-outfit mt-1 block text-center text-xs font-semibold hover:underline"
+        >
+          +{{ hiddenWeekCount }} {{ t('nook.moreItems') }} &rarr;
+        </router-link>
       </div>
       <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
         {{ t('nook.comingSoon') }}

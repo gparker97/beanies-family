@@ -36,16 +36,9 @@ export interface RecurringPreset {
 export const RECURRING_INCOME_PRESETS: RecurringPreset[] = [
   { icon: '\u{1F4B0}', label: 'Salary', category: 'salary', type: 'income', defaultName: 'Salary' },
   {
-    icon: '\u{1F469}\u200D\u{1F4BC}',
-    label: "Partner's Income",
-    category: 'salary',
-    type: 'income',
-    defaultName: "Partner's Income",
-  },
-  {
     icon: '\u{1F4CA}',
     label: 'Side Income',
-    category: 'side_income',
+    category: 'freelance',
     type: 'income',
     defaultName: 'Side Income',
   },
@@ -55,14 +48,14 @@ export const RECURRING_EXPENSE_PRESETS: RecurringPreset[] = [
   {
     icon: '\u{1F3E0}',
     label: 'Rent',
-    category: 'housing',
+    category: 'rent',
     type: 'expense',
     defaultName: 'Rent / Mortgage',
   },
   {
     icon: '\u{1F697}',
     label: 'Car',
-    category: 'transport',
+    category: 'car_payment',
     type: 'expense',
     defaultName: 'Car Payment',
   },
