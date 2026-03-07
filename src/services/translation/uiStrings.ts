@@ -1734,13 +1734,121 @@ const STRING_DEFS = {
     en: 'Your family at a glance',
     beanie: 'your bean pod at a glance',
   },
-  'nook.statusGreatWeek': {
+  'nook.motto0': {
     en: "Everyone's having a great week!",
     beanie: 'the beanies are thriving!',
   },
+  'nook.motto1': {
+    en: 'Together, anything is possible!',
+    beanie: 'together, beans can do anything!',
+  },
+  'nook.motto2': {
+    en: "Your family's doing amazing things!",
+    beanie: 'your bean pod is sprouting magic!',
+  },
+  'nook.motto3': {
+    en: 'Every little step counts!',
+    beanie: 'every little bean counts!',
+  },
+  'nook.motto4': {
+    en: "Look how far you've all come!",
+    beanie: 'look how tall your beanstalk grew!',
+  },
+  'nook.motto5': {
+    en: "What a wonderful crew you've got!",
+    beanie: 'what a wonderful pod you have!',
+  },
+  'nook.motto6': {
+    en: "Today's going to be a good one!",
+    beanie: "today's a perfect day for beans!",
+  },
+  'nook.motto7': {
+    en: 'Teamwork makes the dream work!',
+    beanie: 'bean teamwork makes the dream sprout!',
+  },
+  'nook.motto8': {
+    en: 'Small wins add up to big victories!',
+    beanie: 'tiny beans grow into mighty stalks!',
+  },
+  'nook.motto9': {
+    en: "Keep it up, you're all stars!",
+    beanie: 'keep sprouting, little stars!',
+  },
+  'nook.motto10': {
+    en: 'Home is where the heart is!',
+    beanie: 'home is where the beans are!',
+  },
+  'nook.motto11': {
+    en: "You're building something beautiful!",
+    beanie: "you're growing something beautiful!",
+  },
+  'nook.motto12': {
+    en: 'Another day, another adventure!',
+    beanie: 'another day, another bean quest!',
+  },
+  'nook.motto13': {
+    en: 'The best is yet to come!',
+    beanie: 'the biggest harvest is yet to come!',
+  },
+  'nook.motto14': {
+    en: 'Making memories, one day at a time!',
+    beanie: 'planting memories, one bean at a time!',
+  },
+  'nook.motto15': {
+    en: "Your family's strength is inspiring!",
+    beanie: 'your bean pod is super strong!',
+  },
+  'nook.motto16': {
+    en: 'Cheering for you all today!',
+    beanie: 'cheering for every bean today!',
+  },
+  'nook.motto17': {
+    en: "Happiness grows when it's shared!",
+    beanie: 'happiness sprouts when beans share!',
+  },
+  'nook.motto18': {
+    en: 'Great things happen together!',
+    beanie: 'great things happen in the pod!',
+  },
+  'nook.motto19': {
+    en: "You've got this, family!",
+    beanie: "you've got this, beanies!",
+  },
+  'nook.motto20': {
+    en: 'Beans, beans, good for your heart!',
+    beanie: 'beans, beans, good for your heart!',
+  },
+  'nook.motto21': {
+    en: 'First you get the beans, then you get the power, then you get the women',
+    beanie: 'first you get the beans, then you get the power, then you get the women',
+  },
+  'nook.motto22': {
+    en: "Don't count your beans before they sprout!",
+    beanie: "don't count your beans before they sprout!",
+  },
+  'nook.motto23': {
+    en: 'Who let the beans out?!',
+    beanie: 'who let the beans out?!',
+  },
+  'nook.motto24': {
+    en: "You're one cool bean family!",
+    beanie: "you're one cool bean pod!",
+  },
+  'nook.motto25': {
+    en: 'Has anyone seen my beans?',
+    beanie: 'has anyone seen my beans?',
+  },
+  'nook.motto26': {
+    en: 'Life is what happens between bean counts!',
+    beanie: 'life is what happens between bean counts!',
+  },
+  'nook.motto27': {
+    en: 'Bean there, done that, got the family!',
+    beanie: 'bean there, done that, got the pod!',
+  },
   'nook.statusSummary': {
-    en: '{tasks} completed \u00B7 {milestones} approaching',
-    beanie: '{tasks} beans counted \u00B7 {milestones} goals sprouting',
+    en: '{activities} activities planned today \u00B7 {tasks} tasks coming up',
+    beanie: '{activities} bean adventures today \u00B7 {tasks} tasks sprouting',
   },
   'nook.yourBeans': { en: 'Your Beans', beanie: 'your bean pod' },
   'nook.addBean': { en: 'Add Bean', beanie: 'add a beanie' },
