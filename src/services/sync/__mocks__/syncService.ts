@@ -41,6 +41,10 @@ export const getSaveFailureLevel = vi.fn(() => 'none');
 export const getLastSaveError = vi.fn(() => null);
 export const resetSaveFailures = vi.fn();
 
+// Cache persistence failure tracking
+export const isCachePersistFailed = vi.fn(() => false);
+export const onCacheFailureChange = vi.fn(() => () => {});
+
 // Lifecycle
 export const reset = vi.fn();
 export const initialize = vi.fn(async () => false);
