@@ -2347,6 +2347,10 @@ const STRING_DEFS = {
   'onboarding.pillarPlanShort': { en: 'Plans', beanie: 'plans' },
   'onboarding.pillarFamily': { en: 'Grow together', beanie: 'grow together' },
   'onboarding.pillarFamilyShort': { en: 'Family', beanie: 'family' },
+  'onboarding.currencyQuestion': {
+    en: "What's your family's base currency?",
+    beanie: "what's your family's base currency?",
+  },
   'onboarding.welcomeCta': {
     en: "Let's Get This Pod Rolling \u{1F96B}",
     beanie: "let's get this pod rolling \u{1F96B}",
@@ -2383,7 +2387,11 @@ const STRING_DEFS = {
   },
   'onboarding.income': { en: '\u2191 Income', beanie: '\u2191 income' },
   'onboarding.expenses': { en: '\u2193 Expenses', beanie: '\u2193 expenses' },
-  'onboarding.sectionSavings': { en: 'How much to save?', beanie: 'how much to save?' },
+  'onboarding.sectionSavings': {
+    en: 'Set your savings goal each month',
+    beanie: 'set your savings goal each month',
+  },
+  'onboarding.ofMyIncome': { en: 'of my income', beanie: 'of my income' },
   'onboarding.savingsNice': { en: 'Nice!', beanie: 'nice!' },
   'onboarding.savingsEncouragement': {
     en: "That's {amount}/month into your bean jar. \u{1F331}",
@@ -2427,8 +2435,11 @@ const STRING_DEFS = {
     en: '\u2014 add a lesson or activity',
     beanie: '\u2014 add a lesson or activity',
   },
+  'onboarding.assignee': { en: 'Who', beanie: 'who' },
   'onboarding.days': { en: 'Days', beanie: 'days' },
   'onboarding.time': { en: 'Time', beanie: 'time' },
+  'onboarding.startTime': { en: 'Start Time', beanie: 'start time' },
+  'onboarding.endTime': { en: 'End Time', beanie: 'end time' },
   'onboarding.costPerMonth': { en: 'Cost / Month', beanie: 'cost / month' },
   'onboarding.addActivity': { en: 'Add Activity', beanie: 'add activity' },
   'onboarding.addedToPlanner': {

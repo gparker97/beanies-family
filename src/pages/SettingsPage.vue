@@ -7,6 +7,7 @@ import { BaseCard, BaseSelect, BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 
+import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
@@ -21,6 +22,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
 
+const router = useRouter();
 const authStore = useAuthStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
@@ -341,13 +343,12 @@ function formatLastSync(timestamp: string | null): string {
                 {{ t('onboarding.restartOnboardingDescription') }}
               </p>
             </div>
-            <button
+            <BaseButton
               data-testid="restart-onboarding"
-              class="bg-heritage-orange/10 font-heading text-heritage-orange hover:bg-heritage-orange/20 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-              @click="settingsStore.setOnboardingCompleted(false)"
+              @click="settingsStore.setOnboardingCompleted(false).then(() => router.push('/nook'))"
             >
               {{ t('onboarding.restartOnboarding') }}
-            </button>
+            </BaseButton>
           </div>
         </div>
       </BaseCard>

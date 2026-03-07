@@ -18,15 +18,13 @@ const { t } = useTranslation();
 <template>
   <div class="ob-complete">
     <!-- Decorative floating emoji -->
-    <div class="ob-float-emoji ob-float-party">{'\u{1F389}'}</div>
-    <div class="ob-float-emoji ob-float-star">{'\u{1F31F}'}</div>
-    <div class="ob-float-emoji ob-float-bean">{'\u{1F96B}'}</div>
+    <div class="ob-float-emoji ob-float-party">🎉</div>
+    <div class="ob-float-emoji ob-float-star">🌟</div>
+    <div class="ob-float-emoji ob-float-bean">🥫</div>
 
     <div class="relative z-[1]">
       <!-- Hero emoji -->
-      <div class="ob-hero-emoji ob-float-anim">
-        {'\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}'}
-      </div>
+      <div class="ob-hero-emoji ob-float-anim">👨‍👩‍👧‍👦</div>
 
       <!-- Title -->
       <h2 class="ob-title">
@@ -43,22 +41,22 @@ const { t } = useTranslation();
       <!-- Summary cards -->
       <div class="ob-summary-cards">
         <div class="ob-summary-card">
-          <div class="text-xl sm:text-2xl">{'\u{1F3E6}'}</div>
+          <div class="text-xl sm:text-2xl">🏦</div>
           <div class="ob-summary-value">{{ accountCount }}</div>
           <div class="ob-summary-label">{{ t('onboarding.summaryAccount') }}</div>
         </div>
         <div class="ob-summary-card">
-          <div class="text-xl sm:text-2xl">{'\u{1F504}'}</div>
+          <div class="text-xl sm:text-2xl">🔄</div>
           <div class="ob-summary-value">{{ recurringCount }}</div>
           <div class="ob-summary-label">{{ t('onboarding.summaryRecurring') }}</div>
         </div>
         <div class="ob-summary-card">
-          <div class="text-xl sm:text-2xl">{'\u{1F3AF}'}</div>
+          <div class="text-xl sm:text-2xl">🎯</div>
           <div class="ob-summary-value text-heritage-orange">{{ savingsPercent }}%</div>
           <div class="ob-summary-label">{{ t('onboarding.summarySavings') }}</div>
         </div>
         <div class="ob-summary-card">
-          <div class="text-xl sm:text-2xl">{'\u{1F3B9}'}</div>
+          <div class="text-xl sm:text-2xl">🎹</div>
           <div class="ob-summary-value">{{ activityCount }}</div>
           <div class="ob-summary-label">{{ t('onboarding.summaryActivity') }}</div>
         </div>
