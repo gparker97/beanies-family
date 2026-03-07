@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import { BaseButton } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
@@ -26,6 +26,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
+const route = useRoute();
 const router = useRouter();
 const accountsStore = useAccountsStore();
 const assetsStore = useAssetsStore();
@@ -43,6 +44,15 @@ const showEditModal = ref(false);
 const editingAccount = ref<Account | null>(null);
 const groupBy = ref<'member' | 'category'>('member');
 const addModalDefaults = ref<{ memberId?: string; type?: AccountType } | undefined>();
+
+// Open edit modal from query param (e.g. navigated from Dashboard)
+onMounted(() => {
+  const viewId = route.query.view as string | undefined;
+  if (viewId) {
+    const account = accountsStore.accounts.find((a) => a.id === viewId);
+    if (account) openEditModal(account);
+  }
+});
 
 const groupByOptions = computed(() => [
   { value: 'member', label: t('accounts.groupByMember') },

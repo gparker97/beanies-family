@@ -135,22 +135,22 @@ const STRING_DEFS = {
   'status.overdue': { en: 'Overdue', beanie: 'overdue' },
 
   // Navigation
-  'nav.dashboard': { en: 'Financial Dashboard', beanie: 'finance corner 💵' },
-  'nav.accounts': { en: 'Accounts', beanie: 'accounts 🏦' },
-  'nav.transactions': { en: 'Transactions', beanie: 'transactions 💳' },
-  'nav.assets': { en: 'Assets', beanie: 'things 🏢' },
-  'nav.goals': { en: 'Goals', beanie: 'goals 🎯' },
-  'nav.reports': { en: 'Reports', beanie: 'reports 📊' },
-  'nav.forecast': { en: 'Forecast', beanie: 'finance forecast 🔮' },
-  'nav.family': { en: 'Family Hub', beanie: 'my family 👨‍👩‍👧' },
-  'nav.settings': { en: 'Settings', beanie: 'settings ⚙️' },
+  'nav.dashboard': { en: 'Financial Dashboard', beanie: 'finance corner' },
+  'nav.accounts': { en: 'Accounts', beanie: 'accounts' },
+  'nav.transactions': { en: 'Transactions', beanie: 'transactions' },
+  'nav.assets': { en: 'Assets', beanie: 'assets' },
+  'nav.goals': { en: 'Goals', beanie: 'goals' },
+  'nav.reports': { en: 'Reports', beanie: 'reports' },
+  'nav.forecast': { en: 'Forecast', beanie: 'finance forecast' },
+  'nav.family': { en: 'Family Hub', beanie: 'my family' },
+  'nav.settings': { en: 'Settings', beanie: 'settings' },
   'nav.section.treehouse': { en: 'The Treehouse', beanie: 'family treehouse' },
   'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'piggy bank' },
-  'nav.nook': { en: 'Family Dashboard', beanie: 'family nook 🏡' },
-  'nav.planner': { en: 'Family Planner', beanie: 'our plans 📅' },
-  'nav.todo': { en: 'Family To-Do', beanie: 'to-do list ✅' },
-  'nav.overview': { en: 'Overview', beanie: 'finance corner 💵' },
-  'nav.budgets': { en: 'Budgets', beanie: 'budgets 💰' },
+  'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },
+  'nav.planner': { en: 'Family Planner', beanie: 'our plans' },
+  'nav.todo': { en: 'Family To-Do', beanie: 'to-do list' },
+  'nav.overview': { en: 'Overview', beanie: 'finance corner' },
+  'nav.budgets': { en: 'Budgets', beanie: 'budgets' },
   'nav.comingSoon': { en: 'Soon!', beanie: 'soon!' },
 
   // Common actions
@@ -791,6 +791,13 @@ const STRING_DEFS = {
   'dashboard.roleLittleBean': { en: 'Little Bean', beanie: 'little bean' },
   'dashboard.chartHidden': { en: 'Chart hidden', beanie: 'chart hidden' },
   'dashboard.noDataYet': { en: 'No data yet', beanie: 'no beans to chart yet' },
+  'dashboard.comingUp': { en: 'Coming Up', beanie: 'coming up' },
+  'dashboard.yourAssets': { en: 'Your Assets', beanie: 'your assets' },
+  'dashboard.yourAccounts': { en: 'Your Accounts', beanie: 'your accounts' },
+  'dashboard.noAccounts': {
+    en: 'No accounts yet. Add accounts to track your finances.',
+    beanie: 'no bean jars yet. add some to start counting!',
+  },
 
   // Greeting
   'greeting.morning': { en: 'Good morning,', beanie: 'good morning,' },
@@ -1994,6 +2001,7 @@ const STRING_DEFS = {
   // Planner — View modal
   'planner.viewActivity': { en: 'Activity Details', beanie: 'activity details' },
   'planner.noLocation': { en: 'No location', beanie: 'no location' },
+  'planner.openInMaps': { en: 'Open in Google Maps', beanie: 'open in maps' },
   'planner.noNotes': { en: 'No notes', beanie: 'no notes' },
   'planner.cost': { en: 'Cost', beanie: 'cost' },
   'planner.transport': { en: 'Transport', beanie: 'transport' },
@@ -2066,7 +2074,7 @@ const STRING_DEFS = {
   // Budget — Batch / CSV (coming soon)
   'budget.batchAdd.title': { en: 'Batch Add', beanie: 'batch add' },
   'budget.csvUpload.title': { en: 'CSV Upload', beanie: 'csv upload' },
-  'budget.comingSoon': { en: 'beanies in development', beanie: 'beans sprouting' },
+  'budget.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
 
   // Budget — Settings modal
   'budget.settings.title': { en: 'Budget Settings', beanie: 'budget settings' },

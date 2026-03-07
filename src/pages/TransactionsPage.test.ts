@@ -88,6 +88,12 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
   }),
 }));
 
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 // Mock recurring processor
 const mockProcessRecurringItems = vi.fn().mockResolvedValue({ processed: 0, errors: [] });
 const mockGetDueDatesInRange = vi.fn(
