@@ -5,6 +5,8 @@ import { useExchangeRates } from '@/composables/useExchangeRates';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { useSettingsStore } from '@/stores/settingsStore';
 
+const props = withDefaults(defineProps<{ standalone?: boolean }>(), { standalone: true });
+
 const settingsStore = useSettingsStore();
 const {
   isUpdating,
@@ -44,7 +46,10 @@ function formatRate(rate: number): string {
 </script>
 
 <template>
-  <BaseCard title="Exchange Rates">
+  <component
+    :is="props.standalone ? BaseCard : 'div'"
+    :title="props.standalone ? 'Exchange Rates' : undefined"
+  >
     <div class="space-y-4">
       <!-- Last update info -->
       <div class="flex items-center justify-between">
@@ -171,5 +176,5 @@ function formatRate(rate: number): string {
         </BaseButton>
       </div>
     </div>
-  </BaseCard>
+  </component>
 </template>
