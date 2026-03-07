@@ -177,7 +177,7 @@ function handleSave() {
           class="flex items-center gap-2 rounded-[14px] border-2 px-4 py-2.5 text-sm"
           style="background: rgb(39 174 96 / 6%); border-color: rgb(39 174 96 / 30%)"
         >
-          <span class="text-base">{'\u{1F3E6}'}</span>
+          <span class="text-base">🏦</span>
           <span class="font-heading font-semibold">{{ accountName }}</span>
           <span class="ml-auto text-xs font-semibold" style="color: #27ae60">
             {{ t('onboarding.autoSelected') }}

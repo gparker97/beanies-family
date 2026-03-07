@@ -2,24 +2,23 @@
 import { ref, computed } from 'vue';
 import OnboardingStepHeader from './OnboardingStepHeader.vue';
 import OnboardingSectionLabel from './OnboardingSectionLabel.vue';
-import OnboardingRecurringModal from './OnboardingRecurringModal.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
-import BaseCombobox from '@/components/ui/BaseCombobox.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import { BaseCombobox } from '@/components/ui';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { INSTITUTIONS } from '@/constants/institutions';
+import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
+import { OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import {
   RECURRING_INCOME_PRESETS,
   RECURRING_EXPENSE_PRESETS,
   type RecurringPreset,
 } from '@/constants/activityPresets';
-import type { CurrencyCode } from '@/types/models';
+import type { CurrencyCode, RecurringFrequency } from '@/types/models';
 
 defineEmits<{
   next: [];
@@ -44,28 +43,34 @@ const accountTypeOptions = [
 
 const accountType = ref('checking');
 const bankInstitution = ref<string | undefined>(undefined);
-const accountName = ref('');
 const accountBalance = ref<number | undefined>(undefined);
 const accountCurrency = ref<string>(settingsStore.baseCurrency);
 const accountAdded = ref(false);
 const addedAccountName = ref('');
 const addedAccountId = ref('');
 
-const institutionOptions = computed(() =>
-  INSTITUTIONS.map((inst) => ({
-    value: inst.name,
-    label: inst.shortName,
-  }))
-);
+const { options: institutionOptions } = useInstitutionOptions();
+
+/** Generate account name: "Dad's OCBC Savings" */
+const generatedAccountName = computed(() => {
+  const ownerName = familyStore.owner?.name?.split(' ')[0] || '';
+  const bank = bankInstitution.value || '';
+  const typeLabel = accountTypeOptions.find((o) => o.value === accountType.value)?.label || '';
+  const parts = [ownerName ? `${ownerName}'s` : '', bank, typeLabel].filter(Boolean);
+  return parts.join(' ') || typeLabel || 'Account';
+});
+
+const canAddAccount = computed(() => bankInstitution.value);
 
 async function handleAddAccount() {
-  if (!accountName.value.trim()) return;
+  if (!canAddAccount.value) return;
   const memberId = familyStore.owner?.id;
   if (!memberId) return;
 
+  const name = generatedAccountName.value;
   const account = await accountsStore.createAccount({
     memberId,
-    name: accountName.value.trim(),
+    name,
     type: accountType.value as any,
     currency: accountCurrency.value as CurrencyCode,
     balance: accountBalance.value || 0,
@@ -75,99 +80,136 @@ async function handleAddAccount() {
   });
 
   if (account) {
-    addedAccountName.value = `${bankInstitution.value ? bankInstitution.value + ' ' : ''}${account.name}`;
+    addedAccountName.value = name;
     addedAccountId.value = account.id;
     accountAdded.value = true;
   }
 }
 
-function handleAddAnother() {
-  accountName.value = '';
+function handleAddAnotherAccount() {
   accountBalance.value = undefined;
   bankInstitution.value = undefined;
   accountType.value = 'checking';
   accountAdded.value = false;
 }
 
-// ── Section B: Recurring Transactions ───────────────────────────────────────
+// ── Section B: Recurring Transactions (inline, like Step 3 activities) ─────
 
-const recurringModalOpen = ref(false);
+const ALL_PRESETS = [...RECURRING_INCOME_PRESETS, ...RECURRING_EXPENSE_PRESETS];
+
 const selectedPreset = ref<RecurringPreset | null>(null);
-const filledPresets = ref<Map<string, { name: string; amount: number; dayOfMonth: number }>>(
-  new Map()
-);
+const recurringDescription = ref('');
+const recurringAmount = ref<number | undefined>(undefined);
+const recurringCurrency = ref<string>(settingsStore.baseCurrency);
+const recurringFrequency = ref<RecurringFrequency>('monthly');
+const recurringAdded = ref(false);
 
-function openRecurringModal(preset: RecurringPreset) {
-  if (!addedAccountId.value) return;
+const frequencyOptions = [
+  { value: 'daily', label: 'Daily', icon: '\u{1F504}' },
+  { value: 'monthly', label: 'Monthly', icon: '\u{1F4C5}' },
+  { value: 'yearly', label: 'Yearly', icon: '\u{1F4C6}' },
+];
+
+interface AddedRecurring {
+  description: string;
+  icon: string;
+  type: 'income' | 'expense';
+  amount: number;
+  frequency: RecurringFrequency;
+}
+const addedRecurrings = ref<AddedRecurring[]>([]);
+
+function selectRecurringPreset(preset: RecurringPreset) {
   selectedPreset.value = preset;
-  recurringModalOpen.value = true;
+  recurringDescription.value = preset.defaultName;
+  recurringAmount.value = undefined;
+  recurringFrequency.value = 'monthly';
+  recurringAdded.value = false;
 }
 
-async function handleRecurringSave(data: {
-  type: 'income' | 'expense';
-  name: string;
-  amount: number;
-  currency: string;
-  category: string;
-  dayOfMonth: number;
-  frequency: 'monthly' | 'yearly';
-}) {
+const canAddRecurring = computed(
+  () =>
+    recurringDescription.value.trim() &&
+    recurringAmount.value &&
+    recurringAmount.value > 0 &&
+    addedAccountId.value
+);
+
+async function handleAddRecurring() {
+  if (!canAddRecurring.value || !recurringAmount.value) return;
   const accountId = addedAccountId.value;
   if (!accountId) return;
+
+  const freq = recurringFrequency.value;
+  const dayOfMonth = freq === 'yearly' ? 1 : 1;
+  const monthOfYear = freq === 'yearly' ? 1 : undefined;
 
   const today = new Date().toISOString().split('T')[0] as string;
   await recurringStore.createRecurringItem({
     accountId,
-    type: data.type,
-    amount: data.amount,
-    currency: data.currency as CurrencyCode,
-    category: data.category,
-    description: data.name,
-    frequency: data.frequency,
-    dayOfMonth: data.dayOfMonth,
+    type: selectedPreset.value?.type || 'expense',
+    amount: recurringAmount.value,
+    currency: recurringCurrency.value as CurrencyCode,
+    category: selectedPreset.value?.category || 'other',
+    description: recurringDescription.value.trim(),
+    frequency: freq,
+    dayOfMonth,
+    monthOfYear,
     startDate: today,
     isActive: true,
   });
 
-  if (selectedPreset.value) {
-    filledPresets.value.set(selectedPreset.value.label, {
-      name: data.name,
-      amount: data.amount,
-      dayOfMonth: data.dayOfMonth,
-    });
-  }
+  addedRecurrings.value.push({
+    description: recurringDescription.value.trim(),
+    icon: selectedPreset.value?.icon || '\u{1F4B8}',
+    type: selectedPreset.value?.type || 'expense',
+    amount: recurringAmount.value,
+    frequency: freq,
+  });
+  recurringAdded.value = true;
+}
 
-  recurringModalOpen.value = false;
+function handleAddAnotherRecurring() {
+  selectedPreset.value = null;
+  recurringDescription.value = '';
+  recurringAmount.value = undefined;
+  recurringFrequency.value = 'monthly';
+  recurringAdded.value = false;
+}
+
+function formatFrequency(freq: RecurringFrequency): string {
+  if (freq === 'daily') return '/day';
+  if (freq === 'yearly') return '/yr';
+  return '/mo';
 }
 
 // ── Section C: Savings Slider ───────────────────────────────────────────────
 
 const savingsMode = ref('percent');
 const savingsPercent = ref(20);
+const fixedSavingsAmount = ref<number | undefined>(undefined);
+const fixedSavingsCurrency = ref<string>(settingsStore.baseCurrency);
 
 const totalIncome = computed(() => {
-  let sum = 0;
-  for (const p of RECURRING_INCOME_PRESETS) {
-    const entry = filledPresets.value.get(p.label);
-    if (entry) sum += entry.amount;
-  }
-  return sum;
+  return addedRecurrings.value
+    .filter((r) => r.type === 'income')
+    .reduce((sum, r) => sum + r.amount, 0);
 });
 
 const savingsAmount = computed(() => {
-  if (savingsMode.value === 'percent' && totalIncome.value > 0) {
+  if (savingsMode.value === 'fixed') {
+    return fixedSavingsAmount.value || 0;
+  }
+  if (totalIncome.value > 0) {
     return Math.round((totalIncome.value * savingsPercent.value) / 100);
   }
   return 0;
 });
 
 const totalExpenses = computed(() => {
-  let sum = 0;
-  for (const p of RECURRING_EXPENSE_PRESETS) {
-    const entry = filledPresets.value.get(p.label);
-    if (entry) sum += entry.amount;
-  }
-  return sum;
+  return addedRecurrings.value
+    .filter((r) => r.type === 'expense')
+    .reduce((sum, r) => sum + r.amount, 0);
 });
 
 const flexibleAmount = computed(() => {
@@ -192,7 +234,7 @@ function formatCurrency(val: number): string {
 <template>
   <div class="ob-form">
     <OnboardingStepHeader
-      icon="\u{1F437}"
+      icon="🐷"
       icon-bg="rgba(241,93,34,0.08)"
       step-label="Step 2 of 3"
       title-prefix="Your "
@@ -217,21 +259,19 @@ function formatCurrency(val: number): string {
       </div>
 
       <template v-if="!accountAdded">
-        <!-- Bank + Name + Balance grid -->
+        <!-- Bank + Balance grid -->
         <div class="ob-account-grid">
-          <div>
-            <div class="ob-label">{{ t('onboarding.bank') }}</div>
+          <div data-testid="onboarding-bank-select">
             <BaseCombobox
-              v-model="bankInstitution"
+              :model-value="bankInstitution ?? ''"
               :options="institutionOptions"
+              :label="t('onboarding.bank')"
               :placeholder="t('onboarding.bankPlaceholder')"
-            />
-          </div>
-          <div>
-            <div class="ob-label">{{ t('onboarding.accountName') }}</div>
-            <BaseInput
-              v-model="accountName"
-              :placeholder="t('onboarding.accountNamePlaceholder')"
+              :search-placeholder="t('form.searchInstitutions')"
+              :other-value="OTHER_INSTITUTION_VALUE"
+              :other-label="t('form.other')"
+              :other-placeholder="t('form.enterCustomName')"
+              @update:model-value="bankInstitution = $event || undefined"
             />
           </div>
           <div>
@@ -239,17 +279,25 @@ function formatCurrency(val: number): string {
             <CurrencyAmountInput
               :amount="accountBalance"
               :currency="accountCurrency"
+              font-size="0.85rem"
               @update:amount="accountBalance = $event"
               @update:currency="accountCurrency = $event"
             />
           </div>
         </div>
 
-        <!-- Add button -->
-        <div class="mt-2.5 flex justify-end">
+        <!-- Generated name preview + Add button -->
+        <div class="mt-2.5 flex items-center justify-between">
+          <div
+            v-if="bankInstitution"
+            class="font-heading truncate text-xs font-semibold opacity-35"
+          >
+            {{ generatedAccountName }}
+          </div>
+          <div v-else />
           <button
             class="ob-add-pill"
-            :disabled="!accountName.trim()"
+            :disabled="!canAddAccount"
             data-testid="onboarding-add-account"
             @click="handleAddAccount"
           >
@@ -261,12 +309,12 @@ function formatCurrency(val: number): string {
       <!-- Confirmation row -->
       <div v-else class="mt-2.5 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-xs" style="color: #27ae60">{'\u2713'}</span>
+          <span class="text-xs" style="color: #27ae60">✓</span>
           <span class="font-heading text-xs font-semibold" style="color: #27ae60">
             {{ addedAccountName }} {{ t('onboarding.added') }}
           </span>
         </div>
-        <button class="ob-add-pill" @click="handleAddAnother">
+        <button class="ob-add-pill" @click="handleAddAnotherAccount">
           {{ t('onboarding.addAnother') }}
         </button>
       </div>
@@ -275,7 +323,7 @@ function formatCurrency(val: number): string {
     <!-- Divider -->
     <div class="ob-divider" />
 
-    <!-- Section B: Regular transactions -->
+    <!-- Section B: Regular transactions (inline like Step 3 activities) -->
     <div class="ob-section">
       <OnboardingSectionLabel
         letter="B"
@@ -285,77 +333,103 @@ function formatCurrency(val: number): string {
         badge-gradient="linear-gradient(135deg, var(--heritage-orange, #F15D22), var(--terracotta, #E67E22))"
       />
 
-      <!-- Income presets -->
-      <div class="mb-2">
-        <div class="ob-category-header ob-category-income">
-          {{ t('onboarding.income') }}
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <div
-            v-for="preset in RECURRING_INCOME_PRESETS"
-            :key="preset.label"
-            class="ob-preset-card"
-            :class="{ 'ob-preset-filled': filledPresets.has(preset.label) }"
-            @click="openRecurringModal(preset)"
-          >
-            <span class="text-base">{{ preset.icon }}</span>
-            <div v-if="filledPresets.has(preset.label)">
-              <div class="font-heading text-xs font-bold">{{ preset.label }}</div>
-              <div class="text-xs opacity-45">
-                ${{ filledPresets.get(preset.label)?.amount?.toLocaleString() }} &middot;
-                {{ filledPresets.get(preset.label)?.dayOfMonth
-                }}{{
-                  ['st', 'nd', 'rd'][(filledPresets.get(preset.label)?.dayOfMonth ?? 1) - 1] || 'th'
-                }}
-              </div>
-            </div>
-            <span v-else class="font-heading text-xs font-semibold opacity-45">{{
-              preset.label
-            }}</span>
-            <span
-              v-if="filledPresets.has(preset.label)"
-              class="text-xs font-bold"
-              style="color: #27ae60"
-              >{'\u2713'}</span
-            >
-          </div>
-        </div>
+      <!-- Preset chips -->
+      <div class="mb-3 flex flex-wrap gap-1.5">
+        <button
+          v-for="preset in ALL_PRESETS"
+          :key="preset.label"
+          class="ob-chip"
+          :class="{
+            'ob-chip-selected': selectedPreset?.label === preset.label,
+            'ob-chip-income': preset.type === 'income',
+            'ob-chip-expense': preset.type === 'expense',
+          }"
+          @click="selectRecurringPreset(preset)"
+        >
+          <span class="text-sm">{{ preset.icon }}</span>
+          {{ preset.label }}
+        </button>
       </div>
 
-      <!-- Expense presets -->
-      <div>
-        <div class="ob-category-header ob-category-expense">
-          {{ t('onboarding.expenses') }}
-        </div>
-        <div class="flex flex-wrap gap-2">
+      <!-- Inline form card (when preset selected and not yet added) -->
+      <div
+        v-if="selectedPreset && !recurringAdded"
+        class="ob-recurring-card"
+        data-testid="onboarding-recurring-card"
+      >
+        <!-- Header: icon + description input -->
+        <div class="mb-3.5 flex items-center gap-3">
           <div
-            v-for="preset in RECURRING_EXPENSE_PRESETS"
-            :key="preset.label"
-            class="ob-preset-card"
-            :class="{ 'ob-preset-filled': filledPresets.has(preset.label) }"
-            @click="openRecurringModal(preset)"
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] text-lg"
+            :style="{
+              background:
+                selectedPreset.type === 'income' ? 'rgb(39 174 96 / 10%)' : 'rgb(241 93 34 / 8%)',
+            }"
           >
-            <span class="text-base">{{ preset.icon }}</span>
-            <div v-if="filledPresets.has(preset.label)">
-              <div class="font-heading text-xs font-bold">{{ preset.label }}</div>
-              <div class="text-xs opacity-45">
-                ${{ filledPresets.get(preset.label)?.amount?.toLocaleString() }} &middot;
-                {{ filledPresets.get(preset.label)?.dayOfMonth
-                }}{{
-                  ['st', 'nd', 'rd'][(filledPresets.get(preset.label)?.dayOfMonth ?? 1) - 1] || 'th'
-                }}
-              </div>
-            </div>
-            <span v-else class="font-heading text-xs font-semibold opacity-45">{{
-              preset.label
-            }}</span>
-            <span
-              v-if="filledPresets.has(preset.label)"
-              class="text-xs font-bold"
-              style="color: #27ae60"
-              >{'\u2713'}</span
-            >
+            {{ selectedPreset.icon }}
           </div>
+          <div class="min-w-0 flex-1">
+            <input
+              v-model="recurringDescription"
+              type="text"
+              class="ob-inline-input"
+              :placeholder="t('onboarding.transactionNamePlaceholder')"
+              data-testid="onboarding-recurring-description"
+            />
+          </div>
+        </div>
+
+        <!-- Amount + Frequency row -->
+        <div class="ob-recurring-fields">
+          <div class="ob-recurring-amount-col">
+            <div class="ob-detail-label">{{ t('onboarding.amount') }}</div>
+            <CurrencyAmountInput
+              :amount="recurringAmount"
+              :currency="recurringCurrency"
+              font-size="0.85rem"
+              @update:amount="recurringAmount = $event"
+              @update:currency="recurringCurrency = $event"
+            />
+          </div>
+          <div class="ob-recurring-freq-col">
+            <div class="ob-detail-label">{{ t('onboarding.frequency') }}</div>
+            <FrequencyChips v-model="recurringFrequency" :options="frequencyOptions" />
+          </div>
+        </div>
+
+        <button
+          class="ob-add-pill mt-3 w-full"
+          :disabled="!canAddRecurring"
+          data-testid="onboarding-add-recurring"
+          @click="handleAddRecurring"
+        >
+          {{ t('onboarding.addRecurring') }}
+        </button>
+      </div>
+
+      <!-- Added recurring list -->
+      <div v-if="addedRecurrings.length > 0" class="ob-added-list">
+        <div v-for="(item, idx) in addedRecurrings" :key="idx" class="ob-added-row">
+          <span class="text-base">{{ item.icon }}</span>
+          <div class="min-w-0 flex-1">
+            <div class="font-heading truncate text-xs font-bold">{{ item.description }}</div>
+            <div class="truncate text-xs opacity-45">
+              ${{ item.amount.toLocaleString() }}{{ formatFrequency(item.frequency) }}
+            </div>
+          </div>
+          <span
+            class="ob-added-type"
+            :class="item.type === 'income' ? 'ob-type-income' : 'ob-type-expense'"
+          >
+            {{ item.type }}
+          </span>
+          <span class="text-xs font-bold" style="color: #27ae60">✓</span>
+        </div>
+
+        <div v-if="recurringAdded" class="mt-2 flex justify-end">
+          <button class="ob-add-pill" @click="handleAddAnotherRecurring">
+            {{ t('onboarding.addAnother') }}
+          </button>
         </div>
       </div>
     </div>
@@ -373,51 +447,69 @@ function formatCurrency(val: number): string {
       />
 
       <div class="ob-savings-card">
-        <!-- Mode toggle + value -->
-        <div class="mb-1.5 flex items-center justify-between">
+        <!-- Mode toggle -->
+        <div class="mb-3">
           <TogglePillGroup v-model="savingsMode" :options="savingsModeOptions" />
-          <div class="text-right">
+        </div>
+
+        <!-- Percent mode: slider -->
+        <template v-if="savingsMode === 'percent'">
+          <div class="mb-1 flex items-end justify-between">
             <span class="font-heading text-heritage-orange text-2xl font-extrabold">
               {{ savingsPercent }}%
             </span>
+            <div class="text-right">
+              <span v-if="totalIncome > 0" class="font-heading text-sm font-semibold opacity-40">
+                ${{ savingsAmount.toLocaleString() }}/mo
+              </span>
+              <div class="font-heading text-xs font-medium opacity-35">
+                {{ t('onboarding.ofMyIncome') }}
+              </div>
+            </div>
+          </div>
+
+          <input
+            v-model.number="savingsPercent"
+            type="range"
+            min="5"
+            max="50"
+            step="5"
+            class="ob-slider"
+            data-testid="onboarding-savings-slider"
+          />
+
+          <div class="ob-slider-labels">
             <span
-              v-if="totalIncome > 0"
-              class="font-heading ml-1.5 text-sm font-semibold opacity-40"
+              v-for="label in sliderLabels"
+              :key="label"
+              :class="{ 'ob-slider-active': label === savingsPercent }"
             >
-              ${{ savingsAmount.toLocaleString() }}/mo
+              {{ label }}%
             </span>
           </div>
-        </div>
+        </template>
 
-        <!-- Slider -->
-        <input
-          v-model.number="savingsPercent"
-          type="range"
-          min="5"
-          max="50"
-          step="5"
-          class="ob-slider"
-          data-testid="onboarding-savings-slider"
-        />
-
-        <!-- Scale labels -->
-        <div class="ob-slider-labels">
-          <span
-            v-for="label in sliderLabels"
-            :key="label"
-            :class="{ 'ob-slider-active': label === savingsPercent }"
-          >
-            {{ label }}%
-          </span>
-        </div>
+        <!-- Fixed mode: amount input -->
+        <template v-else>
+          <div class="ob-detail-label">{{ t('onboarding.amount') }}</div>
+          <div class="max-w-[300px]">
+            <CurrencyAmountInput
+              :amount="fixedSavingsAmount"
+              :currency="fixedSavingsCurrency"
+              font-size="0.85rem"
+              @update:amount="fixedSavingsAmount = $event"
+              @update:currency="fixedSavingsCurrency = $event"
+            />
+          </div>
+        </template>
 
         <!-- Encouragement -->
         <div
-          v-if="totalIncome > 0"
+          v-if="savingsAmount > 0"
           class="mt-2.5 flex items-center gap-2 rounded-xl p-2 px-3"
           style="background: rgb(174 214 241 / 10%)"
         >
-          <span class="text-sm">{'\u{1F96B}'}</span>
+          <span class="text-sm">🥫</span>
           <span class="text-xs leading-snug opacity-55">
             <strong class="text-heritage-orange">{{ t('onboarding.savingsNice') }}</strong>
             {{
@@ -459,16 +551,6 @@ function formatCurrency(val: number): string {
         <div class="ob-summary-bar-label">{{ t('onboarding.summaryFlexible') }}</div>
       </div>
     </div>
-
-    <!-- Recurring Modal -->
-    <OnboardingRecurringModal
-      :open="recurringModalOpen"
-      :preset="selectedPreset"
-      :account-name="addedAccountName"
-      :account-id="addedAccountId"
-      @close="recurringModalOpen = false"
-      @save="handleRecurringSave"
-    />
   </div>
 </template>
 
@@ -476,7 +558,6 @@ function formatCurrency(val: number): string {
 .ob-form {
   background: linear-gradient(180deg, var(--cloud-white, #f8f9fa) 0%, #edf6fc 100%);
   min-height: 100%;
-  overflow: hidden;
   padding: 20px 16px;
   position: relative;
 }
@@ -550,7 +631,7 @@ function formatCurrency(val: number): string {
 @media (width >= 640px) {
   .ob-account-grid {
     align-items: end;
-    grid-template-columns: 1fr 1fr 0.8fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -563,8 +644,9 @@ function formatCurrency(val: number): string {
   font-family: Outfit, sans-serif;
   font-size: 0.68rem;
   font-weight: 600;
-  padding: 4px 12px;
+  padding: 8px 16px;
   transition: opacity 0.2s;
+  white-space: nowrap;
 }
 
 .ob-add-pill:disabled {
@@ -572,56 +654,162 @@ function formatCurrency(val: number): string {
   opacity: 0.4;
 }
 
-.ob-category-header {
-  align-items: center;
-  display: flex;
-  font-family: Outfit, sans-serif;
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-  width: 100%;
+/* ── Bank combobox: solid background override ─────────────────────────── */
+
+:deep([data-testid='combobox-trigger']) {
+  background: white !important;
+  border-color: rgb(44 62 80 / 8%);
+  box-shadow: 0 1px 4px rgb(44 62 80 / 4%);
 }
 
-.ob-category-income {
-  color: #27ae60;
+.dark :deep([data-testid='combobox-trigger']) {
+  background: #243342 !important;
+  border-color: rgb(255 255 255 / 8%);
 }
 
-.ob-category-expense {
-  color: var(--heritage-orange, #f15d22);
+:deep([data-testid='combobox-dropdown']) {
+  z-index: 100;
 }
 
-.ob-preset-card {
+/* ── Section B: Recurring chips + inline card ──────────────────────────── */
+
+.ob-chip {
   align-items: center;
   background: white;
   border: 2px solid rgb(44 62 80 / 5%);
   border-radius: 12px;
+  color: var(--deep-slate, #2c3e50);
   cursor: pointer;
   display: flex;
-  gap: 8px;
-  padding: 8px 14px;
+  font-family: Outfit, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  gap: 5px;
+  padding: 6px 12px;
   transition: all 0.2s;
 }
 
-.dark .ob-preset-card {
+.dark .ob-chip {
+  background: #243342;
+  border-color: rgb(255 255 255 / 6%);
+  color: #e2e8f0;
+}
+
+.ob-chip:hover {
+  background: rgb(174 214 241 / 10%);
+  border-color: var(--sky-silk, #aed6f1);
+}
+
+.ob-chip-selected {
+  background: rgb(241 93 34 / 8%);
+  border-color: var(--heritage-orange, #f15d22);
+  color: var(--heritage-orange, #f15d22);
+}
+
+.ob-recurring-card {
+  background: white;
+  border: 2px solid rgb(44 62 80 / 5%);
+  border-radius: 16px;
+  padding: 18px;
+  position: relative;
+  z-index: 1;
+}
+
+.dark .ob-recurring-card {
   background: #243342;
   border-color: rgb(255 255 255 / 6%);
 }
 
-.ob-preset-card:not(.ob-preset-filled):hover {
-  border-color: var(--sky-silk, #aed6f1);
-  box-shadow: 0 4px 16px rgb(44 62 80 / 6%);
-  transform: translateY(-1px);
+.ob-inline-input {
+  background: transparent;
+  border: none;
+  color: var(--deep-slate, #2c3e50);
+  font-family: Outfit, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  outline: none;
+  width: 100%;
 }
 
-.ob-preset-filled {
+.ob-inline-input::placeholder {
+  opacity: 0.3;
+}
+
+.dark .ob-inline-input {
+  color: #f1f5f9;
+}
+
+.ob-detail-label {
+  font-family: Outfit, sans-serif;
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  opacity: 0.4;
+  text-transform: uppercase;
+}
+
+.ob-recurring-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (width >= 640px) {
+  .ob-recurring-fields {
+    flex-direction: row;
+    gap: 16px;
+  }
+}
+
+.ob-recurring-amount-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.ob-recurring-freq-col {
+  flex-shrink: 0;
+}
+
+/* ── Added recurring list ──────────────────────────────────────────────── */
+
+.ob-added-list {
+  margin-top: 10px;
+}
+
+.ob-added-row {
+  align-items: center;
   background: rgb(39 174 96 / 6%);
-  border-color: #27ae60;
+  border: 1.5px solid rgb(39 174 96 / 20%);
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 8px 12px;
 }
 
-.dark .ob-preset-filled {
+.dark .ob-added-row {
   background: rgb(39 174 96 / 10%);
+}
+
+.ob-added-type {
+  border-radius: 6px;
+  font-family: Outfit, sans-serif;
+  font-size: 0.55rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.ob-type-income {
+  background: rgb(39 174 96 / 10%);
+  color: #27ae60;
+}
+
+.ob-type-expense {
+  background: rgb(241 93 34 / 8%);
+  color: var(--heritage-orange, #f15d22);
 }
 
 .ob-savings-card {

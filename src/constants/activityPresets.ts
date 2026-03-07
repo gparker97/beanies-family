@@ -19,6 +19,7 @@ export const ACTIVITY_PRESETS: ActivityPreset[] = [
   { icon: '\u{1F94B}', label: 'Martial Arts', category: 'sport', defaultTitle: 'Martial Arts' },
   { icon: '\u{1F483}', label: 'Dance', category: 'lesson', defaultTitle: 'Dance Class' },
   { icon: '\u{1F4DA}', label: 'Tutoring', category: 'lesson', defaultTitle: 'Tutoring' },
+  { icon: '\u{1F4E6}', label: 'Other', category: 'other', defaultTitle: 'Activity' },
 ];
 
 /**
