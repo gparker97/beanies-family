@@ -213,6 +213,11 @@ test.describe('Google Drive Sync', () => {
     // Click through homepage to WelcomeGate
     await page.getByTestId('homepage-get-started').click();
 
+    // Set e2e_auto_auth before clicking create to bypass InviteGateOverlay
+    await page.evaluate(() => {
+      sessionStorage.setItem('e2e_auto_auth', 'true');
+    });
+
     await page
       .getByRole('button', { name: /create/i })
       .first()
@@ -223,10 +228,6 @@ test.describe('Google Drive Sync', () => {
     await page.getByLabel('Email').fill('drive@test.com');
     await page.getByLabel('Password').first().fill('test12345');
     await page.getByLabel('Confirm password').fill('test12345');
-
-    await page.evaluate(() => {
-      sessionStorage.setItem('e2e_auto_auth', 'true');
-    });
 
     await page.getByRole('button', { name: 'Next' }).click();
 

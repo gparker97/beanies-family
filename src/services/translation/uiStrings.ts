@@ -2274,6 +2274,58 @@ const STRING_DEFS = {
     beanie: 'learn more about beanies.family',
   },
 
+  // Invite gate
+  'inviteGate.title': { en: 'Invite Only', beanie: 'invite only' },
+  'inviteGate.description': {
+    en: "We're still building! You need an exclusive invite to access beanies.family. If you're one of the lucky few, enter your invite bean below.",
+    beanie:
+      "we're still building! you need an exclusive invite to access beanies.family. if you're one of the lucky few, enter your invite bean below.",
+  },
+  'inviteGate.tokenLabel': { en: 'Invite Bean', beanie: 'invite bean' },
+  'inviteGate.tokenPlaceholder': { en: 'Enter your token', beanie: 'enter your token' },
+  'inviteGate.tokenRequired': { en: 'Please enter a token', beanie: 'please enter a token' },
+  'inviteGate.tokenInvalid': {
+    en: "That token doesn't look right. Check and try again.",
+    beanie: "that token doesn't look right. check and try again.",
+  },
+  'inviteGate.unlock': { en: 'Unlock', beanie: 'unlock' },
+  'inviteGate.noToken': { en: "Don't have one?", beanie: "don't have one?" },
+  'inviteGate.requestOne': { en: 'Request an invite', beanie: 'request an invite' },
+  'inviteGate.requestTitle': { en: 'Request an Invite', beanie: 'request an invite' },
+  'inviteGate.requestDescription': {
+    en: "Tell us a bit about yourself and we'll get back to you.",
+    beanie: "tell us a bit about yourself and we'll get back to you.",
+  },
+  'inviteGate.nameLabel': { en: 'Name', beanie: 'name' },
+  'inviteGate.namePlaceholder': { en: 'Your name', beanie: 'your name' },
+  'inviteGate.emailLabel': { en: 'Email', beanie: 'email' },
+  'inviteGate.emailPlaceholder': { en: 'you@example.com', beanie: 'you@example.com' },
+  'inviteGate.messageLabel': { en: 'Message (optional)', beanie: 'message (optional)' },
+  'inviteGate.messagePlaceholder': {
+    en: 'Why are you interested?',
+    beanie: 'why are you interested?',
+  },
+  'inviteGate.fieldsRequired': {
+    en: 'Name and email are required',
+    beanie: 'name and email are required',
+  },
+  'inviteGate.emailInvalid': {
+    en: 'Please enter a valid email',
+    beanie: 'please enter a valid email',
+  },
+  'inviteGate.sendRequest': { en: 'Send Request', beanie: 'send request' },
+  'inviteGate.haveToken': { en: 'I have a token', beanie: 'i have a token' },
+  'inviteGate.requestError': {
+    en: 'Something went wrong. Please try again later.',
+    beanie: 'something went wrong. please try again later.',
+  },
+  'inviteGate.confirmedTitle': { en: 'Request Sent!', beanie: 'request sent!' },
+  'inviteGate.confirmedDescription': {
+    en: "Thanks for your interest! We'll review your request and send you an invite bean soon.",
+    beanie: "thanks for your interest! we'll review your request and send you an invite bean soon.",
+  },
+  'inviteGate.backToHome': { en: 'Back to Home', beanie: 'back to home' },
+
   // Linked asset accounts
   'accounts.linkedTo': { en: 'Linked to {asset}', beanie: 'linked to {asset}' },
   'accounts.editOnAssetsPage': {

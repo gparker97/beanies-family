@@ -30,6 +30,11 @@ test.describe('Setup Flow', () => {
 
     // Click through homepage to WelcomeGate
     await page.getByTestId('homepage-get-started').click();
+
+    // Set e2e_auto_auth before clicking create to bypass InviteGateOverlay
+    await page.evaluate(() => {
+      sessionStorage.setItem('e2e_auto_auth', 'true');
+    });
     await page.getByTestId('create-pod-button').click();
 
     // Fill some fields but leave password empty to bypass native required

@@ -10,7 +10,9 @@ import PickBeanView from '@/components/login/PickBeanView.vue';
 import CreatePodView from '@/components/login/CreatePodView.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
 import BiometricLoginView from '@/components/login/BiometricLoginView.vue';
+import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { isInviteGateEnabled } from '@/utils/inviteToken';
 import { useSyncStore } from '@/stores/syncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -52,6 +54,7 @@ const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
 const isSingleFamilyAutoSelect = ref(false);
+const inviteGateLocked = ref(isInviteGateEnabled());
 
 onMounted(async () => {
   if (familyStore.members.length === 0) {
@@ -412,12 +415,16 @@ function handleSignedIn(destination: string) {
         @signed-in="handleSignedIn"
       />
 
-      <CreatePodView
-        v-else-if="activeView === 'create'"
-        @back="activeView = 'welcome'"
-        @signed-in="handleSignedIn"
-        @navigate="handleNavigate"
-      />
+      <div v-else-if="activeView === 'create'" class="relative">
+        <div :class="{ 'pointer-events-none blur-[0.1px]': inviteGateLocked }">
+          <CreatePodView
+            @back="activeView = 'welcome'"
+            @signed-in="handleSignedIn"
+            @navigate="handleNavigate"
+          />
+        </div>
+        <InviteGateOverlay v-if="inviteGateLocked" @unlocked="inviteGateLocked = false" />
+      </div>
 
       <JoinPodView
         v-else-if="activeView === 'join'"

@@ -141,6 +141,8 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           VITE_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           VITE_GOOGLE_PROJECT_NUMBER: ${{ secrets.GOOGLE_PROJECT_NUMBER }}
+          VITE_INVITE_BEAN_HASHES: ${{ secrets.INVITE_BEAN_HASHES }}
+          VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
