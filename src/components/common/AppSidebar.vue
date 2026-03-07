@@ -84,15 +84,11 @@ const sections = computed(() =>
   <aside class="bg-secondary-500 flex h-full w-64 flex-shrink-0 flex-col p-4">
     <!-- Logo & Branding -->
     <div class="mb-4 flex items-center gap-3 px-1">
-      <div
-        class="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-full bg-white"
-      >
-        <img
-          src="/brand/beanies_logo_transparent_logo_only_192x192.png"
-          alt="beanies.family"
-          class="h-[38px] w-[38px] object-contain"
-        />
-      </div>
+      <img
+        src="/brand/beanies_father_son_icon_192x192.png"
+        alt="beanies.family"
+        class="h-[44px] w-[44px] flex-shrink-0 rounded-xl object-contain"
+      />
       <div class="min-w-0">
         <h1 class="font-outfit text-base leading-tight font-bold">
           <span class="text-white">beanies</span><span class="text-primary-500">.family</span>
