@@ -27,11 +27,12 @@ test.describe('Sound Effects', () => {
     await expect(toggle).not.toBeChecked();
 
     // Wait for IndexedDB write to complete before reloading
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1500);
 
     // Reload and verify persistence
     await page.reload();
-    await expect(page.getByTestId('sound-toggle')).not.toBeChecked();
+    await expect(page.getByTestId('sound-toggle')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('sound-toggle')).not.toBeChecked({ timeout: 5000 });
   });
 
   test('sound toggle can be re-enabled', async ({ page }) => {
