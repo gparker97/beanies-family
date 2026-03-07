@@ -25,6 +25,7 @@ test.describe('Beanie Mode', () => {
 
     // Go to settings and disable beanie mode
     await page.goto('/settings');
+    await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggle = page.getByTestId('beanie-mode-toggle');
     await toggle.uncheck();
     await expect(toggle).not.toBeChecked();
@@ -40,6 +41,7 @@ test.describe('Beanie Mode', () => {
   test('re-enabling beanie mode restores beanie strings', async ({ page }) => {
     // Disable beanie mode
     await page.goto('/settings');
+    await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggle = page.getByTestId('beanie-mode-toggle');
     await toggle.uncheck();
 
@@ -52,6 +54,7 @@ test.describe('Beanie Mode', () => {
 
     // Re-enable beanie mode
     await page.goto('/settings');
+    await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggleAgain = page.getByTestId('beanie-mode-toggle');
     await toggleAgain.check();
 

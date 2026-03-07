@@ -20,6 +20,7 @@ test.describe('Sound Effects', () => {
 
   test('toggling sound off and reloading persists the setting', async ({ page }) => {
     await page.goto('/settings');
+    await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggle = page.getByTestId('sound-toggle');
 
     // Uncheck
@@ -37,6 +38,7 @@ test.describe('Sound Effects', () => {
 
   test('sound toggle can be re-enabled', async ({ page }) => {
     await page.goto('/settings');
+    await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggle = page.getByTestId('sound-toggle');
 
     // Disable then re-enable
