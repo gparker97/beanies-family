@@ -15,20 +15,18 @@ test.describe('Onboarding Wizard', () => {
     await bypassLoginIfNeeded(page);
 
     // bypassLoginIfNeeded sets e2e_auto_auth which auto-skips onboarding.
-    // Restart it via Settings and clear the flag so the wizard renders.
+    // Set e2e_force_onboarding so the wizard renders despite auto-auth.
+    await page.evaluate(() => {
+      sessionStorage.setItem('e2e_force_onboarding', 'true');
+    });
+
+    // Restart onboarding via Settings
     await page.goto('/settings');
     await page.getByTestId('restart-onboarding').click();
 
     // Wait for the router navigation triggered by restart-onboarding to settle
     await page.waitForURL('**/nook', { timeout: 10000 });
 
-    // Remove e2e_auto_auth so OnboardingWizard doesn't auto-skip on next mount
-    await page.evaluate(() => {
-      sessionStorage.removeItem('e2e_auto_auth');
-    });
-
-    // Full reload so the wizard mounts fresh without the e2e_auto_auth flag
-    await page.goto('/nook');
     await page.getByTestId('onboarding-wizard').waitFor({ state: 'visible', timeout: 10000 });
   }
 

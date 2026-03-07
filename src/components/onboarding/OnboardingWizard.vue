@@ -29,8 +29,13 @@ const recurringCount = computed(() => recurringStore.recurringItems.length);
 const activityCount = computed(() => activityStore.activities.length);
 
 onMounted(() => {
-  // E2E auto-skip: same pattern as InviteGateOverlay and TrustDeviceModal
-  if (import.meta.env.DEV && sessionStorage.getItem('e2e_auto_auth') === 'true') {
+  // E2E auto-skip: same pattern as InviteGateOverlay and TrustDeviceModal.
+  // The e2e_force_onboarding flag allows E2E tests to show the wizard even with auto-auth.
+  if (
+    import.meta.env.DEV &&
+    sessionStorage.getItem('e2e_auto_auth') === 'true' &&
+    sessionStorage.getItem('e2e_force_onboarding') !== 'true'
+  ) {
     settingsStore.setOnboardingCompleted(true);
     visible.value = false;
   }
