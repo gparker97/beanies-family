@@ -145,13 +145,14 @@ test.describe('Trusted Device Password Cache', () => {
     const cached = settings!.cachedFamilyKeys as Record<string, string>;
     expect(cached['test-family']).toBe('test-encryption-pw');
 
-    // Navigate to settings
+    // Navigate to settings and open Data Management modal
     await page.goto('/settings');
     await page.waitForURL('/settings');
+    await page.getByText('Data Management').first().click();
 
-    // Find and click "Clear Data" button
+    // Find and click "Clear Data" button inside the modal
     const clearDataBtn = page.getByRole('button', { name: 'Clear Data' });
-    await clearDataBtn.scrollIntoViewIfNeeded();
+    await clearDataBtn.waitFor({ state: 'visible', timeout: 5000 });
     await clearDataBtn.click();
 
     // Confirm the destructive action

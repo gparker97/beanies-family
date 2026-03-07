@@ -20,8 +20,10 @@ test.describe('Onboarding Wizard', () => {
       sessionStorage.setItem('e2e_force_onboarding', 'true');
     });
 
-    // Restart onboarding via Settings
+    // Restart onboarding via Settings → Appearance modal
     await page.goto('/settings');
+    await page.getByText('Appearance').first().click();
+    await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
 
     // Wait for the router navigation triggered by restart-onboarding to settle
@@ -175,8 +177,10 @@ test.describe('Onboarding Wizard', () => {
     await page.getByTestId('onboarding-finish').click();
     await expect(page.getByTestId('onboarding-wizard')).not.toBeVisible({ timeout: 5000 });
 
-    // Go to Settings and restart
+    // Go to Settings and restart via Appearance modal
     await page.goto('/settings');
+    await page.getByText('Appearance').first().click();
+    await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
 
     // Go back to /nook — wizard should reappear
