@@ -29,8 +29,12 @@ async function handleStart() {
     <div class="ob-float-emoji ob-float-piggy">🐷</div>
     <div class="ob-float-emoji ob-float-tree">🌳</div>
 
-    <!-- Hero emoji -->
-    <div class="ob-hero-emoji ob-float-anim">👨‍👩‍👧‍👦</div>
+    <!-- Hero image -->
+    <img
+      src="/brand/beanies_family_hugging_transparent_512x512.png"
+      alt="beanies family hugging"
+      class="ob-hero-img ob-float-anim"
+    />
 
     <!-- Title -->
     <h2 class="ob-title">
@@ -199,17 +203,19 @@ async function handleStart() {
   }
 }
 
-.ob-hero-emoji {
-  font-size: 60px;
+.ob-hero-img {
+  height: 160px;
   margin-bottom: 24px;
   position: relative;
+  width: 160px;
   z-index: 1;
 }
 
 @media (width >= 640px) {
-  .ob-hero-emoji {
-    font-size: 80px;
+  .ob-hero-img {
+    height: 220px;
     margin-bottom: 32px;
+    width: 220px;
   }
 
   .ob-float-bean {
