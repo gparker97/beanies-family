@@ -56,6 +56,7 @@ export const useAuthStore = defineStore('auth', () => {
   // State
   const isInitialized = ref(false);
   const isAuthenticated = ref(false);
+  const hasFamilies = ref(false);
   const currentUser = ref<AuthUser | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -82,6 +83,8 @@ export const useAuthStore = defineStore('auth', () => {
       // Check if any family exists in registry
       const db = await getRegistryDatabase();
       const families = await db.getAll('families');
+
+      hasFamilies.value = families.length > 0;
 
       if (families.length > 0) {
         // Try restoring a previous session (survives page refresh)
@@ -542,6 +545,7 @@ export const useAuthStore = defineStore('auth', () => {
     // State
     isInitialized,
     isAuthenticated,
+    hasFamilies,
     currentUser,
     isLoading,
     error,

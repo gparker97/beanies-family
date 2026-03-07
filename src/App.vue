@@ -129,13 +129,10 @@ async function handleGoogleReconnected() {
  * Works with any storage provider (local file or Google Drive).
  */
 const showLayout = computed(() => {
-  // Don't show sidebar/header on login, welcome, or 404 pages
-  return (
-    route.name !== 'NotFound' &&
-    route.name !== 'Welcome' &&
-    route.name !== 'Login' &&
-    route.name !== 'JoinFamily'
-  );
+  // Don't show sidebar/header unless signed in and on an app page
+  if (!authStore.isAuthenticated) return false;
+  const noLayoutPages = ['NotFound', 'Welcome', 'Login', 'JoinFamily', 'Home'];
+  return !noLayoutPages.includes(route.name as string);
 });
 
 /**
@@ -373,9 +370,12 @@ onMounted(async () => {
     if (authStore.needsAuth) {
       // E2E auto-auth: restore from sessionStorage (dev mode only)
       if (!authStore.restoreE2EAuth()) {
-        initBreadcrumbs.push('auth: redirecting to welcome (not authenticated)');
-        if (route.name !== 'Welcome' && route.name !== 'Login' && route.name !== 'JoinFamily') {
-          router.replace('/welcome');
+        const authPages: Array<string | undefined> = ['Welcome', 'Login', 'JoinFamily', 'Home'];
+        if (!authPages.includes(route.name as string)) {
+          // No cached families → homepage; has families → welcome gate
+          const target = authStore.hasFamilies ? '/welcome' : '/home';
+          initBreadcrumbs.push(`auth: redirecting to ${target} (not authenticated)`);
+          router.replace(target);
         }
         return;
       }

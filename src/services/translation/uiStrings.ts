@@ -2250,6 +2250,30 @@ const STRING_DEFS = {
     beanie: 'over budget — spending has exceeded 100% of budget.',
   },
 
+  // Homepage
+  'homepage.getStarted': { en: 'Get Started', beanie: 'get started' },
+  'homepage.about': { en: 'About', beanie: 'about' },
+  'homepage.heroDescription': {
+    en: 'The family hub that keeps everyone organised, on track, and growing together.',
+    beanie: 'the family hub that keeps all your beanies organised, on track, and growing together.',
+  },
+  'homepage.aboutDescription': {
+    en: 'beanies.family is a local-first, privacy-focused family planning app. Your data is encrypted and stays on your devices — no servers, no tracking, no compromises.',
+    beanie:
+      'beanies.family is a local-first, privacy-focused family planning app. your data is encrypted and stays on your devices — no servers, no tracking, no compromises.',
+  },
+  'homepage.featureFinance': { en: 'Family finances', beanie: 'family finances' },
+  'homepage.featurePlanner': { en: 'Activity planner', beanie: 'activity planner' },
+  'homepage.featureTodo': { en: 'Shared to-do lists', beanie: 'shared to-do lists' },
+  'homepage.featurePrivacy': { en: 'End-to-end encrypted', beanie: 'end-to-end encrypted' },
+  'homepage.betaBadge': { en: 'Beta', beanie: 'beta' },
+  'homepage.viewOnGithub': { en: 'View on GitHub', beanie: 'view on github' },
+  'homepage.signIn': { en: 'Sign In / Join', beanie: 'sign in / join' },
+  'homepage.learnMore': {
+    en: 'Learn more about beanies.family',
+    beanie: 'learn more about beanies.family',
+  },
+
   // Linked asset accounts
   'accounts.linkedTo': { en: 'Linked to {asset}', beanie: 'linked to {asset}' },
   'accounts.editOnAssetsPage': {

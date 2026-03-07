@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
+import { useRouter } from 'vue-router';
 
 const { t } = useTranslation();
+const router = useRouter();
 
 type LoginView = 'load-pod' | 'create' | 'join';
 
@@ -96,6 +98,15 @@ const emit = defineEmits<{
         <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
           {{ t('loginV6.joinSubtitle') }}
         </p>
+      </button>
+    </div>
+
+    <div class="mt-6 text-center">
+      <button
+        class="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        @click="router.push('/home')"
+      >
+        {{ t('homepage.learnMore') }}
       </button>
     </div>
   </div>
