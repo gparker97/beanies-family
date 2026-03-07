@@ -2,28 +2,65 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
-import { useGoalsStore } from '@/stores/goalsStore';
+import { useActivityStore } from '@/stores/activityStore';
+import { toDateInputValue } from '@/utils/date';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
-const goalsStore = useGoalsStore();
+const activityStore = useActivityStore();
 
-const completedCount = computed(() => todoStore.filteredCompletedTodos.length);
-
-const milestonesCount = computed(
-  () => goalsStore.filteredActiveGoals.filter((g) => g.deadline).length
-);
-
-const subtitle = computed(() => {
-  if (completedCount.value === 0 && milestonesCount.value === 0) {
-    return '';
-  }
-  return t('nook.statusSummary')
-    .replace('{tasks}', String(completedCount.value))
-    .replace('{milestones}', String(milestonesCount.value));
+const todayActivitiesCount = computed(() => {
+  const todayStr = toDateInputValue(new Date());
+  return activityStore.upcomingActivities.filter(({ date }) => date === todayStr).length;
 });
 
-const title = computed(() => t('nook.statusGreatWeek'));
+const openTodosCount = computed(() => todoStore.filteredOpenTodos.length);
+
+const subtitle = computed(() => {
+  return t('nook.statusSummary')
+    .replace('{activities}', String(todayActivitiesCount.value))
+    .replace('{tasks}', String(openTodosCount.value));
+});
+
+// Cycle through motivational messages based on day of year
+const motivationalKeys = [
+  'nook.motto0',
+  'nook.motto1',
+  'nook.motto2',
+  'nook.motto3',
+  'nook.motto4',
+  'nook.motto5',
+  'nook.motto6',
+  'nook.motto7',
+  'nook.motto8',
+  'nook.motto9',
+  'nook.motto10',
+  'nook.motto11',
+  'nook.motto12',
+  'nook.motto13',
+  'nook.motto14',
+  'nook.motto15',
+  'nook.motto16',
+  'nook.motto17',
+  'nook.motto18',
+  'nook.motto19',
+  'nook.motto20',
+  'nook.motto21',
+  'nook.motto22',
+  'nook.motto23',
+  'nook.motto24',
+  'nook.motto25',
+  'nook.motto26',
+  'nook.motto27',
+] as const;
+
+const title = computed(() => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((now.getTime() - start.getTime()) / 86400000);
+  const key = motivationalKeys[dayOfYear % motivationalKeys.length] ?? 'nook.motto0';
+  return t(key);
+});
 </script>
 
 <template>
@@ -47,11 +84,8 @@ const title = computed(() => t('nook.statusGreatWeek'));
       <p class="font-outfit truncate text-sm leading-snug font-semibold">
         {{ title }}
       </p>
-      <p v-if="subtitle" class="mt-0.5 truncate text-xs opacity-70">
+      <p class="mt-0.5 truncate text-xs opacity-70">
         {{ subtitle }}
-      </p>
-      <p v-else class="mt-0.5 truncate text-xs opacity-70">
-        {{ t('nook.familyAtAGlance') }}
       </p>
     </div>
   </div>
