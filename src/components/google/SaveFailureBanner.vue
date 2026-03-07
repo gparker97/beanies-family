@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
-import { requestAccessToken } from '@/services/google/googleAuth';
+import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { reEncryptEnvelope, downloadAsFile } from '@/services/sync/fileSync';
 import { getFamilyKey, getEnvelope } from '@/services/sync/syncService';
 
@@ -13,7 +13,7 @@ const props = defineProps<{
 
 const { t } = useTranslation();
 const router = useRouter();
-const isReconnecting = ref(false);
+const { isReconnecting, reconnect } = useGoogleReconnect();
 const isDownloading = ref(false);
 
 const emit = defineEmits<{
@@ -21,15 +21,8 @@ const emit = defineEmits<{
 }>();
 
 async function handleReconnect() {
-  isReconnecting.value = true;
-  try {
-    await requestAccessToken();
-    emit('reconnected');
-  } catch {
-    // Will retry on next click
-  } finally {
-    isReconnecting.value = false;
-  }
+  const success = await reconnect();
+  if (success) emit('reconnected');
 }
 
 async function handleDownloadBackup() {

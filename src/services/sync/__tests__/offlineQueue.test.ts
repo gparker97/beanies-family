@@ -93,6 +93,105 @@ describe('offlineQueue', () => {
     });
   });
 
+  describe('setFlushProvider auto-flush', () => {
+    it('auto-flushes when pending content exists and online', async () => {
+      offlineQueue.enqueueOfflineSave('{"data":"auto"}');
+
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+
+      // Allow the async flushQueue to complete
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"auto"}'));
+      expect(offlineQueue.hasPendingSave()).toBe(false);
+    });
+
+    it('does not auto-flush when offline', () => {
+      offlineQueue.enqueueOfflineSave('{"data":"offline"}');
+
+      Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+
+      const mockWrite = vi.fn();
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+
+      expect(mockWrite).not.toHaveBeenCalled();
+
+      // Restore
+      Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+    });
+  });
+
+  describe('handleOnline retry', () => {
+    it('retries after 5s on flush failure', async () => {
+      vi.useFakeTimers();
+
+      const mockWrite = vi.fn().mockRejectedValue(new Error('fail'));
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"retry"}');
+
+      // Simulate online event
+      window.dispatchEvent(new Event('online'));
+
+      // Wait for the initial flush to fail
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+
+      // Now make the write succeed for the retry
+      mockWrite.mockResolvedValue(undefined);
+
+      // Advance past the 5s retry
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockWrite).toHaveBeenCalledTimes(2);
+
+      vi.useRealTimers();
+    });
+
+    it('does not retry when queue is empty after flush', async () => {
+      vi.useFakeTimers();
+
+      const mockWrite = vi.fn().mockResolvedValue(undefined);
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"ok"}');
+
+      window.dispatchEvent(new Event('online'));
+
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+
+      // Advance past retry window — no retry should happen
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it('clearQueue cancels pending retry timer', async () => {
+      vi.useFakeTimers();
+
+      const mockWrite = vi.fn().mockRejectedValue(new Error('fail'));
+      offlineQueue.setFlushProvider({ write: mockWrite } as any);
+      offlineQueue.enqueueOfflineSave('{"data":"cancel"}');
+
+      window.dispatchEvent(new Event('online'));
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Clear queue (which calls stopListening → clears retry timer)
+      offlineQueue.clearQueue();
+
+      mockWrite.mockResolvedValue(undefined);
+      await vi.advanceTimersByTimeAsync(6000);
+
+      // Only the initial failed attempt
+      expect(mockWrite).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+  });
+
   describe('sessionStorage restoration on module load', () => {
     it('restores pending content from sessionStorage', async () => {
       // Pre-populate sessionStorage before importing the module
