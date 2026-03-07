@@ -3,6 +3,48 @@ import { type Page } from '@playwright/test';
 const E2E_PASSWORD = 'test1234';
 
 /**
+ * Navigates through the setup wizard to step 3 (Add Family Members).
+ * Useful for tests that need to interact with step 3 directly.
+ */
+export async function navigateToSetupStep3(page: Page): Promise<void> {
+  // Click through homepage to WelcomeGate
+  const getStartedButton = page.getByTestId('homepage-get-started');
+  const isOnHomepage = await getStartedButton
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (isOnHomepage) {
+    await getStartedButton.click();
+  }
+
+  const createPodButton = page.getByTestId('create-pod-button');
+  await createPodButton.waitFor({ state: 'visible', timeout: 5000 });
+
+  // Set auto-auth flag before clicking create
+  await page.evaluate(() => {
+    sessionStorage.setItem('e2e_auto_auth', 'true');
+  });
+  await createPodButton.click();
+
+  // Step 1: Name & Password
+  await page.getByLabel('Family Name').fill('Test Family');
+  await page.getByLabel('Your Name').fill('John Doe');
+  await page.getByLabel('Email').fill('john@example.com');
+  await page.getByLabel('Password').first().fill(E2E_PASSWORD);
+  await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
+  await page.getByRole('button', { name: 'Next' }).click();
+
+  // Step 2: Skip to step 3 via dev hook (storage picker can't be automated)
+  await page.getByText('Save & secure your pod').waitFor({ state: 'visible', timeout: 10000 });
+  await page.evaluate(() => {
+    (window as any).__e2eCreatePod?.setStep(3);
+  });
+
+  // Wait for step 3 to render
+  await page.getByRole('button', { name: 'Finish' }).waitFor({ state: 'visible', timeout: 5000 });
+}
+
+/**
  * Bypasses the login page for E2E tests.
  *
  * On first call (fresh browser context after clearAllData): walks through
