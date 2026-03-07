@@ -14,7 +14,9 @@ import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vu
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
+import OnboardingWizard from '@/components/onboarding/OnboardingWizard.vue';
 import { usePermissions } from '@/composables/usePermissions';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -30,6 +32,7 @@ import type {
 } from '@/types/models';
 
 const router = useRouter();
+const settingsStore = useSettingsStore();
 const { canViewFinances } = usePermissions();
 const todoStore = useTodoStore();
 const activityStore = useActivityStore();
@@ -195,5 +198,8 @@ async function handleTransactionDelete(id: string) {
       @save="handleTransactionSave"
       @delete="handleTransactionDelete"
     />
+
+    <!-- Onboarding wizard (shown for fresh pods) -->
+    <OnboardingWizard v-if="!settingsStore.onboardingCompleted" />
   </div>
 </template>

@@ -2332,6 +2332,159 @@ const STRING_DEFS = {
     en: 'This loan is linked to an asset. Edit it on the Assets page.',
     beanie: 'this loan is linked to an asset. edit it on the assets page.',
   },
+
+  // Onboarding wizard
+  'onboarding.welcomePrefix': { en: 'Welcome to ', beanie: 'welcome to ' },
+  'onboarding.welcomeBrand': { en: 'beanies' },
+  'onboarding.welcomeDescription': {
+    en: "Your family's cozy corner for managing the chaos \u2014 finances, schedules, activities, and everything in between. Less stress, more time for your little beans.",
+    beanie:
+      "your family's cozy corner for managing the chaos \u2014 finances, schedules, activities, and everything in between. less stress, more time for your little beans.",
+  },
+  'onboarding.pillarMoney': { en: 'Track money', beanie: 'track money' },
+  'onboarding.pillarMoneyShort': { en: 'Money', beanie: 'money' },
+  'onboarding.pillarPlan': { en: 'Plan life', beanie: 'plan life' },
+  'onboarding.pillarPlanShort': { en: 'Plans', beanie: 'plans' },
+  'onboarding.pillarFamily': { en: 'Grow together', beanie: 'grow together' },
+  'onboarding.pillarFamilyShort': { en: 'Family', beanie: 'family' },
+  'onboarding.welcomeCta': {
+    en: "Let's Get This Pod Rolling \u{1F96B}",
+    beanie: "let's get this pod rolling \u{1F96B}",
+  },
+  'onboarding.welcomeSubtitle': {
+    en: 'just 3 quick steps \u00B7 takes about 2 minutes',
+    beanie: 'just 3 quick steps \u00B7 takes about 2 minutes',
+  },
+
+  // Money step
+  'onboarding.sectionAccount': { en: 'Drop in an account', beanie: 'drop in an account' },
+  'onboarding.sectionAccountSub': {
+    en: '\u2014 start with your main one',
+    beanie: '\u2014 start with your main one',
+  },
+  'onboarding.bank': { en: 'Bank', beanie: 'bank' },
+  'onboarding.bankPlaceholder': { en: 'Select bank...', beanie: 'select bank...' },
+  'onboarding.accountName': { en: 'Account Name', beanie: 'account name' },
+  'onboarding.accountNamePlaceholder': {
+    en: 'e.g. Savings Account',
+    beanie: 'e.g. savings account',
+  },
+  'onboarding.balance': { en: 'Balance', beanie: 'balance' },
+  'onboarding.addAccount': { en: 'Add Account', beanie: 'add account' },
+  'onboarding.added': { en: 'added', beanie: 'added' },
+  'onboarding.addAnother': { en: '+ Add another', beanie: '+ add another' },
+  'onboarding.sectionRecurring': {
+    en: 'Add a regular transaction',
+    beanie: 'add a regular transaction',
+  },
+  'onboarding.sectionRecurringSub': {
+    en: '\u2014 tap a category to add details',
+    beanie: '\u2014 tap a category to add details',
+  },
+  'onboarding.income': { en: '\u2191 Income', beanie: '\u2191 income' },
+  'onboarding.expenses': { en: '\u2193 Expenses', beanie: '\u2193 expenses' },
+  'onboarding.sectionSavings': { en: 'How much to save?', beanie: 'how much to save?' },
+  'onboarding.savingsNice': { en: 'Nice!', beanie: 'nice!' },
+  'onboarding.savingsEncouragement': {
+    en: "That's {amount}/month into your bean jar. \u{1F331}",
+    beanie: "that's {amount}/month into your bean jar. \u{1F331}",
+  },
+  'onboarding.summaryIncome': { en: 'Income', beanie: 'income' },
+  'onboarding.summaryFixedCosts': { en: 'Fixed costs', beanie: 'fixed costs' },
+  'onboarding.summarySavingsBar': { en: 'Savings', beanie: 'savings' },
+  'onboarding.summaryFlexible': { en: 'Flexible', beanie: 'flexible' },
+
+  // Recurring modal
+  'onboarding.addRecurring': { en: 'Add Regular Transaction', beanie: 'add regular transaction' },
+  'onboarding.customTransaction': { en: 'Custom', beanie: 'custom' },
+  'onboarding.direction': { en: 'Direction', beanie: 'direction' },
+  'onboarding.directionExpense': {
+    en: '\u2193 Expense',
+    beanie: '\u2193 expense',
+  },
+  'onboarding.directionIncome': {
+    en: '\u2191 Income',
+    beanie: '\u2191 income',
+  },
+  'onboarding.transactionName': { en: 'Transaction Name', beanie: 'transaction name' },
+  'onboarding.transactionNamePlaceholder': {
+    en: 'e.g. Monthly Rent',
+    beanie: 'e.g. monthly rent',
+  },
+  'onboarding.amount': { en: 'Amount', beanie: 'amount' },
+  'onboarding.dayOfMonth': { en: 'Day of Month', beanie: 'day of month' },
+  'onboarding.frequency': { en: 'Frequency', beanie: 'frequency' },
+  'onboarding.account': { en: 'Account', beanie: 'account' },
+  'onboarding.autoSelected': { en: 'Auto-selected', beanie: 'auto-selected' },
+  'onboarding.addCategory': { en: 'Add {category}', beanie: 'add {category}' },
+
+  // Family step
+  'onboarding.sectionActivity': {
+    en: 'What keeps your family busy?',
+    beanie: 'what keeps your family busy?',
+  },
+  'onboarding.sectionActivitySub': {
+    en: '\u2014 add a lesson or activity',
+    beanie: '\u2014 add a lesson or activity',
+  },
+  'onboarding.days': { en: 'Days', beanie: 'days' },
+  'onboarding.time': { en: 'Time', beanie: 'time' },
+  'onboarding.costPerMonth': { en: 'Cost / Month', beanie: 'cost / month' },
+  'onboarding.addActivity': { en: 'Add Activity', beanie: 'add activity' },
+  'onboarding.addedToPlanner': {
+    en: 'Added to planner & budget',
+    beanie: 'added to planner & budget',
+  },
+  'onboarding.sectionDiscover': { en: 'More things to explore', beanie: 'more things to explore' },
+  'onboarding.sectionDiscoverSub': {
+    en: '\u2014 waiting in your Nook',
+    beanie: '\u2014 waiting in your nook',
+  },
+  'onboarding.closingTitle': {
+    en: 'We built beanies to help you.',
+    beanie: 'we built beanies to help you.',
+  },
+  'onboarding.closingSubtitle': {
+    en: "So you can spend your time on what's important \u2014 your little beans.",
+    beanie: "so you can spend your time on what's important \u2014 your little beans.",
+  },
+
+  // Completion step
+  'onboarding.completePrefix': { en: 'Your ', beanie: 'your ' },
+  'onboarding.completeHighlight': { en: 'Bean Pod', beanie: 'bean pod' },
+  'onboarding.completeSuffix': { en: ' is Ready!', beanie: ' is ready!' },
+  'onboarding.completeDescription': {
+    en: "That's it \u2014 you're all set. Explore, add more, and make beanies yours.",
+    beanie: "that's it \u2014 you're all set. explore, add more, and make beanies yours.",
+  },
+  'onboarding.summaryAccount': { en: 'Account', beanie: 'account' },
+  'onboarding.summaryRecurring': { en: 'Recurring', beanie: 'recurring' },
+  'onboarding.summarySavings': { en: 'Savings', beanie: 'savings' },
+  'onboarding.summaryActivity': { en: 'Activity', beanie: 'activity' },
+  'onboarding.completeCta': {
+    en: 'Enter The Nook \u{1F3E1}',
+    beanie: 'enter the nook \u{1F3E1}',
+  },
+  'onboarding.completeSubtitle': {
+    en: "go take care of your little beans \u2014 we'll take care of the rest. \u{1F96B}",
+    beanie: "go take care of your little beans \u2014 we'll take care of the rest. \u{1F96B}",
+  },
+
+  // Navigation
+  'onboarding.back': { en: '\u2190 Back', beanie: '\u2190 back' },
+  'onboarding.skip': { en: 'Skip for now', beanie: 'skip for now' },
+  'onboarding.nextFamily': { en: 'Next: Family Life \u2192', beanie: 'next: family life \u2192' },
+  'onboarding.allDone': { en: 'All Done! \u{1F389}', beanie: 'all done! \u{1F389}' },
+
+  // Settings
+  'onboarding.restartOnboarding': {
+    en: 'Restart Onboarding',
+    beanie: 'restart onboarding',
+  },
+  'onboarding.restartOnboardingDescription': {
+    en: 'Walk through the setup wizard again to add accounts, transactions, and activities.',
+    beanie: 'walk through the setup wizard again to add accounts, transactions, and activities.',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**

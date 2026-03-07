@@ -328,6 +328,27 @@ function formatLastSync(timestamp: string | null): string {
               @change="handleSoundToggle"
             />
           </div>
+
+          <!-- Restart Onboarding -->
+          <div
+            class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"
+          >
+            <div>
+              <p class="font-medium text-gray-900 dark:text-gray-100">
+                {{ t('onboarding.restartOnboarding') }}
+              </p>
+              <p class="text-sm text-gray-500 dark:text-gray-400">
+                {{ t('onboarding.restartOnboardingDescription') }}
+              </p>
+            </div>
+            <button
+              data-testid="restart-onboarding"
+              class="bg-heritage-orange/10 font-heading text-heritage-orange hover:bg-heritage-orange/20 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+              @click="settingsStore.setOnboardingCompleted(false)"
+            >
+              {{ t('onboarding.restartOnboarding') }}
+            </button>
+          </div>
         </div>
       </BaseCard>
 

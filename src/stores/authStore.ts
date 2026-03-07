@@ -221,9 +221,9 @@ export const useAuthStore = defineStore('auth', () => {
         });
       }
 
-      // Mark onboarding as completed — the create pod wizard handles everything
+      // Leave onboarding incomplete so the onboarding wizard shows on /nook
       const settingsStore = useSettingsStore();
-      await settingsStore.setOnboardingCompleted(true);
+      await settingsStore.setOnboardingCompleted(false);
 
       // Auto sign in
       const user: AuthUser = {
