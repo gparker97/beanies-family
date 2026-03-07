@@ -7,7 +7,6 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
-import ActivityItem from '@/components/dashboard/ActivityItem.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
@@ -20,7 +19,6 @@ import { useBudgetStore } from '@/stores/budgetStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { CreateBudgetInput, UpdateBudgetInput, CreateTransactionInput } from '@/types/models';
-import type { CurrencyCode } from '@/types/models';
 
 const budgetStore = useBudgetStore();
 const transactionsStore = useTransactionsStore();
@@ -102,20 +100,11 @@ const percentSpentText = computed(() => `${Math.round(budgetStore.budgetProgress
 // Current month/year label for category header
 const currentMonthLabel = computed(() => formatMonthYearShort(new Date()));
 
-// Build subtitle for upcoming transaction rows
-function buildUpcomingSubtitle(tx: { daysUntil: number }): string {
-  let label: string;
-  if (tx.daysUntil === 0) label = t('budget.upcoming.today');
-  else if (tx.daysUntil === 1) label = t('budget.upcoming.tomorrow');
-  else label = t('budget.upcoming.inDays').replace('{days}', String(tx.daysUntil));
-  return `${label} · ${t('budget.upcoming.recurring')}`;
-}
-
 // Category progress bar gradient class by status
 function getCategoryBarClass(status: string): string {
   switch (status) {
     case 'over':
-      return 'bg-[var(--heritage-orange)]';
+      return 'bg-[#F15D22]';
     case 'warning':
       return 'bg-gradient-to-r from-[#F15D22] to-[#E67E22]';
     default:
@@ -369,102 +358,77 @@ async function handleQuickAdd(data: CreateTransactionInput) {
         </SummaryStatCard>
       </div>
 
-      <!-- ── Two-Column: Upcoming + Category Breakdown ─────────────────── -->
-      <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <!-- Upcoming Transactions -->
-        <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <div class="mb-4 flex items-center justify-between">
-            <span class="nook-section-label text-secondary-500 dark:text-gray-400">
-              {{ t('budget.section.upcomingTransactions') }}
-            </span>
-            <router-link
-              to="/transactions"
-              class="text-primary-500 hover:text-primary-600 text-xs font-medium"
-            >
-              {{ t('budget.section.viewAll') }}
-            </router-link>
-          </div>
-          <div
-            v-if="budgetStore.upcomingTransactions.length === 0"
-            class="py-6 text-center text-sm text-slate-400 dark:text-slate-500"
-          >
-            {{ t('budget.empty.title') }}
-          </div>
-          <div v-else>
-            <ActivityItem
-              v-for="tx in budgetStore.upcomingTransactions"
-              :key="tx.id"
-              :icon="CATEGORY_EMOJI_MAP[tx.category] || '💰'"
-              :icon-tint="tx.type === 'income' ? 'green' : 'orange'"
-              :name="tx.description"
-              :subtitle="buildUpcomingSubtitle(tx)"
-              :amount="tx.amount"
-              :currency="tx.currency as CurrencyCode"
-              :type="tx.type === 'income' ? 'income' : 'expense'"
-            />
-          </div>
+      <!-- ── Spending by Category (full width) ────────────────────────── -->
+      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <div class="mb-4 flex items-center justify-between">
+          <span class="nook-section-label text-secondary-500 dark:text-gray-400">
+            {{ t('budget.section.spendingByCategory') }}
+          </span>
+          <span class="text-xs font-medium text-slate-400 dark:text-slate-500">
+            {{ currentMonthLabel }}
+          </span>
         </div>
-
-        <!-- Spending by Category -->
-        <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-          <div class="mb-4 flex items-center justify-between">
-            <span class="nook-section-label text-secondary-500 dark:text-gray-400">
-              {{ t('budget.section.spendingByCategory') }}
-            </span>
-            <span class="text-xs font-medium text-slate-400 dark:text-slate-500">
-              {{ currentMonthLabel }}
-            </span>
-          </div>
+        <div
+          v-if="budgetStore.categoryBudgetStatus.length === 0"
+          class="py-6 text-center text-sm text-slate-400 dark:text-slate-500"
+        >
+          {{ t('budget.category.noBudget') }}
+        </div>
+        <div v-else class="space-y-3">
           <div
-            v-if="budgetStore.categoryBudgetStatus.length === 0"
-            class="py-6 text-center text-sm text-slate-400 dark:text-slate-500"
+            v-for="cat in budgetStore.categoryBudgetStatus"
+            :key="cat.categoryId"
+            class="rounded-[14px] px-3 py-2.5"
+            :class="cat.status === 'over' ? 'bg-[#F15D22]/5 dark:bg-[#F15D22]/10' : ''"
           >
-            {{ t('budget.category.noBudget') }}
-          </div>
-          <div v-else class="space-y-3">
-            <div
-              v-for="cat in budgetStore.categoryBudgetStatus"
-              :key="cat.categoryId"
-              class="rounded-[14px] px-3 py-2.5"
-            >
-              <div class="mb-1.5 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="text-base">{{ CATEGORY_EMOJI_MAP[cat.categoryId] || '' }}</span>
-                  <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ cat.name }}
-                  </span>
-                </div>
-                <div class="text-right">
-                  <span
-                    v-if="isUnlocked"
-                    class="font-outfit text-sm font-semibold text-slate-700 dark:text-slate-200"
-                  >
-                    {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
-                    <span class="text-xs font-normal text-slate-400">
-                      / {{ formatInDisplayCurrency(cat.budgeted, settingsStore.baseCurrency) }}
-                    </span>
-                  </span>
-                  <span v-else class="text-sm text-slate-400">{{ MASK }}</span>
-                </div>
-              </div>
-              <!-- Progress bar -->
-              <div class="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-600/40">
-                <div
-                  class="h-full rounded-full transition-all duration-500"
-                  :class="getCategoryBarClass(cat.status)"
-                  :style="{ width: `${Math.min(100, cat.percentUsed)}%` }"
-                />
-              </div>
-              <!-- Over-budget message (only for over status) -->
-              <div v-if="cat.status === 'over' && isUnlocked" class="mt-1">
-                <span class="text-xs font-medium text-[var(--heritage-orange)]">
-                  {{
-                    formatInDisplayCurrency(cat.spent - cat.budgeted, settingsStore.baseCurrency)
-                  }}
-                  {{ t('budget.category.overAmount') }} ·
-                  {{ t('budget.category.overEncouragement') }} 💪
+            <div class="mb-1.5 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-base">{{ CATEGORY_EMOJI_MAP[cat.categoryId] || '' }}</span>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ cat.name }}
                 </span>
               </div>
+              <div class="text-right">
+                <span
+                  v-if="isUnlocked"
+                  class="font-outfit text-sm font-semibold"
+                  :class="
+                    cat.status === 'over' ? 'text-[#F15D22]' : 'text-slate-700 dark:text-slate-200'
+                  "
+                >
+                  {{ formatInDisplayCurrency(cat.spent, settingsStore.baseCurrency) }}
+                  <span
+                    class="text-xs font-normal"
+                    :class="cat.status === 'over' ? 'text-[#F15D22]/60' : 'text-slate-400'"
+                  >
+                    / {{ formatInDisplayCurrency(cat.budgeted, settingsStore.baseCurrency) }}
+                  </span>
+                </span>
+                <span v-else class="text-sm text-slate-400">{{ MASK }}</span>
+              </div>
+            </div>
+            <!-- Progress bar -->
+            <div
+              class="overflow-hidden rounded-full transition-all duration-300"
+              :class="
+                cat.status === 'over'
+                  ? 'h-2.5 bg-[#F15D22]/20'
+                  : 'h-1.5 bg-slate-100 dark:bg-slate-600/40'
+              "
+            >
+              <div
+                class="h-full rounded-full transition-all duration-500"
+                :class="getCategoryBarClass(cat.status)"
+                :style="{ width: `${Math.min(100, cat.percentUsed)}%` }"
+              />
+            </div>
+            <!-- Over-budget message (only for over status) -->
+            <div v-if="cat.status === 'over' && isUnlocked" class="mt-1">
+              <span class="text-xs font-medium text-[var(--heritage-orange)]">
+                {{ formatInDisplayCurrency(cat.spent - cat.budgeted, settingsStore.baseCurrency) }}
+                {{ t('budget.category.overAmount') }} ·
+                {{ t('budget.category.overEncouragement') }} 💪
+              </span>
             </div>
           </div>
         </div>
@@ -476,7 +440,7 @@ async function handleQuickAdd(data: CreateTransactionInput) {
         <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
           <!-- Header row: title + edit button -->
           <div class="mb-4 flex items-center justify-between">
-            <span class="font-outfit text-sm font-bold text-slate-700 dark:text-slate-200">
+            <span class="nook-section-label text-secondary-500 dark:text-gray-400">
               {{ t('budget.section.budgetSettings') }}
             </span>
             <button

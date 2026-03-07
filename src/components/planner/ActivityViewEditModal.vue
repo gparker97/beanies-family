@@ -494,12 +494,30 @@ async function handleDelete() {
           @start-edit="startEdit('location')"
         >
           <template #view>
-            <span
-              v-if="activity.location"
-              class="text-sm text-[var(--color-text)] dark:text-gray-300"
-            >
-              {{ activity.location }}
-            </span>
+            <div v-if="activity.location" class="flex items-center gap-1.5">
+              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                {{ activity.location }}
+              </span>
+              <a
+                :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#F15D22] transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                :title="t('planner.openInMaps')"
+                @click.stop
+              >
+                <svg
+                  class="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+              </a>
+            </div>
             <span v-else class="text-sm text-[var(--color-text-muted)] italic">
               {{ t('planner.noLocation') }}
             </span>

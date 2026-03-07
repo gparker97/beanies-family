@@ -5,29 +5,30 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import ActivityItem from '@/components/dashboard/ActivityItem.vue';
 import FamilyBeanRow from '@/components/dashboard/FamilyBeanRow.vue';
-import GoalProgressItem from '@/components/dashboard/GoalProgressItem.vue';
 import NetWorthHeroCard from '@/components/dashboard/NetWorthHeroCard.vue';
-import RecurringSummaryWidget from '@/components/dashboard/RecurringSummaryWidget.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useNetWorthHistory } from '@/composables/useNetWorthHistory';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
+import { getAccountTypeIcon, getAssetTypeIcon } from '@/constants/icons';
 import { getNextDueDateForItem } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
-
-import { useGoalsStore } from '@/stores/goalsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
+import { convertToBaseCurrency } from '@/utils/currency';
 import { formatDateShort } from '@/utils/date';
+import type { AccountType } from '@/types/models';
 
 const router = useRouter();
 const accountsStore = useAccountsStore();
+const assetsStore = useAssetsStore();
 const transactionsStore = useTransactionsStore();
 const recurringStore = useRecurringStore();
-const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const { isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
@@ -38,34 +39,26 @@ const { selectedPeriod, chartData, periodComparison, incomeChange, expenseChange
   useNetWorthHistory();
 
 // ── Financial data ──────────────────────────────────────────────────────────
-// Combined net worth: accounts + physical assets - all liabilities
 const netWorth = computed(() => accountsStore.filteredCombinedNetWorth);
 
-// Monthly income: one-time transactions + expected recurring income
 const monthlyIncome = computed(
   () =>
     transactionsStore.filteredThisMonthOneTimeIncome +
     recurringStore.filteredTotalMonthlyRecurringIncome
 );
 
-// Monthly expenses: one-time transactions + expected recurring expenses
 const monthlyExpenses = computed(
   () =>
     transactionsStore.filteredThisMonthOneTimeExpenses +
     recurringStore.filteredTotalMonthlyRecurringExpenses
 );
 
-// Net cash flow
 const netCashFlow = computed(() => monthlyIncome.value - monthlyExpenses.value);
 
-// Savings rate
 const savingsRate = computed(() => {
   if (monthlyIncome.value <= 0) return 0;
   return Math.round((netCashFlow.value / monthlyIncome.value) * 100);
 });
-
-// ── Goals ───────────────────────────────────────────────────────────────────
-const activeGoals = computed(() => goalsStore.filteredActiveGoals.slice(0, 3));
 
 // ── Recent + Upcoming Transactions ──────────────────────────────────────────
 const recentTransactions = computed(() => transactionsStore.filteredRecentTransactions.slice(0, 5));
@@ -86,6 +79,27 @@ const upcomingTransactions = computed(() => {
     .sort((a, b) => a.nextDate!.getTime() - b.nextDate!.getTime())
     .slice(0, 5);
 });
+
+// ── Assets + Accounts ───────────────────────────────────────────────────────
+const topAssets = computed(() =>
+  [...assetsStore.filteredAssets]
+    .sort(
+      (a, b) =>
+        convertToBaseCurrency(b.currentValue, b.currency) -
+        convertToBaseCurrency(a.currentValue, a.currency)
+    )
+    .slice(0, 5)
+);
+
+const topAccounts = computed(() =>
+  [...accountsStore.filteredActiveAccounts]
+    .sort(
+      (a, b) =>
+        Math.abs(convertToBaseCurrency(b.balance, b.currency)) -
+        Math.abs(convertToBaseCurrency(a.balance, a.currency))
+    )
+    .slice(0, 5)
+);
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 function formatDate(dateString: string): string {
@@ -108,24 +122,8 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
   return 'orange';
 }
 
-function getGoalTint(index: number): 'orange' | 'silk' | 'slate' {
-  const tints: ('orange' | 'silk' | 'slate')[] = ['orange', 'silk', 'slate'];
-  return tints[index % tints.length] ?? 'orange';
-}
-
-function getGoalIcon(type: string): string {
-  switch (type) {
-    case 'savings':
-      return '🏠';
-    case 'debt_payoff':
-      return '💳';
-    case 'investment':
-      return '📈';
-    case 'purchase':
-      return '🛒';
-    default:
-      return '🎯';
-  }
+function isLiability(type: AccountType): boolean {
+  return type === 'credit_card' || type === 'loan';
 }
 </script>
 
@@ -188,47 +186,13 @@ function getGoalIcon(type: string): string {
     <!-- ── Your Beans (Family Row) ─────────────────────────────────────── -->
     <FamilyBeanRow @add-member="router.push('/family')" @select-member="router.push('/family')" />
 
-    <!-- ── Two-column: Goals + Upcoming Transactions ───────────────────── -->
+    <!-- ── Row 1: Coming Up + Recent Transactions ────────────────────── -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <!-- Savings Goals -->
+      <!-- Coming Up -->
       <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
         <div class="mb-4 flex items-center justify-between">
           <div class="nook-section-label text-secondary-500 dark:text-gray-400">
-            {{ t('dashboard.savingsGoals') }}
-          </div>
-          <router-link
-            to="/goals"
-            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
-          >
-            {{ t('dashboard.seeAll') }}
-          </router-link>
-        </div>
-
-        <div v-if="activeGoals.length === 0" class="py-8 text-center">
-          <EmptyStateIllustration variant="goals" class="mb-4" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noGoals') }}</p>
-        </div>
-        <div v-else>
-          <GoalProgressItem
-            v-for="(goal, idx) in activeGoals"
-            :key="goal.id"
-            :class="syncHighlightClass(goal.id)"
-            :icon="getGoalIcon(goal.type)"
-            :icon-tint="getGoalTint(idx)"
-            :name="goal.name"
-            :current-amount="goal.currentAmount"
-            :target-amount="goal.targetAmount"
-            :currency="goal.currency"
-            :silk-bar="idx === 1"
-          />
-        </div>
-      </div>
-
-      <!-- Upcoming Transactions -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-        <div class="mb-4 flex items-center justify-between">
-          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
-            {{ t('dashboard.upcomingTransactions') }}
+            {{ t('dashboard.comingUp') }}
           </div>
           <router-link
             to="/transactions"
@@ -243,23 +207,25 @@ function getGoalIcon(type: string): string {
           <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noUpcoming') }}</p>
         </div>
         <div v-else>
-          <ActivityItem
+          <div
             v-for="{ item, nextDate } in upcomingTransactions"
             :key="item.id"
+            class="cursor-pointer"
             :class="syncHighlightClass(item.id)"
-            :name="item.description"
-            :subtitle="`${getDaysUntil(nextDate!)}, ${item.frequency}`"
-            :amount="item.amount"
-            :currency="item.currency"
-            :type="item.type === 'income' ? 'income' : 'expense'"
-            :icon-tint="getIconTint(item.type)"
-          />
+            @click="router.push('/transactions')"
+          >
+            <ActivityItem
+              :name="item.description"
+              :subtitle="`${getDaysUntil(nextDate!)}, ${item.frequency}`"
+              :amount="item.amount"
+              :currency="item.currency"
+              :type="item.type === 'income' ? 'income' : 'expense'"
+              :icon-tint="getIconTint(item.type)"
+            />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- ── Recent Transactions + Recurring Summary ─────────────────────── -->
-    <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
       <!-- Recent Transactions -->
       <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
         <div class="mb-4 flex items-center justify-between">
@@ -284,8 +250,9 @@ function getGoalIcon(type: string): string {
           <div
             v-for="transaction in recentTransactions"
             :key="transaction.id"
-            class="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            class="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
             :class="syncHighlightClass(transaction.id)"
+            @click="router.push({ path: '/transactions', query: { view: transaction.id } })"
           >
             <div class="flex-shrink-0">
               <CategoryIcon :category="transaction.category" size="md" />
@@ -308,9 +275,126 @@ function getGoalIcon(type: string): string {
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Recurring Summary -->
-      <RecurringSummaryWidget />
+    <!-- ── Row 2: Your Assets + Your Accounts ────────────────────────── -->
+    <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <!-- Your Assets -->
+      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+            {{ t('dashboard.yourAssets') }}
+          </div>
+          <router-link
+            to="/assets"
+            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+          >
+            {{ t('dashboard.seeAll') }}
+          </router-link>
+        </div>
+
+        <div v-if="topAssets.length === 0" class="py-8 text-center">
+          <EmptyStateIllustration variant="assets" class="mb-4" />
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noAssets') }}</p>
+        </div>
+        <div v-else class="space-y-1">
+          <div
+            v-for="asset in topAssets"
+            :key="asset.id"
+            class="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            :class="syncHighlightClass(asset.id)"
+            @click="router.push({ path: '/assets', query: { view: asset.id } })"
+          >
+            <div
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+              :style="{
+                backgroundColor: (getAssetTypeIcon(asset.type)?.color ?? '#64748b') + '18',
+              }"
+            >
+              <BeanieIcon
+                :name="`asset-${asset.type}`"
+                size="sm"
+                :style="{ color: getAssetTypeIcon(asset.type)?.color ?? '#64748b' }"
+              />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
+                {{ asset.name }}
+              </p>
+              <p class="text-secondary-500/35 text-xs dark:text-gray-500">
+                {{ t(`assets.type.${asset.type}`) }}
+              </p>
+            </div>
+            <CurrencyAmount
+              :amount="asset.currentValue"
+              :currency="asset.currency"
+              size="sm"
+              class="flex-shrink-0"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Your Accounts -->
+      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+            {{ t('dashboard.yourAccounts') }}
+          </div>
+          <router-link
+            to="/accounts"
+            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+          >
+            {{ t('dashboard.seeAll') }}
+          </router-link>
+        </div>
+
+        <div v-if="topAccounts.length === 0" class="py-8 text-center">
+          <EmptyStateIllustration variant="accounts" class="mb-4" />
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noAccounts') }}</p>
+        </div>
+        <div v-else class="space-y-1">
+          <div
+            v-for="account in topAccounts"
+            :key="account.id"
+            class="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            :class="syncHighlightClass(account.id)"
+            @click="router.push({ path: '/accounts', query: { view: account.id } })"
+          >
+            <div
+              class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl"
+              :style="{
+                backgroundColor: (getAccountTypeIcon(account.type)?.color ?? '#6b7280') + '18',
+              }"
+            >
+              <template v-if="account.icon">
+                <span class="text-sm">{{ account.icon }}</span>
+              </template>
+              <BeanieIcon
+                v-else
+                :name="`account-${account.type}`"
+                size="sm"
+                :style="{ color: getAccountTypeIcon(account.type)?.color ?? '#6b7280' }"
+              />
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-secondary-500 truncate text-sm font-semibold dark:text-gray-100">
+                {{ account.name }}
+              </p>
+              <p class="text-secondary-500/35 text-xs dark:text-gray-500">
+                {{ account.institution || getAccountTypeIcon(account.type)?.label || account.type }}
+              </p>
+            </div>
+            <CurrencyAmount
+              :amount="account.balance"
+              :currency="account.currency"
+              :type="isLiability(account.type) ? 'expense' : 'neutral'"
+              size="sm"
+              class="flex-shrink-0"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

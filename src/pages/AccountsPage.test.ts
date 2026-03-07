@@ -90,6 +90,12 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
   })),
 }));
 
+// Mock vue-router
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 // Mock formatCurrency
 vi.mock('@/constants/currencies', () => ({
   formatCurrency: (amount: number, currency: string) => `${currency} ${amount.toFixed(2)}`,
