@@ -191,6 +191,9 @@ test.describe('Google Drive Sync', () => {
     await dbHelper.clearAllData();
     await page.goto('/');
 
+    // Click through homepage to WelcomeGate
+    await page.getByTestId('homepage-get-started').click();
+
     // Click "Load my pod" on welcome gate
     const loadButton = page.getByRole('button', { name: /load/i });
     await loadButton.first().waitFor({ state: 'visible', timeout: 5000 });
@@ -206,6 +209,9 @@ test.describe('Google Drive Sync', () => {
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
     await page.goto('/');
+
+    // Click through homepage to WelcomeGate
+    await page.getByTestId('homepage-get-started').click();
 
     await page
       .getByRole('button', { name: /create/i })

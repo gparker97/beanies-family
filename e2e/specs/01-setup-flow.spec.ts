@@ -28,7 +28,8 @@ test.describe('Setup Flow', () => {
     // Reload after clearing so the app re-initializes with empty state
     await page.goto('/');
 
-    // Click "Create a new pod" on WelcomeGate
+    // Click through homepage to WelcomeGate
+    await page.getByTestId('homepage-get-started').click();
     await page.getByTestId('create-pod-button').click();
 
     // Fill some fields but leave password empty to bypass native required
