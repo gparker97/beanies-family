@@ -381,10 +381,11 @@ async function handleClearData() {
     <!-- ── About Footer ────────────────────────────────────────────────── -->
     <div class="px-2 pb-4 text-center text-xs text-slate-400 dark:text-slate-500">
       <p>
+        <span class="opacity-60">🫘</span>
         <strong class="text-slate-500 dark:text-slate-400">{{ t('settings.appName') }}</strong>
         · {{ t('settings.version') }}
       </p>
-      <p class="mt-1">{{ t('settings.privacyNote') }}</p>
+      <p class="mt-1"><span class="opacity-60">🔒</span> {{ t('settings.privacyNote') }}</p>
     </div>
 
     <!-- ══════════════════════════════════════════════════════════════════ -->
