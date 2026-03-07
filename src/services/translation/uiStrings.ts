@@ -1761,6 +1761,7 @@ const STRING_DEFS = {
   'nook.seeAll': { en: 'See All', beanie: 'see all' },
   'nook.noEvents': { en: 'No events scheduled', beanie: 'no beans on the calendar' },
   'nook.comingSoon': { en: 'Coming soon', beanie: 'coming soon' },
+  'nook.moreItems': { en: 'more this week', beanie: 'more beans this week' },
   'nook.noMilestones': { en: 'No milestones yet', beanie: 'no milestones yet' },
   'nook.noActivity': { en: 'No recent activity', beanie: 'the beanies are resting' },
   'nook.birthday': { en: "{name}'s Birthday", beanie: "{name}'s bean day" },
