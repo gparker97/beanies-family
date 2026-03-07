@@ -2023,6 +2023,22 @@ const STRING_DEFS = {
   'storage.localFile': { en: 'Local File', beanie: 'local file' },
   'storage.dropbox': { en: 'Dropbox', beanie: 'dropbox' },
   'storage.iCloud': { en: 'iCloud', beanie: 'icloud' },
+  'storage.localFileWarning': {
+    en: "Local files are great for security but don't sync with other family members. If you plan to use this app with your family, we recommend a storage provider (e.g. Google Drive) for your encrypted data file.",
+    beanie:
+      "local files are great for security but don't sync with other family members. if you plan to use this app with your family, we recommend a storage provider (e.g. google drive) for your encrypted data file.",
+  },
+  'storage.localFileWarningEncryption': {
+    en: "Don't worry — your data is fully encrypted and only accessible to those you share the file with.",
+    beanie:
+      "don't worry — your data is fully encrypted and only accessible to those you share the file with.",
+  },
+  'storage.localFileContinue': {
+    en: 'Continue with Local File',
+    beanie: 'continue with local file',
+  },
+  'storage.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
+  'storage.recommended': { en: 'Recommended', beanie: 'recommended' },
 
   // Family Planner
   'planner.title': { en: 'Family Planner', beanie: 'beanie planner' },

@@ -758,7 +758,10 @@ watch(
       <div class="flex min-w-0 flex-1 flex-col">
         <AppHeader @toggle-menu="isMenuOpen = !isMenuOpen" />
 
-        <main class="flex-1 overflow-auto p-4 md:p-6" :class="{ 'pb-24': isMobile }">
+        <main
+          class="flex-1 overflow-auto overscroll-y-contain p-4 md:p-6"
+          :class="{ 'pb-24': isMobile }"
+        >
           <router-view />
         </main>
       </div>

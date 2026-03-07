@@ -341,6 +341,11 @@
 }
 
 /* ─── Base styles ───────────────────────────────────────────────────────── */
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-text);
