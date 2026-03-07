@@ -15,7 +15,7 @@ test.describe('Beanie Mode', () => {
     await page.goto('/settings');
     const toggle = page.getByTestId('beanie-mode-toggle');
     await expect(toggle).toBeVisible();
-    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
   });
 
   test('disabling beanie mode updates visible strings immediately', async ({ page }) => {
@@ -27,8 +27,8 @@ test.describe('Beanie Mode', () => {
     await page.goto('/settings');
     await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggle = page.getByTestId('beanie-mode-toggle');
-    await toggle.uncheck();
-    await expect(toggle).not.toBeChecked();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
 
     // Wait for IndexedDB write to complete
     await page.waitForTimeout(500);
@@ -43,7 +43,7 @@ test.describe('Beanie Mode', () => {
     await page.goto('/settings');
     await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggle = page.getByTestId('beanie-mode-toggle');
-    await toggle.uncheck();
+    await toggle.click();
 
     // Wait for IndexedDB write to complete
     await page.waitForTimeout(500);
@@ -56,7 +56,7 @@ test.describe('Beanie Mode', () => {
     await page.goto('/settings');
     await page.waitForTimeout(500); // Wait for splash overlay to fully disappear
     const toggleAgain = page.getByTestId('beanie-mode-toggle');
-    await toggleAgain.check();
+    await toggleAgain.click();
 
     // Wait for IndexedDB write to complete
     await page.waitForTimeout(500);
