@@ -1848,7 +1848,7 @@ const STRING_DEFS = {
   },
   'nook.statusSummary': {
     en: '{activities} activities planned today \u00B7 {tasks} tasks coming up',
-    beanie: '{activities} bean adventures today \u00B7 {tasks} tasks sprouting',
+    beanie: '{activities} activities today \u00B7 {tasks} tasks coming up!',
   },
   'nook.yourBeans': { en: 'Your Beans', beanie: 'your bean pod' },
   'nook.addBean': { en: 'Add Bean', beanie: 'add a beanie' },
