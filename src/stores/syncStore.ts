@@ -148,6 +148,12 @@ export const useSyncStore = defineStore('sync', () => {
     }
   });
 
+  // Subscribe to cache persistence failure changes
+  const cachePersistFailed = ref(false);
+  syncService.onCacheFailureChange((failed) => {
+    cachePersistFailed.value = failed;
+  });
+
   // Register docService persist callback → triggers debounced save
   syncService.registerDocPersistCallback();
 
@@ -624,21 +630,23 @@ export const useSyncStore = defineStore('sync', () => {
   /**
    * Load data from the local persistence cache (IndexedDB).
    * Used as a fallback when the beanpod file needs permission on page refresh.
-   * Derives the family key from the cached password + cached envelope.
+   * Imports the family key directly from a base64-encoded raw key.
    */
   async function loadFromPersistenceCache(
-    password: string,
+    keyB64: string,
     activeFamilyId: string
   ): Promise<{ success: boolean }> {
     try {
       await initPersistenceDB(activeFamilyId);
 
-      // Load cached envelope (needed to derive the family key)
+      // Load cached envelope (needed for syncService.setFamilyKey)
       const cachedEnvelope = await loadCachedEnvelope();
       if (!cachedEnvelope) return { success: false };
 
-      // Derive family key from password + envelope's wrapped keys
-      const { familyKey: fk } = await tryUnwrapFamilyKey(cachedEnvelope, password);
+      // Import family key directly from base64 (not password-derived)
+      const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+      const { base64ToBuffer } = await import('@/utils/encoding');
+      const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(keyB64)));
 
       // Load cached Automerge doc
       const doc = await loadCachedDoc(fk);
@@ -1450,6 +1458,7 @@ export const useSyncStore = defineStore('sync', () => {
     saveFailureLevel,
     lastSaveError,
     showSaveFailureBanner,
+    cachePersistFailed,
     // Actions
     initialize,
     requestPermission,

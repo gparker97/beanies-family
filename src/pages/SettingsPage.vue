@@ -9,6 +9,7 @@ import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
+import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
@@ -30,6 +31,16 @@ const translationStore = useTranslationStore();
 const { t } = useTranslation();
 const { canInstall, isInstalled, installApp } = usePWA();
 const { canManagePod } = usePermissions();
+const { isReconnecting, reconnect } = useGoogleReconnect();
+
+async function handleSettingsReconnect() {
+  const success = await reconnect();
+  if (success) await syncStore.handleGoogleReconnected();
+}
+
+async function handleForceSave() {
+  await syncStore.forceSyncNow();
+}
 
 const showClearConfirm = ref(false);
 const showLoadFileConfirm = ref(false);
@@ -547,9 +558,36 @@ function formatLastSync(timestamp: string | null): string {
                 </div>
               </div>
 
-              <!-- Error display -->
-              <div v-if="syncStore.error" class="mt-4 rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-                <p class="text-sm text-red-600 dark:text-red-400">{{ syncStore.error }}</p>
+              <!-- Error display with action buttons -->
+              <div
+                v-if="syncStore.error"
+                class="mt-4 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
+              >
+                <p class="text-sm text-amber-800 dark:text-amber-300">{{ syncStore.error }}</p>
+                <div class="mt-2 flex gap-2">
+                  <BaseButton
+                    v-if="syncStore.isGoogleDriveConnected"
+                    variant="primary"
+                    size="sm"
+                    :loading="isReconnecting"
+                    @click="handleSettingsReconnect"
+                  >
+                    {{ t('settings.reconnectDrive') }}
+                  </BaseButton>
+                  <BaseButton variant="secondary" size="sm" @click="handleForceSave">
+                    {{ t('settings.forceSave') }}
+                  </BaseButton>
+                </div>
+              </div>
+
+              <!-- Cache persistence warning -->
+              <div
+                v-if="syncStore.cachePersistFailed"
+                class="mt-2 rounded-lg bg-amber-50 p-3 dark:bg-amber-900/20"
+              >
+                <p class="text-sm text-amber-700 dark:text-amber-300">
+                  {{ t('settings.cachePersistWarning') }}
+                </p>
               </div>
 
               <!-- Success message -->

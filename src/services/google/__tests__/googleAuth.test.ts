@@ -129,6 +129,62 @@ describe('googleAuth (PKCE)', () => {
       vi.unstubAllEnvs();
     });
 
+    it('deduplicates concurrent calls', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+
+      // Fire two concurrent calls
+      const p1 = googleAuth.attemptSilentRefresh();
+      const p2 = googleAuth.attemptSilentRefresh();
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+      expect(r1).toBe('mock-refreshed-token');
+      expect(r2).toBe('mock-refreshed-token');
+
+      // refreshAccessToken should only have been called once
+      expect(refreshAccessToken).toHaveBeenCalledTimes(1);
+
+      vi.unstubAllEnvs();
+    });
+
+    it('allows a new call after the first completes', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'stored-refresh-token'
+      );
+      await googleAuth.initializeAuth('family-123');
+
+      const { refreshAccessToken } = await import('../oauthProxy');
+
+      // First call
+      await googleAuth.attemptSilentRefresh();
+      // Second call after completion
+      await googleAuth.attemptSilentRefresh();
+
+      expect(refreshAccessToken).toHaveBeenCalledTimes(2);
+
+      vi.unstubAllEnvs();
+    });
+
     it('returns null and clears token on invalid_grant error', async () => {
       vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
 

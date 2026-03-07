@@ -479,6 +479,27 @@ async function handleClearDataAndSignOut() {
   window.location.reload();
 }
 
+// Attempt silent reconnect to Google Drive when tab becomes visible or network comes back.
+// Uses a guard to prevent concurrent reconnect attempts.
+let isReconnecting = false;
+async function attemptSilentReconnect() {
+  if (isReconnecting || !syncStore.isGoogleDriveConnected) return;
+  isReconnecting = true;
+  try {
+    const { attemptSilentRefresh } = await import('@/services/google/googleAuth');
+    const refreshed = await attemptSilentRefresh();
+    if (refreshed) {
+      if (syncStore.showGoogleReconnect || syncStore.saveFailureLevel !== 'none') {
+        await syncStore.handleGoogleReconnected();
+      }
+    }
+  } catch {
+    /* Silent — non-critical */
+  } finally {
+    isReconnecting = false;
+  }
+}
+
 // Save data when going hidden; check for external file changes when becoming visible.
 // visibilitychange → hidden is the primary save point (fires reliably on tab close,
 // app switch, etc.). beforeunload is best-effort only — browsers may terminate
@@ -490,7 +511,7 @@ function handleVisibilityChange() {
     saveNow().catch(console.warn);
   } else if (document.visibilityState === 'visible') {
     syncStore.resumeFilePolling();
-    // Check for external file changes (cross-device sync)
+    attemptSilentReconnect().catch(console.warn);
     syncStore.reloadIfFileChanged().catch(console.warn);
   }
 }
@@ -500,12 +521,18 @@ function handleBeforeUnload() {
   saveNow().catch(console.warn);
 }
 
+function handleOnline() {
+  attemptSilentReconnect().catch(console.warn);
+}
+
 document.addEventListener('visibilitychange', handleVisibilityChange);
 window.addEventListener('beforeunload', handleBeforeUnload);
+window.addEventListener('online', handleOnline);
 
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange);
   window.removeEventListener('beforeunload', handleBeforeUnload);
+  window.removeEventListener('online', handleOnline);
 });
 
 // Show passkey or trust device prompt after fresh sign-in.

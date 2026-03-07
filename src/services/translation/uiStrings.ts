@@ -603,6 +603,12 @@ const STRING_DEFS = {
     en: 'Yes, Delete Everything',
     beanie: 'yes, clear my bean pod',
   },
+  'settings.reconnectDrive': { en: 'Reconnect', beanie: 'reconnect' },
+  'settings.forceSave': { en: 'Force Save', beanie: 'force save' },
+  'settings.cachePersistWarning': {
+    en: 'Local cache is not updating — your data may not survive a page refresh',
+    beanie: "local cache isn't saving — your beans might not survive a refresh",
+  },
   'settings.about': { en: 'About', beanie: 'about' },
   'settings.appName': { en: 'beanies.family', beanie: 'beanies.family' },
   'settings.version': { en: 'Version 1.0.0 (MVP)', beanie: 'version 1.0.0 (mvp)' },
