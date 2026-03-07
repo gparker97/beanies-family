@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
@@ -15,7 +16,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import { clearFolderCache } from '@/services/google/driveService';
-import type { FamilyMember, Gender, AgeGroup } from '@/types/models';
+import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -53,6 +54,36 @@ const driveResultError = ref<string | null>(null);
 const addedMembers = ref<FamilyMember[]>([]);
 const newMemberName = ref('');
 const newMemberRole = ref<'parent' | 'child'>('parent');
+const dobMonth = ref('');
+const dobDay = ref('');
+const dobYear = ref('');
+
+const MONTH_KEYS = [
+  'month.january',
+  'month.february',
+  'month.march',
+  'month.april',
+  'month.may',
+  'month.june',
+  'month.july',
+  'month.august',
+  'month.september',
+  'month.october',
+  'month.november',
+  'month.december',
+] as const;
+
+const monthOptions = computed(() =>
+  MONTH_KEYS.map((key, i) => ({
+    value: String(i + 1),
+    label: t(key),
+  }))
+);
+
+const dayOptions = Array.from({ length: 31 }, (_, i) => ({
+  value: String(i + 1),
+  label: String(i + 1),
+}));
 
 const totalSteps = 3;
 
@@ -194,6 +225,15 @@ async function handleAddMember() {
     return;
   }
 
+  const dateOfBirth: DateOfBirth | undefined =
+    dobMonth.value && dobDay.value
+      ? {
+          month: parseInt(dobMonth.value, 10),
+          day: parseInt(dobDay.value, 10),
+          ...(dobYear.value ? { year: parseInt(dobYear.value, 10) } : {}),
+        }
+      : undefined;
+
   const memberInput = {
     name: newMemberName.value,
     email: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 7)}@setup.local`,
@@ -202,6 +242,7 @@ async function handleAddMember() {
     role: 'member' as const,
     color: getNextColor(),
     requiresPassword: true,
+    ...(dateOfBirth ? { dateOfBirth } : {}),
   };
 
   const member = await familyStore.createMember(memberInput);
@@ -209,6 +250,9 @@ async function handleAddMember() {
     addedMembers.value.push(member);
     newMemberName.value = '';
     newMemberRole.value = 'parent';
+    dobMonth.value = '';
+    dobDay.value = '';
+    dobYear.value = '';
   } else {
     formError.value = t('loginV6.addMemberFailed');
   }
@@ -761,10 +805,31 @@ function handleBack() {
           </div>
         </div>
 
+        <!-- Birthday (month & day required, year optional) -->
+        <div>
+          <span
+            class="font-outfit text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase dark:text-gray-300"
+            >🎂 {{ t('modal.birthday') }}</span
+          >
+          <div class="mt-1 grid grid-cols-[1fr_0.6fr_0.7fr] gap-1.5">
+            <BaseSelect
+              v-model="dobMonth"
+              :options="monthOptions"
+              :placeholder="t('family.dateOfBirth.month')"
+            />
+            <BaseSelect
+              v-model="dobDay"
+              :options="dayOptions"
+              :placeholder="t('family.dateOfBirth.day')"
+            />
+            <BaseInput v-model="dobYear" type="number" placeholder="Year" />
+          </div>
+        </div>
+
         <BaseButton
           class="w-full"
           variant="secondary"
-          :disabled="!newMemberName"
+          :disabled="!newMemberName || !dobMonth || !dobDay"
           @click="handleAddMember"
         >
           🫘 {{ t('loginV6.addMember') }}
