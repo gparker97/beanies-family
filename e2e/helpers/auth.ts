@@ -30,14 +30,13 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     .catch(() => false);
 
   if (isOnWelcome) {
-    await createPodButton.click();
-
-    // Set auto-auth flag BEFORE signUp triggers (Next click calls signUp
-    // which sets freshSignIn=true; the TrustDeviceModal watcher fires
-    // immediately and must see this flag to stay suppressed).
+    // Set auto-auth flag BEFORE clicking create so InviteGateOverlay
+    // and TrustDeviceModal are both suppressed in E2E.
     await page.evaluate(() => {
       sessionStorage.setItem('e2e_auto_auth', 'true');
     });
+
+    await createPodButton.click();
 
     // Step 1: Name & Password
     await page.getByLabel('Family Name').fill('Test Family');
