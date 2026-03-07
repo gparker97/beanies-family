@@ -41,9 +41,13 @@ export function enqueueOfflineSave(content: string): void {
 
 /**
  * Set the provider to use when flushing the queue.
+ * Auto-flushes if there's pending content and we're online.
  */
 export function setFlushProvider(provider: StorageProvider): void {
   flushProvider = provider;
+  if (pendingContent && navigator.onLine) {
+    flushQueue().catch(console.warn);
+  }
 }
 
 /**
@@ -106,8 +110,23 @@ function clearFromSession(): void {
 
 // --- Event listeners ---
 
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
 function handleOnline(): void {
-  flushQueue().catch(console.warn);
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+  flushQueue()
+    .then((success) => {
+      if (!success && pendingContent) {
+        retryTimer = setTimeout(() => {
+          retryTimer = null;
+          if (pendingContent) flushQueue().catch(console.warn);
+        }, 5000);
+      }
+    })
+    .catch(console.warn);
 }
 
 function startListening(): void {
@@ -119,5 +138,9 @@ function startListening(): void {
 function stopListening(): void {
   if (!isListening) return;
   window.removeEventListener('online', handleOnline);
+  if (retryTimer) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
   isListening = false;
 }

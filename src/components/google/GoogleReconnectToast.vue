@@ -1,27 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { requestAccessToken } from '@/services/google/googleAuth';
+import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 
 const { t } = useTranslation();
-const isReconnecting = ref(false);
-const reconnectError = ref(false);
+const { isReconnecting, reconnectError, reconnect } = useGoogleReconnect();
 
 const emit = defineEmits<{
   reconnected: [];
 }>();
 
 async function handleReconnect() {
-  isReconnecting.value = true;
-  reconnectError.value = false;
-  try {
-    await requestAccessToken();
-    emit('reconnected');
-  } catch {
-    reconnectError.value = true;
-  } finally {
-    isReconnecting.value = false;
-  }
+  const success = await reconnect();
+  if (success) emit('reconnected');
 }
 </script>
 

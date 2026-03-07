@@ -242,11 +242,27 @@ export function getAccessToken(): string | null {
   return isTokenValid() ? accessToken : null;
 }
 
+// Deduplication: only one silent refresh runs at a time.
+let pendingSilentRefresh: Promise<string | null> | null = null;
+
 /**
  * Attempt a silent token refresh using the stored refresh token.
  * Returns the new access token on success, or null if interactive auth is required.
+ * Concurrent calls are deduplicated — only one refresh runs at a time.
  */
 export async function attemptSilentRefresh(): Promise<string | null> {
+  if (pendingSilentRefresh) return pendingSilentRefresh;
+
+  const promise = performSilentRefresh();
+  pendingSilentRefresh = promise;
+  try {
+    return await promise;
+  } finally {
+    if (pendingSilentRefresh === promise) pendingSilentRefresh = null;
+  }
+}
+
+async function performSilentRefresh(): Promise<string | null> {
   const clientId = getClientId();
   if (!clientId || !refreshToken) return null;
 

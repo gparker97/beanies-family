@@ -138,6 +138,30 @@ export function onSaveFailureChange(callback: SaveFailureCallback): () => void {
   };
 }
 
+// --- Cache persistence failure tracking ---
+let cachePersistFailed = false;
+type CacheFailureCallback = (failed: boolean) => void;
+const cacheFailureCallbacks: CacheFailureCallback[] = [];
+
+function setCachePersistFailed(failed: boolean): void {
+  if (cachePersistFailed !== failed) {
+    cachePersistFailed = failed;
+    cacheFailureCallbacks.forEach((cb) => cb(failed));
+  }
+}
+
+export function isCachePersistFailed(): boolean {
+  return cachePersistFailed;
+}
+
+export function onCacheFailureChange(callback: CacheFailureCallback): () => void {
+  cacheFailureCallbacks.push(callback);
+  return () => {
+    const idx = cacheFailureCallbacks.indexOf(callback);
+    if (idx > -1) cacheFailureCallbacks.splice(idx, 1);
+  };
+}
+
 // Current state
 let state: SyncServiceState = {
   isInitialized: false,
@@ -269,6 +293,7 @@ export function reset(): void {
   currentEnvelope = null;
   lastKnownFileTimestamp = null;
   resetSaveFailures();
+  setCachePersistFailed(false);
   updateState({
     isInitialized: false,
     isConfigured: false,
@@ -841,9 +866,12 @@ export function registerDocPersistCallback(): void {
     // This ensures the cache survives page refresh even if the file
     // save (below) hasn't completed yet.
     if (currentFamilyKey && isCacheReady()) {
-      persistDoc(currentFamilyKey).catch((err) => {
-        console.warn('[syncService] persistDoc failed:', err);
-      });
+      persistDoc(currentFamilyKey)
+        .then(() => setCachePersistFailed(false))
+        .catch((err) => {
+          console.warn('[syncService] persistDoc failed:', err);
+          setCachePersistFailed(true);
+        });
       if (currentEnvelope) {
         persistEnvelope(currentEnvelope).catch((err) => {
           console.warn('[syncService] persistEnvelope failed:', err);
