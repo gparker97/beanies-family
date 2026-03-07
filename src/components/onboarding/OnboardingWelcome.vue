@@ -1,25 +1,36 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import OnboardingProgressPips from './OnboardingProgressPips.vue';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useTranslation } from '@/composables/useTranslation';
+import type { CurrencyCode } from '@/types/models';
 
 const emit = defineEmits<{
   next: [];
 }>();
 
 const { t } = useTranslation();
+const settingsStore = useSettingsStore();
+const { currencyOptions } = useCurrencyOptions();
+
+const selectedCurrency = ref<string>(settingsStore.baseCurrency);
+
+async function handleStart() {
+  await settingsStore.setBaseCurrency(selectedCurrency.value as CurrencyCode);
+  emit('next');
+}
 </script>
 
 <template>
   <div class="ob-welcome">
     <!-- Decorative floating emoji -->
-    <div class="ob-float-emoji ob-float-bean">{'\u{1F96B}'}</div>
-    <div class="ob-float-emoji ob-float-piggy">{'\u{1F437}'}</div>
-    <div class="ob-float-emoji ob-float-tree">{'\u{1F333}'}</div>
+    <div class="ob-float-emoji ob-float-bean">🥫</div>
+    <div class="ob-float-emoji ob-float-piggy">🐷</div>
+    <div class="ob-float-emoji ob-float-tree">🌳</div>
 
     <!-- Hero emoji -->
-    <div class="ob-hero-emoji ob-float-anim">
-      {'\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}'}
-    </div>
+    <div class="ob-hero-emoji ob-float-anim">👨‍👩‍👧‍👦</div>
 
     <!-- Title -->
     <h2 class="ob-title">
@@ -36,24 +47,55 @@ const { t } = useTranslation();
     <!-- Three pillar cards -->
     <div class="ob-pillars">
       <div class="ob-pillar-card">
-        <div class="text-xl sm:text-2xl">{'\u{1F437}'}</div>
+        <div class="text-xl sm:text-2xl">🐷</div>
         <div class="ob-pillar-label">
           <span class="hidden sm:inline">{{ t('onboarding.pillarMoney') }}</span>
           <span class="sm:hidden">{{ t('onboarding.pillarMoneyShort') }}</span>
         </div>
       </div>
       <div class="ob-pillar-card">
-        <div class="text-xl sm:text-2xl">{'\u{1F4C5}'}</div>
+        <div class="text-xl sm:text-2xl">📅</div>
         <div class="ob-pillar-label">
           <span class="hidden sm:inline">{{ t('onboarding.pillarPlan') }}</span>
           <span class="sm:hidden">{{ t('onboarding.pillarPlanShort') }}</span>
         </div>
       </div>
       <div class="ob-pillar-card">
-        <div class="text-xl sm:text-2xl">{'\u{1F333}'}</div>
+        <div class="text-xl sm:text-2xl">🌳</div>
         <div class="ob-pillar-label">
           <span class="hidden sm:inline">{{ t('onboarding.pillarFamily') }}</span>
           <span class="sm:hidden">{{ t('onboarding.pillarFamilyShort') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Currency question -->
+    <div class="ob-currency-question">
+      <div class="ob-currency-label">{{ t('onboarding.currencyQuestion') }}</div>
+      <div class="relative inline-block">
+        <select
+          v-model="selectedCurrency"
+          class="ob-currency-select"
+          data-testid="onboarding-currency-select"
+        >
+          <option
+            v-for="opt in currencyOptions"
+            :key="opt.value"
+            :value="opt.value"
+            :disabled="opt.disabled"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+          <svg class="h-3.5 w-3.5 opacity-35" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
         </div>
       </div>
     </div>
@@ -64,7 +106,7 @@ const { t } = useTranslation();
     </div>
 
     <!-- CTA -->
-    <button class="ob-cta ob-pulse-glow" data-testid="onboarding-start" @click="emit('next')">
+    <button class="ob-cta ob-pulse-glow" data-testid="onboarding-start" @click="handleStart">
       {{ t('onboarding.welcomeCta') }}
     </button>
 
@@ -316,6 +358,66 @@ const { t } = useTranslation();
     font-size: 0.7rem;
     margin-top: 24px;
   }
+}
+
+.ob-currency-question {
+  margin-bottom: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+@media (width >= 640px) {
+  .ob-currency-question {
+    margin-bottom: 36px;
+  }
+}
+
+.ob-currency-label {
+  color: var(--deep-slate, #2c3e50);
+  font-family: Outfit, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.dark .ob-currency-label {
+  color: #cbd5e1;
+}
+
+@media (width >= 640px) {
+  .ob-currency-label {
+    font-size: 0.8rem;
+  }
+}
+
+.ob-currency-select {
+  appearance: none;
+  background: white;
+  border: 2px solid rgb(44 62 80 / 8%);
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgb(44 62 80 / 5%);
+  color: var(--deep-slate, #2c3e50);
+  cursor: pointer;
+  font-family: Outfit, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-width: 200px;
+  padding: 10px 36px 10px 16px;
+  transition: all 0.2s;
+}
+
+.ob-currency-select:focus {
+  border-color: var(--heritage-orange, #f15d22);
+  box-shadow: 0 0 0 3px rgb(241 93 34 / 10%);
+  outline: none;
+}
+
+.dark .ob-currency-select {
+  background: #243342;
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 20%);
+  color: #f1f5f9;
 }
 
 @keyframes ob-float {
