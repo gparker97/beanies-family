@@ -19,11 +19,15 @@ test.describe('Onboarding Wizard', () => {
     await page.goto('/settings');
     await page.getByTestId('restart-onboarding').click();
 
-    // Remove e2e_auto_auth so OnboardingWizard doesn't auto-skip
+    // Wait for the router navigation triggered by restart-onboarding to settle
+    await page.waitForURL('**/nook', { timeout: 10000 });
+
+    // Remove e2e_auto_auth so OnboardingWizard doesn't auto-skip on next mount
     await page.evaluate(() => {
       sessionStorage.removeItem('e2e_auto_auth');
     });
 
+    // Full reload so the wizard mounts fresh without the e2e_auto_auth flag
     await page.goto('/nook');
     await page.getByTestId('onboarding-wizard').waitFor({ state: 'visible', timeout: 10000 });
   }

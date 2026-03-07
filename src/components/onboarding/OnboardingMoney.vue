@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import OnboardingStepHeader from './OnboardingStepHeader.vue';
 import OnboardingSectionLabel from './OnboardingSectionLabel.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
-import { BaseCombobox } from '@/components/ui';
+import { BaseCombobox, BaseSelect } from '@/components/ui';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -36,9 +36,7 @@ const recurringStore = useRecurringStore();
 const accountTypeOptions = [
   { value: 'checking', label: 'Checking', icon: '\u{1F3E6}' },
   { value: 'savings', label: 'Savings', icon: '\u{1F4B0}' },
-  { value: 'credit_card', label: 'Credit Card', icon: '\u{1F4B3}' },
   { value: 'investment', label: 'Investment', icon: '\u{1F4C8}' },
-  { value: 'loan', label: 'Mortgage', icon: '\u{1F3E0}' },
 ];
 
 const accountType = ref('checking');
@@ -95,14 +93,18 @@ function handleAddAnotherAccount() {
 
 // ── Section B: Recurring Transactions (inline, like Step 3 activities) ─────
 
-const ALL_PRESETS = [...RECURRING_INCOME_PRESETS, ...RECURRING_EXPENSE_PRESETS];
-
 const selectedPreset = ref<RecurringPreset | null>(null);
 const recurringDescription = ref('');
 const recurringAmount = ref<number | undefined>(undefined);
 const recurringCurrency = ref<string>(settingsStore.baseCurrency);
 const recurringFrequency = ref<RecurringFrequency>('monthly');
 const recurringAdded = ref(false);
+const recurringAccountId = ref('');
+const descriptionInputRef = ref<HTMLInputElement | null>(null);
+
+const accountOptions = computed(() =>
+  accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))
+);
 
 const frequencyOptions = [
   { value: 'daily', label: 'Daily', icon: '\u{1F504}' },
@@ -125,6 +127,13 @@ function selectRecurringPreset(preset: RecurringPreset) {
   recurringAmount.value = undefined;
   recurringFrequency.value = 'monthly';
   recurringAdded.value = false;
+  // Default to last added account if not already selected
+  if (!recurringAccountId.value && addedAccountId.value) {
+    recurringAccountId.value = addedAccountId.value;
+  }
+  nextTick(() => {
+    descriptionInputRef.value?.focus();
+  });
 }
 
 const canAddRecurring = computed(
@@ -132,12 +141,12 @@ const canAddRecurring = computed(
     recurringDescription.value.trim() &&
     recurringAmount.value &&
     recurringAmount.value > 0 &&
-    addedAccountId.value
+    recurringAccountId.value
 );
 
 async function handleAddRecurring() {
   if (!canAddRecurring.value || !recurringAmount.value) return;
-  const accountId = addedAccountId.value;
+  const accountId = recurringAccountId.value;
   if (!accountId) return;
 
   const freq = recurringFrequency.value;
@@ -221,7 +230,7 @@ const savingsModeOptions = [
   { value: 'fixed', label: 'Fixed $' },
 ];
 
-const sliderLabels = [5, 10, 15, 20, 30, 40, 50];
+const sliderLabels = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
 
 function formatCurrency(val: number): string {
   if (val >= 1000) {
@@ -333,22 +342,47 @@ function formatCurrency(val: number): string {
         badge-gradient="linear-gradient(135deg, var(--heritage-orange, #F15D22), var(--terracotta, #E67E22))"
       />
 
-      <!-- Preset chips -->
-      <div class="mb-3 flex flex-wrap gap-1.5">
-        <button
-          v-for="preset in ALL_PRESETS"
-          :key="preset.label"
-          class="ob-chip"
-          :class="{
-            'ob-chip-selected': selectedPreset?.label === preset.label,
-            'ob-chip-income': preset.type === 'income',
-            'ob-chip-expense': preset.type === 'expense',
-          }"
-          @click="selectRecurringPreset(preset)"
-        >
-          <span class="text-sm">{{ preset.icon }}</span>
-          {{ preset.label }}
-        </button>
+      <!-- Preset chips: income + expense -->
+      <div class="ob-chip-groups">
+        <div class="ob-chip-group">
+          <div class="ob-chip-group-label ob-chip-group-label--income">
+            {{ t('onboarding.summaryIncome') }}
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="preset in RECURRING_INCOME_PRESETS"
+              :key="preset.label"
+              class="ob-chip ob-chip-income"
+              :class="{
+                'ob-chip-selected ob-chip-selected--income': selectedPreset?.label === preset.label,
+              }"
+              @click="selectRecurringPreset(preset)"
+            >
+              <span class="text-sm">{{ preset.icon }}</span>
+              {{ preset.label }}
+            </button>
+          </div>
+        </div>
+        <div class="ob-chip-group">
+          <div class="ob-chip-group-label ob-chip-group-label--expense">
+            {{ t('onboarding.summaryFixedCosts') }}
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="preset in RECURRING_EXPENSE_PRESETS"
+              :key="preset.label"
+              class="ob-chip ob-chip-expense"
+              :class="{
+                'ob-chip-selected ob-chip-selected--expense':
+                  selectedPreset?.label === preset.label,
+              }"
+              @click="selectRecurringPreset(preset)"
+            >
+              <span class="text-sm">{{ preset.icon }}</span>
+              {{ preset.label }}
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Inline form card (when preset selected and not yet added) -->
@@ -370,13 +404,25 @@ function formatCurrency(val: number): string {
           </div>
           <div class="min-w-0 flex-1">
             <input
+              ref="descriptionInputRef"
               v-model="recurringDescription"
               type="text"
-              class="ob-inline-input"
+              class="ob-desc-input"
               :placeholder="t('onboarding.transactionNamePlaceholder')"
               data-testid="onboarding-recurring-description"
             />
           </div>
+        </div>
+
+        <!-- Account selector -->
+        <div v-if="accountOptions.length > 0" class="mb-3">
+          <div class="ob-detail-label">{{ t('onboarding.account') }}</div>
+          <BaseSelect
+            :model-value="recurringAccountId"
+            :options="accountOptions"
+            :placeholder="t('form.selectAccount')"
+            @update:model-value="recurringAccountId = String($event)"
+          />
         </div>
 
         <!-- Amount + Frequency row -->
@@ -575,6 +621,7 @@ function formatCurrency(val: number): string {
   position: absolute;
   right: -80px;
   width: 300px;
+  z-index: -1;
 }
 
 .ob-form::after {
@@ -586,6 +633,7 @@ function formatCurrency(val: number): string {
   position: absolute;
   top: -40px;
   width: 200px;
+  z-index: -1;
 }
 
 @media (width >= 640px) {
@@ -597,7 +645,6 @@ function formatCurrency(val: number): string {
 .ob-section {
   margin-bottom: 20px;
   position: relative;
-  z-index: 1;
 }
 
 .ob-divider {
@@ -605,7 +652,6 @@ function formatCurrency(val: number): string {
   height: 1px;
   margin: 4px 0 20px;
   position: relative;
-  z-index: 1;
 }
 
 .dark .ob-divider {
@@ -711,8 +757,6 @@ function formatCurrency(val: number): string {
   border: 2px solid rgb(44 62 80 / 5%);
   border-radius: 16px;
   padding: 18px;
-  position: relative;
-  z-index: 1;
 }
 
 .dark .ob-recurring-card {
@@ -736,6 +780,35 @@ function formatCurrency(val: number): string {
 }
 
 .dark .ob-inline-input {
+  color: #f1f5f9;
+}
+
+.ob-desc-input {
+  background: rgb(44 62 80 / 4%);
+  border: 1.5px solid rgb(44 62 80 / 8%);
+  border-radius: 12px;
+  color: var(--deep-slate, #2c3e50);
+  font-family: Outfit, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  outline: none;
+  padding: 8px 12px;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.ob-desc-input:focus {
+  border-color: var(--heritage-orange, #f15d22);
+}
+
+.ob-desc-input::placeholder {
+  font-weight: 500;
+  opacity: 0.3;
+}
+
+.dark .ob-desc-input {
+  background: rgb(255 255 255 / 6%);
+  border-color: rgb(255 255 255 / 10%);
   color: #f1f5f9;
 }
 
@@ -817,8 +890,6 @@ function formatCurrency(val: number): string {
   border-radius: 16px;
   box-shadow: 0 2px 12px rgb(44 62 80 / 4%);
   padding: 14px;
-  position: relative;
-  z-index: 1;
 }
 
 .dark .ob-savings-card {
@@ -888,7 +959,6 @@ function formatCurrency(val: number): string {
   padding: 12px;
   position: relative;
   text-align: center;
-  z-index: 1;
 }
 
 @media (width >= 640px) {
