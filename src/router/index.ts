@@ -10,6 +10,12 @@ const routes: RouteRecordRaw[] = [
     redirect: '/nook',
   },
   {
+    path: '/home',
+    name: 'Home',
+    component: () => import('@/pages/HomePage.vue'),
+    meta: { titleKey: 'app.name', requiresAuth: false },
+  },
+  {
     path: '/welcome',
     name: 'Welcome',
     component: () => import('@/pages/LoginPage.vue'),
