@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, toRaw } from 'vue';
+import { ref, computed, onMounted, toRaw } from 'vue';
+import { useRoute } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
@@ -29,6 +30,7 @@ import type {
   AssetLoan,
 } from '@/types/models';
 
+const route = useRoute();
 const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
@@ -49,6 +51,15 @@ const totalAppreciation = computed(() => assetsStore.totalAppreciation);
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const isSubmitting = ref(false);
+
+// Open edit modal from query param (e.g. navigated from Dashboard)
+onMounted(() => {
+  const viewId = route.query.view as string | undefined;
+  if (viewId) {
+    const asset = assetsStore.assets.find((a) => a.id === viewId);
+    if (asset) openEditModal(asset);
+  }
+});
 
 // Asset type options
 const assetTypes = computed(() => [

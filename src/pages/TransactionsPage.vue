@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
@@ -41,6 +42,7 @@ import {
   toDateInputValue,
 } from '@/utils/date';
 
+const route = useRoute();
 const transactionsStore = useTransactionsStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
@@ -69,6 +71,15 @@ const pendingProjectedScope = ref<{
   tx: DisplayTransaction;
 } | null>(null);
 const addModalInitialValues = ref<Partial<CreateTransactionInput> | null>(null);
+
+// Open view modal from query param (e.g. navigated from Dashboard)
+onMounted(() => {
+  const viewId = route.query.view as string | undefined;
+  if (viewId) {
+    const tx = transactionsStore.transactions.find((t) => t.id === viewId);
+    if (tx) viewingTransaction.value = tx;
+  }
+});
 
 // ── Computeds ─────────────────────────────────────────────────────────────
 const baseCurrency = computed(() => settingsStore.baseCurrency);
