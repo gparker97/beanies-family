@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-06",
-    "translationCount": 1169
+    "lastUpdated": "2026-03-07",
+    "translationCount": 1207
   },
   "translations": {
     "app.name": {
@@ -5850,6 +5850,196 @@
       "translation": "超出预算—支出已超出预算的100%。",
       "hash": "4yith6",
       "lastUpdated": "2026-03-06"
+    },
+    "todo.reopenTask": {
+      "translation": "重新启动的任务",
+      "hash": "tnj6x4",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.getStarted": {
+      "translation": "开始",
+      "hash": "f2eah5",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.about": {
+      "translation": "软件简介",
+      "hash": "11jkh9",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.heroDescription": {
+      "translation": "家庭中心，让每个人都有条不紊，步入正轨，共同成长。",
+      "hash": "h71zsg",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.aboutDescription": {
+      "translation": "beanies.family是一款本地首创、注重隐私的计划生育应用。您的数据已加密并保留在您的设备上--没有服务器、没有跟踪、没有泄露。",
+      "hash": "7wsmka",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.featureFinance": {
+      "translation": "家计理财",
+      "hash": "ygasjv",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.featurePlanner": {
+      "translation": "活动策划人",
+      "hash": "w8561t",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.featureTodo": {
+      "translation": "共享的待办事项列表",
+      "hash": "uktmlz",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.featurePrivacy": {
+      "translation": "端到端加密",
+      "hash": "8rw5of",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.betaBadge": {
+      "translation": "测试版",
+      "hash": "18avk",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.viewOnGithub": {
+      "translation": "查看GitHub",
+      "hash": "y2uhjr",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.signIn": {
+      "translation": "登陆/注册",
+      "hash": "yhdjfx",
+      "lastUpdated": "2026-03-07"
+    },
+    "homepage.learnMore": {
+      "translation": "了解更多关于beanies.family的信息",
+      "hash": "xsytxv",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.title": {
+      "translation": "仅邀请",
+      "hash": "1qgu3n",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.description": {
+      "translation": "我们仍在建设中！您需要获得独家邀请才能访问beanies.family。如果您是少数幸运儿之一，请在下方输入您的邀请Bean。",
+      "hash": "iulx8j",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.tokenLabel": {
+      "translation": "邀请Bean",
+      "hash": "1q8cbr",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.tokenPlaceholder": {
+      "translation": "輸入您的Yelp授權碼",
+      "hash": "5yrqoc",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.tokenRequired": {
+      "translation": "请输入个人Token",
+      "hash": "c8smlg",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.tokenInvalid": {
+      "translation": "该令牌看起来不正确。请检查并重试。",
+      "hash": "9qel29",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.unlock": {
+      "translation": "解锁",
+      "hash": "t1thuk",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.noToken": {
+      "translation": "还没有账号？",
+      "hash": "8nflxd",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.requestOne": {
+      "translation": "申请邀请",
+      "hash": "uwmuwb",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.requestTitle": {
+      "translation": "申请邀请",
+      "hash": "fr6ya3",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.requestDescription": {
+      "translation": "请介绍一下您自己，我们会尽快回复您。",
+      "hash": "c309b2",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.nameLabel": {
+      "translation": "姓名",
+      "hash": "1fvl7",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.namePlaceholder": {
+      "translation": "您的姓名",
+      "hash": "x97ah4",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.emailLabel": {
+      "translation": "电子邮箱",
+      "hash": "13xh18",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.emailPlaceholder": {
+      "translation": "you@example.com",
+      "hash": "88piuc",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.messageLabel": {
+      "translation": "错误讯息(选择性)",
+      "hash": "v1mcu2",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.messagePlaceholder": {
+      "translation": "你感興趣嗎？",
+      "hash": "6efhap",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.fieldsRequired": {
+      "translation": "电话号码是必填项！",
+      "hash": "60iup9",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.emailInvalid": {
+      "translation": "请输入有效的电子邮件地址",
+      "hash": "fhnbvf",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.sendRequest": {
+      "translation": "发送请求",
+      "hash": "htdi4p",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.haveToken": {
+      "translation": "我有一个令牌",
+      "hash": "94dohl",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.requestError": {
+      "translation": "出现错误。请稍后再试。",
+      "hash": "hvkb0c",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.confirmedTitle": {
+      "translation": "已经请求发送！",
+      "hash": "brl1mg",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.confirmedDescription": {
+      "translation": "感谢您的关注！我们将审核您的请求，并尽快向您发送邀请Bean。",
+      "hash": "4mar6",
+      "lastUpdated": "2026-03-07"
+    },
+    "inviteGate.backToHome": {
+      "translation": "返回首页",
+      "hash": "weah05",
+      "lastUpdated": "2026-03-07"
     }
   }
 }
