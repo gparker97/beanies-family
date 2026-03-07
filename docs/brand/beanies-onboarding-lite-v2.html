@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beanies.family — Onboarding Flow v2 (Lite — 3 Steps)</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-slate: #2C3E50;
+  --heritage-orange: #F15D22;
+  --sky-silk: #AED6F1;
+  --terracotta: #E67E22;
+  --cloud-white: #F8F9FA;
+  --soft-shadow: 0 8px 40px rgba(44,62,80,0.08);
+  --sq: 24px;
+  --fh: 'Outfit', sans-serif;
+  --fb: 'Inter', sans-serif;
+  --silk10: rgba(174,214,241,0.10);
+  --silk20: rgba(174,214,241,0.20);
+  --or10: rgba(241,93,34,0.08);
+  --or20: rgba(241,93,34,0.15);
+  --s05: rgba(44,62,80,0.05);
+  --s10: rgba(44,62,80,0.10);
+  --green: #27AE60;
+  --green-bg: rgba(39,174,96,0.06);
+  --green-border: rgba(39,174,96,0.3);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--fb);background:#EAEDF0;color:var(--deep-slate);-webkit-font-smoothing:antialiased;}
+
+/* NAV */
+.pn{position:fixed;top:0;left:0;right:0;z-index:1000;background:rgba(44,62,80,0.95);backdrop-filter:blur(16px);padding:14px 32px;display:flex;align-items:center;gap:24px;border-bottom:2px solid var(--heritage-orange);}
+.pn-b{font-family:var(--fh);font-weight:700;color:white;font-size:0.95rem;display:flex;align-items:center;gap:8px;white-space:nowrap;}
+.pn-b i{width:28px;height:28px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-style:normal;}
+.pn-l{display:flex;gap:4px;flex-wrap:wrap;}
+.pn-l a{font-family:var(--fh);font-size:0.7rem;font-weight:600;color:rgba(255,255,255,0.5);text-decoration:none;padding:6px 14px;border-radius:20px;transition:all 0.2s;letter-spacing:0.04em;}
+.pn-l a:hover{color:white;background:rgba(241,93,34,0.25);}
+.pn-t{margin-left:auto;font-family:var(--fh);font-size:0.6rem;font-weight:600;color:var(--heritage-orange);letter-spacing:0.15em;text-transform:uppercase;white-space:nowrap;}
+
+/* SECTIONS */
+.ms{min-height:100vh;padding:120px 40px 80px;position:relative;}
+.sh{text-align:center;margin-bottom:60px;}
+.sn{font-family:var(--fh);font-size:0.65rem;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;color:var(--heritage-orange);opacity:0.7;margin-bottom:8px;}
+.st{font-family:var(--fh);font-size:clamp(2rem,4vw,3.2rem);font-weight:800;color:var(--deep-slate);line-height:1.1;margin-bottom:12px;}
+.ss{font-size:1rem;color:var(--deep-slate);opacity:0.5;max-width:560px;margin:0 auto;line-height:1.6;}
+
+/* DEVICE FRAME */
+.df{max-width:1200px;margin:0 auto;background:var(--deep-slate);border-radius:20px;padding:12px;box-shadow:0 40px 100px rgba(44,62,80,0.25);}
+.dt{display:flex;align-items:center;gap:8px;padding:8px 16px 12px;}
+.dd{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,0.15);}
+.dd.r{background:#ff5f57;}.dd.y{background:#febc2e;}.dd.g{background:#28c840;}
+.du{flex:1;text-align:center;font-family:var(--fb);font-size:0.7rem;color:rgba(255,255,255,0.35);background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 16px;margin-left:40px;}
+.ds{border-radius:12px;overflow:hidden;background:var(--cloud-white);}
+
+/* PHONE */
+.pf{width:340px;background:var(--deep-slate);border-radius:44px;padding:16px;box-shadow:0 30px 80px rgba(44,62,80,0.3);flex-shrink:0;}
+.pno{width:120px;height:28px;background:var(--deep-slate);border-radius:0 0 20px 20px;margin:-16px auto 0;position:relative;z-index:2;}
+.ps{border-radius:32px;overflow:hidden;background:var(--cloud-white);min-height:600px;position:relative;}
+.pl{text-align:center;margin-top:20px;font-family:var(--fh);font-weight:600;font-size:0.85rem;color:var(--deep-slate);opacity:0.6;}
+
+/* ANNOTATION */
+.an{display:flex;align-items:flex-start;gap:16px;max-width:1200px;margin:32px auto 0;padding:0 20px;}
+.anl{width:3px;min-height:80px;border-radius:3px;background:linear-gradient(180deg,var(--heritage-orange),transparent);flex-shrink:0;}
+.ant{font-family:var(--fh);font-size:0.75rem;font-weight:700;color:var(--heritage-orange);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;}
+.anx{font-size:0.85rem;color:var(--deep-slate);opacity:0.55;line-height:1.6;max-width:700px;}
+
+/* SHARED */
+.nc{background:white;border-radius:var(--sq);padding:24px;box-shadow:var(--soft-shadow);}
+.pt{display:inline-block;font-family:var(--fh);font-size:0.65rem;font-weight:600;padding:5px 12px;border-radius:20px;letter-spacing:0.04em;}
+.po{background:var(--or10);color:var(--heritage-orange);}.psk{background:var(--silk20);color:#3A7BAD;}.psl{background:var(--s05);color:var(--deep-slate);opacity:0.6;}
+
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 0 0 rgba(241,93,34,0.2);}50%{box-shadow:0 0 20px 8px rgba(241,93,34,0.1);}}
+.af{animation:float 4s ease-in-out infinite;}.ap{animation:pulse-glow 3s ease-in-out infinite;}
+.bgc{background:var(--cloud-white);}.bsg{background:linear-gradient(160deg,#F8F9FA 40%,#E8F4FD);}.bwg{background:linear-gradient(160deg,#F8F9FA 40%,#FEF0E8);}
+
+/* ═══ ONBOARDING BASE ═══ */
+.obs{min-height:600px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;background:linear-gradient(180deg,var(--cloud-white) 0%,#EDF6FC 100%);position:relative;overflow:hidden;}
+.obs::before{content:'';position:absolute;bottom:-100px;left:-100px;width:400px;height:400px;background:radial-gradient(circle,rgba(174,214,241,0.25),transparent 70%);border-radius:50%;}
+.obs::after{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(241,93,34,0.1),transparent 70%);border-radius:50%;}
+.obi{font-size:80px;margin-bottom:32px;position:relative;z-index:1;}
+.obt{font-family:var(--fh);font-size:2rem;font-weight:800;color:var(--deep-slate);margin-bottom:12px;position:relative;z-index:1;}
+.obt .o{color:var(--heritage-orange);}
+.obd{font-size:0.95rem;color:var(--deep-slate);opacity:0.5;max-width:400px;line-height:1.6;margin-bottom:40px;position:relative;z-index:1;}
+.obds{display:flex;gap:8px;margin-bottom:40px;position:relative;z-index:1;}
+.obdt{width:10px;height:10px;border-radius:50%;background:var(--s10);transition:all 0.3s ease;}
+.obdt.a{width:32px;border-radius:10px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));}
+.obdt.done{background:var(--green);}
+.obb{font-family:var(--fh);font-size:1rem;font-weight:600;color:white;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));border:none;padding:16px 48px;border-radius:60px;cursor:pointer;box-shadow:0 8px 32px rgba(241,93,34,0.25);position:relative;z-index:1;transition:transform 0.2s;}
+.obb:hover{transform:translateY(-2px);}
+
+/* Form screens */
+.ob-form{padding:32px 40px;background:linear-gradient(180deg,var(--cloud-white) 0%,#EDF6FC 100%);position:relative;overflow:hidden;}
+.ob-form::before{content:'';position:absolute;bottom:-80px;right:-80px;width:300px;height:300px;background:radial-gradient(circle,rgba(174,214,241,0.2),transparent 70%);border-radius:50%;}
+.ob-form::after{content:'';position:absolute;top:-40px;left:-40px;width:200px;height:200px;background:radial-gradient(circle,rgba(241,93,34,0.06),transparent 70%);border-radius:50%;}
+/* Mobile form variant */
+.ob-form-m{padding:20px 16px;background:linear-gradient(180deg,var(--cloud-white) 0%,#EDF6FC 100%);position:relative;overflow:hidden;}
+.ob-form-m::before{content:'';position:absolute;bottom:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(174,214,241,0.2),transparent 70%);border-radius:50%;}
+
+.ob-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;position:relative;z-index:1;}
+.ob-step{display:flex;align-items:center;gap:10px;}
+.ob-step-icon{width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;}
+.ob-step-text{font-family:var(--fh);font-size:0.6rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--deep-slate);opacity:0.4;}
+.ob-step-title{font-family:var(--fh);font-size:1.2rem;font-weight:800;color:var(--deep-slate);margin-top:2px;}
+.ob-step-title .o{color:var(--heritage-orange);}
+.ob-progress{display:flex;gap:6px;align-items:center;}
+.ob-pip{width:8px;height:8px;border-radius:50%;background:var(--s10);}
+.ob-pip.active{width:24px;border-radius:8px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));}
+.ob-pip.done{background:var(--green);}
+
+/* Sections within a step */
+.ob-section{position:relative;z-index:1;margin-bottom:20px;}
+.ob-section-label{font-family:var(--fh);font-size:0.6rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.ob-section-label .num{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:800;color:white;}
+.ob-label{font-family:var(--fh);font-size:0.58rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:5px;}
+
+/* Chips */
+.ob-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.ob-chip{display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:12px;border:2px solid var(--s05);background:white;cursor:pointer;transition:all 0.2s;font-family:var(--fh);font-size:0.68rem;font-weight:600;color:var(--deep-slate);}
+.ob-chip:hover{border-color:var(--sky-silk);background:var(--silk10);}
+.ob-chip.selected{border-color:var(--heritage-orange);background:var(--or10);color:var(--heritage-orange);}
+.ob-chip .emoji{font-size:0.85rem;}
+
+/* Day chips (compact for days of week) */
+.day-chip{width:36px;height:36px;border-radius:12px;border:2px solid var(--s05);background:white;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;font-family:var(--fh);font-size:0.6rem;font-weight:700;color:var(--deep-slate);}
+.day-chip:hover{border-color:var(--sky-silk);}
+.day-chip.selected{border-color:var(--heritage-orange);background:var(--or10);color:var(--heritage-orange);}
+
+/* Cards */
+.ob-card{background:white;border:2px solid var(--s05);border-radius:16px;padding:14px;cursor:pointer;transition:all 0.2s;position:relative;z-index:1;}
+.ob-card:hover{border-color:var(--sky-silk);transform:translateY(-1px);box-shadow:0 4px 16px rgba(44,62,80,0.06);}
+.ob-card.filled{border-color:var(--green);background:var(--green-bg);}
+.ob-card.selected{border-color:var(--heritage-orange);background:var(--or10);}
+
+/* Nav */
+.ob-nav{display:flex;justify-content:space-between;align-items:center;margin-top:20px;position:relative;z-index:1;}
+.ob-btn{font-family:var(--fh);font-size:0.82rem;font-weight:600;color:white;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));border:none;padding:12px 32px;border-radius:40px;cursor:pointer;box-shadow:0 6px 20px rgba(241,93,34,0.2);transition:transform 0.2s;}
+.ob-btn:hover{transform:translateY(-2px);}
+.ob-btn-ghost{font-family:var(--fh);font-size:0.78rem;font-weight:500;color:var(--deep-slate);opacity:0.35;background:none;border:none;cursor:pointer;padding:12px 16px;}
+.ob-btn-skip{font-family:var(--fh);font-size:0.68rem;font-weight:500;color:var(--deep-slate);opacity:0.3;background:none;border:none;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+
+/* Slider */
+.ob-slider-track{width:100%;height:6px;background:var(--s05);border-radius:6px;position:relative;margin:12px 0 4px;}
+.ob-slider-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--heritage-orange),var(--terracotta));}
+.ob-slider-thumb{width:20px;height:20px;border-radius:50%;background:white;border:3px solid var(--heritage-orange);box-shadow:0 2px 8px rgba(241,93,34,0.2);position:absolute;top:50%;transform:translate(-50%,-50%);cursor:grab;}
+
+/* Teaser cards */
+.ob-teaser{background:white;border-radius:16px;padding:14px;text-align:center;border:1px solid var(--s05);transition:all 0.2s;cursor:pointer;}
+.ob-teaser:hover{border-color:var(--sky-silk);box-shadow:0 4px 16px rgba(44,62,80,0.06);}
+
+/* Modal overlay */
+.ob-modal-overlay{position:absolute;inset:0;background:rgba(44,62,80,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:10;border-radius:12px;}
+.ob-modal{background:white;border-radius:24px;padding:28px;width:420px;max-width:90%;box-shadow:0 20px 60px rgba(44,62,80,0.2);position:relative;}
+.ob-modal-m{background:white;border-radius:24px;padding:20px;width:100%;margin:16px;box-shadow:0 20px 60px rgba(44,62,80,0.2);}
+
+/* Completion */
+.ob-complete{min-height:600px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px;text-align:center;background:linear-gradient(180deg,#EDF6FC 0%,var(--cloud-white) 50%,#FEF8F4 100%);position:relative;overflow:hidden;}
+.ob-complete::before{content:'';position:absolute;top:-100px;left:50%;transform:translateX(-50%);width:500px;height:500px;background:radial-gradient(circle,rgba(174,214,241,0.2),transparent 70%);border-radius:50%;}
+.ob-complete::after{content:'';position:absolute;bottom:-60px;right:-60px;width:300px;height:300px;background:radial-gradient(circle,rgba(241,93,34,0.08),transparent 70%);border-radius:50%;}
+
+/* Desktop + Mobile side-by-side layout */
+.dual-view{display:flex;gap:40px;align-items:flex-start;justify-content:center;max-width:1500px;margin:0 auto;}
+.dual-view .df{flex:1;max-width:900px;}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="pn">
+  <div class="pn-b"><i>🫘</i> beanies<span style="color:var(--heritage-orange)">.family</span></div>
+  <div class="pn-l">
+    <a href="#s0">Welcome</a>
+    <a href="#s1">Money Snapshot</a>
+    <a href="#s1m">Modal</a>
+    <a href="#s2">Family Life</a>
+    <a href="#s3">Done!</a>
+    <a href="#flow">Flow</a>
+  </div>
+  <div class="pn-t">Onboarding Lite v2</div>
+</nav>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- STEP 1: WELCOME                                           -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<section class="ms bsg" id="s0">
+  <div class="sh">
+    <div class="sn">Step 01 of 03</div>
+    <h2 class="st">Welcome — Meet Your Bean Pod</h2>
+    <p class="ss">Quick emotional hook. Three progress dots — that's it, only three steps.</p>
+  </div>
+
+  <div class="dual-view">
+    <!-- Desktop -->
+    <div class="df">
+      <div class="dt"><div class="dd r"></div><div class="dd y"></div><div class="dd g"></div><div class="du">🔒 beanies.family/welcome</div></div>
+      <div class="ds">
+        <div class="obs" style="min-height:560px;">
+          <div style="position:absolute;top:40px;left:60px;font-size:2rem;opacity:0.15;animation:float 5s ease-in-out infinite;">🫘</div>
+          <div style="position:absolute;top:120px;right:80px;font-size:1.5rem;opacity:0.1;animation:float 6s ease-in-out 1s infinite;">🐷</div>
+          <div style="position:absolute;bottom:80px;left:120px;font-size:1.8rem;opacity:0.1;animation:float 4.5s ease-in-out 0.5s infinite;">🌳</div>
+          <div class="obi af">👨‍👩‍👧‍👦</div>
+          <h2 class="obt">Welcome to <span class="o">beanies</span><span>.family</span></h2>
+          <p class="obd">Your family's cozy corner for managing the chaos — finances, schedules, activities, and everything in between. Less stress, more time for your little beans. 🫘</p>
+          <div style="display:flex;gap:16px;margin-bottom:36px;position:relative;z-index:1;">
+            <div style="background:white;border-radius:16px;padding:12px 20px;text-align:center;box-shadow:0 4px 16px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">🐷</div><div style="font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.5;margin-top:4px;">Track money</div></div>
+            <div style="background:white;border-radius:16px;padding:12px 20px;text-align:center;box-shadow:0 4px 16px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">📅</div><div style="font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.5;margin-top:4px;">Plan life</div></div>
+            <div style="background:white;border-radius:16px;padding:12px 20px;text-align:center;box-shadow:0 4px 16px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">🌳</div><div style="font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.5;margin-top:4px;">Grow together</div></div>
+          </div>
+          <div class="obds"><div class="obdt a"></div><div class="obdt"></div><div class="obdt"></div></div>
+          <button class="obb ap">Let's Get This Pod Rolling 🫘</button>
+          <div style="font-family:var(--fh);font-size:0.7rem;color:var(--deep-slate);opacity:0.3;margin-top:24px;font-style:italic;position:relative;z-index:1;">just 3 quick steps · takes about 2 minutes</div>
+        </div>
+      </div>
+    </div>
+    <!-- Mobile -->
+    <div class="pf">
+      <div class="pno"></div>
+      <div class="ps">
+        <div class="obs" style="min-height:600px;padding:32px 24px;">
+          <div style="position:absolute;top:30px;left:30px;font-size:1.5rem;opacity:0.12;animation:float 5s ease-in-out infinite;">🫘</div>
+          <div style="position:absolute;top:80px;right:30px;font-size:1rem;opacity:0.08;animation:float 6s ease-in-out 1s infinite;">🐷</div>
+          <div style="font-size:60px;margin-bottom:24px;position:relative;z-index:1;animation:float 4s ease-in-out infinite;">👨‍👩‍👧‍👦</div>
+          <h2 style="font-family:var(--fh);font-size:1.4rem;font-weight:800;color:var(--deep-slate);margin-bottom:8px;position:relative;z-index:1;">Welcome to <span style="color:var(--heritage-orange);">beanies</span>.family</h2>
+          <p style="font-size:0.8rem;color:var(--deep-slate);opacity:0.5;max-width:260px;line-height:1.5;margin-bottom:28px;position:relative;z-index:1;">Your family's cozy corner for managing the chaos. Less stress, more time for your little beans. 🫘</p>
+          <div style="display:flex;gap:10px;margin-bottom:28px;position:relative;z-index:1;">
+            <div style="background:white;border-radius:14px;padding:10px 14px;text-align:center;box-shadow:0 2px 10px rgba(44,62,80,0.05);"><div style="font-size:1rem;">🐷</div><div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.5;margin-top:3px;">Money</div></div>
+            <div style="background:white;border-radius:14px;padding:10px 14px;text-align:center;box-shadow:0 2px 10px rgba(44,62,80,0.05);"><div style="font-size:1rem;">📅</div><div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.5;margin-top:3px;">Plans</div></div>
+            <div style="background:white;border-radius:14px;padding:10px 14px;text-align:center;box-shadow:0 2px 10px rgba(44,62,80,0.05);"><div style="font-size:1rem;">🌳</div><div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.5;margin-top:3px;">Family</div></div>
+          </div>
+          <div class="obds"><div class="obdt a"></div><div class="obdt"></div><div class="obdt"></div></div>
+          <button class="obb" style="font-size:0.85rem;padding:14px 36px;">Let's Get Rolling 🫘</button>
+          <div style="font-family:var(--fh);font-size:0.62rem;color:var(--deep-slate);opacity:0.3;margin-top:16px;font-style:italic;position:relative;z-index:1;">3 quick steps · ~2 minutes</div>
+        </div>
+      </div>
+      <div class="pl">Mobile — Welcome</div>
+    </div>
+  </div>
+
+  <div class="an" style="margin-top:40px;"><div class="anl"></div><div><div class="ant">Design Notes</div><div class="anx">Mobile version scales gracefully — smaller emoji, tighter padding, shorter copy. The three pillar cards become compact icon + one-word labels. Progress dots and CTA are identical in spirit. The phone notch adds authenticity to the mobile preview.</div></div></div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- STEP 2: MONEY SNAPSHOT                                    -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<section class="ms bwg" id="s1">
+  <div class="sh">
+    <div class="sn">Step 02 of 03</div>
+    <h2 class="st">Your Money Snapshot 🐷</h2>
+    <p class="ss">Three clean sections: drop in an account, add a regular transaction (via modal), set your savings slider.</p>
+  </div>
+
+  <div class="dual-view">
+    <!-- Desktop -->
+    <div class="df">
+      <div class="dt"><div class="dd r"></div><div class="dd y"></div><div class="dd g"></div><div class="du">🔒 beanies.family/onboarding/money</div></div>
+      <div class="ds">
+        <div class="ob-form">
+          <div class="ob-header">
+            <div class="ob-step">
+              <div class="ob-step-icon" style="background:var(--or10);">🐷</div>
+              <div>
+                <div class="ob-step-text">Step 2 of 3</div>
+                <div class="ob-step-title">Your <span class="o">money snapshot</span></div>
+              </div>
+            </div>
+            <div class="ob-progress"><div class="ob-pip done"></div><div class="ob-pip active"></div><div class="ob-pip"></div></div>
+          </div>
+
+          <!-- ─── A: Drop in an Account ─── -->
+          <div class="ob-section">
+            <div class="ob-section-label" style="color:var(--heritage-orange);">
+              <div class="num" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));">A</div>
+              Drop in an account
+              <span style="font-weight:400;opacity:0.5;font-size:0.55rem;letter-spacing:0;text-transform:none;">— start with your main one</span>
+            </div>
+
+            <!-- Type chips -->
+            <div class="ob-chips" style="margin-bottom:10px;">
+              <div class="ob-chip selected"><span class="emoji">🏦</span> Checking</div>
+              <div class="ob-chip"><span class="emoji">💰</span> Savings</div>
+              <div class="ob-chip"><span class="emoji">💳</span> Credit Card</div>
+              <div class="ob-chip"><span class="emoji">📈</span> Investment</div>
+              <div class="ob-chip"><span class="emoji">🏠</span> Mortgage</div>
+            </div>
+
+            <!-- Bank + Name + Balance row -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 0.8fr;gap:10px;align-items:end;">
+              <div>
+                <div class="ob-label">Bank</div>
+                <div style="background:white;border:2px solid var(--s05);border-radius:14px;padding:11px 14px;font-size:0.82rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                  <span style="color:var(--deep-slate);">DBS</span>
+                  <span style="opacity:0.2;font-size:0.55rem;">▼</span>
+                </div>
+              </div>
+              <div>
+                <div class="ob-label">Account Name</div>
+                <div style="background:white;border:2px solid var(--heritage-orange);border-radius:14px;padding:11px 14px;font-size:0.82rem;color:var(--deep-slate);">Savings Account</div>
+              </div>
+              <div>
+                <div class="ob-label">Balance</div>
+                <div style="background:white;border:2px solid var(--s05);border-radius:14px;padding:11px 14px;font-size:0.82rem;display:flex;align-items:center;gap:4px;"><span style="opacity:0.3;">$</span> 12,450</div>
+              </div>
+            </div>
+
+            <!-- Confirmation + add more -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:0.75rem;color:var(--green);">✓</span>
+                <span style="font-family:var(--fh);font-size:0.68rem;font-weight:600;color:var(--green);">DBS Savings Account added</span>
+              </div>
+              <div style="font-family:var(--fh);font-size:0.68rem;font-weight:600;color:var(--heritage-orange);cursor:pointer;padding:4px 12px;border-radius:12px;background:var(--or10);">+ Add another</div>
+            </div>
+          </div>
+
+          <div style="height:1px;background:var(--s05);margin:4px 0 20px;position:relative;z-index:1;"></div>
+
+          <!-- ─── B: Add a regular transaction ─── -->
+          <div class="ob-section">
+            <div class="ob-section-label" style="color:var(--heritage-orange);">
+              <div class="num" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));">B</div>
+              Add a regular transaction
+              <span style="font-weight:400;opacity:0.5;font-size:0.55rem;letter-spacing:0;text-transform:none;">— tap a category to add details</span>
+            </div>
+
+            <!-- Category chips (tapping opens modal) -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+              <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:var(--green);letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;width:100%;margin-bottom:2px;">↑ Income</div>
+              <div class="ob-card filled" style="padding:10px 14px;display:flex;align-items:center;gap:10px;flex:none;">
+                <span style="font-size:1rem;">💰</span>
+                <div><div style="font-family:var(--fh);font-size:0.72rem;font-weight:700;">Salary</div><div style="font-size:0.58rem;opacity:0.45;">$8,500 · 25th · Monthly</div></div>
+                <span style="font-size:0.6rem;color:var(--green);font-weight:700;">✓</span>
+              </div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;"><span style="font-size:1rem;">👩‍💼</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.45;">Partner's Income</span></div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;"><span style="font-size:1rem;">📊</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.45;">Side Income</span></div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:var(--heritage-orange);letter-spacing:0.08em;text-transform:uppercase;display:flex;align-items:center;width:100%;margin-bottom:2px;">↓ Expenses</div>
+              <div class="ob-card filled" style="padding:10px 14px;display:flex;align-items:center;gap:10px;flex:none;">
+                <span style="font-size:1rem;">🏠</span>
+                <div><div style="font-family:var(--fh);font-size:0.72rem;font-weight:700;">Rent</div><div style="font-size:0.58rem;opacity:0.45;">$2,800 · 1st · Monthly</div></div>
+                <span style="font-size:0.6rem;color:var(--green);font-weight:700;">✓</span>
+              </div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;"><span style="font-size:1rem;">🚗</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.45;">Car</span></div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;"><span style="font-size:1rem;">⚡</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.45;">Utilities</span></div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;"><span style="font-size:1rem;">📱</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.45;">Phone</span></div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;"><span style="font-size:1rem;">🛡️</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.45;">Insurance</span></div>
+              <div class="ob-card" style="padding:10px 14px;display:flex;align-items:center;gap:8px;flex:none;border-style:dashed;opacity:0.5;"><span style="font-size:1rem;">✏️</span><span style="font-family:var(--fh);font-size:0.72rem;font-weight:600;">Custom</span></div>
+            </div>
+          </div>
+
+          <div style="height:1px;background:var(--s05);margin:4px 0 20px;position:relative;z-index:1;"></div>
+
+          <!-- ─── C: Savings slider ─── -->
+          <div class="ob-section" style="margin-bottom:12px;">
+            <div class="ob-section-label" style="color:var(--heritage-orange);">
+              <div class="num" style="background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));">C</div>
+              How much to save?
+            </div>
+            <div style="background:white;border-radius:16px;padding:18px 20px;box-shadow:0 2px 12px rgba(44,62,80,0.04);position:relative;z-index:1;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                <div style="display:flex;background:var(--s05);border-radius:10px;padding:2px;">
+                  <div style="font-family:var(--fh);font-size:0.6rem;font-weight:600;color:white;background:var(--deep-slate);padding:5px 12px;border-radius:8px;cursor:pointer;">% of Income</div>
+                  <div style="font-family:var(--fh);font-size:0.6rem;font-weight:600;color:var(--deep-slate);opacity:0.35;padding:5px 12px;border-radius:8px;cursor:pointer;">Fixed $</div>
+                </div>
+                <div style="text-align:right;">
+                  <span style="font-family:var(--fh);font-size:1.4rem;font-weight:800;color:var(--heritage-orange);">20%</span>
+                  <span style="font-family:var(--fh);font-size:0.78rem;font-weight:600;color:var(--deep-slate);opacity:0.4;margin-left:6px;">$1,700/mo</span>
+                </div>
+              </div>
+              <div class="ob-slider-track"><div class="ob-slider-fill" style="width:20%;"></div><div class="ob-slider-thumb" style="left:20%;"></div></div>
+              <div style="display:flex;justify-content:space-between;font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.25;margin-top:2px;"><span>5%</span><span>10%</span><span>15%</span><span style="color:var(--heritage-orange);opacity:1;font-weight:700;">20%</span><span>30%</span><span>40%</span><span>50%</span></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;background:var(--silk10);border-radius:12px;">
+                <span style="font-size:0.9rem;">🫘</span>
+                <span style="font-size:0.65rem;color:var(--deep-slate);opacity:0.55;line-height:1.4;"><strong style="color:var(--heritage-orange);">Nice!</strong> That's $1,700/month into your bean jar. 🌱</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary bar -->
+          <div style="background:linear-gradient(135deg,var(--deep-slate),#3D5368);border-radius:16px;padding:14px 20px;color:white;display:flex;justify-content:space-around;text-align:center;position:relative;z-index:1;">
+            <div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;color:#6EE7B7;">+$8,500</div><div style="font-size:0.55rem;opacity:0.4;margin-top:2px;">Income</div></div>
+            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+            <div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;color:var(--heritage-orange);">-$2,800</div><div style="font-size:0.55rem;opacity:0.4;margin-top:2px;">Fixed costs</div></div>
+            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+            <div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;color:#6EE7B7;">$1,700</div><div style="font-size:0.55rem;opacity:0.4;margin-top:2px;">Savings</div></div>
+            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+            <div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;">$4,000</div><div style="font-size:0.55rem;opacity:0.4;margin-top:2px;">Flexible</div></div>
+          </div>
+
+          <div class="ob-nav">
+            <button class="ob-btn-ghost">← Back</button>
+            <div style="display:flex;align-items:center;gap:16px;">
+              <button class="ob-btn-skip">Skip for now</button>
+              <button class="ob-btn">Next: Family Life →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile -->
+    <div class="pf">
+      <div class="pno"></div>
+      <div class="ps">
+        <div class="ob-form-m" style="min-height:600px;display:flex;flex-direction:column;">
+          <!-- Mobile header (compact) -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:32px;height:32px;border-radius:10px;background:var(--or10);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🐷</div>
+              <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;">Step 2 of 3</div><div style="font-family:var(--fh);font-size:0.95rem;font-weight:800;">Money <span style="color:var(--heritage-orange);">Snapshot</span></div></div>
+            </div>
+            <div class="ob-progress"><div class="ob-pip done"></div><div class="ob-pip active"></div><div class="ob-pip"></div></div>
+          </div>
+
+          <!-- A: Account (stacked for mobile) -->
+          <div style="margin-bottom:14px;">
+            <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:var(--heritage-orange);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">A · Drop in an account</div>
+            <div class="ob-chips" style="margin-bottom:8px;">
+              <div class="ob-chip selected" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">🏦</span> Checking</div>
+              <div class="ob-chip" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">💰</span> Savings</div>
+              <div class="ob-chip" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">💳</span> Card</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+              <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">Bank</div><div style="background:white;border:2px solid var(--s05);border-radius:10px;padding:8px 10px;font-size:0.72rem;display:flex;align-items:center;justify-content:space-between;"><span>DBS</span><span style="opacity:0.2;font-size:0.5rem;">▼</span></div></div>
+              <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">Account Name</div><div style="background:white;border:2px solid var(--heritage-orange);border-radius:10px;padding:8px 10px;font-size:0.72rem;">Savings</div></div>
+            </div>
+            <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">Balance</div><div style="background:white;border:2px solid var(--s05);border-radius:10px;padding:8px 10px;font-size:0.72rem;display:flex;align-items:center;gap:4px;"><span style="opacity:0.3;">$</span> 12,450</div></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px;"><span style="font-size:0.65rem;color:var(--green);">✓</span><span style="font-family:var(--fh);font-size:0.6rem;font-weight:600;color:var(--green);">Added</span><span style="margin-left:auto;font-family:var(--fh);font-size:0.6rem;font-weight:600;color:var(--heritage-orange);padding:3px 10px;border-radius:10px;background:var(--or10);">+ Another</span></div>
+          </div>
+
+          <div style="height:1px;background:var(--s05);margin:2px 0 14px;"></div>
+
+          <!-- B: Recurring (tap to open modal) -->
+          <div style="margin-bottom:14px;">
+            <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:var(--heritage-orange);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">B · Add a regular transaction</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <div class="ob-card filled" style="padding:8px 12px;display:flex;align-items:center;gap:8px;flex:none;border-radius:12px;"><span style="font-size:0.85rem;">💰</span><div><div style="font-family:var(--fh);font-size:0.65rem;font-weight:700;">Salary</div><div style="font-size:0.5rem;opacity:0.4;">$8,500</div></div><span style="font-size:0.55rem;color:var(--green);">✓</span></div>
+              <div class="ob-card" style="padding:8px 12px;display:flex;align-items:center;gap:6px;flex:none;border-radius:12px;"><span style="font-size:0.85rem;">🏠</span><span style="font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.4;">Rent</span></div>
+              <div class="ob-card" style="padding:8px 12px;display:flex;align-items:center;gap:6px;flex:none;border-radius:12px;"><span style="font-size:0.85rem;">🚗</span><span style="font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.4;">Car</span></div>
+              <div class="ob-card" style="padding:8px 12px;display:flex;align-items:center;gap:6px;flex:none;border-radius:12px;"><span style="font-size:0.85rem;">⚡</span><span style="font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.4;">Utilities</span></div>
+            </div>
+          </div>
+
+          <div style="height:1px;background:var(--s05);margin:2px 0 14px;"></div>
+
+          <!-- C: Savings slider (mobile compact) -->
+          <div style="margin-bottom:12px;">
+            <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:var(--heritage-orange);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">C · How much to save?</div>
+            <div style="background:white;border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(44,62,80,0.04);">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <div style="display:flex;background:var(--s05);border-radius:8px;padding:2px;"><div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;color:white;background:var(--deep-slate);padding:4px 10px;border-radius:6px;">%</div><div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.3;padding:4px 10px;">$</div></div>
+                <div><span style="font-family:var(--fh);font-size:1.1rem;font-weight:800;color:var(--heritage-orange);">20%</span><span style="font-family:var(--fh);font-size:0.65rem;opacity:0.4;margin-left:4px;">$1,700</span></div>
+              </div>
+              <div class="ob-slider-track" style="margin:8px 0 2px;"><div class="ob-slider-fill" style="width:20%;"></div><div class="ob-slider-thumb" style="left:20%;width:16px;height:16px;"></div></div>
+            </div>
+          </div>
+
+          <!-- Summary bar (mobile) -->
+          <div style="background:linear-gradient(135deg,var(--deep-slate),#3D5368);border-radius:14px;padding:12px;color:white;display:flex;justify-content:space-around;text-align:center;">
+            <div><div style="font-family:var(--fh);font-size:0.78rem;font-weight:800;color:#6EE7B7;">+$8.5k</div><div style="font-size:0.48rem;opacity:0.4;">In</div></div>
+            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+            <div><div style="font-family:var(--fh);font-size:0.78rem;font-weight:800;color:var(--heritage-orange);">-$2.8k</div><div style="font-size:0.48rem;opacity:0.4;">Out</div></div>
+            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+            <div><div style="font-family:var(--fh);font-size:0.78rem;font-weight:800;color:#6EE7B7;">$1.7k</div><div style="font-size:0.48rem;opacity:0.4;">Save</div></div>
+            <div style="width:1px;background:rgba(255,255,255,0.1);"></div>
+            <div><div style="font-family:var(--fh);font-size:0.78rem;font-weight:800;">$4k</div><div style="font-size:0.48rem;opacity:0.4;">Flex</div></div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:12px;">
+            <span style="font-family:var(--fh);font-size:0.65rem;opacity:0.3;">← Back</span>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-family:var(--fh);font-size:0.58rem;opacity:0.25;text-decoration:underline;">Skip</span>
+              <div style="font-family:var(--fh);font-size:0.72rem;font-weight:600;color:white;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));padding:10px 20px;border-radius:30px;">Next →</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pl">Mobile — Money Snapshot</div>
+    </div>
+  </div>
+
+  <div class="an" style="margin-top:40px;"><div class="anl"></div><div><div class="ant">Design Notes</div><div class="anx"><strong>Section A</strong> now has a Bank dropdown (DBS, OCBC, UOB, etc.) replacing the owner emoji avatars — cleaner and more practical. Account name and balance fields are narrower to accommodate. <strong>Section B</strong> is renamed "Add a regular transaction" — tapping any category chip opens a modal (shown below) with pre-filled category name, amount field, day-of-month, and account pre-selected from Section A. Filled items show green with a summary. <strong>Section C</strong> savings slider is unchanged. Mobile version abbreviates the summary bar ($8.5k instead of $8,500) and stacks fields vertically where needed.</div></div></div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- STEP 2b: RECURRING TRANSACTION MODAL                      -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<section class="ms bgc" id="s1m">
+  <div class="sh">
+    <div class="sn">Step 02 — Modal</div>
+    <h2 class="st">Add Regular Transaction Modal</h2>
+    <p class="ss">Opens when the user taps a category chip (e.g. "Rent"). Pre-filled with category, account from step A, just needs amount and day.</p>
+  </div>
+
+  <div class="dual-view">
+    <!-- Desktop with modal overlay -->
+    <div class="df">
+      <div class="dt"><div class="dd r"></div><div class="dd y"></div><div class="dd g"></div><div class="du">🔒 beanies.family/onboarding/money</div></div>
+      <div class="ds" style="position:relative;">
+        <!-- Blurred background (the form beneath) -->
+        <div class="ob-form" style="filter:blur(3px);opacity:0.4;pointer-events:none;min-height:500px;">
+          <div class="ob-header">
+            <div class="ob-step"><div class="ob-step-icon" style="background:var(--or10);">🐷</div><div><div class="ob-step-text">Step 2 of 3</div><div class="ob-step-title">Your <span class="o">money snapshot</span></div></div></div>
+          </div>
+        </div>
+
+        <!-- Modal overlay -->
+        <div class="ob-modal-overlay">
+          <div class="ob-modal">
+            <!-- Modal header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:40px;height:40px;border-radius:14px;background:var(--or10);display:flex;align-items:center;justify-content:center;font-size:1.2rem;">🏠</div>
+                <div>
+                  <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;">Add Regular Transaction</div>
+                  <div style="font-family:var(--fh);font-size:1.1rem;font-weight:800;color:var(--deep-slate);">Rent / Mortgage</div>
+                </div>
+              </div>
+              <div style="width:32px;height:32px;border-radius:50%;background:var(--s05);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0.8rem;opacity:0.4;">✕</div>
+            </div>
+
+            <!-- Direction toggle -->
+            <div style="margin-bottom:16px;">
+              <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Direction</div>
+              <div style="display:flex;gap:8px;">
+                <div style="flex:1;text-align:center;padding:10px;border-radius:14px;border:2px solid var(--heritage-orange);background:var(--or10);font-family:var(--fh);font-size:0.72rem;font-weight:600;color:var(--heritage-orange);cursor:pointer;">↓ Expense</div>
+                <div style="flex:1;text-align:center;padding:10px;border-radius:14px;border:2px solid var(--s05);font-family:var(--fh);font-size:0.72rem;font-weight:600;opacity:0.35;cursor:pointer;">↑ Income</div>
+              </div>
+            </div>
+
+            <!-- Name -->
+            <div style="margin-bottom:14px;">
+              <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Transaction Name</div>
+              <div style="background:var(--s05);border-radius:14px;padding:12px 16px;font-size:0.82rem;color:var(--deep-slate);">Monthly Rent</div>
+            </div>
+
+            <!-- Amount + Day of Month -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+              <div>
+                <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Amount</div>
+                <div style="background:var(--s05);border-radius:14px;padding:12px 16px;font-size:0.82rem;display:flex;align-items:center;gap:4px;"><span style="opacity:0.3;">$</span><span>2,800</span></div>
+              </div>
+              <div>
+                <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Day of Month</div>
+                <div style="background:var(--s05);border-radius:14px;padding:12px 16px;font-size:0.82rem;display:flex;align-items:center;justify-content:space-between;">
+                  <span>1st</span><span style="opacity:0.2;font-size:0.55rem;">▼</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Frequency -->
+            <div style="margin-bottom:14px;">
+              <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Frequency</div>
+              <div style="display:flex;gap:6px;">
+                <span style="font-family:var(--fh);font-size:0.62rem;font-weight:600;padding:6px 14px;border-radius:10px;background:var(--s05);opacity:0.4;cursor:pointer;">Weekly</span>
+                <span style="font-family:var(--fh);font-size:0.62rem;font-weight:600;padding:6px 14px;border-radius:10px;background:var(--deep-slate);color:white;cursor:pointer;">Monthly</span>
+                <span style="font-family:var(--fh);font-size:0.62rem;font-weight:600;padding:6px 14px;border-radius:10px;background:var(--s05);opacity:0.4;cursor:pointer;">Yearly</span>
+              </div>
+            </div>
+
+            <!-- Account (pre-selected from Section A) -->
+            <div style="margin-bottom:20px;">
+              <div style="font-family:var(--fh);font-size:0.55rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Account</div>
+              <div style="background:var(--green-bg);border:2px solid var(--green-border);border-radius:14px;padding:10px 16px;font-size:0.78rem;display:flex;align-items:center;gap:8px;">
+                <span style="font-size:0.85rem;">🏦</span>
+                <span style="font-family:var(--fh);font-weight:600;">DBS Savings Account</span>
+                <span style="margin-left:auto;font-size:0.6rem;color:var(--green);font-weight:600;">Auto-selected</span>
+              </div>
+            </div>
+
+            <!-- Save button -->
+            <button style="width:100%;font-family:var(--fh);font-size:0.85rem;font-weight:700;color:white;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));border:none;padding:14px;border-radius:18px;cursor:pointer;box-shadow:0 6px 20px rgba(241,93,34,0.2);">Add Rent 🏠</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile with modal -->
+    <div class="pf">
+      <div class="pno"></div>
+      <div class="ps" style="position:relative;">
+        <!-- Blurred background -->
+        <div class="ob-form-m" style="filter:blur(3px);opacity:0.3;pointer-events:none;min-height:600px;"></div>
+        <!-- Mobile modal -->
+        <div style="position:absolute;inset:0;background:rgba(44,62,80,0.5);backdrop-filter:blur(4px);display:flex;align-items:flex-end;z-index:10;border-radius:32px;">
+          <div class="ob-modal-m" style="border-radius:24px 24px 0 0;margin:0;padding:20px 18px 28px;">
+            <!-- Drag handle -->
+            <div style="width:36px;height:4px;background:var(--s10);border-radius:4px;margin:0 auto 16px;"></div>
+            <!-- Modal header -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+              <div style="width:36px;height:36px;border-radius:12px;background:var(--or10);display:flex;align-items:center;justify-content:center;font-size:1rem;">🏠</div>
+              <div>
+                <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.4;text-transform:uppercase;">Add Regular Transaction</div>
+                <div style="font-family:var(--fh);font-size:0.95rem;font-weight:800;">Rent / Mortgage</div>
+              </div>
+            </div>
+            <!-- Direction -->
+            <div style="display:flex;gap:6px;margin-bottom:12px;">
+              <div style="flex:1;text-align:center;padding:8px;border-radius:12px;border:2px solid var(--heritage-orange);background:var(--or10);font-family:var(--fh);font-size:0.65rem;font-weight:600;color:var(--heritage-orange);">↓ Expense</div>
+              <div style="flex:1;text-align:center;padding:8px;border-radius:12px;border:2px solid var(--s05);font-family:var(--fh);font-size:0.65rem;font-weight:600;opacity:0.3;">↑ Income</div>
+            </div>
+            <!-- Name -->
+            <div style="margin-bottom:10px;"><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;margin-bottom:4px;">Name</div><div style="background:var(--s05);border-radius:12px;padding:10px 14px;font-size:0.75rem;">Monthly Rent</div></div>
+            <!-- Amount + Day -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+              <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;margin-bottom:4px;">Amount</div><div style="background:var(--s05);border-radius:12px;padding:10px 14px;font-size:0.75rem;"><span style="opacity:0.3;">$</span> 2,800</div></div>
+              <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;margin-bottom:4px;">Day</div><div style="background:var(--s05);border-radius:12px;padding:10px 14px;font-size:0.75rem;display:flex;justify-content:space-between;">1st <span style="opacity:0.2;font-size:0.5rem;">▼</span></div></div>
+            </div>
+            <!-- Account (pre-selected) -->
+            <div style="background:var(--green-bg);border:2px solid var(--green-border);border-radius:12px;padding:8px 12px;font-size:0.7rem;display:flex;align-items:center;gap:6px;margin-bottom:14px;">
+              <span style="font-size:0.75rem;">🏦</span><span style="font-family:var(--fh);font-weight:600;">DBS Savings</span><span style="margin-left:auto;font-size:0.5rem;color:var(--green);">Auto</span>
+            </div>
+            <!-- Save -->
+            <button style="width:100%;font-family:var(--fh);font-size:0.78rem;font-weight:700;color:white;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));border:none;padding:12px;border-radius:16px;cursor:pointer;">Add Rent 🏠</button>
+          </div>
+        </div>
+      </div>
+      <div class="pl">Mobile — Transaction Modal</div>
+    </div>
+  </div>
+
+  <div class="an" style="margin-top:40px;"><div class="anl"></div><div><div class="ant">Design Notes</div><div class="anx">The modal opens over the Money Snapshot screen with a backdrop blur. It pre-fills the category name and emoji, defaults to the correct direction (Expense for rent, Income for salary), and pre-selects the account created in Section A (shown with a green "Auto-selected" badge). The user just needs to confirm/enter the amount and pick the day of month. On mobile, the modal slides up from the bottom as a native-feeling bottom sheet with a drag handle. The "Add Rent 🏠" CTA uses the category emoji for personality.</div></div></div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- STEP 3: FAMILY LIFE                                       -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<section class="ms bsg" id="s2">
+  <div class="sh">
+    <div class="sn">Step 03 of 03</div>
+    <h2 class="st">Your Family Life 🌳</h2>
+    <p class="ss">Add one activity with day-of-week selection, cost, and pickup duty. Then a quick peek at what else beanies can do.</p>
+  </div>
+
+  <div class="dual-view">
+    <!-- Desktop -->
+    <div class="df">
+      <div class="dt"><div class="dd r"></div><div class="dd y"></div><div class="dd g"></div><div class="du">🔒 beanies.family/onboarding/family</div></div>
+      <div class="ds">
+        <div class="ob-form">
+          <div class="ob-header">
+            <div class="ob-step">
+              <div class="ob-step-icon" style="background:rgba(110,231,183,0.15);">🌳</div>
+              <div>
+                <div class="ob-step-text">Step 3 of 3 — last one!</div>
+                <div class="ob-step-title">Your <span class="o">family life</span></div>
+              </div>
+            </div>
+            <div class="ob-progress"><div class="ob-pip done"></div><div class="ob-pip done"></div><div class="ob-pip active"></div></div>
+          </div>
+
+          <!-- ─── A: Add an Activity ─── -->
+          <div class="ob-section">
+            <div class="ob-section-label" style="color:#27AE60;">
+              <div class="num" style="background:linear-gradient(135deg,#6EE7B7,#27AE60);">A</div>
+              What keeps your family busy?
+              <span style="font-weight:400;opacity:0.5;font-size:0.55rem;letter-spacing:0;text-transform:none;">— add a lesson or activity</span>
+            </div>
+
+            <!-- Quick-add presets -->
+            <div class="ob-chips" style="margin-bottom:12px;">
+              <div class="ob-chip selected"><span class="emoji">🎹</span> Piano</div>
+              <div class="ob-chip"><span class="emoji">⚽</span> Soccer</div>
+              <div class="ob-chip"><span class="emoji">🏊</span> Swimming</div>
+              <div class="ob-chip"><span class="emoji">🎨</span> Art</div>
+              <div class="ob-chip"><span class="emoji">🥋</span> Martial Arts</div>
+              <div class="ob-chip"><span class="emoji">💃</span> Dance</div>
+              <div class="ob-chip"><span class="emoji">📚</span> Tutoring</div>
+              <div class="ob-chip" style="border-style:dashed;opacity:0.5;"><span class="emoji">✏️</span> Custom</div>
+            </div>
+
+            <!-- Filled activity card -->
+            <div class="ob-card filled" style="padding:18px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+                <div style="width:40px;height:40px;border-radius:14px;background:var(--silk20);display:flex;align-items:center;justify-content:center;font-size:1.1rem;">🎹</div>
+                <div style="flex:1;"><div style="font-family:var(--fh);font-size:0.85rem;font-weight:700;">Piano Lessons</div></div>
+                <span style="font-family:var(--fh);font-size:0.82rem;font-weight:700;color:var(--heritage-orange);">$200/mo</span>
+              </div>
+
+              <!-- Day of week multi-select -->
+              <div style="margin-bottom:14px;">
+                <div style="font-family:var(--fh);font-size:0.52rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Days</div>
+                <div style="display:flex;gap:6px;">
+                  <div class="day-chip">Mon</div>
+                  <div class="day-chip">Tue</div>
+                  <div class="day-chip selected">Wed</div>
+                  <div class="day-chip">Thu</div>
+                  <div class="day-chip">Fri</div>
+                  <div class="day-chip selected">Sat</div>
+                  <div class="day-chip">Sun</div>
+                </div>
+              </div>
+
+              <!-- Details row -->
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
+                <div style="background:var(--s05);border-radius:10px;padding:8px 10px;text-align:center;">
+                  <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.06em;">Time</div>
+                  <div style="font-family:var(--fh);font-size:0.7rem;font-weight:700;margin-top:2px;">10:00am</div>
+                </div>
+                <div style="background:var(--s05);border-radius:10px;padding:8px 10px;text-align:center;">
+                  <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.06em;">Frequency</div>
+                  <div style="font-family:var(--fh);font-size:0.7rem;font-weight:700;margin-top:2px;">Weekly</div>
+                </div>
+                <div style="background:var(--s05);border-radius:10px;padding:8px 10px;text-align:center;">
+                  <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.06em;">For</div>
+                  <div style="margin-top:3px;"><div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:9px;margin:0 auto;">👶</div></div>
+                </div>
+                <div style="background:var(--s05);border-radius:10px;padding:8px 10px;text-align:center;">
+                  <div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.06em;">Pickup</div>
+                  <div style="margin-top:3px;"><div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#F9D5C2,#F2A07B);display:flex;align-items:center;justify-content:center;font-size:9px;margin:0 auto;">👩</div></div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-family:var(--fh);font-size:0.65rem;font-weight:600;color:var(--green);">✓ Added to planner & budget</span>
+                <span style="font-family:var(--fh);font-size:0.65rem;font-weight:600;color:var(--heritage-orange);cursor:pointer;padding:4px 12px;border-radius:10px;background:var(--or10);">+ Another</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:1px;background:var(--s05);margin:4px 0 20px;position:relative;z-index:1;"></div>
+
+          <!-- ─── B: Discover Teasers ─── -->
+          <div class="ob-section" style="margin-bottom:12px;">
+            <div class="ob-section-label" style="color:#3A7BAD;">
+              <div class="num" style="background:linear-gradient(135deg,var(--sky-silk),#7FB8E0);">B</div>
+              More things to explore
+              <span style="font-weight:400;opacity:0.5;font-size:0.55rem;letter-spacing:0;text-transform:none;">— waiting in your Nook</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
+              <div class="ob-teaser"><div style="font-size:1.5rem;margin-bottom:6px;">🏠</div><div style="font-family:var(--fh);font-size:0.68rem;font-weight:700;">Assets</div><div style="font-size:0.55rem;opacity:0.4;margin-top:3px;line-height:1.4;">Property, vehicles</div></div>
+              <div class="ob-teaser"><div style="font-size:1.5rem;margin-bottom:6px;">🎯</div><div style="font-family:var(--fh);font-size:0.68rem;font-weight:700;">Goals</div><div style="font-size:0.55rem;opacity:0.4;margin-top:3px;line-height:1.4;">Save towards dreams</div></div>
+              <div class="ob-teaser"><div style="font-size:1.5rem;margin-bottom:6px;">✅</div><div style="font-family:var(--fh);font-size:0.68rem;font-weight:700;">To-Dos</div><div style="font-size:0.55rem;opacity:0.4;margin-top:3px;line-height:1.4;">Shared family tasks</div></div>
+              <div class="ob-teaser"><div style="font-size:1.5rem;margin-bottom:6px;">🔐</div><div style="font-family:var(--fh);font-size:0.68rem;font-weight:700;">Vault</div><div style="font-size:0.55rem;opacity:0.4;margin-top:3px;line-height:1.4;">Passwords & secrets</div></div>
+              <div class="ob-teaser"><div style="font-size:1.5rem;margin-bottom:6px;">📊</div><div style="font-family:var(--fh);font-size:0.68rem;font-weight:700;">Budgets</div><div style="font-size:0.55rem;opacity:0.4;margin-top:3px;line-height:1.4;">Category tracking</div></div>
+            </div>
+          </div>
+
+          <!-- Closing message -->
+          <div style="background:linear-gradient(135deg,var(--deep-slate),#3D5368);border-radius:16px;padding:16px 24px;color:white;display:flex;align-items:center;gap:14px;position:relative;z-index:1;">
+            <div style="font-size:2rem;">🫘</div>
+            <div><div style="font-family:var(--fh);font-size:0.82rem;font-weight:700;">We built beanies to help you.</div><div style="font-size:0.68rem;opacity:0.5;margin-top:2px;">So you can spend your time on what's important — your little beans.</div></div>
+          </div>
+
+          <div class="ob-nav">
+            <button class="ob-btn-ghost">← Back</button>
+            <div style="display:flex;align-items:center;gap:16px;">
+              <button class="ob-btn-skip">Skip for now</button>
+              <button class="ob-btn" style="padding:14px 40px;">All Done! 🎉</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile -->
+    <div class="pf">
+      <div class="pno"></div>
+      <div class="ps">
+        <div class="ob-form-m" style="min-height:600px;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:32px;height:32px;border-radius:10px;background:rgba(110,231,183,0.15);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🌳</div>
+              <div><div style="font-family:var(--fh);font-size:0.5rem;font-weight:600;opacity:0.4;text-transform:uppercase;letter-spacing:0.1em;">Step 3 of 3 — last one!</div><div style="font-family:var(--fh);font-size:0.95rem;font-weight:800;">Family <span style="color:var(--heritage-orange);">Life</span></div></div>
+            </div>
+            <div class="ob-progress"><div class="ob-pip done"></div><div class="ob-pip done"></div><div class="ob-pip active"></div></div>
+          </div>
+
+          <!-- Activity presets -->
+          <div style="margin-bottom:10px;">
+            <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:#27AE60;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">A · Add an activity</div>
+            <div class="ob-chips" style="margin-bottom:8px;">
+              <div class="ob-chip selected" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">🎹</span> Piano</div>
+              <div class="ob-chip" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">⚽</span> Soccer</div>
+              <div class="ob-chip" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">🏊</span> Swim</div>
+              <div class="ob-chip" style="padding:5px 10px;font-size:0.6rem;"><span class="emoji" style="font-size:0.75rem;">🎨</span> Art</div>
+            </div>
+          </div>
+
+          <!-- Filled card (mobile) -->
+          <div class="ob-card filled" style="padding:14px;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+              <div style="width:32px;height:32px;border-radius:10px;background:var(--silk20);display:flex;align-items:center;justify-content:center;font-size:0.9rem;">🎹</div>
+              <div style="flex:1;font-family:var(--fh);font-size:0.78rem;font-weight:700;">Piano Lessons</div>
+              <span style="font-family:var(--fh);font-size:0.72rem;font-weight:700;color:var(--heritage-orange);">$200/mo</span>
+            </div>
+
+            <!-- Day chips (mobile) -->
+            <div style="margin-bottom:10px;">
+              <div style="font-family:var(--fh);font-size:0.48rem;font-weight:600;opacity:0.35;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Days</div>
+              <div style="display:flex;gap:4px;">
+                <div class="day-chip" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">M</div>
+                <div class="day-chip" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">T</div>
+                <div class="day-chip selected" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">W</div>
+                <div class="day-chip" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">T</div>
+                <div class="day-chip" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">F</div>
+                <div class="day-chip selected" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">S</div>
+                <div class="day-chip" style="width:30px;height:30px;border-radius:10px;font-size:0.5rem;">S</div>
+              </div>
+            </div>
+
+            <!-- Compact details (mobile) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;margin-bottom:8px;">
+              <div style="background:var(--s05);border-radius:8px;padding:6px;text-align:center;"><div style="font-family:var(--fh);font-size:0.42rem;font-weight:600;opacity:0.3;text-transform:uppercase;">Time</div><div style="font-family:var(--fh);font-size:0.6rem;font-weight:700;margin-top:1px;">10am</div></div>
+              <div style="background:var(--s05);border-radius:8px;padding:6px;text-align:center;"><div style="font-family:var(--fh);font-size:0.42rem;font-weight:600;opacity:0.3;text-transform:uppercase;">Freq</div><div style="font-family:var(--fh);font-size:0.6rem;font-weight:700;margin-top:1px;">Weekly</div></div>
+              <div style="background:var(--s05);border-radius:8px;padding:6px;text-align:center;"><div style="font-family:var(--fh);font-size:0.42rem;font-weight:600;opacity:0.3;text-transform:uppercase;">For</div><div style="margin-top:2px;"><div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:8px;margin:0 auto;">👶</div></div></div>
+              <div style="background:var(--s05);border-radius:8px;padding:6px;text-align:center;"><div style="font-family:var(--fh);font-size:0.42rem;font-weight:600;opacity:0.3;text-transform:uppercase;">Pickup</div><div style="margin-top:2px;"><div style="width:18px;height:18px;border-radius:50%;background:linear-gradient(135deg,#F9D5C2,#F2A07B);display:flex;align-items:center;justify-content:center;font-size:8px;margin:0 auto;">👩</div></div></div>
+            </div>
+            <div style="font-family:var(--fh);font-size:0.58rem;font-weight:600;color:var(--green);">✓ Added to planner & budget</div>
+          </div>
+
+          <div style="height:1px;background:var(--s05);margin:2px 0 10px;"></div>
+
+          <!-- Discover teasers (mobile: horizontal scroll feel) -->
+          <div style="margin-bottom:10px;">
+            <div style="font-family:var(--fh);font-size:0.55rem;font-weight:700;color:#3A7BAD;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">B · More to explore</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+              <div class="ob-teaser" style="padding:10px;"><div style="font-size:1.2rem;">🏠</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:700;margin-top:3px;">Assets</div></div>
+              <div class="ob-teaser" style="padding:10px;"><div style="font-size:1.2rem;">🎯</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:700;margin-top:3px;">Goals</div></div>
+              <div class="ob-teaser" style="padding:10px;"><div style="font-size:1.2rem;">✅</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:700;margin-top:3px;">To-Dos</div></div>
+              <div class="ob-teaser" style="padding:10px;"><div style="font-size:1.2rem;">🔐</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:700;margin-top:3px;">Vault</div></div>
+              <div class="ob-teaser" style="padding:10px;"><div style="font-size:1.2rem;">📊</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:700;margin-top:3px;">Budgets</div></div>
+              <div class="ob-teaser" style="padding:10px;"><div style="font-size:1.2rem;">🫘</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:700;margin-top:3px;">More...</div></div>
+            </div>
+          </div>
+
+          <!-- Closing + nav -->
+          <div style="background:linear-gradient(135deg,var(--deep-slate),#3D5368);border-radius:14px;padding:12px 16px;color:white;display:flex;align-items:center;gap:10px;margin-bottom:auto;">
+            <span style="font-size:1.3rem;">🫘</span>
+            <div><div style="font-family:var(--fh);font-size:0.7rem;font-weight:700;">We built beanies to help you.</div><div style="font-size:0.58rem;opacity:0.5;margin-top:1px;">More time for your little beans.</div></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:12px;">
+            <span style="font-family:var(--fh);font-size:0.65rem;opacity:0.3;">← Back</span>
+            <div style="font-family:var(--fh);font-size:0.72rem;font-weight:600;color:white;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));padding:10px 24px;border-radius:30px;">All Done! 🎉</div>
+          </div>
+        </div>
+      </div>
+      <div class="pl">Mobile — Family Life</div>
+    </div>
+  </div>
+
+  <div class="an" style="margin-top:40px;"><div class="anl"></div><div><div class="ant">Design Notes</div><div class="anx">The activity card now includes a <strong>day-of-week multi-select row</strong> — seven chips (Mon–Sun), tap to select multiple days. This captures activities that happen on multiple days (e.g. Piano on Wed + Sat). On mobile the chips use single-letter abbreviations (M, T, W, T, F, S, S) to fit the narrower width. The rest of the card (time, frequency, who, pickup) remains in the compact 4-column grid. Discover teasers use a 3×2 grid on mobile instead of 5-across — more tap-friendly and less cramped. The closing message strip is retained as the emotional bridge to the completion screen.</div></div></div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- WELCOME HOME                                              -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<section class="ms bwg" id="s3">
+  <div class="sh">
+    <div class="sn">Completion</div>
+    <h2 class="st">Welcome Home!</h2>
+    <p class="ss">Celebration, summary, and handoff to the Family Nook.</p>
+  </div>
+
+  <div class="dual-view">
+    <!-- Desktop -->
+    <div class="df">
+      <div class="dt"><div class="dd r"></div><div class="dd y"></div><div class="dd g"></div><div class="du">🔒 beanies.family/welcome-home</div></div>
+      <div class="ds">
+        <div class="ob-complete" style="min-height:520px;">
+          <div style="position:absolute;top:30px;left:15%;font-size:1.5rem;opacity:0.2;animation:float 4s ease-in-out infinite;">🎉</div>
+          <div style="position:absolute;top:80px;right:12%;font-size:1.2rem;opacity:0.15;animation:float 5s ease-in-out 1s infinite;">🌟</div>
+          <div style="position:absolute;bottom:100px;left:10%;font-size:1.3rem;opacity:0.15;animation:float 4.5s ease-in-out 0.5s infinite;">🫘</div>
+          <div style="position:relative;z-index:1;">
+            <div style="font-size:100px;margin-bottom:20px;animation:float 4s ease-in-out infinite;">👨‍👩‍👧‍👦</div>
+            <h2 style="font-family:var(--fh);font-size:2.2rem;font-weight:800;color:var(--deep-slate);margin-bottom:8px;">Your <span style="color:var(--heritage-orange);">Bean Pod</span> is Ready!</h2>
+            <p style="font-size:0.95rem;color:var(--deep-slate);opacity:0.5;max-width:400px;margin:0 auto 28px;line-height:1.6;">That's it — you're all set. Explore, add more, and make beanies yours.</p>
+            <div style="display:flex;gap:14px;margin-bottom:32px;justify-content:center;">
+              <div style="background:white;border-radius:16px;padding:14px 22px;text-align:center;box-shadow:0 4px 20px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">🏦</div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;">1</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:600;opacity:0.4;">Account</div></div>
+              <div style="background:white;border-radius:16px;padding:14px 22px;text-align:center;box-shadow:0 4px 20px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">🔄</div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;">2</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:600;opacity:0.4;">Recurring</div></div>
+              <div style="background:white;border-radius:16px;padding:14px 22px;text-align:center;box-shadow:0 4px 20px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">🎯</div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;color:var(--heritage-orange);">20%</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:600;opacity:0.4;">Savings</div></div>
+              <div style="background:white;border-radius:16px;padding:14px 22px;text-align:center;box-shadow:0 4px 20px rgba(44,62,80,0.06);"><div style="font-size:1.3rem;">🎹</div><div style="font-family:var(--fh);font-size:1rem;font-weight:800;">1</div><div style="font-family:var(--fh);font-size:0.58rem;font-weight:600;opacity:0.4;">Activity</div></div>
+            </div>
+            <button class="obb ap" style="font-size:1.05rem;padding:16px 52px;">Enter The Nook 🏡</button>
+            <div style="font-family:var(--fh);font-size:0.72rem;color:var(--deep-slate);opacity:0.3;margin-top:20px;font-style:italic;">go take care of your little beans — we'll take care of the rest. 🫘</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile -->
+    <div class="pf">
+      <div class="pno"></div>
+      <div class="ps">
+        <div class="ob-complete" style="min-height:600px;padding:32px 20px;">
+          <div style="position:absolute;top:20px;left:15%;font-size:1.2rem;opacity:0.15;animation:float 4s ease-in-out infinite;">🎉</div>
+          <div style="position:absolute;top:60px;right:12%;font-size:1rem;opacity:0.1;animation:float 5s ease-in-out 1s infinite;">🌟</div>
+          <div style="position:relative;z-index:1;">
+            <div style="font-size:72px;margin-bottom:16px;animation:float 4s ease-in-out infinite;">👨‍👩‍👧‍👦</div>
+            <h2 style="font-family:var(--fh);font-size:1.5rem;font-weight:800;color:var(--deep-slate);margin-bottom:6px;">Your <span style="color:var(--heritage-orange);">Bean Pod</span><br>is Ready!</h2>
+            <p style="font-size:0.78rem;color:var(--deep-slate);opacity:0.5;max-width:260px;margin:0 auto 20px;line-height:1.5;">You're all set. Explore and make beanies yours.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:24px;">
+              <div style="background:white;border-radius:14px;padding:12px;text-align:center;box-shadow:0 2px 12px rgba(44,62,80,0.05);"><div style="font-size:1.1rem;">🏦</div><div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;">1</div><div style="font-family:var(--fh);font-size:0.5rem;opacity:0.4;">Account</div></div>
+              <div style="background:white;border-radius:14px;padding:12px;text-align:center;box-shadow:0 2px 12px rgba(44,62,80,0.05);"><div style="font-size:1.1rem;">🔄</div><div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;">2</div><div style="font-family:var(--fh);font-size:0.5rem;opacity:0.4;">Recurring</div></div>
+              <div style="background:white;border-radius:14px;padding:12px;text-align:center;box-shadow:0 2px 12px rgba(44,62,80,0.05);"><div style="font-size:1.1rem;">🎯</div><div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;color:var(--heritage-orange);">20%</div><div style="font-family:var(--fh);font-size:0.5rem;opacity:0.4;">Savings</div></div>
+              <div style="background:white;border-radius:14px;padding:12px;text-align:center;box-shadow:0 2px 12px rgba(44,62,80,0.05);"><div style="font-size:1.1rem;">🎹</div><div style="font-family:var(--fh);font-size:0.85rem;font-weight:800;">1</div><div style="font-family:var(--fh);font-size:0.5rem;opacity:0.4;">Activity</div></div>
+            </div>
+            <button class="obb" style="font-size:0.88rem;padding:14px 40px;">Enter The Nook 🏡</button>
+            <div style="font-family:var(--fh);font-size:0.62rem;color:var(--deep-slate);opacity:0.3;margin-top:16px;font-style:italic;">take care of your little beans 🫘</div>
+          </div>
+        </div>
+      </div>
+      <div class="pl">Mobile — Welcome Home</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- FLOW OVERVIEW                                             -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<section class="ms bgc" id="flow" style="padding-bottom:120px;">
+  <div class="sh">
+    <div class="sn">Reference</div>
+    <h2 class="st">Lite Flow v2 — Overview</h2>
+    <p class="ss">Three steps, under two minutes. Now with modal-based recurring entry, bank dropdown, and day-of-week selection.</p>
+  </div>
+
+  <div style="max-width:900px;margin:0 auto;">
+    <div style="display:grid;grid-template-columns:1fr;gap:0;">
+
+      <div style="display:flex;align-items:flex-start;gap:24px;margin-bottom:8px;">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:48px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:white;font-family:var(--fh);font-weight:800;box-shadow:0 4px 16px rgba(241,93,34,0.25);">1</div>
+          <div style="width:3px;height:40px;background:linear-gradient(180deg,var(--heritage-orange),var(--sky-silk));border-radius:3px;margin-top:8px;"></div>
+        </div>
+        <div class="nc" style="flex:1;padding:20px 24px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.3rem;">👨‍👩‍👧‍👦</span><div style="font-family:var(--fh);font-size:1rem;font-weight:700;">Welcome</div><span class="pt psl" style="margin-left:auto;">~10 sec</span></div>
+          <div style="font-size:0.78rem;opacity:0.5;line-height:1.6;">Emotional hook, three pillars, three progress dots. Identical in desktop and mobile.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:24px;margin-bottom:8px;">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:48px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:white;font-family:var(--fh);font-weight:800;box-shadow:0 4px 16px rgba(241,93,34,0.25);">2</div>
+          <div style="width:3px;height:40px;background:linear-gradient(180deg,var(--sky-silk),#6EE7B7);border-radius:3px;margin-top:8px;"></div>
+        </div>
+        <div class="nc" style="flex:1;padding:20px 24px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.3rem;">🐷</span><div style="font-family:var(--fh);font-size:1rem;font-weight:700;">Money Snapshot</div><span class="pt po" style="margin-left:auto;">Piggy Bank</span><span class="pt psl">~60 sec</span></div>
+          <div style="font-size:0.78rem;opacity:0.5;line-height:1.6;"><strong>A: Account</strong> — bank dropdown + name + balance. <strong>B: Regular transactions</strong> — tap category chip → modal with name, amount, day, frequency, pre-selected account. <strong>C: Savings slider</strong> — % or fixed $, derives from salary. Live summary bar.</div>
+          <div style="display:flex;gap:6px;margin-top:8px;"><span class="pt psk">Skippable</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:24px;margin-bottom:8px;">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:48px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#6EE7B7,#27AE60);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:white;font-family:var(--fh);font-weight:800;box-shadow:0 4px 16px rgba(39,174,96,0.25);">3</div>
+          <div style="width:3px;height:40px;background:linear-gradient(180deg,#6EE7B7,var(--heritage-orange));border-radius:3px;margin-top:8px;"></div>
+        </div>
+        <div class="nc" style="flex:1;padding:20px 24px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.3rem;">🌳</span><div style="font-family:var(--fh);font-size:1rem;font-weight:700;">Family Life</div><span class="pt" style="background:rgba(110,231,183,0.15);color:#27AE60;margin-left:auto;">Treehouse</span><span class="pt psl">~45 sec</span></div>
+          <div style="font-size:0.78rem;opacity:0.5;line-height:1.6;"><strong>A: Activity</strong> — tap preset → fill card with <strong>day-of-week multi-select</strong> (Mon–Sun chips), time, frequency, cost, who, pickup. <strong>B: Discover teasers</strong> — 5 icon cards (Assets, Goals, To-Dos, Vault, Budgets). Closing message.</div>
+          <div style="display:flex;gap:6px;margin-top:8px;"><span class="pt psk">Skippable</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:flex-start;gap:24px;">
+        <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:48px;">
+          <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));display:flex;align-items:center;justify-content:center;font-size:1.5rem;box-shadow:0 4px 16px rgba(241,93,34,0.25);">🏡</div>
+        </div>
+        <div class="nc" style="flex:1;padding:20px 24px;background:linear-gradient(135deg,#FEF8F4,#EDF6FC);border:2px solid var(--or20);">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;"><span style="font-size:1.3rem;">🎉</span><div style="font-family:var(--fh);font-size:1rem;font-weight:700;">Welcome Home!</div><span class="pt" style="background:rgba(39,174,96,0.08);color:var(--green);margin-left:auto;">~2 min total</span></div>
+          <div style="font-size:0.78rem;opacity:0.5;line-height:1.6;">Summary cards (1 account, 2 recurring, 20% savings, 1 activity), celebration, "Enter The Nook." Mobile uses 2×2 grid for summary cards.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="an" style="margin-top:48px;"><div class="anl"></div><div><div class="ant">Changes in v2</div><div class="anx" style="max-width:800px;">
+    <strong>1. Bank dropdown replaces owner avatars</strong> on the account row — more practical, less cluttered. Owner can be set later or defaults to the logged-in user.<br><br>
+    <strong>2. "Add a regular transaction" replaces "Your regulars"</strong> — clearer intent. Tapping a category opens a focused modal rather than trying to inline-edit within the crowded main screen.<br><br>
+    <strong>3. Transaction modal</strong> pre-fills category, defaults direction (expense/income), pre-selects the account from Section A. User just confirms name, amount, and day. Mobile version uses a bottom sheet pattern.<br><br>
+    <strong>4. Day-of-week multi-select chips</strong> added to the activity card — Mon through Sun, tap multiple. Supports activities on multiple days. Mobile uses single-letter abbreviations.<br><br>
+    <strong>5. Mobile frames shown alongside desktop</strong> for every step — demonstrating how the layout adapts. Mobile uses stacked fields, abbreviated labels, compact chips, and bottom-sheet modals.
+  </div></div></div>
+</section>
+
+</body>
+</html>
