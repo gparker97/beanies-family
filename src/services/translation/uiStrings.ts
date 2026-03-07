@@ -568,14 +568,14 @@ const STRING_DEFS = {
     beanie: 'choose your preferred color scheme',
   },
   'settings.language': { en: 'Language', beanie: 'language' },
-  'settings.beanieMode': { en: 'Beanie Mode', beanie: 'beanie mode' },
+  'settings.beanieMode': { en: 'Beanie Mode', beanie: 'get me out of beanie mode' },
   'settings.beanieModeDescription': {
-    en: 'Replace standard labels with friendly beanie-themed language',
-    beanie: 'replace standard labels with friendly beanie-themed language',
+    en: 'Talk like a real beanie!',
+    beanie: "what's with all this dumb bean talk?! just give me plain english!",
   },
   'settings.beanieModeDisabled': {
     en: 'Beanie Mode is only available in English',
-    beanie: 'beanie mode is only available in english',
+    beanie: 'sorry, beanie mode is only available in english',
   },
   'settings.soundEffects': { en: 'Sound Effects', beanie: 'sound effects' },
   'settings.soundEffectsDescription': {
