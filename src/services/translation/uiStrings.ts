@@ -635,13 +635,13 @@ const STRING_DEFS = {
   'settings.appName': { en: 'beanies.family', beanie: 'beanies.family' },
   'settings.version': { en: 'Version 1.0.0 (MVP)', beanie: 'version 1.0.0 (mvp)' },
   'settings.appDescription': {
-    en: 'A local-first, privacy-focused family finance application.',
-    beanie: "a private, local-first home for your family's beanies.",
+    en: 'A secure, privacy-focused family finance and planning application.',
+    beanie: "a private and secure home for your family's precious beanies",
   },
   'settings.privacyNote': {
-    en: 'Your data is encrypted and saved to a file you control. Nothing is stored on our servers — your financial data never leaves your device.',
+    en: 'Your data is always encrypted, both in transit and at rest, and saved to a file you control. Nothing is stored on our servers — your precious financial and family data never leaves your hands.',
     beanie:
-      'your beanies are fully encrypted and saved to a file only you control. they never leave your device.',
+      'Your data is always encrypted, both in transit and at rest, and saved to a file you control. Nothing is stored on our servers — your precious financial and family data never leaves your hands.',
   },
 
   // Form labels
