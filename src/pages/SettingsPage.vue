@@ -83,8 +83,52 @@ const themeOptions = computed(() => [
   { value: 'system', label: t('settings.theme.system') },
 ]);
 
+const showRatesWarning = ref(false);
+const pendingCurrency = ref<string | null>(null);
+const isFetchingRates = ref(false);
+const ratesFetchError = ref<string | null>(null);
+
 async function updateCurrency(value: string | number) {
+  const hasRates = settingsStore.exchangeRates && settingsStore.exchangeRates.length > 0;
+  if (!hasRates && value !== settingsStore.baseCurrency) {
+    pendingCurrency.value = value as string;
+    ratesFetchError.value = null;
+    showRatesWarning.value = true;
+    return;
+  }
   await settingsStore.setBaseCurrency(value as string);
+}
+
+async function handleFetchAndSwitch() {
+  isFetchingRates.value = true;
+  ratesFetchError.value = null;
+  try {
+    const { forceUpdateRates } = await import('@/services/exchangeRate');
+    const result = await forceUpdateRates();
+    if (result.success) {
+      await settingsStore.loadGlobalSettings();
+      await settingsStore.loadSettings();
+      if (pendingCurrency.value) {
+        await settingsStore.setBaseCurrency(pendingCurrency.value);
+      }
+      showRatesWarning.value = false;
+      pendingCurrency.value = null;
+    } else {
+      ratesFetchError.value = result.error ?? t('settings.ratesFetchFailed');
+    }
+  } catch {
+    ratesFetchError.value = t('settings.ratesFetchFailed');
+  } finally {
+    isFetchingRates.value = false;
+  }
+}
+
+function handleSwitchWithoutRates() {
+  if (pendingCurrency.value) {
+    settingsStore.setBaseCurrency(pendingCurrency.value);
+  }
+  showRatesWarning.value = false;
+  pendingCurrency.value = null;
 }
 
 async function updateTheme(value: string | number) {
@@ -391,6 +435,58 @@ async function handleClearData() {
     <!-- ══════════════════════════════════════════════════════════════════ -->
     <!-- ── MODALS ────────────────────────────────────────────────────── -->
     <!-- ══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ── Exchange Rates Warning Modal ─────────────────────────────────── -->
+    <BaseModal :open="showRatesWarning" size="sm" @close="showRatesWarning = false">
+      <div class="p-5">
+        <div class="mb-3 flex items-center gap-2">
+          <svg
+            class="h-5 w-5 flex-shrink-0 text-amber-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+          <h3 class="font-outfit text-base font-bold text-gray-900 dark:text-gray-100">
+            {{ t('settings.baseCurrency') }}
+          </h3>
+        </div>
+        <p class="mb-4 text-sm leading-relaxed text-gray-600 dark:text-gray-300">
+          {{ t('settings.noRatesWarning') }}
+        </p>
+        <div
+          v-if="ratesFetchError"
+          class="mb-3 rounded-lg bg-red-50 p-2 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400"
+        >
+          {{ ratesFetchError }}
+        </div>
+        <div class="flex gap-2">
+          <BaseButton
+            class="flex-1"
+            size="sm"
+            :loading="isFetchingRates"
+            @click="handleFetchAndSwitch"
+          >
+            {{ t('settings.fetchRatesNow') }}
+          </BaseButton>
+          <BaseButton
+            variant="ghost"
+            size="sm"
+            class="flex-1"
+            :disabled="isFetchingRates"
+            @click="handleSwitchWithoutRates"
+          >
+            {{ t('settings.switchAnyway') }}
+          </BaseButton>
+        </div>
+      </div>
+    </BaseModal>
 
     <!-- ── Appearance Modal ────────────────────────────────────────────── -->
     <BaseModal
