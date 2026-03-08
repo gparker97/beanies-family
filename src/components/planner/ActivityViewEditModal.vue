@@ -495,9 +495,6 @@ async function handleDelete() {
         >
           <template #view>
             <div v-if="activity.location" class="flex items-center gap-1.5">
-              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-                {{ activity.location }}
-              </span>
               <a
                 :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
                 target="_blank"
@@ -517,6 +514,9 @@ async function handleDelete() {
                   <circle cx="12" cy="10" r="3" />
                 </svg>
               </a>
+              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                {{ activity.location }}
+              </span>
             </div>
             <span v-else class="text-sm text-[var(--color-text-muted)] italic">
               {{ t('planner.noLocation') }}
