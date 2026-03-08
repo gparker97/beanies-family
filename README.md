@@ -56,3 +56,4 @@ Greg
 
 <img width="192" height="192" alt="beanies_father_son_icon_192x192" src="https://github.com/user-attachments/assets/c6b6fd45-cc71-4feb-9c7d-3fb41c42a4a3" />
 
+<sub><sup>License: beanies.family is open source under the ./LICENSE. You are free to use, study, and self-host the software, but you may not sell it or offer it as a commercial service. The name "beanies.family", the beanies logo, and all brand assets are trademarks of NJL Solutions Pte Ltd. See ./TRADEMARK.md for details.</sup></sub>
