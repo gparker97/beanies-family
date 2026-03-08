@@ -77,8 +77,8 @@ export interface MobileTabDef {
 
 export const MOBILE_TAB_ITEMS: MobileTabDef[] = [
   { labelKey: 'mobile.nook', path: '/nook', emoji: '\u{1F3E1}' },
+  { labelKey: 'mobile.todo', path: '/todo', emoji: '\u2705' },
   { labelKey: 'mobile.planner', path: '/planner', emoji: '\u{1F4C5}' },
   { labelKey: 'mobile.piggyBank', path: '/dashboard', emoji: '\u{1F437}' },
-  { labelKey: 'mobile.budget', path: '/budgets', emoji: '\u{1F4CB}' },
   { labelKey: 'mobile.pod', path: '/family', emoji: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}' },
 ];
