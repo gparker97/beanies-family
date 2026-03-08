@@ -998,7 +998,7 @@ const STRING_DEFS = {
     en: '{count} Beans Growing Strong',
     beanie: '{count} beans growing strong',
   },
-  'family.hub.addBean': { en: '+ Add Bean', beanie: '+ add bean' },
+  'family.hub.addBean': { en: '+ Add a Beanie', beanie: '+ add a beanie' },
   'family.hub.familyStats': { en: 'Family Stats', beanie: 'family stats' },
   'family.hub.members': { en: 'Members', beanie: 'beanies' },
   'family.hub.totalActivities': { en: 'Total Activities', beanie: 'total activities' },

@@ -323,65 +323,92 @@ function cancelEditFamilyName() {
           <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
             {{ t('family.hub.title') }} 🫘
           </h1>
+          <!-- Family name — prominent, editable -->
+          <div class="mt-1 flex items-center gap-1.5">
+            <span
+              v-if="!isEditingFamilyName"
+              class="font-outfit text-primary-500 text-lg font-bold"
+            >
+              {{ familyContextStore.activeFamilyName || t('family.title') }}
+            </span>
+            <div v-else class="flex items-center gap-2">
+              <input
+                v-model="editFamilyName"
+                type="text"
+                class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 w-48 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+                @keyup.enter="saveFamilyName"
+                @keyup.escape="cancelEditFamilyName"
+              />
+              <button
+                class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                @click="saveFamilyName"
+              >
+                <BeanieIcon name="check" size="md" />
+              </button>
+              <button
+                class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+                @click="cancelEditFamilyName"
+              >
+                <BeanieIcon name="close" size="md" />
+              </button>
+            </div>
+            <button
+              v-if="!isEditingFamilyName && familyContextStore.activeFamilyName && canManagePod"
+              class="text-primary-500/40 hover:text-primary-500/70 rounded p-0.5 transition-colors"
+              :title="t('family.editFamilyName')"
+              @click="startEditFamilyName"
+            >
+              <BeanieIcon name="edit" size="sm" />
+            </button>
+          </div>
           <p class="text-secondary-500/40 mt-0.5 text-sm dark:text-gray-500">
             {{ t('family.hub.subtitle').replace('{count}', String(familyStore.members.length)) }}
           </p>
         </div>
-        <div v-if="canManagePod" class="flex gap-2">
-          <BaseButton
-            v-if="familyContextStore.activeFamilyId"
-            variant="secondary"
-            @click="openInviteModal"
-          >
-            {{ t('login.inviteTitle') }}
-          </BaseButton>
+        <!-- Action buttons — stacked right on desktop -->
+        <div v-if="canManagePod" class="flex flex-shrink-0 flex-col items-end gap-2">
           <button
             class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 rounded-full bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all"
             @click="openAddModal"
           >
             {{ t('family.hub.addBean') }}
           </button>
+          <button
+            v-if="familyContextStore.activeFamilyId"
+            class="hidden items-center gap-2 rounded-full border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-4 py-2 shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md sm:flex dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20"
+            @click="openInviteModal"
+          >
+            <span class="text-base">💌</span>
+            <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+              {{ t('login.inviteTitle') }}
+            </span>
+          </button>
         </div>
       </div>
 
-      <!-- Family name inline edit -->
-      <div class="mt-2 flex items-center gap-2">
+      <!-- Invite button — full-width on mobile only -->
+      <button
+        v-if="canManagePod && familyContextStore.activeFamilyId"
+        class="mt-4 flex w-full items-center gap-3 rounded-2xl border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-4 py-3 text-left shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md sm:hidden dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20"
+        @click="openInviteModal"
+      >
         <span
-          v-if="!isEditingFamilyName"
-          class="text-sm font-medium text-gray-600 dark:text-gray-400"
+          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/80 text-lg shadow-sm dark:bg-white/15"
         >
-          {{ familyContextStore.activeFamilyName || t('family.title') }}
+          💌
         </span>
-        <div v-else class="flex items-center gap-2">
-          <input
-            v-model="editFamilyName"
-            type="text"
-            class="focus:border-primary-500 focus:ring-primary-500 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-900 focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
-            @keyup.enter="saveFamilyName"
-            @keyup.escape="cancelEditFamilyName"
-          />
-          <button
-            class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-            @click="saveFamilyName"
-          >
-            <BeanieIcon name="check" size="md" />
-          </button>
-          <button
-            class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-            @click="cancelEditFamilyName"
-          >
-            <BeanieIcon name="close" size="md" />
-          </button>
-        </div>
-        <button
-          v-if="!isEditingFamilyName && familyContextStore.activeFamilyName && canManagePod"
-          class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
-          :title="t('family.editFamilyName')"
-          @click="startEditFamilyName"
+        <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+          {{ t('login.inviteTitle') }}
+        </span>
+        <svg
+          class="text-secondary-500/30 ml-auto h-4 w-4 dark:text-gray-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          <BeanieIcon name="edit" size="sm" />
-        </button>
-      </div>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
     </div>
 
     <!-- 2-column layout: member cards + quick info panel -->
