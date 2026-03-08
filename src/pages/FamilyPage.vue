@@ -1,20 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import { BaseCard, BaseButton, BaseInput, BaseModal } from '@/components/ui';
+import { BaseButton, BaseInput, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
-import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
+import FamilyMemberCard from '@/components/family/FamilyMemberCard.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
 import { useClipboard } from '@/composables/useClipboard';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
-import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
-import { timeAgo } from '@/utils/date';
-import { isTemporaryEmail, isValidEmail } from '@/utils/email';
+import { isValidEmail } from '@/utils/email';
+import { toDateInputValue } from '@/utils/date';
 import { generateInviteQR } from '@/utils/qrCode';
 import { shareFileWithEmail } from '@/services/google/driveService';
 import { getValidToken } from '@/services/google/googleAuth';
@@ -22,7 +20,10 @@ import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
+import { useActivityStore } from '@/stores/activityStore';
+import { useTodoStore } from '@/stores/todoStore';
 import type {
+  ActivityCategory,
   CreateFamilyMemberInput,
   FamilyMember,
   UpdateFamilyMemberInput,
@@ -32,9 +33,93 @@ const route = useRoute();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
+const activityStore = useActivityStore();
+const todoStore = useTodoStore();
 const { t } = useTranslation();
 const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
+
+/** Event bar color based on activity category (matches sidebar mockup). */
+function getEventBarColor(category: ActivityCategory): string {
+  switch (category) {
+    case 'lesson':
+    case 'sport':
+      return 'bg-primary-500';
+    case 'appointment':
+      return 'bg-sky-silk-300';
+    case 'social':
+      return 'bg-secondary-500/20';
+    default:
+      return 'bg-primary-500';
+  }
+}
+
+/** A highlight item shown on member cards (up to 2 per member). */
+export interface MemberHighlight {
+  emoji: string;
+  title: string;
+  subtitle: string;
+}
+
+// Per-member upcoming highlights (2 most important items: activities, todos, birthdays)
+const memberHighlights = computed(() => {
+  const today = toDateInputValue(new Date());
+  const map = new Map<string, MemberHighlight[]>();
+
+  for (const m of familyStore.members) {
+    const items: MemberHighlight[] = [];
+
+    // 1. Next upcoming activity for this member
+    const nextActivity = activityStore.upcomingActivities.find(
+      (e) => e.activity.assigneeId === m.id
+    );
+    if (nextActivity) {
+      items.push({
+        emoji: nextActivity.activity.icon || '📅',
+        title: `${nextActivity.activity.icon || '📅'} ${nextActivity.activity.startTime || nextActivity.date}`,
+        subtitle: nextActivity.activity.title,
+      });
+    }
+
+    // 2. Birthday milestone (if dateOfBirth is set)
+    if (m.dateOfBirth && items.length < 2) {
+      const month = String(m.dateOfBirth.month).padStart(2, '0');
+      const day = String(m.dateOfBirth.day).padStart(2, '0');
+      const birthdayThisYear = `${new Date().getFullYear()}-${month}-${day}`;
+      // Show if birthday is upcoming (within next 90 days)
+      if (birthdayThisYear >= today) {
+        items.push({
+          emoji: '🎂',
+          title: `🎂 ${month}/${day}`,
+          subtitle: t('family.hub.highlight.birthday'),
+        });
+      }
+    }
+
+    // 3. Next open todo for this member
+    if (items.length < 2) {
+      const memberTodos = todoStore.openTodos.filter((td) => td.assigneeId === m.id);
+      const nextTodo = memberTodos[0];
+      if (nextTodo) {
+        items.push({
+          emoji: '📋',
+          title: `📋 ${memberTodos.length} ${memberTodos.length === 1 ? 'task' : 'tasks'}`,
+          subtitle: t('family.hub.highlight.thisWeek'),
+        });
+      }
+    }
+
+    map.set(m.id, items);
+  }
+  return map;
+});
+
+// Upcoming activities within the next 7 days (for quick info panel)
+const upcomingThisWeek = computed(() => {
+  const today = toDateInputValue(new Date());
+  const weekFromNow = toDateInputValue(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  return activityStore.upcomingActivities.filter((e) => e.date >= today && e.date <= weekFromNow);
+});
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
@@ -231,9 +316,36 @@ function cancelEditFamilyName() {
 
 <template>
   <div class="space-y-6">
-    <!-- Family name + actions -->
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
+    <!-- Header: Bean Pod title + family name + actions -->
+    <div>
+      <div class="flex items-start justify-between">
+        <div>
+          <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
+            {{ t('family.hub.title') }} 🫘
+          </h1>
+          <p class="text-secondary-500/40 mt-0.5 text-sm dark:text-gray-500">
+            {{ t('family.hub.subtitle').replace('{count}', String(familyStore.members.length)) }}
+          </p>
+        </div>
+        <div v-if="canManagePod" class="flex gap-2">
+          <BaseButton
+            v-if="familyContextStore.activeFamilyId"
+            variant="secondary"
+            @click="openInviteModal"
+          >
+            {{ t('login.inviteTitle') }}
+          </BaseButton>
+          <button
+            class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 rounded-full bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all"
+            @click="openAddModal"
+          >
+            {{ t('family.hub.addBean') }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Family name inline edit -->
+      <div class="mt-2 flex items-center gap-2">
         <span
           v-if="!isEditingFamilyName"
           class="text-sm font-medium text-gray-600 dark:text-gray-400"
@@ -270,105 +382,112 @@ function cancelEditFamilyName() {
           <BeanieIcon name="edit" size="sm" />
         </button>
       </div>
-      <div v-if="canManagePod" class="flex gap-2">
-        <BaseButton
-          v-if="familyContextStore.activeFamilyId"
-          variant="secondary"
-          @click="openInviteModal"
-        >
-          {{ t('login.inviteTitle') }}
-        </BaseButton>
-        <BaseButton @click="openAddModal">
-          {{ t('family.addMember') }}
-        </BaseButton>
-      </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <BaseCard
-        v-for="member in familyStore.members"
-        :key="member.id"
-        :hoverable="true"
-        class="cursor-pointer"
-        :class="syncHighlightClass(member.id)"
-        @click="openEditModal(member)"
-      >
-        <div class="flex items-start gap-4">
-          <BeanieAvatar
-            :variant="getMemberAvatarVariant(member)"
-            :color="member.color"
-            size="lg"
-            :aria-label="member.name"
-          />
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <h3 class="truncate font-medium text-gray-900 dark:text-gray-100">
-                {{ member.name }}
-              </h3>
-              <span @click.stop>
-                <MemberRoleManager
-                  :current-role="member.role"
-                  :member-id="member.id"
-                  :disabled="!canManagePod"
-                  @change="handleRoleChange(member.id, $event)"
-                />
-              </span>
-            </div>
-            <p class="truncate text-sm text-gray-500 dark:text-gray-400">
-              {{ isTemporaryEmail(member.email) ? t('family.emailNotSet') : member.email }}
-            </p>
-            <!-- Status badge -->
-            <div class="mt-1.5 flex items-center gap-2">
-              <span
-                v-if="member.requiresPassword"
-                class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-              >
-                <span class="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                {{ t('family.status.waitingToJoin') }}
-              </span>
-              <template v-else>
-                <span
-                  class="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                >
-                  <span class="h-1.5 w-1.5 rounded-full bg-green-500" />
-                  {{ t('family.status.active') }}
-                </span>
-                <span class="text-xs text-gray-400 dark:text-gray-500">
-                  {{
-                    member.lastLoginAt
-                      ? t('family.lastSeen').replace('{date}', timeAgo(member.lastLoginAt))
-                      : t('family.neverLoggedIn')
-                  }}
-                </span>
-              </template>
-            </div>
-            <!-- Copied feedback -->
-            <p
-              v-if="copiedMemberId === member.id"
-              class="mt-1 text-xs font-medium text-green-600 dark:text-green-400"
-            >
-              {{ t('family.linkCopied') }}
-            </p>
+    <!-- 2-column layout: member cards + quick info panel -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <!-- Member cards (2/3 width on desktop) -->
+      <div class="space-y-4 lg:col-span-2">
+        <FamilyMemberCard
+          v-for="member in familyStore.members"
+          :key="member.id"
+          :member="member"
+          :highlights="memberHighlights.get(member.id) ?? []"
+          :can-manage="canManagePod"
+          :copied-feedback="copiedMemberId === member.id"
+          :class="syncHighlightClass(member.id)"
+          @edit="openEditModal(member)"
+          @delete="deleteMember(member.id)"
+          @copy-invite="copyMemberInviteLink(member.id)"
+          @role-change="handleRoleChange(member.id, $event)"
+        />
+      </div>
+
+      <!-- Quick Info panel (1/3 width on desktop) -->
+      <div class="space-y-5">
+        <!-- Family Stats -->
+        <div
+          class="rounded-[var(--sq)] bg-gradient-to-br from-[var(--tint-silk-10)] to-[var(--tint-orange-4)] p-5 dark:from-slate-700/50 dark:to-slate-700/30"
+        >
+          <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
+            🌳 {{ t('family.hub.familyStats') }}
           </div>
-          <div class="flex flex-shrink-0 gap-1">
-            <button
-              v-if="member.requiresPassword && canManagePod"
-              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
-              :title="t('family.copyInviteLinkHint')"
-              @click.stop="copyMemberInviteLink(member.id)"
-            >
-              <BeanieIcon name="copy" size="md" />
-            </button>
-            <button
-              v-if="member.role !== 'owner' && canManagePod"
-              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
-              @click.stop="deleteMember(member.id)"
-            >
-              <BeanieIcon name="trash" size="md" />
-            </button>
+          <div class="space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span class="text-secondary-500/50 dark:text-gray-500">
+                {{ t('family.hub.members') }}
+              </span>
+              <span class="font-outfit text-secondary-500 font-bold dark:text-gray-200">
+                {{ familyStore.members.length }}
+                {{ t('family.hub.statBeans') }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-secondary-500/50 dark:text-gray-500">
+                {{ t('family.hub.totalActivities') }}
+              </span>
+              <span class="font-outfit text-secondary-500 font-bold dark:text-gray-200">
+                {{ activityStore.activeActivities.length }}
+                {{ t('family.hub.highlight.thisWeek') }}
+              </span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-secondary-500/50 dark:text-gray-500">
+                {{ t('family.hub.upcomingEvents') }}
+              </span>
+              <span class="font-outfit text-secondary-500 font-bold dark:text-gray-200">
+                {{ upcomingThisWeek.length }}
+                {{ t('family.hub.statUpcoming') }}
+              </span>
+            </div>
           </div>
         </div>
-      </BaseCard>
+
+        <!-- Events This Week -->
+        <div>
+          <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
+            {{ t('family.hub.eventsThisWeek') }}
+          </div>
+          <div
+            v-if="upcomingThisWeek.length"
+            class="divide-y divide-[var(--tint-slate-5)] dark:divide-slate-700"
+          >
+            <div
+              v-for="event in upcomingThisWeek.slice(0, 5)"
+              :key="event.activity.id + event.date"
+              class="flex gap-3 py-3"
+            >
+              <!-- Color bar -->
+              <div
+                class="w-1 flex-shrink-0 rounded-full"
+                :class="getEventBarColor(event.activity.category)"
+              />
+              <div class="min-w-0 flex-1">
+                <div class="text-secondary-500/40 text-xs dark:text-gray-500">
+                  {{ event.date
+                  }}{{ event.activity.startTime ? ', ' + event.activity.startTime : '' }}
+                </div>
+                <div
+                  class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-200"
+                >
+                  {{ event.activity.title }}
+                </div>
+                <div class="text-secondary-500/40 text-xs dark:text-gray-500">
+                  {{
+                    event.activity.assigneeId
+                      ? familyStore.members.find((m) => m.id === event.activity.assigneeId)?.name ||
+                        ''
+                      : t('family.title')
+                  }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <p v-else class="text-secondary-500/40 text-xs dark:text-gray-500">
+            {{ t('family.hub.noEvents') }}
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Add Member Modal -->
