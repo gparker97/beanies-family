@@ -19,7 +19,7 @@ import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
-import { updateRatesIfStale } from '@/services/exchangeRate';
+import { updateRatesIfStale, forceUpdateRates } from '@/services/exchangeRate';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -437,8 +437,13 @@ onMounted(async () => {
       console.error('[App] Post-init health check failed — no Automerge doc\n' + breadcrumbLog);
     }
 
-    // Auto-update exchange rates if enabled (non-blocking)
-    if (settingsStore.exchangeRateAutoUpdate) {
+    // Always fetch exchange rates on init when none are loaded (first-time users,
+    // join flow, cross-browser). If rates exist, only refresh if auto-update is
+    // enabled and rates are stale (>24h).
+    const hasNoRates = !settingsStore.exchangeRates || settingsStore.exchangeRates.length === 0;
+    if (hasNoRates) {
+      forceUpdateRates().catch(console.error);
+    } else if (settingsStore.exchangeRateAutoUpdate) {
       updateRatesIfStale().catch(console.error);
     }
   } catch (err) {

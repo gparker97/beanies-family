@@ -634,6 +634,17 @@ const STRING_DEFS = {
   'settings.about': { en: 'About', beanie: 'about' },
   'settings.appName': { en: 'beanies.family', beanie: 'beanies.family' },
   'settings.version': { en: 'Version 1.0.0 (MVP)', beanie: 'version 1.0.0 (mvp)' },
+  'settings.noRatesWarning': {
+    en: 'Exchange rates have not been loaded yet. Currency conversions will not work correctly without them.',
+    beanie:
+      'exchange rates have not been loaded yet. currency conversions will not work correctly without them.',
+  },
+  'settings.fetchRatesNow': { en: 'Fetch Rates Now', beanie: 'fetch rates now' },
+  'settings.switchAnyway': { en: 'Switch Anyway', beanie: 'switch anyway' },
+  'settings.ratesFetchFailed': {
+    en: 'Could not fetch exchange rates. Check your connection and try again.',
+    beanie: 'could not fetch exchange rates. check your connection and try again.',
+  },
   'settings.appDescription': {
     en: 'A secure, privacy-focused family finance and planning application.',
     beanie: "a private and secure home for your family's precious beanies",
