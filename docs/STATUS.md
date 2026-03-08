@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-06
-> **Updated by:** Claude (View-first modals + endTime auto-sync)
+> **Last updated:** 2026-03-08
+> **Updated by:** Claude (Close #73, header/PWA/currency fixes deployed)
 
 ## Current Phase
 
@@ -53,6 +53,7 @@
 - First-run setup wizard
 - Multi-currency display with global display currency selector
 - Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards (merged todos + planner activities with view-first modals), inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed (view-first modals for todos + transactions). Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
+- Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 
 ### Beanie Brand Asset Icons
 
@@ -884,3 +885,8 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | 2026-03-05 | Nook card click-to-edit modals                              | Schedule cards merge planner activities with todos; all Nook cards (Schedule, Recent Activity, Todo Widget) open inline edit modals — no page navigation. NookTodoWidget reactivity bug fixed                                                                                       |
 | 2026-03-06 | View-first modals for activities and transactions           | Shared `useInlineEdit` composable + `InlineEditField` component; ActivityViewEditModal (7 inline fields), TransactionViewEditModal (4 inline fields); TodoViewEditModal refactored to use shared code; reactivity fix (store-lookup computed); toggle complete from todo view modal |
 | 2026-03-06 | Activity endTime auto-sync                                  | End time defaults to startTime + 1hr; reactive sync when start time changes; endTime clamped to not precede startTime; applies to ActivityModal and ActivityViewEditModal. `addHourToTime()` utility in date.ts                                                                     |
+| 2026-03-08 | Family Hub v7 redesign (#73) — closed                       | Redesigned as "The Bean Pod" with activity-focused member cards, quick-info panel, role tags. Calendar removed (→ Family Planner). Deployed to prod                                                                                                                                 |
+| 2026-03-08 | Header redesign: profile dropdown + sign-out modal          | Notification bell removed, profile avatar dropdown on mobile (matching desktop), Deep Slate gradient header, sign-out confirmation modal with "Sign Out & Clear Data" option using InfoHintBadge                                                                                    |
+| 2026-03-08 | PWA update speed improvements                               | 5-min polling (down from 60min), check on tab visibility change, auto-update on next navigation after 1-min grace period                                                                                                                                                            |
+| 2026-03-08 | Google OAuth race condition fix                             | `performSilentRefresh()` recovers refresh token from IndexedDB when in-memory token is lost (page reload/SW update), preventing unnecessary consent popup                                                                                                                           |
+| 2026-03-08 | Currency conversion staleness fix (critical)                | App init rate refresh now reloads Vue store after completion; `exchangeRates` computed picks most recent rates between per-family (synced) and device-local by comparing timestamps                                                                                                 |
