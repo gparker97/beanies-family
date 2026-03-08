@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-07",
-    "translationCount": 1207
+    "lastUpdated": "2026-03-08",
+    "translationCount": 1345
   },
   "translations": {
     "app.name": {
@@ -1157,14 +1157,14 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.appDescription": {
-      "translation": "本地优先、以隐私为中心的家庭金融应用程序。",
-      "hash": "lzikpd",
-      "lastUpdated": "2026-02-10"
+      "translation": "一个安全、注重隐私的家庭财务和规划应用程序。",
+      "hash": "rulfci",
+      "lastUpdated": "2026-03-08"
     },
     "settings.privacyNote": {
-      "translation": "您的数据将被加密并保存到您控制的文件中。我们的服务器上不会存储任何内容—您的财务数据永远不会离开您的设备。",
-      "hash": "9cf8jv",
-      "lastUpdated": "2026-02-24"
+      "translation": "您的数据始终在传输和静态过程中加密，并保存到您控制的文件中。我们的服务器上不会存储任何内容—您宝贵的财务和家庭数据永远不会离开您的手中。",
+      "hash": "ibk2ga",
+      "lastUpdated": "2026-03-08"
     },
     "form.name": {
       "translation": "姓名",
@@ -1557,9 +1557,9 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.beanieModeDescription": {
-      "translation": "用友好的豆豆主题语言替换标准标签",
-      "hash": "c5uge9",
-      "lastUpdated": "2026-02-24"
+      "translation": "像真正的豆豆一样说话！",
+      "hash": "kh7px5",
+      "lastUpdated": "2026-03-08"
     },
     "settings.beanieModeDisabled": {
       "translation": "Beanie Mode仅提供英语版本",
@@ -3541,15 +3541,10 @@
       "hash": "c4u9m7",
       "lastUpdated": "2026-03-03"
     },
-    "nook.statusGreatWeek": {
-      "translation": "每个人都有一个美好的一周！",
-      "hash": "28huqx",
-      "lastUpdated": "2026-02-26"
-    },
     "nook.statusSummary": {
-      "translation": "{tasks}已完成\\ u00B7 {milestones}接近",
-      "hash": "6dsjq8",
-      "lastUpdated": "2026-02-26"
+      "translation": "今天计划的{activities}活动\\ u00B7 {tasks}个任务即将到来",
+      "hash": "6w03dp",
+      "lastUpdated": "2026-03-08"
     },
     "nook.yourBeans": {
       "translation": "你的豆子",
@@ -4937,9 +4932,9 @@
       "lastUpdated": "2026-03-03"
     },
     "budget.comingSoon": {
-      "translation": "正在开发的beanies",
-      "hash": "ophanb",
-      "lastUpdated": "2026-03-01"
+      "translation": "不日上映",
+      "hash": "3jubzu",
+      "lastUpdated": "2026-03-08"
     },
     "budget.settings.title": {
       "translation": "预算设置",
@@ -6040,6 +6035,701 @@
       "translation": "返回首页",
       "hash": "weah05",
       "lastUpdated": "2026-03-07"
+    },
+    "settings.editProfile": {
+      "translation": "编辑个人资料",
+      "hash": "610z1p",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.appearance": {
+      "translation": "设备外观",
+      "hash": "8cjaf0",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.appearanceDesc": {
+      "translation": "主题和显示首选项",
+      "hash": "wditex",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.currency": {
+      "translation": "汇率",
+      "hash": "xhqbjq",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.currencyDesc": {
+      "translation": "货币汇率",
+      "hash": "r8hf0w",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.security": {
+      "translation": "安全与隐私",
+      "hash": "27a53m",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.securityDesc": {
+      "translation": "密钥和设备信任",
+      "hash": "a43azh",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.familyMembers": {
+      "translation": "家庭成员",
+      "hash": "ez95r1",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.familyMembersDesc": {
+      "translation": "管理您的家庭",
+      "hash": "gdvumu",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.familyData": {
+      "translation": "家庭数据",
+      "hash": "a33yzq",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.familyDataDesc": {
+      "translation": "云存储",
+      "hash": "5vqcjp",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.dataManagement": {
+      "translation": "数据管理",
+      "hash": "6yx94p",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.card.dataManagementDesc": {
+      "translation": "导出并清除数据",
+      "hash": "th5eoz",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.quickToggles": {
+      "translation": "快速设置",
+      "hash": "dv79yu",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.darkMode": {
+      "translation": "暗色模式",
+      "hash": "1j3fgt",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.darkModeDescription": {
+      "translation": "切换到对眼睛更轻松的深色配色方案",
+      "hash": "ogosjd",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.reconnectDrive": {
+      "translation": "重新连接",
+      "hash": "lihjux",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.forceSave": {
+      "translation": "强制保存",
+      "hash": "y7vg0i",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.cachePersistWarning": {
+      "translation": "本地缓存未更新—您的数据可能无法在页面刷新后存活",
+      "hash": "r1rzc2",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.noRatesWarning": {
+      "translation": "汇率尚未加载。没有它们，货币转换将无法正常工作。",
+      "hash": "esgm77",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.fetchRatesNow": {
+      "translation": "立即获取价格",
+      "hash": "jotqbn",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.switchAnyway": {
+      "translation": "仍然切换",
+      "hash": "jpquwf",
+      "lastUpdated": "2026-03-08"
+    },
+    "settings.ratesFetchFailed": {
+      "translation": "无法获取汇率。请检查您的网络连接，然后重试。",
+      "hash": "1n7w03",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.comingUp": {
+      "translation": "即將播出",
+      "hash": "6nm2ca",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.yourAssets": {
+      "translation": "一站式管理",
+      "hash": "fryq5s",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.yourAccounts": {
+      "translation": "您的帐户",
+      "hash": "9xvmlv",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.noAccounts": {
+      "translation": "还没有账户。添加账户以跟踪您的财务状况。",
+      "hash": "gi1dfe",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto0": {
+      "translation": "每个人都有一个美好的一周！",
+      "hash": "28huqx",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto1": {
+      "translation": "齐心协力，一切皆有可能！",
+      "hash": "o7vr6e",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto2": {
+      "translation": "你的家人正在做一些了不起的事情！",
+      "hash": "gynd9p",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto3": {
+      "translation": "每一小步都很重要！",
+      "hash": "gp9idq",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto4": {
+      "translation": "看看你们都走了多远！",
+      "hash": "b33apd",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto5": {
+      "translation": "你的团队真是太棒了！",
+      "hash": "wke23c",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto6": {
+      "translation": "今天会是个好日子！",
+      "hash": "prmjhq",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto7": {
+      "translation": "团队合作使梦想成真",
+      "hash": "u9gfyh",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto8": {
+      "translation": "小胜加起来就是大胜！",
+      "hash": "k5xyg0",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto9": {
+      "translation": "继续加油，你们都是明星！",
+      "hash": "y3z00r",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto10": {
+      "translation": "主页是心之所在",
+      "hash": "pvkmo0",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto11": {
+      "translation": "您正在建造美丽的东西！",
+      "hash": "y3icwt",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto12": {
+      "translation": "又是新的一天，又是新的冒险！",
+      "hash": "pwd7j",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto13": {
+      "translation": "最好的尚未到来。",
+      "hash": "mx34nt",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto14": {
+      "translation": "一天一天地创造美好回忆！",
+      "hash": "7tthu6",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto15": {
+      "translation": "您家人的力量鼓舞人心！",
+      "hash": "i6gv5w",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto16": {
+      "translation": "今天为大家加油！",
+      "hash": "yk049u",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto17": {
+      "translation": "幸福只有在分享时才会增长！",
+      "hash": "ry7rsw",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto18": {
+      "translation": "伟大的事情在一起发生！",
+      "hash": "87184x",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto19": {
+      "translation": "你做到了，家人！",
+      "hash": "6x82pa",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto20": {
+      "translation": "豆子，豆子，对你的心脏有好处！",
+      "hash": "uox3ce",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto21": {
+      "translation": "首先你得到豆子，然后你得到力量，然后你得到女人",
+      "hash": "lqdxsm",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto22": {
+      "translation": "在豆子发芽之前不要数它们！",
+      "hash": "b2muiw",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto23": {
+      "translation": "谁把豆子放出来的？ ！",
+      "hash": "5de3p9",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto24": {
+      "translation": "你是一个很酷的豆子家族！",
+      "hash": "mzvc9x",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto25": {
+      "translation": "有人看见我的豆子了吗？",
+      "hash": "4vrmln",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto26": {
+      "translation": "生命就是在豆子数之间发生的事情！",
+      "hash": "ydvy76",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.motto27": {
+      "translation": "Bean在那里，做到了，得到了家人！",
+      "hash": "cyvzvb",
+      "lastUpdated": "2026-03-08"
+    },
+    "nook.moreItems": {
+      "translation": "本周更多",
+      "hash": "aijlez",
+      "lastUpdated": "2026-03-08"
+    },
+    "storage.localFileWarning": {
+      "translation": "本地文件非常安全，但不会与其他家庭成员同步。如果您计划与家人一起使用此应用程序，我们建议您为加密数据文件提供存储服务（例如Google云端硬盘）。",
+      "hash": "xhrlzt",
+      "lastUpdated": "2026-03-08"
+    },
+    "storage.localFileWarningEncryption": {
+      "translation": "别担心，您的数据是完全加密的，只有与您共享文件的人才能访问。",
+      "hash": "3zhg6i",
+      "lastUpdated": "2026-03-08"
+    },
+    "storage.localFileContinue": {
+      "translation": "使用本地文件继续",
+      "hash": "aqx372",
+      "lastUpdated": "2026-03-08"
+    },
+    "storage.comingSoon": {
+      "translation": "不日上映",
+      "hash": "3jubzu",
+      "lastUpdated": "2026-03-08"
+    },
+    "storage.recommended": {
+      "translation": "建議使用",
+      "hash": "jo0amd",
+      "lastUpdated": "2026-03-08"
+    },
+    "planner.openInMaps": {
+      "translation": "在地图中打开",
+      "hash": "byafaf",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.welcomePrefix": {
+      "translation": "欢迎使用",
+      "hash": "rhv02v",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.welcomeBrand": {
+      "translation": "beanies",
+      "hash": "3vkzbt",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.welcomeDescription": {
+      "translation": "您的家庭舒适的角落，可以管理混乱的2014年财务状况、日程安排、活动以及介于两者之间的一切。减少压力，为您的小豆子留出更多时间。",
+      "hash": "h8xo2a",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.pillarMoney": {
+      "translation": "追踪收入",
+      "hash": "o2yt1n",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.pillarMoneyShort": {
+      "translation": "金钱",
+      "hash": "18ddb4",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.pillarPlan": {
+      "translation": "规划生命",
+      "hash": "42zoul",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.pillarPlanShort": {
+      "translation": "计划",
+      "hash": "19ykp6",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.pillarFamily": {
+      "translation": "共同成长",
+      "hash": "48v8ft",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.pillarFamilyShort": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.currencyQuestion": {
+      "translation": "您家庭的基础货币是多少？",
+      "hash": "98eiz2",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.welcomeCta": {
+      "translation": "Let's Get This Pod Rolling\\ u {1F96B}",
+      "hash": "wa3hdy",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.welcomeSubtitle": {
+      "translation": "只需3个快速步骤\\ u00B7大约需要2分钟",
+      "hash": "nmeql7",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionAccount": {
+      "translation": "存入账号",
+      "hash": "f1mz0k",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionAccountSub": {
+      "translation": "\\ u2014从您的主要问题开始",
+      "hash": "c53i22",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.bank": {
+      "translation": "银行",
+      "hash": "187rw",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.bankPlaceholder": {
+      "translation": "％s-选择银行",
+      "hash": "8j9mc2",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.accountName": {
+      "translation": "账户名",
+      "hash": "jsbizi",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.accountNamePlaceholder": {
+      "translation": "例如：储蓄账户",
+      "hash": "76ofre",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.balance": {
+      "translation": "余量",
+      "hash": "lx5d4s",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.addAccount": {
+      "translation": "添加账户",
+      "hash": "he46su",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.added": {
+      "translation": "已添加",
+      "hash": "1j60w0",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.addAnother": {
+      "translation": "添加另一个",
+      "hash": "30qbrl",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionRecurring": {
+      "translation": "添加常规交易",
+      "hash": "qqn3jw",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionRecurringSub": {
+      "translation": "\\ u2014轻触类别以添加详细信息",
+      "hash": "68vele",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.income": {
+      "translation": "\\ u2191收入",
+      "hash": "6czm7t",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.expenses": {
+      "translation": "\\ u2193费用",
+      "hash": "z2ohyh",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionSavings": {
+      "translation": "每月设定优惠目标",
+      "hash": "whhv1k",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.ofMyIncome": {
+      "translation": "我的收入",
+      "hash": "gwfip8",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.savingsNice": {
+      "translation": "好極！你已將你的分數傳送至 Facebook！",
+      "hash": "18t3r8",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.savingsEncouragement": {
+      "translation": "您的豆罐每月收入为{amount}。\\ u {1F331}",
+      "hash": "swt60v",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summaryIncome": {
+      "translation": "收入",
+      "hash": "yqip87",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summaryFixedCosts": {
+      "translation": "固定成本",
+      "hash": "kqu06y",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summarySavingsBar": {
+      "translation": "节省金额",
+      "hash": "ciwz1j",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summaryFlexible": {
+      "translation": "灵活",
+      "hash": "tx9bl7",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.addRecurring": {
+      "translation": "添加常规交易",
+      "hash": "exwnwl",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.customTransaction": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.direction": {
+      "translation": "方向",
+      "hash": "h80bq7",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.directionExpense": {
+      "translation": "\\ u2193支出",
+      "hash": "cl637u",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.directionIncome": {
+      "translation": "\\ u2191收入",
+      "hash": "6czm7t",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.transactionName": {
+      "translation": "Transaction Name",
+      "hash": "6i0l6b",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.transactionNamePlaceholder": {
+      "translation": "例如，每月",
+      "hash": "iu7j7g",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.amount": {
+      "translation": "金额(元)",
+      "hash": "whwdbs",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.dayOfMonth": {
+      "translation": "每月的某些天",
+      "hash": "dq6zut",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.frequency": {
+      "translation": "频率",
+      "hash": "vzf4u4",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.account": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.autoSelected": {
+      "translation": "已自动选择",
+      "hash": "dvloo7",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.addCategory": {
+      "translation": "添加类别",
+      "hash": "94p0bh",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionActivity": {
+      "translation": "是什么让您的家人忙碌？",
+      "hash": "oas0tl",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionActivitySub": {
+      "translation": "\\ u2014添加课程或活动",
+      "hash": "ldn6ug",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.assignee": {
+      "translation": "对象",
+      "hash": "1v32",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.days": {
+      "translation": "天",
+      "hash": "19i0n",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.time": {
+      "translation": "时间",
+      "hash": "1jvfx",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.startTime": {
+      "translation": "开始时间",
+      "hash": "5z1fkb",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.endTime": {
+      "translation": "结束时间",
+      "hash": "smmmuq",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.costPerMonth": {
+      "translation": "成本/月",
+      "hash": "tzz7y4",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.addActivity": {
+      "translation": "添加项目门票",
+      "hash": "l4t8gi",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.addedToPlanner": {
+      "translation": "已添加到计划和预算",
+      "hash": "cu82xe",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionDiscover": {
+      "translation": "更多精彩体验",
+      "hash": "ub3ygy",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.sectionDiscoverSub": {
+      "translation": "\\ u2014在Nook等候",
+      "hash": "43jfyw",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.closingTitle": {
+      "translation": "我们建造了豆豆来帮助您。",
+      "hash": "scam6i",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.closingSubtitle": {
+      "translation": "这样您就可以把时间花在重要的事情上\\ u2014您的小豆子上。",
+      "hash": "ffy8gs",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.completePrefix": {
+      "translation": "你的",
+      "hash": "1ez1v1",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.completeHighlight": {
+      "translation": "豆荚",
+      "hash": "mwc6vp",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.completeSuffix": {
+      "translation": "准备完毕！",
+      "hash": "dtw87o",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.completeDescription": {
+      "translation": "大功告成！\\ u2014大功告成！探索、添加更多信息，打造属于您的便帽。",
+      "hash": "ilg3an",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summaryAccount": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summaryRecurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summarySavings": {
+      "translation": "节省金额",
+      "hash": "ciwz1j",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.summaryActivity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.completeCta": {
+      "translation": "进入角落\\ u {1F3E1}",
+      "hash": "486yif",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.completeSubtitle": {
+      "translation": "去照顾你的小豆子\\ u2014我们会处理剩下的。\\ u {1F96B}",
+      "hash": "im0nwh",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.back": {
+      "translation": "\\ u2190返回",
+      "hash": "7agdeg",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.skip": {
+      "translation": "暂时跳过",
+      "hash": "r83laa",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.nextFamily": {
+      "translation": "下一篇：家庭生活\\ u2192",
+      "hash": "68w8j2",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.allDone": {
+      "translation": "全部完成！\\ u {1F389}",
+      "hash": "3x02yo",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.restartOnboarding": {
+      "translation": "重新启动入职流程",
+      "hash": "dxu1os",
+      "lastUpdated": "2026-03-08"
+    },
+    "onboarding.restartOnboardingDescription": {
+      "translation": "再次浏览设置向导以添加帐户、交易和活动。",
+      "hash": "f3ncki",
+      "lastUpdated": "2026-03-08"
     }
   }
 }
