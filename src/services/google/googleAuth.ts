@@ -17,6 +17,7 @@ import {
   getGoogleRefreshToken,
   clearGoogleRefreshToken,
 } from '@/services/sync/fileHandleStore';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 
 const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
@@ -264,6 +265,22 @@ export async function attemptSilentRefresh(): Promise<string | null> {
 
 async function performSilentRefresh(): Promise<string | null> {
   const clientId = getClientId();
+
+  // If in-memory refreshToken was lost (page reload / SW update), try loading
+  // from IndexedDB before giving up. This closes the race window where
+  // getValidToken() is called before initializeAuth() completes.
+  if (!refreshToken) {
+    const familyId = currentFamilyId ?? getActiveFamilyId();
+    if (familyId) {
+      const stored = await getGoogleRefreshToken(familyId);
+      if (stored) {
+        refreshToken = stored;
+        currentFamilyId = familyId;
+        console.warn('[googleAuth] Recovered refresh token from IndexedDB during silent refresh');
+      }
+    }
+  }
+
   if (!clientId || !refreshToken) return null;
 
   try {
