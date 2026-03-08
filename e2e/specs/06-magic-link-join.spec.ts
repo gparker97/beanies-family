@@ -55,8 +55,8 @@ test.describe('Magic Link Invite System', () => {
       await page.goto('/family');
       await page.waitForURL('/family');
 
-      // Click "+ Add Bean"
-      const addButton = page.getByRole('button', { name: /add bean/i });
+      // Click "+ Add a Beanie"
+      const addButton = page.getByRole('button', { name: /add a beanie/i });
       await addButton.click();
 
       // Fill out form — find name input in the dialog
