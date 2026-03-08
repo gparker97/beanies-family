@@ -68,15 +68,15 @@ describe('MobileBottomNav', () => {
     const buttons = wrapper.findAll('button');
 
     await buttons[1]!.trigger('click');
-    expect(mockPush).toHaveBeenCalledWith('/planner');
+    expect(mockPush).toHaveBeenCalledWith('/todo');
   });
 
   it('renders tab labels', () => {
     const wrapper = mount(MobileBottomNav);
     expect(wrapper.text()).toContain('mobile.nook');
+    expect(wrapper.text()).toContain('mobile.todo');
     expect(wrapper.text()).toContain('mobile.planner');
     expect(wrapper.text()).toContain('mobile.piggyBank');
-    expect(wrapper.text()).toContain('mobile.budget');
     expect(wrapper.text()).toContain('mobile.pod');
   });
 
@@ -85,8 +85,8 @@ describe('MobileBottomNav', () => {
     const wrapper = mount(MobileBottomNav);
     const buttons = wrapper.findAll('button');
 
-    // Third tab (Piggy Bank → /dashboard) should be active for /dashboard/accounts
-    const piggyPill = buttons[2]!.find('div');
+    // Fourth tab (Piggy Bank → /dashboard) should be active for /dashboard/accounts
+    const piggyPill = buttons[3]!.find('div');
     expect(piggyPill.classes()).toContain('bg-[rgba(241,93,34,0.08)]');
   });
 });
