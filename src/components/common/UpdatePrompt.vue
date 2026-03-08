@@ -1,31 +1,99 @@
 <script setup lang="ts">
+import { ref, watch, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { useRegisterSW } from 'virtual:pwa-register/vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
+const router = useRouter();
+
+// Grace period before auto-updating on next navigation (ms)
+const AUTO_UPDATE_GRACE_MS = 60_000; // 1 minute
+// SW update polling interval (ms)
+const POLL_INTERVAL_MS = 5 * 60_000; // 5 minutes
+
+let swRegistration: ServiceWorkerRegistration | undefined;
+const readyToAutoUpdate = ref(false);
+let graceTimer: ReturnType<typeof setTimeout> | null = null;
+let removeRouteGuard: (() => void) | null = null;
 
 const { needRefresh, updateServiceWorker } = useRegisterSW({
   onRegisteredSW(_swUrl: string, registration: ServiceWorkerRegistration | undefined) {
-    // Check for updates every hour
+    swRegistration = registration;
     if (registration) {
-      setInterval(() => registration.update(), 60 * 60 * 1000);
+      // Poll for updates every 5 minutes
+      setInterval(() => registration.update(), POLL_INTERVAL_MS);
     }
   },
 });
 
-async function handleUpdate() {
+// Check for updates when the tab becomes visible
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && swRegistration) {
+    swRegistration.update();
+  }
+}
+document.addEventListener('visibilitychange', handleVisibilityChange);
+
+// When an update is detected, start the grace timer → auto-update on next navigation
+watch(needRefresh, (ready) => {
+  if (ready) {
+    startGraceTimer();
+  } else {
+    clearGraceTimer();
+  }
+});
+
+function startGraceTimer() {
+  clearGraceTimer();
+  graceTimer = setTimeout(() => {
+    readyToAutoUpdate.value = true;
+    // Install a route guard that triggers the update on next navigation
+    removeRouteGuard = router.beforeEach((_to, _from, next) => {
+      // Trigger update — the page will reload
+      performUpdate();
+      // Don't call next() — the reload will handle navigation
+      next(false);
+    });
+  }, AUTO_UPDATE_GRACE_MS);
+}
+
+function clearGraceTimer() {
+  if (graceTimer) {
+    clearTimeout(graceTimer);
+    graceTimer = null;
+  }
+  readyToAutoUpdate.value = false;
+  if (removeRouteGuard) {
+    removeRouteGuard();
+    removeRouteGuard = null;
+  }
+}
+
+async function performUpdate() {
   try {
     await updateServiceWorker();
   } catch {
-    // Fallback: hard reload if service worker update fails (e.g. desktop browser)
+    // Fallback: hard reload if service worker update fails
   }
-  // If still on the page after a short delay, force a hard reload
   setTimeout(() => window.location.reload(), 500);
 }
 
+function handleUpdate() {
+  clearGraceTimer();
+  performUpdate();
+}
+
 function handleDismiss() {
+  // Dismiss the banner but keep the grace timer running —
+  // the update will still apply on the next navigation after the grace period
   needRefresh.value = false;
 }
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
+  clearGraceTimer();
+});
 </script>
 
 <template>
