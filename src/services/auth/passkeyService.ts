@@ -89,7 +89,8 @@ export async function registerPasskeyForMember(
       { alg: -257, type: 'public-key' }, // RS256
     ],
     authenticatorSelection: {
-      authenticatorAttachment: 'platform',
+      // Omit authenticatorAttachment — 'platform' causes failures on some Android OEM
+      // credential managers (Honor/MagicOS, etc). Use hints instead for newer browsers.
       userVerification: 'required',
       residentKey: 'required',
       requireResidentKey: true,
@@ -99,16 +100,33 @@ export async function registerPasskeyForMember(
     extensions: prfExtension as AuthenticationExtensionsClientInputs,
   };
 
+  // Use PublicKeyCredentialHints for browsers that support it (Chrome 128+)
+  // This replaces authenticatorAttachment with a non-restrictive hint
+  const createOptions: CredentialCreationOptions = { publicKey: publicKeyOptions };
+  applyCredentialHints(createOptions, ['client-device']);
+
   let credential: PublicKeyCredential | null;
   try {
-    credential = (await navigator.credentials.create({
-      publicKey: publicKeyOptions,
-    })) as PublicKeyCredential | null;
+    credential = (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'NotAllowedError') {
+    // On NotReadableError (Android credential manager issue), retry without PRF extension
+    if (err instanceof DOMException && err.name === 'NotReadableError') {
+      try {
+        delete publicKeyOptions.extensions;
+        credential = (await navigator.credentials.create(
+          createOptions
+        )) as PublicKeyCredential | null;
+      } catch (retryErr) {
+        return {
+          success: false,
+          error: formatCredentialManagerError(retryErr),
+        };
+      }
+    } else if (err instanceof DOMException && err.name === 'NotAllowedError') {
       return { success: false, error: 'Registration was cancelled' };
+    } else {
+      return { success: false, error: formatCredentialManagerError(err) };
     }
-    return { success: false, error: err instanceof Error ? err.message : 'Registration failed' };
   }
 
   if (!credential) {
@@ -203,19 +221,31 @@ export async function authenticateWithPasskey(
     extensions: prfExtension as AuthenticationExtensionsClientInputs,
   };
 
+  const getOptions: CredentialRequestOptions = { publicKey: publicKeyOptions };
+
   let assertion: PublicKeyCredential | null;
   try {
-    assertion = (await navigator.credentials.get({
-      publicKey: publicKeyOptions,
-    })) as PublicKeyCredential | null;
+    assertion = (await navigator.credentials.get(getOptions)) as PublicKeyCredential | null;
   } catch (err) {
-    if (err instanceof DOMException && err.name === 'NotAllowedError') {
+    // On NotReadableError (Android credential manager issue), retry without PRF extension
+    if (err instanceof DOMException && err.name === 'NotReadableError') {
+      try {
+        delete publicKeyOptions.extensions;
+        assertion = (await navigator.credentials.get(getOptions)) as PublicKeyCredential | null;
+      } catch (retryErr) {
+        return {
+          success: false,
+          error: formatCredentialManagerError(retryErr),
+        };
+      }
+    } else if (err instanceof DOMException && err.name === 'NotAllowedError') {
       return { success: false, error: 'Authentication was cancelled' };
+    } else {
+      return {
+        success: false,
+        error: formatCredentialManagerError(err),
+      };
     }
-    return {
-      success: false,
-      error: err instanceof Error ? err.message : 'Authentication failed',
-    };
   }
 
   if (!assertion) {
@@ -505,4 +535,41 @@ export function base64urlToBuffer(base64url: string): ArrayBuffer {
   const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
   return base64ToBuffer(padded);
+}
+
+/**
+ * Apply PublicKeyCredentialHints to credential options for browsers that support it.
+ * Chrome 128+ supports hints as a non-restrictive alternative to authenticatorAttachment.
+ * Older browsers silently ignore unknown properties, so this is safe to apply unconditionally.
+ */
+function applyCredentialHints(
+  options: CredentialCreationOptions | CredentialRequestOptions,
+  hints: string[]
+): void {
+  // hints is set on the publicKey options object in newer WebAuthn specs
+  const pk = (options as Record<string, unknown>).publicKey as Record<string, unknown> | undefined;
+  if (pk) {
+    pk.hints = hints;
+  }
+}
+
+/**
+ * Format credential manager errors into user-friendly messages.
+ * Android's credential manager can return opaque NotReadableError messages.
+ */
+function formatCredentialManagerError(err: unknown): string {
+  if (err instanceof DOMException) {
+    if (err.name === 'NotReadableError') {
+      return 'Your device credential manager could not complete this request. Please ensure your device biometrics (fingerprint or face unlock) are set up and try again.';
+    }
+    if (err.name === 'NotSupportedError') {
+      return 'Passkeys are not supported on this device. Please use password sign-in instead.';
+    }
+    if (err.name === 'SecurityError') {
+      return 'A security error occurred. Please make sure you are using a secure (HTTPS) connection.';
+    }
+  }
+  return err instanceof Error
+    ? err.message
+    : 'An unexpected error occurred during passkey operation';
 }
