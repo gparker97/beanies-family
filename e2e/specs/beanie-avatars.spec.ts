@@ -39,8 +39,8 @@ test.describe('Beanie Avatars', () => {
   test('add member with Female Child shows correct avatar', async ({ page }) => {
     await page.goto('/family');
 
-    // Click Add Member
-    await page.getByRole('button', { name: /add member|add a beanie/i }).click();
+    // Click + Add Bean
+    await page.getByRole('button', { name: /add bean/i }).click();
 
     // Fill name via the centered placeholder input
     await page.getByPlaceholder(/name/i).fill('Luna');

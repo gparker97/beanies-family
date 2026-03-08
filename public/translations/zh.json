@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-08",
-    "translationCount": 1345
+    "translationCount": 1371
   },
   "translations": {
     "app.name": {
@@ -6729,6 +6729,136 @@
     "onboarding.restartOnboardingDescription": {
       "translation": "再次浏览设置向导以添加帐户、交易和活动。",
       "hash": "f3ncki",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.budgetSummary": {
+      "translation": "预算",
+      "hash": "x3510l",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.noBudget": {
+      "translation": "还没有有效的预算。设置一个以跟踪您的支出。",
+      "hash": "588k4k",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.createBudget": {
+      "translation": "编制预算。",
+      "hash": "a0vgnv",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.budgetSpent": {
+      "translation": "已消费",
+      "hash": "1ta0dq",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.budgetRemaining": {
+      "translation": "剩余",
+      "hash": "edvnjq",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.budgetCategories": {
+      "translation": "热门类别",
+      "hash": "jf4hs7",
+      "lastUpdated": "2026-03-08"
+    },
+    "dashboard.budgetOver": {
+      "translation": "超過",
+      "hash": "21djo",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.title": {
+      "translation": "The Bean Pod",
+      "hash": "hju4ec",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.subtitle": {
+      "translation": "{count}颗豆类长势强劲",
+      "hash": "7j2mpo",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.addBean": {
+      "translation": "+添加Bean",
+      "hash": "jug3ms",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.familyStats": {
+      "translation": "家庭统计数据",
+      "hash": "ssjkyr",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.members": {
+      "translation": "成员",
+      "hash": "rt2xhj",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.totalActivities": {
+      "translation": "活动总数",
+      "hash": "z4l0nd",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.upcomingEvents": {
+      "translation": "即将举行的活动",
+      "hash": "trnc7x",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.eventsThisWeek": {
+      "translation": "本周活动",
+      "hash": "33s1lb",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.noEvents": {
+      "translation": "本周活动",
+      "hash": "1jukj2",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.stat.activities": {
+      "translation": "活动",
+      "hash": "46kgs3",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.stat.todos": {
+      "translation": "托多斯",
+      "hash": "1c7qa5",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.stat.goals": {
+      "translation": "目标",
+      "hash": "152c9s",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.stat.events": {
+      "translation": "比賽項目",
+      "hash": "yiuhbt",
+      "lastUpdated": "2026-03-08"
+    },
+    "todo.links": {
+      "translation": "Links",
+      "hash": "17pqxl",
+      "lastUpdated": "2026-03-08"
+    },
+    "mobile.todo": {
+      "translation": "待办事项",
+      "hash": "1c6kgt",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.statBeans": {
+      "translation": "豆类",
+      "hash": "1jqegz",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.statUpcoming": {
+      "translation": "即将",
+      "hash": "llyxwc",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.highlight.birthday": {
+      "translation": "生日",
+      "hash": "d598o4",
+      "lastUpdated": "2026-03-08"
+    },
+    "family.hub.highlight.thisWeek": {
+      "translation": "本周",
+      "hash": "mwbbqu",
       "lastUpdated": "2026-03-08"
     }
   }

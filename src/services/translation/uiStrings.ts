@@ -992,6 +992,28 @@ const STRING_DEFS = {
     beanie: "they're in! they can now sign into your family pod",
   },
 
+  // Family Hub
+  'family.hub.title': { en: 'The Bean Pod', beanie: 'the bean pod' },
+  'family.hub.subtitle': {
+    en: '{count} Beans Growing Strong',
+    beanie: '{count} beans growing strong',
+  },
+  'family.hub.addBean': { en: '+ Add Bean', beanie: '+ add bean' },
+  'family.hub.familyStats': { en: 'Family Stats', beanie: 'family stats' },
+  'family.hub.members': { en: 'Members', beanie: 'beanies' },
+  'family.hub.totalActivities': { en: 'Total Activities', beanie: 'total activities' },
+  'family.hub.upcomingEvents': { en: 'Upcoming Events', beanie: 'upcoming events' },
+  'family.hub.eventsThisWeek': { en: 'Events This Week', beanie: 'events this week' },
+  'family.hub.noEvents': { en: 'No Events This Week', beanie: 'no events this week' },
+  'family.hub.stat.activities': { en: 'Activities', beanie: 'activities' },
+  'family.hub.stat.todos': { en: 'Todos', beanie: 'todos' },
+  'family.hub.stat.goals': { en: 'Goals', beanie: 'goals' },
+  'family.hub.stat.events': { en: 'Events', beanie: 'events' },
+  'family.hub.statBeans': { en: 'beans', beanie: 'beans' },
+  'family.hub.statUpcoming': { en: 'upcoming', beanie: 'upcoming' },
+  'family.hub.highlight.birthday': { en: 'Birthday!', beanie: 'birthday!' },
+  'family.hub.highlight.thisWeek': { en: 'This Week', beanie: 'this week' },
+
   // Settings (additional)
   'settings.preferredCurrencies': { en: 'Preferred Currencies', beanie: 'preferred currencies' },
   'settings.preferredCurrenciesHint': {
