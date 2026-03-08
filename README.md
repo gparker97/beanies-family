@@ -1,6 +1,6 @@
 # Hey, guys!
 
-Yes, it's _actually_ me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart outside taco trucks on wednesday afternoons. But getting back to the point...
+Yes, it's *actually* me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart outside taco trucks on wednesday afternoons. But getting back to the point...
 
 Since the day I "graduated" college for a real job, put in a solid month of (let's call it) work, and witnessed my first paycheck direct-deposited to my bank account, this is the app I've wanted to create. I gazed lovingly at the glorious $2,867 (minus taxes) in my account that day, and dreamt about the day I would definitely become a billionaire. Or at least the day I wouldn't be a starving student anymore.
 
@@ -8,7 +8,7 @@ It started with a janky spreadsheet. I added formulas, tables, charts. I kept tr
 
 Then, the world changed (in, let's say, 2008), and I said to myself, "Hey, self! Why do you keep trying to re-invent the wheel (the wheel having been invented earlier that year)? There's a million personal finance apps out there! Just download one, you numbskull."
 
-So I did, and I fiddled with those fickle banking connectors that sync your transactions, but always fail. Then they ask for your credentials 10 times in a row, and proceed to not work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my important transactions were in cash or paid on cards. Some banks and cards don't provide reliable APIs. When things did work (rarely) it was temporary and only tracked what you _did_ spend, not what you _planned_ to spend.
+So I did, and I fiddled with those fickle banking connectors that sync your transactions, but always fail. Then they ask for your credentials 10 times in a row, and proceed to not work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my important transactions were in cash or paid on cards. Some banks and cards don't provide reliable APIs. When things did work (rarely) it was temporary and only tracked what you *did* spend, not what you *planned* to spend.
 
 My goal was never to record every last transaction and track my budget down to the penny. If that's yours, this app probably isn't for you. I just wanted a rough idea, so I would know if I was going to end up as a hobo in 6 months.
 
@@ -20,9 +20,9 @@ When my youngest was about 6 months old, my wife started calling him 小豆豆. 
 
 I built this app to track all that stuff I mentioned above: your family finances, what you spent and received, what you plan to spend and receive (roughly), and to tell you how much you'll have in the future - in short, your "wealth".
 
-But also, to track your _actual_ family life: piano lessons, schoolwork, sports practice, family vacations (we may even give you advice), and, of course, who will pick up whom (yes, _whom_). In short, anything we can help you with, even in a small way, as you navigate the joys and sorrows of a complicated, crowded, chaotic, stressful, but of course, rewarding? (sorry, I meant, rewarding) family life.
+But also, to track your *actual* family life: piano lessons, schoolwork, sports practice, family vacations (we may even give you advice), and, of course, who will pick up whom (yes, *whom*). In short, anything we can help you with, even in a small way, as you navigate the joys and sorrows of a complicated, crowded, chaotic, stressful, but of course, rewarding? (sorry, I meant, rewarding) family life.
 
-It's not a perfect app. It doesn't sync with banks (and I doubt it ever will). But it gives you a rough idea of how much you have, how much you will have, and what in this world you actually have to do _today_. (Of course, only if you tell it that stuff first. It's not magic.)
+It's not a perfect app. It doesn't sync with banks (and I doubt it ever will). But it gives you a rough idea of how much you have, how much you will have, and what in this world you actually have to do *today*. (Of course, only if you tell it that stuff first. It's not magic.)
 
 Treat [beanies.family](https://beanies.family) like a friend, and it will reward you in spades. Maybe it'll even buy you a beer the next time you can spare 22 minutes after work and have $7 saved from meticulously tracking your budget every month. (Is that how much beers cost nowadays? I wouldn't know.)
 
