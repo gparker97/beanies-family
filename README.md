@@ -8,7 +8,7 @@ It started with a janky spreadsheet. I added formulas, tables, charts. I kept tr
 
 Then, the world changed (in, let's say, 2008), and I said to myself, "Hey, self! Why do you keep trying to re-invent the wheel (the wheel having been invented earlier that year)? There's a million personal finance apps out there! Just download one, you numbskull."
 
-So I did, and I fiddled with those fickle banking connectors that sync your transactions, but always fail. Then they ask for your credentials 10 times in a row, and proceed to not work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my important transactions were in cash or paid on cards. Some banks and cards don't provide reliable APIs. When things did work (rarely) it was temporary and only tracked what you did spend, not what you planned to spend.
+So I did, and I fiddled with those fickle banking connectors that sync your transactions, but always fail. Then they ask for your credentials 10 times in a row, and proceed to not work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my important transactions were in cash or paid on cards. Some banks and cards don't provide reliable APIs. When things did work (rarely) it was temporary and only tracked what you *did* spend, not what you *planned* to spend.
 
 My goal was never to record every last transaction and track my budget down to the penny. If that's yours, this app probably isn't for you. I just wanted a rough idea, so I would know if I was going to end up as a hobo in 6 months.
 
