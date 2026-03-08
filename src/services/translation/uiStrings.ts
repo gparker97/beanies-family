@@ -858,7 +858,12 @@ const STRING_DEFS = {
   },
   'header.financialFiguresVisible': { en: 'Finances visible', beanie: 'finances visible' },
   'header.financialFiguresHidden': { en: 'Finances hidden', beanie: 'finances hidden' },
-  'header.notifications': { en: 'Notifications', beanie: 'notifications' },
+  'header.notifications': {
+    en: 'Notifications - Coming Soon',
+    beanie: 'notifications - coming soon!',
+  },
+  'header.editProfile': { en: 'Edit Profile', beanie: 'edit profile' },
+  'header.settings': { en: 'Settings', beanie: 'settings' },
 
   // Sidebar
   'sidebar.noDataFile': { en: 'No data file', beanie: 'no data file' },
@@ -1151,6 +1156,20 @@ const STRING_DEFS = {
   'auth.signingIn': { en: 'Signing in...', beanie: 'signing in...' },
   'auth.creatingAccount': { en: 'Creating account...', beanie: 'creating account...' },
   'auth.signOut': { en: 'Sign Out', beanie: 'sign out' },
+  'auth.signOutConfirmTitle': { en: 'Sign Out', beanie: 'sign out' },
+  'auth.signOutConfirmMessage': {
+    en: 'Are you sure you want to sign out?',
+    beanie: 'are you sure you want to leave the pod?',
+  },
+  'auth.signOutConfirmHint': {
+    en: 'Your data is saved and will be here when you come back.',
+    beanie: 'your beans are safe and will be here when you come back.',
+  },
+  'auth.signOutClearDataHint': {
+    en: 'Signs out and removes all local data from this device. Use this on shared or public devices.',
+    beanie:
+      "use this on shared or public devices - signs out and removes all local data from this device. don't worry - your data is safe with you and we'll find it again when you come back.",
+  },
   'auth.fillAllFields': { en: 'Please fill in all fields', beanie: 'please fill in all fields' },
   'auth.passwordsDoNotMatch': { en: 'Passwords do not match', beanie: 'passwords do not match' },
   'auth.passwordMinLength': {
