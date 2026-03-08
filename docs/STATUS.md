@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-08
-> **Updated by:** Claude (Close #73, header/PWA/currency fixes deployed)
+> **Updated by:** Claude (Passkey compat fix, join/load loading spinners deployed)
 
 ## Current Phase
 
@@ -890,3 +890,5 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | 2026-03-08 | PWA update speed improvements                               | 5-min polling (down from 60min), check on tab visibility change, auto-update on next navigation after 1-min grace period                                                                                                                                                            |
 | 2026-03-08 | Google OAuth race condition fix                             | `performSilentRefresh()` recovers refresh token from IndexedDB when in-memory token is lost (page reload/SW update), preventing unnecessary consent popup                                                                                                                           |
 | 2026-03-08 | Currency conversion staleness fix (critical)                | App init rate refresh now reloads Vue store after completion; `exchangeRates` computed picks most recent rates between per-family (synced) and device-local by comparing timestamps                                                                                                 |
+| 2026-03-08 | Passkey Android credential manager compatibility            | Removed `authenticatorAttachment: 'platform'` (fails on Honor/MagicOS OEM credential managers), added `hints: ['client-device']` for Chrome 128+, auto-retry without PRF extension on `NotReadableError`, user-friendly error messages for credential manager failures              |
+| 2026-03-08 | Join/load flow loading spinners                             | Added BeanieSpinner to all async gaps: file picker, invite token decryption, password creation step. Replaced CSS border spinners with branded BeanieSpinner. Buttons use `:loading` prop for spinner display. Fixed both JoinPodView and LoadPodView                               |
