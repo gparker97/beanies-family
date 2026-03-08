@@ -1722,6 +1722,7 @@ const STRING_DEFS = {
   'todo.taskTitle': { en: 'Task title', beanie: 'task title' },
   'todo.viewTask': { en: 'Task Details', beanie: 'task details' },
   'todo.noDescription': { en: 'No description', beanie: 'no description' },
+  'todo.links': { en: 'Links', beanie: 'links' },
   'todo.createdBy': { en: 'Created by', beanie: 'created by' },
   'todo.status': { en: 'Status', beanie: 'status' },
   'todo.status.open': { en: 'Open', beanie: 'open' },

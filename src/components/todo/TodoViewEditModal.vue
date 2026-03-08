@@ -12,6 +12,7 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
 import type { TodoItem } from '@/types/models';
 
 type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description';
@@ -173,6 +174,18 @@ const viewFormattedDate = computed(() => {
   if (!todo.value?.dueDate) return null;
   const date = new Date(todo.value.dueDate);
   return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+});
+
+// Detected links from title + description
+const detectedLinks = computed(() => {
+  if (!todo.value) return [];
+  const texts = [todo.value.title, todo.value.description ?? ''].join(' ');
+  return extractUrls(texts).map((url) => ({
+    url,
+    domain: getUrlDomain(url),
+    label: getUrlLabel(url),
+    favicon: getFaviconUrl(url),
+  }));
 });
 
 // Keyboard handlers
@@ -507,6 +520,44 @@ async function handleDelete() {
             </div>
           </template>
         </InlineEditField>
+      </FormFieldGroup>
+
+      <!-- Detected links -->
+      <FormFieldGroup v-if="detectedLinks.length > 0" :label="t('todo.links')">
+        <div class="space-y-1.5">
+          <a
+            v-for="link in detectedLinks"
+            :key="link.url"
+            :href="link.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition-colors hover:bg-[var(--tint-purple-8)] dark:hover:bg-purple-900/20"
+            @click.stop
+          >
+            <img
+              :src="link.favicon"
+              :alt="link.domain"
+              width="16"
+              height="16"
+              class="h-4 w-4 shrink-0 rounded-sm"
+              loading="lazy"
+            />
+            <span class="min-w-0 flex-1 truncate font-medium text-purple-600 dark:text-purple-400">
+              {{ link.label }}
+            </span>
+            <svg
+              class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)]"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path
+                d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3"
+              />
+            </svg>
+          </a>
+        </div>
       </FormFieldGroup>
 
       <!-- Created by / Completed by — non-editable -->
