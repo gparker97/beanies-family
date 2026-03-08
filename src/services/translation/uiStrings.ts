@@ -831,6 +831,16 @@ const STRING_DEFS = {
     en: 'No accounts yet. Add accounts to track your finances.',
     beanie: 'no bean jars yet. add some to start counting!',
   },
+  'dashboard.budgetSummary': { en: 'Budget', beanie: 'bean budget' },
+  'dashboard.noBudget': {
+    en: 'No active budget yet. Set one up to track your spending.',
+    beanie: 'no bean budget yet. set one up to keep your beans in check!',
+  },
+  'dashboard.createBudget': { en: 'Create Budget →', beanie: 'create budget →' },
+  'dashboard.budgetSpent': { en: 'spent', beanie: 'spent' },
+  'dashboard.budgetRemaining': { en: 'remaining', beanie: 'left' },
+  'dashboard.budgetCategories': { en: 'Top Categories', beanie: 'top categories' },
+  'dashboard.budgetOver': { en: 'over', beanie: 'over' },
 
   // Greeting
   'greeting.morning': { en: 'Good morning,', beanie: 'good morning,' },
