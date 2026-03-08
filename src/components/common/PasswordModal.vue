@@ -80,7 +80,13 @@ function resetForm() {
 </script>
 
 <template>
-  <BaseModal :open="open" :title="resolvedTitle" :closable="closable" @close="handleClose">
+  <BaseModal
+    :open="open"
+    :title="resolvedTitle"
+    :closable="closable"
+    layer="overlay"
+    @close="handleClose"
+  >
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <p class="text-sm text-gray-600 dark:text-gray-400">
         {{ resolvedDescription }}

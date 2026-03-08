@@ -9,13 +9,18 @@ interface Props {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   closable?: boolean;
   fullscreenMobile?: boolean;
+  /** z-index layer: 'base' (z-50) for normal modals, 'overlay' (z-[60]) for modals that stack on top of other modals */
+  layer?: 'base' | 'overlay';
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'md',
   closable: true,
   fullscreenMobile: false,
+  layer: 'base',
 });
+
+const layerClass = computed(() => (props.layer === 'overlay' ? 'z-[60]' : 'z-50'));
 
 const { isMobile } = useBreakpoint();
 const isFullscreen = computed(() => props.fullscreenMobile && isMobile.value);
@@ -75,7 +80,11 @@ onUnmounted(() => {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        v-if="open"
+        class="fixed inset-0 flex items-center justify-center p-4"
+        :class="layerClass"
+      >
         <!-- Backdrop -->
         <div class="absolute inset-0 bg-black/50" @click="close" />
 

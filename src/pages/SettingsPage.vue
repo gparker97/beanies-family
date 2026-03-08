@@ -437,7 +437,7 @@ async function handleClearData() {
     <!-- ══════════════════════════════════════════════════════════════════ -->
 
     <!-- ── Exchange Rates Warning Modal ─────────────────────────────────── -->
-    <BaseModal :open="showRatesWarning" size="sm" @close="showRatesWarning = false">
+    <BaseModal :open="showRatesWarning" size="sm" layer="overlay" @close="showRatesWarning = false">
       <div class="p-5">
         <div class="mb-3 flex items-center gap-2">
           <svg
