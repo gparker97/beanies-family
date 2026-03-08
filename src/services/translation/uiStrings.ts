@@ -1920,6 +1920,7 @@ const STRING_DEFS = {
 
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'nook' },
+  'mobile.todo': { en: 'To-Do', beanie: 'to-do' },
   'mobile.planner': { en: 'Planner', beanie: 'planner' },
   'mobile.piggyBank': { en: 'Piggy Bank', beanie: 'piggy bank' },
   'mobile.budget': { en: 'Budget', beanie: 'budget' },
