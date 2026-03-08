@@ -440,11 +440,26 @@ onMounted(async () => {
     // Always fetch exchange rates on init when none are loaded (first-time users,
     // join flow, cross-browser). If rates exist, only refresh if auto-update is
     // enabled and rates are stale (>24h).
+    // After updating, reload the store so Vue reactive state reflects the new rates.
     const hasNoRates = !settingsStore.exchangeRates || settingsStore.exchangeRates.length === 0;
     if (hasNoRates) {
-      forceUpdateRates().catch(console.error);
+      forceUpdateRates()
+        .then((r) => {
+          if (r.ratesUpdated > 0) {
+            settingsStore.loadSettings();
+            settingsStore.loadGlobalSettings();
+          }
+        })
+        .catch(console.error);
     } else if (settingsStore.exchangeRateAutoUpdate) {
-      updateRatesIfStale().catch(console.error);
+      updateRatesIfStale()
+        .then((r) => {
+          if (r.ratesUpdated > 0) {
+            settingsStore.loadSettings();
+            settingsStore.loadGlobalSettings();
+          }
+        })
+        .catch(console.error);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

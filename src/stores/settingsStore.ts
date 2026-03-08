@@ -28,9 +28,40 @@ export const useSettingsStore = defineStore('settings', () => {
   const language = computed(() => globalSettings.value.language ?? 'en');
   const syncEnabled = computed(() => settings.value.syncEnabled);
   const aiProvider = computed(() => settings.value.aiProvider);
-  const exchangeRates = computed(() => globalSettings.value.exchangeRates);
+  // Use the most recent rates between per-family (synced via .beanpod) and
+  // device-local (IndexedDB). Per-family rates sync across devices, ensuring
+  // all devices converge on the same values. Device-local rates may be newer
+  // if this device just refreshed. Always pick whichever set was fetched last.
+  const exchangeRates = computed(() => {
+    const familyRates = settings.value.exchangeRates;
+    const globalRates = globalSettings.value.exchangeRates;
+    const hasFamilyRates = familyRates && familyRates.length > 0;
+    const hasGlobalRates = globalRates && globalRates.length > 0;
+
+    if (hasFamilyRates && hasGlobalRates) {
+      const familyFetch = settings.value.exchangeRateLastFetch;
+      const globalFetch = globalSettings.value.exchangeRateLastFetch;
+      if (familyFetch && globalFetch) {
+        return new Date(familyFetch) >= new Date(globalFetch) ? familyRates : globalRates;
+      }
+      // If only one has a timestamp, prefer that one
+      if (familyFetch) return familyRates;
+      if (globalFetch) return globalRates;
+    }
+
+    if (hasFamilyRates) return familyRates;
+    return globalRates;
+  });
   const exchangeRateAutoUpdate = computed(() => globalSettings.value.exchangeRateAutoUpdate);
-  const exchangeRateLastFetch = computed(() => globalSettings.value.exchangeRateLastFetch);
+  // Return the most recent fetch timestamp across both storage layers
+  const exchangeRateLastFetch = computed(() => {
+    const familyFetch = settings.value.exchangeRateLastFetch;
+    const globalFetch = globalSettings.value.exchangeRateLastFetch;
+    if (familyFetch && globalFetch) {
+      return new Date(familyFetch) >= new Date(globalFetch) ? familyFetch : globalFetch;
+    }
+    return familyFetch || globalFetch;
+  });
   const beanieMode = computed(() => {
     // E2E tests inject this flag to force standard English for stable text selectors
     if (typeof window !== 'undefined' && (window as any).__e2e_beanie_off) return false;
