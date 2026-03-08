@@ -27,6 +27,10 @@ vi.mock('@/services/sync/fileHandleStore', () => ({
   clearGoogleRefreshToken: vi.fn(async () => {}),
 }));
 
+vi.mock('@/services/indexeddb/database', () => ({
+  getActiveFamilyId: vi.fn(() => null),
+}));
+
 // Reset module state between tests
 let googleAuth: typeof import('../googleAuth');
 
@@ -181,6 +185,46 @@ describe('googleAuth (PKCE)', () => {
       await googleAuth.attemptSilentRefresh();
 
       expect(refreshAccessToken).toHaveBeenCalledTimes(2);
+
+      vi.unstubAllEnvs();
+    });
+
+    it('recovers refresh token from IndexedDB when in-memory token is lost', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ email: 'test@example.com' }),
+      });
+
+      // Simulate: initializeAuth was NOT called (page reload race condition),
+      // but getActiveFamilyId returns a valid family ID and IndexedDB has the token.
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      (getActiveFamilyId as ReturnType<typeof vi.fn>).mockReturnValue('family-abc');
+
+      const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+      (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+        'recovered-refresh-token'
+      );
+
+      // Call attemptSilentRefresh WITHOUT calling initializeAuth first
+      const result = await googleAuth.attemptSilentRefresh();
+      expect(result).toBe('mock-refreshed-token');
+
+      // Verify it loaded the token from IndexedDB using the active family ID
+      expect(getGoogleRefreshToken).toHaveBeenCalledWith('family-abc');
+
+      vi.unstubAllEnvs();
+    });
+
+    it('returns null when no family ID and no refresh token available', async () => {
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+
+      const { getActiveFamilyId } = await import('@/services/indexeddb/database');
+      (getActiveFamilyId as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+      const result = await googleAuth.attemptSilentRefresh();
+      expect(result).toBeNull();
 
       vi.unstubAllEnvs();
     });
