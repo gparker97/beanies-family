@@ -7,6 +7,12 @@ describe('extractUrls', () => {
     expect(extractUrls(text)).toEqual(['https://example.com', 'https://foo.bar/path']);
   });
 
+  it('preserves original protocol (http vs https)', () => {
+    expect(extractUrls('see http://legacy.example.com/old')).toEqual([
+      'https://legacy.example.com/old',
+    ]);
+  });
+
   it('returns empty array when no URLs present', () => {
     expect(extractUrls('no links here')).toEqual([]);
   });
