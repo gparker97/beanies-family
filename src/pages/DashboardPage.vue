@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import ActivityItem from '@/components/dashboard/ActivityItem.vue';
+import BudgetSummaryCard from '@/components/dashboard/BudgetSummaryCard.vue';
 import FamilyBeanRow from '@/components/dashboard/FamilyBeanRow.vue';
 import NetWorthHeroCard from '@/components/dashboard/NetWorthHeroCard.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
@@ -186,46 +187,8 @@ function isLiability(type: AccountType): boolean {
     <!-- ── Your Beans (Family Row) ─────────────────────────────────────── -->
     <FamilyBeanRow @add-member="router.push('/family')" @select-member="router.push('/family')" />
 
-    <!-- ── Row 1: Coming Up + Recent Transactions ────────────────────── -->
+    <!-- ── Row 1: Recent Transactions + Coming Up ────────────────────── -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-      <!-- Coming Up -->
-      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
-        <div class="mb-4 flex items-center justify-between">
-          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
-            {{ t('dashboard.comingUp') }}
-          </div>
-          <router-link
-            to="/transactions"
-            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
-          >
-            {{ t('dashboard.seeAll') }}
-          </router-link>
-        </div>
-
-        <div v-if="upcomingTransactions.length === 0" class="py-8 text-center">
-          <EmptyStateIllustration variant="recurring" class="mb-4" />
-          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noUpcoming') }}</p>
-        </div>
-        <div v-else>
-          <div
-            v-for="{ item, nextDate } in upcomingTransactions"
-            :key="item.id"
-            class="cursor-pointer"
-            :class="syncHighlightClass(item.id)"
-            @click="router.push('/transactions')"
-          >
-            <ActivityItem
-              :name="item.description"
-              :subtitle="`${getDaysUntil(nextDate!)}, ${item.frequency}`"
-              :amount="item.amount"
-              :currency="item.currency"
-              :type="item.type === 'income' ? 'income' : 'expense'"
-              :icon-tint="getIconTint(item.type)"
-            />
-          </div>
-        </div>
-      </div>
-
       <!-- Recent Transactions -->
       <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
         <div class="mb-4 flex items-center justify-between">
@@ -271,6 +234,44 @@ function isLiability(type: AccountType): boolean {
               :type="transaction.type === 'income' ? 'income' : 'expense'"
               size="sm"
               class="flex-shrink-0"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Coming Up -->
+      <div class="rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] dark:bg-slate-800">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="nook-section-label text-secondary-500 dark:text-gray-400">
+            {{ t('dashboard.comingUp') }}
+          </div>
+          <router-link
+            to="/transactions"
+            class="text-primary-500 hover:text-primary-600 text-xs font-medium"
+          >
+            {{ t('dashboard.seeAll') }}
+          </router-link>
+        </div>
+
+        <div v-if="upcomingTransactions.length === 0" class="py-8 text-center">
+          <EmptyStateIllustration variant="recurring" class="mb-4" />
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('dashboard.noUpcoming') }}</p>
+        </div>
+        <div v-else>
+          <div
+            v-for="{ item, nextDate } in upcomingTransactions"
+            :key="item.id"
+            class="cursor-pointer"
+            :class="syncHighlightClass(item.id)"
+            @click="router.push('/transactions')"
+          >
+            <ActivityItem
+              :name="item.description"
+              :subtitle="`${getDaysUntil(nextDate!)}, ${item.frequency}`"
+              :amount="item.amount"
+              :currency="item.currency"
+              :type="item.type === 'income' ? 'income' : 'expense'"
+              :icon-tint="getIconTint(item.type)"
             />
           </div>
         </div>
@@ -396,5 +397,8 @@ function isLiability(type: AccountType): boolean {
         </div>
       </div>
     </div>
+
+    <!-- ── Row 3: Budget Summary (full width) ────────────────────────── -->
+    <BudgetSummaryCard />
   </div>
 </template>
