@@ -2,8 +2,11 @@
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MemberFilterDropdown from '@/components/common/MemberFilterDropdown.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -74,6 +77,7 @@ const currentMember = computed(() => familyStore.currentMember);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
 const showCurrencyDropdown = ref(false);
+const showSignOutModal = ref(false);
 const privacyAnimating = ref(false);
 
 // ── Currency chips ───────────────────────────────────────────────────────
@@ -142,17 +146,32 @@ function resetAllStores() {
   useActivityStore().resetState();
 }
 
-async function handleSignOut() {
+function handleEditProfile() {
   showProfileDropdown.value = false;
-  // Sign out first — flushes pending saves while sync service still has the
-  // file handle, and reads isTrustedDevice before stores are reset
+  if (currentMember.value) {
+    router.push({ path: '/family', query: { edit: currentMember.value.id } });
+  }
+}
+
+function handleOpenSettings() {
+  showProfileDropdown.value = false;
+  router.push('/settings');
+}
+
+function promptSignOut() {
+  showProfileDropdown.value = false;
+  showSignOutModal.value = true;
+}
+
+async function confirmSignOut() {
+  showSignOutModal.value = false;
   await authStore.signOut();
   resetAllStores();
   router.replace('/login');
 }
 
-async function handleSignOutAndClearData() {
-  showProfileDropdown.value = false;
+async function confirmSignOutAndClearData() {
+  showSignOutModal.value = false;
   await authStore.signOutAndClearData();
   resetAllStores();
   router.replace('/login');
@@ -182,7 +201,7 @@ async function handleSignOutAndClearData() {
         </h1>
       </div>
 
-      <!-- Right: Privacy toggle + Notification bell -->
+      <!-- Right: Privacy toggle + Profile avatar -->
       <div class="flex items-center gap-2">
         <!-- Privacy mode toggle -->
         <button
@@ -216,15 +235,118 @@ async function handleSignOutAndClearData() {
           />
         </button>
 
-        <!-- Notification bell -->
-        <button
-          type="button"
-          class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white text-gray-500 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-400 dark:shadow-none"
-          :aria-label="t('header.notifications')"
-        >
-          <BeanieIcon name="bell" size="md" />
-          <span class="bg-primary-500 absolute top-1.5 right-1.5 h-2 w-2 rounded-full" />
-        </button>
+        <!-- Profile avatar dropdown -->
+        <div class="relative">
+          <button
+            v-if="currentMember || authStore.isAuthenticated"
+            type="button"
+            class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+            @click="showProfileDropdown = !showProfileDropdown"
+            @blur="closeProfileDropdown"
+          >
+            <BeanieAvatar
+              :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
+              :color="currentMember?.color || '#3b82f6'"
+              size="sm"
+              :aria-label="currentMember?.name || 'Profile'"
+              data-testid="header-avatar-mobile"
+            />
+          </button>
+
+          <!-- Profile dropdown menu (shared styling) -->
+          <div
+            v-if="showProfileDropdown"
+            class="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:border-slate-700 dark:bg-slate-800 dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
+          >
+            <!-- Profile header -->
+            <div
+              class="bg-gradient-to-r from-[var(--color-secondary-500)] to-[var(--color-secondary-500)]/90 px-4 py-3"
+            >
+              <div class="flex items-center gap-3">
+                <BeanieAvatar
+                  :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
+                  :color="currentMember?.color || '#3b82f6'"
+                  size="md"
+                />
+                <div class="min-w-0">
+                  <p class="font-outfit truncate text-sm font-semibold text-white">
+                    {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
+                  </p>
+                  <p
+                    v-if="familyContextStore.activeFamilyName"
+                    class="truncate text-xs text-white/60"
+                  >
+                    {{ familyContextStore.activeFamilyName }}
+                  </p>
+                  <p
+                    v-if="
+                      authStore.currentUser?.email && !isTemporaryEmail(authStore.currentUser.email)
+                    "
+                    class="truncate text-xs text-white/50"
+                  >
+                    {{ authStore.currentUser.email }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Menu items -->
+            <div class="py-1.5">
+              <!-- Edit Profile -->
+              <button
+                v-if="currentMember"
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleEditProfile"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {{ t('header.editProfile') }}
+              </button>
+
+              <!-- Settings -->
+              <button
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleOpenSettings"
+              >
+                <BeanieIcon name="settings" size="sm" class="opacity-50" />
+                {{ t('header.settings') }}
+              </button>
+
+              <!-- Divider -->
+              <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
+
+              <!-- Sign out -->
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
+                @mousedown.prevent="promptSignOut"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                {{ t('auth.signOut') }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
 
@@ -419,19 +541,7 @@ async function handleSignOutAndClearData() {
           />
         </button>
 
-        <!-- Notification bell (white-bg squircle) -->
-        <button
-          type="button"
-          class="relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white text-gray-500 shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:text-gray-400 dark:shadow-none"
-          :aria-label="t('header.notifications')"
-          :title="t('header.notifications')"
-        >
-          <BeanieIcon name="bell" size="md" />
-          <!-- Heritage Orange notification dot -->
-          <span class="bg-primary-500 absolute top-1.5 right-1.5 h-2 w-2 rounded-full" />
-        </button>
-
-        <!-- Profile dropdown (avatar + chevron only) -->
+        <!-- Profile dropdown (avatar + chevron) -->
         <div class="relative">
           <button
             v-if="currentMember || authStore.isAuthenticated"
@@ -452,47 +562,174 @@ async function handleSignOutAndClearData() {
           <!-- Profile dropdown menu -->
           <div
             v-if="showProfileDropdown"
-            class="absolute right-0 z-50 mt-1 w-56 rounded-2xl border border-gray-200 bg-white py-1 shadow-lg dark:border-slate-700 dark:bg-slate-800"
+            class="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_8px_24px_rgba(44,62,80,0.12)] dark:border-slate-700 dark:bg-slate-800 dark:shadow-[0_8px_24px_rgba(0,0,0,0.3)]"
           >
-            <div class="border-b border-gray-200 px-4 py-2 dark:border-slate-700">
-              <p class="text-sm font-medium text-gray-900 dark:text-white">
-                {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
-              </p>
-              <p
-                v-if="familyContextStore.activeFamilyName"
-                class="text-xs text-gray-500 dark:text-gray-400"
-              >
-                {{ familyContextStore.activeFamilyName }}
-              </p>
-              <p
-                v-if="
-                  authStore.currentUser?.email && !isTemporaryEmail(authStore.currentUser.email)
-                "
-                class="text-xs text-gray-500 dark:text-gray-400"
-              >
-                {{ authStore.currentUser.email }}
-              </p>
+            <!-- Profile header with Deep Slate gradient -->
+            <div
+              class="bg-gradient-to-r from-[var(--color-secondary-500)] to-[var(--color-secondary-500)]/90 px-4 py-3"
+            >
+              <div class="flex items-center gap-3">
+                <BeanieAvatar
+                  :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
+                  :color="currentMember?.color || '#3b82f6'"
+                  size="md"
+                />
+                <div class="min-w-0">
+                  <p class="font-outfit truncate text-sm font-semibold text-white">
+                    {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
+                  </p>
+                  <p
+                    v-if="familyContextStore.activeFamilyName"
+                    class="truncate text-xs text-white/60"
+                  >
+                    {{ familyContextStore.activeFamilyName }}
+                  </p>
+                  <p
+                    v-if="
+                      authStore.currentUser?.email && !isTemporaryEmail(authStore.currentUser.email)
+                    "
+                    class="truncate text-xs text-white/50"
+                  >
+                    {{ authStore.currentUser.email }}
+                  </p>
+                </div>
+              </div>
             </div>
-            <!-- Sign out -->
-            <button
-              type="button"
-              class="w-full px-4 py-2 text-left text-sm text-red-600 transition-colors hover:bg-gray-100 dark:text-red-400 dark:hover:bg-slate-700"
-              @mousedown.prevent="handleSignOut"
-            >
-              {{ t('auth.signOut') }}
-            </button>
-            <!-- Sign out & clear data (trusted device) -->
-            <button
-              v-if="useSettingsStore().isTrustedDevice"
-              type="button"
-              class="w-full px-4 py-2 text-left text-sm text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
-              @mousedown.prevent="handleSignOutAndClearData"
-            >
-              {{ t('auth.signOutClearData') }}
-            </button>
+
+            <!-- Menu items -->
+            <div class="py-1.5">
+              <!-- Edit Profile -->
+              <button
+                v-if="currentMember"
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleEditProfile"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {{ t('header.editProfile') }}
+              </button>
+
+              <!-- Settings -->
+              <button
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleOpenSettings"
+              >
+                <BeanieIcon name="settings" size="sm" class="opacity-50" />
+                {{ t('header.settings') }}
+              </button>
+
+              <!-- Divider -->
+              <div class="my-1.5 border-t border-gray-100 dark:border-slate-700" />
+
+              <!-- Sign out -->
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
+                @mousedown.prevent="promptSignOut"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                {{ t('auth.signOut') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </template>
+
+    <!-- ═══ SIGN OUT CONFIRMATION MODAL ═══ -->
+    <Teleport to="body">
+      <BaseModal
+        :open="showSignOutModal"
+        :title="t('auth.signOutConfirmTitle')"
+        size="sm"
+        layer="overlay"
+        @close="showSignOutModal = false"
+      >
+        <div class="flex flex-col items-center gap-4 text-center">
+          <!-- Icon -->
+          <div
+            class="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-100 text-red-500 dark:bg-red-900/30 dark:text-red-400"
+          >
+            <svg
+              class="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </div>
+
+          <p class="text-sm text-gray-600 dark:text-gray-300">
+            {{ t('auth.signOutConfirmMessage') }}
+          </p>
+          <p class="text-xs text-gray-400 dark:text-gray-500">
+            {{ t('auth.signOutConfirmHint') }}
+          </p>
+        </div>
+
+        <template #footer>
+          <div class="flex flex-col gap-3">
+            <!-- Primary actions -->
+            <div class="flex justify-end gap-3">
+              <BaseButton variant="ghost" size="sm" @click="showSignOutModal = false">
+                {{ t('action.cancel') }}
+              </BaseButton>
+              <BaseButton variant="danger" size="sm" @click="confirmSignOut">
+                {{ t('auth.signOut') }}
+              </BaseButton>
+            </div>
+
+            <!-- Sign out & clear data -->
+            <div class="border-t border-gray-100 pt-3 dark:border-slate-700">
+              <div class="flex items-center justify-center gap-2">
+                <BaseButton variant="ghost" size="sm" @click="confirmSignOutAndClearData">
+                  <template #default>
+                    <span class="flex items-center gap-2">
+                      <svg
+                        class="h-3.5 w-3.5 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                      {{ t('auth.signOutClearData') }}
+                    </span>
+                  </template>
+                </BaseButton>
+                <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
+              </div>
+            </div>
+          </div>
+        </template>
+      </BaseModal>
+    </Teleport>
   </header>
 </template>
