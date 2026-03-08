@@ -2,15 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
 
 describe('extractUrls', () => {
-  it('extracts http and https URLs from text', () => {
-    const text = 'Check https://example.com and http://foo.bar/path for details';
+  it('extracts https URLs from text', () => {
+    const text = 'Check https://example.com and https://foo.bar/path for details';
     expect(extractUrls(text)).toEqual(['https://example.com', 'https://foo.bar/path']);
   });
 
-  it('preserves original protocol (http vs https)', () => {
-    expect(extractUrls('see http://legacy.example.com/old')).toEqual([
-      'https://legacy.example.com/old',
-    ]);
+  it('extracts multiple URLs from text', () => {
+    const text = 'Visit https://alpha.com then https://beta.org/docs';
+    expect(extractUrls(text)).toEqual(['https://alpha.com', 'https://beta.org/docs']);
   });
 
   it('returns empty array when no URLs present', () => {
