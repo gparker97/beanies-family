@@ -6,6 +6,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { isTemporaryEmail } from '@/utils/email';
@@ -293,6 +294,7 @@ async function handlePickFromDrive() {
 // --- File picker / drop zone ---
 async function handleLoadFile() {
   formError.value = null;
+  isLoadingFile.value = true;
 
   try {
     const result = await syncStore.loadFromNewFile();
@@ -311,6 +313,8 @@ async function handleLoadFile() {
     }
   } catch {
     formError.value = syncStore.error || t('auth.fileLoadFailed');
+  } finally {
+    isLoadingFile.value = false;
   }
 }
 
@@ -430,6 +434,7 @@ async function tryInviteTokenDecrypt(): Promise<boolean> {
     return false;
   }
 
+  isLoadingFile.value = true;
   try {
     const { hashInviteToken, redeemInviteToken, isInviteExpired } =
       await import('@/services/crypto/inviteService');
@@ -472,6 +477,8 @@ async function tryInviteTokenDecrypt(): Promise<boolean> {
     console.warn('[JoinPodView] invite decrypt exception:', e);
     formError.value = t('join.inviteTokenInvalid');
     return false;
+  } finally {
+    isLoadingFile.value = false;
   }
 }
 
@@ -615,9 +622,7 @@ function handleBack() {
 
       <!-- Looking up / cloud loading spinner -->
       <div v-if="isLookingUp || (isLoadingFile && !needsManualFileLoad)" class="py-12 text-center">
-        <div
-          class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
-        ></div>
+        <BeanieSpinner size="md" class="mx-auto mb-3" />
         <p class="text-sm text-gray-500 dark:text-gray-400">
           {{ isLoadingFile ? t('join.loadingFromCloud') : t('join.lookingUp') }}
         </p>
@@ -711,9 +716,7 @@ function handleBack() {
                 @drop="handleDrop"
               >
                 <div v-if="isLoadingFile" class="py-2">
-                  <div
-                    class="border-t-primary-500 mx-auto mb-2 h-6 w-6 animate-spin rounded-full border-2 border-white/30"
-                  ></div>
+                  <BeanieSpinner size="sm" class="mx-auto mb-2" />
                   <p class="text-xs text-white/60">{{ t('auth.loadingFile') }}</p>
                 </div>
                 <template v-else>
@@ -1071,7 +1074,7 @@ function handleBack() {
           />
         </div>
 
-        <BaseButton type="submit" class="mt-4 w-full" :disabled="isJoining">
+        <BaseButton type="submit" class="mt-4 w-full" :loading="isJoining">
           {{ isJoining ? t('join.completing') : t('auth.createAndSignIn') }}
         </BaseButton>
       </form>
@@ -1107,7 +1110,7 @@ function handleBack() {
         <BaseButton
           type="submit"
           class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
-          :disabled="isLoadingFile"
+          :loading="isLoadingFile"
         >
           {{ t('loginV6.unlockButton') }}
         </BaseButton>

@@ -3,6 +3,7 @@
 import { ref, computed, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import GoogleDriveFilePicker from '@/components/google/GoogleDriveFilePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -199,6 +200,7 @@ async function handleGrantPermission() {
 
 async function handleLoadFile() {
   formError.value = null;
+  isLoadingFile.value = true;
 
   try {
     const result = await syncStore.loadFromNewFile();
@@ -219,6 +221,8 @@ async function handleLoadFile() {
     }
   } catch {
     formError.value = syncStore.error || t('auth.fileLoadFailed');
+  } finally {
+    isLoadingFile.value = false;
   }
 }
 
@@ -546,7 +550,7 @@ async function handleDriveRefresh() {
         <BaseButton
           type="submit"
           class="from-primary-500 to-terracotta-400 mt-4 w-full bg-gradient-to-r"
-          :disabled="isLoadingFile"
+          :loading="isLoadingFile"
         >
           {{ t('loginV6.unlockButton') }}
         </BaseButton>
@@ -589,9 +593,7 @@ async function handleDriveRefresh() {
 
       <!-- Loading state (only for auto-load and permission grant) -->
       <div v-if="isLoadingFile" class="py-12 text-center">
-        <div
-          class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
-        ></div>
+        <BeanieSpinner size="md" class="mx-auto mb-3" />
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('auth.loadingFile') }}</p>
       </div>
 
