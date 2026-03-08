@@ -33,7 +33,13 @@ const options: { scope: RecurringEditScope; icon: string; labelKey: string; desc
 </script>
 
 <template>
-  <BaseModal :open="state.open" :title="t('recurring.editScopeTitle')" size="sm" @close="cancel">
+  <BaseModal
+    :open="state.open"
+    :title="t('recurring.editScopeTitle')"
+    size="sm"
+    layer="overlay"
+    @close="cancel"
+  >
     <div class="flex flex-col gap-2">
       <button
         v-for="opt in options"
