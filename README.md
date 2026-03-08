@@ -1,4 +1,4 @@
-# Hey, guys!
+# Hey, guys! 🫘
 
 Yes, it's *actually* me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart outside taco trucks on wednesday afternoons. But getting back to the point...
 
@@ -53,3 +53,6 @@ Enjoy beanies, bros.
 Peace.
 
 Greg
+
+<img width="192" height="192" alt="beanies_father_son_icon_192x192" src="https://github.com/user-attachments/assets/c6b6fd45-cc71-4feb-9c7d-3fb41c42a4a3" />
+
