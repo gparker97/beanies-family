@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-08",
-    "translationCount": 1371
+    "lastUpdated": "2026-03-09",
+    "translationCount": 1377
   },
   "translations": {
     "app.name": {
@@ -1842,9 +1842,9 @@
       "lastUpdated": "2026-03-03"
     },
     "header.notifications": {
-      "translation": "消息推送",
-      "hash": "y97he0",
-      "lastUpdated": "2026-03-03"
+      "translation": "通知-即将推出",
+      "hash": "avwt4f",
+      "lastUpdated": "2026-03-09"
     },
     "sidebar.noDataFile": {
       "translation": "无数据文件",
@@ -6777,9 +6777,9 @@
       "lastUpdated": "2026-03-08"
     },
     "family.hub.addBean": {
-      "translation": "+添加Bean",
-      "hash": "jug3ms",
-      "lastUpdated": "2026-03-08"
+      "translation": "+添加一个豆豆",
+      "hash": "ij0ie7",
+      "lastUpdated": "2026-03-09"
     },
     "family.hub.familyStats": {
       "translation": "家庭统计数据",
@@ -6860,6 +6860,36 @@
       "translation": "本周",
       "hash": "mwbbqu",
       "lastUpdated": "2026-03-08"
+    },
+    "header.editProfile": {
+      "translation": "编辑个人资料",
+      "hash": "610z1p",
+      "lastUpdated": "2026-03-09"
+    },
+    "header.settings": {
+      "translation": "设置",
+      "hash": "osmo8z",
+      "lastUpdated": "2026-03-09"
+    },
+    "auth.signOutConfirmTitle": {
+      "translation": "注销",
+      "hash": "66wnsb",
+      "lastUpdated": "2026-03-09"
+    },
+    "auth.signOutConfirmMessage": {
+      "translation": "确定退出登录？",
+      "hash": "tzhvfk",
+      "lastUpdated": "2026-03-09"
+    },
+    "auth.signOutConfirmHint": {
+      "translation": "您的数据已保存，当您回来时会显示在这里。",
+      "hash": "umy2u8",
+      "lastUpdated": "2026-03-09"
+    },
+    "auth.signOutClearDataHint": {
+      "translation": "注销并删除此设备的所有本地数据。在共享或公共设备上使用此功能。",
+      "hash": "higzxu",
+      "lastUpdated": "2026-03-09"
     }
   }
 }
