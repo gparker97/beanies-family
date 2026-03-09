@@ -35,7 +35,7 @@ Here's the fun stuff:
 - Claude Max / Opus 4.6 (Mostly. I may have pitched in a line or 2.)
 - Vue 3 / Typescript + Vite / Tailwind / Pinia
 - IndexedDB (to cache encrypted family data in your local browser, which you can clear at anytime)
-- Browser-native Web Crypto API (AES-256-GCM) - Your data is fully encrypted in transit and at rest, each family member gets their own password-dervived key (PBKDF2) that wraps a shared family key (AWS-KW), and data *never* leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache
+- Browser-native Web Crypto API - Your data is fully encrypted in transit and at rest (AES-256-GCM), each family member gets their own password-dervived key (PBKDF2) that wraps a shared family key (AWS-KW), and data *never* leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache
 - Automerge (for CRDTs - adds a bit of heft to the package, but we tried rolling our own merge algorithms and trust me, it's not worth it - keeping your data safe is what matters)
 - Vitest (unit tests) + Playwright (E2E tests) + Dependabot to keep dependencies up to date and secure (seriously, how cool is Dependabot!?)
 - One single, stupid, plain vanilla DynamoDB in the cloud to map your email to family ID so we can locate your (encrypted) family data file in your personal location that only you can access. Nothing else. Anywhere. Ever.
