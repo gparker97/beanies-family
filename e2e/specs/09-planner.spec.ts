@@ -84,7 +84,7 @@ test.describe('Family Planner', () => {
 
     // Fill in form — recurrence defaults to "Recurring"
     await page.getByPlaceholder("What's the activity?").fill('Piano Lesson');
-    await page.locator('input[type="date"]').fill('2026-03-04');
+    await page.locator('input[type="date"]').first().fill('2026-03-04');
 
     // Open start time dropdown (trigger shows "9:00 AM" by default) then select 3:00 PM
     await page.getByRole('button', { name: '9:00 AM' }).first().click();
@@ -119,7 +119,7 @@ test.describe('Family Planner', () => {
     await page.getByPlaceholder("What's the activity?").fill('Soccer Training');
 
     // Date
-    await page.locator('input[type="date"]').fill('2026-03-02');
+    await page.locator('input[type="date"]').first().fill('2026-03-02');
 
     // Recurrence is "Recurring" by default
     // The DayOfWeekSelector should be visible — select Monday (M) and Wednesday (W)
@@ -320,7 +320,7 @@ test.describe('Family Planner', () => {
 
     // Basic fields
     await page.getByPlaceholder("What's the activity?").fill('Soccer Practice');
-    await page.locator('input[type="date"]').fill('2026-03-02');
+    await page.locator('input[type="date"]').first().fill('2026-03-02');
 
     // Start time defaults to 9:00 AM, end time auto-defaults to 10:00 AM
 
@@ -351,6 +351,156 @@ test.describe('Family Planner', () => {
     expect(activity.location).toBe('City Sports Park');
     expect(activity.instructorName).toBe('Coach Johnson');
     expect(activity.instructorContact).toBe('coach@sports.com');
+  });
+
+  test('should create a recurring activity with an end date', async ({ page }) => {
+    await setupPlanner(page);
+
+    // Open add modal
+    await page.getByRole('button', { name: /\+ add activity/i }).click();
+
+    // Fill in form — recurrence defaults to "Recurring"
+    await page.getByPlaceholder("What's the activity?").fill('Summer Swimming');
+    await page.locator('input[type="date"]').first().fill('2026-06-01');
+
+    // Recurrence stays at default (Recurring + Weekly)
+
+    // Fill end date (inside the recurring details section)
+    // There are now 2 date inputs: start date and end date
+    const dateInputs = page.locator('input[type="date"]');
+    await dateInputs.nth(1).fill('2026-08-31');
+
+    // Save
+    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Verify persistence — recurrenceEndDate should be saved
+    const exported = await dbHelper.exportData();
+    expect(exported.activities).toHaveLength(1);
+    const activity = exported.activities![0];
+    expect(activity.title).toBe('Summer Swimming');
+    expect(activity.recurrence).toBe('weekly');
+    expect(activity.recurrenceEndDate).toBe('2026-08-31');
+  });
+
+  test('should edit a single occurrence of a recurring activity (this only)', async ({ page }) => {
+    await setupPlanner(page);
+
+    // Create a weekly recurring activity starting tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await page.getByPlaceholder("What's the activity?").fill('Weekly Lesson');
+    await page.locator('input[type="date"]').first().fill(tomorrowStr);
+    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Click the first occurrence in the upcoming list — opens view modal
+    await page.getByText('Weekly Lesson').first().click();
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
+
+    // Click Edit — edit modal opens directly (scope deferred to save)
+    await page.getByRole('button', { name: /^edit$/i }).click();
+    await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
+
+    // Change title and save
+    await page.getByPlaceholder("What's the activity?").fill('Special Lesson');
+    await page.getByRole('button', { name: /save activity/i }).click();
+
+    // Scope modal appears after save — choose "This Occurrence Only"
+    await expect(page.getByText(/this occurrence only/i)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /this occurrence only/i }).click();
+    await expect(page.getByText(/edit activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Verify in IndexedDB: original template + new override = 2 activities
+    const exported = await dbHelper.exportData();
+    expect(exported.activities).toHaveLength(2);
+    const original = exported.activities!.find((a: any) => a.title === 'Weekly Lesson');
+    const override = exported.activities!.find((a: any) => a.title === 'Special Lesson');
+    expect(original).toBeDefined();
+    expect(original!.recurrence).toBe('weekly');
+    expect(override).toBeDefined();
+    expect(override!.recurrence).toBe('none');
+    expect(override!.parentActivityId).toBe(original!.id);
+  });
+
+  test('should edit this and all future occurrences of a recurring activity', async ({ page }) => {
+    await setupPlanner(page);
+
+    // Create a weekly recurring activity starting tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await page.getByPlaceholder("What's the activity?").fill('Piano Class');
+    await page.locator('input[type="date"]').first().fill(tomorrowStr);
+    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Click the first occurrence → view modal → Edit → edit modal opens directly
+    await page.getByText('Piano Class').first().click();
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /^edit$/i }).click();
+    await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
+
+    // Change title and save
+    await page.getByPlaceholder("What's the activity?").fill('Advanced Piano');
+    await page.getByRole('button', { name: /save activity/i }).click();
+
+    // Scope modal appears after save — choose "This & All Future"
+    await expect(page.getByText(/this & all future/i)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /this & all future/i }).click();
+    await expect(page.getByText(/edit activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Verify: original end-dated + new template = 2 activities
+    const exported = await dbHelper.exportData();
+    expect(exported.activities).toHaveLength(2);
+    const original = exported.activities!.find((a: any) => a.title === 'Piano Class');
+    const newTemplate = exported.activities!.find((a: any) => a.title === 'Advanced Piano');
+    expect(original).toBeDefined();
+    expect(original!.recurrenceEndDate).toBeDefined(); // end-dated
+    expect(newTemplate).toBeDefined();
+    expect(newTemplate!.recurrence).toBe('weekly');
+    expect(newTemplate!.date).toBeTruthy(); // date is the clicked occurrence, not necessarily the original start
+  });
+
+  test('should edit all occurrences of a recurring activity', async ({ page }) => {
+    await setupPlanner(page);
+
+    // Create a weekly recurring activity starting tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await page.getByPlaceholder("What's the activity?").fill('Soccer Training');
+    await page.locator('input[type="date"]').first().fill(tomorrowStr);
+    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Click the first occurrence → view modal → Edit → edit modal opens directly
+    await page.getByText('Soccer Training').first().click();
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /^edit$/i }).click();
+    await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
+
+    // Change title and save
+    await page.getByPlaceholder("What's the activity?").fill('Updated Soccer');
+    await page.getByRole('button', { name: /save activity/i }).click();
+
+    // Scope modal appears after save — choose "All Occurrences"
+    await expect(page.getByText(/all occurrences/i)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /all occurrences/i }).click();
+    await expect(page.getByText(/edit activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Verify: still only 1 activity, with updated title
+    const exported = await dbHelper.exportData();
+    expect(exported.activities).toHaveLength(1);
+    expect(exported.activities![0].title).toBe('Updated Soccer');
+    expect(exported.activities![0].recurrence).toBe('weekly');
   });
 
   test.skip('should show legend with category colors', async ({ page }) => {

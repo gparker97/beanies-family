@@ -3,12 +3,13 @@ import { ref, computed } from 'vue';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
   ActivityCategory,
+  ISODateString,
 } from '@/types/models';
 
 /** Default highlight color per activity category. */
@@ -39,19 +40,25 @@ export const useActivityStore = defineStore('activities', () => {
   // Filtered getters (by global member filter)
   const filteredActivities = createMemberFiltered(activeActivities, (a) => a.assigneeId);
 
+  /** Map of parentActivityId → Set of override dates, for skipping in expansion. */
+  const overridesByParent = computed(() => {
+    const map = new Map<string, Set<string>>();
+    for (const a of activities.value) {
+      if (a.parentActivityId) {
+        let dates = map.get(a.parentActivityId);
+        if (!dates) {
+          dates = new Set();
+          map.set(a.parentActivityId, dates);
+        }
+        dates.add(a.date);
+      }
+    }
+    return map;
+  });
+
   /**
    * Expand a single recurring activity into occurrences for a given month.
    */
-  /**
-   * Parse a YYYY-MM-DD string as local midnight (not UTC).
-   * new Date('2026-03-04') parses as UTC; new Date(y, m, d) is local.
-   * Mixing the two causes off-by-one bugs in non-UTC timezones.
-   */
-  function parseLocalDate(dateStr: string): Date {
-    const parts = dateStr.split('-').map(Number);
-    return new Date(parts[0]!, parts[1]! - 1, parts[2]!);
-  }
-
   function expandRecurring(
     activity: FamilyActivity,
     year: number,
@@ -59,28 +66,28 @@ export const useActivityStore = defineStore('activities', () => {
   ): { activity: FamilyActivity; date: string }[] {
     const results: { activity: FamilyActivity; date: string }[] = [];
     const startDate = parseLocalDate(activity.date);
+    const endDate = activity.recurrenceEndDate ? parseLocalDate(activity.recurrenceEndDate) : null;
     const monthStart = new Date(year, month, 1);
     const monthEnd = new Date(year, month + 1, 0);
+
+    // If the recurrence ended before this month, skip entirely
+    if (endDate && endDate < monthStart) return results;
+
+    // Effective month boundary respecting end date
+    const effectiveEnd = endDate && endDate < monthEnd ? endDate : monthEnd;
 
     if (activity.recurrence === 'none') {
       // One-off: only include if it falls in this month
       if (startDate >= monthStart && startDate <= monthEnd) {
         results.push({ activity, date: activity.date });
       }
-      return results;
-    }
-
-    if (activity.recurrence === 'daily') {
-      // Generate each day of the month from the start date
+    } else if (activity.recurrence === 'daily') {
       const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
-      while (cursor <= monthEnd) {
+      while (cursor <= effectiveEnd) {
         results.push({ activity, date: formatDate(cursor) });
         cursor.setDate(cursor.getDate() + 1);
       }
-      return results;
-    }
-
-    if (activity.recurrence === 'weekly') {
+    } else if (activity.recurrence === 'weekly') {
       // Multi-day support: use daysOfWeek array, fall back to single day from start date
       const targetDays = activity.daysOfWeek?.length ? activity.daysOfWeek : [startDate.getDay()];
 
@@ -91,35 +98,33 @@ export const useActivityStore = defineStore('activities', () => {
           cursor.setDate(cursor.getDate() + 1);
         }
         // Only include if activity has started by this date
-        while (cursor <= monthEnd) {
+        while (cursor <= effectiveEnd) {
           if (cursor >= startDate) {
             results.push({ activity, date: formatDate(cursor) });
           }
           cursor.setDate(cursor.getDate() + 7);
         }
       }
-      return results;
-    }
-
-    if (activity.recurrence === 'monthly') {
+    } else if (activity.recurrence === 'monthly') {
       const dayOfMonth = startDate.getDate();
       const candidate = new Date(year, month, Math.min(dayOfMonth, monthEnd.getDate()));
-      if (candidate >= startDate && candidate >= monthStart && candidate <= monthEnd) {
+      if (candidate >= startDate && candidate >= monthStart && candidate <= effectiveEnd) {
         results.push({ activity, date: formatDate(candidate) });
       }
-      return results;
-    }
-
-    if (activity.recurrence === 'yearly') {
+    } else if (activity.recurrence === 'yearly') {
       if (startDate.getMonth() === month) {
         const candidate = new Date(year, month, startDate.getDate());
-        if (candidate >= startDate) {
+        if (candidate >= startDate && (!endDate || candidate <= endDate)) {
           results.push({ activity, date: formatDate(candidate) });
         }
       }
-      return results;
     }
 
+    // Filter out dates that have materialized overrides (one-offs with parentActivityId)
+    const overrides = overridesByParent.value.get(activity.id);
+    if (overrides) {
+      return results.filter((r) => !overrides.has(r.date));
+    }
     return results;
   }
 
@@ -210,6 +215,65 @@ export const useActivityStore = defineStore('activities', () => {
     return result ?? false;
   }
 
+  /**
+   * Split a recurring activity at a given date.
+   * End-dates the original at the day before, creates a new template from the split date.
+   */
+  async function splitActivity(
+    activityId: string,
+    fromDate: ISODateString
+  ): Promise<FamilyActivity | null> {
+    const original = activities.value.find((a) => a.id === activityId);
+    if (!original) return null;
+
+    const dayBefore = toDateInputValue(addDays(parseLocalDate(fromDate), -1));
+    await updateActivity(activityId, { recurrenceEndDate: dayBefore });
+
+    // Deep-clone to strip Automerge/Vue proxy wrappers (nested arrays like daysOfWeek)
+    const {
+      id: _id,
+      createdAt: _ca,
+      updatedAt: _ua,
+      recurrenceEndDate: _re,
+      ...rest
+    } = JSON.parse(JSON.stringify(original));
+    return createActivity({
+      ...rest,
+      date: fromDate,
+      recurrenceEndDate: original.recurrenceEndDate,
+    });
+  }
+
+  /**
+   * Materialize a one-off override for a single occurrence of a recurring activity.
+   */
+  async function materializeOverride(
+    parentId: string,
+    occurrenceDate: ISODateString,
+    overrides?: UpdateFamilyActivityInput
+  ): Promise<FamilyActivity | null> {
+    const parent = activities.value.find((a) => a.id === parentId);
+    if (!parent) return null;
+
+    // Deep-clone to strip Automerge/Vue proxy wrappers (nested arrays like daysOfWeek)
+    const {
+      id: _id,
+      createdAt: _ca,
+      updatedAt: _ua,
+      recurrence: _rec,
+      daysOfWeek: _dow,
+      recurrenceEndDate: _re,
+      ...rest
+    } = JSON.parse(JSON.stringify(parent));
+    return createActivity({
+      ...rest,
+      ...overrides,
+      date: occurrenceDate,
+      recurrence: 'none',
+      parentActivityId: parentId,
+    });
+  }
+
   function resetState() {
     activities.value = [];
     isLoading.value = false;
@@ -233,6 +297,8 @@ export const useActivityStore = defineStore('activities', () => {
     createActivity,
     updateActivity,
     deleteActivity,
+    splitActivity,
+    materializeOverride,
     resetState,
   };
 });

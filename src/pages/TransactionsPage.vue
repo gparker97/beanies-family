@@ -65,11 +65,8 @@ const viewingTransaction = ref<Transaction | null>(null);
 const editingTransaction = ref<Transaction | null>(null);
 const editingRecurringItem = ref<RecurringItem | null>(null);
 
-// Deferred projected-transaction editing state
-const pendingProjectedScope = ref<{
-  scope: 'this-only' | 'this-and-future';
-  tx: DisplayTransaction;
-} | null>(null);
+// Deferred projected-transaction editing state (scope is asked at save time)
+const pendingProjectedTx = ref<DisplayTransaction | null>(null);
 const addModalInitialValues = ref<Partial<CreateTransactionInput> | null>(null);
 
 // Open view modal from query param (e.g. navigated from Dashboard)
@@ -225,13 +222,13 @@ function closeEditModal() {
   showEditModal.value = false;
   editingTransaction.value = null;
   editingRecurringItem.value = null;
-  pendingProjectedScope.value = null;
+  pendingProjectedTx.value = null;
 }
 
 function closeAddModal() {
   showAddModal.value = false;
   addModalInitialValues.value = null;
-  pendingProjectedScope.value = null;
+  pendingProjectedTx.value = null;
 }
 
 async function handleTransactionSave(
@@ -241,10 +238,6 @@ async function handleTransactionSave(
     if (!(await transactionsStore.updateTransaction(data.id, data.data))) return;
     closeEditModal();
   } else {
-    // If materializing a "this-only" projected transaction, ensure recurringItemId is set
-    if (pendingProjectedScope.value?.scope === 'this-only') {
-      data.recurringItemId = pendingProjectedScope.value.tx.recurringItemId;
-    }
     if (!(await transactionsStore.createTransaction(data))) return;
     closeAddModal();
   }
@@ -315,24 +308,45 @@ async function syncLinkedTransactions(recurringItemId: string, data: CreateRecur
 
 async function handleSaveRecurring(data: CreateRecurringItemInput) {
   if (editingRecurringItem.value) {
-    let updatedItemId = editingRecurringItem.value.id;
+    const itemId = editingRecurringItem.value.id;
 
-    // "This and future" deferred split: split first, then apply edits to the new item
-    if (pendingProjectedScope.value?.scope === 'this-and-future') {
-      const splitDate = pendingProjectedScope.value.tx.date;
-      const newItem = await recurringStore.splitRecurringItem(
-        editingRecurringItem.value.id,
-        splitDate
-      );
-      if (!newItem) return; // split failed — keep modal open
-      if (!(await recurringStore.updateRecurringItem(newItem.id, data))) return;
-      updatedItemId = newItem.id;
-    } else {
-      if (!(await recurringStore.updateRecurringItem(editingRecurringItem.value.id, data))) return;
+    // Projected transaction edit — show scope modal at save time
+    if (pendingProjectedTx.value) {
+      const scope = await chooseScope();
+      if (!scope) return; // cancelled — keep modal open
+
+      const projectedDate = pendingProjectedTx.value.date;
+
+      if (scope === 'all') {
+        if (!(await recurringStore.updateRecurringItem(itemId, data))) return;
+        await syncLinkedTransactions(itemId, data);
+      } else if (scope === 'this-only') {
+        // Materialize a one-off transaction from the edited recurring data
+        await transactionsStore.createTransaction({
+          accountId: data.accountId,
+          type: data.type,
+          amount: data.amount,
+          currency: data.currency,
+          category: data.category,
+          date: projectedDate,
+          description: data.description,
+          isReconciled: false,
+          recurringItemId: pendingProjectedTx.value.recurringItemId,
+        });
+      } else if (scope === 'this-and-future') {
+        const newItem = await recurringStore.splitRecurringItem(itemId, projectedDate);
+        if (!newItem) return;
+        if (!(await recurringStore.updateRecurringItem(newItem.id, data))) return;
+        await syncLinkedTransactions(newItem.id, data);
+      }
+
+      closeEditModal();
+      return;
     }
 
-    // Propagate template changes to linked materialized transactions
-    await syncLinkedTransactions(updatedItemId, data);
+    // Non-projected recurring item edit — update directly
+    if (!(await recurringStore.updateRecurringItem(itemId, data))) return;
+    await syncLinkedTransactions(itemId, data);
     closeEditModal();
   } else if (editingTransaction.value) {
     // Converting a one-time transaction to recurring
@@ -386,36 +400,12 @@ function getRecurringItem(tx: DisplayTransaction): RecurringItem | undefined {
 }
 
 // ── Projected transaction click handler ────────────────────────────────────
-async function handleProjectedClick(tx: DisplayTransaction) {
-  const scope = await chooseScope();
-  if (!scope) return;
-
+// Scope modal is deferred to save time — open the edit modal directly.
+function handleProjectedClick(tx: DisplayTransaction) {
   const ri = getRecurringItem(tx);
   if (!ri) return;
-
-  if (scope === 'all') {
-    // Edit the recurring template directly — no side effects needed
-    openEditRecurringModal(ri);
-  } else if (scope === 'this-only') {
-    // Defer materialization: pre-fill the add modal with projected values
-    pendingProjectedScope.value = { scope: 'this-only', tx };
-    addModalInitialValues.value = {
-      accountId: tx.accountId,
-      type: tx.type,
-      amount: tx.amount,
-      currency: tx.currency,
-      category: tx.category,
-      date: tx.date,
-      description: tx.description,
-      isReconciled: false,
-      recurringItemId: tx.recurringItemId,
-    };
-    showAddModal.value = true;
-  } else if (scope === 'this-and-future') {
-    // Defer split: open the original recurring item for editing
-    pendingProjectedScope.value = { scope: 'this-and-future', tx };
-    openEditRecurringModal(ri);
-  }
+  pendingProjectedTx.value = tx;
+  openEditRecurringModal(ri);
 }
 
 function handleViewOpenEdit(transaction: Transaction) {
@@ -777,6 +767,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       :open="showEditModal"
       :transaction="editingTransaction"
       :recurring-item="editingRecurringItem"
+      :projected-date="pendingProjectedTx?.date"
       @close="closeEditModal"
       @save="handleTransactionSave"
       @save-recurring="handleSaveRecurring"

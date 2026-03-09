@@ -11,7 +11,7 @@ const activityStore = useActivityStore();
 
 const emit = defineEmits<{
   'open-todo': [id: string];
-  'open-activity': [id: string];
+  'open-activity': [id: string, date: string];
 }>();
 
 interface ScheduleItem {
@@ -141,7 +141,7 @@ const hiddenWeekCount = computed(() => weekItems.value.length - MAX_WEEK_VISIBLE
 
 function handleClick(item: ScheduleItem) {
   if (item.type === 'todo') emit('open-todo', item.id);
-  else emit('open-activity', item.id);
+  else emit('open-activity', item.id, item.date);
 }
 </script>
 
