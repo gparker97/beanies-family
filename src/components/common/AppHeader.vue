@@ -158,6 +158,11 @@ function handleOpenSettings() {
   router.push('/settings');
 }
 
+function handleOpenHelp() {
+  showProfileDropdown.value = false;
+  router.push('/help');
+}
+
 function promptSignOut() {
   showProfileDropdown.value = false;
   showSignOutModal.value = true;
@@ -320,6 +325,26 @@ async function confirmSignOutAndClearData() {
               >
                 <BeanieIcon name="settings" size="sm" class="opacity-50" />
                 {{ t('header.settings') }}
+              </button>
+
+              <!-- Help -->
+              <button
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleOpenHelp"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                {{ t('nav.help') }}
               </button>
 
               <!-- Divider -->
@@ -626,6 +651,26 @@ async function confirmSignOutAndClearData() {
               >
                 <BeanieIcon name="settings" size="sm" class="opacity-50" />
                 {{ t('header.settings') }}
+              </button>
+
+              <!-- Help -->
+              <button
+                type="button"
+                class="text-secondary-500 flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-slate-700"
+                @mousedown.prevent="handleOpenHelp"
+              >
+                <svg
+                  class="h-4 w-4 shrink-0 opacity-50"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+                {{ t('nav.help') }}
               </button>
 
               <!-- Divider -->

@@ -125,6 +125,24 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'noAccess.title' },
   },
   {
+    path: '/help',
+    name: 'HelpCenter',
+    component: () => import('@/pages/HelpCenterPage.vue'),
+    meta: { titleKey: 'help.title', requiresAuth: false },
+  },
+  {
+    path: '/help/:category',
+    name: 'HelpCategory',
+    component: () => import('@/pages/HelpCategoryPage.vue'),
+    meta: { titleKey: 'help.title', requiresAuth: false },
+  },
+  {
+    path: '/help/:category/:slug',
+    name: 'HelpArticle',
+    component: () => import('@/pages/HelpArticlePage.vue'),
+    meta: { titleKey: 'help.title', requiresAuth: false },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),

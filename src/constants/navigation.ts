@@ -62,6 +62,7 @@ export const NAV_ITEMS: NavItemDef[] = [
   },
   { labelKey: 'nav.assets', path: '/assets', emoji: '\u{1F3E2}', section: 'piggyBank' },
   // Pinned
+  { labelKey: 'nav.help', path: '/help', emoji: '\u{1F4DA}', section: 'pinned' },
   { labelKey: 'nav.settings', path: '/settings', emoji: '\u2699\uFE0F', section: 'pinned' },
 ];
 
