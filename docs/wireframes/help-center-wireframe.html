@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beanies.family — Help Center Wireframe</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════
+     CSS VARIABLES — BEANIES BRAND PALETTE
+     ═══════════════════════════════════════════ */
+  :root {
+    --deep-slate: #2C3E50;
+    --heritage-orange: #F15D22;
+    --sky-silk: #AED6F1;
+    --terracotta: #E67E22;
+    --cloud-white: #F8F9FA;
+    --soft-green: #27AE60;
+    --purple-accent: #9B59B6;
+
+    --slate-light: #34495E;
+    --slate-muted: #4A6274;
+    --text-muted: #7F8C9B;
+    --border-light: #E8ECF0;
+
+    --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+    --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+    --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+
+    --tint-orange-8: rgba(241, 93, 34, 0.08);
+    --tint-orange-15: rgba(241, 93, 34, 0.15);
+    --tint-silk-10: rgba(174, 214, 241, 0.1);
+    --tint-silk-20: rgba(174, 214, 241, 0.2);
+    --tint-slate-5: rgba(44, 62, 80, 0.05);
+    --tint-green-10: rgba(39, 174, 96, 0.1);
+    --tint-purple-10: rgba(155, 89, 182, 0.1);
+
+    --sq: 24px;
+    --sq-sm: 16px;
+    --sq-lg: 32px;
+  }
+
+  /* ═══════════════════════════════════════════
+     RESET & BASE
+     ═══════════════════════════════════════════ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Source Serif 4', Georgia, serif;
+    color: var(--deep-slate);
+    background: var(--cloud-white);
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  /* ═══════════════════════════════════════════
+     WIREFRAME ANNOTATION SYSTEM
+     ═══════════════════════════════════════════ */
+  .wireframe-note {
+    position: relative;
+  }
+  .wireframe-note::after {
+    content: attr(data-note);
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--purple-accent);
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    z-index: 100;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .wireframe-section-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--purple-accent);
+    background: var(--tint-purple-10);
+    padding: 6px 14px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+
+  /* ═══════════════════════════════════════════
+     PAGE-LEVEL SECTIONS
+     ═══════════════════════════════════════════ */
+  .page-section {
+    padding: 80px 0;
+    position: relative;
+  }
+  .page-section + .page-section {
+    border-top: 1px solid var(--border-light);
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+  .container-narrow {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* ═══════════════════════════════════════════
+     TYPOGRAPHY
+     ═══════════════════════════════════════════ */
+  h1, h2, h3, h4, h5 {
+    font-family: 'Outfit', sans-serif;
+    line-height: 1.2;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 1: HERO / LANDING
+     ═══════════════════════════════════════════ */
+  .hero {
+    background:
+      radial-gradient(ellipse 80% 60% at 20% 90%, var(--tint-silk-20) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 85% 20%, var(--tint-orange-8) 0%, transparent 60%),
+      var(--cloud-white);
+    padding: 100px 0 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -120px;
+    right: -60px;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: var(--tint-orange-8);
+    animation: float 8s ease-in-out infinite;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -80px;
+    left: -40px;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: var(--tint-silk-20);
+    animation: float 10s ease-in-out infinite reverse;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(20px); }
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border: 1px solid var(--border-light);
+    border-radius: 40px;
+    padding: 8px 20px 8px 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--deep-slate);
+    margin-bottom: 32px;
+    box-shadow: var(--card-shadow);
+    position: relative;
+    z-index: 2;
+    animation: fadeUp 0.6s ease-out;
+  }
+  .hero-badge .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--soft-green);
+    animation: pulse-dot 2s infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .hero h1 {
+    font-size: 52px;
+    font-weight: 800;
+    color: var(--deep-slate);
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+    animation: fadeUp 0.6s ease-out 0.1s both;
+  }
+  .hero h1 .orange { color: var(--heritage-orange); }
+
+  .hero-subtitle {
+    font-size: 20px;
+    color: var(--text-muted);
+    max-width: 540px;
+    margin: 0 auto 40px;
+    position: relative;
+    z-index: 2;
+    animation: fadeUp 0.6s ease-out 0.2s both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Search bar */
+  .hero-search {
+    position: relative;
+    max-width: 560px;
+    margin: 0 auto;
+    z-index: 2;
+    animation: fadeUp 0.6s ease-out 0.3s both;
+  }
+  .hero-search input {
+    width: 100%;
+    padding: 18px 24px 18px 54px;
+    border: 2px solid var(--border-light);
+    border-radius: var(--sq);
+    font-family: 'Source Serif 4', serif;
+    font-size: 17px;
+    color: var(--deep-slate);
+    background: white;
+    box-shadow: var(--soft-shadow);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  .hero-search input:focus {
+    border-color: var(--sky-silk);
+    box-shadow: 0 8px 40px rgba(174, 214, 241, 0.2);
+  }
+  .hero-search input::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  .hero-search .search-icon {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    opacity: 0.4;
+  }
+  .hero-search .search-hint {
+    margin-top: 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+  }
+  .hero-search .search-hint span {
+    background: var(--tint-slate-5);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 500;
+    margin: 0 2px;
+  }
+
+  /* Hero mascot */
+  .hero-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    text-align: left;
+  }
+  .hero-text {
+    flex: 1;
+    max-width: 560px;
+  }
+  .hero-mascot {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+    animation: fadeUp 0.8s ease-out 0.4s both;
+  }
+  .hero-mascot img {
+    width: 280px;
+    height: 280px;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 32px rgba(44, 62, 80, 0.10));
+    animation: gentle-bob 4s ease-in-out infinite;
+  }
+  @keyframes gentle-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  .hero-mascot .mascot-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--tint-orange-15) 0%, transparent 70%);
+    z-index: -1;
+  }
+
+  @media (max-width: 900px) {
+    .hero-layout {
+      flex-direction: column-reverse;
+      text-align: center;
+      gap: 32px;
+    }
+    .hero-mascot img {
+      width: 200px;
+      height: 200px;
+    }
+  }
+  @media (max-width: 600px) {
+    .hero-mascot img {
+      width: 160px;
+      height: 160px;
+    }
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 2: CATEGORY CARDS
+     ═══════════════════════════════════════════ */
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin-top: 12px;
+  }
+
+  .category-card {
+    background: white;
+    border-radius: var(--sq);
+    padding: 32px 28px;
+    box-shadow: var(--card-shadow);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+  .category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--card-hover-shadow);
+  }
+
+  .category-card .card-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    margin-bottom: 20px;
+  }
+  .category-card .card-icon.orange { background: var(--tint-orange-15); }
+  .category-card .card-icon.silk { background: var(--tint-silk-20); }
+  .category-card .card-icon.green { background: var(--tint-green-10); }
+  .category-card .card-icon.slate { background: var(--tint-slate-5); }
+
+  .category-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .category-card p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .category-card .article-count {
+    display: inline-block;
+    margin-top: 16px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--heritage-orange);
+    letter-spacing: 0.04em;
+  }
+
+  .category-card .card-stripe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+  }
+  .card-stripe.orange { background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta)); }
+  .card-stripe.silk { background: linear-gradient(90deg, var(--sky-silk), #87CEEB); }
+  .card-stripe.green { background: linear-gradient(90deg, var(--soft-green), #2ECC71); }
+  .card-stripe.slate { background: linear-gradient(90deg, var(--deep-slate), var(--slate-light)); }
+
+  /* ═══════════════════════════════════════════
+     SECTION 3: POPULAR ARTICLES
+     ═══════════════════════════════════════════ */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+  .section-header h2 {
+    font-size: 28px;
+    font-weight: 700;
+  }
+  .section-header .view-all {
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--heritage-orange);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: gap 0.2s;
+  }
+  .section-header .view-all:hover { gap: 8px; }
+
+  .articles-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .article-card {
+    background: white;
+    border-radius: var(--sq);
+    padding: 28px;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+  }
+  .article-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--card-hover-shadow);
+  }
+
+  .article-card .tag {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+    width: fit-content;
+  }
+  .tag.getting-started { background: var(--tint-orange-15); color: var(--heritage-orange); }
+  .tag.security { background: var(--tint-green-10); color: var(--soft-green); }
+  .tag.features { background: var(--tint-silk-20); color: #2980B9; }
+  .tag.how-it-works { background: var(--tint-slate-5); color: var(--slate-light); }
+
+  .article-card h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    line-height: 1.35;
+  }
+  .article-card .excerpt {
+    font-size: 14px;
+    color: var(--text-muted);
+    flex: 1;
+    line-height: 1.55;
+  }
+  .article-card .read-time {
+    margin-top: 16px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 4: SECURITY SPOTLIGHT
+     ═══════════════════════════════════════════ */
+  .security-spotlight {
+    background:
+      radial-gradient(ellipse 70% 80% at 90% 50%, rgba(44, 62, 80, 0.03) 0%, transparent 60%),
+      var(--cloud-white);
+  }
+
+  .spotlight-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+  }
+
+  .spotlight-text h2 {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 16px;
+    line-height: 1.15;
+  }
+  .spotlight-text .lead {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .security-features {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .security-features li {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .security-features .feat-icon {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+  .security-features .feat-content h4 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .security-features .feat-content p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+
+  .spotlight-visual {
+    position: relative;
+  }
+
+  .encryption-diagram {
+    background: white;
+    border-radius: var(--sq-lg);
+    padding: 40px;
+    box-shadow: var(--soft-shadow);
+    position: relative;
+  }
+
+  .diagram-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+
+  .diagram-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .diagram-step {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: var(--sq-sm);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    transition: transform 0.15s;
+  }
+  .diagram-step:hover { transform: translateX(4px); }
+  .diagram-step .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 28px;
+  }
+  .diagram-step.s1 { background: var(--tint-orange-8); }
+  .diagram-step.s1 .step-num { background: var(--heritage-orange); color: white; }
+  .diagram-step.s2 { background: var(--tint-silk-10); }
+  .diagram-step.s2 .step-num { background: var(--sky-silk); color: var(--deep-slate); }
+  .diagram-step.s3 { background: var(--tint-green-10); }
+  .diagram-step.s3 .step-num { background: var(--soft-green); color: white; }
+  .diagram-step.s4 { background: var(--tint-slate-5); }
+  .diagram-step.s4 .step-num { background: var(--deep-slate); color: white; }
+
+  .diagram-arrow {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 16px;
+    opacity: 0.4;
+  }
+
+  .diagram-caption {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-light);
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 5: TABLE OF CONTENTS / FULL INDEX
+     ═══════════════════════════════════════════ */
+  .toc-section {
+    background: white;
+  }
+
+  .toc-columns {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 48px;
+  }
+
+  .toc-group {
+    padding: 32px;
+    border-radius: var(--sq);
+    border: 1px solid var(--border-light);
+    transition: border-color 0.2s;
+  }
+  .toc-group:hover {
+    border-color: var(--sky-silk);
+  }
+
+  .toc-group-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--border-light);
+  }
+  .toc-group-header .toc-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .toc-group-header h3 {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .toc-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .toc-list li a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: var(--deep-slate);
+    font-size: 14px;
+    transition: background 0.15s, padding-left 0.15s;
+  }
+  .toc-list li a:hover {
+    background: var(--tint-orange-8);
+    padding-left: 20px;
+  }
+  .toc-list li a .link-icon {
+    font-size: 16px;
+    opacity: 0.5;
+    min-width: 20px;
+    text-align: center;
+  }
+  .toc-list li a .arrow {
+    margin-left: auto;
+    opacity: 0;
+    color: var(--heritage-orange);
+    transition: opacity 0.15s;
+    font-size: 13px;
+  }
+  .toc-list li a:hover .arrow { opacity: 1; }
+
+  /* ═══════════════════════════════════════════
+     SECTION 6: ARTICLE PAGE WIREFRAME
+     ═══════════════════════════════════════════ */
+  .article-page-section {
+    background:
+      linear-gradient(180deg, white 0%, var(--cloud-white) 100%);
+  }
+
+  .article-page-demo {
+    background: white;
+    border-radius: var(--sq-lg);
+    box-shadow: var(--soft-shadow);
+    overflow: hidden;
+    border: 1px solid var(--border-light);
+  }
+
+  .article-browser-bar {
+    background: #F1F3F5;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .browser-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+  .browser-dot.r { background: #FF5F57; }
+  .browser-dot.y { background: #FFBD2E; }
+  .browser-dot.g { background: #28C840; }
+  .browser-url {
+    margin-left: 12px;
+    background: white;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    flex: 1;
+    max-width: 360px;
+  }
+
+  .article-page-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr 200px;
+    min-height: 600px;
+  }
+
+  /* Sidebar nav in article view */
+  .article-sidebar {
+    border-right: 1px solid var(--border-light);
+    padding: 24px 16px;
+    background: #FAFBFC;
+  }
+  .article-sidebar .sidebar-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    padding: 0 12px;
+    margin-bottom: 12px;
+  }
+  .article-sidebar .sidebar-nav {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 28px;
+  }
+  .sidebar-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--deep-slate);
+    transition: background 0.15s;
+  }
+  .sidebar-nav li a:hover { background: var(--tint-orange-8); }
+  .sidebar-nav li a.active {
+    background: linear-gradient(135deg, var(--tint-orange-15), var(--tint-orange-8));
+    color: var(--heritage-orange);
+    font-weight: 600;
+  }
+  .sidebar-nav li a .nav-emoji {
+    font-size: 14px;
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* Article body */
+  .article-body {
+    padding: 40px 48px;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .article-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+  }
+  .article-breadcrumb a {
+    color: var(--heritage-orange);
+    text-decoration: none;
+  }
+
+  .article-body h1 {
+    font-size: 32px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+
+  .article-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .article-meta .meta-tag {
+    background: var(--tint-green-10);
+    color: var(--soft-green);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+  }
+
+  .article-body h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 32px 0 14px;
+    padding-top: 8px;
+  }
+
+  .article-body p {
+    font-size: 16px;
+    color: var(--deep-slate);
+    margin-bottom: 16px;
+    line-height: 1.75;
+  }
+
+  .article-body .callout {
+    background: var(--tint-orange-8);
+    border-left: 4px solid var(--heritage-orange);
+    border-radius: 0 var(--sq-sm) var(--sq-sm) 0;
+    padding: 20px 24px;
+    margin: 24px 0;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .callout .callout-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--heritage-orange);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .article-body .info-box {
+    background: var(--tint-silk-20);
+    border-radius: var(--sq-sm);
+    padding: 20px 24px;
+    margin: 24px 0;
+  }
+  .info-box .info-title {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .article-body .code-block {
+    background: var(--deep-slate);
+    color: #ECF0F1;
+    border-radius: var(--sq-sm);
+    padding: 20px 24px;
+    margin: 20px 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .code-block .comment { color: #7F8C9B; }
+  .code-block .keyword { color: var(--sky-silk); }
+  .code-block .string { color: var(--terracotta); }
+  .code-block .fn { color: #2ECC71; }
+
+  /* On-page TOC */
+  .article-toc {
+    border-left: 1px solid var(--border-light);
+    padding: 24px 20px;
+    position: sticky;
+    top: 20px;
+    align-self: start;
+  }
+  .article-toc .toc-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .article-toc .toc-links {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .toc-links li a {
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 4px 0;
+    display: block;
+    border-left: 2px solid transparent;
+    padding-left: 12px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .toc-links li a:hover {
+    color: var(--heritage-orange);
+    border-left-color: var(--heritage-orange);
+  }
+  .toc-links li a.active {
+    color: var(--heritage-orange);
+    border-left-color: var(--heritage-orange);
+    font-weight: 600;
+  }
+
+  .article-feedback {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-light);
+  }
+  .article-feedback p {
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+  .feedback-buttons {
+    display: flex;
+    gap: 8px;
+  }
+  .feedback-btn {
+    padding: 8px 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border-light);
+    background: white;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .feedback-btn:hover {
+    background: var(--tint-orange-8);
+    border-color: var(--heritage-orange);
+  }
+
+  /* ═══════════════════════════════════════════
+     SECTION 7: CHATBOT TEASER
+     ═══════════════════════════════════════════ */
+  .chatbot-teaser {
+    background:
+      linear-gradient(135deg, var(--deep-slate) 0%, var(--slate-light) 100%);
+    padding: 80px 0;
+    color: white;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .chatbot-teaser::before {
+    content: '';
+    position: absolute;
+    top: -100px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(241,93,34,0.12) 0%, transparent 70%);
+  }
+
+  .chatbot-teaser h2 {
+    font-size: 36px;
+    font-weight: 800;
+    margin-bottom: 16px;
+    position: relative;
+    z-index: 2;
+  }
+  .chatbot-teaser .lead {
+    font-size: 18px;
+    color: rgba(255,255,255,0.7);
+    max-width: 520px;
+    margin: 0 auto 36px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .chatbot-preview {
+    max-width: 440px;
+    margin: 0 auto;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--sq);
+    padding: 24px;
+    backdrop-filter: blur(10px);
+    position: relative;
+    z-index: 2;
+    text-align: left;
+  }
+  .chat-message {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .chat-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    min-width: 32px;
+  }
+  .chat-avatar.user { background: rgba(241,93,34,0.2); }
+  .chat-avatar.bot { background: rgba(174,214,241,0.2); }
+  .chat-bubble {
+    background: rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 16px;
+    font-family: 'Source Serif 4', serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: rgba(255,255,255,0.9);
+  }
+  .chat-input-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.3);
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+    font-style: italic;
+  }
+  .coming-soon-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(241,93,34,0.15);
+    color: var(--heritage-orange);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ═══════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════ */
+  .help-footer {
+    padding: 48px 0;
+    text-align: center;
+    border-top: 1px solid var(--border-light);
+  }
+  .footer-brand {
+    font-family: 'Outfit', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .footer-brand .orange { color: var(--heritage-orange); }
+  .footer-tagline {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-muted);
+    opacity: 0.6;
+    margin-bottom: 20px;
+  }
+  .footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px;
+  }
+  .footer-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .footer-links a:hover { color: var(--heritage-orange); }
+
+  /* ═══════════════════════════════════════════
+     MOBILE RESPONSIVE
+     ═══════════════════════════════════════════ */
+  @media (max-width: 900px) {
+    .categories-grid { grid-template-columns: repeat(2, 1fr); }
+    .articles-grid { grid-template-columns: 1fr; }
+    .spotlight-layout { grid-template-columns: 1fr; gap: 40px; }
+    .toc-columns { grid-template-columns: 1fr; }
+    .article-page-layout { grid-template-columns: 1fr; }
+    .article-sidebar { display: none; }
+    .article-toc { display: none; }
+    .hero h1 { font-size: 36px; }
+  }
+  @media (max-width: 600px) {
+    .categories-grid { grid-template-columns: 1fr; }
+    .page-section { padding: 48px 0; }
+    .container, .container-narrow { padding: 0 20px; }
+    .hero { padding: 64px 0 48px; }
+    .hero h1 { font-size: 30px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 1 — HERO / SEARCH               ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-layout">
+      <div class="hero-text">
+        <div class="hero-badge wireframe-note" data-note="Top bar — Live status">
+          <span class="dot"></span>
+          beanies.family help center
+        </div>
+
+        <h1>how can we <span class="orange">help</span>?</h1>
+        <p class="hero-subtitle">
+          Everything you need to know about your family's favourite bean counter &mdash; from first pod to full financial planning.
+        </p>
+
+        <div class="hero-search wireframe-note" data-note="Full-text search">
+          <span class="search-icon">&#x1F50D;</span>
+          <input type="text" placeholder="search for anything... encryption, budgets, activities..." />
+          <div class="search-hint">
+            Try: <span>getting started</span> <span>encryption</span> <span>how net worth works</span> <span>privacy</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-mascot">
+        <div class="mascot-glow"></div>
+        <img src="../../public/brand/beanies_family_hugging_transparent_512x512.png" alt="The beanies family hugging" />
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 2 — CATEGORY CARDS               ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="page-section">
+  <div class="container">
+    <span class="wireframe-section-label">Section: Categories</span>
+
+    <div class="categories-grid">
+
+      <a href="#" class="category-card wireframe-note" data-note="Card 1">
+        <div class="card-stripe orange"></div>
+        <div class="card-icon orange">&#x1F331;</div>
+        <h3>Getting Started</h3>
+        <p>Create your first pod, add family members, and start tracking your beans.</p>
+        <span class="article-count">8 articles &rarr;</span>
+      </a>
+
+      <a href="#" class="category-card wireframe-note" data-note="Card 2">
+        <div class="card-stripe silk"></div>
+        <div class="card-icon silk">&#x1F3E1;</div>
+        <h3>Features &amp; How-To</h3>
+        <p>Accounts, transactions, budgets, goals, activities, the planner, and everything in between.</p>
+        <span class="article-count">24 articles &rarr;</span>
+      </a>
+
+      <a href="#" class="category-card wireframe-note" data-note="Card 3">
+        <div class="card-stripe green"></div>
+        <div class="card-icon green">&#x1F512;</div>
+        <h3>Security &amp; Privacy</h3>
+        <p>How we encrypt your data, protect your keys, and keep your beans safe &mdash; with full transparency.</p>
+        <span class="article-count">12 articles &rarr;</span>
+      </a>
+
+      <a href="#" class="category-card wireframe-note" data-note="Card 4">
+        <div class="card-stripe slate"></div>
+        <div class="card-icon slate">&#x2699;&#xFE0F;</div>
+        <h3>How It Works</h3>
+        <p>The logic behind the numbers &mdash; how calculations, summaries, and smart features work under the hood.</p>
+        <span class="article-count">16 articles &rarr;</span>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 3 — POPULAR ARTICLES             ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="page-section">
+  <div class="container">
+    <span class="wireframe-section-label">Section: Popular Articles</span>
+
+    <div class="section-header">
+      <h2>Popular reads</h2>
+      <a href="#" class="view-all">View all articles &rarr;</a>
+    </div>
+
+    <div class="articles-grid">
+
+      <a href="#" class="article-card">
+        <span class="tag getting-started">Getting Started</span>
+        <h4>Creating your first pod</h4>
+        <p class="excerpt">A step-by-step guide to setting up your family's encrypted data pod, choosing a strong password, and inviting your first beans.</p>
+        <span class="read-time">&#x1F4D6; 5 min read</span>
+      </a>
+
+      <a href="#" class="article-card">
+        <span class="tag security">Security</span>
+        <h4>How your data is encrypted</h4>
+        <p class="excerpt">AES-256-GCM, PBKDF2 key derivation, family key wrapping &mdash; everything that happens between your password and your protected data.</p>
+        <span class="read-time">&#x1F4D6; 8 min read</span>
+      </a>
+
+      <a href="#" class="article-card">
+        <span class="tag how-it-works">How It Works</span>
+        <h4>How net worth is calculated</h4>
+        <p class="excerpt">Your accounts, assets, and currency conversions &mdash; exactly how beanies adds up your bean count across everything you own.</p>
+        <span class="read-time">&#x1F4D6; 4 min read</span>
+      </a>
+
+      <a href="#" class="article-card">
+        <span class="tag features">Features</span>
+        <h4>Managing budgets &amp; tracking spending</h4>
+        <p class="excerpt">Set monthly limits by category, see your pace status, and understand the "on track" versus "caution" indicators.</p>
+        <span class="read-time">&#x1F4D6; 6 min read</span>
+      </a>
+
+      <a href="#" class="article-card">
+        <span class="tag security">Security</span>
+        <h4>The .beanpod file explained</h4>
+        <p class="excerpt">What's inside your encrypted family data file, how family keys are wrapped per-member, and why your password can never be recovered.</p>
+        <span class="read-time">&#x1F4D6; 7 min read</span>
+      </a>
+
+      <a href="#" class="article-card">
+        <span class="tag how-it-works">How It Works</span>
+        <h4>Cash flow &amp; savings rate</h4>
+        <p class="excerpt">How monthly income, expenses (one-time + recurring), and the savings rate percentage are calculated on the dashboard.</p>
+        <span class="read-time">&#x1F4D6; 3 min read</span>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 4 — SECURITY SPOTLIGHT           ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="page-section security-spotlight">
+  <div class="container">
+    <span class="wireframe-section-label">Section: Security Spotlight</span>
+
+    <div class="spotlight-layout">
+
+      <div class="spotlight-text">
+        <h2>Your beans are <br/>safe with us</h2>
+        <p class="lead">
+          beanies.family uses bank-grade encryption that runs entirely in your browser. Your data never touches our servers unencrypted &mdash; because it never touches our servers at all.
+        </p>
+
+        <ul class="security-features">
+          <li>
+            <div class="feat-icon" style="background: var(--tint-orange-15);">&#x1F510;</div>
+            <div class="feat-content">
+              <h4>AES-256-GCM Encryption</h4>
+              <p>The same authenticated encryption used by governments and banks. Every byte of your family data is encrypted before it leaves memory.</p>
+            </div>
+          </li>
+          <li>
+            <div class="feat-icon" style="background: var(--tint-silk-20);">&#x1F511;</div>
+            <div class="feat-content">
+              <h4>PBKDF2 Key Derivation</h4>
+              <p>Your password is strengthened through 100,000 rounds of PBKDF2-SHA256 before it becomes an encryption key. Brute force isn't happening.</p>
+            </div>
+          </li>
+          <li>
+            <div class="feat-icon" style="background: var(--tint-green-10);">&#x1F46A;</div>
+            <div class="feat-content">
+              <h4>Per-Member Key Wrapping</h4>
+              <p>Each family member has their own wrapped copy of the family key. Change your password without re-encrypting the entire file.</p>
+            </div>
+          </li>
+          <li>
+            <div class="feat-icon" style="background: var(--tint-slate-5);">&#x1F4BB;</div>
+            <div class="feat-content">
+              <h4>Browser-Native Crypto</h4>
+              <p>All encryption uses the Web Crypto API built into your browser &mdash; no third-party libraries, no external dependencies, no supply chain risk.</p>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="spotlight-visual wireframe-note" data-note="Interactive diagram">
+        <div class="encryption-diagram">
+          <div class="diagram-title">How your data is protected</div>
+
+          <div class="diagram-flow">
+            <div class="diagram-step s1">
+              <span class="step-num">1</span>
+              Your password + random salt
+            </div>
+            <div class="diagram-arrow">&#x2193;</div>
+            <div class="diagram-step s2">
+              <span class="step-num">2</span>
+              PBKDF2 (100,000 rounds) &rarr; AES key
+            </div>
+            <div class="diagram-arrow">&#x2193;</div>
+            <div class="diagram-step s3">
+              <span class="step-num">3</span>
+              AES-KW unwraps the family key
+            </div>
+            <div class="diagram-arrow">&#x2193;</div>
+            <div class="diagram-step s4">
+              <span class="step-num">4</span>
+              Family key decrypts your .beanpod
+            </div>
+          </div>
+
+          <div class="diagram-caption">
+            All of this happens in your browser. Nothing is sent anywhere.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 5 — FULL TABLE OF CONTENTS       ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="page-section toc-section">
+  <div class="container">
+    <span class="wireframe-section-label">Section: Full Article Index</span>
+
+    <div class="section-header">
+      <h2>All topics</h2>
+    </div>
+
+    <div class="toc-columns">
+
+      <!-- Getting Started -->
+      <div class="toc-group">
+        <div class="toc-group-header">
+          <div class="toc-icon" style="background: var(--tint-orange-15);">&#x1F331;</div>
+          <h3>Getting Started</h3>
+        </div>
+        <ul class="toc-list">
+          <li><a href="#"><span class="link-icon">&#x1F4E6;</span> Creating your first pod <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F511;</span> Choosing a strong pod password <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F46A;</span> Adding family members <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F517;</span> Joining a pod via invite link <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4F1;</span> Installing the app (PWA) <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F310;</span> Setting your language &amp; currency <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F3A8;</span> Light mode, dark mode &amp; beanie mode <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x2601;&#xFE0F;</span> Connecting Google Drive <span class="arrow">&rarr;</span></a></li>
+        </ul>
+      </div>
+
+      <!-- Security & Privacy -->
+      <div class="toc-group">
+        <div class="toc-group-header">
+          <div class="toc-icon" style="background: var(--tint-green-10);">&#x1F512;</div>
+          <h3>Security &amp; Privacy</h3>
+        </div>
+        <ul class="toc-list">
+          <li><a href="#"><span class="link-icon">&#x1F510;</span> How your data is encrypted <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4C4;</span> The .beanpod file explained <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F511;</span> Family keys &amp; key wrapping <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F91D;</span> Invite tokens &amp; how they work <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F9EC;</span> Passkeys &amp; biometric unlock <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F6E1;&#xFE0F;</span> Zero-knowledge architecture <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4BE;</span> Where your data is stored <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F440;</span> Privacy mode explained <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x2601;&#xFE0F;</span> Google Drive &amp; OAuth security <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F504;</span> What happens when you sign out <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x26A0;&#xFE0F;</span> Password recovery (there is none) <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4CA;</span> Security FAQ <span class="arrow">&rarr;</span></a></li>
+        </ul>
+      </div>
+
+      <!-- Features & How-To -->
+      <div class="toc-group">
+        <div class="toc-group-header">
+          <div class="toc-icon" style="background: var(--tint-silk-20);">&#x1F3E1;</div>
+          <h3>Features &amp; How-To</h3>
+        </div>
+        <ul class="toc-list">
+          <li><a href="#"><span class="link-icon">&#x1F3E0;</span> The Family Nook (home screen) <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4B0;</span> Managing accounts <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4B3;</span> Recording transactions <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F504;</span> Recurring transactions <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4B5;</span> Budgets &amp; category limits <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F3AF;</span> Setting &amp; tracking goals <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F3E2;</span> Tracking assets <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4C5;</span> Family Planner &amp; calendar <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x2705;</span> Family To-Do lists <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F30D;</span> Multi-currency support <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F465;</span> Family member management <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x2699;&#xFE0F;</span> App settings <span class="arrow">&rarr;</span></a></li>
+        </ul>
+      </div>
+
+      <!-- How It Works -->
+      <div class="toc-group">
+        <div class="toc-group-header">
+          <div class="toc-icon" style="background: var(--tint-slate-5);">&#x2699;&#xFE0F;</div>
+          <h3>How It Works</h3>
+        </div>
+        <ul class="toc-list">
+          <li><a href="#"><span class="link-icon">&#x1F4B0;</span> How net worth is calculated <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4C8;</span> Cash flow &amp; savings rate <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4CA;</span> Budget pace status logic <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4B1;</span> Currency conversion explained <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F504;</span> How recurring items generate <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4CA;</span> Dashboard summary cards <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F465;</span> Family member filtering <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F389;</span> Celebration triggers <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F504;</span> Cross-device sync &amp; CRDT <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F4F1;</span> Offline support &amp; caching <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F516;</span> Goal progress calculation <span class="arrow">&rarr;</span></a></li>
+          <li><a href="#"><span class="link-icon">&#x1F9EE;</span> How the net worth chart works <span class="arrow">&rarr;</span></a></li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 6 — ARTICLE PAGE LAYOUT          ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="page-section article-page-section">
+  <div class="container">
+    <span class="wireframe-section-label">Wireframe: Article Page Layout</span>
+
+    <div class="section-header">
+      <h2>Article page</h2>
+      <span style="font-family: 'Outfit', sans-serif; font-size: 13px; color: var(--text-muted);">What an individual article looks like</span>
+    </div>
+
+    <div class="article-page-demo">
+      <!-- Browser chrome -->
+      <div class="article-browser-bar">
+        <span class="browser-dot r"></span>
+        <span class="browser-dot y"></span>
+        <span class="browser-dot g"></span>
+        <span class="browser-url">help.beanies.family/security/how-your-data-is-encrypted</span>
+      </div>
+
+      <div class="article-page-layout">
+        <!-- Left sidebar -->
+        <div class="article-sidebar wireframe-note" data-note="Persistent sidebar nav">
+          <div class="sidebar-label">Security &amp; Privacy</div>
+          <ul class="sidebar-nav">
+            <li><a href="#" class="active"><span class="nav-emoji">&#x1F510;</span> How data is encrypted</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F4C4;</span> The .beanpod file</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F511;</span> Family keys</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F91D;</span> Invite tokens</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F9EC;</span> Passkeys</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F6E1;&#xFE0F;</span> Zero-knowledge</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F4BE;</span> Data storage</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F440;</span> Privacy mode</a></li>
+          </ul>
+
+          <div class="sidebar-label" style="margin-top: 8px;">Related</div>
+          <ul class="sidebar-nav">
+            <li><a href="#"><span class="nav-emoji">&#x1F4B0;</span> Net worth calc</a></li>
+            <li><a href="#"><span class="nav-emoji">&#x1F504;</span> Cross-device sync</a></li>
+          </ul>
+        </div>
+
+        <!-- Article content -->
+        <div class="article-body wireframe-note" data-note="Article content area">
+          <div class="article-breadcrumb">
+            <a href="#">Help Center</a>
+            <span>/</span>
+            <a href="#">Security &amp; Privacy</a>
+            <span>/</span>
+            <span>How your data is encrypted</span>
+          </div>
+
+          <h1>How your data is encrypted</h1>
+
+          <div class="article-meta">
+            <span class="meta-tag">Security</span>
+            <span>&#x1F4D6; 8 min read</span>
+            <span>Updated March 2026</span>
+          </div>
+
+          <p>
+            beanies.family encrypts all of your family data using <strong>AES-256-GCM</strong> &mdash; the same authenticated encryption standard used by governments, banks, and security-critical applications worldwide. Here's exactly how it works, step by step.
+          </p>
+
+          <div class="callout">
+            <div class="callout-title">&#x1F331; The short version</div>
+            Your password is turned into an encryption key. That key unwraps your family's master key. The master key decrypts your data. All of this happens in your browser &mdash; nothing is ever sent to a server.
+          </div>
+
+          <h2>Your password becomes a key</h2>
+
+          <p>
+            When you enter your password, beanies.family doesn't use it directly. Instead, it runs your password through <strong>PBKDF2</strong> (Password-Based Key Derivation Function 2) with 100,000 rounds of SHA-256 hashing and a random 16-byte salt unique to your account.
+          </p>
+
+          <p>
+            This process is deliberately slow &mdash; it takes your browser about half a second. That's intentional. It means an attacker trying to guess your password would need half a second <em>per guess</em>, making brute-force attacks impractical.
+          </p>
+
+          <div class="info-box">
+            <div class="info-title">&#x1F4A1; Why a salt matters</div>
+            <p style="font-size: 14px; color: var(--text-muted); margin: 0;">
+              The random salt ensures that even if two family members choose the same password, their derived encryption keys will be completely different. It also prevents precomputed "rainbow table" attacks.
+            </p>
+          </div>
+
+          <h2>The family key</h2>
+
+          <p>
+            Your family's data isn't encrypted with your password directly. Instead, there's a single <strong>family key</strong> &mdash; a random 256-bit AES key generated when the pod was created. This key is what actually encrypts and decrypts your data.
+          </p>
+
+          <p>
+            Each family member holds a <strong>wrapped copy</strong> of this family key, protected by their own password-derived key using <strong>AES-KW</strong> (AES Key Wrap, RFC 3394). This means:
+          </p>
+
+          <div class="code-block">
+            <span class="comment">// Simplified view of the encryption layers</span><br/>
+            <br/>
+            <span class="keyword">Your password</span><br/>
+            &nbsp;&nbsp;&#x2193; <span class="fn">PBKDF2</span>(<span class="string">100,000 rounds, SHA-256, random salt</span>)<br/>
+            <span class="keyword">Password-derived key</span><br/>
+            &nbsp;&nbsp;&#x2193; <span class="fn">AES-KW unwrap</span><br/>
+            <span class="keyword">Family key</span> <span class="comment">// shared by all members</span><br/>
+            &nbsp;&nbsp;&#x2193; <span class="fn">AES-256-GCM decrypt</span>(<span class="string">12-byte IV</span>)<br/>
+            <span class="keyword">Your family data</span> <span class="comment">// Automerge CRDT binary</span>
+          </div>
+
+          <h2>What this means for you</h2>
+
+          <p>
+            This architecture gives you several powerful guarantees. Changing your password only re-wraps the family key &mdash; it doesn't re-encrypt your entire data file. Each encryption uses a fresh random IV, so even identical data produces different ciphertext. And the authentication tag in AES-GCM means tampering is detected immediately.
+          </p>
+
+          <div class="article-feedback wireframe-note" data-note="Feedback widget">
+            <p>Was this article helpful?</p>
+            <div class="feedback-buttons">
+              <button class="feedback-btn">&#x1F44D; Yes, thanks!</button>
+              <button class="feedback-btn">&#x1F44E; Not quite</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: On-page TOC -->
+        <div class="article-toc wireframe-note" data-note="Scroll-spy TOC">
+          <div class="toc-label">On this page</div>
+          <ul class="toc-links">
+            <li><a href="#" class="active">Your password becomes a key</a></li>
+            <li><a href="#">The family key</a></li>
+            <li><a href="#">What this means for you</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  WIREFRAME SECTION 7 — CHATBOT TEASER               ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<section class="chatbot-teaser">
+  <div class="container">
+    <span class="coming-soon-badge wireframe-note" data-note="Phase 2 feature">
+      &#x2728; Coming soon
+    </span>
+
+    <h2>Ask a beanie</h2>
+    <p class="lead">
+      Can't find what you need? Soon you'll be able to chat with our AI helper, trained on every article in the help center.
+    </p>
+
+    <div class="chatbot-preview wireframe-note" data-note="LLM chatbot preview">
+      <div class="chat-message">
+        <div class="chat-avatar user">&#x1F9D1;</div>
+        <div class="chat-bubble">How is my net worth calculated?</div>
+      </div>
+      <div class="chat-message">
+        <div class="chat-avatar bot">&#x1F331;</div>
+        <div class="chat-bubble">
+          Your net worth combines all account balances (checking, savings, investments) plus asset values, minus any loan balances. Each value is converted to your display currency using the latest exchange rates. The formula is:<br/><br/>
+          <strong>Net Worth = Accounts + Assets &minus; Loans</strong>
+        </div>
+      </div>
+      <div class="chat-input-preview">
+        &#x1F4AC; Ask anything about beanies.family...
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════════╗
+     ║  FOOTER                                              ║
+     ╚══════════════════════════════════════════════════════╝ -->
+<footer class="help-footer">
+  <div class="container">
+    <div class="footer-brand">beanies<span class="orange">.family</span></div>
+    <div class="footer-tagline">every bean counts</div>
+    <div class="footer-links">
+      <a href="#">Help Center</a>
+      <a href="#">Security</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Back to App</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
