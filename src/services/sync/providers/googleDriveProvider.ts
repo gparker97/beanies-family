@@ -33,6 +33,23 @@ import {
 } from '@/services/google/driveService';
 import { enqueueOfflineSave, setFlushProvider } from '../offlineQueue';
 
+/** Retry a Drive API call with exponential backoff on 5xx errors. */
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      const is5xx = e instanceof DriveApiError && e.status >= 500;
+      if (!is5xx || attempt === maxRetries) throw e;
+      // Exponential backoff: 1s, 2s, 4s
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    }
+  }
+  throw lastError; // unreachable, satisfies TS
+}
+
 export class GoogleDriveProvider implements StorageProvider {
   readonly type = 'google_drive' as const;
   private fileId: string;
@@ -48,25 +65,26 @@ export class GoogleDriveProvider implements StorageProvider {
   /**
    * Write content to Google Drive.
    * On 401: try silent refresh first, then interactive auth, then throw.
+   * On 5xx: retry up to 3 times with exponential backoff.
    * On network error: queue for offline flush.
    */
   async write(content: string): Promise<void> {
     try {
       const token = await getValidToken();
-      await updateFile(token, this.fileId, content);
+      await withRetry(() => updateFile(token, this.fileId, content));
     } catch (e) {
       // 401 — token expired, try silent refresh first to avoid popup during auto-save
       if (e instanceof DriveApiError && e.status === 401) {
         const silentToken = await attemptSilentRefresh();
         if (silentToken) {
-          await updateFile(silentToken, this.fileId, content);
+          await withRetry(() => updateFile(silentToken, this.fileId, content));
           return;
         }
         // Silent refresh failed — fall back to interactive auth.
         // Force consent when we have no refresh token so Google issues one.
         try {
           const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
-          await updateFile(newToken, this.fileId, content);
+          await withRetry(() => updateFile(newToken, this.fileId, content));
           return;
         } catch {
           // Interactive auth failed (popup blocked, dismissed, etc.) — queue for retry
@@ -78,6 +96,15 @@ export class GoogleDriveProvider implements StorageProvider {
       // 404 — file gone (deleted/moved), let caller handle
       if (e instanceof DriveApiError && e.status === 404) {
         throw e;
+      }
+
+      // 5xx — all retries exhausted, queue for offline flush
+      if (e instanceof DriveApiError && e.status >= 500) {
+        console.warn(
+          `[GoogleDriveProvider] write failed after retries (${e.status}), queueing offline`
+        );
+        enqueueOfflineSave(content);
+        return;
       }
 
       // Network error — queue for offline flush
@@ -93,20 +120,21 @@ export class GoogleDriveProvider implements StorageProvider {
   /**
    * Read file content from Google Drive.
    * On 401: try silent refresh first, then interactive auth (consistent with write()).
+   * On 5xx: retry up to 3 times with exponential backoff.
    */
   async read(): Promise<string | null> {
     try {
       const token = await getValidToken();
-      return await readFile(token, this.fileId);
+      return await withRetry(() => readFile(token, this.fileId));
     } catch (e) {
       if (e instanceof DriveApiError && e.status === 401) {
         const silentToken = await attemptSilentRefresh();
         if (silentToken) {
-          return await readFile(silentToken, this.fileId);
+          return await withRetry(() => readFile(silentToken, this.fileId));
         }
         // Force consent when we have no refresh token so Google issues one.
         const newToken = await requestAccessToken({ forceConsent: !hasRefreshToken() });
-        return await readFile(newToken, this.fileId);
+        return await withRetry(() => readFile(newToken, this.fileId));
       }
       throw e;
     }
@@ -115,7 +143,7 @@ export class GoogleDriveProvider implements StorageProvider {
   /**
    * Get last modified time from Drive metadata (lightweight polling check).
    * Re-throws 401 errors so callers can detect auth failures.
-   * Swallows network errors (offline is expected) and other non-critical failures.
+   * Swallows network/5xx errors (transient failures are expected).
    */
   async getLastModified(): Promise<string | null> {
     try {
@@ -127,7 +155,7 @@ export class GoogleDriveProvider implements StorageProvider {
       if (e instanceof DriveApiError && (e.status === 401 || e.status === 404)) {
         throw e;
       }
-      // Network errors and other failures — non-critical for a metadata check
+      // Network errors, 5xx, and other failures — non-critical for a metadata check
       return null;
     }
   }

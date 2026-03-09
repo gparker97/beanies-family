@@ -417,11 +417,36 @@ onMounted(async () => {
     }
 
     // Step 5: Load family data from the active per-family DB
+    // Defer file polling until after processRecurringItems to prevent the
+    // reload cascade (init mutations → file poll detects "change" → reload → loop).
+    syncStore.deferPolling();
     initBreadcrumbs.push('data: loading family data');
     const { closeDatabase: closeDb } = await import('@/services/indexeddb/database');
     await closeDb();
-    await loadFamilyData();
-    initBreadcrumbs.push('data: loadFamilyData completed');
+
+    // Timeout guard: if loading takes too long (Google Drive 5xx, network issues),
+    // dismiss the spinner so the app is usable. Data continues loading in background.
+    const INIT_TIMEOUT_MS = 30_000;
+    let initTimedOut = false;
+    const timeoutId = setTimeout(() => {
+      initTimedOut = true;
+      initBreadcrumbs.push('data: loadFamilyData TIMED OUT after 30s');
+      console.warn('[App] loadFamilyData timed out — dismissing spinner');
+      isInitializing.value = false;
+    }, INIT_TIMEOUT_MS);
+
+    try {
+      await loadFamilyData();
+      initBreadcrumbs.push('data: loadFamilyData completed');
+    } finally {
+      clearTimeout(timeoutId);
+      // Init complete — start deferred file polling for cross-device sync
+      syncStore.startDeferredPolling();
+      if (initTimedOut) {
+        initBreadcrumbs.push('data: loadFamilyData finished after timeout (background)');
+        console.warn('[App] loadFamilyData completed after timeout — data is now available');
+      }
+    }
 
     // Post-init health check: verify the Automerge doc is loaded
     try {
