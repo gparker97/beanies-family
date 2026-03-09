@@ -9,7 +9,7 @@ beanies.family is growing in features and complexity. Users need comprehensive, 
 
 **Provider:** OpenRouter (API aggregator — single API, swap models via config string)
 **Starting model:** Google Gemini Flash (via OpenRouter, ~$0.075/1M input tokens)
-**Knowledge injection:** System prompt + public help docs at `beanies.family/help` (no RAG/fine-tuning for V1)
+**Knowledge injection:** System prompt personality (manual) + help docs auto-generated from `src/content/help/` via build script (no RAG/fine-tuning for V1)
 **Messaging:** Emphasize secure, encrypted, personal cloud storage, data always in your control. Avoid "local-first" and "PWA" terminology — say "app" or "website".
 **Placement:** Floating widget on Settings page only (V1)
 **Auth:** Authenticated users only
@@ -22,20 +22,22 @@ beanies.family is growing in features and complexity. Users need comprehensive, 
 
 Before building, these existing patterns MUST be leveraged — no reimplementation:
 
-| Existing Code                               | Reuse For                                                                |
-| ------------------------------------------- | ------------------------------------------------------------------------ |
-| `wrapAsync()` from `useStoreActions.ts`     | Wrap all async chat operations (loading/error state + toasts)            |
-| `useOnline()` from `useOnline.ts`           | Detect offline state in chat widget                                      |
-| `useBreakpoint()` from `useBreakpoint.ts`   | Mobile vs desktop chat panel sizing                                      |
-| `useConfirm()` from `useConfirm.ts`         | "Clear chat history?" confirmation                                       |
-| `useTranslation()` from `useTranslation.ts` | All UI text via `t()`                                                    |
-| `useSounds()` from `useSounds.ts`           | Optional message send/receive sounds                                     |
-| `BaseButton.vue`                            | Send button, suggestion chip buttons, clear history button               |
-| `BeanieSpinner.vue`                         | Loading indicator while waiting for response                             |
-| `translationCacheRepository.ts` pattern     | IndexedDB chat history (same `idb` library, same lazy DB singleton)      |
-| `oauthProxy.ts` pattern                     | Chat API service (same `safeJsonParse`, error extraction, fetch pattern) |
-| `registryService.ts` pattern                | API URL + API key from env vars                                          |
-| Types from `src/types/models.ts`            | UUID, ISODateString patterns for chat types                              |
+| Existing Code                               | Reuse For                                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `wrapAsync()` from `useStoreActions.ts`     | Wrap all async chat operations (loading/error state + toasts)                         |
+| `useOnline()` from `useOnline.ts`           | Detect offline state in chat widget                                                   |
+| `useBreakpoint()` from `useBreakpoint.ts`   | Mobile vs desktop chat panel sizing                                                   |
+| `useConfirm()` from `useConfirm.ts`         | "Clear chat history?" confirmation                                                    |
+| `useTranslation()` from `useTranslation.ts` | All UI text via `t()`                                                                 |
+| `useSounds()` from `useSounds.ts`           | Optional message send/receive sounds                                                  |
+| `BaseButton.vue`                            | Send button, suggestion chip buttons, clear history button                            |
+| `BeanieSpinner.vue`                         | Loading indicator while waiting for response                                          |
+| `translationCacheRepository.ts` pattern     | IndexedDB chat history (same `idb` library, same lazy DB singleton)                   |
+| `oauthProxy.ts` pattern                     | Chat API service (same `safeJsonParse`, error extraction, fetch pattern)              |
+| `registryService.ts` pattern                | API URL + API key from env vars                                                       |
+| Types from `src/types/models.ts`            | UUID, ISODateString patterns for chat types                                           |
+| `src/content/help/` content layer           | Single source of truth for all help docs — chatbot knowledge derived via build script |
+| `getArticleSearchText()` from help index    | Flattens `HelpArticle` into plain text for LLM prompt generation (strips HTML tags)   |
 
 **No `BaseSidePanel` for chat.** BaseSidePanel is full-height (`inset-y-0`) and fixed-width (`max-w-md`) — designed for navigation sidebars, not compact floating panels. The chat widget uses a simple `<Teleport to="body">` + `fixed` positioning div with CSS transitions. This is ~20 lines of template, not a new component.
 
@@ -54,7 +56,9 @@ Before building, these existing patterns MUST be leveraged — no reimplementati
 **New files:**
 
 - `infrastructure/lambda/chat/index.mjs` — Lambda handler
-- `infrastructure/lambda/chat/systemPrompt.mjs` — System prompt constant
+- `infrastructure/lambda/chat/systemPrompt.mjs` — Personality section (manual) + imports `helpContent.mjs`
+- `infrastructure/lambda/chat/helpContent.mjs` — Auto-generated from `src/content/help/` by build script
+- `scripts/generateChatDocs.mjs` — Build script for help doc extraction
 
 Follows the exact pattern of the existing registry/oauth Lambdas (Node.js 20.x ESM, same CORS handling, same response helpers).
 
@@ -106,53 +110,56 @@ Frontend → POST /chat (x-api-key auth) → Lambda → OpenRouter API → Gemin
 - `infrastructure/variables.tf` — Add 3 new variables
 - `infrastructure/outputs.tf` — Add chat output
 
-### 3. System Prompt (Structured Knowledge Base)
+### 3. System Prompt (Generated from Help Content Layer)
 
-**File:** `infrastructure/lambda/chat/systemPrompt.mjs`
+**Files:**
 
-All documentation is embedded directly in the system prompt as organized sections. This is the **V1 approach** — simple, no extra infrastructure, no CloudFront changes. The system prompt is reviewable on GitHub or locally in the repo.
+- `infrastructure/lambda/chat/systemPrompt.mjs` — Personality section (manually authored) + imports generated docs
+- `infrastructure/lambda/chat/helpContent.mjs` — **Auto-generated** from `src/content/help/` by build script
+- `scripts/generateChatDocs.mjs` — Build script that extracts help articles into Lambda-consumable ESM
 
-**Structure:** Exported as named constants per topic, combined into a single `SYSTEM_PROMPT` export. This structure makes the future V2 migration to tool-use trivial (see V2 Migration Path below).
+**Single source of truth (DRY):** Help documentation lives in `src/content/help/` as structured TypeScript (`HelpArticle` objects with 7 section types). The same content powers:
+
+1. The public Help Center at `beanies.family/help` (16 articles across 4 categories)
+2. Client-side search via `getArticleSearchText()`
+3. **The chatbot system prompt** — via `scripts/generateChatDocs.mjs`
+
+No manually maintained duplicate docs in the Lambda. When help articles are added or updated, running the build script regenerates the chatbot's knowledge base automatically.
+
+**Build script approach (`scripts/generateChatDocs.mjs`):**
+
+```javascript
+// Reads src/content/help/*.ts via a lightweight TS eval (esbuild or tsx)
+// Calls getArticleSearchText() on each article
+// Groups by category, outputs ESM module
+
+// Output: infrastructure/lambda/chat/helpContent.mjs
+export const HELP_DOCS = {
+  'getting-started': `Creating Your First Pod\n...`,
+  features: `Managing Accounts\n...`,
+  security: `How Your Data Is Encrypted\n...`,
+  'how-it-works': `Net Worth Calculation\n...`,
+};
+
+export const ALL_HELP_TEXT = Object.values(HELP_DOCS).join('\n\n---\n\n');
+```
+
+**System prompt structure:**
 
 ```javascript
 // infrastructure/lambda/chat/systemPrompt.mjs
+import { ALL_HELP_TEXT, HELP_DOCS } from './helpContent.mjs';
 
-const PERSONALITY = `...`; // ~500 tokens
-const DOCS_GETTING_STARTED = `...`; // ~500 tokens
-const DOCS_ACCOUNTS = `...`; // ~400 tokens
-const DOCS_TRANSACTIONS = `...`; // ~400 tokens
-const DOCS_BUDGETS = `...`; // ~300 tokens
-const DOCS_GOALS = `...`; // ~300 tokens
-const DOCS_ASSETS = `...`; // ~300 tokens
-const DOCS_FAMILY = `...`; // ~400 tokens
-const DOCS_PLANNER = `...`; // ~300 tokens
-const DOCS_TODOS = `...`; // ~300 tokens
-const DOCS_SECURITY = `...`; // ~600 tokens
-const DOCS_DATA_STORAGE = `...`; // ~400 tokens
-const DOCS_NAVIGATION = `...`; // ~300 tokens
-const DOCS_FAQ = `...`; // ~500 tokens
+const PERSONALITY = `...`; // ~500 tokens — manually authored (voice, references, boundaries)
 
-// V1: send everything (~5000-5500 tokens total)
-export const SYSTEM_PROMPT = [
-  PERSONALITY,
-  DOCS_GETTING_STARTED,
-  DOCS_ACCOUNTS,
-  DOCS_TRANSACTIONS,
-  DOCS_BUDGETS,
-  DOCS_GOALS,
-  DOCS_ASSETS,
-  DOCS_FAMILY,
-  DOCS_PLANNER,
-  DOCS_TODOS,
-  DOCS_SECURITY,
-  DOCS_DATA_STORAGE,
-  DOCS_NAVIGATION,
-  DOCS_FAQ,
-].join('\n\n---\n\n');
+// V1: personality + all help docs (~5000-5500 tokens total)
+export const SYSTEM_PROMPT = PERSONALITY + '\n\n---\n\n' + ALL_HELP_TEXT;
 
 // V2 (future): export individual sections for tool-use selective fetching
-export { PERSONALITY, DOCS_GETTING_STARTED, DOCS_ACCOUNTS /* ... */ };
+export { PERSONALITY, HELP_DOCS };
 ```
+
+**npm script:** `"generate:chat-docs": "node scripts/generateChatDocs.mjs"` — run before deploying Lambda, or as pre-deploy step.
 
 **Estimated total:** ~5000-5500 tokens. At Gemini Flash rates ($0.075/1M), this adds ~$0.0004 per request — negligible at current scale.
 
@@ -186,21 +193,14 @@ Boundaries:
 - Redirect out-of-scope questions warmly
 ```
 
-**Documentation section topics** (each a separate constant):
+**Documentation sections** (auto-generated from `src/content/help/`, 4 categories, 16 articles):
 
-- Getting started: setup, creating a family, inviting members
-- Accounts: adding, editing, types, institutions
-- Transactions: income, expenses, transfers, recurring
-- Budgets: creation, tracking, categories
-- Goals: financial goals, progress, deadlines
-- Assets: real estate, vehicles, crypto, investments
-- Family: members, roles (owner/admin/member), invitations via magic link/QR
-- Planner: calendar, scheduling
-- To-dos: task management
-- Security: AES-256-GCM, PBKDF2 (100k iterations), AES-KW, passkeys, WebAuthn, Web Crypto API
-- Data storage: .beanpod files, personal cloud storage, Google Drive
-- Navigation: sidebar, mobile tabs, hamburger menu
-- FAQ: common questions and answers
+- **Getting Started** (4 articles): Creating your first pod, inviting family members, navigating the app, understanding your data
+- **Features** (4 articles): Managing accounts, recording transactions, tracking budgets, setting financial goals
+- **Security** (4 articles): How your data is encrypted, the .beanpod file explained, passkeys and biometric login, privacy and data control
+- **How It Works** (4 articles): Net worth calculation, transaction types, recurring items, multi-currency support
+
+These map 1:1 to the public Help Center at `beanies.family/help`. Adding a new help article automatically includes it in the chatbot's knowledge on next build.
 
 ### 5. Frontend: Chat Service
 
@@ -359,28 +359,30 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 
 ## Files Affected
 
-### New files (13):
+### New files (15):
 
-| File                                                                          | Purpose                                                           |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| **Backend (5):**                                                              |                                                                   |
-| `infrastructure/lambda/chat/index.mjs`                                        | Chat proxy Lambda handler                                         |
-| `infrastructure/lambda/chat/systemPrompt.mjs`                                 | System prompt (personality + all docs as structured constants)    |
-| `infrastructure/modules/chat/main.tf`                                         | Terraform: Lambda, DynamoDB rate limit table, API GW route, IAM   |
-| `infrastructure/modules/chat/variables.tf`                                    | Terraform input variables                                         |
-| `infrastructure/modules/chat/outputs.tf`                                      | Terraform outputs                                                 |
-| **Frontend (4):**                                                             |                                                                   |
-| `src/services/chat/chatService.ts`                                            | API client (follows oauthProxy.ts pattern)                        |
-| `src/services/indexeddb/repositories/chatHistoryRepository.ts`                | IndexedDB history (follows translationCache pattern)              |
-| `src/components/chat/ChatWidget.vue`                                          | Chat widget (Teleport + fixed positioning + existing composables) |
-| `src/components/chat/ChatMessage.vue`                                         | Message bubble                                                    |
-| **Tests (4):**                                                                |                                                                   |
-| `src/services/chat/__tests__/chatService.test.ts`                             | Unit tests for chat API service                                   |
-| `src/services/indexeddb/repositories/__tests__/chatHistoryRepository.test.ts` | Unit tests for IndexedDB chat history                             |
-| `src/components/chat/__tests__/ChatWidget.test.ts`                            | Component tests for chat widget                                   |
-| `e2e/specs/chat-widget.spec.ts`                                               | E2E tests for chat widget flow                                    |
+| File                                                                          | Purpose                                                             |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Backend (7):**                                                              |                                                                     |
+| `infrastructure/lambda/chat/index.mjs`                                        | Chat proxy Lambda handler                                           |
+| `infrastructure/lambda/chat/systemPrompt.mjs`                                 | System prompt: personality (manual) + imports generated help docs   |
+| `infrastructure/lambda/chat/helpContent.mjs`                                  | **Auto-generated** — help docs extracted from `src/content/help/`   |
+| `infrastructure/modules/chat/main.tf`                                         | Terraform: Lambda, DynamoDB rate limit table, API GW route, IAM     |
+| `infrastructure/modules/chat/variables.tf`                                    | Terraform input variables                                           |
+| `infrastructure/modules/chat/outputs.tf`                                      | Terraform outputs                                                   |
+| `scripts/generateChatDocs.mjs`                                                | Build script: extracts help articles → `helpContent.mjs` for Lambda |
+| **Frontend (4):**                                                             |                                                                     |
+| `src/services/chat/chatService.ts`                                            | API client (follows oauthProxy.ts pattern)                          |
+| `src/services/indexeddb/repositories/chatHistoryRepository.ts`                | IndexedDB history (follows translationCache pattern)                |
+| `src/components/chat/ChatWidget.vue`                                          | Chat widget (Teleport + fixed positioning + existing composables)   |
+| `src/components/chat/ChatMessage.vue`                                         | Message bubble                                                      |
+| **Tests (4):**                                                                |                                                                     |
+| `src/services/chat/__tests__/chatService.test.ts`                             | Unit tests for chat API service                                     |
+| `src/services/indexeddb/repositories/__tests__/chatHistoryRepository.test.ts` | Unit tests for IndexedDB chat history                               |
+| `src/components/chat/__tests__/ChatWidget.test.ts`                            | Component tests for chat widget                                     |
+| `e2e/specs/chat-widget.spec.ts`                                               | E2E tests for chat widget flow                                      |
 
-### Modified files (9):
+### Modified files (10):
 
 | File                                    | Change                                                                                                                |
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -393,6 +395,7 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 | `src/stores/authStore.ts`               | Add clearAllConversations() to sign-out (in both `signOut()` and `signOutAndClearData()`, after `flushPendingSave()`) |
 | `.env.example`                          | Add VITE_CHAT_ENABLED                                                                                                 |
 | `.github/workflows/deploy.yml`          | Add VITE_CHAT_ENABLED to build env                                                                                    |
+| `package.json`                          | Add `generate:chat-docs` script                                                                                       |
 
 **Eliminated from original plan (DRY):**
 
@@ -402,9 +405,7 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 - ~~`EmptyStateIllustration` for chat~~ → No text support, needs SVG authoring. Inline greeting + BaseButton chips instead
 - ~~Markdown library~~ → Plain text with `whitespace-pre-wrap` for V1
 - ~~Manual loading/error refs~~ → `wrapAsync()` handles this
-- ~~14 static HTML help pages~~ → Docs embedded in system prompt as structured constants
-- ~~CloudFront Function / spa_router.js~~ → Not needed (no public help site for V1)
-- ~~CloudFront Terraform changes~~ → Not needed
+- ~~Manually authored doc constants~~ → Help docs now auto-generated from `src/content/help/` via build script (single source of truth with Help Center)
 
 ---
 
@@ -412,32 +413,34 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 
 **Phase A: Backend**
 
-1. Write system prompt with structured docs (`systemPrompt.mjs`)
-2. Write Lambda handler (`index.mjs`)
-3. Create Terraform module (`modules/chat/`) + update root Terraform files
-4. Deploy via `terraform apply`
+1. Create build script `scripts/generateChatDocs.mjs` (extracts `src/content/help/` → `helpContent.mjs`)
+2. Run build script to generate `infrastructure/lambda/chat/helpContent.mjs`
+3. Write personality section in `systemPrompt.mjs` (imports generated `helpContent.mjs`)
+4. Write Lambda handler (`index.mjs`)
+5. Create Terraform module (`modules/chat/`) + update root Terraform files
+6. Deploy via `terraform apply`
 
 **Phase B: Frontend service layer**
 
-5. Add types to `models.ts` (ChatMessage, StoredMessage)
-6. Create `chatHistoryRepository.ts` (follows translationCache pattern)
-7. Create `chatService.ts` (follows oauthProxy pattern)
-8. Write unit tests for chatService + chatHistoryRepository
+7. Add types to `models.ts` (ChatMessage, StoredMessage)
+8. Create `chatHistoryRepository.ts` (follows translationCache pattern)
+9. Create `chatService.ts` (follows oauthProxy pattern)
+10. Write unit tests for chatService + chatHistoryRepository
 
 **Phase C: Frontend UI**
 
-9. Add translation strings to `uiStrings.ts`
-10. Create `ChatMessage.vue` (message bubble)
-11. Create `ChatWidget.vue` (Teleport + fixed positioning + existing composables)
-12. Write component tests for ChatWidget + ChatMessage
-13. Integrate into `SettingsPage.vue` + add env vars to `.env.example` + deploy workflow
+11. Add translation strings to `uiStrings.ts`
+12. Create `ChatMessage.vue` (message bubble)
+13. Create `ChatWidget.vue` (Teleport + fixed positioning + existing composables)
+14. Write component tests for ChatWidget + ChatMessage
+15. Integrate into `SettingsPage.vue` + add env vars to `.env.example` + deploy workflow
 
 **Phase D: Cleanup & integration tests**
 
-14. Add `clearAllConversations()` to authStore sign-out (both `signOut()` and `signOutAndClearData()`)
-15. Write E2E test (`e2e/specs/chat-widget.spec.ts`)
-16. Run full test suite (`npm run test:run`) — verify no regressions
-17. Update `docs/STATUS.md`
+16. Add `clearAllConversations()` to authStore sign-out (both `signOut()` and `signOutAndClearData()`)
+17. Write E2E test (`e2e/specs/chat-widget.spec.ts`)
+18. Run full test suite (`npm run test:run`) — verify no regressions
+19. Update `docs/STATUS.md`
 
 ---
 
@@ -514,7 +517,7 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 3. **Sign-out:** Chat history cleared from IndexedDB after sign-out
 4. **Comedy references:** LLM responses include classic comedy references (Spaceballs, Seinfeld, etc.), not sci-fi
 5. **Desktop + mobile:** Widget renders correctly on both form factors
-6. **System prompt review:** Review `systemPrompt.mjs` on GitHub — all doc sections present and accurate
+6. **System prompt review:** Run `npm run generate:chat-docs`, review generated `helpContent.mjs` — all 16 articles present, content matches Help Center
 7. **Existing tests pass:** `npm run test:run` — all existing tests still pass (no regressions)
 
 ---
@@ -529,14 +532,14 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 2. Lambda defines a `fetch_help_doc` tool the LLM can call
 3. LLM reads the user's question, decides which doc(s) to fetch
 4. Lambda returns the requested doc content to the LLM
-5. LLM can make multiple tool calls (e.g., fetch security + data-storage for cross-topic questions)
+5. LLM can make multiple tool calls (e.g., fetch security + features for cross-topic questions)
 6. LLM synthesizes an answer from the fetched docs
 
-**Why V1 is structured for this:** The `systemPrompt.mjs` file already exports each doc section as a named constant (`DOCS_SECURITY`, `DOCS_ACCOUNTS`, etc.). For V2, the Lambda simply:
+**Why V1 is structured for this:** The generated `helpContent.mjs` already exports docs grouped by category in the `HELP_DOCS` object (`HELP_DOCS['security']`, `HELP_DOCS['features']`, etc.). For V2, the Lambda simply:
 
-- Stops concatenating all sections into `SYSTEM_PROMPT`
-- Registers a tool: `{ name: "fetch_doc", parameters: { topic: "security|accounts|..." } }`
-- Handles tool calls by returning the requested `DOCS_*` constant
+- Stops concatenating all sections into `ALL_HELP_TEXT`
+- Registers a tool: `{ name: "fetch_doc", parameters: { category: "security|features|getting-started|how-it-works" } }`
+- Handles tool calls by returning `HELP_DOCS[category]`
 - Loops until the LLM gives a final answer (typically 2-3 round trips)
 
 **Trade-offs vs V1:**
@@ -546,6 +549,6 @@ Add to `uiStrings.ts` (~12 strings, all with `en` + `beanie`):
 - **Quality:** Slightly less cross-topic context, but LLM can fetch multiple docs
 - **Complexity:** Moderate — tool definition + response loop in Lambda
 
-**Optional V2 enhancement:** Host docs at `beanies.family/help/*.html` (requires CloudFront Function for SPA routing exclusion). This makes docs browseable by users AND fetchable by the LLM via URL. But this is optional — the Lambda can serve docs from its own constants without any public URL.
+**Help Center already public:** Docs are browseable by users at `beanies.family/help` AND available to the Lambda via the generated `helpContent.mjs`. No additional CloudFront changes needed — the Vue SPA routing already handles `/help/*` paths.
 
 **Implementation estimate:** ~2-3 hours of Lambda changes when the time comes. No frontend changes needed.
