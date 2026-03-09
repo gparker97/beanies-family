@@ -313,18 +313,36 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Default timeout for Drive API requests (15 seconds). */
+const DRIVE_REQUEST_TIMEOUT_MS = 15_000;
+
 /**
- * Make a Drive API request with error handling.
+ * Make a Drive API request with error handling and timeout.
  * Throws DriveApiError on non-2xx responses.
+ * Throws on timeout (AbortError) to prevent indefinite hangs.
  */
 async function driveRequest(token: string, url: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers as Record<string, string> | undefined),
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DRIVE_REQUEST_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.headers as Record<string, string> | undefined),
+      },
+    });
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if ((e as Error).name === 'AbortError') {
+      throw new DriveApiError('Request timed out', 408);
+    }
+    throw e;
+  }
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
     const status = res.status;
