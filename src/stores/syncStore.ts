@@ -1194,6 +1194,23 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  // When true, setupAutoSync marks itself ready but defers file polling
+  // until startDeferredPolling() is called. Prevents the reload cascade
+  // during init (processRecurringItems creates mutations → file polling
+  // detects "change" → triggers reload → more mutations → loop).
+  let pollingDeferred = false;
+
+  function deferPolling(): void {
+    pollingDeferred = true;
+  }
+
+  function startDeferredPolling(): void {
+    pollingDeferred = false;
+    if (autoSyncStopHandle && !filePollingTimer) {
+      startFilePolling();
+    }
+  }
+
   /**
    * Setup auto-sync.
    * In V4, the docService persist callback drives saves automatically.
@@ -1206,7 +1223,11 @@ export const useSyncStore = defineStore('sync', () => {
     // Mark as set up (the actual save triggering comes from docService's persist callback)
     autoSyncStopHandle = () => {};
 
-    startFilePolling();
+    // If polling is deferred (during init), skip starting it now —
+    // startDeferredPolling() will start it once init is complete.
+    if (!pollingDeferred) {
+      startFilePolling();
+    }
   }
 
   /**
@@ -1487,6 +1508,8 @@ export const useSyncStore = defineStore('sync', () => {
     manualImport,
     reloadAllStores,
     setupAutoSync,
+    deferPolling,
+    startDeferredPolling,
     reloadIfFileChanged,
     handleGoogleReconnected,
     pauseFilePolling,
