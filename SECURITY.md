@@ -81,7 +81,7 @@ Security vulnerabilities should not be publicly disclosed until patched.
 
 ### 2. Report privately
 
-Send an email to: **[security@yourdomain.com]** (Update this with your actual email)
+Contact the site owner via the contact page on the website
 
 Include the following information:
 
@@ -212,8 +212,8 @@ This application is designed with the following compliance considerations:
 
 For security inquiries, contact:
 
-- **Security Team**: security@yourdomain.com (Update this)
-- **General Issues**: https://github.com/greg-grobrix/beanies-family/issues
+- **Security Team**: Contact me via the contact form on the website
+- **General Issues**: https://github.com/gparker97/beanies-family/issues
 - **Private Reports**: Use GitHub Security Advisories
 
 ---
