@@ -17,7 +17,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { CATEGORY_COLORS } from '@/stores/activityStore';
-import { addHourToTime } from '@/utils/date';
+import { addHourToTime, formatNookDate } from '@/utils/date';
 import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
 import type {
   FamilyActivity,
@@ -35,6 +35,7 @@ const props = defineProps<{
   defaultDate?: string;
   defaultStartTime?: string;
   readOnly?: boolean;
+  occurrenceDate?: string;
 }>();
 
 const emit = defineEmits<{
@@ -129,6 +130,7 @@ const endTime = ref('');
 const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
 const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
 const daysOfWeek = ref<number[]>([]);
+const recurrenceEndDate = ref('');
 const category = ref<ActivityCategory>('lesson');
 const assigneeId = ref('');
 const dropoffMemberId = ref<string>('');
@@ -185,6 +187,7 @@ const { isEditing, isSubmitting } = useFormModal(
             ? 'weekly'
             : 'weekly';
       daysOfWeek.value = activity.daysOfWeek ?? [];
+      recurrenceEndDate.value = activity.recurrenceEndDate ?? '';
       category.value = activity.category;
       assigneeId.value = activity.assigneeId ?? '';
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
@@ -212,6 +215,7 @@ const { isEditing, isSubmitting } = useFormModal(
       recurrenceMode.value = 'recurring';
       recurrenceFrequency.value = 'weekly';
       daysOfWeek.value = [];
+      recurrenceEndDate.value = '';
       category.value = 'lesson';
       assigneeId.value = '';
       dropoffMemberId.value = '';
@@ -337,6 +341,10 @@ function handleSave() {
       recurrenceMode.value === 'recurring' && effectiveRecurrence.value === 'weekly'
         ? [...daysOfWeek.value]
         : undefined,
+    recurrenceEndDate:
+      recurrenceMode.value === 'recurring' && recurrenceEndDate.value
+        ? recurrenceEndDate.value
+        : undefined,
     category: category.value,
     assigneeId: primaryAssignee,
     dropoffMemberId: dropoffMemberId.value || undefined,
@@ -380,6 +388,21 @@ function handleSave() {
     @delete="emit('delete')"
   >
     <div :class="readOnly ? 'pointer-events-none opacity-60' : ''">
+      <!-- Occurrence date banner for recurring activity edits -->
+      <div
+        v-if="occurrenceDate"
+        class="mb-4 rounded-[14px] bg-[var(--tint-silk-20)] px-4 py-3 dark:bg-sky-900/20"
+      >
+        <div class="flex items-center gap-2">
+          <span class="text-base">📅</span>
+          <span
+            class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+          >
+            {{ t('planner.editingOccurrence').replace('{date}', formatNookDate(occurrenceDate)) }}
+          </span>
+        </div>
+      </div>
+
       <!-- 1. Who? -->
       <FormFieldGroup :label="t('modal.whosGoing')">
         <FamilyChipPicker v-model="assigneeId" mode="single" />
@@ -445,12 +468,26 @@ function handleSave() {
         </div>
       </ConditionalSection>
 
-      <!-- 8. Date + Start / End time -->
-      <div class="grid grid-cols-3 gap-4">
+      <!-- 8. Start Date + End Date (end date only for recurring) -->
+      <div
+        class="grid gap-4"
+        :class="recurrenceMode === 'recurring' ? 'grid-cols-2' : 'grid-cols-1'"
+      >
         <FormFieldGroup :label="t('planner.field.date')" required>
           <BaseInput v-model="date" type="date" required />
         </FormFieldGroup>
 
+        <FormFieldGroup
+          v-if="recurrenceMode === 'recurring'"
+          :label="t('planner.field.endDate')"
+          optional
+        >
+          <BaseInput v-model="recurrenceEndDate" type="date" :min="date" />
+        </FormFieldGroup>
+      </div>
+
+      <!-- 9. Start / End time -->
+      <div class="grid grid-cols-2 gap-4">
         <FormFieldGroup :label="t('modal.startTime')">
           <TimePresetPicker v-model="startTime" />
         </FormFieldGroup>

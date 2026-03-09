@@ -22,6 +22,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { confirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
+import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import type {
   FamilyActivity,
   Transaction,
@@ -46,20 +47,21 @@ const selectedTodo = computed(() =>
 );
 
 // ── Activity modal ───────────────────────────────────────────────────────────
-const viewingActivity = ref<FamilyActivity | null>(null);
 const showActivityEditModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
-
-function openActivity(id: string) {
-  const activity = activityStore.activities.find((a) => a.id === id);
-  if (activity) {
-    viewingActivity.value = activity;
-  }
-}
+const editingOccurrenceDate = ref<string | undefined>(undefined);
+const {
+  viewingActivity,
+  viewingOccurrenceDate,
+  openViewModal: openActivity,
+  handleViewOpenEdit: scopedActivityOpenEdit,
+  handleScopedSave,
+} = useActivityScopeEdit();
 
 function handleActivityOpenEdit(activity: FamilyActivity) {
-  viewingActivity.value = null;
-  editingActivity.value = activity;
+  const { activity: target, occurrenceDate } = scopedActivityOpenEdit(activity);
+  editingActivity.value = target;
+  editingOccurrenceDate.value = occurrenceDate;
   showActivityEditModal.value = true;
 }
 
@@ -67,10 +69,16 @@ async function handleActivitySave(
   data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }
 ) {
   if ('id' in data && 'data' in data) {
-    await activityStore.updateActivity(data.id, data.data);
+    if (editingOccurrenceDate.value && editingActivity.value?.recurrence !== 'none') {
+      const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
+      if (!saved) return;
+    } else {
+      await activityStore.updateActivity(data.id, data.data);
+    }
   }
   showActivityEditModal.value = false;
   editingActivity.value = null;
+  editingOccurrenceDate.value = undefined;
 }
 
 async function handleActivityDelete() {
@@ -87,6 +95,7 @@ async function handleActivityDelete() {
     playWhoosh();
   }
   editingActivity.value = null;
+  editingOccurrenceDate.value = undefined;
 }
 
 // ── Transaction modal ────────────────────────────────────────────────────────
@@ -148,7 +157,10 @@ async function handleTransactionDelete(id: string) {
     />
 
     <!-- Today's Schedule + This Week -->
-    <ScheduleCards @open-todo="selectedTodoId = $event" @open-activity="openActivity" />
+    <ScheduleCards
+      @open-todo="selectedTodoId = $event"
+      @open-activity="(id: string, date: string) => openActivity(id, date)"
+    />
 
     <!-- Todo widget (full width) -->
     <NookTodoWidget />
@@ -167,13 +179,21 @@ async function handleTransactionDelete(id: string) {
 
     <ActivityViewEditModal
       :activity="viewingActivity"
+      :occurrence-date="viewingOccurrenceDate"
       @close="viewingActivity = null"
       @open-edit="handleActivityOpenEdit"
+      @activity-swapped="
+        (newId: string) => {
+          const a = activityStore.activities.find((act) => act.id === newId);
+          if (a) viewingActivity = a;
+        }
+      "
     />
 
     <ActivityModal
       :open="showActivityEditModal"
       :activity="editingActivity"
+      :occurrence-date="editingOccurrenceDate"
       @close="
         showActivityEditModal = false;
         editingActivity = null;

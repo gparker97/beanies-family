@@ -9,7 +9,7 @@ const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
-const emit = defineEmits<{ edit: [id: string] }>();
+const emit = defineEmits<{ edit: [id: string, date: string] }>();
 
 const PAGE_SIZE = 6;
 const visibleCount = ref(PAGE_SIZE);
@@ -72,7 +72,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
         type="button"
         class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-800"
         :style="{ borderLeftColor: getActivityColor(occ.activity) }"
-        @click="emit('edit', occ.activity.id)"
+        @click="emit('edit', occ.activity.id, occ.date)"
       >
         <!-- Category dot -->
         <span

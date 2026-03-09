@@ -15,7 +15,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   'add-activity': [];
-  'edit-activity': [id: string];
+  'edit-activity': [id: string, date: string];
 }>();
 
 const { t } = useTranslation();
@@ -110,7 +110,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
         type="button"
         class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-700"
         :style="{ borderLeftColor: getActivityColor(occ.activity) }"
-        @click="emit('edit-activity', occ.activity.id)"
+        @click="emit('edit-activity', occ.activity.id, occ.date)"
       >
         <!-- Category dot -->
         <span
@@ -180,7 +180,7 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
           type="button"
           class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-700"
           :style="{ borderLeftColor: getActivityColor(occ.activity) }"
-          @click="emit('edit-activity', occ.activity.id)"
+          @click="emit('edit-activity', occ.activity.id, occ.date)"
         >
           <span
             class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"

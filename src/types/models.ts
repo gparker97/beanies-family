@@ -309,6 +309,8 @@ export interface FamilyActivity {
   endTime?: string; // HH:mm
   recurrence: ActivityRecurrence;
   daysOfWeek?: number[]; // Multi-day weekly recurrence (0=Sun..6=Sat)
+  recurrenceEndDate?: ISODateString; // Optional end date for recurring activities
+  parentActivityId?: UUID; // Links one-off override to its recurring parent
 
   // Category
   category: ActivityCategory;

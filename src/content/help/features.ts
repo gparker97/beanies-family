@@ -263,4 +263,146 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'family-planner-and-activities',
+    category: 'features',
+    title: 'Family Planner & Activities',
+    excerpt:
+      'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
+    icon: '\u{1F4C5}',
+    readTime: 4,
+    updatedDate: '2026-03-09',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Overview',
+        level: 2,
+        id: 'overview',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "The <strong>Family Planner</strong> is your calendar hub for scheduling and tracking family activities \u2014 lessons, sports, appointments, social events, and more. View your family's schedule at a glance with the month calendar, day agenda, and upcoming activities list.",
+      },
+      {
+        type: 'heading',
+        content: 'Creating activities',
+        level: 2,
+        id: 'creating',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Click <strong>+ Add Activity</strong> to open the activity form. Give it a title, pick a category (lesson, sport, appointment, social, pickup, or other), and set a date. You can assign the activity to a specific family member and add a start/end time.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Activities can be <strong>one-off</strong> (a single date) or <strong>recurring</strong> (repeating on a schedule). Toggle between these modes at the top of the form.',
+      },
+      {
+        type: 'heading',
+        content: 'Recurring activities',
+        level: 2,
+        id: 'recurring',
+      },
+      {
+        type: 'paragraph',
+        content: 'Recurring activities repeat on a schedule you define. Supported frequencies:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Weekly</strong> \u2014 Repeats every week. Select specific days (e.g., Monday and Wednesday) for multi-day schedules.',
+          '<strong>Daily</strong> \u2014 Repeats every day.',
+          '<strong>Monthly</strong> \u2014 Repeats on the same day each month.',
+          '<strong>Yearly</strong> \u2014 Repeats on the same date each year.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can set an optional <strong>end date</strong> for recurring activities. No new occurrences will be generated after this date.',
+      },
+      {
+        type: 'heading',
+        content: 'Editing a single occurrence',
+        level: 2,
+        id: 'editing-occurrence',
+      },
+      {
+        type: 'paragraph',
+        content:
+          "When you tap on an occurrence of a recurring activity and click <strong>Edit</strong>, you'll see three options:",
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>This Occurrence Only</strong> \u2014 Changes only this specific date. A one-off copy is created, leaving all other occurrences untouched.',
+          '<strong>This & All Future</strong> \u2014 Splits the schedule at this date. The original ends the day before, and a new schedule starts from this date with your changes.',
+          '<strong>All Occurrences</strong> \u2014 Updates the entire recurring template. Every past and future occurrence reflects the change.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'The same options appear when deleting a recurring activity occurrence. You can remove just one date, end the schedule from a certain point, or delete the entire series.',
+        title: 'Tip',
+        icon: '\u{1F4A1}',
+      },
+      {
+        type: 'heading',
+        content: 'Activity details',
+        level: 2,
+        id: 'details',
+      },
+      {
+        type: 'paragraph',
+        content: 'Each activity can include additional details:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Location</strong> \u2014 Where the activity takes place.',
+          '<strong>Transport</strong> \u2014 Assign family members for dropoff and pickup.',
+          '<strong>Instructor / Coach</strong> \u2014 Name and contact information.',
+          '<strong>Notes</strong> \u2014 Any additional information.',
+          '<strong>Fees</strong> \u2014 Track costs per session, month, or term.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Calendar views',
+        level: 2,
+        id: 'calendar-views',
+      },
+      {
+        type: 'paragraph',
+        content: 'The planner offers multiple ways to view your schedule:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Month view</strong> \u2014 A calendar grid showing activity dots on each day. Click a day to open the day agenda sidebar.',
+          '<strong>Day agenda</strong> \u2014 A sidebar showing all activities for a selected day, sorted by time.',
+          '<strong>Upcoming activities</strong> \u2014 A list of the next 30 activities across all family members.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Inline editing',
+        level: 2,
+        id: 'inline-editing',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap any activity to open its detail view. From there, you can edit most fields directly \u2014 title, time, location, assignee, transport, instructor, and notes \u2014 without opening the full edit form. Changes save automatically when you click away.',
+      },
+    ],
+  },
 ];

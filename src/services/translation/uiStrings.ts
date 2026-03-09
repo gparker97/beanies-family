@@ -895,6 +895,10 @@ const STRING_DEFS = {
     en: 'Try selecting a different date range or add a new transaction.',
     beanie: 'try a different date range or add a new transaction.',
   },
+  'transactions.editingProjected': {
+    en: 'Editing projected transaction for {date}',
+    beanie: 'editing this projected bean for {date}',
+  },
   'transactions.deleteConfirm': {
     en: 'Are you sure you want to delete this transaction?',
     beanie: 'remove this transaction for good?',
@@ -2112,6 +2116,10 @@ const STRING_DEFS = {
   },
   'planner.addActivity': { en: '+ Add Activity', beanie: '+ new activity' },
   'planner.editActivity': { en: 'Edit Activity', beanie: 'edit activity' },
+  'planner.editingOccurrence': {
+    en: 'Editing occurrence on {date}',
+    beanie: 'editing this bean on {date}',
+  },
   'planner.newActivity': { en: 'New Activity', beanie: 'new beanie activity' },
   'planner.deleteActivity': { en: 'Delete Activity', beanie: 'delete activity' },
   'planner.deleteConfirm': {
@@ -2168,6 +2176,7 @@ const STRING_DEFS = {
   // Planner — Form fields
   'planner.field.title': { en: 'Activity Title', beanie: 'activity title' },
   'planner.field.date': { en: 'Start Date', beanie: 'start date' },
+  'planner.field.endDate': { en: 'End Date', beanie: 'end date' },
   'planner.field.startTime': { en: 'Start Time', beanie: 'start time' },
   'planner.field.endTime': { en: 'End Time', beanie: 'end time' },
   'planner.field.category': { en: 'Category', beanie: 'category' },

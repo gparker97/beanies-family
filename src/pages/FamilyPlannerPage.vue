@@ -13,6 +13,7 @@ import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
+import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import { confirm } from '@/composables/useConfirm';
 import type {
   FamilyActivity,
@@ -25,6 +26,13 @@ const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
 const activityStore = useActivityStore();
 const memberFilterStore = useMemberFilterStore();
+const {
+  viewingActivity,
+  viewingOccurrenceDate,
+  openViewModal,
+  handleViewOpenEdit: scopedViewOpenEdit,
+  handleScopedSave,
+} = useActivityScopeEdit();
 
 function toggleAllMembers() {
   if (!memberFilterStore.isAllSelected) memberFilterStore.selectAll();
@@ -41,6 +49,7 @@ const activeView = ref('month');
 const showInactive = ref(false);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
+const editingOccurrenceDate = ref<string | undefined>(undefined);
 const selectedDate = ref<string | undefined>(undefined);
 const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
@@ -55,18 +64,9 @@ const headerSubtitle = computed(() => {
 
 function openAddModal(date?: string) {
   editingActivity.value = null;
+  editingOccurrenceDate.value = undefined;
   selectedDate.value = date;
   showModal.value = true;
-}
-
-// View modal for quick viewing + inline editing
-const viewingActivity = ref<FamilyActivity | null>(null);
-
-function openViewModal(id: string) {
-  const activity = activityStore.activities.find((a) => a.id === id);
-  if (activity) {
-    viewingActivity.value = activity;
-  }
 }
 
 function handleCalendarDateClick(date: string) {
@@ -80,14 +80,15 @@ function handleSidebarAdd() {
   openAddModal(date);
 }
 
-function handleSidebarEdit(id: string) {
+function handleSidebarEdit(id: string, date: string) {
   sidebarDate.value = null;
-  openViewModal(id);
+  openViewModal(id, date);
 }
 
 function handleViewOpenEdit(activity: FamilyActivity) {
-  viewingActivity.value = null;
-  editingActivity.value = activity;
+  const { activity: target, occurrenceDate } = scopedViewOpenEdit(activity);
+  editingActivity.value = target;
+  editingOccurrenceDate.value = occurrenceDate;
   showModal.value = true;
 }
 
@@ -95,12 +96,19 @@ async function handleSave(
   data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }
 ) {
   if ('id' in data && 'data' in data) {
-    await activityStore.updateActivity(data.id, data.data);
+    // Recurring occurrence edit — defer scope to save time
+    if (editingOccurrenceDate.value && editingActivity.value?.recurrence !== 'none') {
+      const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
+      if (!saved) return; // cancelled — keep modal open
+    } else {
+      await activityStore.updateActivity(data.id, data.data);
+    }
   } else {
     await activityStore.createActivity(data as CreateFamilyActivityInput);
   }
   showModal.value = false;
   editingActivity.value = null;
+  editingOccurrenceDate.value = undefined;
 }
 
 async function handleDelete() {
@@ -116,6 +124,7 @@ async function handleDelete() {
     await activityStore.deleteActivity(activityToDelete.id);
   }
   editingActivity.value = null;
+  editingOccurrenceDate.value = undefined;
 }
 
 // --- Todo view/edit modal ---
@@ -123,6 +132,11 @@ const selectedTodo = ref<TodoItem | null>(null);
 
 function openTodoViewModal(todo: TodoItem) {
   selectedTodo.value = todo;
+}
+
+function handleActivitySwapped(newId: string) {
+  const newActivity = activityStore.activities.find((a) => a.id === newId);
+  if (newActivity) viewingActivity.value = newActivity;
 }
 </script>
 
@@ -165,7 +179,7 @@ function openTodoViewModal(todo: TodoItem) {
 
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      <UpcomingActivities @edit="openViewModal" />
+      <UpcomingActivities @edit="(id: string, date: string) => openViewModal(id, date)" />
       <TodoPreview @view="openTodoViewModal" />
     </div>
 
@@ -221,6 +235,7 @@ function openTodoViewModal(todo: TodoItem) {
       :default-date="selectedDate"
       :default-start-time="defaultStartTime"
       :read-only="!canEditActivities"
+      :occurrence-date="editingOccurrenceDate"
       @close="
         showModal = false;
         defaultStartTime = undefined;
@@ -233,8 +248,10 @@ function openTodoViewModal(todo: TodoItem) {
 
     <ActivityViewEditModal
       :activity="viewingActivity"
+      :occurrence-date="viewingOccurrenceDate"
       @close="viewingActivity = null"
       @open-edit="handleViewOpenEdit"
+      @activity-swapped="handleActivitySwapped"
     />
   </div>
 </template>

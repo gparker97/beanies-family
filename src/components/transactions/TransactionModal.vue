@@ -27,7 +27,7 @@ import type {
   CreateRecurringItemInput,
   RecurringFrequency,
 } from '@/types/models';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, formatNookDate } from '@/utils/date';
 import { computeGoalAllocRaw } from '@/utils/finance';
 
 const props = defineProps<{
@@ -35,6 +35,7 @@ const props = defineProps<{
   transaction?: Transaction | null;
   recurringItem?: RecurringItem | null;
   initialValues?: Partial<CreateTransactionInput> | null;
+  projectedDate?: string;
 }>();
 
 const emit = defineEmits<{
@@ -389,6 +390,19 @@ function handleDelete() {
     @save="handleSave"
     @delete="handleDelete"
   >
+    <!-- Projected date banner for recurring transaction occurrence edits -->
+    <div
+      v-if="projectedDate"
+      class="mb-4 rounded-[14px] bg-[var(--tint-silk-20)] px-4 py-3 dark:bg-sky-900/20"
+    >
+      <div class="flex items-center gap-2">
+        <span class="text-base">📅</span>
+        <span class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t('transactions.editingProjected').replace('{date}', formatNookDate(projectedDate)) }}
+        </span>
+      </div>
+    </div>
+
     <!-- 1. Direction toggle -->
     <FormFieldGroup :label="t('modal.direction')">
       <TogglePillGroup

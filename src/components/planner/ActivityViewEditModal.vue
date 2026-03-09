@@ -2,13 +2,14 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { getCurrencyInfo } from '@/constants/currencies';
-import { formatDate, addHourToTime } from '@/utils/date';
+import { formatDate, addHourToTime, toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -17,16 +18,29 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import type { FamilyActivity } from '@/types/models';
 
-type EditableField = 'title' | 'assignee' | 'date' | 'startTime' | 'endTime' | 'location' | 'notes';
+type EditableField =
+  | 'title'
+  | 'assignee'
+  | 'date'
+  | 'startTime'
+  | 'endTime'
+  | 'location'
+  | 'dropoff'
+  | 'pickup'
+  | 'instructorName'
+  | 'instructorContact'
+  | 'notes';
 
 const props = defineProps<{
   activity: FamilyActivity | null;
+  occurrenceDate?: string;
 }>();
 
 const emit = defineEmits<{
   close: [];
   deleted: [id: string];
   'open-edit': [activity: FamilyActivity];
+  'activity-swapped': [newId: string];
 }>();
 
 const { t } = useTranslation();
@@ -49,10 +63,16 @@ const draftDate = ref('');
 const draftStartTime = ref('');
 const draftEndTime = ref('');
 const draftLocation = ref('');
+const draftDropoffMemberId = ref('');
+const draftPickupMemberId = ref('');
+const draftInstructorName = ref('');
+const draftInstructorContact = ref('');
 const draftNotes = ref('');
 
 // Template refs for auto-focus
 const titleInputRef = ref<HTMLInputElement | null>(null);
+const instructorNameRef = ref<HTMLInputElement | null>(null);
+const instructorContactRef = ref<HTMLInputElement | null>(null);
 const notesRef = ref<HTMLTextAreaElement | null>(null);
 
 const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
@@ -78,12 +98,26 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         case 'location':
           draftLocation.value = activity.value.location ?? '';
           break;
+        case 'dropoff':
+          draftDropoffMemberId.value = activity.value.dropoffMemberId ?? '';
+          break;
+        case 'pickup':
+          draftPickupMemberId.value = activity.value.pickupMemberId ?? '';
+          break;
+        case 'instructorName':
+          draftInstructorName.value = activity.value.instructorName ?? '';
+          break;
+        case 'instructorContact':
+          draftInstructorContact.value = activity.value.instructorContact ?? '';
+          break;
         case 'notes':
           draftNotes.value = activity.value.notes ?? '';
           break;
       }
       nextTick(() => {
         if (field === 'title') titleInputRef.value?.focus();
+        if (field === 'instructorName') instructorNameRef.value?.focus();
+        if (field === 'instructorContact') instructorContactRef.value?.focus();
         if (field === 'notes') notesRef.value?.focus();
       });
     },
@@ -152,6 +186,38 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           }
           break;
         }
+        case 'dropoff': {
+          const val = draftDropoffMemberId.value || null;
+          if (val !== (activity.value.dropoffMemberId ?? null)) {
+            update.dropoffMemberId = val;
+            changed = true;
+          }
+          break;
+        }
+        case 'pickup': {
+          const val = draftPickupMemberId.value || null;
+          if (val !== (activity.value.pickupMemberId ?? null)) {
+            update.pickupMemberId = val;
+            changed = true;
+          }
+          break;
+        }
+        case 'instructorName': {
+          const val = draftInstructorName.value.trim() || null;
+          if (val !== (activity.value.instructorName ?? null)) {
+            update.instructorName = val;
+            changed = true;
+          }
+          break;
+        }
+        case 'instructorContact': {
+          const val = draftInstructorContact.value.trim() || null;
+          if (val !== (activity.value.instructorContact ?? null)) {
+            update.instructorContact = val;
+            changed = true;
+          }
+          break;
+        }
         case 'notes': {
           const val = draftNotes.value.trim() || null;
           if (val !== (activity.value.notes ?? null)) {
@@ -163,16 +229,59 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
       }
 
       if (changed) {
-        await activityStore.updateActivity(activity.value.id, update);
+        // Scope-on-save for recurring activity inline edits
+        if (isRecurring.value && props.occurrenceDate && !scopeResolved.value) {
+          const scope = await chooseScope();
+          if (!scope) return; // cancelled — discard edit
+
+          if (scope === 'all') {
+            await activityStore.updateActivity(activity.value.id, update);
+            scopeResolved.value = true;
+          } else if (scope === 'this-only') {
+            const override = await activityStore.materializeOverride(
+              activity.value.id,
+              props.occurrenceDate,
+              update
+            );
+            if (override) {
+              effectiveTargetId.value = override.id;
+              emit('activity-swapped', override.id);
+            }
+            // Override has recurrence:'none' so future edits skip scope naturally
+          } else if (scope === 'this-and-future') {
+            const newTemplate = await activityStore.splitActivity(
+              activity.value.id,
+              props.occurrenceDate
+            );
+            if (newTemplate) {
+              await activityStore.updateActivity(newTemplate.id, update);
+              effectiveTargetId.value = newTemplate.id;
+              emit('activity-swapped', newTemplate.id);
+            }
+            scopeResolved.value = true;
+          }
+        } else {
+          // Non-recurring, or scope already resolved — direct update
+          const targetId = effectiveTargetId.value ?? activity.value.id;
+          await activityStore.updateActivity(targetId, update);
+        }
       }
     },
   });
+
+// Scope-on-save state for inline edits on recurring occurrences.
+// After the first scope choice, subsequent inline edits skip the modal.
+const scopeResolved = ref(false);
+// After "this-only" or "this-and-future", inline edits target the new entity
+const effectiveTargetId = ref<string | null>(null);
 
 // Reset when activity changes
 watch(
   () => props.activity,
   () => {
     editingField.value = null;
+    scopeResolved.value = false;
+    effectiveTargetId.value = null;
   }
 );
 
@@ -191,9 +300,38 @@ const viewFormattedDate = computed(() => {
   return formatDate(activity.value.date);
 });
 
+const isRecurring = computed(() => activity.value?.recurrence !== 'none');
+
 const recurrenceLabel = computed(() => {
   if (!activity.value) return '';
   return t(`planner.recurrence.${activity.value.recurrence}`);
+});
+
+const DAY_KEYS: Record<number, string> = {
+  0: 'sun',
+  1: 'mon',
+  2: 'tue',
+  3: 'wed',
+  4: 'thu',
+  5: 'fri',
+  6: 'sat',
+};
+
+const daysOfWeekLabel = computed(() => {
+  if (!activity.value?.daysOfWeek?.length) return '';
+  // Sort days starting from Monday (1,2,3,4,5,6,0)
+  const sorted = [...activity.value.daysOfWeek].sort((a, b) => (a || 7) - (b || 7));
+  return sorted
+    .map((d) => {
+      const key = DAY_KEYS[d] ?? 'sun';
+      return t(`planner.day.${key}` as 'planner.day.sun');
+    })
+    .join(', ');
+});
+
+const endDateFormatted = computed(() => {
+  if (!activity.value?.recurrenceEndDate) return null;
+  return formatDate(activity.value.recurrenceEndDate);
 });
 
 const feeLabel = computed(() => {
@@ -244,6 +382,16 @@ function handleEndTimeChange(value: string) {
   saveField('endTime');
 }
 
+function handleDropoffChange(value: string | string[]) {
+  draftDropoffMemberId.value = value as string;
+  saveField('dropoff');
+}
+
+function handlePickupChange(value: string | string[]) {
+  draftPickupMemberId.value = value as string;
+  saveField('pickup');
+}
+
 function handleClose() {
   saveAndClose();
   emit('close');
@@ -263,8 +411,36 @@ function handleOpenEdit() {
 
 async function handleDelete() {
   if (!activity.value) return;
-  const id = activity.value.id;
+  const act = activity.value;
   emit('close');
+
+  // Recurring activity with occurrence date — scope-aware delete
+  if (act.recurrence !== 'none' && props.occurrenceDate) {
+    const scope = await chooseScope();
+    if (!scope) return;
+
+    if (scope === 'this-only') {
+      await activityStore.materializeOverride(act.id, props.occurrenceDate, {
+        isActive: false,
+      });
+      playWhoosh();
+      emit('deleted', act.id);
+      return;
+    }
+
+    if (scope === 'this-and-future') {
+      const dayBefore = toDateInputValue(addDays(parseLocalDate(props.occurrenceDate), -1));
+      await activityStore.updateActivity(act.id, {
+        recurrenceEndDate: dayBefore,
+      });
+      playWhoosh();
+      emit('deleted', act.id);
+      return;
+    }
+
+    // 'all' — fall through to standard delete with confirm
+  }
+
   if (
     await showConfirm({
       title: 'planner.deleteActivity',
@@ -272,9 +448,9 @@ async function handleDelete() {
       variant: 'danger',
     })
   ) {
-    await activityStore.deleteActivity(id);
+    await activityStore.deleteActivity(act.id);
     playWhoosh();
-    emit('deleted', id);
+    emit('deleted', act.id);
   }
 }
 </script>
@@ -354,6 +530,45 @@ async function handleDelete() {
         </span>
       </div>
 
+      <!-- Schedule details for recurring activities -->
+      <div
+        v-if="isRecurring"
+        class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+      >
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+              {{ t('planner.field.recurrence') }}
+            </span>
+            <span
+              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+            >
+              {{ recurrenceLabel }}
+            </span>
+          </div>
+          <div v-if="daysOfWeekLabel" class="flex items-center gap-2">
+            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+              {{ t('modal.whichDays') }}
+            </span>
+            <span
+              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+            >
+              {{ daysOfWeekLabel }}
+            </span>
+          </div>
+          <div v-if="endDateFormatted" class="flex items-center gap-2">
+            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+              {{ t('planner.field.endDate') }}
+            </span>
+            <span
+              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+            >
+              {{ endDateFormatted }}
+            </span>
+          </div>
+        </div>
+      </div>
+
       <!-- Assignee — inline editable -->
       <FormFieldGroup :label="t('planner.field.assignee')">
         <InlineEditField
@@ -386,8 +601,8 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Date — inline editable -->
-      <FormFieldGroup :label="t('planner.field.date')">
+      <!-- Date — inline editable (only shown for one-off activities) -->
+      <FormFieldGroup v-if="!isRecurring" :label="t('planner.field.date')">
         <InlineEditField
           :editing="editingField === 'date'"
           tint-color="orange"
@@ -559,32 +774,153 @@ async function handleDelete() {
         </span>
       </FormFieldGroup>
 
-      <!-- Transport — read-only -->
-      <div
-        v-if="activity.dropoffMemberId || activity.pickupMemberId"
-        class="grid grid-cols-2 gap-4"
-      >
-        <FormFieldGroup v-if="activity.dropoffMemberId" :label="t('planner.field.dropoff')">
-          <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-            {{ getMemberName(activity.dropoffMemberId) }}
-          </span>
+      <!-- Transport — inline editable -->
+      <div class="grid grid-cols-2 gap-4">
+        <FormFieldGroup :label="t('planner.field.dropoff')">
+          <InlineEditField
+            :editing="editingField === 'dropoff'"
+            tint-color="orange"
+            @start-edit="startEdit('dropoff')"
+          >
+            <template #view>
+              <span
+                v-if="activity.dropoffMemberId"
+                class="text-sm text-[var(--color-text)] dark:text-gray-300"
+              >
+                {{ getMemberName(activity.dropoffMemberId) }}
+              </span>
+              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
+            </template>
+            <template #edit>
+              <FamilyChipPicker
+                :model-value="draftDropoffMemberId"
+                mode="single"
+                compact
+                @update:model-value="handleDropoffChange"
+              />
+            </template>
+          </InlineEditField>
         </FormFieldGroup>
-        <FormFieldGroup v-if="activity.pickupMemberId" :label="t('planner.field.pickup')">
-          <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-            {{ getMemberName(activity.pickupMemberId) }}
-          </span>
+        <FormFieldGroup :label="t('planner.field.pickup')">
+          <InlineEditField
+            :editing="editingField === 'pickup'"
+            tint-color="orange"
+            @start-edit="startEdit('pickup')"
+          >
+            <template #view>
+              <span
+                v-if="activity.pickupMemberId"
+                class="text-sm text-[var(--color-text)] dark:text-gray-300"
+              >
+                {{ getMemberName(activity.pickupMemberId) }}
+              </span>
+              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
+            </template>
+            <template #edit>
+              <FamilyChipPicker
+                :model-value="draftPickupMemberId"
+                mode="single"
+                compact
+                @update:model-value="handlePickupChange"
+              />
+            </template>
+          </InlineEditField>
         </FormFieldGroup>
       </div>
 
-      <!-- Instructor — read-only -->
-      <FormFieldGroup v-if="activity.instructorName" :label="t('planner.field.instructor')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-          {{ activity.instructorName }}
-          <span v-if="activity.instructorContact" class="text-[var(--color-text-muted)]">
-            &middot; {{ activity.instructorContact }}
-          </span>
-        </span>
-      </FormFieldGroup>
+      <!-- Instructor — inline editable -->
+      <div class="grid grid-cols-2 gap-4">
+        <FormFieldGroup :label="t('planner.field.instructor')">
+          <InlineEditField
+            :editing="editingField === 'instructorName'"
+            tint-color="orange"
+            @start-edit="startEdit('instructorName')"
+          >
+            <template #view>
+              <span
+                v-if="activity.instructorName"
+                class="text-sm text-[var(--color-text)] dark:text-gray-300"
+              >
+                {{ activity.instructorName }}
+              </span>
+              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
+            </template>
+            <template #edit>
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <BaseInput
+                    ref="instructorNameRef"
+                    v-model="draftInstructorName"
+                    type="text"
+                    :placeholder="t('planner.field.instructor')"
+                    class="rounded-[14px] ring-2 ring-orange-500/30"
+                    @keydown="handleInputKeydown('instructorName')($event)"
+                  />
+                </div>
+                <button
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  @click.stop="saveField('instructorName')"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+          </InlineEditField>
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('planner.field.instructorContact')">
+          <InlineEditField
+            :editing="editingField === 'instructorContact'"
+            tint-color="orange"
+            @start-edit="startEdit('instructorContact')"
+          >
+            <template #view>
+              <span
+                v-if="activity.instructorContact"
+                class="text-sm text-[var(--color-text)] dark:text-gray-300"
+              >
+                {{ activity.instructorContact }}
+              </span>
+              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
+            </template>
+            <template #edit>
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <BaseInput
+                    ref="instructorContactRef"
+                    v-model="draftInstructorContact"
+                    type="text"
+                    :placeholder="t('planner.field.instructorContact')"
+                    class="rounded-[14px] ring-2 ring-orange-500/30"
+                    @keydown="handleInputKeydown('instructorContact')($event)"
+                  />
+                </div>
+                <button
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  @click.stop="saveField('instructorContact')"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+          </InlineEditField>
+        </FormFieldGroup>
+      </div>
 
       <!-- Notes — inline editable -->
       <FormFieldGroup :label="t('planner.field.notes')">
