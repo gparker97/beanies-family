@@ -332,7 +332,9 @@ export const useSyncStore = defineStore('sync', () => {
     }
 
     try {
+      console.log('[syncStore.loadFromFile] calling syncService.load()...');
       const text = await syncService.load();
+      console.log('[syncStore.loadFromFile] load returned', text ? `${text.length} chars` : 'null');
       if (!text) {
         const lastError = syncService.getState().lastError;
         if (lastError?.startsWith('DriveApiError:404:')) {
@@ -1189,7 +1191,7 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   function resumeFilePolling(): void {
-    if (isConfigured.value && !needsPermission.value && autoSyncStopHandle) {
+    if (isConfigured.value && !needsPermission.value && autoSyncStopHandle && !pollingDeferred) {
       startFilePolling();
     }
   }

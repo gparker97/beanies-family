@@ -61,6 +61,7 @@ let currentProviderFamilyId: string | null = null;
 // Family key + envelope — set by syncStore after unlock
 let currentFamilyKey: CryptoKey | null = null;
 let currentEnvelope: BeanpodFileV4 | null = null;
+let noKeyWarnedOnce = false;
 
 // Drive-reported modifiedTime of the last file we read or wrote
 let lastKnownFileTimestamp: string | null = null;
@@ -241,6 +242,7 @@ export function setProvider(provider: StorageProvider): void {
 export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): void {
   currentFamilyKey = familyKey;
   currentEnvelope = envelope;
+  noKeyWarnedOnce = false; // Reset so future skips can warn again
 }
 
 /**
@@ -248,6 +250,13 @@ export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): voi
  */
 export function getFamilyKey(): CryptoKey | null {
   return currentFamilyKey;
+}
+
+/**
+ * Check if a family key and envelope are set (ready to save).
+ */
+export function hasFamilyKey(): boolean {
+  return !!currentFamilyKey && !!currentEnvelope;
 }
 
 /**
@@ -291,6 +300,7 @@ export function reset(): void {
   currentProviderFamilyId = null;
   currentFamilyKey = null;
   currentEnvelope = null;
+  noKeyWarnedOnce = false;
   lastKnownFileTimestamp = null;
   resetSaveFailures();
   setCachePersistFailed(false);
@@ -898,7 +908,11 @@ export function triggerDebouncedSave(): void {
   saveDebounceTimer = setTimeout(() => {
     saveDebounceTimer = null;
     if (!currentFamilyKey || !currentEnvelope) {
-      console.warn('[syncService] Auto-save skipped: no family key or envelope');
+      // Only log once to avoid console spam during init
+      if (!noKeyWarnedOnce) {
+        console.warn('[syncService] Auto-save skipped: no family key or envelope');
+        noKeyWarnedOnce = true;
+      }
       return;
     }
     save().catch((err) => {
@@ -914,7 +928,10 @@ export function triggerDebouncedSave(): void {
 export async function saveNow(): Promise<boolean> {
   cancelPendingSave();
   if (!currentFamilyKey || !currentEnvelope) {
-    console.warn('[syncService] saveNow skipped: no family key or envelope');
+    if (!noKeyWarnedOnce) {
+      console.warn('[syncService] saveNow skipped: no family key or envelope');
+      noKeyWarnedOnce = true;
+    }
     return false;
   }
   return save();

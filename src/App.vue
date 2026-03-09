@@ -39,7 +39,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
-import { saveNow } from '@/services/sync/syncService';
+import { saveNow, hasFamilyKey } from '@/services/sync/syncService';
 
 const route = useRoute();
 const router = useRouter();
@@ -166,9 +166,11 @@ async function loadFamilyData() {
   // Path 1: File configured + we have permission → load from file (source of truth)
   if (syncStore.isConfigured && !syncStore.needsPermission) {
     initBreadcrumbs.push('path1: loading from sync file');
+    console.log('[loadFamilyData] path1: calling loadFromFile...');
     try {
       const loadResult = await syncStore.loadFromFile();
       initBreadcrumbs.push(`path1: loadFromFile result=${loadResult.success}`);
+      console.log('[loadFamilyData] path1: loadFromFile returned', loadResult);
       if (loadResult.success) {
         memberFilterStore.initialize();
         const result = await processRecurringItems();
@@ -185,12 +187,20 @@ async function loadFamilyData() {
         const cachedKeyB64 = activeFamilyId
           ? settingsStore.getCachedFamilyKey(activeFamilyId)
           : null;
+        console.log(
+          '[loadFamilyData] needsPassword: familyId=',
+          activeFamilyId,
+          'hasCachedKey=',
+          !!cachedKeyB64
+        );
         if (cachedKeyB64) {
           try {
             const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
             const { base64ToBuffer } = await import('@/utils/encoding');
             const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+            console.log('[loadFamilyData] calling decryptPendingFileWithKey...');
             const decryptResult = await syncStore.decryptPendingFileWithKey(fk);
+            console.log('[loadFamilyData] decryptResult=', decryptResult);
             if (decryptResult.success) {
               memberFilterStore.initialize();
               const result = await processRecurringItems();
@@ -552,8 +562,8 @@ async function attemptSilentReconnect() {
 function handleVisibilityChange() {
   if (document.visibilityState === 'hidden') {
     syncStore.pauseFilePolling();
-    // Single immediate save — replaces the old flush + syncNow double-save
-    saveNow().catch(console.warn);
+    // Only attempt save if a family key is established (avoids spam during init)
+    if (hasFamilyKey()) saveNow().catch(console.warn);
   } else if (document.visibilityState === 'visible') {
     syncStore.resumeFilePolling();
     attemptSilentReconnect().catch(console.warn);
@@ -563,7 +573,7 @@ function handleVisibilityChange() {
 
 function handleBeforeUnload() {
   // Best-effort save — browser may terminate the async save
-  saveNow().catch(console.warn);
+  if (hasFamilyKey()) saveNow().catch(console.warn);
 }
 
 function handleOnline() {

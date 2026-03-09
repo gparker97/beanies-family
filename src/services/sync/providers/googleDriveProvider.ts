@@ -41,8 +41,8 @@ async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
       return await fn();
     } catch (e) {
       lastError = e;
-      const is5xx = e instanceof DriveApiError && e.status >= 500;
-      if (!is5xx || attempt === maxRetries) throw e;
+      const isRetryable = e instanceof DriveApiError && (e.status >= 500 || e.status === 408);
+      if (!isRetryable || attempt === maxRetries) throw e;
       // Exponential backoff: 1s, 2s, 4s
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
@@ -124,9 +124,16 @@ export class GoogleDriveProvider implements StorageProvider {
    */
   async read(): Promise<string | null> {
     try {
+      /* eslint-disable no-console -- init diagnostics */
+      console.log('[GoogleDrive.read] getting token...');
       const token = await getValidToken();
-      return await withRetry(() => readFile(token, this.fileId));
+      console.log('[GoogleDrive.read] token obtained, reading file...');
+      const result = await withRetry(() => readFile(token, this.fileId));
+      console.log('[GoogleDrive.read] read complete, length=', result?.length ?? 0);
+      return result;
+      /* eslint-enable no-console */
     } catch (e) {
+      console.warn('[GoogleDrive.read] error:', (e as Error).message);
       if (e instanceof DriveApiError && e.status === 401) {
         const silentToken = await attemptSilentRefresh();
         if (silentToken) {

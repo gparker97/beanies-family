@@ -30,6 +30,7 @@ export const setProvider = vi.fn();
 // Family key / envelope (V4)
 export const setFamilyKey = vi.fn();
 export const getFamilyKey = vi.fn(() => null);
+export const hasFamilyKey = vi.fn(() => false);
 export const getEnvelope = vi.fn(() => null);
 export const setEnvelope = vi.fn();
 
