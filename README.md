@@ -35,7 +35,7 @@ Here's the fun stuff:
 - Claude Max / Opus 4.6 (Mostly. I may have pitched in a line or 2.)
 - Vue 3 / Typescript + Vite / Tailwind / Pinia
 - IndexedDB (to cache encrypted family data in your local browser, which you can clear at anytime)
-- Browser-native Web Crypto API (AES-256-GCM) - Your data is fully encrypted in transit and at rest and never leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache
+- Browser-native Web Crypto API (AES-256-GCM) - Your data is fully encrypted in transit and at rest, each family member gets their own password-dervived key (PBKDF2) that wraps a shared family key (AWS-KW), and data *never* leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache
 - Automerge (for CRDTs - adds a bit of heft to the package, but we tried rolling our own merge algorithms and trust me, it's not worth it - keeping your data safe is what matters)
 - Vitest (unit tests) + Playwright (E2E tests) + Dependabot to keep dependencies up to date and secure (seriously, how cool is Dependabot!?)
 - One single, stupid, plain vanilla DynamoDB in the cloud to map your email to family ID so we can locate your (encrypted) family data file in your personal location that only you can access. Nothing else. Anywhere. Ever.
@@ -44,7 +44,7 @@ So there it is. If you're a techie nerd like me, run it locally. If you don't wa
 
 I'm using [beanies](https://beanies.family) to track our money, our various (1) houses, our (0) boats, my wife's (currently missing) diamond ring (ask my wife where she lost hers.. unfortunately beanies can't tell you that), and more. I'll use it even more for their piano lessons, soccer practices, school plays that, as a respectable father, I really should attend, and to make sure we don't forget to pick up our son from his after school math tutor (again). All while keeping our data safe and secure on my family's personal storage (unless I open read access on my data file to the world and tell everyone the key. Which I won't. Probably.).
 
-If you have a question, comment, suggestion, or just wanna say hi, you can say it here or raise an issue. If you're using it for free and wanna drop me a satoshi for my time (or just cuz you like the app), that's cool too (1beanks5zbnAcptUe.SdrepxqrCzxEuA2z).
+If you have a question, comment, suggestion, or just wanna say hi, you can say it here or raise an issue. If you're using it for free and wanna drop me a satoshi for my time (or just cuz you like the app), that's cool too (1beanks5zbnAcptUeSdrepxqrCzxEuA2z).
 
 Simplify your family life. Every bean counts.
 
