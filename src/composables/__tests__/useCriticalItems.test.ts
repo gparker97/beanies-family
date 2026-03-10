@@ -249,7 +249,7 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value).toHaveLength(0);
   });
 
-  it('includes todos due tomorrow with no-due-date style message', () => {
+  it('excludes todos with a future due date', () => {
     familyStore.setCurrentMember('parent-1');
     todoStore.todos.push(
       makeTodo({
@@ -261,9 +261,7 @@ describe('useCriticalItems', () => {
     );
 
     const { criticalItems } = useCriticalItems();
-    expect(criticalItems.value).toHaveLength(1);
-    expect(criticalItems.value[0]!.message).toContain('future task');
-    expect(criticalItems.value[0]!.icon).toBe('📋');
+    expect(criticalItems.value).toHaveLength(0);
   });
 
   it('includes todos with no due date', () => {
