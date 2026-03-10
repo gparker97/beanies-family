@@ -1971,6 +1971,22 @@ const STRING_DEFS = {
     en: "Don't forget to {task} today!",
     beanie: "don't forget to {task} today!",
   },
+  'nook.criticalTodoAssignedNoDue': {
+    en: '{creator} asked you to {task}',
+    beanie: '{creator} asked you to {task}',
+  },
+  'nook.criticalTodoSelfNoDue': {
+    en: "Don't forget to {task}",
+    beanie: "don't forget to {task}",
+  },
+  'nook.criticalTodoAssignedOverdue': {
+    en: '{creator} asked you to {task} — it was due {date}, whenever you get a chance!',
+    beanie: '{creator} asked you to {task} — was due {date}, no rush!',
+  },
+  'nook.criticalTodoSelfOverdue': {
+    en: 'A gentle reminder to {task} — it was due {date}',
+    beanie: 'a gentle nudge to {task} — was due {date}',
+  },
   'nook.criticalMore': {
     en: 'more for you today',
     beanie: 'more beans for you today',
