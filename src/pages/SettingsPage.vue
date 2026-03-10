@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import PasswordModal from '@/components/common/PasswordModal.vue';
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue';
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
@@ -136,9 +136,6 @@ async function updateTheme(value: string | number) {
 }
 
 // ── Family Data handlers ─────────────────────────────────────────────────────
-onMounted(async () => {
-  await syncStore.initialize();
-});
 
 async function handleSettingsReconnect() {
   const success = await reconnect();

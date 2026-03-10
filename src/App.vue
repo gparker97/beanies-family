@@ -39,7 +39,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
-import { saveNow, hasFamilyKey } from '@/services/sync/syncService';
+import { saveNow, hasFamilyKey, setFamilyKey } from '@/services/sync/syncService';
 
 const route = useRoute();
 const router = useRouter();
@@ -559,11 +559,20 @@ async function attemptSilentReconnect() {
 // visibilitychange → hidden is the primary save point (fires reliably on tab close,
 // app switch, etc.). beforeunload is best-effort only — browsers may terminate
 // the async save before it completes.
+
+/** Restore syncService key from store if out of sync, then save. */
+function saveWithKeyRecovery() {
+  if (!syncStore.hasSessionPassword) return;
+  if (!hasFamilyKey()) {
+    setFamilyKey(syncStore.familyKey!, syncStore.envelope!);
+  }
+  saveNow().catch(console.warn);
+}
+
 function handleVisibilityChange() {
   if (document.visibilityState === 'hidden') {
     syncStore.pauseFilePolling();
-    // Only attempt save if a family key is established (avoids spam during init)
-    if (hasFamilyKey()) saveNow().catch(console.warn);
+    saveWithKeyRecovery();
   } else if (document.visibilityState === 'visible') {
     syncStore.resumeFilePolling();
     attemptSilentReconnect().catch(console.warn);
@@ -572,8 +581,7 @@ function handleVisibilityChange() {
 }
 
 function handleBeforeUnload() {
-  // Best-effort save — browser may terminate the async save
-  if (hasFamilyKey()) saveNow().catch(console.warn);
+  saveWithKeyRecovery();
 }
 
 function handleOnline() {
