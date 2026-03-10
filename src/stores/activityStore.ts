@@ -280,6 +280,20 @@ export const useActivityStore = defineStore('activities', () => {
     error.value = null;
   }
 
+  /**
+   * Get all activity occurrences for a specific date (unfiltered by member).
+   * Uses activeActivities so pickup/dropoff assignments are never excluded
+   * by the global member filter.
+   */
+  function activitiesForDate(dateStr: string): { activity: FamilyActivity; date: string }[] {
+    const d = parseLocalDate(dateStr);
+    const all: { activity: FamilyActivity; date: string }[] = [];
+    for (const a of activeActivities.value) {
+      all.push(...expandRecurring(a, d.getFullYear(), d.getMonth()));
+    }
+    return all.filter((occ) => occ.date === dateStr);
+  }
+
   return {
     // State
     activities,
@@ -292,6 +306,7 @@ export const useActivityStore = defineStore('activities', () => {
     upcomingActivities,
     // Methods
     monthActivities,
+    activitiesForDate,
     // Actions
     loadActivities,
     createActivity,

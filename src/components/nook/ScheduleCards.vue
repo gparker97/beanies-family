@@ -4,6 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { toDateInputValue, formatNookDate } from '@/utils/date';
+import { CATEGORY_FALLBACK_ICON } from '@/constants/activityIcons';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -23,15 +24,6 @@ interface ScheduleItem {
   displayDate: string; // Formatted for display
   icon: string;
 }
-
-const CATEGORY_FALLBACK_ICON: Record<string, string> = {
-  lesson: '📚',
-  sport: '⚽',
-  appointment: '🏥',
-  social: '👥',
-  pickup: '🚗',
-  other: '📌',
-};
 
 const todayStr = computed(() => toDateInputValue(new Date()));
 

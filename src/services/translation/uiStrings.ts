@@ -1939,6 +1939,42 @@ const STRING_DEFS = {
     en: '{activities} activities planned today \u00B7 {tasks} tasks coming up',
     beanie: '{activities} activities today \u00B7 {tasks} tasks coming up!',
   },
+  'nook.criticalPickup': {
+    en: "Don't forget to pick up {child} from {activity} at {time} today!",
+    beanie: 'scoop up {child} from {activity} at {time} today!',
+  },
+  'nook.criticalPickupNoTime': {
+    en: "Don't forget to pick up {child} from {activity} today!",
+    beanie: 'scoop up {child} from {activity} today!',
+  },
+  'nook.criticalDropoff': {
+    en: 'Time to drop off {child} at {activity} at {time}!',
+    beanie: 'time to drop {child} at {activity} at {time}!',
+  },
+  'nook.criticalDropoffNoTime': {
+    en: 'Time to drop off {child} at {activity}!',
+    beanie: 'time to drop {child} at {activity}!',
+  },
+  'nook.criticalActivity': {
+    en: 'You have {activity} at {time} today!',
+    beanie: 'you have {activity} at {time} today!',
+  },
+  'nook.criticalActivityNoTime': {
+    en: "You have {activity} today — don't miss it!",
+    beanie: "you have {activity} today — don't miss it!",
+  },
+  'nook.criticalTodoAssigned': {
+    en: '{creator} asked you to {task} today!',
+    beanie: '{creator} asked you to {task} today!',
+  },
+  'nook.criticalTodoSelf': {
+    en: "Don't forget to {task} today!",
+    beanie: "don't forget to {task} today!",
+  },
+  'nook.criticalMore': {
+    en: 'more for you today',
+    beanie: 'more beans for you today',
+  },
   'nook.yourBeans': { en: 'Your Beans', beanie: 'your bean pod' },
   'nook.addBean': { en: 'Add Bean', beanie: 'add a beanie' },
   'nook.todaySchedule': { en: "Today's Schedule", beanie: "today's beanie schedule" },
