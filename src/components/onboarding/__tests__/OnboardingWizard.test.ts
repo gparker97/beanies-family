@@ -58,6 +58,14 @@ vi.mock('@/stores/activityStore', () => ({
   }),
 }));
 
+const mockSyncNow = vi.fn().mockResolvedValue(true);
+vi.mock('@/stores/syncStore', () => ({
+  useSyncStore: () => ({
+    isConfigured: true,
+    syncNow: mockSyncNow,
+  }),
+}));
+
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({
     owner: { id: 'owner-1', name: 'Test' },

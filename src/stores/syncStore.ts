@@ -301,8 +301,8 @@ export const useSyncStore = defineStore('sync', () => {
     let cachedDoc: Awaited<ReturnType<typeof loadCachedDoc>> = null;
     try {
       cachedDoc = await loadCachedDoc(fk);
-    } catch {
-      // Cache unavailable or corrupted — proceed with remote only
+    } catch (e) {
+      console.warn('[syncStore] Cache recovery failed — proceeding with remote only:', e);
     }
 
     replaceDoc(remoteDoc);

@@ -279,7 +279,17 @@ function getNextColor(): string {
 async function handleFinish() {
   // Save to file if configured — the doc + family key are initialized by createNewFile() in Step 2
   if (syncStore.isConfigured) {
-    await syncStore.syncNow(true);
+    let saved = await syncStore.syncNow(true);
+    if (!saved) {
+      // Retry once — transient errors (Google Drive token refresh, permission prompt) often resolve
+      console.warn('[CreatePod] Initial save failed, retrying...');
+      saved = await syncStore.syncNow(true);
+      if (!saved) {
+        console.warn(
+          '[CreatePod] Save failed after retry — data is cached locally but not persisted to file'
+        );
+      }
+    }
     syncStore.setupAutoSync();
     syncStore.ensureRegistered();
   }
