@@ -2,7 +2,7 @@
 
 ## Overview
 
-The GP Family Finance Planner handles sensitive financial data and takes security seriously. This document outlines our security practices, how to report vulnerabilities, and our security response process.
+The beanies.family app handles sensitive financial data and takes security seriously. This document outlines our security practices, how to report vulnerabilities, and our security response process.
 
 ## Supported Versions
 
