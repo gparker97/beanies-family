@@ -877,7 +877,7 @@ onUnmounted(() => {
         <p class="story__greeting reveal">Hey, guys! <span class="beanie-emoji">&#x1FAD8;</span></p>
 
         <p class="reveal">
-          Yes, it's <em>actually</em> me. Even AI couldn't come up with a greeting as mundane as
+          Yes, it's <em>actually</em> me. Even AI could not come up with a greeting as mundane as
           "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as
           glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart
           outside taco trucks on wednesday afternoons. But getting back to the point...
