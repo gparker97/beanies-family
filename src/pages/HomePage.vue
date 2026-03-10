@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 const showContact = ref(false);
 const showSuccess = ref(false);
+const showBackToTop = ref(false);
 const contactError = ref('');
 const contactLoading = ref(false);
 const contactName = ref('');
@@ -21,6 +22,7 @@ function onScroll() {
   const pct = dh > 0 ? (sy / dh) * 100 : 0;
   if (scrollProgress.value) scrollProgress.value.style.width = pct + '%';
   if (fnav.value) fnav.value.classList.toggle('scrolled', sy > 20);
+  showBackToTop.value = sy > 400;
 }
 
 // IntersectionObserver for reveal animations
@@ -86,6 +88,10 @@ function scrollTo(id: string) {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
@@ -108,11 +114,11 @@ onUnmounted(() => {
 
     <!-- FLOATING PILL NAV -->
     <nav ref="fnav" class="fnav">
-      <router-link to="/home" class="fnav__logo"
+      <a href="#top" class="fnav__logo" @click.prevent="scrollToTop"
         ><img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />beanies<span
           class="fnav__logo-orange"
           >.family</span
-        ></router-link
+        ></a
       >
       <div class="fnav__links">
         <a href="#story" @click.prevent="scrollTo('story')">my story</a>
@@ -124,10 +130,10 @@ onUnmounted(() => {
     <!-- HERO -->
     <section id="top" class="hero">
       <!-- Scattered background beans -->
-      <div class="hero__bean" style=" left: 6%;top: 10%; transform: rotate(-15deg)">&#x1FAD8;</div>
+      <div class="hero__bean" style="left: 6%; top: 10%; transform: rotate(-15deg)">&#x1FAD8;</div>
       <div
         class="hero__bean"
-        style=" font-size: 1.6rem; right: 8%;top: 25%; transform: rotate(20deg)"
+        style="font-size: 1.6rem; right: 8%; top: 25%; transform: rotate(20deg)"
       >
         &#x1FAD8;
       </div>
@@ -139,7 +145,7 @@ onUnmounted(() => {
       </div>
       <div
         class="hero__bean"
-        style=" font-size: 1.3rem; right: 5%;top: 60%; transform: rotate(10deg)"
+        style="font-size: 1.3rem; right: 5%; top: 60%; transform: rotate(10deg)"
       >
         &#x1FAD8;
       </div>
@@ -187,7 +193,7 @@ onUnmounted(() => {
       <!-- Decorative gradient orbs -->
       <div
         class="hero__deco"
-        style=" background: var(--sky-silk); height: 400px; right: -150px; top: -100px;width: 400px"
+        style="background: var(--sky-silk); height: 400px; right: -150px; top: -100px; width: 400px"
       ></div>
       <div
         class="hero__deco"
@@ -235,7 +241,7 @@ onUnmounted(() => {
       <!-- FLOATING DEVICE SHOWCASE -->
       <div class="showcase">
         <!-- Floating accent card: Net Worth -->
-        <div class="hero__float" style=" animation-delay: 0s; left: 50px;top: 10px; z-index: 6">
+        <div class="hero__float" style="animation-delay: 0s; left: 50px; top: 10px; z-index: 6">
           <div class="hero__float-icon">📈</div>
           <div class="hero__float-label">net worth</div>
           <div class="hero__float-val" style="color: #27ae60">+3.2%</div>
@@ -243,14 +249,14 @@ onUnmounted(() => {
         <!-- Floating accent card: Goal -->
         <div
           class="hero__float"
-          style=" animation-delay: 1.5s;bottom: 60px; right: 50px; z-index: 6"
+          style="animation-delay: 1.5s; bottom: 60px; right: 50px; z-index: 6"
         >
           <div class="hero__float-icon">🎯</div>
           <div class="hero__float-label">goal reached</div>
           <div class="hero__float-val">$10,000 &#x1F389;</div>
         </div>
         <!-- Floating accent card: Pickup -->
-        <div class="hero__float" style=" animation-delay: 3s; right: 20px;top: 200px; z-index: 6">
+        <div class="hero__float" style="animation-delay: 3s; right: 20px; top: 200px; z-index: 6">
           <div class="hero__float-icon">🚗</div>
           <div class="hero__float-label">reminder</div>
           <div class="hero__float-val" style="font-size: 0.72rem">pick up Emma at 4pm</div>
@@ -258,11 +264,11 @@ onUnmounted(() => {
         <!-- Floating accent card: Encrypted -->
         <div
           class="hero__float"
-          style=" animation-delay: 4.5s;bottom: 140px; left: 30px; z-index: 6"
+          style="animation-delay: 4.5s; bottom: 140px; left: 30px; z-index: 6"
         >
           <div class="hero__float-icon">🔒</div>
           <div class="hero__float-label">security</div>
-          <div class="hero__float-val" style=" color: var(--soft-green);font-size: 0.72rem">
+          <div class="hero__float-val" style="color: var(--soft-green); font-size: 0.72rem">
             AES-256 encrypted
           </div>
         </div>
@@ -537,7 +543,7 @@ onUnmounted(() => {
               </div>
               <div class="mock-add-btn">+ Add</div>
             </div>
-            <div style=" align-items: center;display: flex; justify-content: space-between">
+            <div style="align-items: center; display: flex; justify-content: space-between">
               <div class="mock-view-toggle">
                 <div class="mock-view-btn mock-view-btn--active">Month</div>
                 <div class="mock-view-btn">Week</div>
@@ -628,10 +634,9 @@ onUnmounted(() => {
                 >
                   📌 Today
                 </div>
-                <div style=" align-items: center;display: flex; gap: 3px; margin-bottom: 2px">
+                <div style="align-items: center; display: flex; gap: 3px; margin-bottom: 2px">
                   <span style="font-size: 8px">📚</span
-                  ><span
-                    style=" font-family: Outfit, sans-serif;font-size: 6.5px; font-weight: 600"
+                  ><span style="font-family: Outfit, sans-serif; font-size: 6.5px; font-weight: 600"
                     >Piano 3pm</span
                   ><span
                     style="
@@ -645,10 +650,9 @@ onUnmounted(() => {
                     >Emma</span
                   >
                 </div>
-                <div style=" align-items: center;display: flex; gap: 3px">
+                <div style="align-items: center; display: flex; gap: 3px">
                   <span style="font-size: 8px">⚽</span
-                  ><span
-                    style=" font-family: Outfit, sans-serif;font-size: 6.5px; font-weight: 600"
+                  ><span style="font-family: Outfit, sans-serif; font-size: 6.5px; font-weight: 600"
                     >Soccer 4pm</span
                   ><span
                     style="
@@ -685,7 +689,7 @@ onUnmounted(() => {
                 >
                   ✅ Tasks
                 </div>
-                <div style=" align-items: center;display: flex; gap: 3px; margin-bottom: 2px">
+                <div style="align-items: center; display: flex; gap: 3px; margin-bottom: 2px">
                   <span
                     style="
                       border: 1.5px solid var(--heritage-orange);
@@ -695,12 +699,11 @@ onUnmounted(() => {
                       width: 6px;
                     "
                   ></span
-                  ><span
-                    style=" font-family: Outfit, sans-serif;font-size: 6.5px; font-weight: 600"
+                  ><span style="font-family: Outfit, sans-serif; font-size: 6.5px; font-weight: 600"
                     >Buy groceries</span
                   >
                 </div>
-                <div style=" align-items: center;display: flex; gap: 3px">
+                <div style="align-items: center; display: flex; gap: 3px">
                   <span
                     style="
                       border: 1.5px solid var(--heritage-orange);
@@ -710,8 +713,7 @@ onUnmounted(() => {
                       width: 6px;
                     "
                   ></span
-                  ><span
-                    style=" font-family: Outfit, sans-serif;font-size: 6.5px; font-weight: 600"
+                  ><span style="font-family: Outfit, sans-serif; font-size: 6.5px; font-weight: 600"
                     >Book dentist</span
                   >
                 </div>
@@ -1153,6 +1155,18 @@ onUnmounted(() => {
       <p class="footer__copy">&copy; 2026 beanies.family. open source under MIT license.</p>
     </footer>
 
+    <!-- BACK TO TOP -->
+    <Transition name="btt">
+      <button
+        v-show="showBackToTop"
+        class="back-to-top"
+        aria-label="Back to top"
+        @click="scrollToTop"
+      >
+        &#x2191;
+      </button>
+    </Transition>
+
     <!-- CONTACT MODAL -->
     <div class="contact-overlay" :class="{ active: showContact }" @click.self="closeContact">
       <div class="contact-modal">
@@ -1239,7 +1253,6 @@ onUnmounted(() => {
    ═══════════════════════════════════════════════ */
 .fnav {
   align-items: center;
-  backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
   background: rgb(255 255 255 / 82%);
   border: 1px solid rgb(44 62 80 / 6%);
@@ -1409,7 +1422,6 @@ onUnmounted(() => {
 
 .hero__headline em {
   background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
-  background-clip: text;
   background-clip: text;
   font-style: normal;
   -webkit-text-fill-color: transparent;
@@ -3082,6 +3094,53 @@ onUnmounted(() => {
   color: var(--muted-text);
   font-size: 0.85rem;
   margin-top: 4px;
+}
+
+/* ═══════════════════════════════════════════════
+   BACK TO TOP
+   ═══════════════════════════════════════════════ */
+.back-to-top {
+  align-items: center;
+  backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  background: rgb(255 255 255 / 85%);
+  border: 1px solid rgb(44 62 80 / 10%);
+  border-radius: 50%;
+  bottom: 28px;
+  box-shadow: 0 2px 12px rgb(44 62 80 / 8%);
+  color: var(--deep-slate);
+  cursor: pointer;
+  display: flex;
+  font-size: 1rem;
+  height: 40px;
+  justify-content: center;
+  position: fixed;
+  right: 28px;
+  transition:
+    background 200ms,
+    transform 200ms,
+    box-shadow 200ms;
+  width: 40px;
+  z-index: 150;
+}
+
+.back-to-top:hover {
+  background: white;
+  box-shadow: 0 4px 16px rgb(44 62 80 / 12%);
+  transform: translateY(-2px);
+}
+
+.btt-enter-active,
+.btt-leave-active {
+  transition:
+    opacity 300ms ease,
+    transform 300ms ease;
+}
+
+.btt-enter-from,
+.btt-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 /* ═══════════════════════════════════════════════
