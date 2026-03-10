@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beanies.family — Your family's finances, growing together.</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --deep-slate: #2C3E50;
+  --heritage-orange: #F15D22;
+  --sky-silk: #AED6F1;
+  --terracotta: #E67E22;
+  --cloud-white: #F8F9FA;
+  --fh: 'Outfit', sans-serif;
+  --fl: 'Lora', serif;
+  --or10: rgba(241,93,34,0.08);
+  --silk20: rgba(174,214,241,0.20);
+  --s05: rgba(44,62,80,0.05);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: var(--fh); -webkit-font-smoothing: antialiased; }
+
+/* ═══════════════════════════════════════ */
+/* FLOATING NAV                           */
+/* ═══════════════════════════════════════ */
+.fnav {
+  position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+  z-index: 200; display: flex; align-items: center; gap: 16px;
+  background: rgba(255,255,255,0.82); backdrop-filter: blur(24px);
+  border: 1px solid rgba(44,62,80,0.06); border-radius: 40px;
+  padding: 8px 10px 8px 20px;
+  transition: all 0.5s;
+}
+.fnav.dark {
+  background: rgba(12,15,19,0.82);
+  border-color: rgba(255,255,255,0.04);
+}
+.fnav-logo {
+  font-weight: 700; font-size: 0.85rem;
+  color: var(--deep-slate);
+  display: flex; align-items: center; gap: 7px;
+  white-space: nowrap; transition: color 0.5s;
+}
+.fnav.dark .fnav-logo { color: rgba(255,255,255,0.7); }
+.fnav-logo em { font-style: normal; color: var(--heritage-orange); }
+.fnav-links {
+  display: flex; gap: 4px;
+}
+.fnav-links a {
+  font-size: 0.68rem; font-weight: 600; color: var(--deep-slate);
+  opacity: 0.35; text-decoration: none; padding: 6px 12px;
+  border-radius: 16px; transition: all 0.2s;
+}
+.fnav-links a:hover { opacity: 0.7; background: var(--s05); }
+.fnav.dark .fnav-links a { color: white; }
+.fnav-cta {
+  font-size: 0.68rem; font-weight: 600;
+  color: white; background: var(--heritage-orange);
+  border: none; padding: 8px 18px; border-radius: 20px; cursor: pointer;
+  transition: all 0.2s;
+}
+.fnav-cta:hover { background: var(--terracotta); }
+
+/* ═══════════════════════════════════════ */
+/* SCROLL PROGRESS                        */
+/* ═══════════════════════════════════════ */
+.spg {
+  position: fixed; top: 0; left: 0; height: 2px; z-index: 300;
+  background: var(--heritage-orange); width: 0%;
+  transition: width 0.15s linear;
+}
+
+/* ═══════════════════════════════════════ */
+/* HERO SECTION — LIGHT                   */
+/* ═══════════════════════════════════════ */
+.hero {
+  min-height: 100vh;
+  background: linear-gradient(180deg, var(--cloud-white) 0%, #EDF6FC 50%, var(--cloud-white) 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 100px 32px 60px;
+  position: relative; overflow: hidden;
+}
+.hero-beans {
+  position: absolute; font-size: 2.5rem; opacity: 0.06; pointer-events: none;
+}
+
+.hero-headline {
+  font-size: clamp(2.8rem, 6vw, 4.5rem); font-weight: 800;
+  color: var(--deep-slate); line-height: 1.08; margin-bottom: 20px;
+}
+.hero-headline em {
+  font-style: normal;
+  background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  font-size: 1.1rem; color: var(--deep-slate); opacity: 0.45;
+  max-width: 480px; line-height: 1.7; margin-bottom: 36px;
+}
+.hero-ctas { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; justify-content: center; }
+.hero-btn {
+  font-family: var(--fh); font-size: 1rem; font-weight: 700;
+  color: white; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  border: none; padding: 16px 40px; border-radius: 60px; cursor: pointer;
+  box-shadow: 0 8px 32px rgba(241,93,34,0.25);
+  transition: all 0.2s;
+}
+.hero-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(241,93,34,0.35); }
+.hero-story-link {
+  font-size: 0.85rem; font-weight: 500; color: var(--deep-slate);
+  opacity: 0.4; text-decoration: none; cursor: pointer;
+  transition: all 0.2s;
+}
+.hero-story-link:hover { opacity: 0.7; color: var(--heritage-orange); }
+
+/* Phone mockup */
+.hero-phone {
+  margin-top: 60px; position: relative;
+  width: 280px; background: var(--deep-slate);
+  border-radius: 36px; padding: 12px;
+  box-shadow: 0 40px 80px rgba(44,62,80,0.2);
+}
+.hero-phone-screen {
+  background: var(--cloud-white); border-radius: 28px; padding: 24px 18px;
+  overflow: hidden;
+}
+.hero-phone-top {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 18px;
+}
+.hero-phone-av {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--sky-silk), #7FB8E0);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.65rem; font-weight: 700; color: white;
+}
+.hp-greet { font-size: 0.65rem; opacity: 0.35; }
+.hp-name { font-size: 0.9rem; font-weight: 700; color: var(--deep-slate); }
+.hp-nw-card {
+  background: white; border-radius: 18px; padding: 18px;
+  box-shadow: 0 2px 12px rgba(44,62,80,0.04); margin-bottom: 12px;
+  text-align: center;
+}
+.hp-nw-label { font-size: 0.55rem; opacity: 0.3; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
+.hp-nw-val { font-size: 1.5rem; font-weight: 800; color: var(--deep-slate); }
+.hp-nw-change { font-size: 0.6rem; font-weight: 600; color: #27AE60; margin-top: 4px; }
+.hp-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hp-mini {
+  background: white; border-radius: 14px; padding: 12px;
+  box-shadow: 0 2px 8px rgba(44,62,80,0.03); text-align: center;
+}
+.hp-mini-icon { font-size: 1rem; margin-bottom: 4px; }
+.hp-mini-label { font-size: 0.5rem; opacity: 0.3; text-transform: uppercase; letter-spacing: 0.08em; }
+.hp-mini-val { font-size: 0.75rem; font-weight: 700; margin-top: 2px; }
+
+/* Floating cards around phone */
+.hero-float {
+  position: absolute; background: white; border-radius: 16px;
+  padding: 14px 18px; box-shadow: 0 8px 32px rgba(44,62,80,0.1);
+  z-index: 3; animation: heroFloat 6s ease-in-out infinite;
+}
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.hf-icon { font-size: 1rem; margin-bottom: 4px; }
+.hf-label { font-size: 0.55rem; opacity: 0.35; text-transform: uppercase; letter-spacing: 0.08em; }
+.hf-val { font-size: 0.9rem; font-weight: 700; }
+
+/* Trust badges */
+.trust-row {
+  display: flex; gap: 32px; justify-content: center;
+  margin-top: 48px; flex-wrap: wrap;
+}
+.trust-badge {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.7rem; font-weight: 600; color: var(--deep-slate); opacity: 0.25;
+}
+.trust-icon {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--s05); display: flex; align-items: center;
+  justify-content: center; font-size: 0.85rem;
+}
+
+/* Scroll indicator */
+.scroll-cue {
+  position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  opacity: 0.15; transition: opacity 0.6s;
+}
+.scroll-cue.hidden { opacity: 0; }
+.scroll-cue span {
+  font-size: 0.55rem; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--deep-slate); opacity: 0.5;
+}
+.scroll-line {
+  width: 1px; height: 28px;
+  background: linear-gradient(transparent, var(--deep-slate));
+  animation: pulse 2.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════ */
+/* STORY ZONE — DARK                      */
+/* ═══════════════════════════════════════ */
+.story-zone {
+  background: #0c0f13; color: rgba(255,255,255,0.58);
+  font-family: var(--fl); line-height: 1.95;
+  position: relative;
+}
+
+/* Transition gradient from light to dark */
+.fade-to-dark {
+  height: 200px;
+  background: linear-gradient(180deg, var(--cloud-white) 0%, #0c0f13 100%);
+}
+.fade-to-light {
+  height: 200px;
+  background: linear-gradient(180deg, #0c0f13 0%, var(--cloud-white) 100%);
+}
+
+/* Story intro label */
+.story-intro {
+  text-align: center; padding: 40px 20px 0;
+}
+.story-intro-label {
+  font-family: var(--fh); font-size: 0.55rem; font-weight: 700;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--heritage-orange); opacity: 0.35;
+}
+
+/* Prose parts */
+.part { max-width: 620px; margin: 0 auto; padding: 0 28px; }
+.spacer { height: 38vh; }
+.spacer-sm { height: 20vh; }
+.bean-div { text-align: center; padding: 20px 0; font-size: 1.4rem; opacity: 0.07; }
+
+/* Prose typography */
+.prose {
+  font-family: var(--fl); font-size: 1.12rem; line-height: 2;
+  color: rgba(255,255,255,0.58);
+}
+.prose p { margin-bottom: 1.6em; }
+.prose p:last-child { margin-bottom: 0; }
+.prose strong { color: rgba(255,255,255,0.88); font-weight: 600; }
+.prose em { color: rgba(255,255,255,0.7); font-style: italic; }
+.prose .hl { color: var(--heritage-orange); font-weight: 500; }
+.prose .hls { color: var(--sky-silk); font-weight: 500; }
+.prose .hlg { color: #5CDB95; font-weight: 500; }
+.prose .hlr { color: #E88D7D; font-weight: 500; }
+.prose .faint { opacity: 0.35; }
+.greeting {
+  font-family: var(--fl); font-size: clamp(2.4rem, 5.5vw, 3.8rem);
+  font-weight: 700; color: white; line-height: 1.2; margin-bottom: 0.6em;
+}
+.chinese { font-size: clamp(1.6rem, 3.5vw, 2.2rem); color: var(--heritage-orange); font-weight: 600; }
+.signoff { font-family: var(--fl); font-size: 1.05rem; color: rgba(255,255,255,0.35); font-style: italic; }
+
+/* Tech pills */
+.tech-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.tech-item {
+  font-family: var(--fh); font-size: 0.62rem; font-weight: 500;
+  color: rgba(255,255,255,0.22);
+  padding: 5px 12px; border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* Reveal */
+.reveal {
+  opacity: 0; transform: translateY(40px);
+  transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1), transform 0.8s cubic-bezier(0.4,0,0.2,1);
+}
+.reveal.vis { opacity: 1; transform: translateY(0); }
+
+/* Ambient glows */
+.amb {
+  position: fixed; pointer-events: none; z-index: -1;
+  border-radius: 50%; filter: blur(140px);
+  opacity: 0; transition: opacity 1.5s;
+}
+.amb.on { opacity: 0.04; }
+.amb-1 { width: 500px; height: 500px; background: var(--heritage-orange); top: -100px; right: -200px; }
+.amb-2 { width: 400px; height: 400px; background: var(--sky-silk); bottom: 10%; left: -150px; }
+.amb-3 { width: 500px; height: 500px; background: #E74C3C; top: 30%; left: -200px; }
+.amb-4 { width: 600px; height: 600px; background: var(--heritage-orange); bottom: -200px; right: -200px; }
+
+/* ═══════════════════════════════════════ */
+/* FEATURES SECTION — LIGHT               */
+/* ═══════════════════════════════════════ */
+.features {
+  background: var(--cloud-white);
+  padding: 100px 32px;
+  text-align: center;
+}
+.feat-label {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.25em;
+  text-transform: uppercase; color: var(--heritage-orange); opacity: 0.5;
+  margin-bottom: 12px;
+}
+.feat-title {
+  font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800;
+  color: var(--deep-slate); margin-bottom: 16px;
+}
+.feat-sub {
+  font-size: 0.95rem; color: var(--deep-slate); opacity: 0.4;
+  max-width: 480px; margin: 0 auto 60px; line-height: 1.7;
+}
+.feat-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px; max-width: 900px; margin: 0 auto;
+}
+.feat-card {
+  background: white; border-radius: 24px; padding: 32px 28px;
+  box-shadow: 0 2px 16px rgba(44,62,80,0.04);
+  text-align: left; transition: all 0.2s;
+}
+.feat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(44,62,80,0.08); }
+.feat-icon {
+  width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; margin-bottom: 16px;
+}
+.feat-card-title { font-size: 0.95rem; font-weight: 700; color: var(--deep-slate); margin-bottom: 6px; }
+.feat-card-desc { font-size: 0.78rem; color: var(--deep-slate); opacity: 0.4; line-height: 1.6; }
+
+/* ═══════════════════════════════════════ */
+/* FOOTER CTA — LIGHT                     */
+/* ═══════════════════════════════════════ */
+.footer-cta {
+  background: linear-gradient(180deg, var(--cloud-white) 0%, #EDF6FC 100%);
+  padding: 80px 32px 60px; text-align: center;
+}
+.footer-bean { font-size: 3rem; opacity: 0.15; margin-bottom: 20px; }
+.footer-headline {
+  font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800;
+  color: var(--deep-slate); margin-bottom: 8px;
+}
+.footer-headline em {
+  font-style: normal; color: var(--heritage-orange);
+}
+.footer-sub {
+  font-size: 0.9rem; color: var(--deep-slate); opacity: 0.35;
+  margin-bottom: 32px;
+}
+.footer-btn {
+  font-family: var(--fh); font-size: 1rem; font-weight: 700;
+  color: white; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+  border: none; padding: 16px 40px; border-radius: 60px; cursor: pointer;
+  box-shadow: 0 8px 32px rgba(241,93,34,0.25);
+  transition: all 0.2s;
+}
+.footer-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(241,93,34,0.35); }
+.footer-or {
+  font-size: 0.7rem; opacity: 0.2; margin: 16px 0;
+}
+.footer-gh {
+  font-size: 0.78rem; font-weight: 500; color: var(--deep-slate);
+  opacity: 0.3; text-decoration: none; transition: all 0.2s;
+}
+.footer-gh:hover { opacity: 0.6; color: var(--heritage-orange); }
+
+/* Bottom bar */
+.bottom-bar {
+  background: var(--deep-slate); padding: 24px 32px;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+}
+.bb-logo {
+  font-weight: 700; font-size: 0.75rem; color: rgba(255,255,255,0.5);
+  display: flex; align-items: center; gap: 6px;
+}
+.bb-logo em { font-style: normal; color: var(--heritage-orange); }
+.bb-tag {
+  font-size: 0.6rem; color: var(--heritage-orange); opacity: 0.4;
+  font-weight: 600;
+}
+
+/* ═══════════════════════════════════════ */
+/* RESPONSIVE                             */
+/* ═══════════════════════════════════════ */
+@media (max-width: 640px) {
+  .fnav-links { display: none; }
+  .hero { padding: 100px 24px 60px; }
+  .trust-row { gap: 16px; }
+  .trust-badge { font-size: 0.6rem; }
+  .trust-icon { width: 28px; height: 28px; font-size: 0.75rem; }
+  .hero-float { display: none; }
+  .feat-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Scroll progress -->
+<div class="spg" id="spg"></div>
+
+<!-- Floating nav -->
+<div class="fnav" id="fnav">
+  <div class="fnav-logo">🫘 beanies<em>.family</em></div>
+  <div class="fnav-links">
+    <a href="#story">Our Story</a>
+    <a href="#features">Features</a>
+  </div>
+  <button class="fnav-cta" onclick="window.open('https://beanies.family','_blank')">Get Started Free</button>
+</div>
+
+<!-- Ambient glows (for story zone) -->
+<div class="amb amb-1" id="amb1"></div>
+<div class="amb amb-2" id="amb2"></div>
+<div class="amb amb-3" id="amb3"></div>
+<div class="amb amb-4" id="amb4"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- HERO                                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="hero" id="hero">
+  <!-- Floating beans -->
+  <div class="hero-beans" style="top:12%;left:8%;transform:rotate(-15deg);">🫘</div>
+  <div class="hero-beans" style="top:30%;right:10%;font-size:1.8rem;transform:rotate(20deg);">🫘</div>
+  <div class="hero-beans" style="bottom:18%;left:14%;font-size:1.6rem;transform:rotate(-30deg);">🫘</div>
+
+  <h1 class="hero-headline">Your family's finances,<br><em>growing together.</em></h1>
+  <p class="hero-sub">A warm, secure nook for your family to track spending, plan activities, set goals, and watch every bean grow.</p>
+
+  <div class="hero-ctas">
+    <button class="hero-btn" onclick="window.open('https://beanies.family','_blank')">Start Growing Free 🌱</button>
+    <a class="hero-story-link" href="#story">Read our story ↓</a>
+  </div>
+
+  <!-- Phone mockup -->
+  <div style="position:relative;margin-top:60px;">
+    <div class="hero-float" style="top:20px;left:-120px;animation-delay:0s;">
+      <div class="hf-icon">📈</div>
+      <div class="hf-label">Net Worth</div>
+      <div class="hf-val" style="color:#27AE60;">+3.2%</div>
+    </div>
+    <div class="hero-float" style="bottom:30px;right:-110px;animation-delay:1.5s;">
+      <div class="hf-icon">🎯</div>
+      <div class="hf-label">Goal Reached</div>
+      <div class="hf-val">$10,000 🎉</div>
+    </div>
+    <div class="hero-phone">
+      <div class="hero-phone-screen">
+        <div class="hero-phone-top">
+          <div class="hero-phone-av">G</div>
+          <div>
+            <div class="hp-greet">Good morning</div>
+            <div class="hp-name">Greg's Nook 🫘</div>
+          </div>
+        </div>
+        <div class="hp-nw-card">
+          <div class="hp-nw-label">Family Net Worth</div>
+          <div class="hp-nw-val">$124,580</div>
+          <div class="hp-nw-change">↑ +$3,892 this month</div>
+        </div>
+        <div class="hp-row">
+          <div class="hp-mini">
+            <div class="hp-mini-icon">🏠</div>
+            <div class="hp-mini-label">Home Fund</div>
+            <div class="hp-mini-val" style="color:var(--heritage-orange);">49%</div>
+          </div>
+          <div class="hp-mini">
+            <div class="hp-mini-icon">🎓</div>
+            <div class="hp-mini-label">Education</div>
+            <div class="hp-mini-val" style="color:#3A7BAD;">27%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trust badges -->
+  <div class="trust-row">
+    <div class="trust-badge"><div class="trust-icon">🔒</div>End-to-End Encrypted</div>
+    <div class="trust-badge"><div class="trust-icon">🏦</div>Bank-Grade Security</div>
+    <div class="trust-badge"><div class="trust-icon">❤️</div>Built with Love</div>
+    <div class="trust-badge"><div class="trust-icon">🚫</div>Zero Ads, Ever</div>
+  </div>
+
+  <!-- Scroll cue -->
+  <div class="scroll-cue" id="scrollCue">
+    <span>scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TRANSITION: LIGHT → DARK                                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="fade-to-dark" id="story"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- THE STORY                                                  -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="story-zone">
+
+  <div class="story-intro">
+    <div class="story-intro-label">OUR STORY</div>
+  </div>
+
+  <div class="spacer-sm"></div>
+
+  <!-- Part 1: The greeting -->
+  <div class="part">
+    <div class="prose reveal" data-amb="1">
+      <p class="greeting">Hey, guys!</p>
+      <p>Yes, it's actually me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as <strong>glorious, unadulterated, deliciously spontaneous non-sequiturs</strong>, like how I like to fart outside taco trucks on wednesday afternoons. But getting back to the point...</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 2: The paycheck -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>Since the day I left (well, "graduated") college for my first real job, put in a solid month of (let's call it) work, and witnessed my first ever paycheck direct-deposited to my bank account, <strong>this is the app I've wanted to create.</strong> I gazed lovingly at that glorious <span class="hls">$2,867 (minus taxes)</span> and dreamt about the day I would definitely become a billionaire.</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 3: The spreadsheet -->
+  <div class="part">
+    <div class="prose reveal" data-amb="2">
+      <p>It started with a janky spreadsheet. I added formulas, then charts. I tried keeping track of how much I spent and saved each month and project that forward. I might have even written some newbie VB macros, and toyed with it for months (maybe years) trying to get it to work the way I wanted. Then, the world changed <span class="faint">(in, let's say, 2008)</span>, and I said to myself, <em>"Hey, self! Why do you keep trying to re-invent the wheel <span class="faint">(the wheel having been invented earlier that year)</span>? There's a million personal finance apps out there! Just download one, you numbskull."</em></p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 4: Banking connector hell -->
+  <div class="part">
+    <div class="prose reveal" data-amb="3">
+      <p>So I did. I fiddled with those fickle banking connectors that try to sync your transactions, <span class="hlr">but always fail.</span> Then they ask for your credentials 10 times in a row, and proceed to not work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my important transactions were in cash or paid on cards. Some banks and cards don't provide reliable APIs. When things did work <span class="faint">(rarely)</span> it was temporary and only tracked what you <em>did</em> spend, not what you <em>planned</em> to spend.</p>
+      <p>My goal was never to track my budget down to the penny. If that's yours, this app probably isn't for you. <strong>I just wanted a rough idea, so I would know if I was going to end up as a hobo in 6 months.</strong></p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 5: Then, we had kids -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>Then, we had kids. With one (1), you can generally manage. 2 kids, life gets a bit harder. Bump that up to <strong>3 (at school age)</strong> and welcome to the insane world of chaos and confusion and writing readmes to dumb personal family planning apps you vibe coded on a whim at 3am. Or, whatever.</p>
+    </div>
+  </div>
+
+  <div class="spacer-sm"></div>
+
+  <!-- Part 6: The activities chaos -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>Soccer practice, piano lessons, math tutor, gymnastics (2 types), karate, taekwondo, and don't forget your kid's actual school fees, your rent (or mortgage), and the list goes on. <strong>Who has to pay for what, and when, and how, and to who?</strong> Or is it whom? Also, while you were obsessing over the proper application of archaic English grammar rules, you realized you forgot to pick up your kid from his baseball tryouts. <span class="hls">And it's raining.</span> At least he has his umbrella. <span class="faint">(Cue glance to the floor to spot the umbrella that fell out of his sports bag).</span></p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 7: 小豆豆 -->
+  <div class="part">
+    <div class="prose reveal" data-amb="4">
+      <p>When my youngest was about 6 months old, my wife started calling him <span class="chinese">小豆豆</span>. Which in Chinese sounds endearing, but just means <span class="hl">little bean</span>. Cuz he sort of looked like one. It sounds cute in English too, so I called him beanie, and it stuck.</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 8: What the app does -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>I built this app to track all that stuff I mentioned above: your money, your accounts, what you spent and received and plan to spend and receive (roughly), and to tell you how much you'll have in the future — in short, your <span class="hlg">"wealth"</span>.</p>
+      <p>But also, to help keep track of your <strong>actual family life</strong>: the kids' lessons, schoolwork, practice, family vacations <span class="faint">(we may even give you advice)</span>, and, of course, who will pick up whom (yes, whom). In short, anything we can help you with, even in a small way, as you navigate the joys and sorrows of a complicated, crowded, chaotic, stressful, but of course, <span class="hl">rewarding</span>? <span class="faint">(sorry, I meant, <span class="hl">rewarding</span>)</span> family life.</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 9: It's not perfect -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>It's not a perfect app. It doesn't sync with banks (and I doubt it ever will). But it gives you a rough idea of how much you have, how much you will have, and <strong>what in the world you actually need to do today.</strong> Of course, only if you tell it that stuff first. It's not magic.</p>
+      <p>Treat beanies.family like a friend, and it will reward you in spades. Maybe it will even buy you a beer the next time you have 22 minutes free after work and $7 saved from meticulously tracking your budget every month. <span class="faint">(Is that how much beers cost nowadays? I wouldn't know).</span></p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 10: Run it locally / cloud -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>You can clone and install it for free if you want to run it locally. The data never leaves your machine if you don't want it to. <strong>We don't even own a database</strong> <span class="faint">(well, not a real one)</span>. I don't want your janky finance data anyway, and I'm not picking up your kid for you.</p>
+      <p>If you want to use the cloud version so you can access it from the internet and easily share it with your family <span class="faint">(don't worry, your data still stays with you)</span>, create an account at <span class="hls">beanies.family</span>. You could also set up the infra by yourself, but that's a pain and you know it. You can try it for free <span class="faint">(that's how we get you)</span>. But hey, you can swing a few bucks <span class="faint">(although I wouldn't know, as I can't read your data)</span>. But, you know, we have bills to pay, too.</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 11: Tech stack -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>Here's the fun stuff:</p>
+      <div class="tech-row">
+        <div class="tech-item">🤖 Claude Max / Opus 4.6</div>
+        <div class="tech-item">⚡ Vue / TypeScript / Tailwind / Pinia</div>
+        <div class="tech-item">💾 IndexedDB</div>
+        <div class="tech-item">🔐 Web Crypto API</div>
+        <div class="tech-item">🧪 Vitest + Playwright + Dependabot</div>
+        <div class="tech-item">☁️ One single, stupid, plain vanilla DynamoDB</div>
+      </div>
+      <br>
+      <p><span class="faint">One single, stupid, plain vanilla DynamoDB in the cloud to map your email to family ID so we can locate your (encrypted) family data file, that only you can access. Nothing else. Anywhere. Ever.</span></p>
+      <p>So there it is. If you're a techie nerd like me, run it locally. If you don't want to deal with all the bs, use it on the cloud.</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="bean-div">🫘</div>
+  <div class="spacer-sm"></div>
+
+  <!-- Part 12: Personal use -->
+  <div class="part">
+    <div class="prose reveal">
+      <p>I'll be using beanies.family to keep track of our money, our various (1) houses, boats <span class="faint">(currently at 0)</span>, and diamond rings <span class="faint">(ask my wife where she lost hers.. unfortunately we can't tell you that)</span>, and more. I'll also use it for their piano lessons, soccer practices, and to make sure we don't forgot to pick up our son from his after school math tutor <span class="faint">(again)</span>. All while keeping that data safe and secure <span class="faint">(unless I open read access on my data file to the world and tell everyone the key. Which I won't. Probably.).</span></p>
+      <p>If you have a question, comment, suggestion, or just wanna say hi, you can say it here or raise an issue. If you're using it for free and wanna drop me a satoshi for my time <span class="faint">(or just cuz you like the app)</span>, that's cool too.</p>
+    </div>
+  </div>
+
+  <div class="spacer"></div>
+
+  <!-- Part 13: Sign-off -->
+  <div class="part">
+    <div class="prose reveal" style="text-align:center;">
+      <p><strong>Simplify your family life. <span class="hl">Every bean counts.</span></strong></p>
+      <p style="margin-top:0.5em;">Enjoy beanies, bros.</p>
+      <p style="margin-top:1em;">Peace.</p>
+      <p style="margin-top:1.5em;" class="signoff">Greg</p>
+    </div>
+  </div>
+
+  <div class="spacer-sm"></div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TRANSITION: DARK → LIGHT                                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="fade-to-light" id="features"></div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FEATURES                                                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="features">
+  <div class="feat-label">What beanies does</div>
+  <div class="feat-title">Two sides. One app.</div>
+  <div class="feat-sub">The Piggy Bank handles your money. The Treehouse handles your life. Together, they keep your family on track.</div>
+
+  <div class="feat-grid">
+    <div class="feat-card reveal">
+      <div class="feat-icon" style="background:var(--or10);">🐷</div>
+      <div class="feat-card-title">The Piggy Bank</div>
+      <div class="feat-card-desc">Track accounts, income, expenses — recurring and one-time. See your net worth grow over time. No bank sync needed, just honest numbers.</div>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon" style="background:rgba(46,204,113,0.08);">🌳</div>
+      <div class="feat-card-title">The Treehouse</div>
+      <div class="feat-card-desc">Activities, schedules, to-dos, and family milestones. Know who's going where, when, and who's picking them up. Finally.</div>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon" style="background:var(--silk20);">🔮</div>
+      <div class="feat-card-title">Future You</div>
+      <div class="feat-card-desc">Project forward. See what your finances look like in 3, 6, 12 months based on your recurring income and expenses. No surprises.</div>
+    </div>
+    <div class="feat-card reveal">
+      <div class="feat-icon" style="background:rgba(155,89,182,0.08);">🔒</div>
+      <div class="feat-card-title">Your Data, Your Rules</div>
+      <div class="feat-card-desc">End-to-end encrypted. Run it locally or in the cloud. We literally cannot read your data. And we don't want to.</div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FOOTER CTA                                                 -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section class="footer-cta">
+  <div class="footer-bean">🫘</div>
+  <div class="footer-headline">Ready to start? <em>Every bean counts.</em></div>
+  <div class="footer-sub">Free to try. Free to run locally. Free to love.</div>
+  <button class="footer-btn" onclick="window.open('https://beanies.family','_blank')">Start Growing Free 🌱</button>
+  <div class="footer-or">or</div>
+  <a class="footer-gh" href="#">Clone it on GitHub →</a>
+</section>
+
+<div class="bottom-bar">
+  <div class="bb-logo">🫘 beanies<em>.family</em></div>
+  <div class="bb-tag">· Every bean counts.</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SCRIPT                                                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+const reveals = document.querySelectorAll('.reveal');
+const spg = document.getElementById('spg');
+const scrollCue = document.getElementById('scrollCue');
+const fnav = document.getElementById('fnav');
+const storyZone = document.querySelector('.story-zone');
+const ambs = {
+  '1': document.getElementById('amb1'),
+  '2': document.getElementById('amb2'),
+  '3': document.getElementById('amb3'),
+  '4': document.getElementById('amb4'),
+};
+
+function onScroll() {
+  const sy = window.scrollY;
+  const dh = document.documentElement.scrollHeight - window.innerHeight;
+  const pct = dh > 0 ? (sy / dh) * 100 : 0;
+
+  // Progress bar
+  spg.style.width = pct + '%';
+
+  // Hide scroll cue
+  scrollCue.classList.toggle('hidden', sy > 100);
+
+  // Switch nav theme based on whether we're in the dark story zone
+  const storyRect = storyZone.getBoundingClientRect();
+  const inStory = storyRect.top < 60 && storyRect.bottom > 60;
+  fnav.classList.toggle('dark', inStory);
+
+  // Reveals
+  const wh = window.innerHeight;
+  reveals.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < wh * 0.82) {
+      el.classList.add('vis');
+      const a = el.dataset.amb;
+      if (a && ambs[a]) ambs[a].classList.add('on');
+    }
+  });
+}
+
+window.addEventListener('scroll', onScroll, { passive: true });
+onScroll();
+</script>
+</body>
+</html>

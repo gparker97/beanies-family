@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>beanies.family — every bean counts</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════════════
+       RESET & VARIABLES
+       ═══════════════════════════════════════════════ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --deep-slate: #2C3E50;
+      --heritage-orange: #F15D22;
+      --sky-silk: #AED6F1;
+      --terracotta: #E67E22;
+      --cloud-white: #F8F9FA;
+      --soft-green: #27AE60;
+      --body-text: #4A5568;
+      --muted-text: #8896A6;
+      --sq: 24px;
+      --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+      --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+    }
+
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--body-text);
+      background: var(--cloud-white);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ═══════════════════════════════════════════════
+       FLOATING PILL NAV (from v1)
+       ═══════════════════════════════════════════════ */
+    .fnav {
+      position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+      z-index: 200; display: flex; align-items: center; gap: 12px;
+      background: rgba(255,255,255,0.82); backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(44,62,80,0.06); border-radius: 40px;
+      padding: 8px 10px 8px 18px;
+      transition: box-shadow 300ms ease, background 500ms ease;
+    }
+    .fnav.scrolled {
+      box-shadow: 0 4px 24px rgba(44, 62, 80, 0.08);
+    }
+    .fnav__logo {
+      font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.85rem;
+      color: var(--deep-slate); display: flex; align-items: center; gap: 7px;
+      text-decoration: none; white-space: nowrap;
+    }
+    .fnav__logo img { width: 26px; height: 26px; border-radius: 8px; }
+    .fnav__logo-orange { color: var(--heritage-orange); }
+    .fnav__links { display: flex; gap: 2px; }
+    .fnav__links a {
+      font-family: 'Outfit', sans-serif; font-size: 0.68rem; font-weight: 600;
+      color: var(--deep-slate); opacity: 0.35; text-decoration: none;
+      padding: 6px 12px; border-radius: 16px; transition: all 200ms;
+    }
+    .fnav__links a:hover { opacity: 0.7; background: rgba(44,62,80,0.05); }
+    .fnav__cta {
+      font-family: 'Outfit', sans-serif; font-size: 0.68rem; font-weight: 600;
+      color: white; background: var(--heritage-orange); border: none;
+      padding: 8px 18px; border-radius: 20px; cursor: pointer;
+      text-decoration: none; transition: all 200ms;
+    }
+    .fnav__cta:hover { background: #D14D1A; transform: translateY(-1px); }
+
+    /* ═══════════════════════════════════════════════
+       SCROLL PROGRESS BAR
+       ═══════════════════════════════════════════════ */
+    .scroll-progress {
+      position: fixed; top: 0; left: 0; height: 2px; z-index: 300;
+      background: var(--heritage-orange); width: 0%;
+      transition: width 150ms linear;
+    }
+
+    /* ═══════════════════════════════════════════════
+       HERO — Tagline + Floating Screens
+       ═══════════════════════════════════════════════ */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px 40px;
+      position: relative; overflow: hidden;
+      background: linear-gradient(180deg, var(--cloud-white) 0%, #EDF6FC 50%, var(--cloud-white) 100%);
+    }
+    /* Subtle background beans */
+    .hero__bean {
+      position: absolute; font-size: 2.2rem; opacity: 0.05; pointer-events: none;
+    }
+    /* Decorative floating dots / shapes */
+    .hero__deco {
+      position: absolute; border-radius: 50%; pointer-events: none;
+      opacity: 0.06;
+    }
+
+    .hero__headline {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.4rem, 6vw, 4rem);
+      color: var(--deep-slate);
+      line-height: 1.08;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .hero__headline em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero__sub {
+      font-size: 1.05rem; color: var(--body-text); opacity: 0.55;
+      max-width: 480px; line-height: 1.7; margin-bottom: 28px;
+      position: relative;
+    }
+
+    .hero__mascot {
+      position: relative;
+      width: 180px; height: 180px;
+      margin: 0 auto 24px;
+      animation: mascotFloat 5s ease-in-out infinite;
+      filter: drop-shadow(0 12px 32px rgba(44, 62, 80, 0.1));
+    }
+    .hero__mascot img {
+      width: 100%; height: 100%; object-fit: contain;
+    }
+    @keyframes mascotFloat {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      25% { transform: translateY(-6px) rotate(1deg); }
+      75% { transform: translateY(-4px) rotate(-1deg); }
+    }
+
+    .hero__cta-group {
+      display: flex; flex-wrap: wrap; justify-content: center;
+      gap: 14px; position: relative;
+    }
+    .btn-primary {
+      font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 1rem;
+      padding: 14px 36px; border-radius: 60px; border: none; cursor: pointer;
+      color: white; text-decoration: none;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      box-shadow: 0 8px 32px rgba(241, 93, 34, 0.25);
+      transition: all 200ms ease;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(241, 93, 34, 0.35); }
+    .hero__story-link {
+      font-family: 'Outfit', sans-serif; font-size: 0.92rem; font-weight: 600;
+      color: var(--deep-slate); opacity: 0.55; text-decoration: none;
+      display: flex; align-items: center; gap: 6px; transition: all 200ms;
+      padding: 8px 18px; border-radius: 24px;
+      background: rgba(44, 62, 80, 0.04);
+      border: 1px solid rgba(44, 62, 80, 0.06);
+    }
+    .hero__story-link:hover { opacity: 0.85; color: var(--heritage-orange); background: rgba(241, 93, 34, 0.05); border-color: rgba(241, 93, 34, 0.12); }
+
+    /* ═══════════════════════════════════════════════
+       FLOATING DEVICE SHOWCASE
+       ═══════════════════════════════════════════════ */
+    .showcase {
+      position: relative;
+      width: 100%; max-width: 1000px;
+      margin: 32px auto 0;
+      height: 440px;
+    }
+
+    .showcase__device {
+      position: absolute;
+      border-radius: 20px;
+      overflow: hidden;
+      background: var(--cloud-white);
+      border: 1px solid rgba(44,62,80,0.08);
+      box-shadow: 0 20px 60px rgba(44,62,80,0.12), 0 4px 16px rgba(44,62,80,0.06);
+      transition: transform 400ms cubic-bezier(0.4,0,0.2,1), box-shadow 400ms ease;
+    }
+    .showcase__device:hover {
+      transform: translateY(-6px) !important;
+      box-shadow: 0 28px 72px rgba(44,62,80,0.16), 0 8px 24px rgba(44,62,80,0.08);
+    }
+
+    /* Center device (Nook) — largest, front */
+    .showcase__device--center {
+      width: 360px;
+      left: 50%; top: 10px;
+      transform: translateX(-50%);
+      z-index: 3;
+    }
+    .showcase__device--center:hover { transform: translateX(-50%) translateY(-6px) !important; }
+
+    /* Left device (Piggy Bank) — tilted, behind */
+    .showcase__device--left {
+      width: 320px;
+      left: 1%; top: 40px;
+      transform: rotate(-4deg);
+      z-index: 2;
+    }
+    .showcase__device--left:hover { transform: rotate(-4deg) translateY(-6px) !important; }
+
+    /* Right device (Planner) — tilted, behind */
+    .showcase__device--right {
+      width: 320px;
+      right: 1%; top: 40px;
+      transform: rotate(4deg);
+      z-index: 2;
+    }
+    .showcase__device--right:hover { transform: rotate(4deg) translateY(-6px) !important; }
+
+    .showcase__device-label {
+      padding: 10px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 1px solid rgba(44,62,80,0.06);
+      background: white;
+    }
+    .showcase__device-label span:first-child { font-size: 14px; }
+    .showcase__device-label span:last-child {
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.75rem;
+      color: var(--deep-slate);
+    }
+
+    /* Floating accent cards */
+    .hero__float {
+      position: absolute; background: white; border-radius: 16px;
+      padding: 12px 16px; box-shadow: 0 8px 32px rgba(44,62,80,0.1);
+      z-index: 5; animation: heroFloat 6s ease-in-out infinite;
+      font-family: 'Outfit', sans-serif;
+    }
+    @keyframes heroFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .hero__float-icon { font-size: 1rem; margin-bottom: 3px; }
+    .hero__float-label { font-size: 0.5rem; opacity: 0.3; text-transform: uppercase; letter-spacing: 0.08em; }
+    .hero__float-val { font-size: 0.85rem; font-weight: 700; }
+
+    /* Trust badges — prominent */
+    .trust-row {
+      display: flex; gap: 16px; justify-content: center;
+      margin-top: 20px; flex-wrap: wrap; position: relative;
+    }
+    .trust-badge {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Outfit', sans-serif; font-size: 0.8rem;
+      font-weight: 600; color: var(--deep-slate);
+      background: white; padding: 12px 20px; border-radius: 20px;
+      box-shadow: 0 2px 12px rgba(44,62,80,0.06);
+      border: 1px solid rgba(44,62,80,0.06);
+      transition: all 200ms ease;
+    }
+    .trust-badge:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(44,62,80,0.1);
+    }
+    .trust-icon {
+      width: 36px; height: 36px; border-radius: 12px;
+      background: rgba(174,214,241,0.15); display: flex;
+      align-items: center; justify-content: center; font-size: 1rem;
+    }
+
+    /* Scroll cue */
+    .scroll-cue {
+      position: relative; display: flex; flex-direction: column;
+      align-items: center; gap: 6px; margin-top: 24px;
+      opacity: 0.15;
+    }
+    .scroll-cue span {
+      font-family: 'Outfit', sans-serif; font-size: 0.55rem; font-weight: 600;
+      letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--deep-slate); opacity: 0.5;
+    }
+    .scroll-line {
+      width: 1px; height: 24px;
+      background: linear-gradient(transparent, var(--deep-slate));
+      animation: scrollPulse 2.2s ease-in-out infinite;
+    }
+    @keyframes scrollPulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* ═══════════════════════════════════════════════
+       MOCK SCREENSHOT STYLES
+       ═══════════════════════════════════════════════ */
+    .mock-screen {
+      width: 100%; overflow: hidden;
+      background: var(--cloud-white);
+      font-family: 'Inter', sans-serif;
+      font-size: 9px; line-height: 1.4;
+      color: var(--deep-slate);
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 7px;
+    }
+    .mock-screen * { box-sizing: border-box; }
+
+    /* --- Nook Screen --- */
+    .mock-greeting { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 12px; }
+    .mock-greeting span { color: var(--heritage-orange); }
+    .mock-date { font-size: 7.5px; color: var(--muted-text); margin-top: 1px; }
+
+    .mock-toast {
+      background: linear-gradient(135deg, #f15d22 0%, #e67e22 55%, #d4701e 100%);
+      border-radius: 11px; padding: 9px 11px; color: white;
+      box-shadow: 0 4px 14px rgba(241,93,34,0.18);
+      position: relative; overflow: hidden;
+    }
+    .mock-toast::before {
+      content: ''; position: absolute; inset: 0; opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+    .mock-toast-header { display: flex; align-items: center; gap: 7px; position: relative; }
+    .mock-toast-icon {
+      width: 26px; height: 26px; border-radius: 8px;
+      background: rgba(255,255,255,0.18); display: flex;
+      align-items: center; justify-content: center; font-size: 12px;
+      flex-shrink: 0;
+    }
+    .mock-toast-title { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 8px; }
+    .mock-toast-sub { font-size: 7px; opacity: 0.65; margin-top: 1px; }
+    .mock-toast-sep {
+      height: 1px; margin-top: 6px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25) 20%, rgba(255,255,255,0.25) 80%, transparent);
+    }
+    .mock-toast-item {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(255,255,255,0.1); border-radius: 8px;
+      padding: 4px 6px; margin-top: 4px;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .mock-toast-item-icon {
+      width: 18px; height: 18px; border-radius: 5px;
+      background: rgba(255,255,255,0.12); display: flex;
+      align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0;
+    }
+    .mock-toast-item-text { font-size: 7px; font-weight: 500; opacity: 0.9; flex: 1; }
+
+    .mock-beans-row { display: flex; gap: 8px; padding: 2px 0; }
+    .mock-bean { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+    .mock-bean-avatar {
+      width: 24px; height: 24px; border-radius: 50%; border: 2px solid;
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .mock-bean-avatar img { width: 80%; height: 80%; object-fit: contain; }
+    .mock-bean-name { font-family: 'Outfit', sans-serif; font-size: 6.5px; font-weight: 600; }
+
+    .mock-schedule-row { display: flex; gap: 6px; }
+    .mock-schedule-card {
+      flex: 1; background: white; border-radius: 11px; padding: 8px;
+      box-shadow: 0 1px 8px rgba(44,62,80,0.03);
+    }
+    .mock-schedule-card--sky { border-left: 3px solid var(--sky-silk); }
+    .mock-schedule-card--orange { border-left: 3px solid var(--heritage-orange); }
+    .mock-schedule-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+    .mock-schedule-label { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 7px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .mock-schedule-badge { font-family: 'Outfit', sans-serif; font-size: 6px; font-weight: 600; padding: 2px 5px; border-radius: 8px; }
+    .mock-schedule-badge--sky { background: rgba(174,214,241,0.2); color: #3A7BAD; }
+    .mock-schedule-badge--orange { color: var(--heritage-orange); }
+    .mock-schedule-item { display: flex; align-items: center; gap: 5px; padding: 2px 0; }
+    .mock-schedule-item-icon {
+      width: 20px; height: 20px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center; font-size: 9px; flex-shrink: 0;
+    }
+    .mock-schedule-item-icon--sky { background: rgba(174,214,241,0.2); }
+    .mock-schedule-item-icon--orange { background: rgba(241,93,34,0.08); }
+    .mock-item-title { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 7.5px; }
+    .mock-item-time { font-size: 6.5px; color: var(--muted-text); opacity: 0.55; }
+
+    /* --- Piggy Bank Screen --- */
+    .mock-hero-card {
+      background: linear-gradient(135deg, #2C3E50, #3D5368);
+      border-radius: 11px; padding: 10px 12px; color: white;
+      position: relative; overflow: hidden;
+    }
+    .mock-hero-card::before {
+      content: ''; position: absolute; top: -20px; right: -20px;
+      width: 70px; height: 70px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(241,93,34,0.15), transparent 70%);
+      pointer-events: none;
+    }
+    .mock-hero-label { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 6.5px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.5; }
+    .mock-hero-amount { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 20px; margin: 2px 0 1px; position: relative; }
+    .mock-hero-change { font-family: 'Outfit', sans-serif; font-size: 7px; font-weight: 600; color: #6EE7B7; display: flex; align-items: center; gap: 3px; }
+    .mock-hero-change span { opacity: 0.35; color: white; }
+    .mock-chart-area {
+      height: 44px; margin-top: 6px; position: relative;
+      background: linear-gradient(180deg, rgba(241,93,34,0.1) 0%, transparent 100%);
+      border-radius: 6px; overflow: hidden;
+    }
+    .mock-chart-line { position: absolute; bottom: 4px; left: 0; right: 0; height: 36px; }
+    .mock-period-pills { display: flex; gap: 2px; position: absolute; top: 6px; right: 0; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 2px; }
+    .mock-period-pill { font-family: 'Outfit', sans-serif; font-size: 6px; font-weight: 600; padding: 2px 5px; border-radius: 5px; color: rgba(255,255,255,0.35); }
+    .mock-period-pill--active { background: rgba(241,93,34,0.4); color: white; }
+
+    .mock-stats-row { display: flex; gap: 5px; }
+    .mock-stat-card { flex: 1; background: white; border-radius: 10px; padding: 7px 8px; box-shadow: 0 1px 8px rgba(44,62,80,0.03); }
+    .mock-stat-card--dark { background: linear-gradient(135deg, #2C3E50, #3D5368); color: white; }
+    .mock-stat-icon { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; margin-bottom: 3px; }
+    .mock-stat-icon--green { background: rgba(39,174,96,0.1); }
+    .mock-stat-icon--orange { background: rgba(241,93,34,0.08); }
+    .mock-stat-icon--white { background: rgba(255,255,255,0.12); }
+    .mock-stat-label { font-family: 'Outfit', sans-serif; font-size: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.4; margin-bottom: 1px; }
+    .mock-stat-amount { font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 11px; }
+    .mock-stat-amount--green { color: #27AE60; }
+    .mock-stat-amount--orange { color: var(--heritage-orange); }
+    .mock-stat-change { font-size: 6px; margin-top: 1px; }
+    .mock-stat-badge { font-size: 5.5px; font-family: 'Outfit', sans-serif; font-weight: 600; padding: 1px 4px; border-radius: 5px; margin-top: 2px; display: inline-block; }
+
+    .mock-accounts-row { display: flex; gap: 5px; }
+    .mock-account-card { flex: 1; background: white; border-radius: 10px; padding: 7px 8px; box-shadow: 0 1px 8px rgba(44,62,80,0.03); }
+    .mock-account-header { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+    .mock-account-label { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 6.5px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.4; }
+    .mock-account-item { display: flex; align-items: center; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid rgba(44,62,80,0.04); }
+    .mock-account-item:last-child { border-bottom: none; }
+    .mock-account-name { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 7px; }
+    .mock-account-bal { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 7px; }
+
+    /* --- Planner Screen --- */
+    .mock-planner-header { display: flex; align-items: center; justify-content: space-between; }
+    .mock-planner-title { font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 12px; }
+    .mock-planner-sub { font-size: 7px; color: var(--muted-text); margin-top: 1px; }
+    .mock-add-btn {
+      font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 6.5px;
+      background: linear-gradient(135deg, #F15D22, #E67E22);
+      color: white; border: none; border-radius: 8px; padding: 4px 8px;
+    }
+    .mock-view-toggle { display: flex; gap: 2px; background: rgba(44,62,80,0.05); border-radius: 8px; padding: 2px; }
+    .mock-view-btn { font-family: 'Outfit', sans-serif; font-size: 6.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; color: var(--muted-text); }
+    .mock-view-btn--active { background: white; color: var(--deep-slate); box-shadow: 0 1px 4px rgba(44,62,80,0.08); }
+    .mock-member-chips { display: flex; gap: 3px; }
+    .mock-member-chip {
+      display: flex; align-items: center; gap: 2px;
+      font-family: 'Outfit', sans-serif; font-size: 6.5px; font-weight: 600;
+      padding: 2px 6px; border-radius: 8px;
+      border: 1px solid rgba(44,62,80,0.08); background: white;
+    }
+    .mock-member-chip--active { background: rgba(241,93,34,0.08); border-color: rgba(241,93,34,0.2); color: var(--heritage-orange); }
+    .mock-member-chip-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+    .mock-calendar { background: white; border-radius: 11px; padding: 6px; box-shadow: 0 1px 8px rgba(44,62,80,0.03); flex: 1; display: flex; flex-direction: column; }
+    .mock-cal-header { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; text-align: center; margin-bottom: 3px; }
+    .mock-cal-day-label { font-family: 'Outfit', sans-serif; font-size: 6px; font-weight: 600; color: var(--muted-text); opacity: 0.5; padding: 1px 0; }
+    .mock-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; flex: 1; }
+    .mock-cal-cell {
+      border-radius: 6px; padding: 1px 2px; min-height: 20px;
+      font-family: 'Outfit', sans-serif; font-size: 6.5px; font-weight: 600;
+      color: var(--deep-slate); position: relative; text-align: center;
+    }
+    .mock-cal-cell--today { background: rgba(241,93,34,0.08); box-shadow: inset 0 0 0 1.5px var(--heritage-orange); }
+    .mock-cal-cell--other { opacity: 0.2; }
+    .mock-cal-cell--has-events::after {
+      content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+      width: 3px; height: 3px; border-radius: 50%; background: var(--heritage-orange);
+    }
+    .mock-cal-cell--has-events-blue::after { content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--sky-silk); }
+    .mock-cal-cell--has-events-multi::after {
+      content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+      width: 8px; height: 3px; border-radius: 2px;
+      background: linear-gradient(90deg, var(--heritage-orange), var(--sky-silk));
+    }
+
+    /* ═══════════════════════════════════════════════
+       SECTION TRANSITIONS (gradual color blending)
+       ═══════════════════════════════════════════════ */
+    .section-fade {
+      height: 120px; position: relative; pointer-events: none;
+    }
+    .section-fade--to-dark {
+      background: linear-gradient(180deg, var(--cloud-white) 0%, var(--deep-slate) 100%);
+    }
+    .section-fade--to-light {
+      background: linear-gradient(180deg, var(--deep-slate) 0%, var(--cloud-white) 100%);
+    }
+    .section-fade--to-story {
+      background: linear-gradient(180deg, var(--cloud-white) 0%, #FDF8F5 100%);
+    }
+    .section-fade--from-story {
+      background: linear-gradient(180deg, #FDF8F5 0%, var(--cloud-white) 100%);
+    }
+    .section-fade--hero-out {
+      background: linear-gradient(180deg, var(--cloud-white) 0%, var(--cloud-white) 30%, var(--deep-slate) 100%);
+    }
+
+    /* Decorative ambient orbs for depth */
+    .ambient-orb {
+      position: absolute; border-radius: 50%; pointer-events: none;
+      filter: blur(80px);
+    }
+
+    /* ═══════════════════════════════════════════════
+       SECTION SHARED STYLES
+       ═══════════════════════════════════════════════ */
+    .container { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+
+    .section-label {
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.7rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--heritage-orange); text-align: center; margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: 'Outfit', sans-serif; font-weight: 700;
+      font-size: clamp(1.5rem, 4vw, 2rem); color: var(--deep-slate);
+      text-align: center; margin-bottom: 12px; line-height: 1.3;
+    }
+    .section-subtitle {
+      text-align: center; max-width: 520px; margin: 0 auto 48px;
+      color: var(--muted-text); font-size: 0.95rem;
+    }
+
+    /* ═══════════════════════════════════════════════
+       SECURITY SECTION
+       ═══════════════════════════════════════════════ */
+    .security-section {
+      padding: 80px 24px 80px;
+      position: relative; background: var(--deep-slate); color: #ECF0F1;
+      overflow: hidden;
+    }
+    /* Decorative orb for security section */
+    .security-section .ambient-orb--1 {
+      width: 400px; height: 400px; background: var(--sky-silk);
+      top: -100px; right: -150px; opacity: 0.06;
+    }
+    .security-section .ambient-orb--2 {
+      width: 300px; height: 300px; background: var(--heritage-orange);
+      bottom: -80px; left: -100px; opacity: 0.04;
+    }
+    .security-section .section-label { color: var(--sky-silk); }
+    .security-section .section-title { color: #ECF0F1; }
+    .security-section .section-subtitle { color: rgba(236, 240, 241, 0.6); }
+
+    .security-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px; max-width: 800px; margin: 0 auto;
+    }
+    .security-card {
+      padding: 24px; border-radius: 20px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .security-card__icon {
+      width: 40px; height: 40px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; margin-bottom: 14px;
+      background: rgba(174, 214, 241, 0.12);
+    }
+    .security-card__title {
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.95rem;
+      color: #ECF0F1; margin-bottom: 6px;
+    }
+    .security-card__text {
+      font-size: 0.82rem; line-height: 1.6; color: rgba(236, 240, 241, 0.55);
+    }
+    .security-section__watermark {
+      position: absolute; bottom: 40px; right: 40px;
+      width: 80px; opacity: 0.06; pointer-events: none;
+    }
+
+    /* ═══════════════════════════════════════════════
+       THE BEANIES STORY
+       ═══════════════════════════════════════════════ */
+    .story-section {
+      padding: 100px 24px 60px; position: relative;
+      background: #FDF8F5;
+      overflow: hidden;
+    }
+    .story-section::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse 60% 40% at 50% 20%, rgba(241, 93, 34, 0.04), transparent 70%);
+      pointer-events: none;
+    }
+    /* Decorative orbs for story */
+    .story-section .ambient-orb--1 {
+      width: 500px; height: 500px; background: var(--heritage-orange);
+      top: 10%; right: -200px; opacity: 0.03;
+    }
+    .story-section .ambient-orb--2 {
+      width: 400px; height: 400px; background: var(--sky-silk);
+      bottom: 15%; left: -150px; opacity: 0.04;
+    }
+    .story-header { text-align: center; margin-bottom: 56px; position: relative; }
+    .story-header__illustration { width: 120px; margin: 0 auto 24px; opacity: 0.9; }
+
+    .story__body { position: relative; max-width: 640px; margin: 0 auto; }
+    .story__body p { margin-bottom: 1.5em; font-size: 1.02rem; line-height: 1.85; color: var(--body-text); }
+    .story__greeting {
+      font-family: 'Outfit', sans-serif; font-weight: 700;
+      font-size: 1.6rem !important; color: var(--deep-slate) !important;
+      line-height: 1.4 !important; margin-bottom: 1.2em !important;
+      padding-bottom: 1em !important;
+      border-bottom: 1px solid rgba(44, 62, 80, 0.08);
+    }
+    .story__greeting .beanie-emoji { display: inline-block; font-style: normal; margin-left: 4px; }
+    .story__highlight { background: linear-gradient(transparent 60%, rgba(174, 214, 241, 0.35) 60%); padding: 0 2px; }
+    .story__emphasis { color: var(--deep-slate); font-weight: 600; }
+    .story__orange { color: var(--heritage-orange); font-weight: 600; }
+    .story__link {
+      color: var(--heritage-orange); text-decoration: none; font-weight: 500;
+      border-bottom: 1px solid rgba(241, 93, 34, 0.3); transition: border-color 200ms ease;
+    }
+    .story__link:hover { border-bottom-color: var(--heritage-orange); }
+
+    .story__tech-list {
+      list-style: none; padding: 0; margin: 0 0 1.5em;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .story__tech-list li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 0.9rem; line-height: 1.6; color: var(--body-text);
+      padding: 10px 14px; border-radius: 14px; background: white;
+      border: 1px solid rgba(44, 62, 80, 0.06);
+    }
+    .story__tech-icon {
+      flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; background: rgba(174, 214, 241, 0.15);
+    }
+
+    .story__signoff { text-align: center; margin-top: 48px; padding-top: 40px; border-top: 1px solid rgba(44, 62, 80, 0.08); }
+    .story__signoff-tagline { font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1.1rem; color: var(--deep-slate); margin-bottom: 4px; }
+    .story__signoff-sub { font-family: 'Outfit', sans-serif; font-weight: 300; font-style: italic; font-size: 0.9rem; color: var(--heritage-orange); opacity: 0.8; }
+    .story__signoff-name { margin-top: 24px; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 1rem; color: var(--deep-slate); }
+    .story__signoff-img { width: 80px; margin: 16px auto 0; border-radius: 20px; }
+
+    /* ═══════════════════════════════════════════════
+       FINAL CTA
+       ═══════════════════════════════════════════════ */
+    .final-cta {
+      padding: 80px 24px; text-align: center;
+      background: linear-gradient(180deg, var(--cloud-white) 0%, #EDF6FC 100%);
+      position: relative; overflow: hidden;
+    }
+    .final-cta .ambient-orb--1 {
+      width: 300px; height: 300px; background: var(--heritage-orange);
+      top: -80px; right: -100px; opacity: 0.04;
+    }
+    .final-cta .ambient-orb--2 {
+      width: 250px; height: 250px; background: var(--sky-silk);
+      bottom: -60px; left: -80px; opacity: 0.06;
+    }
+    .final-cta__bean { font-size: 2.5rem; opacity: 0.12; margin-bottom: 16px; }
+    .final-cta__title {
+      font-family: 'Outfit', sans-serif; font-weight: 700;
+      font-size: clamp(1.4rem, 3.5vw, 1.8rem); color: var(--deep-slate); margin-bottom: 8px;
+    }
+    .final-cta__title em { font-style: normal; color: var(--heritage-orange); }
+    .final-cta__sub { color: var(--muted-text); font-size: 0.95rem; margin-bottom: 28px; }
+    .btn-secondary {
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.85rem;
+      padding: 12px 28px; border-radius: 60px; border: none; cursor: pointer;
+      color: var(--deep-slate); background: white; text-decoration: none;
+      box-shadow: var(--card-shadow); border: 1px solid rgba(44, 62, 80, 0.08);
+      transition: all 200ms ease;
+    }
+    .btn-secondary:hover { transform: translateY(-2px); box-shadow: var(--card-hover-shadow); }
+
+    /* ═══════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════ */
+    .footer {
+      padding: 32px 24px; text-align: center;
+      background: var(--deep-slate);
+    }
+    .footer__brand {
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.85rem;
+      color: rgba(255,255,255,0.5); margin-bottom: 4px;
+    }
+    .footer__brand-orange { color: var(--heritage-orange); }
+    .footer__links { display: flex; justify-content: center; gap: 20px; margin-top: 8px; }
+    .footer__links a { font-size: 0.78rem; color: rgba(255,255,255,0.3); text-decoration: none; transition: color 150ms; }
+    .footer__links a:hover { color: var(--heritage-orange); }
+    .footer__copy { font-size: 0.72rem; color: rgba(255,255,255,0.2); margin-top: 12px; }
+    .footer__tag { font-family: 'Outfit', sans-serif; font-size: 0.6rem; color: var(--heritage-orange); opacity: 0.4; font-weight: 600; margin-top: 4px; }
+    .footer__contact-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.8rem;
+      color: white; background: var(--heritage-orange); border: none;
+      padding: 10px 24px; border-radius: 24px; cursor: pointer;
+      margin-top: 16px; transition: all 200ms ease;
+    }
+    .footer__contact-btn:hover { background: #D14D1A; transform: translateY(-1px); }
+
+    /* Contact modal */
+    .contact-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      background: rgba(44, 62, 80, 0.6); backdrop-filter: blur(8px);
+      display: none; align-items: center; justify-content: center;
+      padding: 24px; opacity: 0; transition: opacity 300ms ease;
+    }
+    .contact-overlay.active { display: flex; opacity: 1; }
+    .contact-modal {
+      background: white; border-radius: 24px; padding: 36px;
+      max-width: 480px; width: 100%; position: relative;
+      box-shadow: 0 24px 80px rgba(44, 62, 80, 0.2);
+      animation: contactSlideIn 300ms ease;
+    }
+    @keyframes contactSlideIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .contact-modal__close {
+      position: absolute; top: 16px; right: 16px;
+      width: 32px; height: 32px; border-radius: 50%;
+      border: none; background: rgba(44, 62, 80, 0.06);
+      cursor: pointer; font-size: 1rem; color: var(--body-text);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 150ms;
+    }
+    .contact-modal__close:hover { background: rgba(44, 62, 80, 0.12); }
+    .contact-modal__title {
+      font-family: 'Outfit', sans-serif; font-weight: 700;
+      font-size: 1.3rem; color: var(--deep-slate); margin-bottom: 4px;
+    }
+    .contact-modal__sub {
+      font-size: 0.85rem; color: var(--muted-text); margin-bottom: 24px;
+    }
+    .contact-form { display: flex; flex-direction: column; gap: 14px; }
+    .contact-form__field {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .contact-form__label {
+      font-family: 'Outfit', sans-serif; font-weight: 600;
+      font-size: 0.72rem; color: var(--deep-slate); opacity: 0.5;
+    }
+    .contact-form__input,
+    .contact-form__textarea {
+      font-family: 'Inter', sans-serif; font-size: 0.88rem;
+      padding: 10px 14px; border-radius: 14px;
+      border: 1px solid rgba(44, 62, 80, 0.12);
+      background: var(--cloud-white); color: var(--deep-slate);
+      outline: none; transition: border-color 200ms;
+    }
+    .contact-form__input:focus,
+    .contact-form__textarea:focus {
+      border-color: var(--heritage-orange);
+    }
+    .contact-form__textarea { min-height: 100px; resize: vertical; }
+    .contact-form__submit {
+      font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 0.9rem;
+      padding: 12px 28px; border-radius: 60px; border: none; cursor: pointer;
+      color: white; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      box-shadow: 0 4px 16px rgba(241, 93, 34, 0.2);
+      transition: all 200ms ease; align-self: flex-start;
+    }
+    .contact-form__submit:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(241, 93, 34, 0.3); }
+    .contact-form__success {
+      display: none; text-align: center; padding: 24px 0;
+    }
+    .contact-form__success.active { display: block; }
+    .contact-form__success-icon { font-size: 2.5rem; margin-bottom: 8px; }
+    .contact-form__success-msg {
+      font-family: 'Outfit', sans-serif; font-weight: 600;
+      font-size: 1.1rem; color: var(--deep-slate);
+    }
+    .contact-form__success-sub {
+      font-size: 0.85rem; color: var(--muted-text); margin-top: 4px;
+    }
+
+    /* ═══════════════════════════════════════════════
+       SCROLL REVEAL
+       ═══════════════════════════════════════════════ */
+    .reveal {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity 600ms ease, transform 600ms ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 100ms; }
+    .reveal-delay-2 { transition-delay: 200ms; }
+    .reveal-delay-3 { transition-delay: 300ms; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .hero__float { animation: none; }
+      .scroll-cue .scroll-line { animation: none; }
+    }
+
+    /* ═══════════════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════════════ */
+    @media (max-width: 900px) {
+      .showcase { height: 340px; }
+      .showcase__device--center { width: 280px; }
+      .showcase__device--left { width: 250px; left: -2%; }
+      .showcase__device--right { width: 250px; right: -2%; }
+      .hero__float { display: none; }
+    }
+    @media (max-width: 640px) {
+      .hero { padding: 100px 20px 40px; }
+      .fnav__links { display: none; }
+      .showcase { height: auto; display: flex; flex-direction: column; gap: 16px; }
+      .showcase__device { position: relative !important; width: 100% !important; left: auto !important; right: auto !important; top: auto !important; transform: none !important; }
+      .showcase__device:hover { transform: translateY(-4px) !important; }
+      .security-grid { grid-template-columns: 1fr; }
+      .story__body p { font-size: 0.95rem; }
+      .story__tech-list li { font-size: 0.84rem; }
+      .security-section__watermark { display: none; }
+      .trust-row { gap: 8px; }
+      .trust-badge { font-size: 0.7rem; padding: 8px 14px; }
+      .trust-icon { width: 28px; height: 28px; font-size: 0.85rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Scroll progress bar -->
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<!-- ═══════════════════════════════════════════════
+     FLOATING PILL NAV
+     ═══════════════════════════════════════════════ -->
+<nav class="fnav" id="fnav">
+  <a href="#" class="fnav__logo">
+    <img src="../../public/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />
+    beanies<span class="fnav__logo-orange">.family</span>
+  </a>
+  <div class="fnav__links">
+    <a href="#story">my story</a>
+    <a href="#security">security</a>
+  </div>
+  <a href="/welcome" class="fnav__cta">try it free</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════
+     HERO — Tagline + Floating Device Showcase
+     ═══════════════════════════════════════════════ -->
+<section class="hero" id="top">
+  <!-- Scattered background beans -->
+  <div class="hero__bean" style="top:10%;left:6%;transform:rotate(-15deg);">&#x1FAD8;</div>
+  <div class="hero__bean" style="top:25%;right:8%;font-size:1.6rem;transform:rotate(20deg);">&#x1FAD8;</div>
+  <div class="hero__bean" style="bottom:18%;left:12%;font-size:1.5rem;transform:rotate(-30deg);">&#x1FAD8;</div>
+  <div class="hero__bean" style="top:60%;right:5%;font-size:1.3rem;transform:rotate(10deg);">&#x1FAD8;</div>
+  <div class="hero__bean" style="bottom:35%;right:18%;font-size:1.8rem;transform:rotate(-20deg);">&#x1FAD8;</div>
+
+  <!-- Decorative gradient orbs -->
+  <div class="hero__deco" style="width:400px;height:400px;background:var(--sky-silk);top:-100px;right:-150px;"></div>
+  <div class="hero__deco" style="width:300px;height:300px;background:var(--heritage-orange);bottom:10%;left:-120px;filter:blur(100px);"></div>
+  <div class="hero__deco" style="width:200px;height:200px;background:var(--terracotta);top:40%;right:5%;filter:blur(80px);opacity:0.04;"></div>
+
+  <div class="hero__mascot">
+    <img src="../../public/brand/beanies_family_hugging_transparent_512x512.png" alt="the beanies family" />
+  </div>
+
+  <h1 class="hero__headline">
+    every. bean.<br><em>counts.</em>
+  </h1>
+  <p class="hero__sub">
+    one app to manage your family's money, activities, and all the chaos. open source and fully encrypted. no ads, no tracking, no nonsense.
+  </p>
+
+  <div class="hero__cta-group">
+    <a href="/welcome" class="btn-primary">start counting beans &#x1FAD8;</a>
+    <a class="hero__story-link" href="#story">why I built this &#x2193;</a>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       FLOATING DEVICE SHOWCASE (3 tilted screens)
+       ═══════════════════════════════════════════════ -->
+  <div class="showcase">
+    <!-- Floating accent card: Net Worth -->
+    <div class="hero__float" style="top:10px;left:50px;animation-delay:0s;z-index:6;">
+      <div class="hero__float-icon">📈</div>
+      <div class="hero__float-label">net worth</div>
+      <div class="hero__float-val" style="color:#27AE60;">+3.2%</div>
+    </div>
+    <!-- Floating accent card: Goal -->
+    <div class="hero__float" style="bottom:60px;right:50px;animation-delay:1.5s;z-index:6;">
+      <div class="hero__float-icon">🎯</div>
+      <div class="hero__float-label">goal reached</div>
+      <div class="hero__float-val">$10,000 &#x1F389;</div>
+    </div>
+    <!-- Floating accent card: Pickup -->
+    <div class="hero__float" style="top:200px;right:20px;animation-delay:3s;z-index:6;">
+      <div class="hero__float-icon">🚗</div>
+      <div class="hero__float-label">reminder</div>
+      <div class="hero__float-val" style="font-size:0.72rem;">pick up Emma at 4pm</div>
+    </div>
+    <!-- Floating accent card: Encrypted -->
+    <div class="hero__float" style="bottom:140px;left:30px;animation-delay:4.5s;z-index:6;">
+      <div class="hero__float-icon">🔒</div>
+      <div class="hero__float-label">security</div>
+      <div class="hero__float-val" style="font-size:0.72rem;color:var(--soft-green);">AES-256 encrypted</div>
+    </div>
+
+    <!-- LEFT: Piggy Bank -->
+    <div class="showcase__device showcase__device--left">
+      <div class="showcase__device-label"><span>&#x1F437;</span> <span>Piggy Bank</span></div>
+      <div class="mock-screen">
+        <div class="mock-hero-card">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; position: relative;">
+            <div>
+              <div class="mock-hero-label">&#x1F437; Net Worth</div>
+              <div class="mock-hero-amount">$125,400</div>
+              <div class="mock-hero-change">&#x2191; +12.5% <span>this month</span></div>
+            </div>
+            <div class="mock-period-pills">
+              <div class="mock-period-pill">1M</div>
+              <div class="mock-period-pill mock-period-pill--active">1Y</div>
+              <div class="mock-period-pill">All</div>
+            </div>
+          </div>
+          <div class="mock-chart-area">
+            <svg class="mock-chart-line" viewBox="0 0 280 36" preserveAspectRatio="none" fill="none">
+              <defs><linearGradient id="cF" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F15D22" stop-opacity="0.3"/><stop offset="100%" stop-color="#F15D22" stop-opacity="0"/></linearGradient></defs>
+              <path d="M0,32 C30,28 60,24 90,20 C120,16 150,22 180,14 C210,8 240,6 280,3" stroke="#F15D22" stroke-width="1.5" fill="none"/>
+              <path d="M0,32 C30,28 60,24 90,20 C120,16 150,22 180,14 C210,8 240,6 280,3 L280,36 L0,36 Z" fill="url(#cF)"/>
+              <circle cx="280" cy="3" r="2.5" fill="#F15D22" stroke="white" stroke-width="1.5"/>
+            </svg>
+          </div>
+        </div>
+        <div class="mock-stats-row">
+          <div class="mock-stat-card">
+            <div class="mock-stat-icon mock-stat-icon--green">📈</div>
+            <div class="mock-stat-label">Income</div>
+            <div class="mock-stat-amount mock-stat-amount--green">$8,500</div>
+          </div>
+          <div class="mock-stat-card">
+            <div class="mock-stat-icon mock-stat-icon--orange">📉</div>
+            <div class="mock-stat-label">Expenses</div>
+            <div class="mock-stat-amount mock-stat-amount--orange">$6,200</div>
+          </div>
+          <div class="mock-stat-card mock-stat-card--dark">
+            <div class="mock-stat-icon mock-stat-icon--white">💰</div>
+            <div class="mock-stat-label" style="color:rgba(255,255,255,0.4);">Cash Flow</div>
+            <div class="mock-stat-amount" style="color:white;">$2,300</div>
+          </div>
+        </div>
+        <div class="mock-accounts-row">
+          <div class="mock-account-card">
+            <div class="mock-account-header"><span style="font-size:9px;">🏦</span> <span class="mock-account-label">Accounts</span></div>
+            <div class="mock-account-item"><span class="mock-account-name">Checking</span><span class="mock-account-bal">$12,400</span></div>
+            <div class="mock-account-item"><span class="mock-account-name">Savings</span><span class="mock-account-bal">$45,600</span></div>
+          </div>
+          <div class="mock-account-card">
+            <div class="mock-account-header"><span style="font-size:9px;">🎯</span> <span class="mock-account-label">Goals</span></div>
+            <div style="margin-bottom:4px;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:1px;"><span class="mock-account-name">Emergency</span><span style="font-family:'Outfit';font-size:6.5px;font-weight:700;color:#27AE60;">82%</span></div>
+              <div style="height:4px;border-radius:2px;background:rgba(44,62,80,0.05);overflow:hidden;"><div style="width:82%;height:100%;border-radius:2px;background:linear-gradient(90deg,#F15D22,#E67E22);"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:1px;"><span class="mock-account-name">Vacation</span><span style="font-family:'Outfit';font-size:6.5px;font-weight:700;color:var(--heritage-orange);">45%</span></div>
+              <div style="height:4px;border-radius:2px;background:rgba(44,62,80,0.05);overflow:hidden;"><div style="width:45%;height:100%;border-radius:2px;background:linear-gradient(90deg,#F15D22,#E67E22);"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: Family Nook (hero device) -->
+    <div class="showcase__device showcase__device--center">
+      <div class="showcase__device-label"><span>&#x1F3E1;</span> <span>Family Nook</span></div>
+      <div class="mock-screen">
+        <div>
+          <div class="mock-greeting">Welcome home, <span>Greg</span></div>
+          <div class="mock-date">Monday, March 10, 2026</div>
+        </div>
+        <div class="mock-toast">
+          <div class="mock-toast-header">
+            <div class="mock-toast-icon">🌳</div>
+            <div>
+              <div class="mock-toast-title">Small steps, big adventures</div>
+              <div class="mock-toast-sub">4 activities, 3 tasks today</div>
+            </div>
+          </div>
+          <div class="mock-toast-sep"></div>
+          <div class="mock-toast-item">
+            <div class="mock-toast-item-icon">🚗</div>
+            <div class="mock-toast-item-text">Pick up Emma from Soccer at 4pm</div>
+          </div>
+          <div class="mock-toast-item">
+            <div class="mock-toast-item-icon">📋</div>
+            <div class="mock-toast-item-text">Sarah asked you to buy groceries</div>
+          </div>
+        </div>
+        <div class="mock-beans-row">
+          <div class="mock-bean">
+            <div class="mock-bean-avatar" style="border-color:#3b82f6;"><img src="../../public/brand/beanies_father_icon_transparent_360x360.png" alt="" /></div>
+            <div class="mock-bean-name">Greg</div>
+          </div>
+          <div class="mock-bean">
+            <div class="mock-bean-avatar" style="border-color:#ec4899;"><img src="../../public/brand/beanies_mother_icon_transparent_350x350.png" alt="" /></div>
+            <div class="mock-bean-name">Sarah</div>
+          </div>
+          <div class="mock-bean">
+            <div class="mock-bean-avatar" style="border-color:#f59e0b;"><img src="../../public/brand/beanies_baby_girl_icon_transparent_300x300.png" alt="" /></div>
+            <div class="mock-bean-name">Emma</div>
+          </div>
+          <div class="mock-bean">
+            <div class="mock-bean-avatar" style="border-color:#10b981;"><img src="../../public/brand/beanies_baby_boy_icon_transparent_300x300.png" alt="" /></div>
+            <div class="mock-bean-name">Liam</div>
+          </div>
+        </div>
+        <div class="mock-schedule-row">
+          <div class="mock-schedule-card mock-schedule-card--sky">
+            <div class="mock-schedule-header">
+              <div class="mock-schedule-label">📆 Today</div>
+              <div class="mock-schedule-badge mock-schedule-badge--sky">Mar 10</div>
+            </div>
+            <div class="mock-schedule-item">
+              <div class="mock-schedule-item-icon mock-schedule-item-icon--sky">📚</div>
+              <div><div class="mock-item-title">Piano Lesson</div><div class="mock-item-time">3pm · Emma</div></div>
+            </div>
+            <div class="mock-schedule-item">
+              <div class="mock-schedule-item-icon mock-schedule-item-icon--sky">⚽</div>
+              <div><div class="mock-item-title">Soccer Practice</div><div class="mock-item-time">4pm · Liam</div></div>
+            </div>
+          </div>
+          <div class="mock-schedule-card mock-schedule-card--orange">
+            <div class="mock-schedule-header">
+              <div class="mock-schedule-label">🗓️ This Week</div>
+              <div class="mock-schedule-badge mock-schedule-badge--orange">Calendar →</div>
+            </div>
+            <div class="mock-schedule-item">
+              <div class="mock-schedule-item-icon mock-schedule-item-icon--orange">🏥</div>
+              <div><div class="mock-item-title">Dentist</div><div class="mock-item-time">Tue · 10am</div></div>
+            </div>
+            <div class="mock-schedule-item">
+              <div class="mock-schedule-item-icon mock-schedule-item-icon--orange">🥋</div>
+              <div><div class="mock-item-title">Taekwondo</div><div class="mock-item-time">Wed · 5pm</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Family Planner -->
+    <div class="showcase__device showcase__device--right">
+      <div class="showcase__device-label"><span>📅</span> <span>Family Planner</span></div>
+      <div class="mock-screen" style="gap:5px;">
+        <div class="mock-planner-header">
+          <div>
+            <div class="mock-planner-title">📅 March 2026</div>
+            <div class="mock-planner-sub">12 activities this month</div>
+          </div>
+          <div class="mock-add-btn">+ Add</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div class="mock-view-toggle">
+            <div class="mock-view-btn mock-view-btn--active">Month</div>
+            <div class="mock-view-btn">Week</div>
+          </div>
+          <div class="mock-member-chips">
+            <div class="mock-member-chip mock-member-chip--active">All</div>
+            <div class="mock-member-chip"><div class="mock-member-chip-dot" style="background:#3b82f6;"></div> Greg</div>
+            <div class="mock-member-chip"><div class="mock-member-chip-dot" style="background:#ec4899;"></div> Sarah</div>
+          </div>
+        </div>
+        <div class="mock-calendar">
+          <div class="mock-cal-header">
+            <div class="mock-cal-day-label">S</div><div class="mock-cal-day-label">M</div><div class="mock-cal-day-label">T</div><div class="mock-cal-day-label">W</div><div class="mock-cal-day-label">T</div><div class="mock-cal-day-label">F</div><div class="mock-cal-day-label">S</div>
+          </div>
+          <div class="mock-cal-grid">
+            <div class="mock-cal-cell mock-cal-cell--has-events">1</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-multi">2</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">3</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-blue">4</div>
+            <div class="mock-cal-cell">5</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">6</div>
+            <div class="mock-cal-cell">7</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-blue">8</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-multi">9</div>
+            <div class="mock-cal-cell mock-cal-cell--today mock-cal-cell--has-events-multi">10</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">11</div>
+            <div class="mock-cal-cell">12</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">13</div>
+            <div class="mock-cal-cell">14</div>
+            <div class="mock-cal-cell">15</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">16</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-blue">17</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-multi">18</div>
+            <div class="mock-cal-cell">19</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">20</div>
+            <div class="mock-cal-cell">21</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">22</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-multi">23</div>
+            <div class="mock-cal-cell">24</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">25</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-blue">26</div>
+            <div class="mock-cal-cell">27</div>
+            <div class="mock-cal-cell">28</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events">29</div>
+            <div class="mock-cal-cell mock-cal-cell--has-events-multi">30</div>
+            <div class="mock-cal-cell">31</div>
+            <div class="mock-cal-cell mock-cal-cell--other">1</div>
+            <div class="mock-cal-cell mock-cal-cell--other">2</div>
+            <div class="mock-cal-cell mock-cal-cell--other">3</div>
+            <div class="mock-cal-cell mock-cal-cell--other">4</div>
+          </div>
+        </div>
+        <!-- Today mini-strip -->
+        <div style="display:flex;gap:5px;">
+          <div style="flex:1;background:white;border-radius:8px;padding:5px 7px;box-shadow:0 1px 6px rgba(44,62,80,0.03);border-left:2px solid var(--heritage-orange);">
+            <div style="font-family:'Outfit';font-size:6px;font-weight:700;text-transform:uppercase;opacity:0.4;margin-bottom:3px;">📌 Today</div>
+            <div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;"><span style="font-size:8px;">📚</span><span style="font-size:6.5px;font-family:'Outfit';font-weight:600;">Piano 3pm</span><span style="font-size:5.5px;background:rgba(249,115,22,0.1);color:var(--heritage-orange);padding:1px 3px;border-radius:3px;font-weight:600;">Emma</span></div>
+            <div style="display:flex;align-items:center;gap:3px;"><span style="font-size:8px;">⚽</span><span style="font-size:6.5px;font-family:'Outfit';font-weight:600;">Soccer 4pm</span><span style="font-size:5.5px;background:rgba(16,185,129,0.1);color:#10b981;padding:1px 3px;border-radius:3px;font-weight:600;">Liam</span></div>
+          </div>
+          <div style="flex:1;background:white;border-radius:8px;padding:5px 7px;box-shadow:0 1px 6px rgba(44,62,80,0.03);border-left:2px solid #9B59B6;">
+            <div style="font-family:'Outfit';font-size:6px;font-weight:700;text-transform:uppercase;opacity:0.4;margin-bottom:3px;">✅ Tasks</div>
+            <div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;"><span style="width:6px;height:6px;border:1.5px solid var(--heritage-orange);border-radius:1.5px;flex-shrink:0;"></span><span style="font-size:6.5px;font-family:'Outfit';font-weight:600;">Buy groceries</span></div>
+            <div style="display:flex;align-items:center;gap:3px;"><span style="width:6px;height:6px;border:1.5px solid var(--heritage-orange);border-radius:1.5px;flex-shrink:0;"></span><span style="font-size:6.5px;font-family:'Outfit';font-weight:600;">Book dentist</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trust badges -->
+  <div class="trust-row">
+    <div class="trust-badge"><div class="trust-icon">&#x1F512;</div>encrypted everything</div>
+    <div class="trust-badge"><div class="trust-icon">&#x1F3E6;</div>we (I) can't read your data</div>
+    <div class="trust-badge"><div class="trust-icon">&#x2764;&#xFE0F;</div>made by a real dad (me)</div>
+    <div class="trust-badge"><div class="trust-icon">&#x1F6AB;</div>no ads. no tracking.</div>
+  </div>
+
+  <div class="scroll-cue">
+    <span>scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- Transition: Hero → Security -->
+<div class="section-fade section-fade--hero-out"></div>
+
+<!-- ═══════════════════════════════════════════════
+     SECURITY
+     ═══════════════════════════════════════════════ -->
+<section class="security-section" id="security">
+  <div class="ambient-orb ambient-orb--1"></div>
+  <div class="ambient-orb ambient-orb--2"></div>
+  <div class="container">
+    <p class="section-label reveal">privacy &amp; security</p>
+    <h2 class="section-title reveal">seriously, I don't want your data</h2>
+    <p class="section-subtitle reveal">
+      your family's data never touches our servers. we built it that way on purpose, because I wouldn't trust my data with you, either. no offense.
+    </p>
+
+    <div class="security-grid">
+      <div class="security-card reveal reveal-delay-1">
+        <div class="security-card__icon">&#x1F510;</div>
+        <p class="security-card__title">real encryption, not marketing talk</p>
+        <p class="security-card__text">AES-256-GCM on everything, at rest and in transit. your data is genuinely unreadable to anyone without your key &mdash; including me.</p>
+      </div>
+      <div class="security-card reveal reveal-delay-2">
+        <div class="security-card__icon">&#x1F511;</div>
+        <p class="security-card__title">you hold the keys</p>
+        <p class="security-card__text">each family member gets their own password-derived key (PBKDF2) that wraps a shared family key (AES-KW). lost your password? I can't help you. that's kinda the whole point.</p>
+      </div>
+      <div class="security-card reveal reveal-delay-3">
+        <div class="security-card__icon">&#x1F4E6;</div>
+        <p class="security-card__title">your storage, your rules</p>
+        <p class="security-card__text">your encrypted data file lives in your own personal storage. it travels directly to your browser &mdash; we never see it, touch it, or store it.</p>
+      </div>
+      <div class="security-card reveal reveal-delay-1">
+        <div class="security-card__icon">&#x1F6AB;</div>
+        <p class="security-card__title">we don't even own a (real) database</p>
+        <p class="security-card__text">one lookup table in the cloud maps your family ID to your encrypted data file. that's literally it. no analytics, no tracking, no selling your info.</p>
+      </div>
+      <div class="security-card reveal reveal-delay-2">
+        <div class="security-card__icon">&#x1F310;</div>
+        <p class="security-card__title">go ahead, read the code</p>
+        <p class="security-card__text">it's all on GitHub. audit it, fork it, run it on your own machine. if you find something sketchy, open an issue. you won't, but I appreciate that you at least thought about it.</p>
+      </div>
+      <div class="security-card reveal reveal-delay-3">
+        <div class="security-card__icon">&#x1F9F9;</div>
+        <p class="security-card__title">sign out = cache gone (if you want)</p>
+        <p class="security-card__text">your browser keeps an encrypted cache for speed. wipe it clean anytime you want. no breadcrumbs, no leftover beans.</p>
+      </div>
+    </div>
+
+    <img src="../../public/brand/beanies_covering_eyes_transparent_512x512.png" alt="" class="security-section__watermark" />
+  </div>
+</section>
+
+<!-- Transition: Security → Story -->
+<div class="section-fade section-fade--to-light"></div>
+<div class="section-fade section-fade--to-story" style="margin-top:-1px;"></div>
+
+<!-- ═══════════════════════════════════════════════
+     THE BEANIES STORY
+     ═══════════════════════════════════════════════ -->
+<section class="story-section" id="story">
+  <div class="ambient-orb ambient-orb--1"></div>
+  <div class="ambient-orb ambient-orb--2"></div>
+  <div class="story-header reveal">
+    <img src="../../public/brand/beanies_father_son_icon_512x512.png" alt="Beanies father and son" class="story-header__illustration" />
+    <p class="section-label">the beanies story</p>
+    <h2 class="section-title">okay, here's the deal</h2>
+  </div>
+
+  <div class="story__body">
+    <p class="story__greeting reveal">Hey, guys! <span class="beanie-emoji">&#x1FAD8;</span></p>
+
+    <p class="reveal">Yes, it's <em>actually</em> me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart outside taco trucks on wednesday afternoons. But getting back to the point...</p>
+
+    <p class="reveal">Since the day I "graduated" college for a real job, put in a solid month of (let's call it) work, and witnessed my first paycheck direct-deposited to my bank account, <span class="story__highlight">this is the app I've wanted to create.</span> I gazed lovingly at the glorious $2,867 (minus taxes) in my account, and dreamt about the day I would definitely become a billionaire. Or at least when I wouldn't be a starving student anymore.</p>
+
+    <p class="reveal">It started with a janky spreadsheet. I added formulas, tables, charts. I wanted to keep track of how much I spent and saved, and project it forward. I might have even written some VB macros, toying with my precious sheet for months (maybe years) trying to get it to work the way I wanted.</p>
+
+    <p class="reveal">Then, the world changed (in, let's say, 2008), and I said to myself, "Hey, self! Why do you keep trying to re-invent the wheel (the wheel having been invented earlier that year)? There's a million personal finance apps out there! Just download one, you numbskull."</p>
+
+    <p class="reveal">So I did, and I fiddled with those fickle banking connectors that sync your transactions, but always fail. Then they ask for your credentials 10 times in a row, and proceed to not work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my important transactions were in cash or paid on cards. Some banks and cards don't provide reliable APIs. When things did work (rarely) it was temporary and only tracked what you <em>did</em> spend, not what you <em>planned</em> to spend.</p>
+
+    <p class="reveal">In any case, my goal was never to record every last transaction and track my budget down to the penny. If that's yours, this app probably isn't for you. <span class="story__emphasis">I just wanted a rough idea, so I would know if I was going to end up as a hobo in 6 months.</span></p>
+
+    <p class="reveal">Then, we had kids. With one (1) child, we could generally manage. After 2 kids, life got crazier. <span class="story__highlight">Bump that up to 3 (at school age) and welcome to the insane world of chaos and confusion and writing readmes to dumb personal family planning apps you vibe coded on a whim at 3am.</span> Or, whatever.</p>
+
+    <p class="reveal">Soccer practice, piano lessons, math tutor, gymnastics (2 types), chinese classes, taekwondo, and don't forget your actual school fees, your rent (or mortgage), and the list goes on. Who has to pay for what, and when, and how, and to who? Or is it whom? Also, while you were obsessing over the proper application of archaic English grammar rules, you realized you forgot to pick up your kid from his baseball tryouts. And it's raining. At least he has his umbrella. (Cue glance to the floor to spot the umbrella that fell out of his sports bag).</p>
+
+    <p class="reveal">When my youngest was about 6 months old, my wife started calling him <span class="story__orange">&#x5C0F;&#x8C46;&#x8C46;</span>. Which in Chinese sounds endearing, but just means <span class="story__orange">little bean</span>. Cuz he sort of looked like one. It sounds cute in English too, so I called him <span class="story__orange">beanie</span>, and it stuck.</p>
+
+    <p class="reveal">I built this app to track all that stuff I mentioned above: your family finances, what you spent and received, what you plan to spend and receive (roughly), and to know how much you'll have in the future &mdash; in short, your "wealth".</p>
+
+    <p class="reveal">But also, I built this to track your <em>actual</em> family life: piano lessons, schoolwork, sports practice, ballet class, family vacations (we may even give you advice), and, of course, who will pick up whom (yes, <em>whom</em>). In short, <span class="story__highlight">anything we can help you with, even in a small way, as you navigate the joys and sorrows of a complicated, crowded, chaotic, stressful, but of course, rewarding?</span> (sorry, I meant, rewarding) <span class="story__highlight">family life.</span></p>
+
+    <p class="reveal">It's not a perfect app. It doesn't sync with banks (and I doubt it ever will). But it gives you a rough idea of how much you have, how much you will have, and what in this world you actually have to do <em>today</em>. (Of course, only if you tell it that stuff first. It's not magic.)</p>
+
+    <p class="reveal">Treat <a href="https://beanies.family" class="story__link">beanies.family</a> like a friend, and it will reward you in spades. Maybe it'll even buy you a beer the next time you can spare 22 minutes after work and have $7 saved from meticulously tracking your budget every month. (Is that how much beers cost nowadays? I wouldn't know.)</p>
+
+    <p class="reveal">You can clone and install it for free if you want to run it locally. The data never leaves your machine if you don't want it to. We don't even own a database (well, not a real one). I don't want your janky finance data anyway, and I'm not picking up your kid for you.</p>
+
+    <p class="reveal">If you want the cloud version so you can share it with your family (don't worry, your data still stays with you), create a family account at <a href="https://beanies.family" class="story__link">beanies.family</a>. Just drop me a line for an invite code. You could also set up the infra by yourself, but that's a pain and you know it.</p>
+
+    <p class="reveal" style="margin-bottom: 0.8em;">Here's the fun stuff:</p>
+
+    <ul class="story__tech-list reveal">
+      <li><span class="story__tech-icon">&#x1F916;</span><span><strong>Claude Max / Opus 4.6</strong> &mdash; Mostly. I may have pitched in a line or 2.</span></li>
+      <li><span class="story__tech-icon">&#x1F4BB;</span><span><strong>Vue 3 / TypeScript</strong> + Vite / Tailwind / Pinia</span></li>
+      <li><span class="story__tech-icon">&#x1F4BE;</span><span><strong>IndexedDB</strong> &mdash; to cache encrypted family data in your local browser, which you can clear at anytime</span></li>
+      <li><span class="story__tech-icon">&#x1F512;</span><span><strong>Web Crypto API</strong> &mdash; Your data is fully encrypted in transit and at rest (AES-256-GCM), each family member gets their own password-derived key (PBKDF2) that wraps a shared family key (AES-KW), and data <em>never</em> leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache</span></li>
+      <li><span class="story__tech-icon">&#x1F500;</span><span><strong>Automerge</strong> &mdash; for CRDTs &mdash; adds a bit of heft to the package, but we tried rolling our own merge algorithms and trust me, it's not worth it &mdash; keeping your data safe is what matters</span></li>
+      <li><span class="story__tech-icon">&#x1F9EA;</span><span><strong>Vitest + Playwright + Dependabot</strong> &mdash; unit tests, E2E tests, and automated dependency updates to keep things secure (seriously, how cool is Dependabot!?)</span></li>
+      <li><span class="story__tech-icon">&#x2601;&#xFE0F;</span><span><strong>One single, stupid, plain vanilla DynamoDB</strong> &mdash; in the cloud to map your family ID to your (encrypted) data file, so we can locate it in your personal location that only you can access. Nothing else. Anywhere. Ever.</span></li>
+    </ul>
+
+    <p class="reveal">So there it is. If you're a techie nerd like me, run it locally. If you don't want to deal with the bs, use <a href="https://beanies.family" class="story__link">beanies.family</a>.</p>
+
+    <p class="reveal">I'm using <a href="https://beanies.family" class="story__link">beanies</a> to track our money, our various (1) houses, our (0) boats, my wife's (currently missing) diamond ring (ask my wife where she lost hers.. unfortunately beanies can't tell you that), and more. I'll use it even more for their piano lessons, soccer practices, school plays that, as a respectable father, I really should attend, and to make sure we don't forget to pick up our son from his after school math tutor (again). All while keeping our data safe and secure on my family's personal storage (unless I open read access on my data file to the world and tell everyone the key. Which I won't. Probably.).</p>
+
+    <p class="reveal">If you have a question, comment, suggestion, or just wanna say hi, you can say it <a href="https://github.com/gparker97/beanies-family/issues" class="story__link">here</a> or raise an issue. If you're using it for free and wanna drop me a satoshi for my time (or just cuz you like the app), that's cool too (1beanks5zbnAcptUeSdrepxqrCzxEuA2z).</p>
+
+    <div class="story__signoff reveal">
+      <p class="story__signoff-tagline">simplify your family life. every bean counts.</p>
+            <p class="story__signoff-name">Peace out, my beans.</p>
+      <p class="story__signoff-name">&mdash; Greg</p>
+      <img src="../../public/brand/beanies_father_son_icon_512x512.png" alt="Greg and beanie" class="story__signoff-img" />
+    </div>
+
+    <p class="reveal" style="text-align: center; margin-top: 32px; font-size: 0.78rem; color: var(--muted-text); opacity: 0.5;">
+      beanies.family is open source. see <a href="https://github.com/gparker97/beanies-family/blob/main/LICENSE" class="story__link" style="font-size: inherit;">LICENSE</a> and <a href="https://github.com/gparker97/beanies-family/blob/main/TRADEMARK.md" class="story__link" style="font-size: inherit;">TRADEMARK.md</a> for details.
+    </p>
+  </div>
+</section>
+
+<!-- Transition: Story → CTA -->
+<div class="section-fade section-fade--from-story" style="height:80px;"></div>
+
+<!-- ═══════════════════════════════════════════════
+     FINAL CTA
+     ═══════════════════════════════════════════════ -->
+<section class="final-cta">
+  <div class="ambient-orb ambient-orb--1"></div>
+  <div class="ambient-orb ambient-orb--2"></div>
+  <div class="container">
+    <div class="final-cta__bean">&#x1FAD8;</div>
+    <h2 class="final-cta__title reveal">so... ready to count some beans? <em>&#x1FAD8;</em></h2>
+    <p class="final-cta__sub reveal">it's free. run it locally or login below, whatever works. yes, it's really free.</p>
+    <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;" class="reveal">
+      <a href="/welcome" class="btn-primary">let's go &#x1FAD8;</a>
+      <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener" class="btn-secondary">
+        view on GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════ -->
+<footer class="footer">
+  <p class="footer__brand">
+    &#x1FAD8; beanies<span class="footer__brand-orange">.family</span>
+  </p>
+  <div class="footer__links">
+    <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a>
+    <a href="/help">help</a>
+    <a href="/welcome">sign in</a>
+  </div>
+  <button class="footer__contact-btn" onclick="document.getElementById('contactOverlay').classList.add('active')">
+    &#x1F4AC; get in touch with me
+  </button>
+  <p class="footer__tag">every bean counts.</p>
+  <p class="footer__copy">&copy; 2026 beanies.family. open source under MIT license.</p>
+</footer>
+
+<!-- ═══════════════════════════════════════════════
+     CONTACT MODAL
+     ═══════════════════════════════════════════════ -->
+<div class="contact-overlay" id="contactOverlay" onclick="if(event.target===this)this.classList.remove('active')">
+  <div class="contact-modal">
+    <button class="contact-modal__close" onclick="document.getElementById('contactOverlay').classList.remove('active')">&times;</button>
+    <p class="contact-modal__title">&#x1FAD8; say hi</p>
+    <p class="contact-modal__sub">got a question, idea, bug report, or just want to chat? I actually read these.</p>
+    <form class="contact-form" id="contactForm" onsubmit="handleContactSubmit(event)">
+      <div class="contact-form__field">
+        <label class="contact-form__label">your name</label>
+        <input class="contact-form__input" type="text" placeholder="e.g. fellow bean counter" required />
+      </div>
+      <div class="contact-form__field">
+        <label class="contact-form__label">email</label>
+        <input class="contact-form__input" type="email" placeholder="so I can write back" required />
+      </div>
+      <div class="contact-form__field">
+        <label class="contact-form__label">what's on your mind?</label>
+        <textarea class="contact-form__textarea" placeholder="bugs, ideas, compliments, roasts... all welcome" required></textarea>
+      </div>
+      <button type="submit" class="contact-form__submit">send it &#x1FAD8;</button>
+    </form>
+    <div class="contact-form__success" id="contactSuccess">
+      <div class="contact-form__success-icon">&#x1FAD8;</div>
+      <p class="contact-form__success-msg">message sent!</p>
+      <p class="contact-form__success-sub">I'll get back to you soon. probably. unless I'm picking up my kid.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════ -->
+<script>
+  // Scroll progress bar
+  const scrollProgress = document.getElementById('scrollProgress');
+  const fnav = document.getElementById('fnav');
+
+  function onScroll() {
+    const sy = window.scrollY;
+    const dh = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = dh > 0 ? (sy / dh) * 100 : 0;
+    scrollProgress.style.width = pct + '%';
+    fnav.classList.toggle('scrolled', sy > 20);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // Scroll reveal (IntersectionObserver)
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.1, rootMargin: '0px 0px -40px 0px' }
+  );
+  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+
+  // Contact form handler
+  function handleContactSubmit(e) {
+    e.preventDefault();
+    const form = document.getElementById('contactForm');
+    const success = document.getElementById('contactSuccess');
+    form.style.display = 'none';
+    success.classList.add('active');
+    // In production, this would POST to an API endpoint
+  }
+</script>
+
+</body>
+</html>
