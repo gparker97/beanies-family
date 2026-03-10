@@ -821,9 +821,14 @@ onUnmounted(() => {
             <div class="security-card__icon">&#x1F310;</div>
             <p class="security-card__title">go ahead, read the code</p>
             <p class="security-card__text">
-              it's all on GitHub. audit it, fork it, run it on your own machine. if you find
-              something sketchy, open an issue. you won't, but I appreciate that you at least
-              thought about it.
+              it's all on
+              <a
+                href="https://github.com/gparker97/beanies-family"
+                target="_blank"
+                class="story__link"
+                >GitHub</a
+              >. audit it, fork it, run it on your own machine. if you find something sketchy, open
+              an issue. you won't, but I appreciate that you at least thought about it.
             </p>
           </div>
           <div class="security-card reveal reveal-delay-3">
@@ -1066,10 +1071,15 @@ onUnmounted(() => {
         </p>
 
         <p class="reveal">
-          If you have a question, comment, suggestion, or just wanna say hi, you can say it
-          <a href="https://github.com/gparker97/beanies-family/issues" class="story__link">here</a>
-          or raise an issue. If you're using it for free and wanna drop me a satoshi for my time (or
-          just cuz you like the app), that's cool too (1beanks5zbnAcptUeSdrepxqrCzxEuA2z).
+          If you have a question, comment, suggestion, or just wanna say hi, you can reach me below
+          or
+          <a
+            href="https://github.com/gparker97/beanies-family/issues"
+            target="_blank"
+            class="story__link"
+            >raise an issue</a
+          >. If you're using beanies for free and wanna drop me a satoshi for my time (or just cuz
+          you like the app), that's cool too (1beanks5zbnAcptUeSdrepxqrCzxEuA2z).
         </p>
 
         <div class="story__signoff reveal">
