@@ -12,13 +12,9 @@ test.describe('Homepage', () => {
     // Should redirect to /home
     await expect(page).toHaveURL('/home');
 
-    // Should display brand elements
-    await expect(page.locator('h1')).toContainText('beanies');
-    await expect(page.locator('h1')).toContainText('.family');
-
-    // Should show feature pills
-    await expect(page.getByText('Family finances')).toBeVisible();
-    await expect(page.getByText('End-to-end encrypted')).toBeVisible();
+    // Should display brand headline
+    await expect(page.locator('h1')).toContainText('every. bean.');
+    await expect(page.locator('h1')).toContainText('counts.');
   });
 
   test('should navigate to welcome gate via Get Started', async ({ page }) => {
@@ -33,26 +29,6 @@ test.describe('Homepage', () => {
 
     // Should see the WelcomeGate
     await expect(page.getByTestId('create-pod-button')).toBeVisible();
-  });
-
-  test('should toggle about section', async ({ page }) => {
-    await page.goto('/');
-    const dbHelper = new IndexedDBHelper(page);
-    await dbHelper.clearAllData();
-    await page.goto('/');
-
-    await expect(page).toHaveURL('/home');
-
-    // About section should be hidden initially
-    await expect(page.getByTestId('homepage-about-section')).not.toBeVisible();
-
-    // Click About
-    await page.getByTestId('homepage-about-toggle').click();
-    await expect(page.getByTestId('homepage-about-section')).toBeVisible();
-
-    // Click again to close
-    await page.getByTestId('homepage-about-toggle').click();
-    await expect(page.getByTestId('homepage-about-section')).not.toBeVisible();
   });
 
   test('should redirect to welcome (not homepage) when families exist', async ({ page }) => {
