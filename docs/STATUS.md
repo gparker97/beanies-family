@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-10
-> **Updated by:** Claude (Critical data loss fix — syncService family key desync after Settings page visit)
+> **Updated by:** Claude (Landing page implementation from mockup)
 
 ## Current Phase
 
@@ -54,6 +54,7 @@
 - Multi-currency display with global display currency selector
 - Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards (merged todos + planner activities with view-first modals), inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed (view-first modals for todos + transactions). Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
+- Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
 
 ### Beanie Brand Asset Icons
 
@@ -814,7 +815,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 - [x] Google Drive sync (OAuth PKCE + Lambda proxy) — #78, #112, ADR-016
 - [x] Projected recurring transactions with scope-based editing (this only / this and future / all) ✓
 - [ ] Skip individual recurring occurrences
-- [ ] Landing/marketing page (#72)
+- [x] Landing/marketing page (#72) ✓
 
 ### Phase 3 — AI & Advanced
 
