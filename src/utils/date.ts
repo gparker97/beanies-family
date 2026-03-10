@@ -203,3 +203,15 @@ export function toDateInputValue(date: Date): string {
   const dayStr = day < 10 ? `0${day}` : `${day}`;
   return `${year}-${monthStr}-${dayStr}`;
 }
+
+/**
+ * Format an HH:mm time string to 12-hour format (e.g. "4pm", "3:30pm").
+ * Omits minutes when they are :00 for a cleaner display.
+ */
+export function formatTime12(time: string): string {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const hour = h! % 12 || 12;
+  const ampm = h! < 12 ? 'am' : 'pm';
+  return m ? `${hour}:${String(m).padStart(2, '0')}${ampm}` : `${hour}${ampm}`;
+}

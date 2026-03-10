@@ -1,0 +1,162 @@
+import { computed } from 'vue';
+import { useFamilyStore } from '@/stores/familyStore';
+import { useTodoStore } from '@/stores/todoStore';
+import { useActivityStore } from '@/stores/activityStore';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { useTranslation } from '@/composables/useTranslation';
+import { toDateInputValue, formatTime12 } from '@/utils/date';
+import { CATEGORY_FALLBACK_ICON } from '@/constants/activityIcons';
+import type { UIStringKey } from '@/services/translation/uiStrings';
+
+export interface CriticalItem {
+  id: string;
+  type: 'todo' | 'activity';
+  message: string;
+  icon: string;
+  time: string; // HH:mm for sorting, '' if untimed
+  occurrenceDate?: string; // for activity modal opening
+}
+
+const MAX_ITEMS = 5;
+
+export function useCriticalItems() {
+  const familyStore = useFamilyStore();
+  const todoStore = useTodoStore();
+  const activityStore = useActivityStore();
+  const { getMemberName } = useMemberInfo();
+  const { t } = useTranslation();
+
+  const todayStr = computed(() => toDateInputValue(new Date()));
+
+  const criticalItems = computed<CriticalItem[]>(() => {
+    const memberId = familyStore.currentMemberId;
+    if (!memberId) return [];
+
+    const items: CriticalItem[] = [];
+
+    // ── Activities where current member has a role today ──────────────
+    const todayActivities = activityStore.activitiesForDate(todayStr.value);
+    for (const { activity, date } of todayActivities) {
+      const isPickup = activity.pickupMemberId === memberId;
+      const isDropoff = activity.dropoffMemberId === memberId;
+      const isAssignee = activity.assigneeId === memberId;
+
+      if (isPickup) {
+        const child = getMemberName(activity.assigneeId, '');
+        items.push({
+          id: activity.id,
+          type: 'activity',
+          message: buildMessage(
+            activity.endTime ? 'nook.criticalPickup' : 'nook.criticalPickupNoTime',
+            { child, activity: activity.title, time: formatTime12(activity.endTime ?? '') }
+          ),
+          icon: '🚗',
+          time: activity.endTime ?? '',
+          occurrenceDate: date,
+        });
+      }
+
+      if (isDropoff) {
+        const child = getMemberName(activity.assigneeId, '');
+        items.push({
+          id: activity.id,
+          type: 'activity',
+          message: buildMessage(
+            activity.startTime ? 'nook.criticalDropoff' : 'nook.criticalDropoffNoTime',
+            { child, activity: activity.title, time: formatTime12(activity.startTime ?? '') }
+          ),
+          icon: '🚗',
+          time: activity.startTime ?? '',
+          occurrenceDate: date,
+        });
+      }
+
+      // Only show generic assignee message if not already showing pickup/dropoff
+      if (isAssignee && !isPickup && !isDropoff) {
+        items.push({
+          id: activity.id,
+          type: 'activity',
+          message: buildMessage(
+            activity.startTime ? 'nook.criticalActivity' : 'nook.criticalActivityNoTime',
+            { activity: activity.title, time: formatTime12(activity.startTime ?? '') }
+          ),
+          icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
+          time: activity.startTime ?? '',
+          occurrenceDate: date,
+        });
+      }
+    }
+
+    // ── Todos assigned to current member, due today ──────────────────
+    for (const todo of todoStore.openTodos) {
+      if (todo.assigneeId !== memberId) continue;
+      const dueDate = todo.dueDate?.split('T')[0] ?? '';
+      if (dueDate !== todayStr.value) continue;
+
+      const taskTitle = lowercaseFirst(todo.title);
+      const isFromOther = todo.createdBy && todo.createdBy !== memberId;
+      items.push({
+        id: todo.id,
+        type: 'todo',
+        message: isFromOther
+          ? buildMessage('nook.criticalTodoAssigned', {
+              creator: getMemberName(todo.createdBy),
+              task: taskTitle,
+            })
+          : buildMessage('nook.criticalTodoSelf', { task: taskTitle }),
+        icon: '📋',
+        time: todo.dueTime ?? '',
+      });
+    }
+
+    // Sort: timed items first (ascending), untimed last
+    items.sort((a, b) => {
+      if (a.time && b.time) return a.time.localeCompare(b.time);
+      if (a.time && !b.time) return -1;
+      if (!a.time && b.time) return 1;
+      return 0;
+    });
+
+    return items.slice(0, MAX_ITEMS);
+  });
+
+  const overflowCount = computed(() => {
+    // Recount without slice to determine overflow
+    const memberId = familyStore.currentMemberId;
+    if (!memberId) return 0;
+    const totalActivities = activityStore
+      .activitiesForDate(todayStr.value)
+      .reduce((n, { activity }) => {
+        const isPickup = activity.pickupMemberId === memberId;
+        const isDropoff = activity.dropoffMemberId === memberId;
+        const isAssignee = activity.assigneeId === memberId;
+        if (isPickup) n++;
+        if (isDropoff) n++;
+        if (isAssignee && !isPickup && !isDropoff) n++;
+        return n;
+      }, 0);
+    const totalTodos = todoStore.openTodos.filter(
+      (todo) =>
+        todo.assigneeId === memberId && (todo.dueDate?.split('T')[0] ?? '') === todayStr.value
+    ).length;
+    const total = totalActivities + totalTodos;
+    return Math.max(0, total - MAX_ITEMS);
+  });
+
+  /** Replace {placeholders} in a translated string. */
+  function buildMessage(key: UIStringKey, replacements: Record<string, string>): string {
+    let msg = t(key);
+    for (const [k, v] of Object.entries(replacements)) {
+      msg = msg.replace(`{${k}}`, v);
+    }
+    return msg;
+  }
+
+  /** Lowercase the first character for mid-sentence use. */
+  function lowercaseFirst(str: string): string {
+    if (!str) return str;
+    return str.charAt(0).toLowerCase() + str.slice(1);
+  }
+
+  return { criticalItems, overflowCount };
+}

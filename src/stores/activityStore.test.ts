@@ -934,4 +934,87 @@ describe('activityStore', () => {
       expect(createCall.recurrenceEndDate).toBeUndefined();
     });
   });
+
+  // ── activitiesForDate ──
+
+  describe('activitiesForDate', () => {
+    it('should return one-off activity matching the given date', () => {
+      const store = useActivityStore();
+      store.activities.push(makeActivity({ id: '1', date: '2026-03-04', recurrence: 'none' }));
+
+      const result = store.activitiesForDate('2026-03-04');
+      expect(result).toHaveLength(1);
+      expect(result[0]!.activity.id).toBe('1');
+      expect(result[0]!.date).toBe('2026-03-04');
+    });
+
+    it('should not return one-off activity on a different date', () => {
+      const store = useActivityStore();
+      store.activities.push(makeActivity({ id: '1', date: '2026-03-04', recurrence: 'none' }));
+
+      const result = store.activitiesForDate('2026-03-05');
+      expect(result).toHaveLength(0);
+    });
+
+    it('should expand weekly recurring activity to matching dates', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-03-04', // Wednesday
+          recurrence: 'weekly',
+          daysOfWeek: [3], // Wednesday
+        })
+      );
+
+      // March 11 is the next Wednesday
+      const result = store.activitiesForDate('2026-03-11');
+      expect(result).toHaveLength(1);
+      expect(result[0]!.date).toBe('2026-03-11');
+    });
+
+    it('should exclude inactive activities', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: '1', date: '2026-03-04', recurrence: 'none', isActive: false })
+      );
+
+      const result = store.activitiesForDate('2026-03-04');
+      expect(result).toHaveLength(0);
+    });
+
+    it('should return activities regardless of member filter', () => {
+      const store = useActivityStore();
+      const memberFilter = useMemberFilterStore();
+      const familyStore = useFamilyStore();
+
+      // Set up a member filter that would normally exclude this activity
+      familyStore.members.push({
+        id: 'member-parent-1',
+        name: 'Parent',
+        role: 'owner',
+      } as FamilyMember);
+      familyStore.members.push({
+        id: 'member-child-1',
+        name: 'Child',
+        role: 'member',
+      } as FamilyMember);
+      memberFilter.initialize();
+      memberFilter.toggleMember('member-child-1'); // deselect child
+
+      store.activities.push(
+        makeActivity({
+          id: '1',
+          date: '2026-03-04',
+          recurrence: 'none',
+          assigneeId: 'member-child-1',
+          pickupMemberId: 'member-parent-1',
+        })
+      );
+
+      // activitiesForDate uses activeActivities (unfiltered) — should still find it
+      const result = store.activitiesForDate('2026-03-04');
+      expect(result).toHaveLength(1);
+    });
+  });
 });

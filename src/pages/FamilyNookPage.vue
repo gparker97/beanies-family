@@ -148,7 +148,10 @@ async function handleTransactionDelete(id: string) {
     <NookGreeting />
 
     <!-- Status toast -->
-    <FamilyStatusToast />
+    <FamilyStatusToast
+      @open-todo="selectedTodoId = $event"
+      @open-activity="(id: string, date: string) => openActivity(id, date)"
+    />
 
     <!-- Your Beans row -->
     <NookYourBeans

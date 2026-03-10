@@ -9,7 +9,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { addHourToTime } from '@/utils/date';
+import { addHourToTime, formatTime12 } from '@/utils/date';
 import { ACTIVITY_PRESETS, type ActivityPreset } from '@/constants/activityPresets';
 import type { CurrencyCode, ActivityCategory } from '@/types/models';
 
@@ -126,14 +126,6 @@ function handleAddAnother() {
   startTime.value = '09:00';
   endTime.value = '10:00';
   activityFee.value = undefined;
-}
-
-function formatTime12(time: string): string {
-  if (!time) return '';
-  const [h, m] = time.split(':').map(Number);
-  const hour = h! % 12 || 12;
-  const ampm = h! < 12 ? 'AM' : 'PM';
-  return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 function formatDaysShort(days: number[]): string {

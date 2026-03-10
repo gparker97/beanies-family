@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isDateBetween, toDateInputValue, parseLocalDate } from '../date';
+import { isDateBetween, toDateInputValue, parseLocalDate, formatTime12 } from '../date';
 
 describe('toDateInputValue', () => {
   it('returns YYYY-MM-DD format', () => {
@@ -95,5 +95,34 @@ describe('isDateBetween', () => {
     expect(isDateBetween('2026-03-15', '2026-03-15', '2026-03-15')).toBe(true);
     expect(isDateBetween('2026-03-14', '2026-03-15', '2026-03-15')).toBe(false);
     expect(isDateBetween('2026-03-16', '2026-03-15', '2026-03-15')).toBe(false);
+  });
+});
+
+describe('formatTime12', () => {
+  it('returns empty string for empty input', () => {
+    expect(formatTime12('')).toBe('');
+  });
+
+  it('formats morning time with minutes', () => {
+    expect(formatTime12('09:30')).toBe('9:30am');
+  });
+
+  it('formats afternoon time with minutes', () => {
+    expect(formatTime12('14:15')).toBe('2:15pm');
+  });
+
+  it('omits minutes when they are :00', () => {
+    expect(formatTime12('15:00')).toBe('3pm');
+    expect(formatTime12('09:00')).toBe('9am');
+  });
+
+  it('formats noon correctly', () => {
+    expect(formatTime12('12:00')).toBe('12pm');
+    expect(formatTime12('12:30')).toBe('12:30pm');
+  });
+
+  it('formats midnight correctly', () => {
+    expect(formatTime12('00:00')).toBe('12am');
+    expect(formatTime12('00:15')).toBe('12:15am');
   });
 });

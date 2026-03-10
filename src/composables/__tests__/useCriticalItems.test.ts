@@ -1,0 +1,347 @@
+import { setActivePinia, createPinia } from 'pinia';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { useCriticalItems } from '@/composables/useCriticalItems';
+import { useActivityStore } from '@/stores/activityStore';
+import { useTodoStore } from '@/stores/todoStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import type { FamilyActivity, FamilyMember, TodoItem } from '@/types/models';
+
+// Mock the repositories so stores can initialise
+vi.mock('@/services/automerge/repositories/activityRepository', () => ({
+  getAllActivities: vi.fn(),
+  getActivityById: vi.fn(),
+  getActivitiesByDate: vi.fn(),
+  getActivitiesByAssignee: vi.fn(),
+  getActivitiesByCategory: vi.fn(),
+  createActivity: vi.fn(),
+  updateActivity: vi.fn(),
+  deleteActivity: vi.fn(),
+}));
+
+vi.mock('@/services/automerge/repositories/todoRepository', () => ({
+  getAllTodos: vi.fn(),
+  createTodo: vi.fn(),
+  updateTodo: vi.fn(),
+  deleteTodo: vi.fn(),
+}));
+
+const NOW = '2026-03-10T00:00:00.000Z';
+const TODAY = '2026-03-10'; // Tuesday
+
+function makeMember(overrides: Partial<FamilyMember> & { id: string; name: string }): FamilyMember {
+  return {
+    role: 'member',
+    email: `${overrides.name.toLowerCase()}@test.com`,
+    color: '#000',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  } as FamilyMember;
+}
+
+function makeActivity(overrides?: Partial<FamilyActivity>): FamilyActivity {
+  return {
+    id: 'activity-1',
+    title: 'Soccer Practice',
+    date: TODAY,
+    startTime: '15:00',
+    endTime: '16:00',
+    recurrence: 'none',
+    category: 'sport',
+    assigneeId: 'child-1',
+    feeSchedule: 'none',
+    reminderMinutes: 0,
+    isActive: true,
+    createdBy: 'parent-1',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+function makeTodo(overrides?: Partial<TodoItem>): TodoItem {
+  return {
+    id: 'todo-1',
+    title: 'Buy groceries',
+    completed: false,
+    createdBy: 'parent-2',
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+describe('useCriticalItems', () => {
+  let familyStore: ReturnType<typeof useFamilyStore>;
+  let activityStore: ReturnType<typeof useActivityStore>;
+  let todoStore: ReturnType<typeof useTodoStore>;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+
+    familyStore = useFamilyStore();
+    activityStore = useActivityStore();
+    todoStore = useTodoStore();
+
+    // Set up family members
+    familyStore.members.push(
+      makeMember({ id: 'parent-1', name: 'Dad', role: 'owner' }),
+      makeMember({ id: 'parent-2', name: 'Mom' }),
+      makeMember({ id: 'child-1', name: 'Emma' })
+    );
+
+    // Mock the current date to TODAY
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(TODAY + 'T08:00:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns empty array when no current member', () => {
+    // currentMemberId is null by default (no setCurrentMember call)
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toEqual([]);
+  });
+
+  it('shows pickup message for activity where current member is pickup', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        pickupMemberId: 'parent-1',
+        assigneeId: 'child-1',
+        endTime: '16:00',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    const msg = criticalItems.value[0]!;
+    // Message contains child name, activity title, and time (beanie: "scoop up", en: "pick up")
+    expect(msg.message).toContain('Emma');
+    expect(msg.message).toContain('Soccer Practice');
+    expect(msg.message).toContain('4pm');
+    expect(msg.icon).toBe('🚗');
+    expect(msg.type).toBe('activity');
+  });
+
+  it('shows dropoff message for activity where current member is dropoff', () => {
+    familyStore.setCurrentMember('parent-2');
+    activityStore.activities.push(
+      makeActivity({
+        dropoffMemberId: 'parent-2',
+        assigneeId: 'child-1',
+        startTime: '15:00',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    const msg = criticalItems.value[0]!;
+    // Message contains child name and time (beanie: "time to drop", en: "drop off")
+    expect(msg.message).toContain('Emma');
+    expect(msg.message).toContain('3pm');
+    expect(msg.icon).toBe('🚗');
+  });
+
+  it('shows both pickup and dropoff when current member has both roles', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        dropoffMemberId: 'parent-1',
+        pickupMemberId: 'parent-1',
+        assigneeId: 'child-1',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(2);
+    // Both items reference the child and activity
+    expect(criticalItems.value.every((i) => i.message.includes('Emma'))).toBe(true);
+    expect(criticalItems.value.every((i) => i.icon === '🚗')).toBe(true);
+  });
+
+  it('shows assignee message when current member is assignee (not pickup/dropoff)', () => {
+    familyStore.setCurrentMember('child-1');
+    activityStore.activities.push(
+      makeActivity({
+        assigneeId: 'child-1',
+        pickupMemberId: 'parent-1',
+        dropoffMemberId: 'parent-2',
+        startTime: '15:00',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('Soccer Practice');
+    expect(criticalItems.value[0]!.message).toContain('3pm');
+    // Should NOT contain pickup/dropoff wording
+    expect(criticalItems.value[0]!.message).not.toContain('pick up');
+    expect(criticalItems.value[0]!.message).not.toContain('drop off');
+  });
+
+  it('skips generic assignee message when member is also pickup', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        assigneeId: 'parent-1',
+        pickupMemberId: 'parent-1',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    // Should only show pickup, not an additional assignee message
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.icon).toBe('🚗');
+  });
+
+  it('shows todo assigned by another member', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        createdBy: 'parent-2',
+        title: 'Buy groceries',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('Mom');
+    expect(criticalItems.value[0]!.message).toContain('buy groceries');
+    expect(criticalItems.value[0]!.type).toBe('todo');
+    expect(criticalItems.value[0]!.icon).toBe('📋');
+  });
+
+  it('shows self-assigned todo message', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+        title: 'Fix the sink',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('fix the sink');
+    expect(criticalItems.value[0]!.message).not.toContain('Dad'); // no creator mention
+  });
+
+  it('excludes completed todos', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        completed: true,
+        completedAt: NOW,
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(0);
+  });
+
+  it('excludes todos not due today', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        dueDate: '2026-03-11', // tomorrow
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(0);
+  });
+
+  it('excludes todos assigned to other members', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-2',
+        dueDate: TODAY,
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(0);
+  });
+
+  it('excludes activities on other dates', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        pickupMemberId: 'parent-1',
+        date: '2026-03-11', // tomorrow
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(0);
+  });
+
+  it('sorts timed items before untimed', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({ id: 'untimed', assigneeId: 'parent-1', dueDate: TODAY, title: 'Untimed task' }),
+      makeTodo({
+        id: 'timed',
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        dueTime: '10:00',
+        title: 'Timed task',
+        createdBy: 'parent-1',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(2);
+    expect(criticalItems.value[0]!.id).toBe('timed');
+    expect(criticalItems.value[1]!.id).toBe('untimed');
+  });
+
+  it('caps items at 5 and reports overflow', () => {
+    familyStore.setCurrentMember('parent-1');
+    for (let i = 0; i < 7; i++) {
+      todoStore.todos.push(
+        makeTodo({
+          id: `todo-${i}`,
+          assigneeId: 'parent-1',
+          dueDate: TODAY,
+          title: `Task ${i}`,
+          createdBy: 'parent-1',
+        })
+      );
+    }
+
+    const { criticalItems, overflowCount } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(5);
+    expect(overflowCount.value).toBe(2);
+  });
+
+  it('uses no-time translation variant when activity has no time', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        pickupMemberId: 'parent-1',
+        assigneeId: 'child-1',
+        startTime: undefined,
+        endTime: undefined,
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    // Should not contain "at " followed by nothing — just the no-time message
+    expect(criticalItems.value[0]!.message).toContain('Emma');
+    expect(criticalItems.value[0]!.message).toContain('Soccer Practice');
+  });
+});
