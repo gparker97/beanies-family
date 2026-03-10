@@ -43,13 +43,26 @@ function initRevealObserver() {
   document.querySelectorAll('.reveal').forEach((el) => observer?.observe(el));
 }
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 async function handleContactSubmit(e: Event) {
   e.preventDefault();
   contactError.value = '';
 
+  if (!contactName.value.trim() || !contactEmail.value.trim()) {
+    contactError.value = 'name and email are required.';
+    return;
+  }
+  if (!isValidEmail(contactEmail.value.trim())) {
+    contactError.value = 'please enter a valid email address.';
+    return;
+  }
+
   const webhookUrl = import.meta.env.VITE_CONTACT_WEBHOOK_URL;
   if (!webhookUrl) {
-    contactError.value = 'Contact form is not configured yet. Please try again later.';
+    contactError.value = 'contact form is not configured yet. please try again later.';
     return;
   }
 
@@ -1177,7 +1190,9 @@ onUnmounted(() => {
         </p>
         <form v-if="!showSuccess" class="contact-form" @submit="handleContactSubmit">
           <div class="contact-form__field">
-            <label class="contact-form__label">your name</label>
+            <label class="contact-form__label"
+              >your name <span class="contact-form__required">*</span></label
+            >
             <input
               v-model="contactName"
               class="contact-form__input"
@@ -1187,7 +1202,9 @@ onUnmounted(() => {
             />
           </div>
           <div class="contact-form__field">
-            <label class="contact-form__label">email</label>
+            <label class="contact-form__label"
+              >email <span class="contact-form__required">*</span></label
+            >
             <input
               v-model="contactEmail"
               class="contact-form__input"
@@ -1202,7 +1219,6 @@ onUnmounted(() => {
               v-model="contactMessage"
               class="contact-form__textarea"
               placeholder="bugs, ideas, compliments, roasts... all welcome"
-              required
             ></textarea>
           </div>
           <p v-if="contactError" class="contact-form__error">{{ contactError }}</p>
@@ -1213,9 +1229,7 @@ onUnmounted(() => {
         <div v-else class="contact-form__success active">
           <div class="contact-form__success-icon">&#x1FAD8;</div>
           <p class="contact-form__success-msg">message sent!</p>
-          <p class="contact-form__success-sub">
-            I'll get back to you soon. probably. unless I'm picking up my kid.
-          </p>
+          <p class="contact-form__success-sub">we'll (I'll) get back to you soon. probably.</p>
         </div>
       </div>
     </div>
@@ -3016,6 +3030,11 @@ onUnmounted(() => {
   font-size: 0.72rem;
   font-weight: 600;
   opacity: 0.5;
+}
+
+.contact-form__required {
+  color: var(--heritage-orange);
+  opacity: 1;
 }
 
 .contact-form__input,
