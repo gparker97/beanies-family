@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-10",
-    "translationCount": 1437
+    "translationCount": 1441
   },
   "translations": {
     "app.name": {
@@ -7189,6 +7189,26 @@
     "nav.help": {
       "translation": "帮助",
       "hash": "1c4m9",
+      "lastUpdated": "2026-03-10"
+    },
+    "nook.criticalTodoAssignedNoDue": {
+      "translation": "{creator}要求您执行{task}",
+      "hash": "l9nr6t",
+      "lastUpdated": "2026-03-10"
+    },
+    "nook.criticalTodoSelfNoDue": {
+      "translation": "不要忘记",
+      "hash": "m8z8tb",
+      "lastUpdated": "2026-03-10"
+    },
+    "nook.criticalTodoAssignedOverdue": {
+      "translation": "{creator}要求您完成{task} —截止日期为{date} ，只要您有机会！",
+      "hash": "fby3f8",
+      "lastUpdated": "2026-03-10"
+    },
+    "nook.criticalTodoSelfOverdue": {
+      "translation": "温馨提醒： {task}截止日期为{date}",
+      "hash": "7viy2w",
       "lastUpdated": "2026-03-10"
     }
   }
