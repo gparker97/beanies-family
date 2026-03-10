@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { useSyncStore } from '@/stores/syncStore';
 import { celebrate } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
 
@@ -15,6 +16,7 @@ const settingsStore = useSettingsStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const activityStore = useActivityStore();
+const syncStore = useSyncStore();
 const { t } = useTranslation();
 
 const currentStep = ref(1);
@@ -55,13 +57,19 @@ function goBack() {
   }
 }
 
-function handleSkip() {
+async function handleSkip() {
   settingsStore.setOnboardingCompleted(true);
+  if (syncStore.isConfigured) {
+    await syncStore.syncNow(true);
+  }
   visible.value = false;
 }
 
-function handleFinish() {
+async function handleFinish() {
   settingsStore.setOnboardingCompleted(true);
+  if (syncStore.isConfigured) {
+    await syncStore.syncNow(true);
+  }
   visible.value = false;
   celebrate('setup-complete');
 }
