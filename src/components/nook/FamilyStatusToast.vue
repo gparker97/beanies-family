@@ -76,45 +76,194 @@ function handleItemClick(item: CriticalItem) {
 </script>
 
 <template>
-  <div
-    class="rounded-[18px] px-6 py-4 text-white"
-    style="
-      background: linear-gradient(135deg, #f15d22, #e67e22);
-      box-shadow: 0 8px 32px rgb(241 93 34 / 20%);
-    "
-  >
+  <div class="status-toast">
+    <!-- Decorative background grain -->
+    <div class="toast-grain" />
+
     <!-- Header row: icon + quote -->
-    <div class="flex items-center gap-4">
-      <div
-        class="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[14px]"
-        style="background: rgb(255 255 255 / 20%)"
-      >
+    <div class="relative flex items-center gap-4">
+      <div class="toast-icon-box">
         <span class="text-xl">🌳</span>
       </div>
-      <div class="min-w-0">
-        <p class="font-outfit truncate text-sm leading-snug font-semibold">
+      <div class="min-w-0 flex-1">
+        <p class="font-outfit truncate text-sm leading-snug font-semibold text-white">
           {{ title }}
         </p>
-        <p class="mt-0.5 truncate text-xs opacity-70">
+        <p class="mt-0.5 truncate text-xs text-white/65">
           {{ subtitle }}
         </p>
       </div>
     </div>
 
     <!-- Critical items for today -->
-    <div v-if="criticalItems.length" class="mt-3 space-y-1.5 border-t border-white/20 pt-3">
-      <button
-        v-for="item in criticalItems"
-        :key="item.id + item.type + item.time"
-        class="flex w-full items-center gap-3 rounded-xl bg-white/10 px-3 py-2 text-left transition-colors hover:bg-white/20 active:bg-white/25"
-        @click="handleItemClick(item)"
-      >
-        <span class="shrink-0 text-base">{{ item.icon }}</span>
-        <span class="line-clamp-2 text-xs leading-snug font-medium">{{ item.message }}</span>
-      </button>
-      <p v-if="overflowCount > 0" class="px-3 text-xs opacity-60">
+    <div v-if="criticalItems.length" class="relative mt-3 pt-3">
+      <!-- Separator line with warm glow -->
+      <div class="toast-separator" />
+
+      <div class="space-y-1.5">
+        <button
+          v-for="(item, index) in criticalItems"
+          :key="item.id + item.type + item.time"
+          class="critical-item"
+          :style="{ animationDelay: `${index * 60}ms` }"
+          @click="handleItemClick(item)"
+        >
+          <!-- Icon with subtle glow ring -->
+          <span class="critical-icon">
+            {{ item.icon }}
+          </span>
+
+          <!-- Message text -->
+          <span class="line-clamp-2 flex-1 text-xs leading-snug font-medium text-white/90">
+            {{ item.message }}
+          </span>
+
+          <!-- Tap chevron -->
+          <svg
+            class="h-3.5 w-3.5 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5"
+            viewBox="0 0 16 16"
+            fill="none"
+          >
+            <path
+              d="M6 3l5 5-5 5"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Overflow indicator -->
+      <p v-if="overflowCount > 0" class="mt-2 px-1 text-xs text-white/45">
         +{{ overflowCount }} {{ t('nook.criticalMore') }}
       </p>
     </div>
   </div>
 </template>
+
+<style scoped>
+.status-toast {
+  background: linear-gradient(135deg, #f15d22 0%, #e67e22 55%, #d4701e 100%);
+  border-radius: 18px;
+  box-shadow:
+    0 8px 32px rgb(241 93 34 / 18%),
+    0 2px 8px rgb(241 93 34 / 10%),
+    inset 0 1px 0 rgb(255 255 255 / 12%);
+  color: white;
+  overflow: hidden;
+  padding: 18px 22px;
+  position: relative;
+}
+
+/* Subtle noise texture for warmth/depth */
+.toast-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  border-radius: inherit;
+  inset: 0;
+  opacity: 0.04;
+  pointer-events: none;
+  position: absolute;
+}
+
+.toast-icon-box {
+  align-items: center;
+  backdrop-filter: blur(4px);
+  background: rgb(255 255 255 / 18%);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 15%),
+    0 2px 8px rgb(0 0 0 / 8%);
+  display: flex;
+  flex-shrink: 0;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.toast-separator {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(255 255 255 / 25%) 20%,
+    rgb(255 255 255 / 25%) 80%,
+    transparent 100%
+  );
+  height: 1px;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+/* Critical item rows */
+.critical-item {
+  align-items: center;
+  animation: critical-slide-in 300ms ease both;
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%);
+  display: flex;
+  gap: 10px;
+  padding: 9px 12px;
+  text-align: left;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease,
+    box-shadow 150ms ease;
+  width: 100%;
+}
+
+.critical-item:hover {
+  background: rgb(255 255 255 / 18%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 10%),
+    0 2px 8px rgb(0 0 0 / 6%);
+}
+
+.critical-item:active {
+  background: rgb(255 255 255 / 22%);
+  transform: scale(0.985);
+}
+
+/* Icon with soft backing glow */
+.critical-icon {
+  align-items: center;
+  background: rgb(255 255 255 / 12%);
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgb(255 255 255 / 6%);
+  display: flex;
+  flex-shrink: 0;
+  font-size: 15px;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+/* Staggered entrance */
+@keyframes critical-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .critical-item {
+    animation: none;
+  }
+
+  .critical-item:active {
+    transform: none;
+  }
+}
+</style>
