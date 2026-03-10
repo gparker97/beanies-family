@@ -317,6 +317,17 @@ export function reset(): void {
  * Initialize the sync service - try to restore file handle from storage.
  */
 export async function initialize(): Promise<boolean> {
+  // Already initialized with valid session for this family — skip destructive re-init
+  const activeFamilyId = getActiveFamilyId();
+  if (
+    currentFamilyKey &&
+    currentEnvelope &&
+    currentProvider &&
+    currentProviderFamilyId === activeFamilyId
+  ) {
+    return state.isConfigured;
+  }
+
   reset();
 
   if (!getActiveFamilyId()) {

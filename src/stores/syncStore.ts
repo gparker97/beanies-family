@@ -377,9 +377,9 @@ export const useSyncStore = defineStore('sync', () => {
             }
           }
 
-          // Update envelope with remote's key material
+          // Update envelope and ensure syncService has the family key
           envelope.value = remoteEnvelope;
-          syncService.setEnvelope(remoteEnvelope);
+          syncService.setFamilyKey(familyKey.value!, remoteEnvelope);
 
           // Prevent next doSave() from re-fetching what we just loaded
           const loadedTs = await syncService.getFileTimestamp();
@@ -1125,7 +1125,7 @@ export const useSyncStore = defineStore('sync', () => {
               );
               mergeDoc(doc);
               envelope.value = pendingEncryptedFile.value.envelope;
-              syncService.setEnvelope(pendingEncryptedFile.value.envelope);
+              syncService.setFamilyKey(familyKey.value!, pendingEncryptedFile.value.envelope);
               pendingEncryptedFile.value = null;
               await reloadAllStores();
               syncService.triggerDebouncedSave();
