@@ -3102,7 +3102,6 @@ onUnmounted(() => {
 .back-to-top {
   align-items: center;
   backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
   background: rgb(255 255 255 / 85%);
   border: 1px solid rgb(44 62 80 / 10%);
   border-radius: 50%;
