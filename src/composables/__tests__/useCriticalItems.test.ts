@@ -249,17 +249,56 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value).toHaveLength(0);
   });
 
-  it('excludes todos not due today', () => {
+  it('includes todos due tomorrow with no-due-date style message', () => {
     familyStore.setCurrentMember('parent-1');
     todoStore.todos.push(
       makeTodo({
         assigneeId: 'parent-1',
         dueDate: '2026-03-11', // tomorrow
+        createdBy: 'parent-1',
+        title: 'Future task',
       })
     );
 
     const { criticalItems } = useCriticalItems();
-    expect(criticalItems.value).toHaveLength(0);
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('future task');
+    expect(criticalItems.value[0]!.icon).toBe('📋');
+  });
+
+  it('includes todos with no due date', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        createdBy: 'parent-2',
+        title: 'No deadline task',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('Mom');
+    expect(criticalItems.value[0]!.message).toContain('no deadline task');
+    expect(criticalItems.value[0]!.icon).toBe('📋');
+  });
+
+  it('shows overdue todos with gentle reminder and clock icon', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        dueDate: '2026-03-08', // two days ago
+        createdBy: 'parent-1',
+        title: 'Overdue task',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('overdue task');
+    expect(criticalItems.value[0]!.message).toContain('Mar 8');
+    expect(criticalItems.value[0]!.icon).toBe('⏰');
   });
 
   it('excludes todos assigned to other members', () => {
