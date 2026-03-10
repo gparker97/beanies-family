@@ -92,8 +92,14 @@ export function useCriticalItems() {
       if (todo.assigneeId !== memberId) continue;
 
       const dueDate = todo.dueDate?.split('T')[0] ?? '';
-      const isOverdue = dueDate !== '' && dueDate < todayStr.value;
+      const hasDate = dueDate !== '';
+      const isOverdue = hasDate && dueDate < todayStr.value;
       const isDueToday = dueDate === todayStr.value;
+      const isFuture = hasDate && dueDate > todayStr.value;
+
+      // Skip todos with a future due date
+      if (isFuture) continue;
+
       const isFromOther = todo.createdBy && todo.createdBy !== memberId;
       const taskTitle = lowercaseFirst(todo.title);
 
@@ -118,7 +124,7 @@ export function useCriticalItems() {
             })
           : buildMessage('nook.criticalTodoSelf', { task: taskTitle });
       } else {
-        // No due date or future due date — still show as a reminder
+        // No due date — show as a general reminder
         message = isFromOther
           ? buildMessage('nook.criticalTodoAssignedNoDue', {
               creator: getMemberName(todo.createdBy),
@@ -162,7 +168,11 @@ export function useCriticalItems() {
         if (isAssignee && !isPickup && !isDropoff) n++;
         return n;
       }, 0);
-    const totalTodos = todoStore.openTodos.filter((todo) => todo.assigneeId === memberId).length;
+    const totalTodos = todoStore.openTodos.filter((todo) => {
+      if (todo.assigneeId !== memberId) return false;
+      const dd = todo.dueDate?.split('T')[0] ?? '';
+      return dd === '' || dd <= todayStr.value;
+    }).length;
     const total = totalActivities + totalTodos;
     return Math.max(0, total - MAX_ITEMS);
   });
