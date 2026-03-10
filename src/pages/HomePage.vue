@@ -1355,6 +1355,7 @@ onUnmounted(() => {
   padding: 8px 18px;
   text-decoration: none;
   transition: all 200ms;
+  white-space: nowrap;
 }
 
 .fnav__cta:hover {
@@ -3227,6 +3228,13 @@ onUnmounted(() => {
    RESPONSIVE
    ═══════════════════════════════════════════════ */
 @media (width <= 900px) {
+  .fnav {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 90vw;
+    padding: 8px 14px;
+  }
+
   .showcase {
     height: 340px;
   }
@@ -3255,8 +3263,29 @@ onUnmounted(() => {
     padding: 100px 20px 40px;
   }
 
-  .fnav__links {
-    display: none;
+  .fnav {
+    gap: 6px 10px;
+    padding: 6px 12px;
+  }
+
+  .fnav__logo {
+    font-size: 0.78rem;
+  }
+
+  .fnav__logo img {
+    height: 22px;
+    margin-right: 5px;
+    width: 22px;
+  }
+
+  .fnav__links a {
+    font-size: 0.6rem;
+    padding: 4px 8px;
+  }
+
+  .fnav__cta {
+    font-size: 0.6rem;
+    padding: 6px 14px;
   }
 
   .showcase {
