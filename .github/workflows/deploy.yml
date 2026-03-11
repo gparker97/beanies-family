@@ -144,6 +144,7 @@ jobs:
           VITE_INVITE_BEAN_HASHES: ${{ secrets.INVITE_BEAN_HASHES }}
           VITE_INVITE_WEBHOOK_URL: ${{ secrets.INVITE_WEBHOOK_URL }}
           VITE_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
+          VITE_SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7

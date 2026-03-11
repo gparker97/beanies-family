@@ -16,6 +16,7 @@ import { useSyncStore } from '@/stores/syncStore';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import { clearFolderCache } from '@/services/google/driveService';
+import { slackNotify } from '@/utils/slackNotify';
 import type { FamilyMember, Gender, AgeGroup, DateOfBirth } from '@/types/models';
 
 const { t } = useTranslation();
@@ -127,6 +128,9 @@ async function handleStep1Next() {
   });
 
   if (result.success) {
+    slackNotify(
+      `🫘 *New family pod started!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}`
+    );
     currentStep.value = 2;
     formError.value = null;
   } else {
@@ -293,6 +297,12 @@ async function handleFinish() {
     syncStore.setupAutoSync();
     syncStore.ensureRegistered();
   }
+  const memberNames = addedMembers.value.map((m) => m.name);
+  const allMembers = [name.value, ...memberNames];
+  const storage = storageType.value === 'google_drive' ? 'Google Drive' : 'Local File';
+  slackNotify(
+    `🎉 *Family pod created!*\n*Family:* ${familyName.value}\n*Members (${allMembers.length}):* ${allMembers.join(', ')}\n*Storage:* ${storage}`
+  );
   emit('signed-in', '/nook');
 }
 
