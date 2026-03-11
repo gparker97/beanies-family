@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-10",
-    "translationCount": 1441
+    "lastUpdated": "2026-03-11",
+    "translationCount": 1442
   },
   "translations": {
     "app.name": {
@@ -7210,6 +7210,11 @@
       "translation": "温馨提醒： {task}截止日期为{date}",
       "hash": "7viy2w",
       "lastUpdated": "2026-03-10"
+    },
+    "common.whatsThis": {
+      "translation": "這是什麼？",
+      "hash": "n0sf5b",
+      "lastUpdated": "2026-03-11"
     }
   }
 }
