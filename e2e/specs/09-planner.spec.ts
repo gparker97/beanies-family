@@ -26,6 +26,11 @@ test.describe('Family Planner', () => {
     await page.waitForURL('/planner');
   }
 
+  /** Select the first family member chip in the activity modal (required for multi-owner). */
+  async function selectAssignee(page: import('@playwright/test').Page) {
+    await page.getByText('John Doe').first().click();
+  }
+
   test('should display the planner page with calendar grid', async ({ page }) => {
     await setupPlanner(page);
 
@@ -56,6 +61,7 @@ test.describe('Family Planner', () => {
 
     // Fill in form — new BeanieFormModal layout
     await page.getByPlaceholder("What's the activity?").fill('Doctor Visit');
+    await selectAssignee(page);
 
     // Switch to one-off mode
     await page.getByRole('button', { name: /one-off/i }).click();
@@ -84,6 +90,7 @@ test.describe('Family Planner', () => {
 
     // Fill in form — recurrence defaults to "Recurring"
     await page.getByPlaceholder("What's the activity?").fill('Piano Lesson');
+    await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill('2026-03-04');
 
     // Open start time dropdown (trigger shows "9:00 AM" by default) then select 3:00 PM
@@ -117,6 +124,7 @@ test.describe('Family Planner', () => {
 
     // Fill title
     await page.getByPlaceholder("What's the activity?").fill('Soccer Training');
+    await selectAssignee(page);
 
     // Date
     await page.locator('input[type="date"]').first().fill('2026-03-02');
@@ -168,6 +176,7 @@ test.describe('Family Planner', () => {
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     await page.getByPlaceholder("What's the activity?").fill('Today Activity');
+    await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(todayStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -191,6 +200,7 @@ test.describe('Family Planner', () => {
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder("What's the activity?").fill('Upcoming Test');
+    await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -211,6 +221,7 @@ test.describe('Family Planner', () => {
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder("What's the activity?").fill('Original Title');
+    await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -251,6 +262,7 @@ test.describe('Family Planner', () => {
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder("What's the activity?").fill('To Delete');
+    await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -320,6 +332,7 @@ test.describe('Family Planner', () => {
 
     // Basic fields
     await page.getByPlaceholder("What's the activity?").fill('Soccer Practice');
+    await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill('2026-03-02');
 
     // Start time defaults to 9:00 AM, end time auto-defaults to 10:00 AM
@@ -361,6 +374,7 @@ test.describe('Family Planner', () => {
 
     // Fill in form — recurrence defaults to "Recurring"
     await page.getByPlaceholder("What's the activity?").fill('Summer Swimming');
+    await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill('2026-06-01');
 
     // Recurrence stays at default (Recurring + Weekly)
@@ -393,6 +407,7 @@ test.describe('Family Planner', () => {
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder("What's the activity?").fill('Weekly Lesson');
+    await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
@@ -436,6 +451,7 @@ test.describe('Family Planner', () => {
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder("What's the activity?").fill('Piano Class');
+    await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
@@ -477,6 +493,7 @@ test.describe('Family Planner', () => {
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder("What's the activity?").fill('Soccer Training');
+    await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
