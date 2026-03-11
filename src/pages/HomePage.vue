@@ -946,10 +946,14 @@ onUnmounted(() => {
 
         <p class="reveal">
           When my youngest was about 6 months old, my wife started calling him
-          <span class="story__orange">&#x5C0F;&#x8C46;&#x8C46;</span>. Which in Chinese sounds
-          endearing, but just means <span class="story__orange">little bean</span>. Cuz he sort of
-          looked like one. It sounds cute in English too, so I called him
-          <span class="story__orange">beanie</span>, and it stuck.
+          <span class="story__pinyin-wrap"
+            ><ruby class="story__orange story__pinyin"
+              >&#x5C0F;&#x8C46;&#x8C46;<rp>(</rp><rt>xiǎo dòu dou</rt><rp>)</rp></ruby
+            ></span
+          >. Which in Chinese sounds endearing, but just means
+          <span class="story__orange">little bean</span>. Cuz he sort of looked like one. It sounds
+          cute in English too, so I called him <span class="story__orange">beanie</span>, and it
+          stuck.
         </p>
 
         <p class="reveal">
@@ -2677,6 +2681,32 @@ onUnmounted(() => {
 .story__orange {
   color: var(--heritage-orange);
   font-weight: 600;
+}
+
+.story__pinyin-wrap {
+  animation: pinyin-float 4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  display: inline-block;
+  will-change: transform;
+}
+
+.story__pinyin rt {
+  color: var(--heritage-orange);
+  font-size: 0.55em;
+  font-style: italic;
+  font-weight: 450;
+  letter-spacing: 0.03em;
+  opacity: 0.8;
+}
+
+@keyframes pinyin-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 .story__link {
