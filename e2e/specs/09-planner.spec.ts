@@ -28,7 +28,11 @@ test.describe('Family Planner', () => {
 
   /** Select the first family member chip in the activity modal (required for multi-owner). */
   async function selectAssignee(page: import('@playwright/test').Page) {
-    await page.getByText('John Doe').first().click();
+    // Scope to the modal dialog to avoid clicking "John Doe" text behind the backdrop
+    await page
+      .locator('div[role="dialog"]')
+      .getByRole('button', { name: /John Doe/i })
+      .click();
   }
 
   test('should display the planner page with calendar grid', async ({ page }) => {
