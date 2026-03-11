@@ -463,7 +463,7 @@ async function handleDelete() {
     :icon="activity.icon || '📋'"
     :icon-bg="activityColor + '20'"
     size="narrow"
-    :save-label="t('action.done')"
+    :save-label="t('action.close')"
     save-gradient="orange"
     :show-delete="true"
     @close="handleClose"
@@ -530,13 +530,14 @@ async function handleDelete() {
         </span>
       </div>
 
-      <!-- Schedule details for recurring activities -->
+      <!-- Schedule & transport summary box -->
       <div
-        v-if="isRecurring"
+        v-if="isRecurring || activity.dropoffMemberId || activity.pickupMemberId"
         class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
       >
         <div class="space-y-1.5">
-          <div class="flex items-center gap-2">
+          <!-- Recurrence details -->
+          <div v-if="isRecurring" class="flex items-center gap-2">
             <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
               {{ t('planner.field.recurrence') }}
             </span>
@@ -565,6 +566,71 @@ async function handleDelete() {
             >
               {{ endDateFormatted }}
             </span>
+          </div>
+
+          <!-- Divider between schedule and transport -->
+          <div
+            v-if="isRecurring && (activity.dropoffMemberId || activity.pickupMemberId)"
+            class="border-t border-gray-200/60 pt-1.5 dark:border-slate-600/60"
+          />
+
+          <!-- Transport: Drop-off / Pick-up — inline editable -->
+          <div
+            v-if="activity.dropoffMemberId || activity.pickupMemberId"
+            class="grid grid-cols-2 gap-x-4"
+          >
+            <div v-if="activity.dropoffMemberId">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                🚗 {{ t('planner.field.dropoff') }}
+              </span>
+              <InlineEditField
+                :editing="editingField === 'dropoff'"
+                tint-color="orange"
+                @start-edit="startEdit('dropoff')"
+              >
+                <template #view>
+                  <span
+                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                  >
+                    {{ getMemberName(activity.dropoffMemberId) }}
+                  </span>
+                </template>
+                <template #edit>
+                  <FamilyChipPicker
+                    :model-value="draftDropoffMemberId"
+                    mode="single"
+                    compact
+                    @update:model-value="handleDropoffChange"
+                  />
+                </template>
+              </InlineEditField>
+            </div>
+            <div v-if="activity.pickupMemberId">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                🚗 {{ t('planner.field.pickup') }}
+              </span>
+              <InlineEditField
+                :editing="editingField === 'pickup'"
+                tint-color="orange"
+                @start-edit="startEdit('pickup')"
+              >
+                <template #view>
+                  <span
+                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                  >
+                    {{ getMemberName(activity.pickupMemberId) }}
+                  </span>
+                </template>
+                <template #edit>
+                  <FamilyChipPicker
+                    :model-value="draftPickupMemberId"
+                    mode="single"
+                    compact
+                    @update:model-value="handlePickupChange"
+                  />
+                </template>
+              </InlineEditField>
+            </div>
           </div>
         </div>
       </div>
@@ -601,53 +667,52 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Date — inline editable (only shown for one-off activities) -->
-      <FormFieldGroup v-if="!isRecurring" :label="t('planner.field.date')">
-        <InlineEditField
-          :editing="editingField === 'date'"
-          tint-color="orange"
-          @start-edit="startEdit('date')"
-        >
-          <template #view>
-            <span
-              v-if="viewFormattedDate"
-              class="font-outfit text-sm font-semibold text-[var(--color-text)]"
-            >
-              {{ viewFormattedDate }}
-            </span>
-            <span v-else class="text-sm text-[var(--color-text-muted)]">&mdash;</span>
-          </template>
-          <template #edit>
-            <div class="flex items-center gap-2">
-              <div class="flex-1">
-                <BaseInput
-                  v-model="draftDate"
-                  type="date"
-                  class="rounded-[14px] ring-2 ring-orange-500/30"
-                  @keydown="handleInputKeydown('date')($event)"
-                />
-              </div>
-              <button
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                @click.stop="saveField('date')"
+      <!-- Date & Times — combined row -->
+      <div :class="!isRecurring ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 gap-4'">
+        <!-- Date (only for one-off activities) -->
+        <FormFieldGroup v-if="!isRecurring" :label="t('planner.field.date')">
+          <InlineEditField
+            :editing="editingField === 'date'"
+            tint-color="orange"
+            @start-edit="startEdit('date')"
+          >
+            <template #view>
+              <span
+                v-if="viewFormattedDate"
+                class="font-outfit text-sm font-semibold text-[var(--color-text)]"
               >
-                <svg
-                  class="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  viewBox="0 0 24 24"
+                {{ viewFormattedDate }}
+              </span>
+              <span v-else class="text-sm text-[var(--color-text-muted)]">&mdash;</span>
+            </template>
+            <template #edit>
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <BaseInput
+                    v-model="draftDate"
+                    type="date"
+                    class="rounded-[14px] ring-2 ring-orange-500/30"
+                    @keydown="handleInputKeydown('date')($event)"
+                  />
+                </div>
+                <button
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  @click.stop="saveField('date')"
                 >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
-          </template>
-        </InlineEditField>
-      </FormFieldGroup>
-
-      <!-- Times — inline editable -->
-      <div class="grid grid-cols-2 gap-4">
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+          </InlineEditField>
+        </FormFieldGroup>
         <FormFieldGroup :label="t('modal.startTime')">
           <InlineEditField
             :editing="editingField === 'startTime'"
@@ -701,15 +766,15 @@ async function handleDelete() {
         </FormFieldGroup>
       </div>
 
-      <!-- Location — inline editable -->
-      <FormFieldGroup :label="t('planner.field.location')">
+      <!-- Location — only shown when populated -->
+      <FormFieldGroup v-if="activity.location" :label="t('planner.field.location')">
         <InlineEditField
           :editing="editingField === 'location'"
           tint-color="orange"
           @start-edit="startEdit('location')"
         >
           <template #view>
-            <div v-if="activity.location" class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5">
               <a
                 :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
                 target="_blank"
@@ -733,9 +798,6 @@ async function handleDelete() {
                 {{ activity.location }}
               </span>
             </div>
-            <span v-else class="text-sm text-[var(--color-text-muted)] italic">
-              {{ t('planner.noLocation') }}
-            </span>
           </template>
           <template #edit>
             <div class="flex items-center gap-2">
@@ -774,76 +836,21 @@ async function handleDelete() {
         </span>
       </FormFieldGroup>
 
-      <!-- Transport — inline editable -->
-      <div class="grid grid-cols-2 gap-4">
-        <FormFieldGroup :label="t('planner.field.dropoff')">
-          <InlineEditField
-            :editing="editingField === 'dropoff'"
-            tint-color="orange"
-            @start-edit="startEdit('dropoff')"
-          >
-            <template #view>
-              <span
-                v-if="activity.dropoffMemberId"
-                class="text-sm text-[var(--color-text)] dark:text-gray-300"
-              >
-                {{ getMemberName(activity.dropoffMemberId) }}
-              </span>
-              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
-            </template>
-            <template #edit>
-              <FamilyChipPicker
-                :model-value="draftDropoffMemberId"
-                mode="single"
-                compact
-                @update:model-value="handleDropoffChange"
-              />
-            </template>
-          </InlineEditField>
-        </FormFieldGroup>
-        <FormFieldGroup :label="t('planner.field.pickup')">
-          <InlineEditField
-            :editing="editingField === 'pickup'"
-            tint-color="orange"
-            @start-edit="startEdit('pickup')"
-          >
-            <template #view>
-              <span
-                v-if="activity.pickupMemberId"
-                class="text-sm text-[var(--color-text)] dark:text-gray-300"
-              >
-                {{ getMemberName(activity.pickupMemberId) }}
-              </span>
-              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
-            </template>
-            <template #edit>
-              <FamilyChipPicker
-                :model-value="draftPickupMemberId"
-                mode="single"
-                compact
-                @update:model-value="handlePickupChange"
-              />
-            </template>
-          </InlineEditField>
-        </FormFieldGroup>
-      </div>
-
-      <!-- Instructor — inline editable -->
-      <div class="grid grid-cols-2 gap-4">
-        <FormFieldGroup :label="t('planner.field.instructor')">
+      <!-- Instructor — only shown when populated -->
+      <div
+        v-if="activity.instructorName || activity.instructorContact"
+        class="grid grid-cols-2 gap-4"
+      >
+        <FormFieldGroup v-if="activity.instructorName" :label="t('planner.field.instructor')">
           <InlineEditField
             :editing="editingField === 'instructorName'"
             tint-color="orange"
             @start-edit="startEdit('instructorName')"
           >
             <template #view>
-              <span
-                v-if="activity.instructorName"
-                class="text-sm text-[var(--color-text)] dark:text-gray-300"
-              >
+              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
                 {{ activity.instructorName }}
               </span>
-              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
             </template>
             <template #edit>
               <div class="flex items-center gap-2">
@@ -875,20 +882,19 @@ async function handleDelete() {
             </template>
           </InlineEditField>
         </FormFieldGroup>
-        <FormFieldGroup :label="t('planner.field.instructorContact')">
+        <FormFieldGroup
+          v-if="activity.instructorContact"
+          :label="t('planner.field.instructorContact')"
+        >
           <InlineEditField
             :editing="editingField === 'instructorContact'"
             tint-color="orange"
             @start-edit="startEdit('instructorContact')"
           >
             <template #view>
-              <span
-                v-if="activity.instructorContact"
-                class="text-sm text-[var(--color-text)] dark:text-gray-300"
-              >
+              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
                 {{ activity.instructorContact }}
               </span>
-              <span v-else class="text-sm text-[var(--color-text-muted)] italic">&mdash;</span>
             </template>
             <template #edit>
               <div class="flex items-center gap-2">
@@ -922,8 +928,8 @@ async function handleDelete() {
         </FormFieldGroup>
       </div>
 
-      <!-- Notes — inline editable -->
-      <FormFieldGroup :label="t('planner.field.notes')">
+      <!-- Notes — only shown when populated -->
+      <FormFieldGroup v-if="activity.notes" :label="t('planner.field.notes')">
         <InlineEditField
           :editing="editingField === 'notes'"
           tint-color="orange"
@@ -932,13 +938,9 @@ async function handleDelete() {
         >
           <template #view>
             <p
-              v-if="activity.notes"
               class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
             >
               {{ activity.notes }}
-            </p>
-            <p v-else class="text-sm text-[var(--color-text-muted)] italic">
-              {{ t('planner.noNotes') }}
             </p>
           </template>
           <template #edit>
@@ -975,21 +977,22 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Created by — read-only -->
-      <FormFieldGroup :label="t('planner.createdBy')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-          {{ getMemberName(activity.createdBy) }}
+      <!-- Created by — subtle footer -->
+      <div class="border-t border-gray-100 pt-2 dark:border-slate-700">
+        <span class="text-xs text-[var(--color-text-muted)]">
+          {{ t('planner.createdBy') }}: {{ getMemberName(activity.createdBy) }}
         </span>
-      </FormFieldGroup>
+      </div>
+    </div>
 
-      <!-- Edit button -->
+    <template #footer-start>
       <button
         type="button"
-        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700"
+        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
         @click="handleOpenEdit"
       >
-        {{ t('action.edit') }}
+        ✏️ {{ t('action.edit') }}
       </button>
-    </div>
+    </template>
   </BeanieFormModal>
 </template>

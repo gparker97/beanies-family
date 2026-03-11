@@ -75,7 +75,7 @@ const modalSize = props.size === 'narrow' ? 'lg' : 'xl';
 
     <template #footer>
       <div class="flex items-center gap-3">
-        <!-- Delete button (optional) -->
+        <!-- Delete button (optional) — always leftmost -->
         <button
           v-if="showDelete"
           type="button"
@@ -87,6 +87,9 @@ const modalSize = props.size === 'narrow' ? 'lg' : 'xl';
         >
           🗑️
         </button>
+
+        <!-- Extra footer actions (slot) -->
+        <slot name="footer-start" />
 
         <!-- Save button -->
         <button
