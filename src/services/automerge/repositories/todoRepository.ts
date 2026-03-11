@@ -1,4 +1,5 @@
 import { createAutomergeRepository } from '../automergeRepository';
+import { normalizeAssignees } from '@/utils/assignees';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
 
 const repo = createAutomergeRepository<'todos', TodoItem, CreateTodoInput, UpdateTodoInput>(
@@ -13,5 +14,5 @@ export const deleteTodo = repo.remove;
 
 export async function getTodosByAssignee(assigneeId: string): Promise<TodoItem[]> {
   const todos = await getAllTodos();
-  return todos.filter((t) => t.assigneeId === assigneeId);
+  return todos.filter((t) => normalizeAssignees(t).includes(assigneeId));
 }

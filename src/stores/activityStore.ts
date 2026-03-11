@@ -4,6 +4,7 @@ import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
+import { normalizeAssignees } from '@/utils/assignees';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -38,7 +39,7 @@ export const useActivityStore = defineStore('activities', () => {
   const inactiveActivities = computed(() => activities.value.filter((a) => !a.isActive));
 
   // Filtered getters (by global member filter)
-  const filteredActivities = createMemberFiltered(activeActivities, (a) => a.assigneeId);
+  const filteredActivities = createMemberFiltered(activeActivities, (a) => normalizeAssignees(a));
 
   /** Map of parentActivityId → Set of override dates, for skipping in expansion. */
   const overridesByParent = computed(() => {

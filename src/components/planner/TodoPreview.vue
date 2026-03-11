@@ -3,14 +3,14 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTodoStore } from '@/stores/todoStore';
 import { useAuthStore } from '@/stores/authStore';
-import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
+import { normalizeAssignees } from '@/utils/assignees';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import type { TodoItem } from '@/types/models';
 
 const router = useRouter();
 const todoStore = useTodoStore();
 const authStore = useAuthStore();
-const { getMemberName, getMemberColor } = useMemberInfo();
 const { t } = useTranslation();
 
 const emit = defineEmits<{ view: [todo: TodoItem] }>();
@@ -82,14 +82,13 @@ function goToTodos() {
           {{ todo.title }}
         </span>
 
-        <!-- Assignee chip -->
-        <span
-          v-if="todo.assigneeId"
-          class="flex-shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-          :style="{ backgroundColor: getMemberColor(todo.assigneeId) }"
-        >
-          {{ getMemberName(todo.assigneeId) }}
-        </span>
+        <!-- Assignee chip(s) -->
+        <MemberChip
+          v-for="mid in normalizeAssignees(todo)"
+          :key="mid"
+          :member-id="mid"
+          class="flex-shrink-0"
+        />
 
         <!-- Due date badge -->
         <span

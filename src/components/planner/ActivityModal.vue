@@ -18,6 +18,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { CATEGORY_COLORS } from '@/stores/activityStore';
 import { addHourToTime, formatNookDate } from '@/utils/date';
+import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
 import type {
   FamilyActivity,
@@ -132,7 +133,7 @@ const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
 const daysOfWeek = ref<number[]>([]);
 const recurrenceEndDate = ref('');
 const category = ref<ActivityCategory>('lesson');
-const assigneeId = ref('');
+const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
 const pickupMemberId = ref<string>('');
 const location = ref('');
@@ -189,7 +190,7 @@ const { isEditing, isSubmitting } = useFormModal(
       daysOfWeek.value = activity.daysOfWeek ?? [];
       recurrenceEndDate.value = activity.recurrenceEndDate ?? '';
       category.value = activity.category;
-      assigneeId.value = activity.assigneeId ?? '';
+      assigneeIds.value = normalizeAssignees(activity);
       dropoffMemberId.value = activity.dropoffMemberId ?? '';
       pickupMemberId.value = activity.pickupMemberId ?? '';
       location.value = activity.location ?? '';
@@ -217,7 +218,7 @@ const { isEditing, isSubmitting } = useFormModal(
       daysOfWeek.value = [];
       recurrenceEndDate.value = '';
       category.value = 'lesson';
-      assigneeId.value = '';
+      assigneeIds.value = [];
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
       location.value = '';
@@ -310,6 +311,7 @@ const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
 
 const canSave = computed(() => {
   if (!title.value.trim() || !date.value) return false;
+  if (assigneeIds.value.length === 0) return false;
   if (hasCost.value && feeSchedule.value === 'none') return false;
   if (hasCost.value && !feePayerId.value) return false;
   return true;
@@ -327,7 +329,7 @@ function handleSave() {
   if (!canSave.value) return;
 
   const currentMember = familyStore.currentMember ?? familyStore.owner;
-  const primaryAssignee = assigneeId.value || undefined;
+  const assigneePayload = toAssigneePayload(assigneeIds.value);
 
   const baseData = {
     title: title.value.trim(),
@@ -346,7 +348,7 @@ function handleSave() {
         ? recurrenceEndDate.value
         : undefined,
     category: category.value,
-    assigneeId: primaryAssignee,
+    ...assigneePayload,
     dropoffMemberId: dropoffMemberId.value || undefined,
     pickupMemberId: pickupMemberId.value || undefined,
     location: location.value.trim() || undefined,
@@ -404,8 +406,8 @@ function handleSave() {
       </div>
 
       <!-- 1. Who? -->
-      <FormFieldGroup :label="t('modal.whosGoing')">
-        <FamilyChipPicker v-model="assigneeId" mode="single" />
+      <FormFieldGroup :label="t('modal.whosGoing')" required>
+        <FamilyChipPicker v-model="assigneeIds" mode="multi" />
       </FormFieldGroup>
 
       <!-- 2. Category picker (grouped) -->

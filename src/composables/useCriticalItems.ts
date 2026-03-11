@@ -5,6 +5,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
+import { normalizeAssignees } from '@/utils/assignees';
 import { CATEGORY_FALLBACK_ICON } from '@/constants/activityIcons';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -39,10 +40,11 @@ export function useCriticalItems() {
     for (const { activity, date } of todayActivities) {
       const isPickup = activity.pickupMemberId === memberId;
       const isDropoff = activity.dropoffMemberId === memberId;
-      const isAssignee = activity.assigneeId === memberId;
+      const isAssignee = normalizeAssignees(activity).includes(memberId);
 
       if (isPickup) {
-        const child = getMemberName(activity.assigneeId, '');
+        const assignees = normalizeAssignees(activity);
+        const child = assignees.length ? getMemberName(assignees[0], '') : '';
         items.push({
           id: activity.id,
           type: 'activity',
@@ -57,7 +59,8 @@ export function useCriticalItems() {
       }
 
       if (isDropoff) {
-        const child = getMemberName(activity.assigneeId, '');
+        const assignees = normalizeAssignees(activity);
+        const child = assignees.length ? getMemberName(assignees[0], '') : '';
         items.push({
           id: activity.id,
           type: 'activity',
@@ -89,7 +92,7 @@ export function useCriticalItems() {
 
     // ── Todos assigned to current member ──────────────────────────────
     for (const todo of todoStore.openTodos) {
-      if (todo.assigneeId !== memberId) continue;
+      if (!normalizeAssignees(todo).includes(memberId)) continue;
 
       const dueDate = todo.dueDate?.split('T')[0] ?? '';
       const hasDate = dueDate !== '';
@@ -162,14 +165,14 @@ export function useCriticalItems() {
       .reduce((n, { activity }) => {
         const isPickup = activity.pickupMemberId === memberId;
         const isDropoff = activity.dropoffMemberId === memberId;
-        const isAssignee = activity.assigneeId === memberId;
+        const isAssignee = normalizeAssignees(activity).includes(memberId);
         if (isPickup) n++;
         if (isDropoff) n++;
         if (isAssignee && !isPickup && !isDropoff) n++;
         return n;
       }, 0);
     const totalTodos = todoStore.openTodos.filter((todo) => {
-      if (todo.assigneeId !== memberId) return false;
+      if (!normalizeAssignees(todo).includes(memberId)) return false;
       const dd = todo.dueDate?.split('T')[0] ?? '';
       return dd === '' || dd <= todayStr.value;
     }).length;

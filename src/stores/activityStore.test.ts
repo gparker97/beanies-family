@@ -720,6 +720,55 @@ describe('activityStore', () => {
       expect(filtered).toHaveLength(4); // 4 Wednesdays * 1 activity
       expect(filtered.every((o) => o.activity.assigneeId === 'parent-1')).toBe(true);
     });
+
+    it('should include multi-assignee activity when any assignee is selected', () => {
+      const store = useActivityStore();
+      const { memberFilter } = setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeIds: ['parent-1', 'child-1'], assigneeId: 'parent-1' }),
+        makeActivity({ id: '2', assigneeId: 'parent-2' })
+      );
+
+      // Filter to only child-1
+      memberFilter.toggleMember('parent-1');
+      memberFilter.toggleMember('parent-2');
+
+      // Activity 1 should still show because child-1 is one of its assignees
+      expect(store.filteredActivities).toHaveLength(1);
+      expect(store.filteredActivities[0]!.id).toBe('1');
+    });
+
+    it('should include multi-assignee activity when multiple assignees are selected', () => {
+      const store = useActivityStore();
+      const { memberFilter } = setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeIds: ['parent-1', 'child-1'], assigneeId: 'parent-1' })
+      );
+
+      // All selected — activity should appear once
+      expect(store.filteredActivities).toHaveLength(1);
+
+      // Deselect parent-2 only — both parent-1 and child-1 are still selected
+      memberFilter.toggleMember('parent-2');
+      expect(store.filteredActivities).toHaveLength(1);
+    });
+
+    it('should exclude multi-assignee activity when none of its assignees are selected', () => {
+      const store = useActivityStore();
+      const { memberFilter } = setupFilterWithMembers();
+
+      store.activities.push(
+        makeActivity({ id: '1', assigneeIds: ['parent-1', 'child-1'], assigneeId: 'parent-1' })
+      );
+
+      // Deselect both parent-1 and child-1
+      memberFilter.toggleMember('parent-1');
+      memberFilter.toggleMember('child-1');
+
+      expect(store.filteredActivities).toHaveLength(0);
+    });
   });
 
   // ── Per-instance overrides ──
