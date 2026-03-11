@@ -21,6 +21,7 @@ interface ScheduleItem {
   title: string;
   date: string; // YYYY-MM-DD for sorting
   time: string; // HH:mm or '' for untimed
+  endTime: string; // HH:mm or '' for no end time
   displayDate: string; // Formatted for display
   icon: string;
 }
@@ -43,6 +44,7 @@ const todayItems = computed<ScheduleItem[]>(() => {
         title: todo.title,
         date: dateStr,
         time: todo.dueTime ?? '',
+        endTime: '',
         displayDate: formatNookDate(dateStr),
         icon: '✅',
       });
@@ -58,6 +60,7 @@ const todayItems = computed<ScheduleItem[]>(() => {
         title: activity.title,
         date,
         time: activity.startTime ?? '',
+        endTime: activity.endTime ?? '',
         displayDate: formatNookDate(date),
         icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
       });
@@ -93,6 +96,7 @@ const weekItems = computed<ScheduleItem[]>(() => {
         title: todo.title,
         date: dateStr,
         time: todo.dueTime ?? '',
+        endTime: '',
         displayDate: formatNookDate(dateStr),
         icon: '📋',
       });
@@ -108,6 +112,7 @@ const weekItems = computed<ScheduleItem[]>(() => {
         title: activity.title,
         date,
         time: activity.startTime ?? '',
+        endTime: activity.endTime ?? '',
         displayDate: formatNookDate(date),
         icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
       });
@@ -180,7 +185,8 @@ function handleClick(item: ScheduleItem) {
               {{ item.title }}
             </div>
             <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
-              {{ item.time ? item.time + ' · ' : '' }}{{ item.displayDate }}
+              {{ item.time ? item.time + (item.endTime ? ' - ' + item.endTime : '') + ' · ' : ''
+              }}{{ item.displayDate }}
             </div>
           </div>
         </div>
@@ -229,7 +235,8 @@ function handleClick(item: ScheduleItem) {
               {{ item.title }}
             </div>
             <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
-              {{ item.time ? item.time + ' · ' : '' }}{{ item.displayDate }}
+              {{ item.time ? item.time + (item.endTime ? ' - ' + item.endTime : '') + ' · ' : ''
+              }}{{ item.displayDate }}
             </div>
           </div>
         </div>

@@ -201,7 +201,8 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
 
             <div class="mt-0.5 flex items-center gap-2">
               <span v-if="occ.activity.startTime" class="text-primary-500 text-xs font-medium">
-                {{ occ.activity.startTime }}
+                {{ occ.activity.startTime
+                }}{{ occ.activity.endTime ? ' - ' + occ.activity.endTime : '' }}
               </span>
               <span
                 v-if="occ.activity.recurrence !== 'none'"
