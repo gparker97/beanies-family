@@ -221,7 +221,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click "Edit" button in view modal to open the full edit modal
-    await page.getByRole('button', { name: /^edit$/i }).click();
+    await page.getByRole('button', { name: /edit/i }).click();
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change the title
@@ -402,7 +402,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click Edit — edit modal opens directly (scope deferred to save)
-    await page.getByRole('button', { name: /^edit$/i }).click();
+    await page.getByRole('button', { name: /edit/i }).click();
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change title and save
@@ -443,7 +443,7 @@ test.describe('Family Planner', () => {
     // Click the first occurrence → view modal → Edit → edit modal opens directly
     await page.getByText('Piano Class').first().click();
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
-    await page.getByRole('button', { name: /^edit$/i }).click();
+    await page.getByRole('button', { name: /edit/i }).click();
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change title and save
@@ -484,7 +484,7 @@ test.describe('Family Planner', () => {
     // Click the first occurrence → view modal → Edit → edit modal opens directly
     await page.getByText('Soccer Training').first().click();
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
-    await page.getByRole('button', { name: /^edit$/i }).click();
+    await page.getByRole('button', { name: /edit/i }).click();
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change title and save
