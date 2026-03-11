@@ -13,6 +13,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { isValidEmail } from '@/utils/email';
 import { toDateInputValue } from '@/utils/date';
+import { normalizeAssignees } from '@/utils/assignees';
 import { generateInviteQR } from '@/utils/qrCode';
 import { shareFileWithEmail } from '@/services/google/driveService';
 import { getValidToken } from '@/services/google/googleAuth';
@@ -70,8 +71,8 @@ const memberHighlights = computed(() => {
     const items: MemberHighlight[] = [];
 
     // 1. Next upcoming activity for this member
-    const nextActivity = activityStore.upcomingActivities.find(
-      (e) => e.activity.assigneeId === m.id
+    const nextActivity = activityStore.upcomingActivities.find((e) =>
+      normalizeAssignees(e.activity).includes(m.id)
     );
     if (nextActivity) {
       items.push({
@@ -98,7 +99,7 @@ const memberHighlights = computed(() => {
 
     // 3. Next open todo for this member
     if (items.length < 2) {
-      const memberTodos = todoStore.openTodos.filter((td) => td.assigneeId === m.id);
+      const memberTodos = todoStore.openTodos.filter((td) => normalizeAssignees(td).includes(m.id));
       const nextTodo = memberTodos[0];
       if (nextTodo) {
         items.push({
@@ -501,9 +502,11 @@ function cancelEditFamilyName() {
                 </div>
                 <div class="text-secondary-500/40 text-xs dark:text-gray-500">
                   {{
-                    event.activity.assigneeId
-                      ? familyStore.members.find((m) => m.id === event.activity.assigneeId)?.name ||
-                        ''
+                    normalizeAssignees(event.activity).length
+                      ? normalizeAssignees(event.activity)
+                          .map((id) => familyStore.members.find((m) => m.id === id)?.name || '')
+                          .filter(Boolean)
+                          .join(', ')
                       : t('family.title')
                   }}
                 </div>

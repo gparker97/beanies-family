@@ -5,6 +5,7 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
+import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
@@ -50,7 +51,7 @@ const displayedOpenTodos = computed(() => {
 
   // Apply page-local member filter
   if (memberFilter.value !== 'all') {
-    items = items.filter((t) => t.assigneeId === memberFilter.value);
+    items = items.filter((t) => normalizeAssignees(t).includes(memberFilter.value));
   }
 
   // Apply sort
@@ -63,7 +64,8 @@ const displayedCompletedTodos = computed(() => {
   // Apply page-local member filter
   if (memberFilter.value !== 'all') {
     items = items.filter(
-      (t) => t.assigneeId === memberFilter.value || t.completedBy === memberFilter.value
+      (t) =>
+        normalizeAssignees(t).includes(memberFilter.value) || t.completedBy === memberFilter.value
     );
   }
 
@@ -96,7 +98,7 @@ async function handleQuickAdd(payload: { title: string; dueDate?: string; assign
   await todoStore.createTodo({
     title: payload.title,
     dueDate: payload.dueDate,
-    assigneeId: payload.assigneeId,
+    ...(payload.assigneeId ? toAssigneePayload([payload.assigneeId]) : {}),
     completed: false,
     createdBy: currentMemberId.value,
   });

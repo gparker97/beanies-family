@@ -4,6 +4,7 @@ import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as todoRepo from '@/services/automerge/repositories/todoRepository';
+import { normalizeAssignees } from '@/utils/assignees';
 import type { TodoItem, CreateTodoInput, UpdateTodoInput } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -32,7 +33,7 @@ export const useTodoStore = defineStore('todos', () => {
 
   // ========== FILTERED GETTERS (by global member filter) ==========
 
-  const filteredTodos = createMemberFiltered(todos, (t) => t.assigneeId);
+  const filteredTodos = createMemberFiltered(todos, (t) => normalizeAssignees(t));
 
   const filteredOpenTodos = computed(() => {
     return filteredTodos.value

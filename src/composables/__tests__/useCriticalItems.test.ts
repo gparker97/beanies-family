@@ -381,4 +381,81 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value[0]!.message).toContain('Emma');
     expect(criticalItems.value[0]!.message).toContain('Soccer Practice');
   });
+
+  // ── Multi-assignee tests ──────────────────────────────────────────
+
+  it('shows activity for all assignees using assigneeIds', () => {
+    // Both parent-1 and child-1 are assignees via the new array field
+    const sharedActivity = makeActivity({
+      assigneeIds: ['parent-1', 'child-1'],
+      assigneeId: 'parent-1', // legacy field (ignored when assigneeIds is present)
+    });
+
+    // Check from parent-1's perspective
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(sharedActivity);
+    const parent1Items = useCriticalItems().criticalItems.value;
+    expect(parent1Items).toHaveLength(1);
+    expect(parent1Items[0]!.message).toContain('Soccer Practice');
+
+    // Check from child-1's perspective
+    activityStore.activities.length = 0;
+    activityStore.activities.push(sharedActivity);
+    familyStore.setCurrentMember('child-1');
+    const child1Items = useCriticalItems().criticalItems.value;
+    expect(child1Items).toHaveLength(1);
+    expect(child1Items[0]!.message).toContain('Soccer Practice');
+  });
+
+  it('shows todo for all assignees using assigneeIds', () => {
+    const sharedTodo = makeTodo({
+      assigneeIds: ['parent-1', 'parent-2'],
+      assigneeId: 'parent-1',
+      dueDate: TODAY,
+      createdBy: 'child-1',
+      title: 'Shared task',
+    });
+
+    // parent-1 should see it
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(sharedTodo);
+    const p1 = useCriticalItems().criticalItems.value;
+    expect(p1).toHaveLength(1);
+    expect(p1[0]!.message).toContain('shared task');
+
+    // parent-2 should also see it
+    todoStore.todos.length = 0;
+    todoStore.todos.push(sharedTodo);
+    familyStore.setCurrentMember('parent-2');
+    const p2 = useCriticalItems().criticalItems.value;
+    expect(p2).toHaveLength(1);
+    expect(p2[0]!.message).toContain('shared task');
+  });
+
+  it('excludes multi-assignee activity from non-assignees', () => {
+    familyStore.setCurrentMember('parent-2');
+    activityStore.activities.push(
+      makeActivity({
+        assigneeIds: ['parent-1', 'child-1'],
+        assigneeId: 'parent-1',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(0);
+  });
+
+  it('excludes multi-assignee todo from non-assignees', () => {
+    familyStore.setCurrentMember('child-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeIds: ['parent-1', 'parent-2'],
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(0);
+  });
 });
