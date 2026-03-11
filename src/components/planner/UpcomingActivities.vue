@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { normalizeAssignees } from '@/utils/assignees';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import type { ActivityRecurrence } from '@/types/models';
 
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
 const emit = defineEmits<{ edit: [id: string, date: string] }>();
@@ -20,16 +20,6 @@ const hasMore = computed(() => upcoming.value.length > visibleCount.value);
 
 function showMore() {
   visibleCount.value += PAGE_SIZE;
-}
-
-function getMemberName(id?: string) {
-  if (!id) return null;
-  return familyStore.members.find((m) => m.id === id)?.name ?? null;
-}
-
-function getMemberColor(id?: string) {
-  if (!id) return '#95A5A6';
-  return familyStore.members.find((m) => m.id === id)?.color ?? '#95A5A6';
 }
 
 function formatDisplayDate(dateStr: string) {
@@ -113,13 +103,11 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
               &#x1F514;
             </span>
             <span class="flex-1" />
-            <span
-              v-if="getMemberName(occ.activity.assigneeId)"
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
-              :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
-            >
-              {{ getMemberName(occ.activity.assigneeId) }}
-            </span>
+            <MemberChip
+              v-for="mid in normalizeAssignees(occ.activity)"
+              :key="mid"
+              :member-id="mid"
+            />
           </div>
         </div>
       </button>

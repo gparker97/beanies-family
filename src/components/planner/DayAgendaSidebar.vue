@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { useMemberInfo } from '@/composables/useMemberInfo';
 import { toDateInputValue as formatDate } from '@/utils/date';
+import { normalizeAssignees } from '@/utils/assignees';
 import type { ActivityRecurrence } from '@/types/models';
 
 const props = defineProps<{
@@ -19,7 +20,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const { getMemberName, getMemberColor } = useMemberInfo();
 const activityStore = useActivityStore();
 
 /** Format the selected date as a readable header (e.g. "Saturday, March 15") */
@@ -139,13 +139,11 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
               {{ recurrenceLabel(occ.activity.recurrence) }}
             </span>
             <span class="flex-1" />
-            <span
-              v-if="occ.activity.assigneeId"
-              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
-              :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
-            >
-              {{ getMemberName(occ.activity.assigneeId) }}
-            </span>
+            <MemberChip
+              v-for="mid in normalizeAssignees(occ.activity)"
+              :key="mid"
+              :member-id="mid"
+            />
           </div>
         </div>
       </button>
@@ -211,13 +209,11 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
                 {{ recurrenceLabel(occ.activity.recurrence) }}
               </span>
               <span class="flex-1" />
-              <span
-                v-if="occ.activity.assigneeId"
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                :style="{ backgroundColor: getMemberColor(occ.activity.assigneeId) }"
-              >
-                {{ getMemberName(occ.activity.assigneeId) }}
-              </span>
+              <MemberChip
+                v-for="mid in normalizeAssignees(occ.activity)"
+                :key="mid"
+                :member-id="mid"
+              />
             </div>
           </div>
         </button>

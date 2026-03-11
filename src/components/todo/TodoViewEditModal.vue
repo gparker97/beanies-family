@@ -9,10 +9,12 @@ import { useFamilyStore } from '@/stores/familyStore';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
+import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import type { TodoItem } from '@/types/models';
 
 type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description';
@@ -40,7 +42,7 @@ const todo = computed(() =>
 const draftTitle = ref('');
 const draftDueDate = ref('');
 const draftDueTime = ref('');
-const draftAssigneeId = ref('');
+const draftAssigneeIds = ref<string[]>([]);
 const draftDescription = ref('');
 
 // Template refs for auto-focus
@@ -62,7 +64,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           draftDueTime.value = todo.value.dueTime ?? '';
           break;
         case 'assignee':
-          draftAssigneeId.value = todo.value.assigneeId ?? '';
+          draftAssigneeIds.value = [...normalizeAssignees(todo.value)];
           break;
         case 'description':
           draftDescription.value = todo.value.description ?? '';
@@ -108,10 +110,12 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           break;
         }
         case 'assignee': {
-          const newAssignee = draftAssigneeId.value || null;
-          const currentAssignee = todo.value.assigneeId ?? null;
-          if (newAssignee !== currentAssignee) {
-            update.assigneeId = newAssignee;
+          const current = normalizeAssignees(todo.value);
+          const draft = draftAssigneeIds.value;
+          if (JSON.stringify(draft) !== JSON.stringify(current)) {
+            const payload = toAssigneePayload(draft);
+            update.assigneeIds = payload.assigneeIds as any;
+            update.assigneeId = (payload.assigneeId ?? null) as any;
             changed = true;
           }
           break;
@@ -142,10 +146,7 @@ watch(
 );
 
 // Computed display values
-const viewAssignee = computed(() => {
-  if (!todo.value?.assigneeId) return null;
-  return familyStore.members.find((m) => m.id === todo.value!.assigneeId);
-});
+const viewAssigneeIds = computed(() => (todo.value ? normalizeAssignees(todo.value) : []));
 
 const viewCompletedBy = computed(() => {
   if (!todo.value?.completedBy) return null;
@@ -220,8 +221,7 @@ function handleTimeChange(value: string) {
 }
 
 function handleAssigneeChange(value: string | string[]) {
-  draftAssigneeId.value = value as string;
-  saveField('assignee');
+  draftAssigneeIds.value = Array.isArray(value) ? value : value ? [value] : [];
 }
 
 // Toggle complete/reopen
@@ -445,26 +445,34 @@ async function handleDelete() {
           @start-edit="startEdit('assignee')"
         >
           <template #view>
-            <span
-              v-if="viewAssignee"
-              class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-              :style="{
-                background: `linear-gradient(135deg, ${viewAssignee.color}, ${viewAssignee.color}cc)`,
-              }"
-            >
-              {{ viewAssignee.name }}
-            </span>
+            <div v-if="viewAssigneeIds.length" class="flex flex-wrap gap-1">
+              <MemberChip v-for="mid in viewAssigneeIds" :key="mid" :member-id="mid" size="md" />
+            </div>
             <span v-else class="text-sm text-[var(--color-text-muted)]">
               {{ t('todo.unassigned') }}
             </span>
           </template>
           <template #edit>
             <FamilyChipPicker
-              :model-value="draftAssigneeId"
-              mode="single"
+              :model-value="draftAssigneeIds"
+              mode="multi"
               compact
               @update:model-value="handleAssigneeChange"
             />
+            <div class="mt-1.5 flex gap-1.5">
+              <button
+                class="rounded-lg bg-[var(--color-primary-500)] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-600)]"
+                @click="saveField('assignee')"
+              >
+                ✓
+              </button>
+              <button
+                class="rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                @click="cancelEdit"
+              >
+                ✕
+              </button>
+            </div>
           </template>
         </InlineEditField>
       </FormFieldGroup>

@@ -4,7 +4,9 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { formatNookDate } from '@/utils/date';
+import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import type { TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
@@ -44,10 +46,6 @@ const selectedTodo = computed(() =>
 );
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-function getMember(id: string) {
-  return familyStore.members.find((m) => m.id === id);
-}
-
 function isOverdue(todo: TodoItem): boolean {
   if (todo.completed || !todo.dueDate) return false;
   const now = new Date();
@@ -71,7 +69,7 @@ async function addTask() {
   await todoStore.createTodo({
     title,
     dueDate: newTaskDate.value || undefined,
-    assigneeId: newTaskAssignee.value || undefined,
+    ...(newTaskAssignee.value ? toAssigneePayload([newTaskAssignee.value]) : {}),
     completed: false,
     createdBy: familyStore.currentMember?.id || '',
   });
@@ -263,15 +261,7 @@ async function toggleComplete(todoId: string) {
             >
               📅 {{ formattedDate(todo.dueDate) }}
             </span>
-            <span
-              v-if="todo.assigneeId && getMember(todo.assigneeId)"
-              class="rounded-md px-2 py-0.5 text-xs font-medium text-white"
-              :style="{
-                background: `linear-gradient(135deg, ${getMember(todo.assigneeId)!.color || '#3b82f6'}, ${getMember(todo.assigneeId)!.color || '#3b82f6'}cc)`,
-              }"
-            >
-              {{ getMember(todo.assigneeId)!.name }}
-            </span>
+            <MemberChip v-for="mid in normalizeAssignees(todo)" :key="mid" :member-id="mid" />
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { toAssigneePayload } from '@/utils/assignees';
 import { useTranslation } from '@/composables/useTranslation';
 import { addHourToTime, formatTime12 } from '@/utils/date';
 import { ACTIVITY_PRESETS, type ActivityPreset } from '@/constants/activityPresets';
@@ -101,7 +102,7 @@ async function handleAddActivity() {
     reminderMinutes: 0,
     isActive: true,
     createdBy: memberId,
-    assigneeId: memberId,
+    ...toAssigneePayload([memberId]),
   });
 
   const memberName = familyStore.members.find((m) => m.id === memberId)?.name?.split(' ')[0] || '';

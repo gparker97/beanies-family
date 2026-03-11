@@ -7,15 +7,16 @@ import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate, addHourToTime, toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import type { FamilyActivity } from '@/types/models';
 
 type EditableField =
@@ -46,7 +47,6 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
-const familyStore = useFamilyStore();
 const { getMemberName } = useMemberInfo();
 
 // Live-lookup from store so display stays reactive after inline edits
@@ -58,7 +58,7 @@ const activity = computed(() =>
 
 // Draft refs
 const draftTitle = ref('');
-const draftAssigneeId = ref('');
+const draftAssigneeIds = ref<string[]>([]);
 const draftDate = ref('');
 const draftStartTime = ref('');
 const draftEndTime = ref('');
@@ -84,7 +84,7 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           draftTitle.value = activity.value.title;
           break;
         case 'assignee':
-          draftAssigneeId.value = activity.value.assigneeId ?? '';
+          draftAssigneeIds.value = [...normalizeAssignees(activity.value)];
           break;
         case 'date':
           draftDate.value = activity.value.date?.split('T')[0] ?? '';
@@ -137,9 +137,14 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           break;
         }
         case 'assignee': {
-          const val = draftAssigneeId.value || null;
-          if (val !== (activity.value.assigneeId ?? null)) {
-            update.assigneeId = val;
+          const current = normalizeAssignees(activity.value);
+          const draft = draftAssigneeIds.value;
+          // Activities require at least 1 assignee
+          if (draft.length === 0) return;
+          if (JSON.stringify(draft) !== JSON.stringify(current)) {
+            const payload = toAssigneePayload(draft);
+            update.assigneeIds = payload.assigneeIds as any;
+            update.assigneeId = (payload.assigneeId ?? null) as any;
             changed = true;
           }
           break;
@@ -290,10 +295,7 @@ const activityColor = computed(() =>
   activity.value ? getActivityColor(activity.value) : '#95A5A6'
 );
 
-const viewAssignee = computed(() => {
-  if (!activity.value?.assigneeId) return null;
-  return familyStore.members.find((m) => m.id === activity.value!.assigneeId);
-});
+const viewAssigneeIds = computed(() => (activity.value ? normalizeAssignees(activity.value) : []));
 
 const viewFormattedDate = computed(() => {
   if (!activity.value?.date) return null;
@@ -366,10 +368,9 @@ function handleNotesKeydown(e: KeyboardEvent) {
   } else if (e.key === 'Escape') cancelEdit();
 }
 
-// Auto-save handlers for pickers
+// Assignee handler (multi-select — no auto-save, user confirms)
 function handleAssigneeChange(value: string | string[]) {
-  draftAssigneeId.value = value as string;
-  saveField('assignee');
+  draftAssigneeIds.value = Array.isArray(value) ? value : value ? [value] : [];
 }
 
 function handleStartTimeChange(value: string) {
@@ -602,6 +603,12 @@ async function handleDelete() {
                     compact
                     @update:model-value="handleDropoffChange"
                   />
+                  <button
+                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                    @click="cancelEdit"
+                  >
+                    ✕
+                  </button>
                 </template>
               </InlineEditField>
             </div>
@@ -628,6 +635,12 @@ async function handleDelete() {
                     compact
                     @update:model-value="handlePickupChange"
                   />
+                  <button
+                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                    @click="cancelEdit"
+                  >
+                    ✕
+                  </button>
                 </template>
               </InlineEditField>
             </div>
@@ -643,26 +656,36 @@ async function handleDelete() {
           @start-edit="startEdit('assignee')"
         >
           <template #view>
-            <span
-              v-if="viewAssignee"
-              class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-white"
-              :style="{
-                background: `linear-gradient(135deg, ${viewAssignee.color}, ${viewAssignee.color}cc)`,
-              }"
-            >
-              {{ viewAssignee.name }}
-            </span>
+            <div v-if="viewAssigneeIds.length" class="flex flex-wrap gap-1">
+              <MemberChip v-for="mid in viewAssigneeIds" :key="mid" :member-id="mid" size="md" />
+            </div>
             <span v-else class="text-sm text-[var(--color-text-muted)]">
               {{ t('todo.unassigned') }}
             </span>
           </template>
           <template #edit>
             <FamilyChipPicker
-              :model-value="draftAssigneeId"
-              mode="single"
+              :model-value="draftAssigneeIds"
+              mode="multi"
               compact
               @update:model-value="handleAssigneeChange"
             />
+            <div class="mt-1.5 flex gap-1.5">
+              <button
+                class="rounded-lg bg-[var(--color-primary-500)] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-600)]"
+                :disabled="draftAssigneeIds.length === 0"
+                :class="{ 'cursor-not-allowed opacity-40': draftAssigneeIds.length === 0 }"
+                @click="saveField('assignee')"
+              >
+                ✓
+              </button>
+              <button
+                class="rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                @click="cancelEdit"
+              >
+                ✕
+              </button>
+            </div>
           </template>
         </InlineEditField>
       </FormFieldGroup>

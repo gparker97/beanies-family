@@ -8,7 +8,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
  */
 export function createMemberFiltered<T>(
   items: Ref<T[]> | ComputedRef<T[]>,
-  getMemberId: (item: T) => string | undefined | null
+  getMemberIds: (item: T) => string | string[] | undefined | null
 ): ComputedRef<T[]> {
   return computed(() => {
     const memberFilter = useMemberFilterStore();
@@ -16,9 +16,10 @@ export function createMemberFiltered<T>(
       return items.value;
     }
     return items.value.filter((item) => {
-      const memberId = getMemberId(item);
-      if (!memberId) return true;
-      return memberFilter.isMemberSelected(memberId);
+      const ids = getMemberIds(item);
+      if (!ids || (Array.isArray(ids) && ids.length === 0)) return true;
+      if (Array.isArray(ids)) return ids.some((id) => memberFilter.isMemberSelected(id));
+      return memberFilter.isMemberSelected(ids);
     });
   });
 }

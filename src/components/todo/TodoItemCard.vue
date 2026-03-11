@@ -2,6 +2,8 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
+import { normalizeAssignees } from '@/utils/assignees';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import type { TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
@@ -17,11 +19,6 @@ const emit = defineEmits<{
   edit: [todo: TodoItem];
   delete: [id: string];
 }>();
-
-const assignee = computed(() => {
-  if (!props.todo.assigneeId) return null;
-  return familyStore.members.find((m) => m.id === props.todo.assigneeId);
-});
 
 const completedByMember = computed(() => {
   if (!props.todo.completedBy) return null;
@@ -162,16 +159,8 @@ const timeAgo = computed(() => {
         <!-- No date set -->
         <span v-else class="text-xs opacity-35">{{ t('todo.noDateSet') }}</span>
 
-        <!-- Assignee chip (gradient background with member color) -->
-        <span
-          v-if="assignee"
-          class="rounded-md px-2.5 py-0.5 text-xs font-medium text-white"
-          :style="{
-            background: `linear-gradient(135deg, ${assignee.color}, ${assignee.color}cc)`,
-          }"
-        >
-          {{ assignee.name }}
-        </span>
+        <!-- Assignee chip(s) -->
+        <MemberChip v-for="mid in normalizeAssignees(todo)" :key="mid" :member-id="mid" />
 
         <!-- Time ago -->
         <span class="text-xs opacity-35">{{ timeAgo }}</span>

@@ -1,4 +1,5 @@
 import { createAutomergeRepository } from '../automergeRepository';
+import { normalizeAssignees } from '@/utils/assignees';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -25,7 +26,7 @@ export async function getActivitiesByDate(date: string): Promise<FamilyActivity[
 
 export async function getActivitiesByAssignee(assigneeId: string): Promise<FamilyActivity[]> {
   const activities = await getAllActivities();
-  return activities.filter((a) => a.assigneeId === assigneeId);
+  return activities.filter((a) => normalizeAssignees(a).includes(assigneeId));
 }
 
 export async function getActivitiesByCategory(category: string): Promise<FamilyActivity[]> {

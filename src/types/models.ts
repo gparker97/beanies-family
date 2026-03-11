@@ -277,7 +277,9 @@ export interface TodoItem {
   id: UUID;
   title: string;
   description?: string;
-  assigneeId?: UUID; // FK to FamilyMember (who should do it)
+  /** @deprecated Use assigneeIds instead */
+  assigneeId?: UUID;
+  assigneeIds?: UUID[]; // FK to FamilyMember(s) — who should do it
   dueDate?: ISODateString; // ISO date (no time = untimed task)
   dueTime?: string; // HH:mm
   completed: boolean;
@@ -317,7 +319,9 @@ export interface FamilyActivity {
   color?: string; // Per-activity highlight color override (falls back to category color)
 
   // People
-  assigneeId?: UUID; // The child/member doing the activity
+  /** @deprecated Use assigneeIds instead */
+  assigneeId?: UUID;
+  assigneeIds?: UUID[]; // The child/member(s) doing the activity
   dropoffMemberId?: UUID; // Who drops off
   pickupMemberId?: UUID; // Who picks up
 
