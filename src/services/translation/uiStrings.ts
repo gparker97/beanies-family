@@ -53,6 +53,7 @@ const STRING_DEFS = {
   'common.shared': { en: 'Shared', beanie: 'everyone' },
   'common.all': { en: 'All', beanie: 'all' },
   'common.none': { en: 'None', beanie: 'none' },
+  'common.whatsThis': { en: "What's this?", beanie: "what's this?" },
   'common.family': { en: 'Family', beanie: 'the pod' },
 
   // Modal shared labels

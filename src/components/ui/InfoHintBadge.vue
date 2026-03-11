@@ -37,7 +37,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
     <div
       v-if="show"
       style="font-family: var(--font-inter)"
-      class="absolute top-7 left-0 z-50 w-72 rounded-xl p-3 text-xs leading-relaxed font-normal tracking-normal normal-case shadow-lg"
+      class="absolute top-7 right-0 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-xl p-3 text-xs leading-relaxed font-normal tracking-normal normal-case shadow-lg"
       :class="
         dark
           ? 'bg-secondary-600 border border-white/15 text-white/85'

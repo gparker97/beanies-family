@@ -738,40 +738,50 @@ async function confirmSignOutAndClearData() {
 
         <template #footer>
           <div class="flex flex-col gap-3">
-            <!-- Primary actions -->
-            <div class="flex justify-end gap-3">
-              <BaseButton variant="ghost" size="sm" @click="showSignOutModal = false">
-                {{ t('action.cancel') }}
+            <!-- Sign-out options — side by side -->
+            <div class="grid grid-cols-2 gap-3">
+              <BaseButton
+                variant="danger"
+                size="sm"
+                class="!h-auto !w-full"
+                @click="confirmSignOut"
+              >
+                <template #default>
+                  <span class="flex items-center justify-center gap-1.5">
+                    🚪 {{ t('auth.signOut') }}
+                  </span>
+                </template>
               </BaseButton>
-              <BaseButton variant="danger" size="sm" @click="confirmSignOut">
-                {{ t('auth.signOut') }}
+              <BaseButton
+                variant="ghost"
+                size="sm"
+                class="!h-auto !w-full !border !border-red-200 !text-red-500 hover:!bg-red-50 dark:!border-red-800 dark:!text-red-400 dark:hover:!bg-red-900/20"
+                @click="confirmSignOutAndClearData"
+              >
+                <template #default>
+                  <span class="flex items-center justify-center gap-1.5">
+                    🗑️ {{ t('auth.signOutClearData') }}
+                  </span>
+                </template>
               </BaseButton>
+            </div>
+            <div class="flex justify-end">
+              <span class="flex items-center gap-1">
+                <span class="text-[10px] text-gray-400 dark:text-gray-500">
+                  {{ t('common.whatsThis') }}
+                </span>
+                <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
+              </span>
             </div>
 
-            <!-- Sign out & clear data -->
-            <div class="border-t border-gray-100 pt-3 dark:border-slate-700">
-              <div class="flex items-center justify-center gap-2">
-                <BaseButton variant="ghost" size="sm" @click="confirmSignOutAndClearData">
-                  <template #default>
-                    <span class="flex items-center gap-2">
-                      <svg
-                        class="h-3.5 w-3.5 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                      {{ t('auth.signOutClearData') }}
-                    </span>
-                  </template>
-                </BaseButton>
-                <InfoHintBadge :text="t('auth.signOutClearDataHint')" />
-              </div>
-            </div>
+            <!-- Cancel -->
+            <button
+              type="button"
+              class="font-outfit mx-auto text-xs font-medium text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              @click="showSignOutModal = false"
+            >
+              {{ t('action.cancel') }}
+            </button>
           </div>
         </template>
       </BaseModal>
