@@ -1288,7 +1288,7 @@ onUnmounted(() => {
   display: flex;
   gap: 12px;
   left: 50%;
-  padding: 8px 10px 8px 18px;
+  padding: 6px 10px 6px 16px;
   position: fixed;
   top: 16px;
   transform: translateX(-50%);
@@ -1307,7 +1307,7 @@ onUnmounted(() => {
   color: var(--deep-slate);
   display: flex;
   font-family: Outfit, sans-serif;
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 700;
   gap: 0;
   text-decoration: none;
@@ -1334,12 +1334,13 @@ onUnmounted(() => {
   border-radius: 16px;
   color: var(--deep-slate);
   font-family: Outfit, sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.85rem;
   font-weight: 600;
   opacity: 0.35;
-  padding: 6px 12px;
+  padding: 4px 10px;
   text-decoration: none;
   transition: all 200ms;
+  white-space: nowrap;
 }
 
 .fnav__links a:hover {
@@ -1354,9 +1355,9 @@ onUnmounted(() => {
   color: white;
   cursor: pointer;
   font-family: Outfit, sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.85rem;
   font-weight: 600;
-  padding: 8px 18px;
+  padding: 6px 16px;
   text-decoration: none;
   transition: all 200ms;
   white-space: nowrap;
@@ -1392,7 +1393,7 @@ onUnmounted(() => {
   justify-content: center;
   min-height: 100vh;
   overflow: hidden;
-  padding: 80px 24px 40px;
+  padding: 100px 24px 40px;
   position: relative;
   text-align: center;
 }
@@ -3261,8 +3262,18 @@ onUnmounted(() => {
   .fnav {
     flex-wrap: wrap;
     justify-content: center;
-    max-width: 90vw;
-    padding: 8px 14px;
+    max-width: 95vw;
+    padding: 6px 12px 6px 14px;
+  }
+
+  .fnav__logo {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+
+  .fnav__links,
+  .fnav__cta {
+    flex-shrink: 0;
   }
 
   .showcase {
@@ -3290,16 +3301,16 @@ onUnmounted(() => {
 
 @media (width <= 640px) {
   .hero {
-    padding: 100px 20px 40px;
+    padding: 120px 20px 40px;
   }
 
   .fnav {
-    gap: 6px 10px;
-    padding: 6px 12px;
+    gap: 6px;
+    padding: 5px 10px 5px 12px;
   }
 
   .fnav__logo {
-    font-size: 0.78rem;
+    font-size: 0.85rem;
   }
 
   .fnav__logo img {
@@ -3308,14 +3319,18 @@ onUnmounted(() => {
     width: 22px;
   }
 
+  .fnav__links {
+    gap: 0;
+  }
+
   .fnav__links a {
-    font-size: 0.6rem;
-    padding: 4px 8px;
+    font-size: 0.75rem;
+    padding: 4px 6px;
   }
 
   .fnav__cta {
-    font-size: 0.6rem;
-    padding: 6px 14px;
+    font-size: 0.75rem;
+    padding: 5px 12px;
   }
 
   .showcase {
