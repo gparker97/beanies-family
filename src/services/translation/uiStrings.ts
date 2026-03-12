@@ -224,8 +224,8 @@ const STRING_DEFS = {
     en: 'Click "Add Recurring" to set up automatic transactions.',
     beanie: 'click "add recurring" to plant some automatic moves.',
   },
-  'recurring.addItem': { en: 'Add Recurring Item', beanie: 'add recurring bean' },
-  'recurring.editItem': { en: 'Edit Recurring Item', beanie: 'edit recurring bean' },
+  'recurring.addItem': { en: 'Add Recurring Item', beanie: 'add recurring item' },
+  'recurring.editItem': { en: 'Edit Recurring Item', beanie: 'edit recurring item' },
   'recurring.deleteConfirm': {
     en: 'Are you sure you want to delete this recurring item? Existing transactions will not be affected.',
     beanie:
@@ -236,22 +236,22 @@ const STRING_DEFS = {
   'recurring.paused': { en: 'Paused', beanie: 'paused' },
   'recurring.pauseItem': { en: 'Pause recurring', beanie: 'pause recurring' },
   'recurring.resumeItem': { en: 'Resume recurring', beanie: 'resume recurring' },
-  'recurring.editScopeTitle': { en: 'Edit Recurring', beanie: 'edit recurring bean' },
-  'recurring.scopeThisOnly': { en: 'This Occurrence Only', beanie: 'just this bean' },
+  'recurring.editScopeTitle': { en: 'Edit Recurring', beanie: 'edit recurring item' },
+  'recurring.scopeThisOnly': { en: 'This Occurrence Only', beanie: 'just this item' },
   'recurring.scopeThisOnlyDesc': { en: 'Change only this date', beanie: 'change only this date' },
-  'recurring.scopeAll': { en: 'All Occurrences', beanie: 'all the beans' },
+  'recurring.scopeAll': { en: 'All Occurrences', beanie: 'all items' },
   'recurring.scopeAllDesc': { en: 'Update the template', beanie: 'update the template' },
-  'recurring.scopeThisAndFuture': { en: 'This & All Future', beanie: 'this & future beans' },
+  'recurring.scopeThisAndFuture': { en: 'This & All Future', beanie: 'this & future items' },
   'recurring.scopeThisAndFutureDesc': {
     en: 'Split from this date forward',
     beanie: 'split from here on',
   },
 
   // Accounts
-  'accounts.title': { en: 'Accounts', beanie: 'bean jars' },
+  'accounts.title': { en: 'Accounts', beanie: 'accounts' },
   'accounts.subtitle': {
     en: 'Manage your bank accounts and credit cards',
-    beanie: 'where your beans live',
+    beanie: 'where all your beans live',
   },
   'accounts.addAccount': { en: 'Add Account', beanie: 'add an account' },
   'accounts.editAccount': { en: 'Edit Account', beanie: 'edit an account' },
@@ -1909,8 +1909,8 @@ const STRING_DEFS = {
     beanie: 'beans, beans, good for your heart!',
   },
   'nook.motto21': {
-    en: 'First you get the beans, then you get the power, then you get the women',
-    beanie: 'first you get the beans, then you get the power, then you get the women',
+    en: 'First you get the beans, then you get the money, and then you get the women',
+    beanie: 'first you get the beans, then you get the money, and then you get the womeeen',
   },
   'nook.motto22': {
     en: "Don't count your beans before they sprout!",
@@ -1936,17 +1936,53 @@ const STRING_DEFS = {
     en: 'Bean there, done that, got the family!',
     beanie: 'bean there, done that, got the pod!',
   },
+  'nook.motto28': {
+    en: 'Lonestar, I see your bean is as big as mine!',
+    beanie: 'lonestar, I see your bean is as big as mine!',
+  },
+  'nook.motto29': {
+    en: 'May the Schwartz be with your beans.',
+    beanie: 'may the schwartz be with your beans.',
+  },
+  'nook.motto30': {
+    en: "I am serious. And don't call me Shirley.",
+    beanie: "i am serious. and don't call me beanie.",
+  },
+  'nook.motto31': {
+    en: "So I got beans goin' for me, which is nice.",
+    beanie: "so i got beans goin' for me, which is nice.",
+  },
+  'nook.motto32': {
+    en: 'Be the bean, Danny.',
+    beanie: 'be the bean, danny.',
+  },
+  'nook.motto33': {
+    en: 'Fat, drunk, and counting beans is a great way to go through life.',
+    beanie: 'fat, drunk, and counting beans is a great way to go through life.',
+  },
+  'nook.motto34': {
+    en: "Today we're teaching beans how to fly!",
+    beanie: "today we're teaching beans how to fly!",
+  },
+  'nook.motto35': {
+    en: "Beans? Beans?? We don't need no stinking beans!!",
+    beanie: "beans? beans?? we don't need no stinking beans!!",
+  },
+  'nook.motto36': {
+    en: 'I picked the wrong week to quit counting beans.',
+    beanie: 'i picked the wrong week to quit counting beans.',
+  },
   'nook.statusSummary': {
     en: '{activities} activities planned today \u00B7 {tasks} tasks coming up',
     beanie: '{activities} activities today \u00B7 {tasks} tasks coming up!',
   },
   'nook.criticalPickup': {
     en: "Don't forget to pick up {child} from {activity} at {time} today!",
-    beanie: 'scoop up {child} from {activity} at {time} today!',
+    beanie: "don't forget to pick up {child} from {activity} at {time} today!",
   },
   'nook.criticalPickupNoTime': {
     en: "Don't forget to pick up {child} from {activity} today!",
-    beanie: 'scoop up {child} from {activity} today!',
+    beanie: "don't forget to pick up {child} from {activity} today!",
   },
   'nook.criticalDropoff': {
     en: 'Time to drop off {child} at {activity} at {time}!',
@@ -1965,28 +2001,28 @@ const STRING_DEFS = {
     beanie: "you have {activity} today — don't miss it!",
   },
   'nook.criticalTodoAssigned': {
-    en: '{creator} asked you to {task} today!',
-    beanie: '{creator} asked you to {task} today!',
+    en: '{creator} asked you: {task} today!',
+    beanie: '{creator} asked you: {task} today!',
   },
   'nook.criticalTodoSelf': {
-    en: "Don't forget to {task} today!",
-    beanie: "don't forget to {task} today!",
+    en: "Don't forget: {task} today!",
+    beanie: "don't forget: {task} today!",
   },
   'nook.criticalTodoAssignedNoDue': {
-    en: '{creator} asked you to {task}',
-    beanie: '{creator} asked you to {task}',
+    en: '{creator} asked you: {task}',
+    beanie: '{creator} asked you: {task}',
   },
   'nook.criticalTodoSelfNoDue': {
-    en: "Don't forget to {task}",
-    beanie: "don't forget to {task}",
+    en: "Don't forget: {task}",
+    beanie: "don't forget: {task}",
   },
   'nook.criticalTodoAssignedOverdue': {
-    en: '{creator} asked you to {task} — it was due {date}, whenever you get a chance!',
-    beanie: '{creator} asked you to {task} — was due {date}, no rush!',
+    en: '{creator} asked you: {task} — it was due {date}, whenever you get a chance!',
+    beanie: '{creator} asked you: {task} — was due {date}, no rush!',
   },
   'nook.criticalTodoSelfOverdue': {
-    en: 'A gentle reminder to {task} — it was due {date}',
-    beanie: 'a gentle nudge to {task} — was due {date}',
+    en: 'A gentle reminder: {task} — it was due {date}',
+    beanie: 'a gentle nudge: {task} — was due {date}',
   },
   'nook.criticalMore': {
     en: 'more for you today',
