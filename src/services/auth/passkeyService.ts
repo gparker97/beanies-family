@@ -89,8 +89,7 @@ export async function registerPasskeyForMember(
       { alg: -257, type: 'public-key' }, // RS256
     ],
     authenticatorSelection: {
-      // Omit authenticatorAttachment — 'platform' causes failures on some Android OEM
-      // credential managers (Honor/MagicOS, etc). Use hints instead for newer browsers.
+      authenticatorAttachment: 'platform',
       userVerification: 'required',
       residentKey: 'required',
       requireResidentKey: true,
@@ -100,31 +99,23 @@ export async function registerPasskeyForMember(
     extensions: prfExtension as AuthenticationExtensionsClientInputs,
   };
 
-  // Use PublicKeyCredentialHints for browsers that support it (Chrome 128+)
-  // This replaces authenticatorAttachment with a non-restrictive hint
   const createOptions: CredentialCreationOptions = { publicKey: publicKeyOptions };
-  applyCredentialHints(createOptions, ['client-device']);
 
+  // Progressive registration: try platform-attached first (ensures "save on this device"
+  // prompt), then fall back without it for Android OEMs that can't handle the constraint.
   let credential: PublicKeyCredential | null;
   try {
     credential = (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
   } catch (err) {
-    // On NotReadableError (Android credential manager issue), retry without PRF extension
-    if (err instanceof DOMException && err.name === 'NotReadableError') {
-      try {
-        delete publicKeyOptions.extensions;
-        credential = (await navigator.credentials.create(
-          createOptions
-        )) as PublicKeyCredential | null;
-      } catch (retryErr) {
-        return {
-          success: false,
-          error: formatCredentialManagerError(retryErr),
-        };
-      }
-    } else if (err instanceof DOMException && err.name === 'NotAllowedError') {
+    if (err instanceof DOMException && err.name === 'NotAllowedError') {
       return { success: false, error: 'Registration was cancelled' };
-    } else {
+    }
+
+    // Platform constraint or PRF extension failed — retry progressively:
+    // 1. Remove authenticatorAttachment, use hints instead (Chrome 128+)
+    // 2. If still failing, also remove PRF extension
+    credential = await retryRegistrationWithFallbacks(createOptions, publicKeyOptions);
+    if (credential === null) {
       return { success: false, error: formatCredentialManagerError(err) };
     }
   }
@@ -452,6 +443,48 @@ export async function signalCredentialsRemoved(credentialIds: string[]): Promise
 
 export async function renamePasskey(credentialId: string, label: string): Promise<void> {
   await passkeyRepo.updatePasskey(credentialId, { label });
+}
+
+// --- Registration retry logic ---
+
+/**
+ * Progressive fallback for credential creation:
+ * 1. Remove authenticatorAttachment, add hints: ['client-device'] (Chrome 128+)
+ * 2. If that still fails, also remove the PRF extension
+ *
+ * Returns the credential on success, or null if user cancelled / all retries failed.
+ * Throws only on unrecoverable errors.
+ */
+async function retryRegistrationWithFallbacks(
+  createOptions: CredentialCreationOptions,
+  publicKeyOptions: PublicKeyCredentialCreationOptions
+): Promise<PublicKeyCredential | null> {
+  // Fallback 1: drop authenticatorAttachment, use hints instead
+  delete publicKeyOptions.authenticatorSelection!.authenticatorAttachment;
+  applyCredentialHints(createOptions, ['client-device']);
+
+  try {
+    return (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
+  } catch (err1) {
+    if (err1 instanceof DOMException && err1.name === 'NotAllowedError') {
+      return null; // User cancelled
+    }
+
+    // Fallback 2: also remove PRF extension (some credential managers choke on it)
+    if (publicKeyOptions.extensions) {
+      delete publicKeyOptions.extensions;
+      try {
+        return (await navigator.credentials.create(createOptions)) as PublicKeyCredential | null;
+      } catch (err2) {
+        if (err2 instanceof DOMException && err2.name === 'NotAllowedError') {
+          return null; // User cancelled
+        }
+        // All retries exhausted — return null, caller will use originalError for message
+      }
+    }
+  }
+
+  return null;
 }
 
 // --- Helpers ---
