@@ -133,11 +133,13 @@ onUnmounted(() => {
           >.family</span
         ></a
       >
-      <div class="fnav__links">
-        <a href="#story" @click.prevent="scrollTo('story')">my story</a>
-        <a href="#security" @click.prevent="scrollTo('security')">security</a>
+      <div class="fnav__right">
+        <div class="fnav__links">
+          <a href="#story" @click.prevent="scrollTo('story')">my story</a>
+          <a href="#security" @click.prevent="scrollTo('security')">security</a>
+        </div>
+        <button class="fnav__cta" @click="goToWelcome">try it free</button>
       </div>
-      <button class="fnav__cta" @click="goToWelcome">try it free</button>
     </nav>
 
     <!-- HERO -->
@@ -1323,6 +1325,12 @@ onUnmounted(() => {
 
 .fnav__logo-orange {
   color: var(--heritage-orange);
+}
+
+.fnav__right {
+  align-items: center;
+  display: flex;
+  gap: 8px;
 }
 
 .fnav__links {
@@ -3271,8 +3279,7 @@ onUnmounted(() => {
     justify-content: center;
   }
 
-  .fnav__links,
-  .fnav__cta {
+  .fnav__right {
     flex-shrink: 0;
   }
 
