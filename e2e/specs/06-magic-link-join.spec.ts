@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test';
 import type { Route } from '@playwright/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
+import { ui } from '../helpers/ui-strings';
 
 test.describe('Magic Link Invite System', () => {
   test.describe('Invite Modal (FamilyPage)', () => {
@@ -120,7 +121,7 @@ test.describe('Magic Link Invite System', () => {
       await page.goto('/join');
 
       // Should show the join title
-      await expect(page.getByText('Join your family')).toBeVisible();
+      await expect(page.getByText(ui('join.verifyTitle'))).toBeVisible();
 
       // Should show "How to join" instructional card with steps
       await expect(page.getByText(/how to join/i)).toBeVisible();

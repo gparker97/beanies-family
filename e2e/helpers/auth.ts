@@ -1,4 +1,5 @@
 import { type Page } from '@playwright/test';
+import { ui } from './ui-strings';
 
 const E2E_PASSWORD = 'test1234';
 
@@ -32,16 +33,18 @@ export async function navigateToSetupStep3(page: Page): Promise<void> {
   await page.getByLabel('Email').fill('john@example.com');
   await page.getByLabel('Password').first().fill(E2E_PASSWORD);
   await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
-  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: ui('action.next') }).click();
 
   // Step 2: Skip to step 3 via dev hook (storage picker can't be automated)
-  await page.getByText('Save & secure your pod').waitFor({ state: 'visible', timeout: 10000 });
+  await page.getByText(ui('loginV6.step2Title')).waitFor({ state: 'visible', timeout: 10000 });
   await page.evaluate(() => {
     (window as any).__e2eCreatePod?.setStep(3);
   });
 
   // Wait for step 3 to render
-  await page.getByRole('button', { name: 'Finish' }).waitFor({ state: 'visible', timeout: 5000 });
+  await page
+    .getByRole('button', { name: ui('loginV6.finish') })
+    .waitFor({ state: 'visible', timeout: 5000 });
 }
 
 /**
@@ -86,12 +89,12 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     await page.getByLabel('Email').fill('john@example.com');
     await page.getByLabel('Password').first().fill(E2E_PASSWORD);
     await page.getByLabel('Confirm password').fill(E2E_PASSWORD);
-    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: ui('action.next') }).click();
 
     // Step 2: Storage & pod password
     // Wait for step 2 to fully render (signUp is async, so step 1's Next
     // triggers an async flow that sets currentStep = 2 on completion).
-    await page.getByText('Save & secure your pod').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByText(ui('loginV6.step2Title')).waitFor({ state: 'visible', timeout: 10000 });
 
     // The Local button triggers showSaveFilePicker (native OS dialog) which
     // cannot be automated in headless browsers. Skip to step 3 using the
@@ -101,17 +104,19 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     });
 
     // Wait for step 3 to render
-    await page.getByRole('button', { name: 'Finish' }).waitFor({ state: 'visible', timeout: 5000 });
+    await page
+      .getByRole('button', { name: ui('loginV6.finish') })
+      .waitFor({ state: 'visible', timeout: 5000 });
 
     // Step 3: Add family members — finish (goes to /nook)
-    await page.getByRole('button', { name: 'Finish' }).click();
+    await page.getByRole('button', { name: ui('loginV6.finish') }).click();
   }
 
   await page.waitForURL('/nook', { timeout: 60000 });
 
   // Dismiss TrustDeviceModal if it appears (triggered by freshSignIn).
   // The modal races with navigation, so give it a short window to show up.
-  const notNowButton = page.getByRole('button', { name: 'Not now' });
+  const notNowButton = page.getByRole('button', { name: ui('trust.notNow') });
   const modalAppeared = await notNowButton
     .waitFor({ state: 'visible', timeout: 3000 })
     .then(() => true)

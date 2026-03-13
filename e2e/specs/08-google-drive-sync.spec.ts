@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import type { Page, Route } from '@playwright/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
+import { ui } from '../helpers/ui-strings';
 
 /**
  * E2E tests for Google Drive cloud storage integration.
@@ -200,7 +201,7 @@ test.describe('Google Drive Sync', () => {
     await loadButton.first().click();
 
     // Google Drive label should be visible (either as button or disabled div)
-    const driveLabel = page.getByText('Google Drive').first();
+    const driveLabel = page.getByText(ui('googleDrive.storageLabel')).first();
     await expect(driveLabel).toBeVisible({ timeout: 5000 });
   });
 
@@ -229,12 +230,12 @@ test.describe('Google Drive Sync', () => {
     await page.getByLabel('Password').first().fill('test12345');
     await page.getByLabel('Confirm password').fill('test12345');
 
-    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: ui('action.next') }).click();
 
-    await page.getByText('Save & secure your pod').waitFor({ state: 'visible', timeout: 10000 });
+    await page.getByText(ui('loginV6.step2Title')).waitFor({ state: 'visible', timeout: 10000 });
 
     // Google Drive should be listed as a storage option
-    await expect(page.getByText('Google Drive').first()).toBeVisible();
+    await expect(page.getByText(ui('googleDrive.storageLabel')).first()).toBeVisible();
   });
 
   test('OAuth mock exchanges code for tokens', async ({ page }) => {

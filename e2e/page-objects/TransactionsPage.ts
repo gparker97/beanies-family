@@ -1,4 +1,5 @@
 import { Page, expect } from '@playwright/test';
+import { ui } from '../helpers/ui-strings';
 
 /**
  * Maps category IDs to their group name for the two-level CategoryChipPicker.
@@ -47,17 +48,17 @@ export class TransactionsPage {
 
     // Direction toggle — default is "out" (expense)
     if (data.type === 'income') {
-      await dialog.getByRole('button', { name: /Money In/ }).click();
+      await dialog.getByRole('button', { name: ui('modal.moneyIn') }).click();
     }
 
     // Account — BaseSelect with placeholder option
     await dialog
       .locator('select')
-      .filter({ has: this.page.locator('option', { hasText: 'Select an account' }) })
+      .filter({ has: this.page.locator('option', { hasText: ui('form.selectAccount') }) })
       .selectOption({ label: data.account });
 
     // Description
-    await dialog.getByPlaceholder('Description').fill(data.description);
+    await dialog.getByPlaceholder(ui('form.description')).fill(data.description);
 
     // Amount (AmountInput — number input, use placeholder to avoid ambiguity with goal allocation input)
     await dialog.getByPlaceholder('0.00').fill(data.amount.toString());
@@ -75,10 +76,10 @@ export class TransactionsPage {
     }
 
     // Switch schedule to "One-time" (default is "Recurring")
-    await dialog.getByRole('button', { name: 'One-time' }).click();
+    await dialog.getByRole('button', { name: ui('modal.oneTime') }).click();
 
     // Save — button text is "Add Transaction"
-    await dialog.getByRole('button', { name: 'Add Transaction' }).click();
+    await dialog.getByRole('button', { name: ui('modal.addTransaction') }).click();
     await expect(dialog).toHaveCount(0);
   }
 

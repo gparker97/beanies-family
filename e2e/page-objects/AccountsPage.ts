@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { ComboboxHelper } from '../helpers/combobox';
+import { ui } from '../helpers/ui-strings';
 
 export class AccountsPage {
   constructor(private page: Page) {}
@@ -9,11 +10,11 @@ export class AccountsPage {
   }
 
   getInstitutionCombobox() {
-    return new ComboboxHelper(this.page, 'Financial Institution');
+    return new ComboboxHelper(this.page, ui('form.institution'));
   }
 
   getCountryCombobox() {
-    return new ComboboxHelper(this.page, 'Country');
+    return new ComboboxHelper(this.page, ui('form.country'));
   }
 
   /**
@@ -55,10 +56,13 @@ export class AccountsPage {
   async addAccount(data: { name: string; type: string; balance: number; currency?: string }) {
     // Use .first() to always click the header button, avoiding strict mode violation
     // when both header and empty state buttons are visible
-    await this.page.getByRole('button', { name: 'Add Account' }).first().click();
+    await this.page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .first()
+      .click();
 
     // Name — raw input with placeholder "Account Name"
-    await this.page.getByPlaceholder('Account Name').fill(data.name);
+    await this.page.getByPlaceholder(ui('modal.accountName')).fill(data.name);
 
     // Type — AccountCategoryPicker: click category chip, then subtype chip
     await this.selectAccountType(data.type);
@@ -69,11 +73,14 @@ export class AccountsPage {
 
     if (data.currency) {
       // Currency is a BaseSelect — find it by the nearby label text
-      await this.page.getByLabel('Currency').selectOption(data.currency);
+      await this.page.getByLabel(ui('form.currency')).selectOption(data.currency);
     }
 
     // Save button — "Add Account" button (inside the modal footer)
-    await this.page.getByRole('button', { name: 'Add Account' }).last().click();
+    await this.page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .last()
+      .click();
 
     // Dismiss any celebration modal that may appear (e.g. 'first-account' trigger)
     const letsGoButton = this.page.getByRole('button', { name: "Let's go!" });
@@ -96,10 +103,13 @@ export class AccountsPage {
     country?: string;
     countrySearch?: string;
   }) {
-    await this.page.getByRole('button', { name: 'Add Account' }).first().click();
+    await this.page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .first()
+      .click();
 
     // Name
-    await this.page.getByPlaceholder('Account Name').fill(data.name);
+    await this.page.getByPlaceholder(ui('modal.accountName')).fill(data.name);
 
     // Type — AccountCategoryPicker: click category chip, then subtype chip
     await this.selectAccountType(data.type);
@@ -130,7 +140,10 @@ export class AccountsPage {
       }
     }
 
-    await this.page.getByRole('button', { name: 'Add Account' }).last().click();
+    await this.page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .last()
+      .click();
     // Dismiss any celebration modal
     const letsGoButton = this.page.getByRole('button', { name: "Let's go!" });
     try {

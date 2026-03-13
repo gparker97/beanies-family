@@ -35,7 +35,10 @@ test.describe('Account Institution Combobox', () => {
     await accountsPage.goto();
 
     // Open the add modal — institution fields are now inline
-    await page.getByRole('button', { name: 'Add Account' }).first().click();
+    await page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .first()
+      .click();
 
     const instCombobox = accountsPage.getInstitutionCombobox();
     await instCombobox.open();
@@ -47,12 +50,15 @@ test.describe('Account Institution Combobox', () => {
     await page.getByRole('button', { name: 'HSBC' }).click();
 
     // Fill remaining required fields and save
-    await page.getByPlaceholder('Account Name').fill('HSBC Account');
+    await page.getByPlaceholder(ui('modal.accountName')).fill('HSBC Account');
     // Select type: Bank category → Checking subtype
     await page.getByRole('button', { name: '🏦 Bank', exact: true }).click();
     await page.getByRole('button', { name: '🏦 Checking', exact: true }).click();
     await page.locator('input[type="number"]').first().fill('5000');
-    await page.getByRole('button', { name: 'Add Account' }).last().click();
+    await page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .last()
+      .click();
 
     // Dismiss celebration modal
     const letsGoButton = page.getByRole('button', { name: "Let's go!" });
@@ -84,12 +90,15 @@ test.describe('Account Institution Combobox', () => {
     await expect(card).toContainText('My Local Bank');
 
     // Verify custom institution is persisted: open add account again and check dropdown
-    await page.getByRole('button', { name: 'Add Account' }).first().click();
+    await page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .first()
+      .click();
     const instCombobox = accountsPage.getInstitutionCombobox();
     await instCombobox.open();
     await instCombobox.expectDropdownContains('My Local Bank');
     // The custom entry should show "Custom" badge
-    await instCombobox.expectDropdownContains('Custom');
+    await instCombobox.expectDropdownContains(ui('form.customBadge'));
   });
 
   test('should select a country alongside institution', async ({ page }) => {
@@ -134,7 +143,7 @@ test.describe('Account Institution Combobox', () => {
     await instCombobox.selectOption('Citibank');
 
     // Save edit
-    await page.getByRole('button', { name: 'Save Account' }).click();
+    await page.getByRole('button', { name: ui('modal.saveAccount') }).click();
     await expect(page.locator('[role="dialog"]')).toHaveCount(0);
 
     // Verify card updated
@@ -217,6 +226,6 @@ test.describe('Asset Loan Lender Combobox', () => {
     const lenderCombobox = assetsPage.getLenderCombobox();
     await lenderCombobox.open();
     await lenderCombobox.expectDropdownContains('Shared Bank');
-    await lenderCombobox.expectDropdownContains('Custom');
+    await lenderCombobox.expectDropdownContains(ui('form.customBadge'));
   });
 });
