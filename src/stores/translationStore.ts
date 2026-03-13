@@ -60,7 +60,6 @@ export const useTranslationStore = defineStore('translation', () => {
       translationFile.value = file;
 
       if (file) {
-        // Load up-to-date translations from file
         for (const key of allKeys) {
           const hash = hashMap[key];
           if (hash) {
@@ -74,24 +73,22 @@ export const useTranslationStore = defineStore('translation', () => {
 
       loadProgress.value = 20;
 
-      // Step 2: Find missing or outdated keys
+      // Step 2: Apply what we have immediately so the UI switches right away
       const missingKeys = allKeys.filter((key) => !translationsMap.has(key));
 
+      translations.value = new Map(translationsMap);
+      currentLanguage.value = language;
+
       if (missingKeys.length === 0) {
-        // All translations are loaded from file
-        translations.value = translationsMap;
-        currentLanguage.value = language;
         loadProgress.value = 100;
         isLoading.value = false;
         return;
       }
 
+      // Step 3: Backfill missing keys from IndexedDB cache
       loadProgress.value = 40;
-
-      // Step 3: Check IndexedDB cache for missing translations
       const cached = await translationCache.getTranslationsForLanguageByKeys(language, missingKeys);
 
-      // Add cached translations that match current hash
       for (const entry of cached) {
         const currentHash = hashMap[entry.key as UIStringKey];
         if (currentHash === entry.hash) {
@@ -99,59 +96,57 @@ export const useTranslationStore = defineStore('translation', () => {
         }
       }
 
-      // Step 4: Find keys still missing after cache check
       const stillMissingKeys = missingKeys.filter((key) => !translationsMap.has(key));
 
+      // Apply cache results incrementally
+      if (translationsMap.size > translations.value.size) {
+        translations.value = new Map(translationsMap);
+      }
+
       if (stillMissingKeys.length === 0) {
-        // All translations found in file + cache
-        translations.value = translationsMap;
-        currentLanguage.value = language;
         loadProgress.value = 100;
         isLoading.value = false;
         return;
       }
 
+      // Step 4: Fetch remaining from API (progressive — update UI as each comes in)
       loadProgress.value = 60;
-
-      // Step 5: Fetch remaining translations from API
       const missingTexts = stillMissingKeys.map((key) => getSourceText(key));
 
-      const translated = await translationApi.translateBatch(
+      const newTranslations: Array<{ key: string; translation: string; hash: string }> = [];
+
+      await translationApi.translateBatch(
         missingTexts,
         'en',
         language,
-        (completed, total) => {
-          const apiProgress = 60 + Math.round((completed / total) * 30);
-          loadProgress.value = apiProgress;
+        (completed, total, translatedText) => {
+          // Apply each new translation to the live map as it arrives
+          const idx = completed - 1;
+          const key = stillMissingKeys[idx]!;
+          const hash = hashMap[key] || '';
+          newTranslations.push({ key, translation: translatedText, hash });
+          translationsMap.set(key, translatedText);
+          translations.value = new Map(translationsMap);
+
+          loadProgress.value = 60 + Math.round((completed / total) * 30);
         }
       );
 
-      // Build new translations array for caching
-      const newTranslations: Array<{ key: string; translation: string; hash: string }> = [];
-      for (let i = 0; i < stillMissingKeys.length; i++) {
-        const key = stillMissingKeys[i]!;
-        const translation = translated[i] || getSourceText(key);
-        const hash = hashMap[key] || '';
-        newTranslations.push({ key, translation, hash });
-        translationsMap.set(key, translation);
-      }
-
       loadProgress.value = 90;
 
-      // Step 6: Save new translations to IndexedDB cache
+      // Step 5: Save new translations to IndexedDB cache
       if (newTranslations.length > 0) {
         await translationCache.saveTranslationsWithHash(newTranslations, language);
       }
 
-      translations.value = translationsMap;
-      currentLanguage.value = language;
       loadProgress.value = 100;
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to load translations';
       console.error('Translation loading failed:', e);
-      // Fallback: use English
-      translations.value.clear();
-      currentLanguage.value = 'en';
+      // Fallback: use English if we haven't already applied partial translations
+      if (translations.value.size === 0) {
+        currentLanguage.value = 'en';
+      }
     } finally {
       isLoading.value = false;
     }
