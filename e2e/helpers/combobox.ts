@@ -14,12 +14,25 @@ export class ComboboxHelper {
     private page: Page,
     label: string
   ) {
-    // The BaseCombobox renders inside a `div.relative.space-y-1` that contains
-    // a <label> with the provided text. Use that structure to scope all
-    // selectors to the correct combobox instance.
-    this.container = page.locator('.relative.space-y-1', {
+    // Find the combobox container by label text. The label may be:
+    // 1. Inside the BaseCombobox wrapper (div.relative.space-y-1) — when
+    //    BaseCombobox has its own :label prop (e.g. AccountModal)
+    // 2. In a parent FormFieldGroup (div.space-y-2) — when the combobox
+    //    is a child of FormFieldGroup (e.g. AssetModal)
+    //
+    // Use a CSS selector that matches either pattern: find the nearest
+    // ancestor containing the label text that also has a combobox trigger.
+    const directMatch = page.locator('.relative.space-y-1', {
       has: page.getByText(label, { exact: true }),
     });
+    const formFieldMatch = page
+      .locator('.space-y-2', {
+        has: page.getByText(label, { exact: true }),
+      })
+      .locator('.relative.space-y-1');
+
+    // Use .or() to match whichever pattern exists on the page
+    this.container = directMatch.or(formFieldMatch).first();
   }
 
   get trigger() {
