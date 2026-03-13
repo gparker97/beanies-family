@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded, navigateToSetupStep3 } from '../helpers/auth';
+import { ui } from '../helpers/ui-strings';
 
 test.describe('Setup Flow', () => {
   test('should complete fresh setup successfully', async ({ page }) => {
@@ -51,7 +52,7 @@ test.describe('Setup Flow', () => {
       });
     });
 
-    await page.getByRole('button', { name: 'Next' }).click();
+    await page.getByRole('button', { name: ui('action.next') }).click();
 
     // Should still be on welcome page with custom JS validation error
     await expect(page).toHaveURL('/welcome');
@@ -91,7 +92,7 @@ test.describe('Setup Flow', () => {
     await expect(addButton).toBeDisabled();
 
     // Finish setup
-    await page.getByRole('button', { name: 'Finish' }).click();
+    await page.getByRole('button', { name: ui('loginV6.finish') }).click();
     await page.waitForURL('/nook', { timeout: 60000 });
 
     // Verify member was persisted with birthday
@@ -122,7 +123,7 @@ test.describe('Setup Flow', () => {
     await expect(page.getByText('Baby Bean')).toBeVisible();
 
     // Finish setup
-    await page.getByRole('button', { name: 'Finish' }).click();
+    await page.getByRole('button', { name: ui('loginV6.finish') }).click();
     await page.waitForURL('/nook', { timeout: 60000 });
 
     // Verify member was persisted with full birthday

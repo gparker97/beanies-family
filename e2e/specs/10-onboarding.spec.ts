@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
+import { ui } from '../helpers/ui-strings';
 
 test.describe('Onboarding Wizard', () => {
   /**
@@ -22,7 +23,7 @@ test.describe('Onboarding Wizard', () => {
 
     // Restart onboarding via Settings → Appearance modal
     await page.goto('/settings');
-    await page.getByText('Appearance').first().click();
+    await page.getByText(ui('settings.card.appearance')).first().click();
     await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
 
@@ -179,7 +180,7 @@ test.describe('Onboarding Wizard', () => {
 
     // Go to Settings and restart via Appearance modal
     await page.goto('/settings');
-    await page.getByText('Appearance').first().click();
+    await page.getByText(ui('settings.card.appearance')).first().click();
     await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByTestId('restart-onboarding').click();
 

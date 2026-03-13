@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { ui } from '../helpers/ui-strings';
 
 /**
  * Helper to read global settings from the registry IndexedDB.
@@ -148,10 +149,10 @@ test.describe('Trusted Device Password Cache', () => {
     // Navigate to settings and open Data Management modal
     await page.goto('/settings');
     await page.waitForURL('/settings');
-    await page.getByText('Data Management').first().click();
+    await page.getByText(ui('settings.dataManagement')).first().click();
 
     // Find and click "Clear Data" button inside the modal
-    const clearDataBtn = page.getByRole('button', { name: 'Clear Data' });
+    const clearDataBtn = page.getByRole('button', { name: ui('settings.clearData') });
     await clearDataBtn.waitFor({ state: 'visible', timeout: 5000 });
     await clearDataBtn.click();
 

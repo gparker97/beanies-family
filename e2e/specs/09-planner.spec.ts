@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { ui } from '../helpers/ui-strings';
 
 /**
  * E2E tests for the Family Planner page.
@@ -64,7 +65,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/new activity/i)).toBeVisible();
 
     // Fill in form — new BeanieFormModal layout
-    await page.getByPlaceholder("What's the activity?").fill('Doctor Visit');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Doctor Visit');
     await selectAssignee(page);
 
     // Switch to one-off mode
@@ -93,7 +94,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
 
     // Fill in form — recurrence defaults to "Recurring"
-    await page.getByPlaceholder("What's the activity?").fill('Piano Lesson');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Piano Lesson');
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill('2026-03-04');
 
@@ -127,7 +128,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
 
     // Fill title
-    await page.getByPlaceholder("What's the activity?").fill('Soccer Training');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Soccer Training');
     await selectAssignee(page);
 
     // Date
@@ -179,7 +180,7 @@ test.describe('Family Planner', () => {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-    await page.getByPlaceholder("What's the activity?").fill('Today Activity');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Today Activity');
     await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(todayStr);
@@ -203,7 +204,7 @@ test.describe('Family Planner', () => {
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
-    await page.getByPlaceholder("What's the activity?").fill('Upcoming Test');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Upcoming Test');
     await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
@@ -224,7 +225,7 @@ test.describe('Family Planner', () => {
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
-    await page.getByPlaceholder("What's the activity?").fill('Original Title');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Original Title');
     await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
@@ -240,7 +241,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change the title
-    await page.getByPlaceholder("What's the activity?").fill('Updated Title');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Updated Title');
     await page.getByRole('button', { name: /save activity/i }).click();
 
     // Modal should close
@@ -265,7 +266,7 @@ test.describe('Family Planner', () => {
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
-    await page.getByPlaceholder("What's the activity?").fill('To Delete');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('To Delete');
     await selectAssignee(page);
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
@@ -335,7 +336,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
 
     // Basic fields
-    await page.getByPlaceholder("What's the activity?").fill('Soccer Practice');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Soccer Practice');
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill('2026-03-02');
 
@@ -348,12 +349,12 @@ test.describe('Family Planner', () => {
     // Recurrence defaults to Recurring + Weekly
 
     // Location is visible inline
-    await page.getByPlaceholder('Location').fill('City Sports Park');
+    await page.getByPlaceholder(ui('planner.field.location')).fill('City Sports Park');
 
     // Instructor fields are inside "add more details" collapsible
     await page.getByRole('button', { name: /add more details/i }).click();
-    await page.getByPlaceholder('Instructor / Coach').fill('Coach Johnson');
-    await page.getByPlaceholder('Contact').fill('coach@sports.com');
+    await page.getByPlaceholder(ui('planner.field.instructor')).fill('Coach Johnson');
+    await page.getByPlaceholder(ui('planner.field.instructorContact')).fill('coach@sports.com');
 
     // Save — use exact regex to avoid conflict with "+ add activity" header button
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -377,7 +378,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
 
     // Fill in form — recurrence defaults to "Recurring"
-    await page.getByPlaceholder("What's the activity?").fill('Summer Swimming');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Summer Swimming');
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill('2026-06-01');
 
@@ -410,7 +411,7 @@ test.describe('Family Planner', () => {
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
-    await page.getByPlaceholder("What's the activity?").fill('Weekly Lesson');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Weekly Lesson');
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -425,7 +426,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change title and save
-    await page.getByPlaceholder("What's the activity?").fill('Special Lesson');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Special Lesson');
     await page.getByRole('button', { name: /save activity/i }).click();
 
     // Scope modal appears after save — choose "This Occurrence Only"
@@ -454,7 +455,7 @@ test.describe('Family Planner', () => {
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
-    await page.getByPlaceholder("What's the activity?").fill('Piano Class');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Piano Class');
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -467,7 +468,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change title and save
-    await page.getByPlaceholder("What's the activity?").fill('Advanced Piano');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Advanced Piano');
     await page.getByRole('button', { name: /save activity/i }).click();
 
     // Scope modal appears after save — choose "This & All Future"
@@ -496,7 +497,7 @@ test.describe('Family Planner', () => {
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
-    await page.getByPlaceholder("What's the activity?").fill('Soccer Training');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Soccer Training');
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -509,7 +510,7 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
 
     // Change title and save
-    await page.getByPlaceholder("What's the activity?").fill('Updated Soccer');
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Updated Soccer');
     await page.getByRole('button', { name: /save activity/i }).click();
 
     // Scope modal appears after save — choose "All Occurrences"
