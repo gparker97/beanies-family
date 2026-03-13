@@ -398,6 +398,10 @@ const STRING_DEFS = {
   'assets.type.crypto': { en: 'Cryptocurrency', beanie: 'cryptocurrency' },
   'assets.type.collectible': { en: 'Collectible', beanie: 'collectible' },
   'assets.type.other': { en: 'Other', beanie: 'other' },
+  'assets.equity': { en: 'Equity', beanie: 'equity' },
+  'assets.activeLoans': { en: 'active loans', beanie: 'active loans' },
+  'assets.afterLoanDeductions': { en: 'After loan deductions', beanie: 'after loan deductions' },
+  'assets.overall': { en: 'overall', beanie: 'overall' },
 
   // Goals
   'goals.title': { en: 'Goals', beanie: 'beanie goals' },

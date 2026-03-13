@@ -137,17 +137,23 @@ const changeColor = computed(() => {
           </svg>
         </slot>
       </div>
-      <div class="flex items-center gap-1.5">
-        <div
-          class="font-outfit text-xs font-semibold tracking-[0.08em] uppercase"
-          :class="dark ? 'opacity-50' : 'text-secondary-500 opacity-45 dark:text-gray-300'"
-        >
-          {{ label }}
+      <div class="min-w-0">
+        <div class="flex items-center gap-1.5">
+          <div
+            class="font-outfit truncate text-xs font-semibold tracking-[0.08em] uppercase"
+            :class="dark ? 'opacity-50' : 'text-secondary-500 opacity-45 dark:text-gray-300'"
+          >
+            {{ label }}
+          </div>
+          <InfoHintBadge v-if="hint" :text="hint" :dark="dark" />
         </div>
-        <InfoHintBadge v-if="hint" :text="hint" :dark="dark" />
-      </div>
-      <div v-if="subtitle" class="text-[10px] opacity-40" :class="dark ? '' : 'text-secondary-500'">
-        {{ subtitle }}
+        <div
+          v-if="subtitle"
+          class="font-outfit truncate text-xs opacity-40"
+          :class="dark ? '' : 'text-secondary-500'"
+        >
+          {{ subtitle }}
+        </div>
       </div>
     </div>
 

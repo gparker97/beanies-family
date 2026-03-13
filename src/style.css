@@ -439,6 +439,19 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
   filter: invert(1);
 }
 
+/* ───── Shared Card Entry Animation ───── */
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Chromium-based date picker popup (Chrome 131+) */
 @supports selector(::picker(select)) {
   input[type='date']::picker(select),

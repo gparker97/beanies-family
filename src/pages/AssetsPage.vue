@@ -197,6 +197,31 @@ function getAppreciationPercent(asset: Asset): number {
   if (asset.purchaseValue === 0) return 0;
   return ((asset.currentValue - asset.purchaseValue) / asset.purchaseValue) * 100;
 }
+
+function getEquityPercent(asset: Asset): number {
+  if (!asset.loan?.outstandingBalance || asset.currentValue <= 0) return 100;
+  return Math.max(
+    0,
+    ((asset.currentValue - asset.loan.outstandingBalance) / asset.currentValue) * 100
+  );
+}
+
+// Stat card subtitles
+const assetCountSubtitle = computed(
+  () => `${assets.value.length} ${assets.value.length === 1 ? 'asset' : 'assets'}`
+);
+const activeLoanCount = computed(
+  () => assets.value.filter((a) => a.loan?.hasLoan && a.loan.outstandingBalance).length
+);
+const loanCountSubtitle = computed(() => `${activeLoanCount.value} ${t('assets.activeLoans')}`);
+const netValueSubtitle = computed(() => t('assets.afterLoanDeductions'));
+const appreciationSubtitle = computed(() => {
+  const pct =
+    assetsStore.filteredTotalAssetValue > 0
+      ? ((totalAppreciation.value / assetsStore.filteredTotalAssetValue) * 100).toFixed(1)
+      : '0.0';
+  return `${Number(pct) >= 0 ? '+' : ''}${pct}% ${t('assets.overall')}`;
+});
 </script>
 
 <template>
@@ -216,6 +241,7 @@ function getAppreciationPercent(asset: Asset): number {
         :amount="totalAssetValue"
         :currency="baseCurrency"
         :hint="t('hints.assetsTotalValue')"
+        :subtitle="assetCountSubtitle"
         tint="green"
       >
         <template #icon>
@@ -228,6 +254,7 @@ function getAppreciationPercent(asset: Asset): number {
         :amount="totalLoanValue"
         :currency="baseCurrency"
         :hint="t('hints.assetsLoans')"
+        :subtitle="loanCountSubtitle"
         tint="orange"
       >
         <template #icon>
@@ -240,6 +267,7 @@ function getAppreciationPercent(asset: Asset): number {
         :amount="netAssetValue"
         :currency="baseCurrency"
         :hint="t('hints.assetsNetValue')"
+        :subtitle="netValueSubtitle"
         tint="slate"
         dark
       >
@@ -253,6 +281,7 @@ function getAppreciationPercent(asset: Asset): number {
         :amount="Math.abs(totalAppreciation)"
         :currency="baseCurrency"
         :hint="t('hints.assetsAppreciation')"
+        :subtitle="appreciationSubtitle"
         :tint="totalAppreciation >= 0 ? 'green' : 'orange'"
       >
         <template #icon>
@@ -305,11 +334,15 @@ function getAppreciationPercent(asset: Asset): number {
         <!-- Asset Cards Grid -->
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <div
-            v-for="asset in group.assets"
+            v-for="(asset, assetIndex) in group.assets"
             :key="asset.id"
             data-testid="asset-card"
-            class="cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
+            class="group cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
             :class="syncHighlightClass(asset.id)"
+            :style="{
+              animation: 'fade-slide-up 0.5s ease-out both',
+              animationDelay: `${assetIndex * 0.07}s`,
+            }"
             @click="openEditModal(asset)"
           >
             <!-- Card Header -->
@@ -317,7 +350,7 @@ function getAppreciationPercent(asset: Asset): number {
               <div class="flex items-center gap-3">
                 <!-- Asset Type Icon -->
                 <div
-                  class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px]"
+                  class="flex h-[42px] w-[42px] items-center justify-center rounded-[14px] transition-transform duration-300 group-hover:scale-[1.08]"
                   :class="[
                     getAssetTypeConfig(asset.type).bgColor,
                     getAssetTypeConfig(asset.type).darkBgColor,
@@ -339,7 +372,7 @@ function getAppreciationPercent(asset: Asset): number {
 
               <!-- Action dots -->
               <button
-                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-[var(--tint-slate-5)]"
+                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 opacity-0 transition-[opacity,background-color] duration-200 group-hover:opacity-100 hover:bg-[var(--tint-slate-5)]"
                 @click.stop="openEditModal(asset)"
               >
                 ⋯
@@ -397,47 +430,77 @@ function getAppreciationPercent(asset: Asset): number {
               </div>
             </div>
 
+            <!-- Equity Bar (for assets with loans) -->
+            <div v-if="asset.loan?.hasLoan && asset.loan.outstandingBalance" class="mb-4">
+              <div class="mb-1.5 flex items-center justify-between">
+                <span class="font-outfit text-xs font-semibold text-gray-500 dark:text-gray-400">{{
+                  t('assets.equity')
+                }}</span>
+                <span class="font-outfit text-xs font-bold text-[#27AE60]"
+                  >{{ getEquityPercent(asset).toFixed(0) }}%</span
+                >
+              </div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-[var(--tint-slate-5)]">
+                <div
+                  class="h-full rounded-full bg-gradient-to-r from-[#27AE60] to-[#2ECC71] transition-all duration-700"
+                  :style="{ width: `${getEquityPercent(asset)}%` }"
+                />
+              </div>
+            </div>
+
             <!-- Loan Info (Heritage Orange — not red) -->
             <div
               v-if="asset.loan?.hasLoan && asset.loan.outstandingBalance"
               class="border-primary-100 dark:border-primary-900/30 dark:bg-primary-900/20 mb-4 rounded-xl border bg-[var(--tint-orange-8)] p-3"
             >
-              <div class="mb-2 flex items-center gap-2">
-                <span>💰</span>
-                <span class="font-outfit text-primary-500 text-xs font-semibold">{{
-                  t('common.loanOutstanding')
-                }}</span>
+              <div class="mb-2 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span>💰</span>
+                  <span
+                    class="font-outfit text-primary-500 text-xs font-semibold tracking-wide uppercase"
+                    >{{ t('common.loanOutstanding') }}</span
+                  >
+                </div>
+                <div class="font-outfit text-primary-500 text-lg font-extrabold">
+                  <CurrencyAmount
+                    :amount="asset.loan.outstandingBalance"
+                    :currency="asset.currency"
+                    type="expense"
+                    size="lg"
+                  />
+                </div>
               </div>
-              <div class="font-outfit text-primary-500 text-lg font-extrabold">
-                <CurrencyAmount
-                  :amount="asset.loan.outstandingBalance"
-                  :currency="asset.currency"
-                  type="expense"
-                  size="xl"
-                />
-              </div>
-              <div v-if="asset.loan.monthlyPayment" class="text-primary-500/80 mt-1 text-xs">
-                <CurrencyAmount
-                  :amount="asset.loan.monthlyPayment"
-                  :currency="asset.currency"
-                  type="neutral"
-                  size="sm"
-                />/month
-                <span v-if="asset.loan.interestRate">
-                  @ {{ formatMasked(asset.loan.interestRate + '%') }}</span
-                >
-              </div>
-              <div v-if="asset.loan.lender" class="text-primary-500/70 mt-0.5 text-xs">
-                {{ asset.loan.lender
-                }}<span v-if="asset.loan.lenderCountry">
-                  &middot; {{ asset.loan.lenderCountry }}</span
-                >
+              <!-- 2-col detail grid -->
+              <div class="text-primary-500/75 mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                <div v-if="asset.loan.monthlyPayment">
+                  <CurrencyAmount
+                    :amount="asset.loan.monthlyPayment"
+                    :currency="asset.currency"
+                    type="neutral"
+                    size="sm"
+                  /><span class="font-semibold">/month</span>
+                </div>
+                <div v-if="asset.loan.interestRate">
+                  @
+                  <span class="font-semibold">{{
+                    formatMasked(asset.loan.interestRate + '%')
+                  }}</span>
+                </div>
+                <div v-if="asset.loan.lender" class="col-span-2 mt-0.5 opacity-80">
+                  {{ asset.loan.lender
+                  }}<span v-if="asset.loan.lenderCountry">
+                    &middot; {{ asset.loan.lenderCountry }}</span
+                  >
+                </div>
               </div>
             </div>
 
             <!-- Notes (if any) -->
-            <div v-if="asset.notes" class="mb-4 text-sm text-gray-600 italic dark:text-gray-400">
-              "{{ asset.notes }}"
+            <div
+              v-if="asset.notes"
+              class="mb-4 border-l-2 border-gray-200 pl-3 text-sm text-gray-500 italic dark:border-slate-600 dark:text-gray-400"
+            >
+              {{ asset.notes }}
             </div>
 
             <!-- Card Footer -->
