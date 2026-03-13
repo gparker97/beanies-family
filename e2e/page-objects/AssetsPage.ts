@@ -10,11 +10,11 @@ export class AssetsPage {
   }
 
   getLenderCombobox() {
-    return new ComboboxHelper(this.page, 'Lender');
+    return new ComboboxHelper(this.page, ui('assets.lender'));
   }
 
   getLenderCountryCombobox() {
-    return new ComboboxHelper(this.page, 'Country');
+    return new ComboboxHelper(this.page, ui('form.country'));
   }
 
   async addAssetWithLoan(data: {
