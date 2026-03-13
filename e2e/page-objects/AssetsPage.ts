@@ -1,5 +1,6 @@
 import { Page, expect } from '@playwright/test';
 import { ComboboxHelper } from '../helpers/combobox';
+import { ui } from '../helpers/ui-strings';
 
 export class AssetsPage {
   constructor(private page: Page) {}
@@ -29,7 +30,10 @@ export class AssetsPage {
     lenderCountry?: string;
     lenderCountrySearch?: string;
   }) {
-    await this.page.getByRole('button', { name: 'Add Asset' }).first().click();
+    await this.page
+      .getByRole('button', { name: ui('assets.addAsset') })
+      .first()
+      .click();
 
     const dialog = this.page.locator('[role="dialog"]');
 
@@ -49,7 +53,7 @@ export class AssetsPage {
     await dialog.getByRole('button', { name: typeLabel }).click();
 
     // Fill asset name (placeholder-based input inside FormFieldGroup)
-    await dialog.getByPlaceholder('Asset Name').fill(data.name);
+    await dialog.getByPlaceholder(ui('assets.assetName')).fill(data.name);
 
     // Fill purchase value — first number input in the modal
     const amountInputs = dialog.locator('input[type="number"]');
@@ -60,7 +64,7 @@ export class AssetsPage {
 
     if (data.hasLoan) {
       // Toggle "Has a Loan" switch
-      await dialog.getByText('Has a Loan').click();
+      await dialog.getByText(ui('assets.hasLoan')).click();
 
       if (data.outstandingBalance !== undefined) {
         // Outstanding balance is the 4th number input (after loan amount)
@@ -89,7 +93,7 @@ export class AssetsPage {
     }
 
     // Save — click the save button in the modal footer
-    await dialog.getByRole('button', { name: /Add Asset/i }).click();
+    await dialog.getByRole('button', { name: ui('modal.addAsset') }).click();
     // Dismiss celebration modal if it appears
     const letsGoButton = this.page.getByRole('button', { name: "Let's go!" });
     try {

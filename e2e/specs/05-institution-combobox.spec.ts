@@ -3,6 +3,7 @@ import { AccountsPage } from '../page-objects/AccountsPage';
 import { AssetsPage } from '../page-objects/AssetsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { ui } from '../helpers/ui-strings';
 
 test.describe('Account Institution Combobox', () => {
   test.beforeEach(async ({ page }) => {
@@ -206,9 +207,12 @@ test.describe('Asset Loan Lender Combobox', () => {
     const assetsPage = new AssetsPage(page);
     await assetsPage.goto();
 
-    await page.getByRole('button', { name: 'Add Asset' }).first().click();
+    await page
+      .getByRole('button', { name: ui('assets.addAsset') })
+      .first()
+      .click();
     const dialog = page.locator('[role="dialog"]');
-    await dialog.getByText('Has a Loan').click();
+    await dialog.getByText(ui('assets.hasLoan')).click();
 
     const lenderCombobox = assetsPage.getLenderCombobox();
     await lenderCombobox.open();
