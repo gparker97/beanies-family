@@ -10,12 +10,12 @@ const DEFAULT_COLOR = '#6b7280';
 export function useMemberInfo() {
   const familyStore = useFamilyStore();
 
-  function getMemberName(memberId: string | undefined, fallback = 'Unknown'): string {
+  function getMemberName(memberId: string | null | undefined, fallback = 'Unknown'): string {
     if (!memberId) return fallback;
     return familyStore.members.find((m) => m.id === memberId)?.name ?? fallback;
   }
 
-  function getMemberColor(memberId: string | undefined, fallback = DEFAULT_COLOR): string {
+  function getMemberColor(memberId: string | null | undefined, fallback = DEFAULT_COLOR): string {
     if (!memberId) return fallback;
     return familyStore.members.find((m) => m.id === memberId)?.color ?? fallback;
   }

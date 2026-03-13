@@ -36,15 +36,25 @@ function formatOrdinal(n: number): string {
 function getGoalIcon(goalType: GoalType): string {
   switch (goalType) {
     case 'savings':
-      return '\u{1F3E0}';
+      return '🐷';
     case 'debt_payoff':
-      return '\u{1F4B3}';
+      return '🎯';
     case 'investment':
-      return '\u{1F4C8}';
+      return '📈';
+    case 'vacation':
+      return '✈️';
+    case 'vehicle':
+      return '🚗';
+    case 'home':
+      return '🏠';
+    case 'education':
+      return '🎓';
+    case 'emergency':
+      return '🛟';
     case 'purchase':
-      return '\u{1F6D2}';
+      return '🛍️';
     default:
-      return '\u{1F3AF}';
+      return '🎯';
   }
 }
 

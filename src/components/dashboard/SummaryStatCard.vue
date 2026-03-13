@@ -13,6 +13,8 @@ interface Props {
   amount: number;
   /** Currency code */
   currency: CurrencyCode;
+  /** Raw string value — when provided, rendered instead of animated currency (e.g. "7") */
+  rawValue?: string;
   /** Change from previous period */
   changeAmount?: number;
   /** Change direction label (e.g., "vs last month") */
@@ -155,7 +157,8 @@ const changeColor = computed(() => {
       class="font-outfit text-2xl font-extrabold"
       :class="dark ? '' : 'text-secondary-500 dark:text-gray-100'"
     >
-      {{ isUnlocked ? animatedFormatted : MASK }}
+      <template v-if="rawValue !== undefined">{{ rawValue }}</template>
+      <template v-else>{{ isUnlocked ? animatedFormatted : MASK }}</template>
     </div>
 
     <!-- Change indicator -->

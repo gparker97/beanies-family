@@ -21,6 +21,7 @@ import type {
 const props = defineProps<{
   open: boolean;
   goal?: Goal | null;
+  defaults?: { memberId?: string; priority?: GoalPriority };
 }>();
 
 const emit = defineEmits<{
@@ -34,25 +35,38 @@ const settingsStore = useSettingsStore();
 
 // Goal type icon chip options
 const GOAL_ICON_OPTIONS = [
+  { value: '🐷', label: 'Savings', icon: '🐷' },
   { value: '🎯', label: 'Debt Payoff', icon: '🎯' },
   { value: '📈', label: 'Investment', icon: '📈' },
-  { value: '🛍️', label: 'Purchase', icon: '🛍️' },
-  { value: '🐷', label: 'Savings', icon: '🐷' },
-  { value: '📦', label: 'Other', icon: '📦' },
+  { value: '✈️', label: 'Vacation', icon: '✈️' },
+  { value: '🚗', label: 'Vehicle', icon: '🚗' },
+  { value: '🏠', label: 'Home', icon: '🏠' },
+  { value: '🎓', label: 'Education', icon: '🎓' },
+  { value: '🛟', label: 'Emergency Fund', icon: '🛟' },
+  { value: '🛍️', label: 'Other Purchase', icon: '🛍️' },
 ];
 
 const emojiToType: Record<string, GoalType> = {
   '🐷': 'savings',
   '🎯': 'debt_payoff',
   '📈': 'investment',
+  '✈️': 'vacation',
+  '🚗': 'vehicle',
+  '🏠': 'home',
+  '🎓': 'education',
+  '🛟': 'emergency',
   '🛍️': 'purchase',
-  '📦': 'savings', // "Other" defaults to savings
 };
 
 const typeToEmoji: Record<GoalType, string> = {
   savings: '🐷',
   debt_payoff: '🎯',
   investment: '📈',
+  vacation: '✈️',
+  vehicle: '🚗',
+  home: '🏠',
+  education: '🎓',
+  emergency: '🛟',
   purchase: '🛍️',
 };
 
@@ -98,8 +112,8 @@ const { isEditing, isSubmitting } = useFormModal(
       targetAmount.value = undefined;
       currentAmount.value = 0;
       currency.value = settingsStore.displayCurrency;
-      priority.value = 'medium';
-      memberId.value = '';
+      priority.value = props.defaults?.priority ?? 'medium';
+      memberId.value = props.defaults?.memberId ?? '';
       deadline.value = '';
     },
   }
@@ -130,7 +144,7 @@ function handleSave() {
       currentAmount: currentAmount.value ?? 0,
       currency: currency.value,
       priority: priority.value,
-      memberId: memberId.value || undefined,
+      memberId: memberId.value && memberId.value !== '__shared__' ? memberId.value : null,
       deadline: deadline.value || undefined,
       isCompleted: false,
     };
