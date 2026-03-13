@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-11",
-    "translationCount": 1442
+    "lastUpdated": "2026-03-13",
+    "translationCount": 1477
   },
   "translations": {
     "app.name": {
@@ -612,9 +612,9 @@
       "lastUpdated": "2026-03-03"
     },
     "assets.hasLoan": {
-      "translation": "此资产有贷款",
-      "hash": "che0bd",
-      "lastUpdated": "2026-03-03"
+      "translation": "有贷款",
+      "hash": "d21163",
+      "lastUpdated": "2026-03-13"
     },
     "assets.hasLoanDesc": {
       "translation": "跟踪抵押贷款、汽车贷款或其他融资",
@@ -817,9 +817,9 @@
       "lastUpdated": "2026-03-03"
     },
     "goals.type.purchase": {
-      "translation": "物品购买",
-      "hash": "twf1gh",
-      "lastUpdated": "2026-03-03"
+      "translation": "其他购买",
+      "hash": "r97txt",
+      "lastUpdated": "2026-03-13"
     },
     "goals.priority.label": {
       "translation": "优先顺序",
@@ -6277,9 +6277,9 @@
       "lastUpdated": "2026-03-08"
     },
     "nook.motto21": {
-      "translation": "首先你得到豆子，然后你得到力量，然后你得到女人",
-      "hash": "lqdxsm",
-      "lastUpdated": "2026-03-08"
+      "translation": "首先你得到豆子，然后你得到钱，然后你得到女人",
+      "hash": "sz3vta",
+      "lastUpdated": "2026-03-13"
     },
     "nook.motto22": {
       "translation": "在豆子发芽之前不要数它们！",
@@ -6927,14 +6927,14 @@
       "lastUpdated": "2026-03-10"
     },
     "nook.criticalTodoAssigned": {
-      "translation": "{creator}今天邀请您执行{task} ！",
-      "hash": "ade3ob",
-      "lastUpdated": "2026-03-10"
+      "translation": "{creator}问您：今天是{task} ！",
+      "hash": "rc7anu",
+      "lastUpdated": "2026-03-13"
     },
     "nook.criticalTodoSelf": {
-      "translation": "今天别忘了{task} ！",
-      "hash": "v32481",
-      "lastUpdated": "2026-03-10"
+      "translation": "别忘了：今天就{task} ！",
+      "hash": "hstn9c",
+      "lastUpdated": "2026-03-13"
     },
     "nook.criticalMore": {
       "translation": "今天为您。",
@@ -7192,29 +7192,204 @@
       "lastUpdated": "2026-03-10"
     },
     "nook.criticalTodoAssignedNoDue": {
-      "translation": "{creator}要求您执行{task}",
-      "hash": "l9nr6t",
-      "lastUpdated": "2026-03-10"
+      "translation": "{creator}询问您： {task}",
+      "hash": "2p35ga",
+      "lastUpdated": "2026-03-13"
     },
     "nook.criticalTodoSelfNoDue": {
-      "translation": "不要忘记",
-      "hash": "m8z8tb",
-      "lastUpdated": "2026-03-10"
+      "translation": "别忘了： {task}",
+      "hash": "e0b5eo",
+      "lastUpdated": "2026-03-13"
     },
     "nook.criticalTodoAssignedOverdue": {
-      "translation": "{creator}要求您完成{task} —截止日期为{date} ，只要您有机会！",
-      "hash": "fby3f8",
-      "lastUpdated": "2026-03-10"
+      "translation": "{creator}问您： {task} — {date}截止，只要您有机会！",
+      "hash": "wtucr",
+      "lastUpdated": "2026-03-13"
     },
     "nook.criticalTodoSelfOverdue": {
-      "translation": "温馨提醒： {task}截止日期为{date}",
-      "hash": "7viy2w",
-      "lastUpdated": "2026-03-10"
+      "translation": "温馨提醒： {task} —截止日期为{date}",
+      "hash": "alygzr",
+      "lastUpdated": "2026-03-13"
     },
     "common.whatsThis": {
       "translation": "這是什麼？",
       "hash": "n0sf5b",
       "lastUpdated": "2026-03-11"
+    },
+    "modal.addAsset": {
+      "translation": "添加文件",
+      "hash": "88awdt",
+      "lastUpdated": "2026-03-13"
+    },
+    "modal.saveAsset": {
+      "translation": "保存资产",
+      "hash": "pqkcjx",
+      "lastUpdated": "2026-03-13"
+    },
+    "assets.addAnAsset": {
+      "translation": "添加资产",
+      "hash": "sbpyik",
+      "lastUpdated": "2026-03-13"
+    },
+    "assets.includeInNetWorthDesc": {
+      "translation": "将此资产计入您家庭的净资产",
+      "hash": "rrlrdp",
+      "lastUpdated": "2026-03-13"
+    },
+    "assets.equity": {
+      "translation": "股東權益",
+      "hash": "ygdmg5",
+      "lastUpdated": "2026-03-13"
+    },
+    "assets.activeLoans": {
+      "translation": "活跃贷款",
+      "hash": "p6mfr",
+      "lastUpdated": "2026-03-13"
+    },
+    "assets.afterLoanDeductions": {
+      "translation": "扣除贷款后",
+      "hash": "ax693a",
+      "lastUpdated": "2026-03-13"
+    },
+    "assets.overall": {
+      "translation": "总体",
+      "hash": "i1qb3n",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.type.vacation": {
+      "translation": "休假",
+      "hash": "qt7u2r",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.type.vehicle": {
+      "translation": "車輛",
+      "hash": "x6r0uk",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.type.home": {
+      "translation": "主页",
+      "hash": "1cc1r",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.type.education": {
+      "translation": "教育",
+      "hash": "sc02a0",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.type.emergency": {
+      "translation": "紧急基金",
+      "hash": "wspnp0",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.achievedGoals": {
+      "translation": "已实现目标",
+      "hash": "qwj3pv",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.needsAttention": {
+      "translation": "需要注意",
+      "hash": "shwil7",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.groupByMember": {
+      "translation": "按成员",
+      "hash": "xkp94z",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.groupByPriority": {
+      "translation": "按优先级",
+      "hash": "91rya5",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.addAGoal": {
+      "translation": "添加目标",
+      "hash": "f3gtfz",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.almostThere": {
+      "translation": "馬上就好！{0} 好像沒有被串連至你的 Yahoo 賬戶。是否可讓我們幫你串連？",
+      "hash": "hmahd",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.letsCatchUp": {
+      "translation": "让我们一起迎头赶上",
+      "hash": "rxp0zr",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.encourage.planted": {
+      "translation": "刚刚种植—每一颗豆子都很重要！",
+      "hash": "r3djp4",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.encourage.growing": {
+      "translation": "半途而废—继续成长！",
+      "hash": "ffw7vj",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.encourage.pastHalf": {
+      "translation": "过了一半—太棒了！",
+      "hash": "ogdqv6",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.encourage.almostThere": {
+      "translation": "差不多了，只剩{remaining}了！",
+      "hash": "iqzxzi",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.encourage.overdue": {
+      "translation": "稍微落后—别担心，继续前进！",
+      "hash": "37x86f",
+      "lastUpdated": "2026-03-13"
+    },
+    "goals.achieved": {
+      "translation": "已实现",
+      "hash": "27a4vi",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto28": {
+      "translation": "Lonestar ，我看到你的豆子和我的一样大！",
+      "hash": "tw5g0x",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto29": {
+      "translation": "愿施瓦茨与你的豆子同在。",
+      "hash": "32tbxh",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto30": {
+      "translation": "我是认真的，别叫我雪莉",
+      "hash": "m3rry4",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto31": {
+      "translation": "所以我得到了豆子，这很好。",
+      "hash": "dqiqfh",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto32": {
+      "translation": "做个傻瓜，丹尼。",
+      "hash": "e8ywqq",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto33": {
+      "translation": "脂肪、醉酒和计数豆类是度过一生的好方法。",
+      "hash": "w11l8h",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto34": {
+      "translation": "今天我们要教豆子如何飞翔！",
+      "hash": "q6xbwa",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto35": {
+      "translation": "豆子？豆子？ ？我们不需要臭豆子！ ！",
+      "hash": "5pkcju",
+      "lastUpdated": "2026-03-13"
+    },
+    "nook.motto36": {
+      "translation": "我选择了错误的一周来停止数豆子。",
+      "hash": "z0uob",
+      "lastUpdated": "2026-03-13"
     }
   }
 }
