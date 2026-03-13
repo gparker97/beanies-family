@@ -133,6 +133,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Update translations
+        run: node scripts/updateTranslations.mjs --all
+
       - name: Build for production
         run: npm run build
         env:

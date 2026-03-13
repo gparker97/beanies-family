@@ -109,20 +109,21 @@ export async function translateBatch(
   texts: string[],
   source: LanguageCode,
   target: LanguageCode,
-  onProgress?: (completed: number, total: number) => void
+  onProgress?: (completed: number, total: number, translatedText: string) => void
 ): Promise<string[]> {
   const results: string[] = [];
 
   for (let i = 0; i < texts.length; i++) {
     const text = texts[i];
+    let result: string;
     try {
-      const translated = await translate(text!, source, target);
-      results.push(translated);
+      result = await translate(text!, source, target);
     } catch {
-      results.push(text!); // Fallback to original
+      result = text!; // Fallback to original
     }
+    results.push(result);
 
-    onProgress?.(i + 1, texts.length);
+    onProgress?.(i + 1, texts.length, result);
 
     // Small delay between requests to be respectful
     if (i < texts.length - 1) {
