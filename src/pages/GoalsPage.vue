@@ -889,17 +889,8 @@ async function deleteCompletedGoal(id: string) {
 }
 
 /* ───── Keyframe Animations ───── */
-@keyframes fade-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
-  }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* fade-slide-up is in global style.css */
 
 @keyframes emoji-bounce {
   0% {
