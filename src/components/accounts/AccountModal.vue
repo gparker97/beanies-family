@@ -12,9 +12,12 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
-import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
+import {
+  useInstitutionOptions,
+  persistCustomInstitutionIfNeeded,
+} from '@/composables/useInstitutionOptions';
 import { COUNTRIES } from '@/constants/countries';
-import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
+import { OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getSubtypeEmoji } from '@/constants/accountCategories';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
@@ -111,16 +114,6 @@ const modalIcon = computed(() => (type.value ? getSubtypeEmoji(type.value as Acc
 
 async function handleRemoveCustomInstitution(instName: string) {
   await removeCustomInstitution(instName);
-}
-
-async function persistCustomInstitutionIfNeeded(instName: string | undefined) {
-  if (!instName?.trim()) return;
-  const isKnown =
-    INSTITUTIONS.some((i) => i.name === instName) ||
-    settingsStore.customInstitutions.includes(instName);
-  if (!isKnown) {
-    await settingsStore.addCustomInstitution(instName.trim());
-  }
 }
 
 async function handleSave() {

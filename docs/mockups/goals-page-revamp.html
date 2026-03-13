@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Goals Page — Revamp Mockup (with App Shell)</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* ───── Brand Palette ───── */
+      --deep-slate: #2C3E50;
+      --deep-slate-dark: #1a252f;
+      --heritage-orange: #F15D22;
+      --sky-silk: #AED6F1;
+      --terracotta: #E67E22;
+      --cloud-white: #F8F9FA;
+      --success-green: #27AE60;
+
+      /* ───── Tints ───── */
+      --tint-orange-8: rgba(241, 93, 34, 0.08);
+      --tint-orange-15: rgba(241, 93, 34, 0.15);
+      --tint-silk-10: rgba(174, 214, 241, 0.1);
+      --tint-silk-20: rgba(174, 214, 241, 0.2);
+      --tint-slate-5: rgba(44, 62, 80, 0.05);
+      --tint-slate-10: rgba(44, 62, 80, 0.1);
+      --tint-success-10: rgba(39, 174, 96, 0.1);
+      --tint-green-10: rgba(39, 174, 96, 0.1);
+
+      /* ───── Shadows ───── */
+      --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+      --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+
+      /* ───── Squircle ───── */
+      --sq: 24px;
+
+      /* ───── Text ───── */
+      --color-text: #2C3E50;
+      --color-text-muted: #6B7B8D;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--deep-slate-dark);
+      color: var(--color-text);
+      height: 100vh;
+      overflow: hidden;
+    }
+    .font-outfit { font-family: 'Outfit', sans-serif; }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* APP SHELL                                              */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .app-shell {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ───── Sidebar ───── */
+    .sidebar {
+      width: 256px;
+      height: 100vh;
+      background: var(--deep-slate);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    /* Logo section */
+    .sidebar-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 4px;
+      margin-bottom: 16px;
+    }
+    .logo-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    .logo-text {
+      display: flex;
+      flex-direction: column;
+    }
+    .logo-wordmark {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .logo-wordmark .white { color: white; }
+    .logo-wordmark .orange { color: var(--heritage-orange); }
+    .logo-tagline {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 300;
+      font-style: italic;
+      color: rgba(255,255,255,0.25);
+      letter-spacing: 0.06em;
+      margin-top: 2px;
+    }
+
+    /* Sidebar accordion headers */
+    .sidebar-section-header {
+      font-family: 'Outfit', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      border-radius: 12px;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      transition: background 0.15s;
+    }
+    .sidebar-section-header:hover { background: rgba(255,255,255,0.03); }
+    .sidebar-section-header.treehouse { color: #6EE7B7; }
+    .sidebar-section-header.piggybank { color: var(--heritage-orange); }
+    .sidebar-section-header .chevron {
+      margin-left: auto;
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    /* Nav items */
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+    .nav-item {
+      font-family: 'Outfit', sans-serif;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      font-size: 18px;
+      font-weight: 500;
+      border-radius: 16px;
+      border: none;
+      background: transparent;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      border-left: 4px solid transparent;
+      transition: all 0.15s;
+    }
+    .nav-item:hover {
+      color: rgba(255,255,255,0.7);
+      background: rgba(255,255,255,0.05);
+    }
+    .nav-item.active {
+      color: white;
+      font-weight: 600;
+      border-left-color: var(--heritage-orange);
+      background: linear-gradient(to right, rgba(241,93,34,0.2), rgba(230,126,34,0.1));
+      padding-left: 12px;
+    }
+    .nav-item .nav-emoji {
+      width: 24px;
+      text-align: center;
+      font-size: 16px;
+    }
+    .nav-item .nav-badge {
+      margin-left: auto;
+      background: var(--heritage-orange);
+      color: white;
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 20px;
+      padding: 1px 6px;
+      border-radius: 99px;
+      text-align: center;
+    }
+    .nav-item.coming-soon { color: rgba(255,255,255,0.25); pointer-events: none; }
+
+    .sidebar-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.08);
+      margin: 8px 8px;
+    }
+
+    /* User card */
+    .sidebar-user {
+      margin-top: auto;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #3498DB;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 16px;
+      border: 2px solid rgba(255,255,255,0.15);
+    }
+    .user-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+    }
+    .user-role {
+      font-size: 14px;
+      color: rgba(255,255,255,0.35);
+    }
+
+    /* Sidebar security */
+    .sidebar-security {
+      margin-top: 12px;
+      padding: 0 4px;
+    }
+    .security-line {
+      font-size: 12px;
+      color: rgba(255,255,255,0.2);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .security-line .green { color: rgba(110, 231, 183, 0.3); }
+
+    /* ───── Main Content Area ───── */
+    .main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .app-header {
+      height: 64px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: transparent;
+      flex-shrink: 0;
+    }
+    .header-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--deep-slate);
+    }
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-pill {
+      height: 40px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 12px;
+      border-radius: 14px;
+      background: white;
+      box-shadow: 0 2px 8px rgba(44,62,80,0.06);
+      border: none;
+      cursor: pointer;
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    .header-pill .flag { font-size: 18px; }
+    .header-pill .chevron { font-size: 8px; color: rgba(44,62,80,0.3); }
+    .header-pill.icon-only {
+      width: 40px;
+      padding: 0;
+      justify-content: center;
+    }
+    .header-pill .currency-active {
+      background: var(--heritage-orange);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .header-pill .currency-inactive {
+      padding: 4px 10px;
+      color: rgba(44,62,80,0.5);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .header-avatar-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 14px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+    }
+    .header-avatar-btn .mini-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #3498DB;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .privacy-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success-green);
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+    }
+
+    /* ───── Page Content ───── */
+    .page-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 24px 32px;
+      background: var(--cloud-white);
+      border-top-left-radius: 0;
+    }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* GOALS PAGE CONTENT                                     */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .page-space { display: flex; flex-direction: column; gap: 24px; padding-top: 24px; }
+
+    /* ───── Page Header Row ───── */
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .page-subtitle { font-size: 14px; color: var(--color-text-muted); }
+
+    .btn-primary {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 20px;
+      border-radius: 16px;
+      border: none;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(241, 93, 34, 0.3);
+    }
+
+    /* ───── Hero Summary Cards ───── */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .stat-card {
+      border-radius: var(--sq);
+      padding: 20px;
+      box-shadow: var(--card-shadow);
+      background: white;
+      transition: transform 0.2s, box-shadow 0.2s;
+      animation: fadeSlideUp 0.5s ease-out both;
+    }
+    .stat-card:nth-child(1) { animation-delay: 0s; }
+    .stat-card:nth-child(2) { animation-delay: 0.08s; }
+    .stat-card:nth-child(3) { animation-delay: 0.16s; }
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--card-hover-shadow);
+    }
+    .stat-card.dark-card {
+      background: var(--deep-slate);
+      color: white;
+    }
+    .stat-icon-box {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    .stat-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.45;
+      margin-bottom: 4px;
+    }
+    .stat-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+    }
+    .stat-value.green { color: var(--success-green); }
+    .stat-value.orange { color: var(--heritage-orange); }
+
+    /* ───── Toggle Pill Group ───── */
+    .toggle-pills {
+      display: inline-flex;
+      background: var(--tint-slate-5);
+      border-radius: 12px;
+      padding: 3px;
+    }
+    .toggle-pill {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 16px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle-pill.active {
+      background: white;
+      color: var(--color-text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    /* ───── Section Header ───── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .member-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      border: 2px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .section-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--deep-slate);
+    }
+    .section-count {
+      font-size: 14px;
+      color: var(--color-text-muted);
+    }
+
+    /* ───── Goal Cards Grid ───── */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    /* ───── Goal Card ───── */
+    .goal-card {
+      border-radius: var(--sq);
+      background: white;
+      padding: 20px;
+      box-shadow: var(--card-shadow);
+      cursor: pointer;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      animation: fadeSlideUp 0.5s ease-out both;
+      position: relative;
+      overflow: hidden;
+    }
+    .goal-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--card-hover-shadow);
+    }
+
+    /* Emoji bounce on card hover */
+    .goal-card:hover .goal-type-icon .emoji {
+      animation: emojiBounce 0.4s ease;
+    }
+
+    /* ★ Almost-there glow (goals > 75%) */
+    .goal-card.almost-there {
+      border: 2px solid transparent;
+      background-image: linear-gradient(white, white), linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      background-origin: border-box;
+      background-clip: padding-box, border-box;
+      box-shadow: var(--card-shadow), 0 0 24px rgba(241, 93, 34, 0.12);
+    }
+    .goal-card.almost-there:hover {
+      box-shadow: var(--card-hover-shadow), 0 0 32px rgba(241, 93, 34, 0.2);
+    }
+
+    .goal-card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .goal-card-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .goal-type-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      position: relative;
+    }
+    .goal-type-icon .emoji {
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    .goal-type-icon.savings { background: var(--tint-success-10); }
+    .goal-type-icon.debt { background: var(--tint-orange-8); }
+    .goal-type-icon.invest { background: rgba(147, 51, 234, 0.08); }
+    .goal-type-icon.purchase { background: var(--tint-silk-20); }
+
+    .goal-name {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--color-text);
+    }
+    .goal-meta {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin-top: 2px;
+    }
+
+    /* ★ Motivational micro-copy */
+    .goal-encouragement {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .goal-encouragement.hot {
+      color: var(--heritage-orange);
+    }
+    .goal-encouragement.warm {
+      color: var(--terracotta);
+    }
+    .goal-encouragement.growing {
+      color: var(--success-green);
+    }
+    .goal-encouragement.planted {
+      color: var(--color-text-muted);
+    }
+
+    /* Action dots */
+    .action-dots {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: background 0.15s;
+    }
+    .action-dots:hover { background: var(--tint-slate-5); }
+
+    /* ───── Progress Section with Milestones ───── */
+    .goal-progress-section { margin-bottom: 12px; }
+    .goal-progress-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .goal-progress-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-text-muted);
+    }
+    .goal-progress-amounts {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    .goal-progress-amounts .separator {
+      margin: 0 4px;
+      opacity: 0.3;
+    }
+
+    /* ★ Progress bar with milestone dots */
+    .progress-track {
+      position: relative;
+      width: 100%;
+      height: 10px;
+      border-radius: 99px;
+      background: #E8ECF0;
+      overflow: visible;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta));
+      transition: width 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+    }
+    .progress-fill.green {
+      background: linear-gradient(90deg, #27AE60, #2ECC71);
+    }
+    /* Glow effect on fill for high-progress goals */
+    .progress-fill.glowing::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      top: -3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--heritage-orange);
+      box-shadow: 0 0 12px rgba(241, 93, 34, 0.5);
+      animation: progressGlow 2s ease-in-out infinite;
+    }
+
+    /* ★ Milestone dots */
+    .milestone-dots {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+    }
+    .milestone-dot {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #D5DAE0;
+      transform: translateX(-50%);
+      transition: all 0.3s;
+      z-index: 2;
+    }
+    .milestone-dot.reached {
+      background: white;
+      box-shadow: 0 0 0 2px var(--heritage-orange);
+    }
+    .milestone-dot[data-pos="25"] { left: 25%; }
+    .milestone-dot[data-pos="50"] { left: 50%; }
+    .milestone-dot[data-pos="75"] { left: 75%; }
+    .milestone-dot[data-pos="100"] { left: calc(100% - 3px); }
+
+    /* ───── Priority Badge ───── */
+    .priority-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 99px;
+    }
+    .priority-badge.critical { background: var(--tint-orange-15); color: var(--heritage-orange); }
+    .priority-badge.high { background: rgba(230, 126, 34, 0.1); color: var(--terracotta); }
+    .priority-badge.medium { background: var(--tint-silk-20); color: #5B9BD5; }
+    .priority-badge.low { background: var(--tint-slate-5); color: var(--color-text-muted); }
+
+    /* ★ "Almost there" badge */
+    .almost-there-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 99px;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      color: white;
+      animation: badgePulse 3s ease-in-out infinite;
+    }
+
+    /* Goal Card Footer */
+    .goal-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid #F0F2F5;
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+    .goal-owner {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .goal-owner-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: white;
+    }
+    .goal-owner-name {
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+    .goal-deadline {
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+    /* ★ Overdue uses Heritage Orange + encouraging language */
+    .goal-deadline.overdue {
+      color: var(--heritage-orange);
+      font-weight: 600;
+    }
+
+    /* ───── Dashed Add Card ───── */
+    .add-card-dashed {
+      min-height: 260px;
+      border-radius: var(--sq);
+      border: 2px dashed #D5DAE0;
+      background: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      color: var(--color-text-muted);
+      transition: all 0.25s;
+      animation: fadeSlideUp 0.5s ease-out both;
+    }
+    .add-card-dashed:hover {
+      border-color: var(--heritage-orange);
+      color: var(--heritage-orange);
+      background: rgba(241, 93, 34, 0.02);
+    }
+    .add-card-dashed .plus-icon { font-size: 28px; font-weight: 300; }
+    .add-card-dashed .add-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* ★ COMPLETED GOALS — CELEBRATION CARDS                  */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .completed-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 16px;
+      background: transparent;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      text-align: left;
+    }
+    .completed-toggle:hover { background: var(--tint-slate-5); }
+    .completed-toggle .toggle-label {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--color-text-muted);
+    }
+    .completed-count-badge {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 10px;
+      border-radius: 99px;
+      background: var(--tint-success-10);
+      color: var(--success-green);
+    }
+    .completed-chevron {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--color-text-muted);
+    }
+
+    .completed-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 12px;
+    }
+
+    /* ★ Celebration gradient card for completed goals */
+    .celebration-card {
+      border-radius: var(--sq);
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      padding: 20px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+      animation: fadeSlideUp 0.5s ease-out both;
+    }
+    .celebration-card::before {
+      content: '';
+      position: absolute;
+      top: -20px;
+      right: -20px;
+      width: 100px;
+      height: 100px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 50%;
+    }
+    .celebration-card::after {
+      content: '';
+      position: absolute;
+      bottom: -30px;
+      left: -10px;
+      width: 80px;
+      height: 80px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 50%;
+    }
+    .celebration-card .goal-card-header-left .goal-type-icon {
+      background: rgba(255,255,255,0.2);
+    }
+    .celebration-card .goal-name { color: white; }
+    .celebration-card .goal-meta { color: rgba(255,255,255,0.7); }
+    .celebration-card .goal-progress-label { color: rgba(255,255,255,0.6); }
+    .celebration-card .goal-progress-amounts { color: white; }
+    .celebration-card .progress-track { background: rgba(255,255,255,0.2); }
+    .celebration-card .progress-fill { background: white !important; }
+    .celebration-card .goal-card-footer { border-top-color: rgba(255,255,255,0.15); }
+    .celebration-card .goal-owner-dot { border: 2px solid rgba(255,255,255,0.3); }
+    .celebration-card .goal-owner-name { color: rgba(255,255,255,0.7); }
+
+    .celebration-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
+      border-radius: 99px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+    }
+
+    .completed-actions {
+      display: flex;
+      gap: 4px;
+      position: relative;
+      z-index: 2;
+    }
+    .completed-action-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: none;
+      background: rgba(255,255,255,0.15);
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      color: white;
+    }
+    .completed-action-btn:hover { background: rgba(255,255,255,0.25); }
+
+    /* ★ Sparkle particles for completed section */
+    .sparkle-container {
+      position: relative;
+    }
+    .sparkle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--heritage-orange);
+      opacity: 0;
+      animation: sparkle 3s ease-in-out infinite;
+    }
+    .sparkle:nth-child(1) { top: 10%; left: 5%; animation-delay: 0s; }
+    .sparkle:nth-child(2) { top: 30%; left: 95%; animation-delay: 0.7s; }
+    .sparkle:nth-child(3) { top: 80%; left: 15%; animation-delay: 1.4s; }
+    .sparkle:nth-child(4) { top: 60%; left: 85%; animation-delay: 2.1s; }
+    .sparkle:nth-child(5) { top: 5%; left: 50%; animation-delay: 0.5s; background: var(--terracotta); }
+    .sparkle:nth-child(6) { top: 90%; left: 60%; animation-delay: 1.8s; background: var(--success-green); }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* ★ ANIMATIONS                                           */
+    /* ═══════════════════════════════════════════════════════ */
+
+    @keyframes fadeSlideUp {
+      from {
+        opacity: 0;
+        transform: translateY(16px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes emojiBounce {
+      0% { transform: scale(1); }
+      30% { transform: scale(1.25) rotate(-5deg); }
+      50% { transform: scale(0.95) rotate(3deg); }
+      70% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes progressGlow {
+      0%, 100% { opacity: 0.6; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    @keyframes badgePulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(241, 93, 34, 0.3); }
+      50% { box-shadow: 0 0 0 6px rgba(241, 93, 34, 0); }
+    }
+
+    @keyframes sparkle {
+      0%, 100% { opacity: 0; transform: scale(0); }
+      50% { opacity: 0.7; transform: scale(1); }
+    }
+
+    /* Stagger card animations */
+    .cards-grid .goal-card:nth-child(1),
+    .cards-grid .celebration-card:nth-child(1) { animation-delay: 0.05s; }
+    .cards-grid .goal-card:nth-child(2),
+    .cards-grid .celebration-card:nth-child(2) { animation-delay: 0.12s; }
+    .cards-grid .goal-card:nth-child(3),
+    .cards-grid .celebration-card:nth-child(3) { animation-delay: 0.19s; }
+    .cards-grid .goal-card:nth-child(4),
+    .cards-grid .add-card-dashed { animation-delay: 0.26s; }
+
+    /* ───── Modal (unchanged from GoalModal — just for reference) ───── */
+    .modal-preview-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--heritage-orange);
+      background: var(--tint-orange-8);
+      padding: 4px 12px;
+      border-radius: 8px;
+      display: inline-block;
+      margin: 24px 0 12px;
+    }
+
+    /* ───── Responsive ───── */
+    @media (max-width: 1024px) {
+      .hero-grid { grid-template-columns: repeat(3, 1fr); }
+      .cards-grid { grid-template-columns: repeat(2, 1fr); }
+      .completed-cards { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .completed-cards { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- SIDEBAR                                         -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <aside class="sidebar">
+      <!-- Logo -->
+      <div class="sidebar-logo">
+        <div class="logo-img">🫘</div>
+        <div class="logo-text">
+          <div class="logo-wordmark">
+            <span class="white">beanies</span><span class="orange">.family</span>
+          </div>
+          <div class="logo-tagline">every bean counts</div>
+        </div>
+      </div>
+
+      <!-- Treehouse Section -->
+      <button class="sidebar-section-header treehouse">
+        <span>🌳</span> The Treehouse
+        <span class="chevron">▼</span>
+      </button>
+      <nav class="sidebar-nav">
+        <button class="nav-item">
+          <span class="nav-emoji">🏡</span> Family Nook
+        </button>
+        <button class="nav-item">
+          <span class="nav-emoji">📅</span> Family Planner
+        </button>
+        <button class="nav-item">
+          <span class="nav-emoji">✅</span> Family To-Do
+        </button>
+        <button class="nav-item coming-soon">
+          <span class="nav-emoji">👨‍👩‍👦</span> Family Hub
+        </button>
+      </nav>
+
+      <!-- Piggy Bank Section -->
+      <button class="sidebar-section-header piggybank">
+        <span>🐷</span> The Piggy Bank
+        <span class="chevron">▼</span>
+      </button>
+      <nav class="sidebar-nav">
+        <button class="nav-item">
+          <span class="nav-emoji">📊</span> Overview
+        </button>
+        <button class="nav-item">
+          <span class="nav-emoji">🏦</span> Accounts
+        </button>
+        <button class="nav-item">
+          <span class="nav-emoji">📋</span> Budgets
+        </button>
+        <button class="nav-item">
+          <span class="nav-emoji">💸</span> Transactions
+        </button>
+        <button class="nav-item active">
+          <span class="nav-emoji">🎯</span> Goals
+          <span class="nav-badge">7</span>
+        </button>
+        <button class="nav-item coming-soon">
+          <span class="nav-emoji">🏠</span> Assets
+        </button>
+      </nav>
+
+      <div class="sidebar-divider"></div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item">
+          <span class="nav-emoji">⚙️</span> Settings
+        </button>
+      </nav>
+
+      <!-- User Card -->
+      <div class="sidebar-user">
+        <div class="user-avatar">G</div>
+        <div>
+          <div class="user-name">Greg</div>
+          <div class="user-role">Owner</div>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div class="sidebar-security">
+        <div class="security-line">
+          <span class="green">🔒</span> AES-256 encrypted
+        </div>
+        <div class="security-line">v0.9.2</div>
+      </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT AREA                               -->
+    <!-- ═══════════════════════════════════════════════ -->
+    <div class="main-area">
+
+      <!-- Header -->
+      <header class="app-header" style="background: var(--cloud-white);">
+        <span class="header-title">Goals</span>
+        <div class="header-controls">
+          <!-- Currency toggle -->
+          <div class="header-pill">
+            <span class="currency-active">USD $</span>
+            <span class="currency-inactive">GBP</span>
+          </div>
+          <!-- Language -->
+          <button class="header-pill" style="gap: 4px; padding: 0 10px;">
+            <span class="flag">🇺🇸</span>
+            <span class="chevron">▼</span>
+          </button>
+          <!-- Privacy -->
+          <button class="header-pill icon-only" style="position: relative;">
+            👁️
+            <span class="privacy-dot" style="position: absolute; bottom: 4px; right: 4px;"></span>
+          </button>
+          <!-- Avatar -->
+          <button class="header-avatar-btn">
+            <span class="mini-avatar">G</span>
+            <span class="chevron" style="font-size: 8px; color: rgba(44,62,80,0.3);">▼</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="page-content">
+        <div class="page-space">
+
+          <!-- ───── Page Header ───── -->
+          <div class="page-header">
+            <p class="page-subtitle">3 family members · 7 active goals</p>
+            <button class="btn-primary">
+              <span style="font-size: 16px;">+</span> Add Goal
+            </button>
+          </div>
+
+          <!-- ───── Hero Summary Cards ───── -->
+          <div class="hero-grid">
+            <div class="stat-card dark-card">
+              <div class="stat-icon-box" style="background: rgba(255,255,255,0.12);">🎯</div>
+              <div class="stat-label" style="color: rgba(255,255,255,0.45);">Active Goals</div>
+              <div class="stat-value" style="color: white;">7</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-box" style="background: var(--tint-success-10);">✅</div>
+              <div class="stat-label">Completed</div>
+              <div class="stat-value green">4</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon-box" style="background: var(--tint-orange-8);">⏰</div>
+              <div class="stat-label">Needs Attention</div>
+              <div class="stat-value orange">1</div>
+            </div>
+          </div>
+
+          <!-- ───── Toggle ───── -->
+          <div>
+            <div class="toggle-pills">
+              <button class="toggle-pill active">By Member</button>
+              <button class="toggle-pill">By Priority</button>
+            </div>
+          </div>
+
+          <!-- ═══════════════════════════════════════════ -->
+          <!-- SECTION: Greg's Goals                       -->
+          <!-- ═══════════════════════════════════════════ -->
+          <div>
+            <div class="section-header">
+              <div class="section-header-left">
+                <div class="member-avatar" style="background: #3498DB;">G</div>
+                <span class="section-label">Greg</span>
+                <span class="section-count">(3)</span>
+              </div>
+            </div>
+
+            <div class="cards-grid">
+              <!-- ★ Goal: Emergency Fund (50% — growing) -->
+              <div class="goal-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon savings"><span class="emoji">🐷</span></div>
+                    <div>
+                      <div class="goal-name">Emergency Fund</div>
+                      <div class="goal-meta">Savings</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <!-- ★ Motivational micro-copy -->
+                <div class="goal-encouragement growing">
+                  🌱 Halfway there — keep growing!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $12,500 <span class="separator">/</span> $25,000
+                    </span>
+                  </div>
+                  <!-- ★ Progress bar with milestone dots -->
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 50%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot reached" data-pos="25"></div>
+                      <div class="milestone-dot reached" data-pos="50"></div>
+                      <div class="milestone-dot" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <span class="priority-badge high">High</span>
+                  <span class="goal-deadline">Dec 2026</span>
+                </div>
+              </div>
+
+              <!-- ★ Goal: Car Loan (55% — overdue, encouraging!) -->
+              <div class="goal-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon debt"><span class="emoji">🎯</span></div>
+                    <div>
+                      <div class="goal-name">Pay Off Car Loan</div>
+                      <div class="goal-meta">Debt Payoff</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <!-- ★ Encouraging, not guilt-inducing! -->
+                <div class="goal-encouragement warm">
+                  💪 Over halfway — let's catch up!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $8,200 <span class="separator">/</span> $15,000
+                    </span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 54.7%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot reached" data-pos="25"></div>
+                      <div class="milestone-dot reached" data-pos="50"></div>
+                      <div class="milestone-dot" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <span class="priority-badge critical">Critical</span>
+                  <!-- ★ Encouraging overdue language -->
+                  <span class="goal-deadline overdue">Let's catch up · Mar 2026</span>
+                </div>
+              </div>
+
+              <!-- ★ Goal: Vacation (36% — just planted) -->
+              <div class="goal-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon purchase"><span class="emoji">🛍️</span></div>
+                    <div>
+                      <div class="goal-name">Family Vacation</div>
+                      <div class="goal-meta">Purchase</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <div class="goal-encouragement planted">
+                  🌱 Just planted — every bean counts!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $1,800 <span class="separator">/</span> $5,000
+                    </span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 36%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot reached" data-pos="25"></div>
+                      <div class="milestone-dot" data-pos="50"></div>
+                      <div class="milestone-dot" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <span class="priority-badge medium">Medium</span>
+                  <span class="goal-deadline">Jul 2026</span>
+                </div>
+              </div>
+
+              <!-- Dashed add card -->
+              <div class="add-card-dashed">
+                <span class="plus-icon">+</span>
+                <span class="add-label">Add a goal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════════════════════════════════════ -->
+          <!-- SECTION: Sarah's Goals                      -->
+          <!-- ═══════════════════════════════════════════ -->
+          <div>
+            <div class="section-header">
+              <div class="section-header-left">
+                <div class="member-avatar" style="background: #E67E22;">S</div>
+                <span class="section-label">Sarah</span>
+                <span class="section-count">(2)</span>
+              </div>
+            </div>
+
+            <div class="cards-grid">
+              <!-- Goal: Investment Portfolio (45%) -->
+              <div class="goal-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon invest"><span class="emoji">📈</span></div>
+                    <div>
+                      <div class="goal-name">Investment Portfolio</div>
+                      <div class="goal-meta">Investment</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <div class="goal-encouragement growing">
+                  🌱 Growing steadily — nice work!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $45,000 <span class="separator">/</span> $100,000
+                    </span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 45%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot reached" data-pos="25"></div>
+                      <div class="milestone-dot" data-pos="50"></div>
+                      <div class="milestone-dot" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <span class="priority-badge high">High</span>
+                  <span class="goal-deadline">Dec 2028</span>
+                </div>
+              </div>
+
+              <!-- ★ Goal: MacBook Pro (85% — ALMOST THERE! with glow) -->
+              <div class="goal-card almost-there">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon purchase"><span class="emoji">🛍️</span></div>
+                    <div>
+                      <div class="goal-name">New MacBook Pro</div>
+                      <div class="goal-meta">Purchase</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <!-- ★ HOT encouragement for almost-there goals -->
+                <div class="goal-encouragement hot">
+                  🔥 So close — just $525 to go!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $2,975 <span class="separator">/</span> $3,500
+                    </span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill glowing" style="width: 85%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot reached" data-pos="25"></div>
+                      <div class="milestone-dot reached" data-pos="50"></div>
+                      <div class="milestone-dot reached" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <!-- ★ Almost-there badge replaces priority -->
+                  <span class="almost-there-badge">🔥 Almost There!</span>
+                  <span class="goal-deadline">Sep 2026</span>
+                </div>
+              </div>
+
+              <div class="add-card-dashed" style="min-height: 260px;">
+                <span class="plus-icon">+</span>
+                <span class="add-label">Add a goal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════════════════════════════════════ -->
+          <!-- SECTION: Family Goals (shared)              -->
+          <!-- ═══════════════════════════════════════════ -->
+          <div>
+            <div class="section-header">
+              <div class="section-header-left">
+                <div class="member-avatar" style="background: var(--deep-slate);">🏠</div>
+                <span class="section-label">Family</span>
+                <span class="section-count">(2)</span>
+              </div>
+            </div>
+
+            <div class="cards-grid">
+              <div class="goal-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon savings"><span class="emoji">🐷</span></div>
+                    <div>
+                      <div class="goal-name">House Down Payment</div>
+                      <div class="goal-meta">Savings</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <div class="goal-encouragement growing">
+                  🌿 Past the halfway mark — amazing!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $38,000 <span class="separator">/</span> $60,000
+                    </span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 63.3%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot reached" data-pos="25"></div>
+                      <div class="milestone-dot reached" data-pos="50"></div>
+                      <div class="milestone-dot" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <span class="priority-badge critical">Critical</span>
+                  <span class="goal-deadline">Jun 2027</span>
+                </div>
+              </div>
+
+              <div class="goal-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon savings"><span class="emoji">🐷</span></div>
+                    <div>
+                      <div class="goal-name">College Fund</div>
+                      <div class="goal-meta">Savings</div>
+                    </div>
+                  </div>
+                  <button class="action-dots">⋯</button>
+                </div>
+
+                <div class="goal-encouragement planted">
+                  🌱 Just planted — great start!
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">
+                      $5,000 <span class="separator">/</span> $50,000
+                    </span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 10%;"></div>
+                    <div class="milestone-dots">
+                      <div class="milestone-dot" data-pos="25"></div>
+                      <div class="milestone-dot" data-pos="50"></div>
+                      <div class="milestone-dot" data-pos="75"></div>
+                      <div class="milestone-dot" data-pos="100"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <span class="priority-badge medium">Medium</span>
+                  <span class="goal-deadline">Aug 2035</span>
+                </div>
+              </div>
+
+              <div class="add-card-dashed">
+                <span class="plus-icon">+</span>
+                <span class="add-label">Add a goal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════════════════════════════════════ -->
+          <!-- ★ COMPLETED GOALS — CELEBRATION SECTION     -->
+          <!-- ═══════════════════════════════════════════ -->
+          <div class="sparkle-container">
+            <!-- Sparkle particles -->
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+            <div class="sparkle"></div>
+
+            <button class="completed-toggle">
+              <span style="font-size: 18px;">🎉</span>
+              <span class="toggle-label">Achieved Goals</span>
+              <span class="completed-count-badge">4</span>
+              <span class="completed-chevron">▲</span>
+            </button>
+
+            <div class="completed-cards">
+              <!-- ★ Celebration gradient card -->
+              <div class="celebration-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon"><span class="emoji">🐷</span></div>
+                    <div>
+                      <div class="goal-name">Wedding Ring</div>
+                      <div class="goal-meta">Achieved Feb 2026</div>
+                    </div>
+                  </div>
+                  <div class="completed-actions">
+                    <button class="completed-action-btn" title="Reopen">↩️</button>
+                    <button class="completed-action-btn" title="Delete">🗑️</button>
+                  </div>
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">$3,500 <span class="separator">/</span> $3,500</span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 100%;"></div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <div class="goal-owner">
+                    <div class="goal-owner-dot" style="background: #3498DB;">G</div>
+                    <span class="goal-owner-name">Greg</span>
+                  </div>
+                  <span class="celebration-badge">🎉 Achieved!</span>
+                </div>
+              </div>
+
+              <div class="celebration-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon"><span class="emoji">🛍️</span></div>
+                    <div>
+                      <div class="goal-name">New Sofa</div>
+                      <div class="goal-meta">Achieved Jan 2026</div>
+                    </div>
+                  </div>
+                  <div class="completed-actions">
+                    <button class="completed-action-btn" title="Reopen">↩️</button>
+                    <button class="completed-action-btn" title="Delete">🗑️</button>
+                  </div>
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">$2,200 <span class="separator">/</span> $2,200</span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 100%;"></div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <div class="goal-owner">
+                    <div class="goal-owner-dot" style="background: var(--deep-slate);">🏠</div>
+                    <span class="goal-owner-name">Family</span>
+                  </div>
+                  <span class="celebration-badge">🎉 Achieved!</span>
+                </div>
+              </div>
+
+              <div class="celebration-card">
+                <div class="goal-card-header">
+                  <div class="goal-card-header-left">
+                    <div class="goal-type-icon"><span class="emoji">🎯</span></div>
+                    <div>
+                      <div class="goal-name">Credit Card Payoff</div>
+                      <div class="goal-meta">Achieved Nov 2025</div>
+                    </div>
+                  </div>
+                  <div class="completed-actions">
+                    <button class="completed-action-btn" title="Reopen">↩️</button>
+                    <button class="completed-action-btn" title="Delete">🗑️</button>
+                  </div>
+                </div>
+
+                <div class="goal-progress-section">
+                  <div class="goal-progress-row">
+                    <span class="goal-progress-label">Progress</span>
+                    <span class="goal-progress-amounts">$4,800 <span class="separator">/</span> $4,800</span>
+                  </div>
+                  <div class="progress-track">
+                    <div class="progress-fill" style="width: 100%;"></div>
+                  </div>
+                </div>
+
+                <div class="goal-card-footer">
+                  <div class="goal-owner">
+                    <div class="goal-owner-dot" style="background: #E67E22;">S</div>
+                    <span class="goal-owner-name">Sarah</span>
+                  </div>
+                  <span class="celebration-badge">🎉 Achieved!</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- .page-space -->
+      </div><!-- .page-content -->
+    </div><!-- .main-area -->
+  </div><!-- .app-shell -->
+</body>
+</html>

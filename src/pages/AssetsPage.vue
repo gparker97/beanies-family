@@ -1,46 +1,32 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, toRaw } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
-import { BaseButton, BaseCombobox, BaseInput, BaseSelect, BaseModal } from '@/components/ui';
-import ActionButtons from '@/components/ui/ActionButtons.vue';
+import { BaseButton } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
+import AssetModal from '@/components/assets/AssetModal.vue';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
-import { useInstitutionOptions } from '@/composables/useInstitutionOptions';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useMemberInfo } from '@/composables/useMemberInfo';
-import { COUNTRIES } from '@/constants/countries';
-import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
-import { INSTITUTIONS, OTHER_INSTITUTION_VALUE } from '@/constants/institutions';
 import { getAssetTypeIcon } from '@/constants/icons';
 import { useAssetsStore } from '@/stores/assetsStore';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type {
-  Asset,
-  AssetType,
-  CreateAssetInput,
-  UpdateAssetInput,
-  AssetLoan,
-} from '@/types/models';
+import type { Asset, AssetType, CreateAssetInput, UpdateAssetInput } from '@/types/models';
 
 const route = useRoute();
 const assetsStore = useAssetsStore();
-const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
 const { getMemberName, getMemberColor } = useMemberInfo();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
-const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
-const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
 
 const baseCurrency = computed(() => settingsStore.baseCurrency);
 const totalAssetValue = computed(() => assetsStore.filteredTotalAssetValue);
@@ -48,9 +34,11 @@ const totalLoanValue = computed(() => assetsStore.filteredTotalLoanValue);
 const netAssetValue = computed(() => assetsStore.filteredNetAssetValue);
 const totalAppreciation = computed(() => assetsStore.totalAppreciation);
 
+// Dual modal pattern
 const showAddModal = ref(false);
 const showEditModal = ref(false);
-const isSubmitting = ref(false);
+const editingAsset = ref<Asset | null>(null);
+const addModalDefaults = ref<{ memberId?: string; type?: AssetType } | undefined>();
 
 // Open edit modal from query param (e.g. navigated from Dashboard)
 onMounted(() => {
@@ -74,85 +62,24 @@ const assetTypes = computed(() => [
   { value: 'other' as AssetType, label: t('assets.type.other') },
 ]);
 
-const { currencyOptions } = useCurrencyOptions();
-
-const memberOptions = computed(() =>
-  familyStore.members.map((m) => ({
-    value: m.id,
-    label: m.name,
-  }))
-);
-
-// Default loan state
-function getDefaultLoan(): AssetLoan {
-  return {
-    hasLoan: false,
-    loanAmount: undefined,
-    outstandingBalance: undefined,
-    interestRate: undefined,
-    monthlyPayment: undefined,
-    loanTermMonths: undefined,
-    lender: undefined,
-    lenderCountry: undefined,
-    loanStartDate: undefined,
-  };
-}
-
-// New asset form state
-const newAsset = ref<CreateAssetInput>({
-  memberId: familyStore.currentMemberId || '',
-  name: '',
-  type: 'real_estate',
-  purchaseValue: 0,
-  currentValue: 0,
-  purchaseDate: undefined,
-  currency: settingsStore.displayCurrency,
-  notes: '',
-  includeInNetWorth: true,
-  loan: getDefaultLoan(),
-});
-
-// Edit asset form state
-const editingAssetId = ref<string | null>(null);
-const editingAsset = ref<
-  UpdateAssetInput & {
-    name: string;
-    memberId: string;
-    type: AssetType;
-    purchaseValue: number;
-    currentValue: number;
-    currency: string;
-  }
->({
-  name: '',
-  memberId: '',
-  type: 'real_estate',
-  purchaseValue: 0,
-  currentValue: 0,
-  purchaseDate: undefined,
-  currency: 'USD',
-  notes: '',
-  includeInNetWorth: true,
-  loan: getDefaultLoan(),
-});
-
 // Uses filtered data based on global member filter
 const assets = computed(() => assetsStore.filteredAssets);
 
 // Group assets by type
+const typeOrder: AssetType[] = [
+  'real_estate',
+  'vehicle',
+  'boat',
+  'jewelry',
+  'electronics',
+  'equipment',
+  'art',
+  'collectible',
+  'other',
+];
+
 const assetsByType = computed(() => {
   const groups = new Map<AssetType, Asset[]>();
-  const typeOrder: AssetType[] = [
-    'real_estate',
-    'vehicle',
-    'boat',
-    'jewelry',
-    'electronics',
-    'equipment',
-    'art',
-    'collectible',
-    'other',
-  ];
 
   for (const asset of assets.value) {
     const existing = groups.get(asset.type) || [];
@@ -221,114 +148,40 @@ function getAssetTypeConfig(type: AssetType): {
   return configs[type] || configs.other;
 }
 
-function formatDate(isoString: string | undefined): string {
+function formatPurchaseDate(isoString: string | undefined): string {
   if (!isoString) return '';
   return new Date(isoString).toLocaleDateString();
 }
 
-function openAddModal() {
-  newAsset.value = {
-    memberId: familyStore.currentMemberId || familyStore.members[0]?.id || '',
-    name: '',
-    type: 'real_estate',
-    purchaseValue: 0,
-    currentValue: 0,
-    purchaseDate: undefined,
-    currency: settingsStore.displayCurrency,
-    notes: '',
-    includeInNetWorth: true,
-    loan: getDefaultLoan(),
-  };
+// Modal handlers
+function openAddWithDefaults(defaults?: { memberId?: string; type?: AssetType }) {
+  addModalDefaults.value = defaults;
+  editingAsset.value = null;
   showAddModal.value = true;
 }
 
 function openEditModal(asset: Asset) {
-  editingAssetId.value = asset.id;
-  editingAsset.value = {
-    name: asset.name,
-    memberId: asset.memberId,
-    type: asset.type,
-    purchaseValue: asset.purchaseValue,
-    currentValue: asset.currentValue,
-    purchaseDate: asset.purchaseDate,
-    currency: asset.currency,
-    notes: asset.notes || '',
-    includeInNetWorth: asset.includeInNetWorth,
-    loan: asset.loan ? { ...asset.loan } : getDefaultLoan(),
-  };
+  editingAsset.value = asset;
   showEditModal.value = true;
 }
 
 function closeEditModal() {
   showEditModal.value = false;
-  editingAssetId.value = null;
+  editingAsset.value = null;
 }
 
-async function persistCustomInstitutionIfNeeded(name: string | undefined) {
-  if (!name?.trim()) return;
-  const isKnown =
-    INSTITUTIONS.some((i) => i.name === name) || settingsStore.customInstitutions.includes(name);
-  if (!isKnown) {
-    await settingsStore.addCustomInstitution(name.trim());
-  }
-}
-
-async function handleRemoveCustomInstitution(name: string) {
-  await removeCustomInstitution(name);
-}
-
-/** Strip undefined values from loan data (Automerge rejects undefined). */
-function cleanLoan(loan: AssetLoan | undefined): AssetLoan {
-  if (!loan?.hasLoan) return { hasLoan: false };
-  const raw = toRaw(loan);
-  const cleaned: Partial<AssetLoan> = { hasLoan: true };
-  for (const [k, v] of Object.entries(raw)) {
-    if (v !== undefined && k !== 'hasLoan') {
-      (cleaned as Record<string, unknown>)[k] = v;
-    }
-  }
-  return cleaned as AssetLoan;
-}
-
-async function createAsset() {
-  if (!newAsset.value.name.trim()) return;
-
-  isSubmitting.value = true;
-  try {
-    // Convert reactive proxy to plain object for IndexedDB storage
-    const rawData = toRaw(newAsset.value);
-    const assetData: CreateAssetInput = {
-      ...rawData,
-      loan: cleanLoan(rawData.loan),
-    };
-    await assetsStore.createAsset(assetData);
-    await persistCustomInstitutionIfNeeded(rawData.loan?.lender);
-    showAddModal.value = false;
-  } finally {
-    isSubmitting.value = false;
-  }
-}
-
-async function saveEdit() {
-  if (!editingAssetId.value || !editingAsset.value.name.trim()) return;
-
-  isSubmitting.value = true;
-  try {
-    // Convert reactive proxy to plain object for IndexedDB storage
-    const rawData = toRaw(editingAsset.value);
-    const assetData: UpdateAssetInput = {
-      ...rawData,
-      loan: cleanLoan(rawData.loan),
-    };
-    await assetsStore.updateAsset(editingAssetId.value, assetData);
-    await persistCustomInstitutionIfNeeded(rawData.loan?.lender);
+async function handleAssetSave(data: CreateAssetInput | { id: string; data: UpdateAssetInput }) {
+  if ('id' in data) {
+    await assetsStore.updateAsset(data.id, data.data);
     closeEditModal();
-  } finally {
-    isSubmitting.value = false;
+  } else {
+    await assetsStore.createAsset(data);
+    showAddModal.value = false;
   }
 }
 
-async function deleteAsset(id: string) {
+async function handleAssetDelete(id: string) {
+  closeEditModal();
   if (await showConfirm({ title: 'confirm.deleteAssetTitle', message: 'assets.deleteConfirm' })) {
     await assetsStore.deleteAsset(id);
     playWhoosh();
@@ -350,7 +203,7 @@ function getAppreciationPercent(asset: Asset): number {
   <div class="space-y-6">
     <!-- Action bar -->
     <div class="flex justify-end">
-      <BaseButton @click="openAddModal">
+      <BaseButton @click="openAddWithDefaults()">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('assets.addAsset') }}
       </BaseButton>
@@ -419,7 +272,7 @@ function getAppreciationPercent(asset: Asset): number {
         {{ t('assets.noAssets') }}
       </h3>
       <p class="mt-1 mb-4 text-gray-500 dark:text-gray-400">{{ t('assets.getStarted') }}</p>
-      <BaseButton @click="openAddModal">
+      <BaseButton @click="openAddWithDefaults()">
         <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
         {{ t('assets.addAsset') }}
       </BaseButton>
@@ -479,17 +332,18 @@ function getAppreciationPercent(asset: Asset): number {
                 <div>
                   <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ asset.name }}</h3>
                   <p v-if="asset.purchaseDate" class="text-sm text-gray-500 dark:text-gray-400">
-                    {{ t('common.purchased') }} {{ formatDate(asset.purchaseDate) }}
+                    {{ t('common.purchased') }} {{ formatPurchaseDate(asset.purchaseDate) }}
                   </p>
                 </div>
               </div>
 
-              <!-- Action Menu -->
-              <ActionButtons
-                @click.stop
-                @edit="openEditModal(asset)"
-                @delete="deleteAsset(asset.id)"
-              />
+              <!-- Action dots -->
+              <button
+                class="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-[var(--tint-slate-5)]"
+                @click.stop="openEditModal(asset)"
+              >
+                ⋯
+              </button>
             </div>
 
             <!-- Value Display -->
@@ -525,15 +379,14 @@ function getAppreciationPercent(asset: Asset): number {
             <!-- Appreciation/Depreciation Badge -->
             <div class="mb-4">
               <div
-                class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-medium"
+                class="font-outfit inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold"
                 :class="
                   getAppreciation(asset) >= 0
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    ? 'bg-[var(--tint-success-10)] text-[#27AE60]'
+                    : 'text-primary-500 bg-[var(--tint-orange-8)]'
                 "
               >
-                <BeanieIcon v-if="getAppreciation(asset) >= 0" name="arrow-up" size="sm" />
-                <BeanieIcon v-else name="arrow-down" size="sm" />
+                <span>{{ getAppreciation(asset) >= 0 ? '↑' : '↓' }}</span>
                 <CurrencyAmount
                   :amount="Math.abs(getAppreciation(asset))"
                   :currency="asset.currency"
@@ -544,18 +397,18 @@ function getAppreciationPercent(asset: Asset): number {
               </div>
             </div>
 
-            <!-- Loan Info (if applicable) -->
+            <!-- Loan Info (Heritage Orange — not red) -->
             <div
               v-if="asset.loan?.hasLoan && asset.loan.outstandingBalance"
-              class="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 dark:border-red-900/30 dark:bg-red-900/20"
+              class="border-primary-100 dark:border-primary-900/30 dark:bg-primary-900/20 mb-4 rounded-xl border bg-[var(--tint-orange-8)] p-3"
             >
               <div class="mb-2 flex items-center gap-2">
-                <BeanieIcon name="wallet" size="sm" class="text-red-500" />
-                <span class="text-sm font-medium text-red-700 dark:text-red-400">{{
+                <span>💰</span>
+                <span class="font-outfit text-primary-500 text-xs font-semibold">{{
                   t('common.loanOutstanding')
                 }}</span>
               </div>
-              <div class="text-lg font-bold text-red-600 dark:text-red-400">
+              <div class="font-outfit text-primary-500 text-lg font-extrabold">
                 <CurrencyAmount
                   :amount="asset.loan.outstandingBalance"
                   :currency="asset.currency"
@@ -563,10 +416,7 @@ function getAppreciationPercent(asset: Asset): number {
                   size="xl"
                 />
               </div>
-              <div
-                v-if="asset.loan.monthlyPayment"
-                class="mt-1 text-sm text-red-600 dark:text-red-400"
-              >
+              <div v-if="asset.loan.monthlyPayment" class="text-primary-500/80 mt-1 text-xs">
                 <CurrencyAmount
                   :amount="asset.loan.monthlyPayment"
                   :currency="asset.currency"
@@ -577,7 +427,7 @@ function getAppreciationPercent(asset: Asset): number {
                   @ {{ formatMasked(asset.loan.interestRate + '%') }}</span
                 >
               </div>
-              <div v-if="asset.loan.lender" class="mt-1 text-xs text-red-500 dark:text-red-500">
+              <div v-if="asset.loan.lender" class="text-primary-500/70 mt-0.5 text-xs">
                 {{ asset.loan.lender
                 }}<span v-if="asset.loan.lenderCountry">
                   &middot; {{ asset.loan.lenderCountry }}</span
@@ -611,7 +461,7 @@ function getAppreciationPercent(asset: Asset): number {
               <div class="flex items-center gap-2">
                 <span
                   v-if="!asset.includeInNetWorth"
-                  class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+                  class="font-outfit rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
                   :title="t('status.excluded')"
                 >
                   {{ t('status.excluded') }}
@@ -619,384 +469,39 @@ function getAppreciationPercent(asset: Asset): number {
               </div>
             </div>
           </div>
+
+          <!-- Dashed Add Card -->
+          <button
+            type="button"
+            data-testid="add-asset-card"
+            class="hover:border-primary-300 hover:text-primary-500 dark:hover:border-primary-500 dark:hover:text-primary-400 flex min-h-[280px] flex-col items-center justify-center gap-2 rounded-[var(--sq)] border-2 border-dashed border-gray-200 bg-transparent p-5 text-gray-400 transition-colors dark:border-slate-600 dark:text-gray-500"
+            @click="openAddWithDefaults({ type: group.type })"
+          >
+            <BeanieIcon name="plus" size="lg" />
+            <span class="font-outfit text-sm font-semibold">
+              {{ t('assets.addAnAsset') }}
+            </span>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Add Asset Modal -->
-    <BaseModal
+    <AssetModal
       :open="showAddModal"
-      :title="t('assets.addAsset')"
-      size="xl"
+      :defaults="addModalDefaults"
       @close="showAddModal = false"
-    >
-      <form class="space-y-4" @submit.prevent="createAsset">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="newAsset.name"
-            :label="t('assets.assetName')"
-            placeholder="e.g., Family Home, Toyota Camry"
-            required
-          />
-
-          <BaseSelect
-            v-model="newAsset.type"
-            :options="assetTypes"
-            :label="t('assets.assetType')"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseSelect
-            v-model="newAsset.memberId"
-            :options="memberOptions"
-            :label="t('form.owner')"
-          />
-
-          <BaseSelect
-            v-model="newAsset.currency"
-            :options="currencyOptions"
-            :label="t('form.currency')"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="newAsset.purchaseValue"
-            type="number"
-            :label="t('common.purchaseValue')"
-            placeholder="0.00"
-            step="0.01"
-          />
-
-          <BaseInput
-            v-model="newAsset.currentValue"
-            type="number"
-            :label="t('common.currentValue')"
-            placeholder="0.00"
-            step="0.01"
-          />
-        </div>
-
-        <BaseInput v-model="newAsset.purchaseDate" type="date" :label="t('assets.purchaseDate')" />
-
-        <BaseInput
-          v-model="newAsset.notes"
-          :label="t('form.notes')"
-          placeholder="Additional details about this asset..."
-        />
-
-        <!-- Loan Toggle -->
-        <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
-          <label class="flex cursor-pointer items-center gap-3">
-            <input
-              v-model="newAsset.loan!.hasLoan"
-              type="checkbox"
-              class="text-primary-600 focus:ring-primary-500 h-5 w-5 rounded border-gray-300 dark:border-slate-600"
-            />
-            <div>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{
-                t('assets.hasLoan')
-              }}</span>
-              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('assets.hasLoanDesc') }}</p>
-            </div>
-          </label>
-        </div>
-
-        <!-- Loan Details (shown when hasLoan is true) -->
-        <div
-          v-if="newAsset.loan?.hasLoan"
-          class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-900"
-        >
-          <h4 class="font-medium text-gray-900 dark:text-gray-100">
-            {{ t('assets.loanDetails') }}
-          </h4>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseInput
-              v-model="newAsset.loan.loanAmount"
-              type="number"
-              :label="t('assets.originalLoanAmount')"
-              placeholder="0.00"
-              step="0.01"
-            />
-
-            <BaseInput
-              v-model="newAsset.loan.outstandingBalance"
-              type="number"
-              :label="t('assets.outstandingBalance')"
-              placeholder="0.00"
-              step="0.01"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseInput
-              v-model="newAsset.loan.interestRate"
-              type="number"
-              :label="t('assets.interestRate')"
-              placeholder="5.0"
-              step="0.01"
-            />
-
-            <BaseInput
-              v-model="newAsset.loan.monthlyPayment"
-              type="number"
-              :label="t('assets.monthlyPayment')"
-              placeholder="0.00"
-              step="0.01"
-            />
-          </div>
-
-          <BaseInput
-            v-model="newAsset.loan.loanTermMonths"
-            type="number"
-            :label="t('assets.loanTerm')"
-            placeholder="360"
-          />
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseCombobox
-              v-model="newAsset.loan.lender"
-              :options="institutionOptions"
-              :label="t('assets.lender')"
-              :placeholder="t('form.searchInstitutions')"
-              :search-placeholder="t('form.searchInstitutions')"
-              :other-value="OTHER_INSTITUTION_VALUE"
-              :other-label="t('form.other')"
-              :other-placeholder="t('form.enterCustomName')"
-              @custom-removed="handleRemoveCustomInstitution"
-            />
-            <BaseCombobox
-              v-model="newAsset.loan.lenderCountry"
-              :options="countryOptions"
-              :label="t('form.country')"
-              :placeholder="t('form.searchCountries')"
-              :search-placeholder="t('form.searchCountries')"
-            />
-          </div>
-
-          <BaseInput
-            v-model="newAsset.loan.loanStartDate"
-            type="date"
-            :label="t('assets.loanStartDate')"
-          />
-        </div>
-
-        <div class="flex items-center gap-4">
-          <label class="flex cursor-pointer items-center gap-2">
-            <input
-              v-model="newAsset.includeInNetWorth"
-              type="checkbox"
-              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-            />
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{
-              t('form.includeInNetWorth')
-            }}</span>
-          </label>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="showAddModal = false">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton :loading="isSubmitting" @click="createAsset">
-            {{ t('assets.addAsset') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleAssetSave"
+      @delete="handleAssetDelete"
+    />
 
     <!-- Edit Asset Modal -->
-    <BaseModal
+    <AssetModal
       :open="showEditModal"
-      :title="t('assets.editAsset')"
-      size="xl"
+      :asset="editingAsset"
       @close="closeEditModal"
-    >
-      <form class="space-y-4" @submit.prevent="saveEdit">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="editingAsset.name"
-            :label="t('assets.assetName')"
-            placeholder="e.g., Family Home, Toyota Camry"
-            required
-          />
-
-          <BaseSelect
-            v-model="editingAsset.type"
-            :options="assetTypes"
-            :label="t('assets.assetType')"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseSelect
-            v-model="editingAsset.memberId"
-            :options="memberOptions"
-            :label="t('form.owner')"
-          />
-
-          <BaseSelect
-            v-model="editingAsset.currency"
-            :options="currencyOptions"
-            :label="t('form.currency')"
-          />
-        </div>
-
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BaseInput
-            v-model="editingAsset.purchaseValue"
-            type="number"
-            :label="t('common.purchaseValue')"
-            placeholder="0.00"
-            step="0.01"
-          />
-
-          <BaseInput
-            v-model="editingAsset.currentValue"
-            type="number"
-            :label="t('common.currentValue')"
-            placeholder="0.00"
-            step="0.01"
-          />
-        </div>
-
-        <BaseInput
-          v-model="editingAsset.purchaseDate"
-          type="date"
-          :label="t('assets.purchaseDate')"
-        />
-
-        <BaseInput
-          v-model="editingAsset.notes"
-          :label="t('form.notes')"
-          placeholder="Additional details about this asset..."
-        />
-
-        <!-- Loan Toggle -->
-        <div class="border-t border-gray-200 pt-4 dark:border-slate-700">
-          <label class="flex cursor-pointer items-center gap-3">
-            <input
-              v-model="editingAsset.loan!.hasLoan"
-              type="checkbox"
-              class="text-primary-600 focus:ring-primary-500 h-5 w-5 rounded border-gray-300 dark:border-slate-600"
-            />
-            <div>
-              <span class="font-medium text-gray-900 dark:text-gray-100">{{
-                t('assets.hasLoan')
-              }}</span>
-              <p class="text-sm text-gray-500 dark:text-gray-400">{{ t('assets.hasLoanDesc') }}</p>
-            </div>
-          </label>
-        </div>
-
-        <!-- Loan Details (shown when hasLoan is true) -->
-        <div
-          v-if="editingAsset.loan?.hasLoan"
-          class="space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-slate-700 dark:bg-slate-900"
-        >
-          <h4 class="font-medium text-gray-900 dark:text-gray-100">
-            {{ t('assets.loanDetails') }}
-          </h4>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseInput
-              v-model="editingAsset.loan.loanAmount"
-              type="number"
-              :label="t('assets.originalLoanAmount')"
-              placeholder="0.00"
-              step="0.01"
-            />
-
-            <BaseInput
-              v-model="editingAsset.loan.outstandingBalance"
-              type="number"
-              :label="t('assets.outstandingBalance')"
-              placeholder="0.00"
-              step="0.01"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseInput
-              v-model="editingAsset.loan.interestRate"
-              type="number"
-              :label="t('assets.interestRate')"
-              placeholder="5.0"
-              step="0.01"
-            />
-
-            <BaseInput
-              v-model="editingAsset.loan.monthlyPayment"
-              type="number"
-              :label="t('assets.monthlyPayment')"
-              placeholder="0.00"
-              step="0.01"
-            />
-          </div>
-
-          <BaseInput
-            v-model="editingAsset.loan.loanTermMonths"
-            type="number"
-            :label="t('assets.loanTerm')"
-            placeholder="360"
-          />
-
-          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BaseCombobox
-              v-model="editingAsset.loan.lender"
-              :options="institutionOptions"
-              :label="t('assets.lender')"
-              :placeholder="t('form.searchInstitutions')"
-              :search-placeholder="t('form.searchInstitutions')"
-              :other-value="OTHER_INSTITUTION_VALUE"
-              :other-label="t('form.other')"
-              :other-placeholder="t('form.enterCustomName')"
-              @custom-removed="handleRemoveCustomInstitution"
-            />
-            <BaseCombobox
-              v-model="editingAsset.loan.lenderCountry"
-              :options="countryOptions"
-              :label="t('form.country')"
-              :placeholder="t('form.searchCountries')"
-              :search-placeholder="t('form.searchCountries')"
-            />
-          </div>
-
-          <BaseInput
-            v-model="editingAsset.loan.loanStartDate"
-            type="date"
-            :label="t('assets.loanStartDate')"
-          />
-        </div>
-
-        <div class="flex items-center gap-4">
-          <label class="flex cursor-pointer items-center gap-2">
-            <input
-              v-model="editingAsset.includeInNetWorth"
-              type="checkbox"
-              class="text-primary-600 focus:ring-primary-500 h-4 w-4 rounded border-gray-300 dark:border-slate-600"
-            />
-            <span class="text-sm text-gray-700 dark:text-gray-300">{{
-              t('form.includeInNetWorth')
-            }}</span>
-          </label>
-        </div>
-      </form>
-
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <BaseButton variant="secondary" @click="closeEditModal">
-            {{ t('action.cancel') }}
-          </BaseButton>
-          <BaseButton data-testid="save-edit-btn" :loading="isSubmitting" @click="saveEdit">
-            {{ t('action.saveChanges') }}
-          </BaseButton>
-        </div>
-      </template>
-    </BaseModal>
+      @save="handleAssetSave"
+      @delete="handleAssetDelete"
+    />
   </div>
 </template>

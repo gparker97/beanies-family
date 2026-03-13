@@ -232,12 +232,21 @@ export interface Asset {
 }
 
 // Goal - Savings targets
-export type GoalType = 'savings' | 'debt_payoff' | 'investment' | 'purchase';
+export type GoalType =
+  | 'savings'
+  | 'debt_payoff'
+  | 'investment'
+  | 'purchase'
+  | 'vacation'
+  | 'vehicle'
+  | 'home'
+  | 'education'
+  | 'emergency';
 export type GoalPriority = 'low' | 'medium' | 'high' | 'critical';
 
 export interface Goal {
   id: UUID;
-  memberId?: UUID; // null = family-wide goal
+  memberId?: UUID | null; // null = family-wide goal
   name: string;
   type: GoalType;
   targetAmount: number;
