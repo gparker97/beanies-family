@@ -5,6 +5,17 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import type { ComboboxOption } from '@/components/ui/BaseCombobox.vue';
 
+/** Persist a custom institution name if it's not already known */
+export async function persistCustomInstitutionIfNeeded(name: string | undefined) {
+  if (!name?.trim()) return;
+  const settingsStore = useSettingsStore();
+  const isKnown =
+    INSTITUTIONS.some((i) => i.name === name) || settingsStore.customInstitutions.includes(name);
+  if (!isKnown) {
+    await settingsStore.addCustomInstitution(name.trim());
+  }
+}
+
 export function useInstitutionOptions() {
   const settingsStore = useSettingsStore();
 
