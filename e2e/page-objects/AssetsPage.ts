@@ -30,16 +30,41 @@ export class AssetsPage {
     lenderCountrySearch?: string;
   }) {
     await this.page.getByRole('button', { name: 'Add Asset' }).first().click();
-    await this.page.getByLabel('Asset Name').fill(data.name);
-    await this.page.getByLabel('Asset Type').selectOption(data.type);
-    await this.page.getByLabel('Purchase Value').fill(data.purchaseValue.toString());
-    await this.page.getByLabel('Current Value').fill(data.currentValue.toString());
+
+    const dialog = this.page.locator('[role="dialog"]');
+
+    // Select asset type via emoji chip (map type string to emoji label)
+    const typeLabels: Record<string, string> = {
+      real_estate: 'Real Estate',
+      vehicle: 'Vehicle',
+      boat: 'Boat',
+      jewelry: 'Jewelry',
+      electronics: 'Electronics',
+      equipment: 'Equipment',
+      art: 'Art',
+      collectible: 'Collectible',
+      other: 'Other',
+    };
+    const typeLabel = typeLabels[data.type] || data.type;
+    await dialog.getByRole('button', { name: typeLabel }).click();
+
+    // Fill asset name (placeholder-based input inside FormFieldGroup)
+    await dialog.getByPlaceholder('Asset Name').fill(data.name);
+
+    // Fill purchase value — first number input in the modal
+    const amountInputs = dialog.locator('input[type="number"]');
+    await amountInputs.nth(0).fill(data.purchaseValue.toString());
+
+    // Fill current value — second number input
+    await amountInputs.nth(1).fill(data.currentValue.toString());
 
     if (data.hasLoan) {
-      await this.page.getByText('This asset has a loan').click();
+      // Toggle "Has a Loan" switch
+      await dialog.getByText('Has a Loan').click();
 
       if (data.outstandingBalance !== undefined) {
-        await this.page.getByLabel('Outstanding Balance').fill(data.outstandingBalance.toString());
+        // Outstanding balance is the 4th number input (after loan amount)
+        await amountInputs.nth(3).fill(data.outstandingBalance.toString());
       }
 
       if (data.lender) {
@@ -63,7 +88,8 @@ export class AssetsPage {
       }
     }
 
-    await this.page.getByRole('button', { name: 'Add Asset' }).last().click();
+    // Save — click the save button in the modal footer
+    await dialog.getByRole('button', { name: /Add Asset/i }).click();
     // Dismiss celebration modal if it appears
     const letsGoButton = this.page.getByRole('button', { name: "Let's go!" });
     try {

@@ -207,7 +207,8 @@ test.describe('Asset Loan Lender Combobox', () => {
     await assetsPage.goto();
 
     await page.getByRole('button', { name: 'Add Asset' }).first().click();
-    await page.getByText('This asset has a loan').click();
+    const dialog = page.locator('[role="dialog"]');
+    await dialog.getByText('Has a Loan').click();
 
     const lenderCombobox = assetsPage.getLenderCombobox();
     await lenderCombobox.open();
