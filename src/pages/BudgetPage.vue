@@ -368,9 +368,20 @@ async function handleQuickAdd(data: CreateTransactionInput) {
           <span class="nook-section-label text-secondary-500 dark:text-gray-400">
             {{ t('budget.section.spendingByCategory') }}
           </span>
-          <span class="text-xs font-medium text-slate-400 dark:text-slate-500">
-            {{ currentMonthLabel }}
-          </span>
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-medium text-slate-400 dark:text-slate-500">
+              {{ currentMonthLabel }}
+            </span>
+            <button
+              class="flex items-center gap-1.5 rounded-[10px] bg-slate-50 px-3 py-1.5 transition-colors hover:bg-slate-100 dark:bg-slate-700/50 dark:hover:bg-slate-700"
+              @click="showSettingsModal = true"
+            >
+              <BeanieIcon name="edit-2" size="xs" class="text-[var(--heritage-orange)]" />
+              <span class="font-outfit text-xs font-semibold text-[var(--heritage-orange)]">
+                {{ t('budget.editBudget') }}
+              </span>
+            </button>
+          </div>
         </div>
         <div
           v-if="budgetStore.categoryBudgetStatus.length === 0"
