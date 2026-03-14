@@ -6,6 +6,7 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -209,13 +210,16 @@ async function handleQuickAdd(data: CreateTransactionInput) {
             </div>
 
             <!-- Amount line: $3,760 / $5,032 -->
-            <div class="mb-2 flex items-baseline gap-1.5">
-              <span class="font-outfit text-3xl leading-none font-extrabold">
-                {{ spentAmount }}
-              </span>
-              <span class="font-outfit text-base font-medium text-white/35">
-                / {{ budgetAmount }}
-              </span>
+            <div class="mb-2 flex items-center gap-2.5">
+              <div class="flex items-baseline gap-1.5">
+                <span class="font-outfit text-3xl leading-none font-extrabold">
+                  {{ spentAmount }}
+                </span>
+                <span class="font-outfit text-base font-medium text-white/35">
+                  / {{ budgetAmount }}
+                </span>
+              </div>
+              <ShowFiguresPrompt v-if="!isUnlocked" dark />
             </div>
 
             <!-- Percentage + remaining -->
