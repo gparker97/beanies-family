@@ -84,7 +84,7 @@ test.describe('Account Management', () => {
     await dashboardPage.unlockPrivacyMode();
 
     // Wait for breakdown card to appear and click the Cash category tile
-    const cashTile = page.getByText(ui('dashboard.breakdown.cash'));
+    const cashTile = page.getByText(ui('dashboard.breakdown.cash'), { exact: true });
     await expect(cashTile).toBeVisible({ timeout: 10000 });
     await cashTile.click();
 
