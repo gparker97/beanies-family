@@ -16,6 +16,7 @@ import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCur
 import { useTranslation } from '@/composables/useTranslation';
 import { getCurrencyInfo } from '@/constants/currencies';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import type { CurrencyCode } from '@/types/models';
 import type { PeriodKey, NetWorthDataPoint } from '@/composables/useNetWorthHistory';
 
@@ -296,11 +297,11 @@ const periodLabel = computed(() => {
           </div>
           <InfoHintBadge v-if="hint" :text="hint" dark />
         </div>
-        <div
-          data-testid="hero-amount"
-          class="font-outfit mb-1 text-4xl leading-none font-extrabold"
-        >
-          {{ formattedAmount }}
+        <div class="mb-1 flex items-center gap-3">
+          <div data-testid="hero-amount" class="font-outfit text-4xl leading-none font-extrabold">
+            {{ formattedAmount }}
+          </div>
+          <ShowFiguresPrompt v-if="!isUnlocked" dark />
         </div>
         <div
           v-if="isUnlocked && (changeAmount !== 0 || changePercent !== 0)"

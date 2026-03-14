@@ -2093,6 +2093,7 @@ const STRING_DEFS = {
   'nook.familyNetWorth': { en: 'Family Net Worth', beanie: 'alllllll your beans' },
   'nook.thisMonth': { en: 'this month', beanie: 'this moon' },
   'nook.monthlyBudget': { en: 'Monthly Budget', beanie: 'monthly bean budget' },
+  'nook.showFigures': { en: 'Show Figures', beanie: 'show figures' },
   'nook.openPiggyBank': { en: 'Open The Piggy Bank', beanie: 'open the piggy bank' },
   'nook.recentActivity': { en: 'Recent Family Activity', beanie: 'recent beanie activity' },
   'nook.seeAll': { en: 'See All', beanie: 'see all' },
@@ -2594,6 +2595,11 @@ const STRING_DEFS = {
   'hints.nookNetWorth': {
     en: 'Your family net worth: all accounts and assets minus all liabilities.',
     beanie: 'your family net worth: all accounts and assets minus all liabilities.',
+  },
+  'hints.nookFiguresHidden': {
+    en: 'Figures are hidden for privacy. You can also toggle them anytime by tapping the beanie icon in the header.',
+    beanie:
+      'figures are hidden for privacy. you can also toggle them anytime by tapping the beanie in the header.',
   },
 
   'hints.budgetPaceIntro': {
