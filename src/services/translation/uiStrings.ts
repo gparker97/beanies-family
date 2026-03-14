@@ -2317,6 +2317,7 @@ const STRING_DEFS = {
   // Planner — Form fields
   'planner.field.title': { en: 'Activity Title', beanie: 'activity title' },
   'planner.field.date': { en: 'Start Date', beanie: 'start date' },
+  'planner.field.dateOnly': { en: 'Date', beanie: 'date' },
   'planner.field.endDate': { en: 'End Date', beanie: 'end date' },
   'planner.field.startTime': { en: 'Start Time', beanie: 'start time' },
   'planner.field.endTime': { en: 'End Time', beanie: 'end time' },
@@ -2366,6 +2367,13 @@ const STRING_DEFS = {
   'planner.cost': { en: 'Cost', beanie: 'cost' },
   'planner.transport': { en: 'Transport', beanie: 'transport' },
   'planner.createdBy': { en: 'Created By', beanie: 'created by' },
+  'planner.reschedule': { en: 'Reschedule This Session', beanie: 'reschedule this session' },
+  'planner.rescheduleHint': {
+    en: 'Move this occurrence to a different date or time',
+    beanie: 'move this session to a new date or time',
+  },
+  'planner.rescheduleTo': { en: 'New Date', beanie: 'new date' },
+  'planner.rescheduleConfirm': { en: 'Reschedule', beanie: 'reschedule' },
   'planner.oneOff': { en: 'One-off', beanie: 'one-off' },
 
   // Transactions — View modal
