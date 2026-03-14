@@ -183,7 +183,7 @@ const { isEditing, isSubmitting } = useFormModal(
 );
 
 const accountOptions = computed(() =>
-  accountsStore.accounts.map((a) => ({ value: a.id, label: a.name }))
+  accountsStore.activeAccounts.map((a) => ({ value: a.id, label: a.name }))
 );
 
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
