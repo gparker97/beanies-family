@@ -38,19 +38,19 @@ const CATEGORIES: CategoryDef[] = [
     route: '/accounts?groupBy=category',
   },
   {
-    key: 'crypto',
-    labelKey: 'dashboard.breakdown.crypto',
-    emoji: '🪙',
-    color: '#9B59B6',
-    types: ['crypto'],
-    route: '/accounts?groupBy=category',
-  },
-  {
     key: 'investments',
     labelKey: 'dashboard.breakdown.investments',
     emoji: '📈',
     color: '#3498DB',
     types: ['investment', 'education_529', 'education_savings', 'other'],
+    route: '/accounts?groupBy=category',
+  },
+  {
+    key: 'crypto',
+    labelKey: 'dashboard.breakdown.crypto',
+    emoji: '🪙',
+    color: '#9B59B6',
+    types: ['crypto'],
     route: '/accounts?groupBy=category',
   },
   {
@@ -123,8 +123,23 @@ const categories = computed<BreakdownItem[]>(() => {
 
   const items: BreakdownItem[] = [];
 
+  // Build items in defined order: cash, investments, crypto, assets, retirement
   for (const cat of CATEGORIES) {
     const amount = accountCategoryTotals.value.get(cat.key) ?? 0;
+
+    // Insert assets before retirement to maintain display order
+    if (cat.key === 'retirement' && assetTotal.value > 0) {
+      items.push({
+        key: ASSETS_DEF.key,
+        labelKey: ASSETS_DEF.labelKey,
+        emoji: ASSETS_DEF.emoji,
+        color: ASSETS_DEF.color,
+        amount: assetTotal.value,
+        percent: (assetTotal.value / grossTotal.value) * 100,
+        route: ASSETS_DEF.route,
+      });
+    }
+
     if (amount <= 0) continue;
     items.push({
       key: cat.key,
@@ -137,7 +152,8 @@ const categories = computed<BreakdownItem[]>(() => {
     });
   }
 
-  if (assetTotal.value > 0) {
+  // If no retirement category existed but assets do, append assets
+  if (assetTotal.value > 0 && !items.some((i) => i.key === 'assets')) {
     items.push({
       key: ASSETS_DEF.key,
       labelKey: ASSETS_DEF.labelKey,
@@ -149,7 +165,7 @@ const categories = computed<BreakdownItem[]>(() => {
     });
   }
 
-  return items.sort((a, b) => b.amount - a.amount);
+  return items;
 });
 
 const hasData = computed(() => categories.value.length > 0 || liabilities.value > 0);
