@@ -69,6 +69,12 @@ const draftInstructorName = ref('');
 const draftInstructorContact = ref('');
 const draftNotes = ref('');
 
+// Reschedule state
+const showReschedule = ref(false);
+const rescheduleDate = ref('');
+const rescheduleStartTime = ref('');
+const rescheduleEndTime = ref('');
+
 // Template refs for auto-focus
 const titleInputRef = ref<HTMLInputElement | null>(null);
 const instructorNameRef = ref<HTMLInputElement | null>(null);
@@ -287,6 +293,7 @@ watch(
     editingField.value = null;
     scopeResolved.value = false;
     effectiveTargetId.value = null;
+    showReschedule.value = false;
   }
 );
 
@@ -454,6 +461,53 @@ async function handleDelete() {
     emit('deleted', act.id);
   }
 }
+
+// ── Reschedule ──────────────────────────────────────────────────────────────
+
+const canReschedule = computed(() => isRecurring.value && !!props.occurrenceDate);
+
+function toggleReschedule() {
+  showReschedule.value = !showReschedule.value;
+  if (showReschedule.value && activity.value) {
+    rescheduleDate.value = props.occurrenceDate ?? activity.value.date?.split('T')[0] ?? '';
+    rescheduleStartTime.value = activity.value.startTime ?? '';
+    rescheduleEndTime.value = activity.value.endTime ?? '';
+  }
+}
+
+function handleRescheduleStartTime(value: string) {
+  rescheduleStartTime.value = value;
+  if (value) rescheduleEndTime.value = addHourToTime(value);
+}
+
+function handleRescheduleEndTime(value: string) {
+  if (value && rescheduleStartTime.value && value < rescheduleStartTime.value) {
+    rescheduleEndTime.value = rescheduleStartTime.value;
+  } else {
+    rescheduleEndTime.value = value;
+  }
+}
+
+async function confirmReschedule() {
+  if (!activity.value || !props.occurrenceDate || !rescheduleDate.value) return;
+
+  const overrides: Record<string, string | null> = { date: rescheduleDate.value };
+  if (rescheduleStartTime.value !== (activity.value.startTime ?? ''))
+    overrides.startTime = rescheduleStartTime.value || null;
+  if (rescheduleEndTime.value !== (activity.value.endTime ?? ''))
+    overrides.endTime = rescheduleEndTime.value || null;
+
+  const override = await activityStore.materializeOverride(
+    activity.value.id,
+    props.occurrenceDate,
+    overrides
+  );
+  if (override) {
+    showReschedule.value = false;
+    emit('activity-swapped', override.id);
+    emit('close');
+  }
+}
 </script>
 
 <template>
@@ -463,7 +517,6 @@ async function handleDelete() {
     :title="t('planner.viewActivity')"
     :icon="activity.icon || '📋'"
     :icon-bg="activityColor + '20'"
-    size="narrow"
     :save-label="t('action.close')"
     save-gradient="orange"
     :show-delete="true"
@@ -471,7 +524,7 @@ async function handleDelete() {
     @save="handleDone"
     @delete="handleDelete"
   >
-    <div class="space-y-3">
+    <div class="space-y-4">
       <!-- Title — inline editable -->
       <InlineEditField
         :editing="editingField === 'title'"
@@ -531,14 +584,13 @@ async function handleDelete() {
         </span>
       </div>
 
-      <!-- Schedule & transport summary box -->
+      <!-- Schedule summary box (recurring only) -->
       <div
-        v-if="isRecurring || activity.dropoffMemberId || activity.pickupMemberId"
+        v-if="isRecurring"
         class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
       >
         <div class="space-y-1.5">
-          <!-- Recurrence details -->
-          <div v-if="isRecurring" class="flex items-center gap-2">
+          <div class="flex items-center gap-2">
             <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
               {{ t('planner.field.recurrence') }}
             </span>
@@ -568,82 +620,68 @@ async function handleDelete() {
               {{ endDateFormatted }}
             </span>
           </div>
+        </div>
+      </div>
 
-          <!-- Divider between schedule and transport -->
-          <div
-            v-if="isRecurring && (activity.dropoffMemberId || activity.pickupMemberId)"
-            class="border-t border-gray-200/60 pt-1.5 dark:border-slate-600/60"
-          />
+      <!-- Reschedule action (recurring occurrences only) -->
+      <div v-if="canReschedule">
+        <button
+          type="button"
+          class="font-outfit flex w-full items-center justify-center gap-2 rounded-[14px] border px-4 py-3 text-sm font-bold transition-colors"
+          :class="
+            showReschedule
+              ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/20 dark:text-orange-400'
+              : 'border-orange-200 bg-orange-50/60 text-orange-600 hover:border-orange-300 hover:bg-orange-50 dark:border-orange-800/40 dark:bg-orange-900/10 dark:text-orange-400 dark:hover:border-orange-700 dark:hover:bg-orange-900/20'
+          "
+          @click="toggleReschedule"
+        >
+          <span>📅</span>
+          {{ t('planner.reschedule') }}
+        </button>
 
-          <!-- Transport: Drop-off / Pick-up — inline editable -->
-          <div
-            v-if="activity.dropoffMemberId || activity.pickupMemberId"
-            class="grid grid-cols-2 gap-x-4"
-          >
-            <div v-if="activity.dropoffMemberId">
-              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-                🚗 {{ t('planner.field.dropoff') }}
-              </span>
-              <InlineEditField
-                :editing="editingField === 'dropoff'"
-                tint-color="orange"
-                @start-edit="startEdit('dropoff')"
-              >
-                <template #view>
-                  <span
-                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-                  >
-                    {{ getMemberName(activity.dropoffMemberId) }}
-                  </span>
-                </template>
-                <template #edit>
-                  <FamilyChipPicker
-                    :model-value="draftDropoffMemberId"
-                    mode="single"
-                    compact
-                    @update:model-value="handleDropoffChange"
-                  />
-                  <button
-                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-                    @click="cancelEdit"
-                  >
-                    ✕
-                  </button>
-                </template>
-              </InlineEditField>
-            </div>
-            <div v-if="activity.pickupMemberId">
-              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-                🚗 {{ t('planner.field.pickup') }}
-              </span>
-              <InlineEditField
-                :editing="editingField === 'pickup'"
-                tint-color="orange"
-                @start-edit="startEdit('pickup')"
-              >
-                <template #view>
-                  <span
-                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-                  >
-                    {{ getMemberName(activity.pickupMemberId) }}
-                  </span>
-                </template>
-                <template #edit>
-                  <FamilyChipPicker
-                    :model-value="draftPickupMemberId"
-                    mode="single"
-                    compact
-                    @update:model-value="handlePickupChange"
-                  />
-                  <button
-                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-                    @click="cancelEdit"
-                  >
-                    ✕
-                  </button>
-                </template>
-              </InlineEditField>
-            </div>
+        <div
+          v-if="showReschedule"
+          class="mt-2 space-y-3 rounded-[14px] border border-orange-200/60 bg-orange-50/50 p-4 dark:border-orange-800/30 dark:bg-orange-900/10"
+        >
+          <p class="text-xs text-[var(--color-text-muted)]">
+            {{ t('planner.rescheduleHint') }}
+          </p>
+
+          <div class="grid grid-cols-3 gap-3">
+            <FormFieldGroup :label="t('planner.rescheduleTo')">
+              <BaseInput v-model="rescheduleDate" type="date" />
+            </FormFieldGroup>
+            <FormFieldGroup :label="t('modal.startTime')">
+              <TimePresetPicker
+                :model-value="rescheduleStartTime"
+                @update:model-value="handleRescheduleStartTime"
+              />
+            </FormFieldGroup>
+            <FormFieldGroup :label="t('modal.endTime')">
+              <TimePresetPicker
+                :model-value="rescheduleEndTime"
+                @update:model-value="handleRescheduleEndTime"
+              />
+            </FormFieldGroup>
+          </div>
+
+          <div class="flex gap-2">
+            <button
+              type="button"
+              class="font-outfit flex-1 rounded-[14px] bg-gradient-to-r from-[#F15D22] to-[#E67E22] py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:shadow-md"
+              :disabled="!rescheduleDate"
+              :class="{ 'cursor-not-allowed opacity-40': !rescheduleDate }"
+              @click="confirmReschedule"
+            >
+              {{ t('planner.rescheduleConfirm') }}
+            </button>
+            <button
+              type="button"
+              class="font-outfit rounded-[14px] border border-gray-200 px-4 py-2.5 text-sm font-bold text-[var(--color-text)] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+              @click="showReschedule = false"
+            >
+              ✕
+            </button>
           </div>
         </div>
       </div>
@@ -693,7 +731,7 @@ async function handleDelete() {
       <!-- Date & Times — combined row -->
       <div :class="!isRecurring ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 gap-4'">
         <!-- Date (only for one-off activities) -->
-        <FormFieldGroup v-if="!isRecurring" :label="t('planner.field.date')">
+        <FormFieldGroup v-if="!isRecurring" :label="t('planner.field.dateOnly')">
           <InlineEditField
             :editing="editingField === 'date'"
             tint-color="orange"
@@ -852,12 +890,74 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Cost — read-only -->
-      <FormFieldGroup v-if="feeLabel" :label="t('planner.cost')">
-        <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
-          {{ feeLabel }}
-        </span>
-      </FormFieldGroup>
+      <!-- Drop-off / Pick-up — inline editable -->
+      <div
+        v-if="activity.dropoffMemberId || activity.pickupMemberId"
+        class="grid grid-cols-2 gap-x-4"
+      >
+        <div v-if="activity.dropoffMemberId">
+          <FormFieldGroup :label="'🚗 ' + t('planner.field.dropoff')">
+            <InlineEditField
+              :editing="editingField === 'dropoff'"
+              tint-color="orange"
+              @start-edit="startEdit('dropoff')"
+            >
+              <template #view>
+                <span
+                  class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                >
+                  {{ getMemberName(activity.dropoffMemberId) }}
+                </span>
+              </template>
+              <template #edit>
+                <FamilyChipPicker
+                  :model-value="draftDropoffMemberId"
+                  mode="single"
+                  compact
+                  @update:model-value="handleDropoffChange"
+                />
+                <button
+                  class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                  @click="cancelEdit"
+                >
+                  ✕
+                </button>
+              </template>
+            </InlineEditField>
+          </FormFieldGroup>
+        </div>
+        <div v-if="activity.pickupMemberId">
+          <FormFieldGroup :label="'🚗 ' + t('planner.field.pickup')">
+            <InlineEditField
+              :editing="editingField === 'pickup'"
+              tint-color="orange"
+              @start-edit="startEdit('pickup')"
+            >
+              <template #view>
+                <span
+                  class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                >
+                  {{ getMemberName(activity.pickupMemberId) }}
+                </span>
+              </template>
+              <template #edit>
+                <FamilyChipPicker
+                  :model-value="draftPickupMemberId"
+                  mode="single"
+                  compact
+                  @update:model-value="handlePickupChange"
+                />
+                <button
+                  class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                  @click="cancelEdit"
+                >
+                  ✕
+                </button>
+              </template>
+            </InlineEditField>
+          </FormFieldGroup>
+        </div>
+      </div>
 
       <!-- Instructor — only shown when populated -->
       <div
@@ -950,6 +1050,13 @@ async function handleDelete() {
           </InlineEditField>
         </FormFieldGroup>
       </div>
+
+      <!-- Cost — read-only -->
+      <FormFieldGroup v-if="feeLabel" :label="t('planner.cost')">
+        <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
+          {{ feeLabel }}
+        </span>
+      </FormFieldGroup>
 
       <!-- Notes — only shown when populated -->
       <FormFieldGroup v-if="activity.notes" :label="t('planner.field.notes')">

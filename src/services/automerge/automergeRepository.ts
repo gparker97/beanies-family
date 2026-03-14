@@ -12,6 +12,14 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
 }
 
 /**
+ * Deep-clone a value to a plain JS object, stripping Vue reactive proxies.
+ * Automerge change functions fail if they receive Vue proxy-wrapped objects.
+ */
+function toPlain<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+/**
  * Generic Automerge repository factory.
  * Mirrors the IndexedDB `createRepository` API exactly:
  * same function signatures, same async return types, same auto-ID + timestamps.
@@ -50,12 +58,14 @@ export function createAutomergeRepository<
 
   async function create(input: CreateInput): Promise<Entity> {
     const now = toISODateString(new Date());
-    const entity = stripUndefined({
-      ...(input as Record<string, unknown>),
-      id: generateUUID(),
-      createdAt: now,
-      updatedAt: now,
-    }) as unknown as Entity;
+    const entity = toPlain(
+      stripUndefined({
+        ...(input as Record<string, unknown>),
+        id: generateUUID(),
+        createdAt: now,
+        updatedAt: now,
+      })
+    ) as unknown as Entity;
 
     const id = (entity as unknown as { id: string }).id;
     changeDoc((d) => {
@@ -74,7 +84,7 @@ export function createAutomergeRepository<
     if (!existing) return undefined;
 
     const now = toISODateString(new Date());
-    const cleanInput = stripUndefined(input as Record<string, unknown>);
+    const cleanInput = toPlain(stripUndefined(input as Record<string, unknown>));
     changeDoc((d) => {
       const col = d[collectionName] as Record<string, Entity>;
       const target = col[id];

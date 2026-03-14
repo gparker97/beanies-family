@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-14",
-    "translationCount": 1487
+    "translationCount": 1492
   },
   "translations": {
     "app.name": {
@@ -7439,6 +7439,31 @@
     "hints.nookFiguresHidden": {
       "translation": "隐藏数字以保护隐私。您也可以随时通过轻触标题中的豆豆图标来切换它们。",
       "hash": "wekn8w",
+      "lastUpdated": "2026-03-14"
+    },
+    "planner.field.dateOnly": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-03-14"
+    },
+    "planner.reschedule": {
+      "translation": "重新安排此课次",
+      "hash": "ikjhxm",
+      "lastUpdated": "2026-03-14"
+    },
+    "planner.rescheduleHint": {
+      "translation": "将此事件移至其他日期或时间",
+      "hash": "3xv28p",
+      "lastUpdated": "2026-03-14"
+    },
+    "planner.rescheduleTo": {
+      "translation": "红线",
+      "hash": "mv0odq",
+      "lastUpdated": "2026-03-14"
+    },
+    "planner.rescheduleConfirm": {
+      "translation": "计划",
+      "hash": "tpjswm",
       "lastUpdated": "2026-03-14"
     }
   }

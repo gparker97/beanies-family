@@ -51,7 +51,7 @@ export const useActivityStore = defineStore('activities', () => {
           dates = new Set();
           map.set(a.parentActivityId, dates);
         }
-        dates.add(a.date);
+        dates.add(a.originalOccurrenceDate ?? a.date);
       }
     }
     return map;
@@ -266,12 +266,16 @@ export const useActivityStore = defineStore('activities', () => {
       recurrenceEndDate: _re,
       ...rest
     } = JSON.parse(JSON.stringify(parent));
+    const finalDate = overrides?.date ?? occurrenceDate;
+    const isRescheduled = finalDate !== occurrenceDate;
+
     return createActivity({
       ...rest,
       ...overrides,
-      date: occurrenceDate,
+      date: finalDate,
       recurrence: 'none',
       parentActivityId: parentId,
+      ...(isRescheduled ? { originalOccurrenceDate: occurrenceDate } : {}),
     });
   }
 
