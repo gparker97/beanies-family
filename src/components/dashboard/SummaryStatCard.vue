@@ -4,6 +4,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useCountUp } from '@/composables/useCountUp';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import type { CurrencyCode } from '@/types/models';
 
 interface Props {
@@ -158,13 +159,16 @@ const changeColor = computed(() => {
     </div>
 
     <!-- Amount -->
-    <div
-      data-testid="stat-amount"
-      class="font-outfit text-2xl font-extrabold"
-      :class="dark ? '' : 'text-secondary-500 dark:text-gray-100'"
-    >
-      <template v-if="rawValue !== undefined">{{ rawValue }}</template>
-      <template v-else>{{ isUnlocked ? animatedFormatted : MASK }}</template>
+    <div class="flex items-center gap-2.5">
+      <div
+        data-testid="stat-amount"
+        class="font-outfit text-2xl font-extrabold"
+        :class="dark ? '' : 'text-secondary-500 dark:text-gray-100'"
+      >
+        <template v-if="rawValue !== undefined">{{ rawValue }}</template>
+        <template v-else>{{ isUnlocked ? animatedFormatted : MASK }}</template>
+      </div>
+      <ShowFiguresPrompt v-if="!isUnlocked && rawValue === undefined" :dark="dark" />
     </div>
 
     <!-- Change indicator -->
