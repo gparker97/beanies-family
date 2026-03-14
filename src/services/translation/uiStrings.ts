@@ -619,6 +619,13 @@ const STRING_DEFS = {
     en: 'Choose your preferred color scheme',
     beanie: 'choose your preferred color scheme',
   },
+  'settings.weekStart': { en: 'Week Starts On', beanie: 'week starts on' },
+  'settings.weekStart.sunday': { en: 'Sunday', beanie: 'sunday' },
+  'settings.weekStart.monday': { en: 'Monday', beanie: 'monday' },
+  'settings.weekStartHint': {
+    en: 'Choose which day the calendar week starts on',
+    beanie: 'choose which day the calendar week starts on',
+  },
   'settings.language': { en: 'Language', beanie: 'language' },
   'settings.beanieMode': { en: 'Beanie Mode', beanie: 'get me out of beanie mode' },
   'settings.beanieModeDescription': {
