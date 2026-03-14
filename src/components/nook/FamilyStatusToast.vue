@@ -95,10 +95,10 @@ function handleItemClick(item: CriticalItem) {
         <span class="text-xl">🌳</span>
       </div>
       <div class="min-w-0 flex-1">
-        <p class="font-outfit truncate text-sm leading-snug font-semibold text-white">
+        <p class="font-outfit text-sm leading-snug font-semibold text-white">
           {{ title }}
         </p>
-        <p class="mt-0.5 truncate text-xs text-white/65">
+        <p class="mt-0.5 text-xs text-white/65">
           {{ subtitle }}
         </p>
       </div>
