@@ -183,6 +183,13 @@ const STRING_DEFS = {
 
   // Dashboard
   'dashboard.netWorth': { en: 'Family Net Worth', beanie: 'alllllll your beans' },
+  'dashboard.netWorthBreakdown': { en: 'Net Worth Breakdown', beanie: 'net worth breakdown' },
+  'dashboard.breakdown.cash': { en: 'Cash', beanie: 'cash' },
+  'dashboard.breakdown.crypto': { en: 'Crypto', beanie: 'crypto' },
+  'dashboard.breakdown.investments': { en: 'Investments', beanie: 'investments' },
+  'dashboard.breakdown.retirement': { en: 'Retirement', beanie: 'retirement' },
+  'dashboard.breakdown.assets': { en: 'Assets', beanie: 'assets' },
+  'dashboard.breakdown.liabilities': { en: 'Liabilities', beanie: 'liabilities' },
   'dashboard.assets': { en: 'Assets', beanie: 'your assets' },
   'dashboard.liabilities': { en: 'Liabilities', beanie: 'beans owed' },
   'dashboard.monthlyIncome': { en: 'Monthly Income', beanie: 'beans coming in' },
@@ -2566,6 +2573,11 @@ const STRING_DEFS = {
     en: 'Total value of all accounts and assets minus all liabilities (loans and credit cards).',
     beanie:
       'total value of all accounts and assets minus all liabilities (loans and credit cards).',
+  },
+  'hints.netWorthBreakdown': {
+    en: 'How your net worth is distributed across cash, investments, crypto, retirement, and assets. Tap a category to see details.',
+    beanie:
+      'how your net worth is distributed across your accounts and assets. tap a category to see more.',
   },
   'hints.accountsAssets': {
     en: 'Sum of all non-liability accounts (checking, savings, investments, etc.) included in net worth.',

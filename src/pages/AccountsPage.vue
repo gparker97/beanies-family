@@ -42,7 +42,9 @@ const { formatInDisplayCurrency } = useCurrencyDisplay();
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingAccount = ref<Account | null>(null);
-const groupBy = ref<'member' | 'category'>('member');
+const groupBy = ref<'member' | 'category'>(
+  route.query.groupBy === 'category' ? 'category' : 'member'
+);
 const addModalDefaults = ref<{ memberId?: string; type?: AccountType } | undefined>();
 
 // Open edit modal from query param (e.g. navigated from Dashboard)
