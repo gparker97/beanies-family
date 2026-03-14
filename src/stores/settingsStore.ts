@@ -77,6 +77,7 @@ export const useSettingsStore = defineStore('settings', () => {
   });
   const customInstitutions = computed(() => settings.value.customInstitutions ?? []);
   const onboardingCompleted = computed(() => settings.value.onboardingCompleted ?? true);
+  const weekStartDay = computed(() => settings.value.weekStartDay ?? 1); // default Monday
   const isTrustedDevice = computed(() => globalSettings.value.isTrustedDevice ?? false);
   const trustedDevicePromptShown = computed(
     () => globalSettings.value.trustedDevicePromptShown ?? false
@@ -310,6 +311,14 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setWeekStartDay(day: 0 | 1): Promise<void> {
+    try {
+      settings.value = await settingsRepo.saveSettings({ weekStartDay: day });
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Failed to update week start day';
+    }
+  }
+
   async function addCustomInstitution(name: string): Promise<void> {
     isLoading.value = true;
     error.value = null;
@@ -473,6 +482,7 @@ export const useSettingsStore = defineStore('settings', () => {
     effectiveDisplayCurrencies,
     customInstitutions,
     onboardingCompleted,
+    weekStartDay,
     isTrustedDevice,
     trustedDevicePromptShown,
     passkeyPromptShown,
@@ -491,6 +501,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setSoundEnabled,
     setPreferredCurrencies,
     setOnboardingCompleted,
+    setWeekStartDay,
     addCustomInstitution,
     removeCustomInstitution,
     setExchangeRateAutoUpdate,
