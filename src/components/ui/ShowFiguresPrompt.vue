@@ -13,7 +13,7 @@ const { t } = useTranslation();
 </script>
 
 <template>
-  <div class="inline-flex items-center gap-2">
+  <div class="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
     <button
       class="flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
       :class="

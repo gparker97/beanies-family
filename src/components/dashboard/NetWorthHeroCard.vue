@@ -289,8 +289,8 @@ const periodLabel = computed(() => {
       class="pointer-events-none absolute -top-[30px] -right-[30px] h-[200px] w-[200px] rounded-full bg-[radial-gradient(circle,rgba(241,93,34,0.15),transparent_70%)]"
     />
 
-    <div class="relative z-10 flex items-start justify-between">
-      <div>
+    <div class="relative z-10 flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
         <div class="mb-2 flex items-center gap-1.5">
           <div class="font-outfit text-xs font-semibold tracking-[0.15em] uppercase opacity-50">
             {{ label }}
@@ -319,12 +319,12 @@ const periodLabel = computed(() => {
       </div>
 
       <!-- Time period pills -->
-      <div class="flex gap-1 rounded-xl bg-white/[0.08] p-[3px]">
+      <div class="flex shrink-0 gap-1 rounded-xl bg-white/[0.08] p-[3px]">
         <button
           v-for="period in periods"
           :key="period.key"
           type="button"
-          class="font-outfit cursor-pointer rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-all"
+          class="font-outfit cursor-pointer rounded-[10px] px-2.5 py-1.5 text-xs font-semibold transition-all sm:px-3"
           :class="
             period.key === selectedPeriod
               ? 'bg-primary-500/40 text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
