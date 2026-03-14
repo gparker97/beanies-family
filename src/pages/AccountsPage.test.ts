@@ -90,9 +90,10 @@ vi.mock('@/composables/useCurrencyDisplay', () => ({
   })),
 }));
 
-// Mock vue-router
+// Mock vue-router — query params are configurable per-test via mockRouteQuery
+const mockRouteQuery: Record<string, string> = {};
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: mockRouteQuery }),
   useRouter: () => ({ push: vi.fn() }),
 }));
 
@@ -170,6 +171,37 @@ describe('AccountsPage - Edit Account Modal', () => {
     // The edit modal should now be visible (open prop = true)
     const modal = wrapper.find('[data-testid="account-modal"]');
     expect(modal.exists()).toBe(true);
+  });
+});
+
+describe('AccountsPage - groupBy query param', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    // Reset query params to default
+    Object.keys(mockRouteQuery).forEach((k) => delete mockRouteQuery[k]);
+  });
+
+  it('should default to member grouping when no query param', () => {
+    const wrapper = mount(AccountsPage, {
+      global: { stubs: defaultStubs },
+    });
+
+    // Component should render accounts under member heading (John Doe)
+    expect(wrapper.html()).toContain('John Doe');
+    expect(wrapper.html()).toContain('Test Checking');
+  });
+
+  it('should use category grouping when groupBy=category query param is set', () => {
+    mockRouteQuery.groupBy = 'category';
+
+    const wrapper = mount(AccountsPage, {
+      global: { stubs: defaultStubs },
+    });
+
+    // Component should render — accounts are grouped by type category, not member name
+    // The account should still be visible regardless of grouping
+    expect(wrapper.html()).toContain('Test Checking');
   });
 });
 

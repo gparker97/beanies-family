@@ -3,6 +3,7 @@ import { DashboardPage } from '../page-objects/DashboardPage';
 import { AccountsPage } from '../page-objects/AccountsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
+import { ui } from '../helpers/ui-strings';
 
 test.describe('Account Management', () => {
   test('should create account and update dashboard net worth', async ({ page }) => {
@@ -57,5 +58,40 @@ test.describe('Account Management', () => {
 
     // Use auto-waiting assertion (account list updates asynchronously)
     await expect(page.locator('[data-testid="account-card"]')).toHaveCount(2);
+  });
+
+  test('should navigate from dashboard breakdown to accounts with category grouping', async ({
+    page,
+  }) => {
+    await page.goto('/');
+    const dbHelper = new IndexedDBHelper(page);
+    await dbHelper.clearAllData();
+    await page.goto('/');
+    await bypassLoginIfNeeded(page);
+
+    // Create an account so the breakdown card appears
+    const accountsPage = new AccountsPage(page);
+    await accountsPage.goto();
+    await accountsPage.addAccount({
+      name: 'My Checking',
+      type: 'checking',
+      balance: 5000,
+    });
+
+    // Go to dashboard and unlock privacy mode
+    const dashboardPage = new DashboardPage(page);
+    await dashboardPage.goto();
+    await dashboardPage.unlockPrivacyMode();
+
+    // Wait for breakdown card to appear and click the Cash category tile
+    const cashTile = page.getByText(ui('dashboard.breakdown.cash'));
+    await expect(cashTile).toBeVisible({ timeout: 10000 });
+    await cashTile.click();
+
+    // Should navigate to accounts page with groupBy=category in the URL
+    await expect(page).toHaveURL(/\/accounts\?groupBy=category/);
+
+    // The category grouping toggle should be active
+    await expect(page.getByText(ui('accounts.groupByCategory'))).toBeVisible();
   });
 });

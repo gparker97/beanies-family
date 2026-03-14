@@ -6,6 +6,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import ActivityItem from '@/components/dashboard/ActivityItem.vue';
 import BudgetSummaryCard from '@/components/dashboard/BudgetSummaryCard.vue';
 import FamilyBeanRow from '@/components/dashboard/FamilyBeanRow.vue';
+import NetWorthBreakdownCard from '@/components/dashboard/NetWorthBreakdownCard.vue';
 import NetWorthHeroCard from '@/components/dashboard/NetWorthHeroCard.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -142,6 +143,9 @@ function isLiability(type: AccountType): boolean {
       :hint="t('hints.dashboardNetWorth')"
       @update:selected-period="selectedPeriod = $event"
     />
+
+    <!-- ── Net Worth Breakdown ──────────────────────────────────────────── -->
+    <NetWorthBreakdownCard />
 
     <!-- ── Summary Stat Cards (3-column) ───────────────────────────────── -->
     <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
