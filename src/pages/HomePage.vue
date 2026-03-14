@@ -974,10 +974,10 @@ onUnmounted(() => {
         </p>
 
         <p class="reveal">
-          It's not a perfect app. It doesn't sync with banks (and I doubt it ever will). But it
-          gives you a rough idea of how much you have, how much you will have, and what in this
-          world you actually have to do <em>today</em>. (Of course, only if you tell it that stuff
-          first. It's not magic.)
+          It's not a perfect app. It doesn't pull in stuff from google calendar (yet) or sync with
+          banks (I doubt it ever will). But it gives you a rough idea of how much you have, how much
+          you will have, and what in this heavenly world you actually have to do <em>today</em>. (Of
+          course, only if you tell it that stuff first. It's not magic.)
         </p>
 
         <p class="reveal">
