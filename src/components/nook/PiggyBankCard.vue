@@ -6,6 +6,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay, formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useCountUp } from '@/composables/useCountUp';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -101,8 +102,11 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
         </div>
         <InfoHintBadge :text="t('hints.nookNetWorth')" dark />
       </div>
-      <div class="font-outfit text-3xl font-extrabold text-white">
-        {{ formattedNetWorth }}
+      <div class="flex items-center gap-2.5">
+        <div class="font-outfit text-3xl font-extrabold text-white">
+          {{ formattedNetWorth }}
+        </div>
+        <ShowFiguresPrompt v-if="!isUnlocked" dark />
       </div>
       <div class="mt-1 flex items-center gap-1.5">
         <span
