@@ -29,10 +29,11 @@ test.describe('Family Planner', () => {
 
   /** Select the first family member chip in the activity modal (required for multi-owner). */
   async function selectAssignee(page: import('@playwright/test').Page) {
-    // Scope to the modal dialog to avoid clicking "John Doe" text behind the backdrop
+    // Click the first "John Doe" button — the assignee picker (not dropoff/pickup pickers below)
     await page
       .locator('div[role="dialog"]')
       .getByRole('button', { name: /John Doe/i })
+      .first()
       .click();
   }
 
