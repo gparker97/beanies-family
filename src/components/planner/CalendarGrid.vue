@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import type { ActivityCategory } from '@/types/models';
 
@@ -12,20 +13,26 @@ const emit = defineEmits<{ selectDate: [date: string] }>();
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
+const settingsStore = useSettingsStore();
 
 const today = new Date();
 const currentYear = ref(today.getFullYear());
 const currentMonth = ref(today.getMonth());
 
-const dayLabels = computed(() => [
-  t('planner.day.sun'),
-  t('planner.day.mon'),
-  t('planner.day.tue'),
-  t('planner.day.wed'),
-  t('planner.day.thu'),
-  t('planner.day.fri'),
-  t('planner.day.sat'),
-]);
+const allDayLabels = [
+  () => t('planner.day.sun'),
+  () => t('planner.day.mon'),
+  () => t('planner.day.tue'),
+  () => t('planner.day.wed'),
+  () => t('planner.day.thu'),
+  () => t('planner.day.fri'),
+  () => t('planner.day.sat'),
+];
+
+const dayLabels = computed(() => {
+  const start = settingsStore.weekStartDay;
+  return Array.from({ length: 7 }, (_, i) => allDayLabels[(i + start) % 7]!());
+});
 
 const monthLabel = computed(() => {
   const date = new Date(currentYear.value, currentMonth.value, 1);
@@ -41,7 +48,7 @@ function formatDate(d: Date): string {
 // Get the week number (0-indexed row) of a date within the month
 function getWeekRow(dayDate: Date): number {
   const firstDayOfMonth = new Date(currentYear.value, currentMonth.value, 1);
-  const firstDayOffset = firstDayOfMonth.getDay();
+  const firstDayOffset = (firstDayOfMonth.getDay() - settingsStore.weekStartDay + 7) % 7;
   return Math.floor((dayDate.getDate() + firstDayOffset - 1) / 7);
 }
 
@@ -57,7 +64,7 @@ const calendarDays = computed(() => {
   const month = currentMonth.value;
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
-  const startOffset = firstDay.getDay(); // 0=Sun
+  const startOffset = (firstDay.getDay() - settingsStore.weekStartDay + 7) % 7;
 
   const days: Array<{
     date: string;

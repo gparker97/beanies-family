@@ -501,6 +501,17 @@ async function handleClearData() {
           @update:model-value="updateTheme"
         />
 
+        <BaseSelect
+          :model-value="String(settingsStore.weekStartDay)"
+          :options="[
+            { value: '1', label: t('settings.weekStart.monday') },
+            { value: '0', label: t('settings.weekStart.sunday') },
+          ]"
+          :label="t('settings.weekStart')"
+          :hint="t('settings.weekStartHint')"
+          @update:model-value="settingsStore.setWeekStartDay(Number($event) as 0 | 1)"
+        />
+
         <!-- Restart Onboarding -->
         <div
           class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-slate-700"

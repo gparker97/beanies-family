@@ -403,6 +403,7 @@ export interface Settings {
   preferredCurrencies?: CurrencyCode[];
   customInstitutions?: string[];
   onboardingCompleted?: boolean;
+  weekStartDay?: 0 | 1; // 0=Sunday, 1=Monday (default: 1)
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

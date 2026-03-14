@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-14",
-    "translationCount": 1492
+    "translationCount": 1496
   },
   "translations": {
     "app.name": {
@@ -7464,6 +7464,26 @@
     "planner.rescheduleConfirm": {
       "translation": "计划",
       "hash": "tpjswm",
+      "lastUpdated": "2026-03-14"
+    },
+    "settings.weekStart": {
+      "translation": "一周始于",
+      "hash": "pxwu0u",
+      "lastUpdated": "2026-03-14"
+    },
+    "settings.weekStart.sunday": {
+      "translation": "（星期日）",
+      "hash": "tw14pc",
+      "lastUpdated": "2026-03-14"
+    },
+    "settings.weekStart.monday": {
+      "translation": "星期一",
+      "hash": "wtlmmo",
+      "lastUpdated": "2026-03-14"
+    },
+    "settings.weekStartHint": {
+      "translation": "选择日历周的开始日期",
+      "hash": "9zv5uj",
       "lastUpdated": "2026-03-14"
     }
   }
