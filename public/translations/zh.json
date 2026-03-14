@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-13",
-    "translationCount": 1477
+    "lastUpdated": "2026-03-14",
+    "translationCount": 1487
   },
   "translations": {
     "app.name": {
@@ -7390,6 +7390,56 @@
       "translation": "我选择了错误的一周来停止数豆子。",
       "hash": "z0uob",
       "lastUpdated": "2026-03-13"
+    },
+    "dashboard.netWorthBreakdown": {
+      "translation": "净值明细",
+      "hash": "cybsq4",
+      "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.cash": {
+      "translation": "货币资金",
+      "hash": "18uvn",
+      "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.crypto": {
+      "translation": "crypto\n\n英 ['krɪptəʊ]   美 ['krɪptoʊ]  \nn.\n（尤指信仰共产主义的）秘密成员;",
+      "hash": "xiwvdt",
+      "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.investments": {
+      "translation": "投资",
+      "hash": "m47b34",
+      "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.retirement": {
+      "translation": "养老",
+      "hash": "kvxyjd",
+      "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.assets": {
+      "translation": "资产",
+      "hash": "wl9d43",
+      "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.liabilities": {
+      "translation": "负债",
+      "hash": "faqc39",
+      "lastUpdated": "2026-03-14"
+    },
+    "nook.showFigures": {
+      "translation": "显示图形",
+      "hash": "6sjkk",
+      "lastUpdated": "2026-03-14"
+    },
+    "hints.netWorthBreakdown": {
+      "translation": "您的净资产如何在现金、投资、加密货币、退休和资产之间分配。轻触类别以查看详细信息。",
+      "hash": "hni97f",
+      "lastUpdated": "2026-03-14"
+    },
+    "hints.nookFiguresHidden": {
+      "translation": "隐藏数字以保护隐私。您也可以随时通过轻触标题中的豆豆图标来切换它们。",
+      "hash": "wekn8w",
+      "lastUpdated": "2026-03-14"
     }
   }
 }
