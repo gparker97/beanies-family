@@ -919,10 +919,8 @@ onUnmounted(() => {
         <p class="reveal">
           In any case, my goal was never to record every last transaction and track my budget down
           to the penny. If that's yours, this app probably isn't for you.
-          <span class="story__emphasis"
-            >I just wanted a rough idea, so I would know if I was going to end up as a hobo in 6
-            months.</span
-          >
+          <span class="story__emphasis">I just wanted a rough idea</span>, so I would know if I was
+          going to end up as a hobo in 6 months.
         </p>
 
         <p class="reveal">
