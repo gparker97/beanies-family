@@ -159,10 +159,9 @@ const effectiveRecurrence = computed<ActivityRecurrence>(() => {
 function hasDetailData(activity: FamilyActivity): boolean {
   return !!(
     activity.notes ||
-    activity.dropoffMemberId ||
-    activity.pickupMemberId ||
     activity.instructorName ||
     activity.instructorContact ||
+    (activity.feeAmount && activity.feeAmount > 0) ||
     activity.reminderMinutes > 0 ||
     !activity.isActive
   );
@@ -389,7 +388,7 @@ function handleSave() {
     @save="readOnly ? emit('close') : handleSave()"
     @delete="emit('delete')"
   >
-    <div :class="readOnly ? 'pointer-events-none opacity-60' : ''">
+    <div class="space-y-5" :class="readOnly ? 'pointer-events-none opacity-60' : ''">
       <!-- Occurrence date banner for recurring activity edits -->
       <div
         v-if="occurrenceDate"
@@ -429,24 +428,7 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- 4. Cost + Currency (inline row) + Fee Schedule -->
-      <FormFieldGroup :label="t('modal.costPerSession')">
-        <CurrencyAmountInput
-          v-model:amount="feeAmount"
-          v-model:currency="feeCurrency"
-          font-size="1.1rem"
-        />
-      </FormFieldGroup>
-      <FormFieldGroup :label="t('planner.field.feeSchedule')">
-        <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
-      </FormFieldGroup>
-
-      <!-- 5. Who Pays? (required if cost > 0) -->
-      <FormFieldGroup v-if="hasCost" :label="t('planner.field.feePayer')" required>
-        <FamilyChipPicker v-model="feePayerId" mode="single" compact />
-      </FormFieldGroup>
-
-      <!-- 6. Recurring / One-off toggle -->
+      <!-- 4. Recurring / One-off toggle -->
       <FormFieldGroup :label="t('modal.schedule')">
         <TogglePillGroup
           v-model="recurrenceMode"
@@ -457,7 +439,7 @@ function handleSave() {
         />
       </FormFieldGroup>
 
-      <!-- 7. Recurring details -->
+      <!-- 5. Recurring details -->
       <ConditionalSection :show="recurrenceMode === 'recurring'">
         <div class="space-y-4">
           <FormFieldGroup :label="t('modal.whichDays')">
@@ -470,41 +452,57 @@ function handleSave() {
         </div>
       </ConditionalSection>
 
-      <!-- 8. Start Date + End Date (end date only for recurring) -->
-      <div
-        class="grid gap-4"
-        :class="recurrenceMode === 'recurring' ? 'grid-cols-2' : 'grid-cols-1'"
-      >
-        <FormFieldGroup :label="t('planner.field.date')" required>
-          <BaseInput v-model="date" type="date" required />
-        </FormFieldGroup>
+      <!-- 6. Date + Times -->
+      <!-- Recurring: Start Date / End Date row, then Start Time / End Time row -->
+      <template v-if="recurrenceMode === 'recurring'">
+        <div class="grid grid-cols-2 gap-4">
+          <FormFieldGroup :label="t('planner.field.date')" required>
+            <BaseInput v-model="date" type="date" required />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('planner.field.endDate')" optional>
+            <BaseInput v-model="recurrenceEndDate" type="date" :min="date" />
+          </FormFieldGroup>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <FormFieldGroup :label="t('modal.startTime')">
+            <TimePresetPicker v-model="startTime" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('modal.endTime')">
+            <TimePresetPicker v-model="endTime" />
+          </FormFieldGroup>
+        </div>
+      </template>
+      <!-- One-off: Date + Start Time + End Time on one row -->
+      <template v-else>
+        <div class="grid grid-cols-3 gap-3">
+          <FormFieldGroup :label="t('planner.field.dateOnly')" required>
+            <BaseInput v-model="date" type="date" required />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('modal.startTime')">
+            <TimePresetPicker v-model="startTime" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('modal.endTime')">
+            <TimePresetPicker v-model="endTime" />
+          </FormFieldGroup>
+        </div>
+      </template>
 
-        <FormFieldGroup
-          v-if="recurrenceMode === 'recurring'"
-          :label="t('planner.field.endDate')"
-          optional
-        >
-          <BaseInput v-model="recurrenceEndDate" type="date" :min="date" />
-        </FormFieldGroup>
-      </div>
-
-      <!-- 9. Start / End time -->
-      <div class="grid grid-cols-2 gap-4">
-        <FormFieldGroup :label="t('modal.startTime')">
-          <TimePresetPicker v-model="startTime" />
-        </FormFieldGroup>
-
-        <FormFieldGroup :label="t('modal.endTime')">
-          <TimePresetPicker v-model="endTime" />
-        </FormFieldGroup>
-      </div>
-
-      <!-- 9. Location -->
+      <!-- 7. Location -->
       <FormFieldGroup :label="t('planner.field.location')" optional>
         <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
       </FormFieldGroup>
 
-      <!-- 10. "Add more details" collapsible -->
+      <!-- 8. Drop Off Duty / Pick Up Duty -->
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormFieldGroup :label="t('planner.field.dropoff')" optional>
+          <FamilyChipPicker v-model="dropoffMemberId" mode="single" compact />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('planner.field.pickup')" optional>
+          <FamilyChipPicker v-model="pickupMemberId" mode="single" compact />
+        </FormFieldGroup>
+      </div>
+
+      <!-- 9. "Add more details" collapsible -->
       <div>
         <button
           type="button"
@@ -530,16 +528,6 @@ function handleSave() {
             />
           </FormFieldGroup>
 
-          <!-- Drop Off Duty / Pick Up Duty -->
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormFieldGroup :label="t('planner.field.dropoff')" optional>
-              <FamilyChipPicker v-model="dropoffMemberId" mode="single" compact />
-            </FormFieldGroup>
-            <FormFieldGroup :label="t('planner.field.pickup')" optional>
-              <FamilyChipPicker v-model="pickupMemberId" mode="single" compact />
-            </FormFieldGroup>
-          </div>
-
           <!-- Instructor -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormFieldGroup :label="t('planner.field.instructor')" optional>
@@ -552,6 +540,23 @@ function handleSave() {
               />
             </FormFieldGroup>
           </div>
+
+          <!-- Cost + Currency + Fee Schedule -->
+          <FormFieldGroup :label="t('modal.costPerSession')">
+            <CurrencyAmountInput
+              v-model:amount="feeAmount"
+              v-model:currency="feeCurrency"
+              font-size="1.1rem"
+            />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('planner.field.feeSchedule')">
+            <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+          </FormFieldGroup>
+
+          <!-- Who Pays? (required if cost > 0) -->
+          <FormFieldGroup v-if="hasCost" :label="t('planner.field.feePayer')" required>
+            <FamilyChipPicker v-model="feePayerId" mode="single" compact />
+          </FormFieldGroup>
 
           <!-- Reminder chips -->
           <FormFieldGroup :label="t('planner.field.reminder')" optional>

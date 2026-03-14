@@ -60,7 +60,19 @@ export function useActivityScopeEdit() {
     } else if (scope === 'this-and-future') {
       const newTemplate = await activityStore.splitActivity(templateId, occurrenceDate);
       if (newTemplate) {
-        await activityStore.updateActivity(newTemplate.id, changes);
+        // Remove date and recurrenceEndDate from changes — splitActivity already set
+        // the correct start date (occurrenceDate) and preserved the original end date.
+        // Letting the form's date through would reset the start to the original,
+        // causing overlapping occurrences with the end-dated original template.
+        const {
+          date: _d,
+          recurrenceEndDate: _re,
+          ...safeChanges
+        } = changes as Record<string, unknown>;
+        await activityStore.updateActivity(
+          newTemplate.id,
+          safeChanges as UpdateFamilyActivityInput
+        );
       }
     }
     return true;

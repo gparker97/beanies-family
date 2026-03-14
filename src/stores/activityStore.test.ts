@@ -904,6 +904,173 @@ describe('activityStore', () => {
     });
   });
 
+  describe('splitActivity with multi-day recurrence', () => {
+    it('should not generate overlapping occurrences after split', () => {
+      const store = useActivityStore();
+      // Original: Tue/Thu/Sat starting March 3 (a Tuesday), end-dated to March 16
+      store.activities.push(
+        makeActivity({
+          id: 'original',
+          date: '2026-03-03',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 4, 6], // Tue, Thu, Sat
+          recurrenceEndDate: '2026-03-16', // End before split point
+        })
+      );
+      // New template: Tue/Fri/Sat starting March 17 (a Tuesday)
+      store.activities.push(
+        makeActivity({
+          id: 'new-template',
+          date: '2026-03-17',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 5, 6], // Tue, Fri, Sat
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2); // March 2026
+
+      // Original should only produce dates <= March 16
+      const originalDates = occurrences
+        .filter((o) => o.activity.id === 'original')
+        .map((o) => o.date)
+        .sort();
+      // Tue 3, Thu 5, Sat 7, Tue 10, Thu 12, Sat 14 — all <= Mar 16
+      expect(originalDates).toEqual([
+        '2026-03-03',
+        '2026-03-05',
+        '2026-03-07',
+        '2026-03-10',
+        '2026-03-12',
+        '2026-03-14',
+      ]);
+
+      // New template should only produce dates >= March 17
+      const newDates = occurrences
+        .filter((o) => o.activity.id === 'new-template')
+        .map((o) => o.date)
+        .sort();
+      // Tue 17, Fri 20, Sat 21, Tue 24, Fri 27, Sat 28, Tue 31
+      expect(newDates).toEqual([
+        '2026-03-17',
+        '2026-03-20',
+        '2026-03-21',
+        '2026-03-24',
+        '2026-03-27',
+        '2026-03-28',
+        '2026-03-31',
+      ]);
+
+      // No date should appear in both
+      const allDates = occurrences.map((o) => o.date);
+      const uniqueDates = new Set(allDates);
+      expect(uniqueDates.size).toBe(allDates.length);
+    });
+
+    it('should not generate new template occurrences before split date', () => {
+      const store = useActivityStore();
+      // New template starting March 17 should NOT generate any dates before that
+      store.activities.push(
+        makeActivity({
+          id: 'new-template',
+          date: '2026-03-17',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 5, 6], // Tue, Fri, Sat
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      const dates = occurrences.map((o) => o.date).sort();
+
+      // All dates must be >= March 17
+      for (const d of dates) {
+        expect(d >= '2026-03-17').toBe(true);
+      }
+      // Specifically, no March 3, 6, 7, 10, 13, 14 etc.
+      expect(dates).toEqual([
+        '2026-03-17',
+        '2026-03-20',
+        '2026-03-21',
+        '2026-03-24',
+        '2026-03-27',
+        '2026-03-28',
+        '2026-03-31',
+      ]);
+    });
+
+    it('should handle split exactly on a recurrence day boundary', () => {
+      const store = useActivityStore();
+      // Original ends March 16 (Monday - not a recurrence day)
+      store.activities.push(
+        makeActivity({
+          id: 'original',
+          date: '2026-03-03',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 4, 6],
+          recurrenceEndDate: '2026-03-16',
+        })
+      );
+      // New template starts March 17 (Tuesday - IS a recurrence day)
+      store.activities.push(
+        makeActivity({
+          id: 'new-template',
+          date: '2026-03-17',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 4, 6],
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      // March 17 (Tue) should only appear once, from new-template
+      const mar17 = occurrences.filter((o) => o.date === '2026-03-17');
+      expect(mar17).toHaveLength(1);
+      expect(mar17[0]!.activity.id).toBe('new-template');
+    });
+
+    it('should correctly handle daysOfWeek change at split boundary', () => {
+      const store = useActivityStore();
+      // Scenario: Tue/Thu/Sat changed to Tue/Fri/Sat from week 3
+      // Original ends March 16 (Mon)
+      store.activities.push(
+        makeActivity({
+          id: 'original',
+          date: '2026-03-03',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 4, 6], // Tue, Thu, Sat
+          recurrenceEndDate: '2026-03-16',
+        })
+      );
+      // New template starts March 17 with changed days
+      store.activities.push(
+        makeActivity({
+          id: 'new-template',
+          date: '2026-03-17',
+          recurrence: 'weekly',
+          daysOfWeek: [2, 5, 6], // Tue, Fri, Sat (Thu→Fri change)
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+
+      // Original should have Thu (day 4) but NOT Fri
+      const originalDates = occurrences
+        .filter((o) => o.activity.id === 'original')
+        .map((o) => o.date);
+      expect(originalDates).toContain('2026-03-05'); // Thu
+      expect(originalDates).toContain('2026-03-12'); // Thu
+      expect(originalDates).not.toContain('2026-03-06'); // No Fri in original
+      expect(originalDates).not.toContain('2026-03-13'); // No Fri in original
+
+      // New template should have Fri (day 5) but NOT Thu
+      const newDates = occurrences
+        .filter((o) => o.activity.id === 'new-template')
+        .map((o) => o.date);
+      expect(newDates).toContain('2026-03-20'); // Fri
+      expect(newDates).toContain('2026-03-27'); // Fri
+      expect(newDates).not.toContain('2026-03-19'); // No Thu in new
+      expect(newDates).not.toContain('2026-03-26'); // No Thu in new
+    });
+  });
+
   describe('materializeOverride', () => {
     it('should create one-off with parentActivityId', async () => {
       const store = useActivityStore();
@@ -981,6 +1148,241 @@ describe('activityStore', () => {
       expect(createCall.recurrence).toBe('none');
       expect(createCall.daysOfWeek).toBeUndefined();
       expect(createCall.recurrenceEndDate).toBeUndefined();
+    });
+  });
+
+  // ── Reschedule (materializeOverride with date change) ──
+
+  describe('reschedule via materializeOverride', () => {
+    it('should create override with the new date when overrides.date is provided', async () => {
+      const store = useActivityStore();
+      const parent = makeActivity({
+        id: 'parent-1',
+        date: '2026-03-04',
+        recurrence: 'weekly',
+        daysOfWeek: [3],
+        startTime: '15:00',
+        endTime: '16:00',
+      });
+      store.activities.push(parent);
+
+      vi.mocked(activityRepo.createActivity).mockImplementation(async (input) => ({
+        ...input,
+        id: 'override-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+      }));
+
+      const override = await store.materializeOverride('parent-1', '2026-03-11', {
+        date: '2026-03-14',
+      });
+
+      expect(override).toBeDefined();
+      // Override should be on the NEW date, not the original occurrence date
+      expect(override!.date).toBe('2026-03-14');
+      expect(override!.recurrence).toBe('none');
+      expect(override!.parentActivityId).toBe('parent-1');
+    });
+
+    it('should set originalOccurrenceDate when date differs from occurrenceDate', async () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: 'parent-1', recurrence: 'weekly', daysOfWeek: [3] })
+      );
+
+      vi.mocked(activityRepo.createActivity).mockImplementation(async (input) => ({
+        ...input,
+        id: 'override-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+      }));
+
+      await store.materializeOverride('parent-1', '2026-03-11', { date: '2026-03-14' });
+
+      const createCall = vi.mocked(activityRepo.createActivity).mock.calls[0]![0];
+      expect(createCall.date).toBe('2026-03-14');
+      expect(createCall.originalOccurrenceDate).toBe('2026-03-11');
+    });
+
+    it('should NOT set originalOccurrenceDate when date is same as occurrenceDate', async () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: 'parent-1', recurrence: 'weekly', daysOfWeek: [3] })
+      );
+
+      vi.mocked(activityRepo.createActivity).mockImplementation(async (input) => ({
+        ...input,
+        id: 'override-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+      }));
+
+      await store.materializeOverride('parent-1', '2026-03-11', { startTime: '16:00' });
+
+      const createCall = vi.mocked(activityRepo.createActivity).mock.calls[0]![0];
+      expect(createCall.date).toBe('2026-03-11');
+      expect(createCall.originalOccurrenceDate).toBeUndefined();
+    });
+
+    it('should use occurrenceDate as fallback when no date override provided', async () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({ id: 'parent-1', recurrence: 'weekly', daysOfWeek: [3] })
+      );
+
+      vi.mocked(activityRepo.createActivity).mockImplementation(async (input) => ({
+        ...input,
+        id: 'override-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+      }));
+
+      await store.materializeOverride('parent-1', '2026-03-11');
+
+      const createCall = vi.mocked(activityRepo.createActivity).mock.calls[0]![0];
+      expect(createCall.date).toBe('2026-03-11');
+    });
+
+    it('should include time overrides alongside date reschedule', async () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: 'parent-1',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+          startTime: '15:00',
+          endTime: '16:00',
+        })
+      );
+
+      vi.mocked(activityRepo.createActivity).mockImplementation(async (input) => ({
+        ...input,
+        id: 'override-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+      }));
+
+      await store.materializeOverride('parent-1', '2026-03-11', {
+        date: '2026-03-14',
+        startTime: '10:00',
+        endTime: '11:00',
+      });
+
+      const createCall = vi.mocked(activityRepo.createActivity).mock.calls[0]![0];
+      expect(createCall.date).toBe('2026-03-14');
+      expect(createCall.startTime).toBe('10:00');
+      expect(createCall.endTime).toBe('11:00');
+      expect(createCall.originalOccurrenceDate).toBe('2026-03-11');
+    });
+  });
+
+  describe('overridesByParent with originalOccurrenceDate', () => {
+    it('should exclude original occurrence date when override is rescheduled', () => {
+      const store = useActivityStore();
+      // Weekly Wednesday template
+      store.activities.push(
+        makeActivity({
+          id: 'template-1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+        })
+      );
+      // Rescheduled override: March 11 moved to March 14
+      store.activities.push(
+        makeActivity({
+          id: 'override-1',
+          date: '2026-03-14', // new date (Saturday)
+          recurrence: 'none',
+          parentActivityId: 'template-1',
+          originalOccurrenceDate: '2026-03-11', // original Wednesday
+          title: 'Rescheduled Lesson',
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      // Template Wednesdays: 4, 18, 25 (11 excluded) + override on 14 = 4 total
+      expect(occurrences).toHaveLength(4);
+      const templateDates = occurrences
+        .filter((o) => o.activity.id === 'template-1')
+        .map((o) => o.date);
+      expect(templateDates).toEqual(['2026-03-04', '2026-03-18', '2026-03-25']);
+      // Override appears on the new date
+      const overrideOcc = occurrences.find((o) => o.activity.id === 'override-1');
+      expect(overrideOcc).toBeDefined();
+      expect(overrideOcc!.date).toBe('2026-03-14');
+    });
+
+    it('should fall back to date when originalOccurrenceDate is not set', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: 'template-1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+        })
+      );
+      // Same-date override (no reschedule) — no originalOccurrenceDate
+      store.activities.push(
+        makeActivity({
+          id: 'override-1',
+          date: '2026-03-11',
+          recurrence: 'none',
+          parentActivityId: 'template-1',
+          title: 'Modified Lesson',
+        })
+      );
+
+      const occurrences = store.monthActivities(2026, 2);
+      // Template: 4, 18, 25 (11 excluded) + override on 11 = 4
+      expect(occurrences).toHaveLength(4);
+      const templateDates = occurrences
+        .filter((o) => o.activity.id === 'template-1')
+        .map((o) => o.date);
+      expect(templateDates).toEqual(['2026-03-04', '2026-03-18', '2026-03-25']);
+    });
+
+    it('should restore original occurrence when rescheduled override is deleted', () => {
+      const store = useActivityStore();
+      store.activities.push(
+        makeActivity({
+          id: 'template-1',
+          date: '2026-03-04',
+          recurrence: 'weekly',
+          daysOfWeek: [3],
+        })
+      );
+
+      // Before override: all 4 Wednesdays
+      let occurrences = store.monthActivities(2026, 2);
+      expect(occurrences).toHaveLength(4);
+
+      // Add rescheduled override
+      const override = makeActivity({
+        id: 'override-1',
+        date: '2026-03-14',
+        recurrence: 'none',
+        parentActivityId: 'template-1',
+        originalOccurrenceDate: '2026-03-11',
+      });
+      store.activities.push(override);
+
+      occurrences = store.monthActivities(2026, 2);
+      expect(occurrences).toHaveLength(4); // 3 template + 1 override
+
+      // Remove override (simulates delete)
+      store.activities.splice(store.activities.indexOf(override), 1);
+
+      // Original occurrence should reappear
+      occurrences = store.monthActivities(2026, 2);
+      expect(occurrences).toHaveLength(4); // all 4 Wednesdays restored
+      expect(occurrences.map((o) => o.date)).toEqual([
+        '2026-03-04',
+        '2026-03-11',
+        '2026-03-18',
+        '2026-03-25',
+      ]);
     });
   });
 

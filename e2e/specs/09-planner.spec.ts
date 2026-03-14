@@ -525,6 +525,61 @@ test.describe('Family Planner', () => {
     expect(exported.activities![0].recurrence).toBe('weekly');
   });
 
+  test('should reschedule a single occurrence of a recurring activity', async ({ page }) => {
+    await setupPlanner(page);
+
+    // Create a weekly recurring activity starting tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+    // Calculate a reschedule target date (3 days after tomorrow)
+    const rescheduleTarget = new Date(tomorrow);
+    rescheduleTarget.setDate(rescheduleTarget.getDate() + 3);
+    const rescheduleStr = `${rescheduleTarget.getFullYear()}-${String(rescheduleTarget.getMonth() + 1).padStart(2, '0')}-${String(rescheduleTarget.getDate()).padStart(2, '0')}`;
+
+    await page.getByRole('button', { name: /\+ add activity/i }).click();
+    await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Reschedule Test');
+    await selectAssignee(page);
+    await page.locator('input[type="date"]').first().fill(tomorrowStr);
+    await page.getByRole('button', { name: /^add activity$/i }).click();
+    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Click the first occurrence in the upcoming list — opens view modal
+    await page.getByText('Reschedule Test').first().click();
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
+
+    // Click "Reschedule This Session" button
+    await page.getByRole('button', { name: /reschedule this session/i }).click();
+
+    // The reschedule form should appear with date and time inputs
+    const dialog = page.locator('div[role="dialog"]');
+    await expect(dialog.getByText(/new date/i)).toBeVisible({ timeout: 3000 });
+
+    // Change the date in the reschedule form
+    const rescheduleDateInput = dialog.locator('input[type="date"]');
+    await rescheduleDateInput.fill(rescheduleStr);
+
+    // Click the Reschedule confirm button
+    await dialog.getByRole('button', { name: /^reschedule$/i }).click();
+
+    // Modal should close
+    await expect(page.getByText(/activity details/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Verify in IndexedDB: original template + rescheduled override = 2 activities
+    const exported = await dbHelper.exportData();
+    expect(exported.activities).toHaveLength(2);
+
+    const original = exported.activities!.find((a: any) => a.recurrence === 'weekly');
+    const override = exported.activities!.find((a: any) => a.recurrence === 'none');
+
+    expect(original).toBeDefined();
+    expect(override).toBeDefined();
+    expect(override!.parentActivityId).toBe(original!.id);
+    expect(override!.date).toBe(rescheduleStr);
+    expect(override!.originalOccurrenceDate).toBe(tomorrowStr);
+  });
+
   test.skip('should show legend with category colors', async ({ page }) => {
     await setupPlanner(page);
 
