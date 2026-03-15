@@ -6,7 +6,7 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
-import { CATEGORY_FALLBACK_ICON } from '@/constants/activityIcons';
+import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
@@ -83,7 +83,7 @@ export function useCriticalItems() {
             activity.startTime ? 'nook.criticalActivity' : 'nook.criticalActivityNoTime',
             { activity: activity.title, time: formatTime12(activity.startTime ?? '') }
           ),
-          icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
+          icon: activity.icon ?? getActivityFallbackEmoji(activity.category),
           time: activity.startTime ?? '',
           occurrenceDate: date,
         });

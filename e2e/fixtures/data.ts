@@ -83,7 +83,7 @@ export class TestDataFactory {
       date: todayStr,
       recurrence: 'weekly',
       daysOfWeek: [new Date().getDay()],
-      category: 'lesson',
+      category: 'piano',
       feeSchedule: 'none',
       reminderMinutes: 0,
       isActive: true,

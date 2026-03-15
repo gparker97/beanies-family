@@ -47,7 +47,7 @@ function makeActivity(overrides?: Partial<FamilyActivity>): FamilyActivity {
     startTime: '15:00',
     endTime: '16:00',
     recurrence: 'none',
-    category: 'sport',
+    category: 'tennis',
     assigneeId: 'child-1',
     feeSchedule: 'none',
     reminderMinutes: 0,
