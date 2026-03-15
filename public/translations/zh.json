@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-14",
-    "translationCount": 1496
+    "lastUpdated": "2026-03-15",
+    "translationCount": 1498
   },
   "translations": {
     "app.name": {
@@ -7485,6 +7485,16 @@
       "translation": "选择日历周的开始日期",
       "hash": "9zv5uj",
       "lastUpdated": "2026-03-14"
+    },
+    "dashboard.breakdown.viewAllAccounts": {
+      "translation": " 查看所有账户",
+      "hash": "hm05og",
+      "lastUpdated": "2026-03-15"
+    },
+    "dashboard.breakdown.viewAllAssets": {
+      "translation": "查看所有档案",
+      "hash": "tbxt43",
+      "lastUpdated": "2026-03-15"
     }
   }
 }
