@@ -219,6 +219,7 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     description: item.description,
     isReconciled: false,
     recurringItemId: item.id,
+    ...(item.activityId ? { activityId: item.activityId } : {}),
   };
 
   // Goal allocation (compute at generation time with guardrail)

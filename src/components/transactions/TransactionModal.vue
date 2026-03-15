@@ -114,6 +114,19 @@ function todayStr() {
 
 const isEditingRecurring = computed(() => !!props.recurringItem);
 
+// Link is locked when editing an existing item that already has a link
+const isLinkLocked = computed(() => {
+  if (isEditingRecurring.value && (props.recurringItem?.loanId || props.recurringItem?.activityId))
+    return true;
+  if (
+    isEditing.value &&
+    props.transaction &&
+    (props.transaction.loanId || props.transaction.activityId)
+  )
+    return true;
+  return false;
+});
+
 const linkedLoan = computed(() => {
   if (!loanId.value) return null;
   return findLoanDetails(loanId.value, assetsStore.assets, accountsStore.accounts);
@@ -167,13 +180,18 @@ const { isEditing, isSubmitting } = useFormModal(
         startDate.value = item.startDate ? item.startDate.substring(0, 10) : todayStr();
         endDate.value = item.endDate ? item.endDate.substring(0, 10) : '';
         accountId.value = item.accountId;
-        activityId.value = undefined;
-        if ((item as any).loanId) {
+        if (item.loanId) {
           linkType.value = 'loan';
-          loanId.value = (item as any).loanId;
+          loanId.value = item.loanId;
+          activityId.value = undefined;
+        } else if (item.activityId) {
+          linkType.value = 'activity';
+          activityId.value = item.activityId;
+          loanId.value = undefined;
         } else {
           linkType.value = '';
           loanId.value = undefined;
+          activityId.value = undefined;
         }
         goalId.value = item.goalId;
         goalAllocMode.value = item.goalAllocMode || 'percentage';
@@ -191,9 +209,9 @@ const { isEditing, isSubmitting } = useFormModal(
         date.value = transaction.date;
         accountId.value = transaction.accountId;
         activityId.value = transaction.activityId;
-        if ((transaction as any).loanId) {
+        if (transaction.loanId) {
           linkType.value = 'loan';
-          loanId.value = (transaction as any).loanId;
+          loanId.value = transaction.loanId;
         } else if (transaction.activityId) {
           linkType.value = 'activity';
         } else {
@@ -408,6 +426,7 @@ function handleSave() {
         isActive: isActive.value,
         lastProcessedDate: props.recurringItem?.lastProcessedDate,
         ...(loanId.value ? { loanId: loanId.value } : {}),
+        ...(activityId.value ? { activityId: activityId.value } : {}),
         goalId: goalId.value || undefined,
         goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
         goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
@@ -433,6 +452,7 @@ function handleSave() {
         endDate: endDate.value || undefined,
         isActive: true,
         ...(loanId.value ? { loanId: loanId.value } : {}),
+        ...(activityId.value ? { activityId: activityId.value } : {}),
         goalId: goalId.value || undefined,
         goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
         goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
@@ -683,26 +703,56 @@ function handleDelete() {
     </ConditionalSection>
 
     <!-- 8a. Link Payment (outgoing only) -->
-    <ConditionalSection :show="direction === 'out' && !isEditingRecurring">
+    <ConditionalSection :show="direction === 'out'">
       <div class="space-y-3">
-        <FormFieldGroup :label="t('txLink.linkPayment')" optional>
-          <TogglePillGroup
-            v-model="linkType"
-            :options="[
-              { value: 'activity', label: '📋 ' + t('txLink.activity') },
-              { value: 'loan', label: '🏦 ' + t('txLink.loan') },
-            ]"
-            clearable
-          />
-        </FormFieldGroup>
+        <!-- Locked link display (editing an already-linked item) -->
+        <template v-if="isLinkLocked">
+          <FormFieldGroup
+            v-if="linkType === 'activity' && activityId"
+            :label="t('txLink.linkPayment')"
+          >
+            <div
+              class="flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)] dark:bg-slate-700"
+            >
+              <span>📋</span>
+              <span class="font-semibold">{{
+                activityStore?.activities?.find((a) => a.id === activityId)?.title ?? activityId
+              }}</span>
+              <span class="ml-auto text-xs text-[var(--color-text-muted)]">🔒</span>
+            </div>
+          </FormFieldGroup>
+          <FormFieldGroup v-if="linkType === 'loan' && linkedLoan" :label="t('txLink.linkPayment')">
+            <div
+              class="flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)] dark:bg-slate-700"
+            >
+              <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }}</span>
+              <span class="font-semibold">{{ linkedLoan.name }}</span>
+              <span class="ml-auto text-xs text-[var(--color-text-muted)]">🔒</span>
+            </div>
+          </FormFieldGroup>
+        </template>
 
-        <FormFieldGroup v-if="linkType === 'activity'" :label="t('txLink.activity')">
-          <ActivityLinkDropdown v-model="activityId" />
-        </FormFieldGroup>
+        <!-- Editable link selector (new items or unlinked items) -->
+        <template v-else>
+          <FormFieldGroup :label="t('txLink.linkPayment')" optional>
+            <TogglePillGroup
+              v-model="linkType"
+              :options="[
+                { value: 'activity', label: '📋 ' + t('txLink.activity') },
+                { value: 'loan', label: '🏦 ' + t('txLink.loan') },
+              ]"
+              clearable
+            />
+          </FormFieldGroup>
 
-        <FormFieldGroup v-if="linkType === 'loan'" :label="t('txLink.loan')">
-          <LoanLinkDropdown v-model="loanId" />
-        </FormFieldGroup>
+          <FormFieldGroup v-if="linkType === 'activity'" :label="t('txLink.activity')">
+            <ActivityLinkDropdown v-model="activityId" />
+          </FormFieldGroup>
+
+          <FormFieldGroup v-if="linkType === 'loan'" :label="t('txLink.loan')">
+            <LoanLinkDropdown v-model="loanId" />
+          </FormFieldGroup>
+        </template>
 
         <AmortizationBreakdown
           v-if="loanId && amortizationPreview"

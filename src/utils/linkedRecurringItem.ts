@@ -25,6 +25,7 @@ export async function syncEntityLinkedRecurringItem(opts: {
   category: string;
   description: string;
   loanId?: string;
+  activityId?: string;
   startDate?: string;
   frequency?: 'monthly' | 'yearly';
 }): Promise<string | undefined> {
@@ -55,6 +56,7 @@ export async function syncEntityLinkedRecurringItem(opts: {
     startDate: opts.startDate || toDateInputValue(new Date()),
     isActive: true,
     ...(opts.loanId ? { loanId: opts.loanId } : {}),
+    ...(opts.activityId ? { activityId: opts.activityId } : {}),
   };
 
   if (opts.existingItemId) {

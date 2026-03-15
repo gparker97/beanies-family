@@ -191,6 +191,7 @@ export interface RecurringItem {
   goalAllocMode?: 'percentage' | 'fixed'; // How to compute allocation
   goalAllocValue?: number; // 20 for 20%, or 200 for $200 fixed
   loanId?: UUID; // Link to an asset loan or loan account for auto-amortization
+  activityId?: UUID; // Link to a family activity for fee tracking
   lastProcessedDate?: ISODateString;
   isActive: boolean;
   createdAt: ISODateString;
