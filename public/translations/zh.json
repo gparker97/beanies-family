@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-15",
-    "translationCount": 1498
+    "translationCount": 1529
   },
   "translations": {
     "app.name": {
@@ -4046,36 +4046,6 @@
       "hash": "wef2gc",
       "lastUpdated": "2026-03-03"
     },
-    "planner.category.lesson": {
-      "translation": "课程",
-      "hash": "xg1oko",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.category.sport": {
-      "translation": "運動項目",
-      "hash": "1boswk",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.category.appointment": {
-      "translation": "预约",
-      "hash": "36ty0v",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.category.social": {
-      "translation": "社交媒体",
-      "hash": "tzitf7",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.category.pickup": {
-      "translation": "取货",
-      "hash": "vhye78",
-      "lastUpdated": "2026-03-03"
-    },
-    "planner.category.other": {
-      "translation": "其他地区",
-      "hash": "19k0z4",
-      "lastUpdated": "2026-03-03"
-    },
     "planner.recurrence.weekly": {
       "translation": "每週",
       "hash": "s8sy1r",
@@ -7494,6 +7464,191 @@
     "dashboard.breakdown.viewAllAssets": {
       "translation": "查看所有档案",
       "hash": "tbxt43",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.group.school": {
+      "translation": "学院",
+      "hash": "u610to",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.group.educational": {
+      "translation": "教育",
+      "hash": "njjusz",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.group.sports": {
+      "translation": "運動",
+      "hash": "tyr5up",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.group.competitions": {
+      "translation": "比赛",
+      "hash": "9dfi5w",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.group.lessons": {
+      "translation": "課程",
+      "hash": "sn8nx7",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.group.fun": {
+      "translation": "好玩的",
+      "hash": "1isf",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.after_school": {
+      "translation": "课后活动",
+      "hash": "b3uwq1",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.school_recital": {
+      "translation": "学校音乐会/演讲",
+      "hash": "164ttd",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.other_school": {
+      "translation": "其他学校活动",
+      "hash": "var01h",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.tutoring": {
+      "translation": "辅导",
+      "hash": "49k5cc",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.math": {
+      "translation": "数学",
+      "hash": "1f8rs",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.language": {
+      "translation": "语言",
+      "hash": "pm7a14",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.science": {
+      "translation": "科学",
+      "hash": "bs1m0s",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.other_educational": {
+      "translation": "其他教育",
+      "hash": "fyxx8j",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.tennis": {
+      "translation": "網球",
+      "hash": "tns079",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.badminton": {
+      "translation": "羽毛球",
+      "hash": "16zh6",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.golf_activity": {
+      "translation": "哥爾夫球",
+      "hash": "1bp1e",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.baseball": {
+      "translation": "棒球/垒球",
+      "hash": "73t2d2",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.gym_activity": {
+      "translation": "健身房/健身中心",
+      "hash": "84je6q",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.yoga_activity": {
+      "translation": "瑜伽/普拉提",
+      "hash": "vyjxqr",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.other_sports_activity": {
+      "translation": "其他体育项目",
+      "hash": "21b6j3",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.spelling_bee": {
+      "translation": "拼字比賽",
+      "hash": "b9x9es",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.math_competition": {
+      "translation": "数学竞赛",
+      "hash": "gdzrtz",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.cubing": {
+      "translation": "方块比赛",
+      "hash": "qczt0v",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.other_competition": {
+      "translation": "其他竞争",
+      "hash": "1w84fj",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.piano": {
+      "translation": "钢琴",
+      "hash": "19wnqh",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.guitar": {
+      "translation": "吉他",
+      "hash": "zgglgq",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.trumpet": {
+      "translation": "小号",
+      "hash": "a6roo9",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.drum": {
+      "translation": "鼓",
+      "hash": "19uiu",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.music": {
+      "translation": "音乐",
+      "hash": "18hb0l",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.art": {
+      "translation": "艺术",
+      "hash": "1f0j",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.dance": {
+      "translation": "舞蹈/芭蕾",
+      "hash": "m8j9cc",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.other_lesson": {
+      "translation": "其他课程",
+      "hash": "1fzc6w",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.birthday": {
+      "translation": "生日派对",
+      "hash": "kxlvnh",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.wedding": {
+      "translation": "婚礼",
+      "hash": "n88zpo",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.bar_mitzvah": {
+      "translation": "神威洗礼",
+      "hash": "sqea36",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.other_celebration": {
+      "translation": "其他庆祝活动",
+      "hash": "dqrmue",
       "lastUpdated": "2026-03-15"
     }
   }

@@ -4,7 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { toDateInputValue, formatNookDate } from '@/utils/date';
-import { CATEGORY_FALLBACK_ICON } from '@/constants/activityIcons';
+import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -62,7 +62,7 @@ const todayItems = computed<ScheduleItem[]>(() => {
         time: activity.startTime ?? '',
         endTime: activity.endTime ?? '',
         displayDate: formatNookDate(date),
-        icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
+        icon: activity.icon ?? getActivityFallbackEmoji(activity.category),
       });
     }
   }
@@ -114,7 +114,7 @@ const weekItems = computed<ScheduleItem[]>(() => {
         time: activity.startTime ?? '',
         endTime: activity.endTime ?? '',
         displayDate: formatNookDate(date),
-        icon: activity.icon ?? CATEGORY_FALLBACK_ICON[activity.category] ?? '📌',
+        icon: activity.icon ?? getActivityFallbackEmoji(activity.category),
       });
     }
   }

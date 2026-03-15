@@ -5,27 +5,20 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
+import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
-  ActivityCategory,
   ISODateString,
 } from '@/types/models';
 
-/** Default highlight color per activity category. */
-export const CATEGORY_COLORS: Record<ActivityCategory, string> = {
-  lesson: '#AED6F1',
-  sport: '#27AE60',
-  appointment: '#F15D22',
-  social: '#9B59B6',
-  pickup: '#E67E22',
-  other: '#95A5A6',
-};
+/** Re-export for backwards compatibility with components that import from here. */
+export const CATEGORY_COLORS = ACTIVITY_COLORS;
 
 /** Returns the activity's custom color or falls back to category default. */
 export function getActivityColor(activity: FamilyActivity): string {
-  return activity.color ?? CATEGORY_COLORS[activity.category];
+  return activity.color ?? getActivityCategoryColor(activity.category);
 }
 
 export const useActivityStore = defineStore('activities', () => {
