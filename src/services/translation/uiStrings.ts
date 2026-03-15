@@ -190,6 +190,8 @@ const STRING_DEFS = {
   'dashboard.breakdown.retirement': { en: 'Retirement', beanie: 'retirement' },
   'dashboard.breakdown.assets': { en: 'Assets', beanie: 'assets' },
   'dashboard.breakdown.liabilities': { en: 'Liabilities', beanie: 'liabilities' },
+  'dashboard.breakdown.viewAllAccounts': { en: 'View All Accounts', beanie: 'view all accounts' },
+  'dashboard.breakdown.viewAllAssets': { en: 'View All Assets', beanie: 'view all assets' },
   'dashboard.assets': { en: 'Assets', beanie: 'your assets' },
   'dashboard.liabilities': { en: 'Liabilities', beanie: 'beans owed' },
   'dashboard.monthlyIncome': { en: 'Monthly Income', beanie: 'beans coming in' },

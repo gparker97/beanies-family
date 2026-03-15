@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, ref } from 'vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { getSubtypeLabelKey } from '@/constants/accountCategories';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { convertToBaseCurrency } from '@/utils/currency';
-import type { AccountType } from '@/types/models';
+import type { AccountType, CurrencyCode } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
-const router = useRouter();
 const { t } = useTranslation();
 const accountsStore = useAccountsStore();
 const assetsStore = useAssetsStore();
@@ -76,6 +75,12 @@ const ASSETS_DEF = {
   emoji: '🏠',
   color: '#2C3E50',
   route: '/assets',
+};
+
+const LIABILITIES_DEF = {
+  key: 'liabilities',
+  color: '#E74C3C',
+  route: '/accounts?groupBy=category',
 };
 
 // ── Computed breakdown ──────────────────────────────────────────────────────
@@ -174,6 +179,72 @@ function formatPercent(pct: number): string {
   if (pct < 1) return '<1%';
   return `${Math.round(pct)}%`;
 }
+
+// ── Expandable detail ───────────────────────────────────────────────────────
+
+const expandedCategory = ref<string | null>(null);
+
+function toggleCategory(key: string) {
+  expandedCategory.value = expandedCategory.value === key ? null : key;
+}
+
+interface DetailItem {
+  name: string;
+  typeLabelKey: string;
+  balance: number;
+  currency: CurrencyCode;
+}
+
+function getDetailsForCategory(key: string): DetailItem[] {
+  if (key === 'assets') {
+    return assetsStore.filteredAssets
+      .filter((a) => a.includeInNetWorth)
+      .map((a) => ({
+        name: a.name,
+        typeLabelKey: `assets.type.${a.type}`,
+        balance: a.currentValue,
+        currency: a.currency,
+      }))
+      .sort(sortByBalanceDesc);
+  }
+
+  if (key === 'liabilities') {
+    return accountsStore.filteredActiveAccounts
+      .filter((a) => a.includeInNetWorth && (a.type === 'credit_card' || a.type === 'loan'))
+      .map((a) => ({
+        name: a.name,
+        typeLabelKey: getSubtypeLabelKey(a.type),
+        balance: a.balance,
+        currency: a.currency,
+      }))
+      .sort(sortByBalanceDesc);
+  }
+
+  const catDef = CATEGORIES.find((c) => c.key === key);
+  if (!catDef) return [];
+
+  return accountsStore.filteredActiveAccounts
+    .filter((a) => a.includeInNetWorth && catDef.types.includes(a.type))
+    .map((a) => ({
+      name: a.name,
+      typeLabelKey: getSubtypeLabelKey(a.type),
+      balance: a.balance,
+      currency: a.currency,
+    }))
+    .sort(sortByBalanceDesc);
+}
+
+function sortByBalanceDesc(a: DetailItem, b: DetailItem): number {
+  return (
+    convertToBaseCurrency(b.balance, b.currency) - convertToBaseCurrency(a.balance, a.currency)
+  );
+}
+
+function getRouteForCategory(key: string): string {
+  if (key === 'liabilities') return LIABILITIES_DEF.route;
+  if (key === 'assets') return ASSETS_DEF.route;
+  return CATEGORIES.find((c) => c.key === key)?.route ?? '/accounts';
+}
 </script>
 
 <template>
@@ -202,8 +273,14 @@ function formatPercent(pct: number): string {
       <div
         v-for="cat in categories"
         :key="cat.key"
-        class="cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-        @click="router.push(cat.route)"
+        class="cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow,ring] duration-200 dark:bg-slate-800"
+        :class="
+          expandedCategory === cat.key
+            ? 'shadow-[var(--card-hover-shadow)] ring-2'
+            : 'hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]'
+        "
+        :style="expandedCategory === cat.key ? { '--tw-ring-color': cat.color + '40' } : {}"
+        @click="toggleCategory(cat.key)"
       >
         <!-- Color accent bar -->
         <div class="h-1" :style="{ backgroundColor: cat.color }" />
@@ -235,14 +312,69 @@ function formatPercent(pct: number): string {
             {{ formatPercent(cat.percent) }}
           </span>
         </div>
+
+        <!-- Inline expanded detail -->
+        <div
+          class="grid transition-[grid-template-rows] duration-300"
+          :class="expandedCategory === cat.key ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+          style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
+          @click.stop
+        >
+          <div class="overflow-hidden">
+            <div class="border-t px-3 pt-2 pb-3" :style="{ borderColor: cat.color + '20' }">
+              <div class="space-y-0.5">
+                <div
+                  v-for="(item, idx) in getDetailsForCategory(cat.key)"
+                  :key="idx"
+                  class="rounded-lg px-2 py-1.5"
+                >
+                  <div class="text-secondary-500 truncate text-xs font-medium dark:text-gray-200">
+                    {{ item.name }}
+                  </div>
+                  <div class="mt-0.5 flex items-center justify-between">
+                    <span class="truncate text-[11px] text-slate-400 dark:text-gray-500">
+                      {{ t(item.typeLabelKey as UIStringKey) }}
+                    </span>
+                    <CurrencyAmount
+                      :amount="item.balance"
+                      :currency="item.currency"
+                      size="sm"
+                      :always-show-original="true"
+                      class="ml-2 shrink-0"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- View all link -->
+              <router-link
+                :to="getRouteForCategory(cat.key)"
+                class="text-primary-500 font-outfit mt-2 block text-center text-[11px] font-semibold hover:underline"
+                @click.stop
+              >
+                {{
+                  cat.key === 'assets'
+                    ? t('dashboard.breakdown.viewAllAssets')
+                    : t('dashboard.breakdown.viewAllAccounts')
+                }}
+                &rarr;
+              </router-link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Liabilities card -->
     <div
       v-if="liabilities > 0"
-      class="mt-3 cursor-pointer overflow-hidden rounded-[var(--sq)] border border-red-200/60 bg-red-50/50 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-shadow)] dark:border-red-900/30 dark:bg-red-950/20"
-      @click="router.push('/accounts?groupBy=category')"
+      class="mt-3 cursor-pointer overflow-hidden rounded-[var(--sq)] border border-red-200/60 bg-red-50/50 transition-[transform,box-shadow,ring] duration-200 dark:border-red-900/30 dark:bg-red-950/20"
+      :class="
+        expandedCategory === 'liabilities'
+          ? 'shadow-[var(--card-shadow)] ring-2 ring-red-400/40'
+          : 'hover:-translate-y-0.5 hover:shadow-[var(--card-shadow)]'
+      "
+      @click="toggleCategory('liabilities')"
     >
       <div class="flex items-center gap-3 px-4 py-3">
         <span class="text-base">🔻</span>
@@ -258,6 +390,52 @@ function formatPercent(pct: number): string {
           size="sm"
           class="ml-auto"
         />
+      </div>
+
+      <!-- Inline expanded detail for liabilities -->
+      <div
+        class="grid transition-[grid-template-rows] duration-300"
+        :class="expandedCategory === 'liabilities' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+        style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
+        @click.stop
+      >
+        <div class="overflow-hidden">
+          <div class="border-t border-red-200/40 px-3 pt-2 pb-3 dark:border-red-900/20">
+            <div class="space-y-0.5">
+              <div
+                v-for="(item, idx) in getDetailsForCategory('liabilities')"
+                :key="idx"
+                class="rounded-lg px-2 py-1.5"
+              >
+                <div class="text-secondary-500 truncate text-xs font-medium dark:text-gray-200">
+                  {{ item.name }}
+                </div>
+                <div class="mt-0.5 flex items-center justify-between">
+                  <span class="truncate text-[11px] text-slate-400 dark:text-gray-500">
+                    {{ t(item.typeLabelKey as UIStringKey) }}
+                  </span>
+                  <CurrencyAmount
+                    :amount="item.balance"
+                    :currency="item.currency"
+                    type="expense"
+                    size="sm"
+                    :always-show-original="true"
+                    class="ml-2 shrink-0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- View all link -->
+            <router-link
+              to="/accounts?groupBy=category"
+              class="text-primary-500 font-outfit mt-2 block text-center text-[11px] font-semibold hover:underline"
+              @click.stop
+            >
+              {{ t('dashboard.breakdown.viewAllAccounts') }} &rarr;
+            </router-link>
+          </div>
+        </div>
       </div>
     </div>
   </div>
