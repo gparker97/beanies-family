@@ -8,6 +8,8 @@ import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate, addHourToTime, toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -49,6 +51,8 @@ const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
 const transactionsStore = useTransactionsStore();
+const recurringStore = useRecurringStore();
+const accountsStore = useAccountsStore();
 const { getMemberName } = useMemberInfo();
 
 // Live-lookup from store so display stays reactive after inline edits
@@ -345,9 +349,24 @@ const endDateFormatted = computed(() => {
   return formatDate(activity.value.recurrenceEndDate);
 });
 
+const linkedRecurringItem = computed(() => {
+  if (!activity.value?.linkedRecurringItemId) return null;
+  return recurringStore.getRecurringItemById(activity.value.linkedRecurringItemId) ?? null;
+});
+
+const linkedPayFromAccount = computed(() => {
+  if (!activity.value?.payFromAccountId) return null;
+  return accountsStore.accounts.find((a) => a.id === activity.value!.payFromAccountId) ?? null;
+});
+
 const linkedTransactions = computed(() => {
-  if (!props.activity) return [];
-  return transactionsStore.transactions.filter((tx) => tx.activityId === props.activity!.id);
+  if (!activity.value) return [];
+  const actId = activity.value.id;
+  const riId = activity.value.linkedRecurringItemId;
+  // Match by activityId OR by recurringItemId (for transactions generated from the linked recurring item)
+  return transactionsStore.transactions.filter(
+    (tx) => tx.activityId === actId || (riId && tx.recurringItemId === riId)
+  );
 });
 
 const feeLabel = computed(() => {
@@ -1114,6 +1133,35 @@ async function confirmReschedule() {
         </InlineEditField>
       </FormFieldGroup>
 
+      <!-- Linked Recurring Payment -->
+      <FormFieldGroup v-if="linkedRecurringItem" :label="t('recurringPrompt.createPayment')">
+        <div
+          class="flex items-center justify-between rounded-xl bg-[var(--tint-orange-8)] px-3 py-2"
+        >
+          <div class="text-sm text-[var(--color-text)]">
+            <span class="font-outfit font-bold"
+              >{{ linkedRecurringItem.currency }}
+              {{
+                linkedRecurringItem.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
+              }}/{{ linkedRecurringItem.frequency === 'yearly' ? 'yr' : 'mo' }}</span
+            >
+            <span v-if="linkedPayFromAccount" class="text-[var(--color-text-muted)]">
+              &middot; from {{ linkedPayFromAccount.name }}
+            </span>
+          </div>
+          <span
+            class="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
+            :class="
+              linkedRecurringItem.isActive
+                ? 'text-primary-500 bg-[var(--tint-orange-8)]'
+                : 'bg-gray-200 text-gray-500 dark:bg-slate-600 dark:text-gray-400'
+            "
+          >
+            {{ linkedRecurringItem.isActive ? t('recurring.active') : t('recurring.paused') }}
+          </span>
+        </div>
+      </FormFieldGroup>
+
       <!-- Linked Transactions -->
       <div v-if="linkedTransactions.length > 0" class="space-y-2">
         <div
@@ -1131,7 +1179,8 @@ async function confirmReschedule() {
             &middot; {{ tx.description || tx.category }}
           </div>
           <div class="font-outfit text-sm font-bold text-[var(--color-text)]">
-            {{ tx.currency }} {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+            {{ tx.currency }}
+            {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
           </div>
         </div>
       </div>

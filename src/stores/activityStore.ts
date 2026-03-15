@@ -183,6 +183,7 @@ export const useActivityStore = defineStore('activities', () => {
       currency: (activity.feeCurrency || settingsStore.displayCurrency) as CurrencyCode,
       category: activityCategoryToExpenseCategory(activity.category) || 'other_lessons',
       description: `${activity.title} Fee`,
+      activityId: activity.id,
       startDate: activity.date,
       frequency: freq,
     });
