@@ -35,20 +35,29 @@ const { state, handleConfirm, handleCancel } = useConfirm();
       <p class="text-sm text-gray-600 dark:text-gray-300">
         {{ t(state.message) }}
       </p>
+      <p v-if="state.detail" class="text-xs text-gray-500 dark:text-gray-400">
+        {{ state.detail }}
+      </p>
     </div>
 
     <!-- Footer -->
     <template #footer>
       <div class="flex justify-end gap-3">
         <BaseButton v-if="state.showCancel" variant="ghost" size="sm" @click="handleCancel">
-          {{ t('action.cancel') }}
+          {{ state.cancelLabel ? t(state.cancelLabel) : t('action.cancel') }}
         </BaseButton>
         <BaseButton
           :variant="state.variant === 'danger' ? 'danger' : 'primary'"
           size="sm"
           @click="handleConfirm"
         >
-          {{ state.showCancel ? t('action.delete') : t('action.ok') }}
+          {{
+            state.confirmLabel
+              ? t(state.confirmLabel)
+              : state.showCancel
+                ? t('action.delete')
+                : t('action.ok')
+          }}
         </BaseButton>
       </div>
     </template>

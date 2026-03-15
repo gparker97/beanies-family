@@ -526,6 +526,18 @@ const STRING_DEFS = {
     en: 'For per-session, weekly, or termly fees, set up recurring payments manually from transactions',
     beanie: 'for per-session, weekly, or termly fees, set up recurring payments from transactions',
   },
+  'recurringPrompt.paymentCreated': {
+    en: 'Monthly Payment Created',
+    beanie: 'monthly payment created',
+  },
+  'recurringPrompt.paymentCreatedDetail': {
+    en: 'A recurring payment has been set up for this activity',
+    beanie: 'a recurring payment has been set up for this activity',
+  },
+  'recurringPrompt.viewTransactions': {
+    en: 'View Transactions',
+    beanie: 'view transactions',
+  },
 
   // Loan Account Fields
   'loanAccount.details': { en: 'Loan Details', beanie: 'loan details' },

@@ -6,16 +6,25 @@ type ConfirmVariant = 'danger' | 'info';
 interface ConfirmOptions {
   title: UIStringKey;
   message: UIStringKey;
+  /** Additional detail text shown below the message (plain string, not translated) */
+  detail?: string;
   variant?: ConfirmVariant;
   showCancel?: boolean;
+  /** Custom confirm button label (overrides default "Delete" / "OK") */
+  confirmLabel?: UIStringKey;
+  /** Custom cancel button label (overrides default "Cancel") */
+  cancelLabel?: UIStringKey;
 }
 
 interface ConfirmState {
   open: boolean;
   title: UIStringKey;
   message: UIStringKey;
+  detail?: string;
   variant: ConfirmVariant;
   showCancel: boolean;
+  confirmLabel?: UIStringKey;
+  cancelLabel?: UIStringKey;
   resolve: ((value: boolean) => void) | null;
 }
 
@@ -27,6 +36,9 @@ const state = ref<ConfirmState>({
   variant: 'danger',
   showCancel: true,
   resolve: null,
+  detail: undefined,
+  confirmLabel: undefined,
+  cancelLabel: undefined,
 });
 
 /**
@@ -39,8 +51,11 @@ export function confirm(options: ConfirmOptions): Promise<boolean> {
       open: true,
       title: options.title,
       message: options.message,
+      detail: options.detail,
       variant: options.variant ?? 'danger',
       showCancel: options.showCancel ?? true,
+      confirmLabel: options.confirmLabel,
+      cancelLabel: options.cancelLabel,
       resolve,
     };
   });
