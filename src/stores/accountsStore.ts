@@ -6,7 +6,8 @@ import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
-import type { Account, CreateAccountInput, UpdateAccountInput } from '@/types/models';
+import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
+import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
 
 export const useAccountsStore = defineStore('accounts', () => {
   // State
@@ -114,6 +115,31 @@ export const useAccountsStore = defineStore('accounts', () => {
     return filteredTotalBalance.value + assetsStore.filteredTotalAssetValue;
   });
 
+  // ── Linked recurring payment sync ──────────────────────────────────────────
+  async function syncLinkedRecurringPayment(account: Account) {
+    if (account.type !== 'loan') return;
+    const enabled = !!(account.payFromAccountId && account.monthlyPayment);
+    const newItemId = await syncEntityLinkedRecurringItem({
+      enabled,
+      existingItemId: account.linkedRecurringItemId,
+      accountId: account.payFromAccountId,
+      amount: account.monthlyPayment ?? 0,
+      currency: account.currency as CurrencyCode,
+      category: 'loan_payment',
+      description: `${account.name} Payment`,
+      loanId: account.id,
+      startDate: account.loanStartDate,
+    });
+    if (newItemId !== account.linkedRecurringItemId) {
+      await accountRepo.updateAccount(account.id, {
+        ...(newItemId ? { linkedRecurringItemId: newItemId } : {}),
+      });
+      accounts.value = accounts.value.map((a) =>
+        a.id === account.id ? { ...a, linkedRecurringItemId: newItemId } : a
+      );
+    }
+  }
+
   // Actions
   async function loadAccounts() {
     await wrapAsync(isLoading, error, async () => {
@@ -132,6 +158,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       }
       return account;
     });
+    if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
 
@@ -144,6 +171,7 @@ export const useAccountsStore = defineStore('accounts', () => {
       }
       return updated;
     });
+    if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
 

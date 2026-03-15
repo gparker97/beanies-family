@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
@@ -21,6 +21,7 @@ import { useProjectedTransactions } from '@/composables/useProjectedTransactions
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -43,7 +44,9 @@ import {
 } from '@/utils/date';
 
 const route = useRoute();
+const router = useRouter();
 const transactionsStore = useTransactionsStore();
+const assetsStore = useAssetsStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 const recurringStore = useRecurringStore();
@@ -240,6 +243,22 @@ async function handleTransactionSave(
   } else {
     if (!(await transactionsStore.createTransaction(data))) return;
     closeAddModal();
+  }
+}
+
+function handleViewActivity(activityId: string) {
+  viewingTransaction.value = null;
+  router.push({ path: '/planner', query: { activity: activityId } });
+}
+
+function handleViewLoan(loanId: string) {
+  viewingTransaction.value = null;
+  // Loan could be an asset or an account — navigate to the appropriate page
+  const asset = assetsStore.assets.find((a) => a.id === loanId);
+  if (asset) {
+    router.push({ path: '/assets', query: { asset: loanId } });
+  } else {
+    router.push({ path: '/accounts', query: { account: loanId } });
   }
 }
 
@@ -779,6 +798,8 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       :transaction="viewingTransaction"
       @close="viewingTransaction = null"
       @open-edit="handleViewOpenEdit"
+      @view-activity="handleViewActivity"
+      @view-loan="handleViewLoan"
     />
   </div>
 </template>

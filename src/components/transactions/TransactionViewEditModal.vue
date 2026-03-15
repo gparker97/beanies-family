@@ -7,8 +7,10 @@ import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useGoalsStore } from '@/stores/goalsStore';
+import { findLoanDetails } from '@/utils/loanPayment';
 import { getCategoryById, CATEGORY_EMOJI_MAP } from '@/constants/categories';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate } from '@/utils/date';
@@ -18,6 +20,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
+import AmortizationBreakdown from '@/components/ui/AmortizationBreakdown.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import type { Transaction } from '@/types/models';
 
@@ -31,12 +34,15 @@ const emit = defineEmits<{
   close: [];
   deleted: [id: string];
   'open-edit': [transaction: Transaction];
+  'view-activity': [activityId: string];
+  'view-loan': [loanId: string];
 }>();
 
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const transactionsStore = useTransactionsStore();
 const accountsStore = useAccountsStore();
+const assetsStore = useAssetsStore();
 const activityStore = useActivityStore();
 const goalsStore = useGoalsStore();
 const { getMemberNameByAccountId } = useMemberInfo();
@@ -160,6 +166,11 @@ const linkedActivity = computed(() => {
 const linkedGoal = computed(() => {
   if (!transaction.value?.goalId) return null;
   return goalsStore.goals.find((g) => g.id === transaction.value!.goalId);
+});
+
+const linkedLoan = computed(() => {
+  if (!transaction.value?.loanId) return null;
+  return findLoanDetails(transaction.value.loanId, assetsStore.assets, accountsStore.accounts);
 });
 
 const currSymbol = computed(() => {
@@ -424,12 +435,42 @@ async function handleDelete() {
         </span>
       </FormFieldGroup>
 
-      <!-- Linked activity — read-only -->
+      <!-- Linked activity — clickable -->
       <FormFieldGroup v-if="linkedActivity" :label="t('planner.field.title')">
-        <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-          {{ linkedActivity.icon }} {{ linkedActivity.title }}
-        </span>
+        <button
+          type="button"
+          class="group hover:text-primary-500 flex items-center gap-2 text-sm text-[var(--color-text)] transition-colors dark:text-gray-300"
+          @click="emit('view-activity', linkedActivity.id)"
+        >
+          <span>{{ linkedActivity.icon }} {{ linkedActivity.title }}</span>
+          <span
+            class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
+            >&rarr; view</span
+          >
+        </button>
       </FormFieldGroup>
+
+      <!-- Linked loan — clickable -->
+      <FormFieldGroup v-if="linkedLoan" :label="t('txLink.linkedLoan')">
+        <button
+          type="button"
+          class="group hover:text-primary-500 flex items-center gap-2 text-sm text-[var(--color-text)] transition-colors dark:text-gray-300"
+          @click="emit('view-loan', transaction.loanId!)"
+        >
+          <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }} {{ linkedLoan.name }}</span>
+          <span
+            class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
+            >&rarr; view</span
+          >
+        </button>
+      </FormFieldGroup>
+      <AmortizationBreakdown
+        v-if="linkedLoan && transaction.loanInterestPortion != null"
+        :interest="transaction.loanInterestPortion"
+        :principal="transaction.loanPrincipalPortion ?? 0"
+        :remaining="linkedLoan.outstandingBalance"
+        :currency="transaction.currency"
+      />
 
       <!-- Linked goal — read-only -->
       <FormFieldGroup v-if="linkedGoal" :label="t('goals.title')">

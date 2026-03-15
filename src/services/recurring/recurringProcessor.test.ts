@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { processRecurringItems } from './recurringProcessor';
-import type { RecurringItem, Account } from '@/types/models';
+import type { RecurringItem, Account, Asset } from '@/types/models';
 
 // Mock the repositories
 vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
@@ -16,7 +16,13 @@ vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
 
 vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAccountById: vi.fn(),
+  getAllAccounts: vi.fn().mockResolvedValue([]),
   updateAccountBalance: vi.fn(),
+}));
+
+vi.mock('@/services/automerge/repositories/assetRepository', () => ({
+  getAllAssets: vi.fn().mockResolvedValue([]),
+  updateAsset: vi.fn(),
 }));
 
 vi.mock('@/services/automerge/repositories/goalRepository', () => ({
@@ -27,6 +33,7 @@ vi.mock('@/services/automerge/repositories/goalRepository', () => ({
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 
 const mockAccount: Account = {
@@ -385,5 +392,236 @@ describe('recurringProcessor - Goal Allocation', () => {
     );
     // Goal progress should NOT be updated
     expect(goalRepo.updateGoalProgress).not.toHaveBeenCalled();
+  });
+});
+
+// --- Loan Payment Generation ---
+
+const mockAssetWithLoan: Asset = {
+  id: 'asset-loan-1',
+  memberId: 'member-1',
+  type: 'real_estate',
+  name: 'Test House',
+  purchaseValue: 300000,
+  currentValue: 320000,
+  currency: 'USD',
+  includeInNetWorth: true,
+  loan: {
+    hasLoan: true,
+    loanAmount: 250000,
+    outstandingBalance: 200000,
+    interestRate: 6,
+    monthlyPayment: 1500,
+    loanTermMonths: 360,
+    lender: 'Test Bank',
+  },
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+const mockLinkedLoanAccount: Account = {
+  id: 'linked-loan-account-1',
+  memberId: 'member-1',
+  name: 'Test House Loan',
+  type: 'loan',
+  currency: 'USD',
+  balance: 200000,
+  institution: 'Test Bank',
+  isActive: true,
+  includeInNetWorth: true,
+  linkedAssetId: 'asset-loan-1',
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+const mockStandaloneLoanAccount: Account = {
+  id: 'standalone-loan-1',
+  memberId: 'member-1',
+  name: 'Car Loan',
+  type: 'loan',
+  currency: 'USD',
+  balance: 15000,
+  institution: 'Test Credit Union',
+  isActive: true,
+  includeInNetWorth: true,
+  interestRate: 5,
+  monthlyPayment: 400,
+  loanTermMonths: 48,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+describe('recurringProcessor - Loan Payment Generation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should apply amortization to asset-linked recurring loan payment', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringLoanPayment: RecurringItem = {
+      id: 'recurring-mortgage-1',
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 1500,
+      currency: 'USD',
+      category: 'loan_payment',
+      description: 'Mortgage Payment',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      loanId: 'asset-loan-1',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringLoanPayment]);
+    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([{ ...mockAssetWithLoan }]);
+    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([
+      { ...mockAccount },
+      { ...mockLinkedLoanAccount },
+    ]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({} as any);
+    vi.mocked(assetRepo.updateAsset).mockResolvedValue({} as any);
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(1);
+
+    // Transaction should include amortization fields
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        loanId: 'asset-loan-1',
+        loanInterestPortion: expect.any(Number),
+        loanPrincipalPortion: expect.any(Number),
+      })
+    );
+
+    // Verify the interest/principal split makes sense (6% on 200k = 1000/mo interest)
+    const txInput = vi.mocked(transactionRepo.createTransaction).mock.calls[0]![0];
+    expect(txInput.loanInterestPortion).toBe(1000); // 200000 * 0.06 / 12
+    expect(txInput.loanPrincipalPortion).toBe(500); // 1500 - 1000
+
+    // Asset loan balance should be reduced
+    expect(assetRepo.updateAsset).toHaveBeenCalledWith(
+      'asset-loan-1',
+      expect.objectContaining({
+        loan: expect.objectContaining({
+          outstandingBalance: 199500, // 200000 - 500
+        }),
+      })
+    );
+
+    // Linked loan account should be synced
+    expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith('linked-loan-account-1', 199500);
+  });
+
+  it('should reduce standalone loan account balance for recurring payment', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringCarPayment: RecurringItem = {
+      id: 'recurring-car-1',
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 400,
+      currency: 'USD',
+      category: 'loan_payment',
+      description: 'Car Loan Payment',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      loanId: 'standalone-loan-1',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringCarPayment]);
+    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([]);
+    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([
+      { ...mockAccount },
+      { ...mockStandaloneLoanAccount },
+    ]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({} as any);
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(1);
+
+    // Transaction should include amortization fields
+    const txInput = vi.mocked(transactionRepo.createTransaction).mock.calls[0]![0];
+    expect(txInput.loanId).toBe('standalone-loan-1');
+    expect(txInput.loanInterestPortion).toBe(62.5); // 15000 * 0.05 / 12
+    expect(txInput.loanPrincipalPortion).toBe(337.5); // 400 - 62.5
+
+    // Standalone loan account balance should be reduced via updateAccountBalance
+    expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith(
+      'standalone-loan-1',
+      14662.5 // 15000 - 337.5
+    );
+  });
+
+  it('should skip loan allocation when loan has zero outstanding balance', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringPaidOff: RecurringItem = {
+      id: 'recurring-paidoff-1',
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 400,
+      currency: 'USD',
+      category: 'loan_payment',
+      description: 'Paid Off Loan Payment',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      loanId: 'standalone-loan-1',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    const paidOffLoan = { ...mockStandaloneLoanAccount, balance: 0 };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringPaidOff]);
+    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([]);
+    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([{ ...mockAccount }, paidOffLoan]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({} as any);
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(1);
+
+    // Transaction should NOT include loan fields (zero balance → skipped)
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        loanId: expect.any(String),
+        loanInterestPortion: expect.any(Number),
+        loanPrincipalPortion: expect.any(Number),
+      })
+    );
+
+    // No asset update or loan balance update should have occurred
+    expect(assetRepo.updateAsset).not.toHaveBeenCalled();
+    // updateAccountBalance should only be called once for the source account, not for the loan
+    const balanceCalls = vi.mocked(accountRepo.updateAccountBalance).mock.calls;
+    for (const call of balanceCalls) {
+      expect(call[0]).not.toBe('standalone-loan-1');
+    }
   });
 });

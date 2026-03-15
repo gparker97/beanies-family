@@ -495,6 +495,45 @@ const STRING_DEFS = {
     beanie: 'no active goals in this currency',
   },
 
+  // Transaction — Link Payment
+  'txLink.linkPayment': { en: 'Link Payment', beanie: 'link payment' },
+  'txLink.activity': { en: 'Activity', beanie: 'activity' },
+  'txLink.loan': { en: 'Loan', beanie: 'loan' },
+  'txLink.selectLoan': { en: 'Select a Loan', beanie: 'pick a loan' },
+  'txLink.noLoans': { en: 'No Active Loans', beanie: 'no loans around' },
+  'txLink.interestPortion': { en: 'Interest', beanie: 'interest' },
+  'txLink.principalPortion': { en: 'Principal', beanie: 'principal' },
+  'txLink.remainingBalance': { en: 'Remaining', beanie: 'remaining' },
+  'txLink.amortizationBreakdown': { en: 'Amortization Breakdown', beanie: 'payment split' },
+  'txLink.amountLocked': {
+    en: 'Amount set by linked payment',
+    beanie: 'amount set by linked payment',
+  },
+  'txLink.extraPaymentNote': {
+    en: 'Extra payment \u2014 full amount goes to principal',
+    beanie: 'extra payment \u2014 all goes to principal',
+  },
+  'txLink.linkedLoan': { en: 'Linked Loan', beanie: 'linked loan' },
+  'txLink.linkedTransactions': { en: 'Linked Transactions', beanie: 'linked transactions' },
+
+  // Recurring Payment Prompt
+  'recurringPrompt.createPayment': {
+    en: 'Create Monthly Payment',
+    beanie: 'create monthly payment',
+  },
+  'recurringPrompt.payFrom': { en: 'Pay From', beanie: 'pay from' },
+  'recurringPrompt.manualSetup': {
+    en: 'For per-session, weekly, or termly fees, set up recurring payments manually from transactions',
+    beanie: 'for per-session, weekly, or termly fees, set up recurring payments from transactions',
+  },
+
+  // Loan Account Fields
+  'loanAccount.details': { en: 'Loan Details', beanie: 'loan details' },
+  'loanAccount.interestRate': { en: 'Interest Rate (%)', beanie: 'interest rate (%)' },
+  'loanAccount.monthlyPayment': { en: 'Monthly Payment', beanie: 'monthly payment' },
+  'loanAccount.loanTerm': { en: 'Loan Term (Months)', beanie: 'loan term (months)' },
+  'loanAccount.startDate': { en: 'Loan Start Date', beanie: 'loan start date' },
+
   // Family
   'family.title': { en: 'Family', beanie: 'the pod' },
   'family.addMember': { en: 'Add Member', beanie: 'add a beanie' },

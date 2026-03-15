@@ -12,6 +12,7 @@ import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
+import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -67,7 +68,8 @@ const location = ref('');
 const feeSchedule = ref<FeeSchedule>('none');
 const feeAmount = ref<number | undefined>(undefined);
 const feeCurrency = ref('');
-const feePayerId = ref<string>('');
+const createRecurringPayment = ref(false);
+const feePayFromAccountId = ref('');
 const instructorName = ref('');
 const instructorContact = ref('');
 const reminderMinutes = ref<ReminderMinutes>(0);
@@ -123,7 +125,8 @@ const { isEditing, isSubmitting } = useFormModal(
       feeSchedule.value = activity.feeSchedule === 'none' ? 'per_session' : activity.feeSchedule;
       feeAmount.value = activity.feeAmount ?? 0;
       feeCurrency.value = activity.feeCurrency ?? settingsStore.displayCurrency;
-      feePayerId.value = activity.feePayerId ?? '';
+      createRecurringPayment.value = !!activity.linkedRecurringItemId;
+      feePayFromAccountId.value = activity.payFromAccountId ?? '';
       instructorName.value = activity.instructorName ?? '';
       instructorContact.value = activity.instructorContact ?? '';
       reminderMinutes.value = activity.reminderMinutes;
@@ -151,7 +154,8 @@ const { isEditing, isSubmitting } = useFormModal(
       feeSchedule.value = 'per_session';
       feeAmount.value = 0;
       feeCurrency.value = settingsStore.displayCurrency;
-      feePayerId.value = '';
+      createRecurringPayment.value = false;
+      feePayFromAccountId.value = '';
       instructorName.value = '';
       instructorContact.value = '';
       reminderMinutes.value = 0;
@@ -236,7 +240,6 @@ const canSave = computed(() => {
   if (!title.value.trim() || !date.value) return false;
   if (assigneeIds.value.length === 0) return false;
   if (hasCost.value && feeSchedule.value === 'none') return false;
-  if (hasCost.value && !feePayerId.value) return false;
   return true;
 });
 
@@ -278,7 +281,9 @@ function handleSave() {
     feeSchedule: hasCost.value ? feeSchedule.value : ('none' as FeeSchedule),
     feeAmount: hasCost.value ? feeAmount.value : undefined,
     feeCurrency: hasCost.value ? feeCurrency.value : undefined,
-    feePayerId: hasCost.value ? feePayerId.value || undefined : undefined,
+    ...(hasCost.value && feePayFromAccountId.value
+      ? { payFromAccountId: feePayFromAccountId.value }
+      : {}),
     instructorName: instructorName.value.trim() || undefined,
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,
@@ -477,10 +482,28 @@ function handleSave() {
             <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
           </FormFieldGroup>
 
-          <!-- Who Pays? (required if cost > 0) -->
-          <FormFieldGroup v-if="hasCost" :label="t('planner.field.feePayer')" required>
-            <FamilyChipPicker v-model="feePayerId" mode="single" compact />
-          </FormFieldGroup>
+          <!-- Recurring payment prompt (only for monthly/yearly fee schedules) -->
+          <RecurringPaymentPrompt
+            v-if="hasCost && (feeSchedule === 'monthly' || feeSchedule === 'yearly')"
+            v-model="createRecurringPayment"
+            :pay-from-account-id="feePayFromAccountId"
+            :payment-amount="feeAmount ?? 0"
+            :currency="feeCurrency || 'USD'"
+            :start-date="date"
+            :frequency="feeSchedule === 'yearly' ? 'yearly' : 'monthly'"
+            @update:pay-from-account-id="feePayFromAccountId = $event"
+          />
+          <p
+            v-if="
+              hasCost &&
+              feeSchedule !== 'none' &&
+              feeSchedule !== 'monthly' &&
+              feeSchedule !== 'yearly'
+            "
+            class="text-xs text-[var(--color-text-muted)]"
+          >
+            {{ t('recurringPrompt.manualSetup') }}
+          </p>
 
           <!-- Reminder chips -->
           <FormFieldGroup :label="t('planner.field.reminder')" optional>

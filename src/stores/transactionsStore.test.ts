@@ -1,9 +1,10 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAccountsStore } from './accountsStore';
+import { useAssetsStore } from './assetsStore';
 import { useGoalsStore } from './goalsStore';
 import { useTransactionsStore } from './transactionsStore';
-import type { Transaction, Account, Goal } from '@/types/models';
+import type { Transaction, Account, Asset, Goal } from '@/types/models';
 
 // Mock the transaction repository
 vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
@@ -24,6 +25,20 @@ vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   updateAccountBalance: vi.fn(),
 }));
 
+// Mock the asset repository
+vi.mock('@/services/automerge/repositories/assetRepository', () => ({
+  getAllAssets: vi.fn().mockResolvedValue([]),
+  getAssetById: vi.fn(),
+  createAsset: vi.fn(),
+  updateAsset: vi.fn(),
+  deleteAsset: vi.fn(),
+}));
+
+// Mock linkedRecurringItem (imported by assetsStore)
+vi.mock('@/utils/linkedRecurringItem', () => ({
+  syncEntityLinkedRecurringItem: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock the goal repository
 vi.mock('@/services/automerge/repositories/goalRepository', () => ({
   getAllGoals: vi.fn().mockResolvedValue([]),
@@ -40,6 +55,7 @@ vi.mock('@/services/automerge/repositories/goalRepository', () => ({
 
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -1069,5 +1085,311 @@ describe('transactionsStore - Goal Allocation Sync', () => {
 
     // 400 - 200 - 200 = 0
     expect(goalsStore.goals[0]!.currentAmount).toBe(0);
+  });
+});
+
+// --- Loan Balance Reduction ---
+
+const mockAssetWithLoan: Asset = {
+  id: 'asset-loan-1',
+  memberId: 'member-1',
+  type: 'real_estate',
+  name: 'Test House',
+  purchaseValue: 300000,
+  currentValue: 320000,
+  currency: 'USD',
+  includeInNetWorth: true,
+  loan: {
+    hasLoan: true,
+    loanAmount: 250000,
+    outstandingBalance: 200000,
+    interestRate: 6,
+    monthlyPayment: 1500,
+    loanTermMonths: 360,
+    lender: 'Test Bank',
+  },
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+const mockLoanAccount: Account = {
+  id: 'loan-account-1',
+  memberId: 'member-1',
+  name: 'Car Loan',
+  type: 'loan',
+  currency: 'USD',
+  balance: 15000, // outstanding balance for standalone loan accounts
+  institution: 'Test Credit Union',
+  isActive: true,
+  includeInNetWorth: true,
+  interestRate: 5,
+  monthlyPayment: 400,
+  loanTermMonths: 48,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+};
+
+describe('transactionsStore - Loan Balance Reduction', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('should apply amortization and reduce asset loan balance when creating expense with loanId', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+    const assetsStore = useAssetsStore();
+
+    // Setup: source account for the payment + asset with loan
+    accountsStore.accounts.push({ ...mockAccount });
+    assetsStore.assets.push({ ...mockAssetWithLoan, loan: { ...mockAssetWithLoan.loan! } });
+
+    // The created transaction (from repo)
+    const loanTx: Transaction = {
+      ...mockTransaction,
+      id: 'loan-tx-1',
+      type: 'expense',
+      amount: 1500,
+      category: 'loan_payment',
+      loanId: 'asset-loan-1',
+      recurringItemId: 'recurring-loan-1', // recurring → standard amortization
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(loanTx);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
+      ...mockAccount,
+      balance: mockAccount.balance - 1500,
+    });
+
+    // applyLoanPayment calls transactionRepo.updateTransaction to store amortization fields
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
+      ...loanTx,
+      loanInterestPortion: 1000,
+      loanPrincipalPortion: 500,
+    });
+
+    // assetsStore.updateAsset → assetRepo.updateAsset (reduce balance)
+    vi.mocked(assetRepo.updateAsset).mockImplementation(async (_id, input) => {
+      const updated = {
+        ...mockAssetWithLoan,
+        ...input,
+      } as Asset;
+      return updated;
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 1500,
+      currency: 'USD',
+      category: 'loan_payment',
+      date: '2024-01-15T00:00:00.000Z',
+      description: 'Mortgage Payment',
+      isReconciled: false,
+      loanId: 'asset-loan-1',
+      recurringItemId: 'recurring-loan-1',
+    });
+
+    // Verify amortization fields were stored on the transaction
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith('loan-tx-1', {
+      loanInterestPortion: expect.any(Number),
+      loanPrincipalPortion: expect.any(Number),
+    });
+
+    // Verify asset repo was called to reduce the loan balance
+    expect(assetRepo.updateAsset).toHaveBeenCalledWith(
+      'asset-loan-1',
+      expect.objectContaining({
+        loan: expect.objectContaining({
+          outstandingBalance: expect.any(Number),
+        }),
+      })
+    );
+  });
+
+  it('should reduce standalone loan account balance when creating expense with loanId', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    // Setup: source account + standalone loan account
+    accountsStore.accounts.push({ ...mockAccount });
+    accountsStore.accounts.push({ ...mockLoanAccount });
+
+    const loanTx: Transaction = {
+      ...mockTransaction,
+      id: 'loan-tx-2',
+      type: 'expense',
+      amount: 400,
+      category: 'loan_payment',
+      loanId: 'loan-account-1',
+      recurringItemId: 'recurring-car-loan', // recurring → standard amortization
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(loanTx);
+    // First updateAccount call: deduct payment from source account
+    // Second updateAccount call: reduce loan account balance
+    vi.mocked(accountRepo.updateAccount)
+      .mockResolvedValueOnce({ ...mockAccount, balance: 600 }) // source account after payment
+      .mockResolvedValueOnce({ ...mockLoanAccount, balance: 14662.5 }); // loan balance reduced
+
+    // applyLoanPayment stores amortization fields
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
+      ...loanTx,
+      loanInterestPortion: 62.5,
+      loanPrincipalPortion: 337.5,
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 400,
+      currency: 'USD',
+      category: 'loan_payment',
+      date: '2024-01-15T00:00:00.000Z',
+      description: 'Car Loan Payment',
+      isReconciled: false,
+      loanId: 'loan-account-1',
+      recurringItemId: 'recurring-car-loan',
+    });
+
+    // Verify amortization fields were stored
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith('loan-tx-2', {
+      loanInterestPortion: expect.any(Number),
+      loanPrincipalPortion: expect.any(Number),
+    });
+
+    // Verify loan account balance was updated (second updateAccount call)
+    expect(accountRepo.updateAccount).toHaveBeenCalledWith(
+      'loan-account-1',
+      expect.objectContaining({ balance: expect.any(Number) })
+    );
+  });
+
+  it('should restore loan balance when deleting a loan-linked transaction', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    // Setup: loan account with reduced balance after a payment was applied
+    const reducedLoanAccount = { ...mockLoanAccount, balance: 14662.5 };
+    accountsStore.accounts.push({ ...mockAccount, balance: 600 });
+    accountsStore.accounts.push(reducedLoanAccount);
+
+    // The existing transaction to delete (has principal portion stored)
+    const existingTx: Transaction = {
+      ...mockTransaction,
+      id: 'loan-tx-del',
+      type: 'expense',
+      amount: 400,
+      category: 'loan_payment',
+      loanId: 'loan-account-1',
+      loanInterestPortion: 62.5,
+      loanPrincipalPortion: 337.5,
+      recurringItemId: 'recurring-car-loan',
+    };
+    transactionsStore.transactions.push(existingTx);
+
+    vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+    // Reverse source account balance
+    vi.mocked(accountRepo.updateAccount)
+      .mockResolvedValueOnce({ ...mockAccount, balance: 1000 }) // source account restored
+      .mockResolvedValueOnce({ ...mockLoanAccount, balance: 15000 }); // loan balance restored
+
+    const result = await transactionsStore.deleteTransaction('loan-tx-del');
+
+    expect(result).toBe(true);
+    // Verify loan account balance was restored (principal added back)
+    expect(accountRepo.updateAccount).toHaveBeenCalledWith(
+      'loan-account-1',
+      expect.objectContaining({ balance: expect.any(Number) })
+    );
+  });
+
+  it('should use extra payment calculation for one-time payment (no recurringItemId)', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    // Setup: source account + standalone loan account
+    accountsStore.accounts.push({ ...mockAccount });
+    accountsStore.accounts.push({ ...mockLoanAccount });
+
+    // One-time transaction (no recurringItemId) → calculateExtraPayment
+    const extraTx: Transaction = {
+      ...mockTransaction,
+      id: 'extra-tx-1',
+      type: 'expense',
+      amount: 1000,
+      category: 'loan_payment',
+      loanId: 'loan-account-1',
+      // No recurringItemId — this is an extra payment
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(extraTx);
+    vi.mocked(accountRepo.updateAccount)
+      .mockResolvedValueOnce({ ...mockAccount, balance: 0 }) // source account
+      .mockResolvedValueOnce({ ...mockLoanAccount, balance: 14000 }); // loan balance reduced
+
+    // Extra payment: full amount goes to principal, no interest
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue({
+      ...extraTx,
+      loanInterestPortion: 0,
+      loanPrincipalPortion: 1000,
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 1000,
+      currency: 'USD',
+      category: 'loan_payment',
+      date: '2024-01-15T00:00:00.000Z',
+      description: 'Extra Car Loan Payment',
+      isReconciled: false,
+      loanId: 'loan-account-1',
+    });
+
+    // Verify the transaction was updated with extra payment (0 interest, full principal)
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith('extra-tx-1', {
+      loanInterestPortion: 0,
+      loanPrincipalPortion: 1000,
+    });
+  });
+
+  it('should not attempt balance reduction when loan has zero outstanding balance', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    // Setup: source account + loan account with zero balance (paid off)
+    accountsStore.accounts.push({ ...mockAccount });
+    const paidOffLoan = { ...mockLoanAccount, balance: 0 };
+    accountsStore.accounts.push(paidOffLoan);
+
+    const loanTx: Transaction = {
+      ...mockTransaction,
+      id: 'zero-loan-tx-1',
+      type: 'expense',
+      amount: 400,
+      category: 'loan_payment',
+      loanId: 'loan-account-1',
+      recurringItemId: 'recurring-car-loan',
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(loanTx);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
+      ...mockAccount,
+      balance: 600,
+    });
+
+    await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 400,
+      currency: 'USD',
+      category: 'loan_payment',
+      date: '2024-01-15T00:00:00.000Z',
+      description: 'Car Loan Payment',
+      isReconciled: false,
+      loanId: 'loan-account-1',
+      recurringItemId: 'recurring-car-loan',
+    });
+
+    // transactionRepo.updateTransaction should NOT be called for loan fields
+    // because the loan has zero balance — applyLoanPayment returns early
+    expect(transactionRepo.updateTransaction).not.toHaveBeenCalled();
   });
 });

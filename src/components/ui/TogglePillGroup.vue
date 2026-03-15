@@ -8,9 +8,12 @@ interface PillOption {
 interface Props {
   modelValue: string;
   options: PillOption[];
+  clearable?: boolean;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  clearable: false,
+});
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
@@ -40,7 +43,9 @@ function getSelectedClasses(variant?: string): string {
           ? getSelectedClasses(opt.variant)
           : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)] dark:text-gray-400 dark:hover:text-gray-200'
       "
-      @click="emit('update:modelValue', opt.value)"
+      @click="
+        emit('update:modelValue', props.clearable && modelValue === opt.value ? '' : opt.value)
+      "
     >
       {{ opt.label }}
     </button>

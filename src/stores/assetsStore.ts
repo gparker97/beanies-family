@@ -4,8 +4,15 @@ import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
+import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { useAccountsStore } from './accountsStore';
-import type { Asset, CreateAssetInput, UpdateAssetInput, AccountType } from '@/types/models';
+import type {
+  Asset,
+  CreateAssetInput,
+  UpdateAssetInput,
+  AccountType,
+  CurrencyCode,
+} from '@/types/models';
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
@@ -116,6 +123,36 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
+  async function syncLinkedRecurringPayment(asset: Asset) {
+    const enabled = !!(
+      asset.loan?.hasLoan &&
+      asset.loan?.payFromAccountId &&
+      asset.loan?.monthlyPayment
+    );
+    const newItemId = await syncEntityLinkedRecurringItem({
+      enabled,
+      existingItemId: asset.loan?.linkedRecurringItemId,
+      accountId: asset.loan?.payFromAccountId,
+      amount: asset.loan?.monthlyPayment ?? 0,
+      currency: asset.currency as CurrencyCode,
+      category: 'loan_payment',
+      description: `${asset.name} Loan Payment`,
+      loanId: asset.id,
+      startDate: asset.loan?.loanStartDate,
+    });
+    // Persist linkedRecurringItemId if changed (use repo to avoid recursive updateAsset)
+    if (newItemId !== asset.loan?.linkedRecurringItemId) {
+      const updatedLoan = {
+        ...asset.loan!,
+        ...(newItemId ? { linkedRecurringItemId: newItemId } : {}),
+      };
+      if (!newItemId) delete (updatedLoan as any).linkedRecurringItemId;
+      await assetRepo.updateAsset(asset.id, { loan: updatedLoan });
+      // Update local state
+      assets.value = assets.value.map((a) => (a.id === asset.id ? { ...a, loan: updatedLoan } : a));
+    }
+  }
+
   async function deleteLinkedLoanAccount(assetId: string) {
     const accountsStore = useAccountsStore();
     const existing = accountsStore.accounts.find((a) => a.linkedAssetId === assetId);
@@ -153,7 +190,10 @@ export const useAssetsStore = defineStore('assets', () => {
       assets.value = [...assets.value, asset];
       return asset;
     });
-    if (result) await syncLinkedLoanAccount(result);
+    if (result) {
+      await syncLinkedLoanAccount(result);
+      await syncLinkedRecurringPayment(result);
+    }
     return result ?? null;
   }
 
@@ -166,11 +206,25 @@ export const useAssetsStore = defineStore('assets', () => {
       }
       return updated;
     });
-    if (result) await syncLinkedLoanAccount(result);
+    if (result) {
+      await syncLinkedLoanAccount(result);
+      await syncLinkedRecurringPayment(result);
+    }
     return result ?? null;
   }
 
   async function deleteAsset(id: string): Promise<boolean> {
+    const assetToDelete = assets.value.find((a) => a.id === id);
+    if (assetToDelete?.loan?.linkedRecurringItemId) {
+      await syncEntityLinkedRecurringItem({
+        enabled: false,
+        existingItemId: assetToDelete.loan.linkedRecurringItemId,
+        amount: 0,
+        currency: assetToDelete.currency as CurrencyCode,
+        category: '',
+        description: '',
+      });
+    }
     await deleteLinkedLoanAccount(id);
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await assetRepo.deleteAsset(id);
