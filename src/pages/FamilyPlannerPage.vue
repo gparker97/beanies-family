@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
@@ -15,16 +16,23 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import { confirm } from '@/composables/useConfirm';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
+  CurrencyCode,
   TodoItem,
 } from '@/types/models';
 
 const { t } = useTranslation();
+const router = useRouter();
 const { canEditActivities } = usePermissions();
 const activityStore = useActivityStore();
+const accountsStore = useAccountsStore();
+const recurringStore = useRecurringStore();
 const memberFilterStore = useMemberFilterStore();
 const {
   viewingActivity,
@@ -95,18 +103,59 @@ function handleViewOpenEdit(activity: FamilyActivity) {
 async function handleSave(
   data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }
 ) {
+  // Track whether a new linked payment is being created
+  const isAddingPayment =
+    'id' in data &&
+    'data' in data &&
+    data.data.payFromAccountId &&
+    !editingActivity.value?.linkedRecurringItemId;
+
   if ('id' in data && 'data' in data) {
-    // Recurring occurrence edit — defer scope to save time
-    if (editingOccurrenceDate.value && editingActivity.value?.recurrence !== 'none') {
+    if (
+      editingOccurrenceDate.value &&
+      editingActivity.value?.recurrence !== 'none' &&
+      !isAddingPayment
+    ) {
+      // Recurring occurrence edit (not payment-related) — show scope modal
       const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
       if (!saved) return; // cancelled — keep modal open
     } else {
+      // Direct update: non-recurring, OR adding a linked payment (always applies to template)
       await activityStore.updateActivity(data.id, data.data);
     }
   } else {
     await activityStore.createActivity(data as CreateFamilyActivityInput);
   }
+
   showModal.value = false;
+
+  // Show success confirmation when a new linked payment was created
+  if (isAddingPayment) {
+    await nextTick(); // let store sync complete
+    const savedActivity = activityStore.activities.find(
+      (a) => a.id === (data as { id: string }).id
+    );
+    if (savedActivity?.linkedRecurringItemId) {
+      const ri = recurringStore.getRecurringItemById(savedActivity.linkedRecurringItemId);
+      const acct = accountsStore.accounts.find((a) => a.id === savedActivity.payFromAccountId);
+      if (ri && acct) {
+        const amt = formatCurrencyWithCode(ri.amount, ri.currency as CurrencyCode);
+        const freq = ri.frequency === 'yearly' ? '/yr' : '/mo';
+        const confirmed = await confirm({
+          title: 'recurringPrompt.paymentCreated',
+          message: 'recurringPrompt.paymentCreatedDetail',
+          detail: `${amt}${freq} from ${acct.name}`,
+          variant: 'info',
+          confirmLabel: 'recurringPrompt.viewTransactions',
+          cancelLabel: 'action.close',
+        });
+        if (confirmed) {
+          router.push('/transactions');
+        }
+      }
+    }
+  }
+
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
 }
