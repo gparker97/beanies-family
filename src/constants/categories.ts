@@ -705,3 +705,52 @@ export function getGroupName(categoryId: string): string {
 export function makeGroupBudgetId(groupName: string): string {
   return `${GROUP_PREFIX}${groupName}`;
 }
+
+/**
+ * Map an activity category to a suggested transaction expense category.
+ * Returns the transaction category ID, or undefined if no mapping exists.
+ */
+export function activityCategoryToExpenseCategory(activityCategory: string): string | undefined {
+  const mapping: Record<string, string> = {
+    // Lessons → Music/Art/Dance Lessons
+    piano: 'music_lessons',
+    guitar: 'music_lessons',
+    trumpet: 'music_lessons',
+    drum: 'music_lessons',
+    music: 'music_lessons',
+    art: 'art_lessons',
+    dance: 'dance_lessons',
+    swimming: 'other_lessons',
+    other_lesson: 'other_lessons',
+    // Educational → Tuition
+    tutoring: 'tuition',
+    math: 'tuition',
+    language: 'tuition',
+    science: 'tuition',
+    other_educational: 'other_education',
+    // Sports → Sports categories
+    tennis: 'sports_team',
+    badminton: 'sports_team',
+    golf_activity: 'golf',
+    baseball: 'sports_team',
+    gym_activity: 'gym',
+    yoga_activity: 'yoga',
+    gymnastics: 'sports_team',
+    other_sports_activity: 'other_sports',
+    // Competitions → Education
+    spelling_bee: 'other_education',
+    math_competition: 'other_education',
+    cubing: 'other_education',
+    other_competition: 'other_education',
+    // School → School Fees
+    after_school: 'school_fees',
+    school_recital: 'school_fees',
+    other_school: 'school_fees',
+    // Fun → Entertainment
+    birthday: 'entertainment',
+    wedding: 'entertainment',
+    bar_mitzvah: 'entertainment',
+    other_celebration: 'entertainment',
+  };
+  return mapping[activityCategory];
+}

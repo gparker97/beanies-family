@@ -1,4 +1,5 @@
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
@@ -13,6 +14,7 @@ import {
   extractDatePart,
 } from '@/utils/date';
 import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
+import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
 
 export interface ProcessResult {
   processed: number;
@@ -235,6 +237,19 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     }
   }
 
+  // Loan payment allocation (compute amortization at generation time)
+  if (item.loanId) {
+    const allAssets = await assetRepo.getAllAssets();
+    const allAccounts = await accountRepo.getAllAccounts();
+    const loan = findLoanDetails(item.loanId, allAssets, allAccounts);
+    if (loan && loan.outstandingBalance > 0) {
+      const result = calculateAmortization(loan.outstandingBalance, loan.interestRate, item.amount);
+      input.loanId = item.loanId;
+      input.loanInterestPortion = result.interestPortion;
+      input.loanPrincipalPortion = result.principalPortion;
+    }
+  }
+
   try {
     await transactionRepo.createTransaction(input);
 
@@ -253,6 +268,30 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
           input.goalId,
           goal.currentAmount + input.goalAllocApplied
         );
+      }
+    }
+
+    // Reduce loan balance
+    if (input.loanPrincipalPortion && input.loanId) {
+      const allAssets = await assetRepo.getAllAssets();
+      const allAccounts = await accountRepo.getAllAccounts();
+      const loan = findLoanDetails(input.loanId, allAssets, allAccounts);
+      if (loan) {
+        const newBalance = Math.max(0, loan.outstandingBalance - input.loanPrincipalPortion);
+        if (loan.type === 'asset') {
+          const asset = allAssets.find((a) => a.id === loan.entityId);
+          if (asset?.loan) {
+            await assetRepo.updateAsset(loan.entityId, {
+              loan: { ...asset.loan, outstandingBalance: newBalance },
+            });
+            // syncLinkedLoanAccount won't fire from repo call — sync linked account manually
+            if (loan.linkedAccountId) {
+              await accountRepo.updateAccountBalance(loan.linkedAccountId, newBalance);
+            }
+          }
+        } else {
+          await accountRepo.updateAccountBalance(loan.entityId, newBalance);
+        }
       }
     }
 

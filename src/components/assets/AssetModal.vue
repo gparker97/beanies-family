@@ -7,6 +7,7 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
+import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { BaseCombobox } from '@/components/ui';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -105,6 +106,8 @@ const loanTermMonths = ref<number | undefined>(undefined);
 const lender = ref<string | undefined>(undefined);
 const lenderCountry = ref<string | undefined>(undefined);
 const loanStartDate = ref('');
+const createRecurringPayment = ref(false);
+const loanPayFromAccountId = ref('');
 
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
@@ -134,6 +137,8 @@ const { isEditing, isSubmitting } = useFormModal(
       lender.value = asset.loan?.lender;
       lenderCountry.value = asset.loan?.lenderCountry;
       loanStartDate.value = asset.loan?.loanStartDate ?? '';
+      createRecurringPayment.value = !!asset.loan?.linkedRecurringItemId;
+      loanPayFromAccountId.value = asset.loan?.payFromAccountId ?? '';
     },
     onNew: () => {
       assetEmoji.value = props.defaults?.type ? typeToEmoji[props.defaults.type] || '' : '';
@@ -157,6 +162,8 @@ const { isEditing, isSubmitting } = useFormModal(
       lender.value = undefined;
       lenderCountry.value = undefined;
       loanStartDate.value = '';
+      createRecurringPayment.value = false;
+      loanPayFromAccountId.value = '';
     },
   }
 );
@@ -188,6 +195,9 @@ function cleanLoan(): AssetLoan {
   if (lender.value) cleaned.lender = lender.value;
   if (lenderCountry.value) cleaned.lenderCountry = lenderCountry.value;
   if (loanStartDate.value) cleaned.loanStartDate = loanStartDate.value;
+  if (loanPayFromAccountId.value) cleaned.payFromAccountId = loanPayFromAccountId.value;
+  if (props.asset?.loan?.linkedRecurringItemId)
+    cleaned.linkedRecurringItemId = props.asset.loan.linkedRecurringItemId;
   return cleaned as AssetLoan;
 }
 
@@ -411,6 +421,16 @@ function handleDelete() {
       <FormFieldGroup :label="t('assets.loanStartDate')">
         <BaseInput v-model="loanStartDate" type="date" />
       </FormFieldGroup>
+
+      <RecurringPaymentPrompt
+        v-if="hasLoan && monthlyPayment && monthlyPayment > 0"
+        v-model="createRecurringPayment"
+        :pay-from-account-id="loanPayFromAccountId"
+        :payment-amount="monthlyPayment ?? 0"
+        :currency="currency"
+        :start-date="loanStartDate"
+        @update:pay-from-account-id="loanPayFromAccountId = $event"
+      />
     </div>
   </BeanieFormModal>
 </template>

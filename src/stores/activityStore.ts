@@ -3,6 +3,9 @@ import { ref, computed } from 'vue';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
+import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
+import { activityCategoryToExpenseCategory } from '@/constants/categories';
+import { useSettingsStore } from './settingsStore';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
 import { ACTIVITY_COLORS, getActivityCategoryColor } from '@/constants/activityCategories';
@@ -11,6 +14,7 @@ import type {
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
   ISODateString,
+  CurrencyCode,
 } from '@/types/models';
 
 /** Re-export for backwards compatibility with components that import from here. */
@@ -166,6 +170,32 @@ export const useActivityStore = defineStore('activities', () => {
     return results.slice(0, 30);
   });
 
+  // ── Linked recurring payment sync ──────────────────────────────────────────
+  async function syncLinkedRecurringPayment(activity: FamilyActivity) {
+    const enabled = !!(activity.payFromAccountId && activity.feeAmount);
+    const settingsStore = useSettingsStore();
+    const freq = activity.feeSchedule === 'yearly' ? 'yearly' : 'monthly';
+    const newItemId = await syncEntityLinkedRecurringItem({
+      enabled,
+      existingItemId: activity.linkedRecurringItemId,
+      accountId: activity.payFromAccountId,
+      amount: activity.feeAmount ?? 0,
+      currency: (activity.feeCurrency || settingsStore.displayCurrency) as CurrencyCode,
+      category: activityCategoryToExpenseCategory(activity.category) || 'other_lessons',
+      description: `${activity.title} Fee`,
+      startDate: activity.date,
+      frequency: freq,
+    });
+    if (newItemId !== activity.linkedRecurringItemId) {
+      await activityRepo.updateActivity(activity.id, {
+        ...(newItemId ? { linkedRecurringItemId: newItemId } : {}),
+      });
+      activities.value = activities.value.map((a) =>
+        a.id === activity.id ? { ...a, linkedRecurringItemId: newItemId } : a
+      );
+    }
+  }
+
   // Actions
   async function loadActivities() {
     await wrapAsync(isLoading, error, async () => {
@@ -180,6 +210,7 @@ export const useActivityStore = defineStore('activities', () => {
       activities.value = [...activities.value, activity];
       return activity;
     });
+    if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
 
@@ -195,6 +226,7 @@ export const useActivityStore = defineStore('activities', () => {
       }
       return updated;
     });
+    if (result) await syncLinkedRecurringPayment(result);
     return result ?? null;
   }
 

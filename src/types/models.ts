@@ -125,6 +125,12 @@ export interface Account {
   isActive: boolean;
   includeInNetWorth: boolean;
   linkedAssetId?: UUID; // Links a loan account to its source asset
+  interestRate?: number; // Annual interest rate (loan accounts only)
+  monthlyPayment?: number; // Monthly payment amount (loan accounts only)
+  loanTermMonths?: number; // Loan term in months (loan accounts only)
+  loanStartDate?: ISODateString; // Loan start date (loan accounts only)
+  payFromAccountId?: UUID; // Account to pay from for linked recurring payment
+  linkedRecurringItemId?: UUID; // Auto-created recurring payment item
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -145,6 +151,9 @@ export interface Transaction {
   accountId: UUID;
   toAccountId?: UUID; // For transfers
   activityId?: UUID; // Link transaction to an activity
+  loanId?: UUID; // Link transaction to an asset loan (by asset ID) or loan account (by account ID)
+  loanInterestPortion?: number; // Interest portion from amortization calculation
+  loanPrincipalPortion?: number; // Principal portion from amortization calculation
   goalId?: UUID; // Link transaction to a goal for progress tracking
   goalAllocMode?: 'percentage' | 'fixed'; // How to compute allocation
   goalAllocValue?: number; // 20 for 20%, or 200 for $200 fixed
@@ -181,6 +190,7 @@ export interface RecurringItem {
   goalId?: UUID; // Link to a goal for progress tracking
   goalAllocMode?: 'percentage' | 'fixed'; // How to compute allocation
   goalAllocValue?: number; // 20 for 20%, or 200 for $200 fixed
+  loanId?: UUID; // Link to an asset loan or loan account for auto-amortization
   lastProcessedDate?: ISODateString;
   isActive: boolean;
   createdAt: ISODateString;
@@ -213,6 +223,8 @@ export interface AssetLoan {
   lender?: string;
   lenderCountry?: string;
   loanStartDate?: ISODateString;
+  payFromAccountId?: UUID; // Account to pay from for linked recurring payment
+  linkedRecurringItemId?: UUID; // Auto-created recurring payment item
 }
 
 export interface Asset {
@@ -381,7 +393,10 @@ export interface FamilyActivity {
   feeSchedule: FeeSchedule;
   feeAmount?: number;
   feeCurrency?: CurrencyCode;
+  /** @deprecated Use payFromAccountId instead — the account's memberId identifies the payer */
   feePayerId?: UUID;
+  payFromAccountId?: UUID; // Account to pay from for linked recurring payment
+  linkedRecurringItemId?: UUID; // Auto-created recurring payment item
 
   // Instructor / Coach
   instructorName?: string;

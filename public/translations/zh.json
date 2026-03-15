@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-15",
-    "translationCount": 1529
+    "translationCount": 1552
   },
   "translations": {
     "app.name": {
@@ -7552,13 +7552,13 @@
       "lastUpdated": "2026-03-15"
     },
     "planner.category.baseball": {
-      "translation": "棒球/垒球",
-      "hash": "73t2d2",
+      "translation": "棒球",
+      "hash": "re7ekw",
       "lastUpdated": "2026-03-15"
     },
     "planner.category.gym_activity": {
-      "translation": "健身房/健身中心",
-      "hash": "84je6q",
+      "translation": "培训",
+      "hash": "m697ne",
       "lastUpdated": "2026-03-15"
     },
     "planner.category.yoga_activity": {
@@ -7649,6 +7649,121 @@
     "planner.category.other_celebration": {
       "translation": "其他庆祝活动",
       "hash": "dqrmue",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.linkPayment": {
+      "translation": "关联付款",
+      "hash": "y6eeow",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.loan": {
+      "translation": "借款",
+      "hash": "1evps",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.selectLoan": {
+      "translation": "选择贷款",
+      "hash": "gklqer",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.noLoans": {
+      "translation": "无有效贷款",
+      "hash": "ainnbc",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.interestPortion": {
+      "translation": "利息",
+      "hash": "ai396y",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.principalPortion": {
+      "translation": "校长",
+      "hash": "369n9q",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.remainingBalance": {
+      "translation": "剩余",
+      "hash": "ni4eui",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.amortizationBreakdown": {
+      "translation": "摊销明细",
+      "hash": "kfbr28",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.amountLocked": {
+      "translation": "关联付款设置的金额",
+      "hash": "g9uoe6",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.extraPaymentNote": {
+      "translation": "额外付款\\ u2014全额转入本金",
+      "hash": "b4usyo",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.linkedLoan": {
+      "translation": "关联贷款",
+      "hash": "4yzamv",
+      "lastUpdated": "2026-03-15"
+    },
+    "txLink.linkedTransactions": {
+      "translation": "关联交易",
+      "hash": "romz9g",
+      "lastUpdated": "2026-03-15"
+    },
+    "recurringPrompt.createPayment": {
+      "translation": "创建每月付款",
+      "hash": "22euz5",
+      "lastUpdated": "2026-03-15"
+    },
+    "recurringPrompt.payFrom": {
+      "translation": "付款人",
+      "hash": "mqtcv6",
+      "lastUpdated": "2026-03-15"
+    },
+    "recurringPrompt.manualSetup": {
+      "translation": "对于每会话、每周或每学期费用，请通过交易手动设置定期付款",
+      "hash": "1ww1h2",
+      "lastUpdated": "2026-03-15"
+    },
+    "loanAccount.details": {
+      "translation": "借款资料",
+      "hash": "aq2pri",
+      "lastUpdated": "2026-03-15"
+    },
+    "loanAccount.interestRate": {
+      "translation": "利率(%)",
+      "hash": "g31neq",
+      "lastUpdated": "2026-03-15"
+    },
+    "loanAccount.monthlyPayment": {
+      "translation": "每月付款",
+      "hash": "hujk99",
+      "lastUpdated": "2026-03-15"
+    },
+    "loanAccount.loanTerm": {
+      "translation": "贷款期限（月）",
+      "hash": "lc6bam",
+      "lastUpdated": "2026-03-15"
+    },
+    "loanAccount.startDate": {
+      "translation": "开始日期",
+      "hash": "109ds4",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.gymnastics": {
+      "translation": "體操",
+      "hash": "wwhw3u",
+      "lastUpdated": "2026-03-15"
+    },
+    "planner.category.swimming": {
+      "translation": "游泳",
+      "hash": "fydqb",
       "lastUpdated": "2026-03-15"
     }
   }

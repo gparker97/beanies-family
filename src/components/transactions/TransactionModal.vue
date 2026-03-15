@@ -9,10 +9,14 @@ import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityLinkDropdown from '@/components/ui/ActivityLinkDropdown.vue';
+import LoanLinkDropdown from '@/components/ui/LoanLinkDropdown.vue';
 import EntityLinkDropdown from '@/components/ui/EntityLinkDropdown.vue';
+import AmortizationBreakdown from '@/components/ui/AmortizationBreakdown.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -29,6 +33,8 @@ import type {
 } from '@/types/models';
 import { toDateInputValue, formatNookDate } from '@/utils/date';
 import { computeGoalAllocRaw } from '@/utils/finance';
+import { calculateAmortization, calculateExtraPayment, findLoanDetails } from '@/utils/loanPayment';
+import { activityCategoryToExpenseCategory } from '@/constants/categories';
 
 const props = defineProps<{
   open: boolean;
@@ -47,6 +53,8 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const accountsStore = useAccountsStore();
+const assetsStore = useAssetsStore();
+const activityStore = useActivityStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
 
@@ -62,6 +70,8 @@ const startDate = ref(todayStr());
 const endDate = ref('');
 const accountId = ref('');
 const activityId = ref<string | undefined>(undefined);
+const linkType = ref<'' | 'activity' | 'loan'>('');
+const loanId = ref<string | undefined>(undefined);
 const goalId = ref<string | undefined>(undefined);
 const goalAllocMode = ref<'percentage' | 'fixed'>('percentage');
 const goalAllocValue = ref<number | undefined>(undefined);
@@ -104,6 +114,38 @@ function todayStr() {
 
 const isEditingRecurring = computed(() => !!props.recurringItem);
 
+const linkedLoan = computed(() => {
+  if (!loanId.value) return null;
+  return findLoanDetails(loanId.value, assetsStore.assets, accountsStore.accounts);
+});
+
+const amortizationPreview = computed(() => {
+  if (!linkedLoan.value || linkedLoan.value.outstandingBalance <= 0) return null;
+  if (recurrenceMode.value === 'recurring') {
+    return calculateAmortization(
+      linkedLoan.value.outstandingBalance,
+      linkedLoan.value.interestRate,
+      amount.value ?? linkedLoan.value.monthlyPayment
+    );
+  }
+  return calculateExtraPayment(linkedLoan.value.outstandingBalance, amount.value ?? 0);
+});
+
+const isAmountLocked = computed(() => {
+  if (
+    linkType.value === 'loan' &&
+    linkedLoan.value &&
+    linkedLoan.value.monthlyPayment > 0 &&
+    recurrenceMode.value === 'recurring'
+  )
+    return true;
+  if (linkType.value === 'activity' && activityId.value) {
+    const activity = activityStore?.activities?.find((a: any) => a.id === activityId.value);
+    if (activity?.feeAmount) return true;
+  }
+  return false;
+});
+
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
   () => props.transaction ?? props.recurringItem ?? null,
@@ -126,6 +168,13 @@ const { isEditing, isSubmitting } = useFormModal(
         endDate.value = item.endDate ? item.endDate.substring(0, 10) : '';
         accountId.value = item.accountId;
         activityId.value = undefined;
+        if ((item as any).loanId) {
+          linkType.value = 'loan';
+          loanId.value = (item as any).loanId;
+        } else {
+          linkType.value = '';
+          loanId.value = undefined;
+        }
         goalId.value = item.goalId;
         goalAllocMode.value = item.goalAllocMode || 'percentage';
         goalAllocValue.value = item.goalAllocValue;
@@ -142,6 +191,15 @@ const { isEditing, isSubmitting } = useFormModal(
         date.value = transaction.date;
         accountId.value = transaction.accountId;
         activityId.value = transaction.activityId;
+        if ((transaction as any).loanId) {
+          linkType.value = 'loan';
+          loanId.value = (transaction as any).loanId;
+        } else if (transaction.activityId) {
+          linkType.value = 'activity';
+        } else {
+          linkType.value = '';
+          loanId.value = undefined;
+        }
         goalId.value = transaction.goalId;
         goalAllocMode.value = transaction.goalAllocMode || 'percentage';
         goalAllocValue.value = transaction.goalAllocValue;
@@ -170,6 +228,8 @@ const { isEditing, isSubmitting } = useFormModal(
       endDate.value = '';
       accountId.value = iv?.accountId ?? getLastAccountId();
       activityId.value = undefined;
+      linkType.value = '';
+      loanId.value = undefined;
       goalId.value = undefined;
       goalAllocMode.value = 'percentage';
       goalAllocValue.value = undefined;
@@ -264,12 +324,17 @@ const goalAllocPreview = computed(() => {
   };
 });
 
-// Clear goal fields when switching to expense
+// Clear goal fields when switching to expense, clear link data when switching to income
 watch(direction, (newDir) => {
   if (newDir === 'out') {
     goalId.value = undefined;
     goalAllocMode.value = 'percentage';
     goalAllocValue.value = undefined;
+  }
+  if (newDir === 'in') {
+    linkType.value = '';
+    loanId.value = undefined;
+    activityId.value = undefined;
   }
 });
 
@@ -278,6 +343,45 @@ watch(goalId, (newId) => {
   if (!newId) {
     goalAllocMode.value = 'percentage';
     goalAllocValue.value = undefined;
+  }
+});
+
+// Mutual exclusivity: activity vs loan link
+watch(linkType, (val) => {
+  if (val !== 'activity') activityId.value = undefined;
+  if (val !== 'loan') loanId.value = undefined;
+});
+
+// Set amount, category, and currency from linked entity
+watch([loanId, activityId], () => {
+  if (
+    loanId.value &&
+    linkedLoan.value &&
+    linkedLoan.value.monthlyPayment > 0 &&
+    recurrenceMode.value === 'recurring'
+  ) {
+    amount.value = linkedLoan.value.monthlyPayment;
+    currency.value = linkedLoan.value.currency;
+    direction.value = 'out';
+  }
+  // Auto-set category, amount, and currency when activity is linked
+  if (activityId.value) {
+    const activity = activityStore?.activities?.find((a: any) => a.id === activityId.value);
+    if (activity) {
+      const suggestedCategory = activityCategoryToExpenseCategory(activity.category);
+      if (suggestedCategory) {
+        category.value = suggestedCategory;
+      }
+      // Also set amount from activity fee
+      if (activity.feeAmount) {
+        amount.value = activity.feeAmount;
+      }
+      // Lock currency to activity's currency
+      if (activity.feeCurrency) {
+        currency.value = activity.feeCurrency;
+      }
+      direction.value = 'out';
+    }
   }
 });
 
@@ -303,6 +407,7 @@ function handleSave() {
         endDate: endDate.value || undefined,
         isActive: isActive.value,
         lastProcessedDate: props.recurringItem?.lastProcessedDate,
+        ...(loanId.value ? { loanId: loanId.value } : {}),
         goalId: goalId.value || undefined,
         goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
         goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
@@ -327,6 +432,7 @@ function handleSave() {
         startDate: startDate.value || toDateInputValue(new Date()),
         endDate: endDate.value || undefined,
         isActive: true,
+        ...(loanId.value ? { loanId: loanId.value } : {}),
         goalId: goalId.value || undefined,
         goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
         goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
@@ -338,7 +444,8 @@ function handleSave() {
     // One-time transaction (create or edit)
     const data = {
       accountId: accountId.value,
-      activityId: activityId.value || undefined,
+      ...(activityId.value ? { activityId: activityId.value } : {}),
+      ...(loanId.value ? { loanId: loanId.value } : {}),
       goalId: goalId.value || undefined,
       goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
       goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
@@ -460,7 +567,19 @@ function handleDelete() {
 
     <!-- 4. Amount + Currency (inline row) -->
     <FormFieldGroup :label="t('form.amount')" required>
-      <CurrencyAmountInput v-model:amount="amount" v-model:currency="currency" />
+      <!-- Amount field with optional locking -->
+      <div v-if="isAmountLocked" class="space-y-1">
+        <div
+          class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+        >
+          <span class="font-outfit text-[1.8rem] font-bold text-[var(--color-text)]">
+            {{ currency }} {{ amount?.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+          </span>
+          <span class="text-sm text-[var(--color-text-muted)]">🔒</span>
+        </div>
+        <p class="text-xs text-[var(--color-text-muted)]">{{ t('txLink.amountLocked') }}</p>
+      </div>
+      <CurrencyAmountInput v-else v-model:amount="amount" v-model:currency="currency" />
     </FormFieldGroup>
 
     <!-- 5. Category chips (two-level drill-down) -->
@@ -551,13 +670,6 @@ function handleDelete() {
           </div>
           <BaseInput v-model="endDate" :label="`${t('form.endDate')} (optional)`" type="date" />
         </div>
-        <FormFieldGroup
-          v-if="!isEditingRecurring && direction === 'out'"
-          :label="t('modal.linkToActivity')"
-          optional
-        >
-          <ActivityLinkDropdown v-model="activityId" />
-        </FormFieldGroup>
       </div>
     </ConditionalSection>
 
@@ -567,9 +679,42 @@ function handleDelete() {
         <FormFieldGroup :label="t('form.date')">
           <BaseInput v-model="date" type="date" required />
         </FormFieldGroup>
-        <FormFieldGroup v-if="direction === 'out'" :label="t('modal.linkToActivity')" optional>
+      </div>
+    </ConditionalSection>
+
+    <!-- 8a. Link Payment (outgoing only) -->
+    <ConditionalSection :show="direction === 'out' && !isEditingRecurring">
+      <div class="space-y-3">
+        <FormFieldGroup :label="t('txLink.linkPayment')" optional>
+          <TogglePillGroup
+            v-model="linkType"
+            :options="[
+              { value: 'activity', label: '📋 ' + t('txLink.activity') },
+              { value: 'loan', label: '🏦 ' + t('txLink.loan') },
+            ]"
+            clearable
+          />
+        </FormFieldGroup>
+
+        <FormFieldGroup v-if="linkType === 'activity'" :label="t('txLink.activity')">
           <ActivityLinkDropdown v-model="activityId" />
         </FormFieldGroup>
+
+        <FormFieldGroup v-if="linkType === 'loan'" :label="t('txLink.loan')">
+          <LoanLinkDropdown v-model="loanId" />
+        </FormFieldGroup>
+
+        <AmortizationBreakdown
+          v-if="loanId && amortizationPreview"
+          :interest="amortizationPreview.interestPortion"
+          :principal="amortizationPreview.principalPortion"
+          :remaining="amortizationPreview.newBalance"
+          :currency="currency"
+        >
+          <p v-if="recurrenceMode === 'one-time'" class="text-xs text-[var(--color-text-muted)]">
+            {{ t('txLink.extraPaymentNote') }}
+          </p>
+        </AmortizationBreakdown>
       </div>
     </ConditionalSection>
 

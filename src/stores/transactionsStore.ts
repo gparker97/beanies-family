@@ -3,11 +3,13 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { computeGoalAllocRaw, calculateBalanceAdjustment } from '@/utils/finance';
+import { calculateAmortization, calculateExtraPayment, findLoanDetails } from '@/utils/loanPayment';
 import type {
   Transaction,
   CreateTransactionInput,
@@ -230,6 +232,75 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return applied;
   }
 
+  /**
+   * Apply loan payment: calculate amortization, store interest/principal on tx, reduce loan balance.
+   * Recurring payments use standard amortization; one-time payments are extra (full to principal).
+   */
+  async function applyLoanPayment(transaction: Transaction): Promise<void> {
+    if (!transaction.loanId) return;
+    try {
+      const accountsStore = useAccountsStore();
+      const assetsStore = useAssetsStore();
+      const loan = findLoanDetails(transaction.loanId, assetsStore.assets, accountsStore.accounts);
+      if (!loan || loan.outstandingBalance <= 0) return;
+
+      // Recurring → standard amortization, one-time → extra payment (full to principal)
+      const result = transaction.recurringItemId
+        ? calculateAmortization(loan.outstandingBalance, loan.interestRate, transaction.amount)
+        : calculateExtraPayment(loan.outstandingBalance, transaction.amount);
+
+      // Store amortization fields on the transaction
+      await transactionRepo.updateTransaction(transaction.id, {
+        loanInterestPortion: result.interestPortion,
+        loanPrincipalPortion: result.principalPortion,
+      });
+      transaction.loanInterestPortion = result.interestPortion;
+      transaction.loanPrincipalPortion = result.principalPortion;
+
+      // Reduce the loan balance
+      if (loan.type === 'asset') {
+        const asset = assetsStore.getAssetById(loan.entityId);
+        if (asset?.loan) {
+          await assetsStore.updateAsset(loan.entityId, {
+            loan: { ...asset.loan, outstandingBalance: result.newBalance },
+          });
+        }
+      } else {
+        await accountsStore.updateAccount(loan.entityId, { balance: result.newBalance });
+      }
+    } catch (e) {
+      console.error('Failed to apply loan payment:', e);
+    }
+  }
+
+  /**
+   * Reverse a loan payment: add principal portion back to the loan balance.
+   */
+  async function reverseLoanPayment(transaction: Transaction): Promise<void> {
+    if (!transaction.loanId || !transaction.loanPrincipalPortion) return;
+    try {
+      const accountsStore = useAccountsStore();
+      const assetsStore = useAssetsStore();
+      const loan = findLoanDetails(transaction.loanId, assetsStore.assets, accountsStore.accounts);
+      if (!loan) return;
+
+      const restoredBalance = loan.outstandingBalance + transaction.loanPrincipalPortion;
+
+      if (loan.type === 'asset') {
+        const asset = assetsStore.getAssetById(loan.entityId);
+        if (asset?.loan) {
+          await assetsStore.updateAsset(loan.entityId, {
+            loan: { ...asset.loan, outstandingBalance: restoredBalance },
+          });
+        }
+      } else {
+        await accountsStore.updateAccount(loan.entityId, { balance: restoredBalance });
+      }
+    } catch (e) {
+      console.error('Failed to reverse loan payment:', e);
+    }
+  }
+
   // Actions
   async function loadTransactions() {
     await wrapAsync(isLoading, error, async () => {
@@ -259,6 +330,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
       // Apply goal allocation (if linked)
       await applyGoalAllocation(transaction);
+
+      // Apply loan payment (if linked)
+      await applyLoanPayment(transaction);
 
       return transaction;
     });
@@ -315,10 +389,16 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
           // Reverse old goal allocation
           await adjustGoalProgress(original.goalId, original.goalAllocApplied, true);
+
+          // Reverse old loan payment
+          await reverseLoanPayment(original);
         }
 
         // Apply new goal allocation (if linked)
         await applyGoalAllocation(updated);
+
+        // Apply new loan payment (if linked)
+        await applyLoanPayment(updated);
       }
       return updated;
     });
@@ -351,6 +431,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
           // Reverse goal allocation
           await adjustGoalProgress(transaction.goalId, transaction.goalAllocApplied, true);
+
+          // Reverse loan payment
+          await reverseLoanPayment(transaction);
         }
       }
       return success;

@@ -7,6 +7,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate, addHourToTime, toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -47,6 +48,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
+const transactionsStore = useTransactionsStore();
 const { getMemberName } = useMemberInfo();
 
 // Live-lookup from store so display stays reactive after inline edits
@@ -341,6 +343,11 @@ const daysOfWeekLabel = computed(() => {
 const endDateFormatted = computed(() => {
   if (!activity.value?.recurrenceEndDate) return null;
   return formatDate(activity.value.recurrenceEndDate);
+});
+
+const linkedTransactions = computed(() => {
+  if (!props.activity) return [];
+  return transactionsStore.transactions.filter((tx) => tx.activityId === props.activity!.id);
 });
 
 const feeLabel = computed(() => {
@@ -1106,6 +1113,28 @@ async function confirmReschedule() {
           </template>
         </InlineEditField>
       </FormFieldGroup>
+
+      <!-- Linked Transactions -->
+      <div v-if="linkedTransactions.length > 0" class="space-y-2">
+        <div
+          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+        >
+          {{ t('txLink.linkedTransactions') }}
+        </div>
+        <div
+          v-for="tx in linkedTransactions"
+          :key="tx.id"
+          class="flex items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 dark:bg-slate-700"
+        >
+          <div class="text-sm text-[var(--color-text)]">
+            <span class="text-[var(--color-text-muted)]">{{ tx.date.slice(0, 10) }}</span>
+            &middot; {{ tx.description || tx.category }}
+          </div>
+          <div class="font-outfit text-sm font-bold text-[var(--color-text)]">
+            {{ tx.currency }} {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+          </div>
+        </div>
+      </div>
 
       <!-- Created by — subtle footer -->
       <div class="border-t border-gray-100 pt-2 dark:border-slate-700">

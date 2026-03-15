@@ -5,6 +5,9 @@ import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
+import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
+import AmountInput from '@/components/ui/AmountInput.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
 import { BaseCombobox } from '@/components/ui';
 import AccountCategoryPicker from '@/components/accounts/AccountCategoryPicker.vue';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -53,6 +56,14 @@ const isActive = ref(true);
 const includeInNetWorth = ref(true);
 const showMoreDetails = ref(false);
 
+// Loan state (for loan-type accounts)
+const interestRate = ref<number | undefined>(undefined);
+const monthlyPayment = ref<number | undefined>(undefined);
+const loanTermMonths = ref<number | undefined>(undefined);
+const loanStartDate = ref('');
+const createRecurringPayment = ref(false);
+const loanPayFromAccountId = ref('');
+
 // MRU: find most recent institution/country from existing accounts
 function getMruDefaults() {
   const latest = accountsStore.accounts
@@ -81,6 +92,16 @@ const { isEditing, isSubmitting } = useFormModal(
       includeInNetWorth.value = account.includeInNetWorth;
       // Auto-expand "More Details" if toggles differ from defaults
       showMoreDetails.value = !account.includeInNetWorth || !account.isActive;
+
+      // Loan fields
+      if (account.type === 'loan') {
+        interestRate.value = account.interestRate;
+        monthlyPayment.value = account.monthlyPayment;
+        loanTermMonths.value = account.loanTermMonths;
+        loanStartDate.value = account.loanStartDate ?? '';
+        createRecurringPayment.value = !!account.linkedRecurringItemId;
+        loanPayFromAccountId.value = account.payFromAccountId ?? '';
+      }
     },
     onNew: () => {
       const mru = getMruDefaults();
@@ -94,6 +115,14 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       includeInNetWorth.value = true;
       showMoreDetails.value = false;
+
+      // Loan fields reset
+      interestRate.value = undefined;
+      monthlyPayment.value = undefined;
+      loanTermMonths.value = undefined;
+      loanStartDate.value = '';
+      createRecurringPayment.value = false;
+      loanPayFromAccountId.value = '';
     },
   }
 );
@@ -131,6 +160,21 @@ async function handleSave() {
       institutionCountry: institutionCountry.value || undefined,
       isActive: isActive.value,
       includeInNetWorth: includeInNetWorth.value,
+      ...(type.value === 'loan' && interestRate.value !== undefined
+        ? { interestRate: interestRate.value }
+        : {}),
+      ...(type.value === 'loan' && monthlyPayment.value !== undefined
+        ? { monthlyPayment: monthlyPayment.value }
+        : {}),
+      ...(type.value === 'loan' && loanTermMonths.value !== undefined
+        ? { loanTermMonths: loanTermMonths.value }
+        : {}),
+      ...(type.value === 'loan' && loanStartDate.value
+        ? { loanStartDate: loanStartDate.value }
+        : {}),
+      ...(type.value === 'loan' && loanPayFromAccountId.value
+        ? { payFromAccountId: loanPayFromAccountId.value }
+        : {}),
     };
 
     await persistCustomInstitutionIfNeeded(institution.value);
@@ -217,7 +261,37 @@ function handleDelete() {
       <CurrencyAmountInput v-model:amount="balance" v-model:currency="currency" />
     </FormFieldGroup>
 
-    <!-- 6. "More Details..." collapsible -->
+    <!-- 6. Loan Details (for loan type accounts) -->
+    <div v-if="type === 'loan'" class="space-y-4 rounded-2xl bg-[var(--tint-orange-8)] p-4">
+      <div class="font-outfit text-sm font-semibold text-[var(--color-text)]">
+        {{ t('loanAccount.details') }}
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <FormFieldGroup :label="t('loanAccount.interestRate')">
+          <BaseInput v-model="interestRate" type="number" step="0.01" min="0" placeholder="5.0" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('loanAccount.monthlyPayment')">
+          <AmountInput v-model="monthlyPayment" :currency-symbol="currency" font-size="1.2rem" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('loanAccount.loanTerm')">
+          <BaseInput v-model="loanTermMonths" type="number" min="1" placeholder="360" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('loanAccount.startDate')">
+          <BaseInput v-model="loanStartDate" type="date" />
+        </FormFieldGroup>
+      </div>
+      <RecurringPaymentPrompt
+        v-if="monthlyPayment && monthlyPayment > 0"
+        v-model="createRecurringPayment"
+        :pay-from-account-id="loanPayFromAccountId"
+        :payment-amount="monthlyPayment ?? 0"
+        :currency="currency"
+        :start-date="loanStartDate"
+        @update:pay-from-account-id="loanPayFromAccountId = $event"
+      />
+    </div>
+
+    <!-- 7. "More Details..." collapsible -->
     <div>
       <button
         type="button"
