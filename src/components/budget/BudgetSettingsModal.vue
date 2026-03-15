@@ -6,11 +6,20 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
-import { EXPENSE_CATEGORIES, CATEGORY_EMOJI_MAP } from '@/constants/categories';
+import {
+  EXPENSE_CATEGORIES,
+  CATEGORY_EMOJI_MAP,
+  GROUP_EMOJI_MAP,
+  getCategoriesGrouped,
+  isGroupBudget,
+  getGroupName,
+  makeGroupBudgetId,
+} from '@/constants/categories';
 import { getCurrencyInfo } from '@/constants/currencies';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput, BudgetCategory } from '@/types/models';
 
@@ -34,8 +43,14 @@ const mode = ref<'percentage' | 'fixed'>('percentage');
 const percentage = ref(20);
 const totalAmount = ref<number | undefined>(undefined);
 const currency = ref(settingsStore.baseCurrency);
-const categoryAllocations = ref<Record<string, number | undefined>>({});
 const showCategories = ref(false);
+
+// Group-level allocations: keyed by group name
+const groupAllocations = ref<Record<string, number | undefined>>({});
+// Category-level allocations: keyed by category ID
+const categoryAllocations = ref<Record<string, number | undefined>>({});
+// Which groups are expanded to show per-category inputs
+const expandedGroups = ref<Set<string>>(new Set());
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.budget,
@@ -46,11 +61,25 @@ const { isEditing, isSubmitting } = useFormModal(
       percentage.value = budget.percentage ?? 20;
       totalAmount.value = budget.totalAmount;
       currency.value = budget.currency;
-      const allocs: Record<string, number | undefined> = {};
+
+      const gAllocs: Record<string, number | undefined> = {};
+      const cAllocs: Record<string, number | undefined> = {};
+      const expanded = new Set<string>();
+
       for (const bc of budget.categories) {
-        allocs[bc.categoryId] = bc.amount;
+        if (isGroupBudget(bc.categoryId)) {
+          gAllocs[getGroupName(bc.categoryId)] = bc.amount;
+        } else {
+          cAllocs[bc.categoryId] = bc.amount;
+          // Find group for this category and mark as expanded
+          const cat = EXPENSE_CATEGORIES.find((c) => c.id === bc.categoryId);
+          if (cat?.group) expanded.add(cat.group);
+        }
       }
-      categoryAllocations.value = allocs;
+
+      groupAllocations.value = gAllocs;
+      categoryAllocations.value = cAllocs;
+      expandedGroups.value = expanded;
       showCategories.value = budget.categories.length > 0;
     },
     onNew: () => {
@@ -58,7 +87,9 @@ const { isEditing, isSubmitting } = useFormModal(
       percentage.value = 20;
       totalAmount.value = undefined;
       currency.value = settingsStore.baseCurrency;
+      groupAllocations.value = {};
       categoryAllocations.value = {};
+      expandedGroups.value = new Set();
       showCategories.value = false;
     },
   }
@@ -73,7 +104,6 @@ const saveLabel = computed(() => (isEditing.value ? t('common.save') : t('budget
 const currSymbol = computed(() => getCurrencyInfo(currency.value)?.symbol ?? '$');
 
 // Effective spending budget preview for percentage mode
-// percentage = savings goal, so spending budget = 100% - savings%
 const effectiveAmount = computed(() => {
   if (mode.value === 'percentage') {
     const spendingPercent = 100 - percentage.value;
@@ -94,22 +124,50 @@ const modeOptions = [
   { value: 'fixed', label: t('budget.settings.fixedAmount') },
 ];
 
-// Group expense categories for the allocation section
-const groupedCategories = computed(() => {
-  const groups = new Map<string, typeof EXPENSE_CATEGORIES>();
-  for (const cat of EXPENSE_CATEGORIES) {
-    const group = cat.group ?? 'Other';
-    if (!groups.has(group)) groups.set(group, []);
-    groups.get(group)!.push(cat);
+const expenseGroups = computed(() => getCategoriesGrouped('expense'));
+
+function toggleGroupExpand(groupName: string) {
+  const expanded = new Set(expandedGroups.value);
+  if (expanded.has(groupName)) {
+    expanded.delete(groupName);
+  } else {
+    expanded.add(groupName);
   }
-  return groups;
-});
+  expandedGroups.value = expanded;
+}
+
+function isGroupExpanded(groupName: string): boolean {
+  return expandedGroups.value.has(groupName);
+}
+
+/** Live sum of per-category allocations for a group. */
+function groupCategorySum(group: { categories: { id: string }[] }): number {
+  return group.categories.reduce((sum, cat) => sum + (categoryAllocations.value[cat.id] ?? 0), 0);
+}
+
+/** Whether any category in this group has an amount set. */
+function hasCategoryAmounts(group: { categories: { id: string }[] }): boolean {
+  return group.categories.some((cat) => (categoryAllocations.value[cat.id] ?? 0) > 0);
+}
 
 function handleSave() {
   const categories: BudgetCategory[] = [];
-  for (const [categoryId, amount] of Object.entries(categoryAllocations.value)) {
-    if (amount && amount > 0) {
-      categories.push({ categoryId, amount });
+
+  for (const group of expenseGroups.value) {
+    if (hasCategoryAmounts(group)) {
+      // Category-level data exists — save per-category entries
+      for (const cat of group.categories) {
+        const amount = categoryAllocations.value[cat.id];
+        if (amount && amount > 0) {
+          categories.push({ categoryId: cat.id, amount });
+        }
+      }
+    } else {
+      // Group-level entry
+      const amount = groupAllocations.value[group.name];
+      if (amount && amount > 0) {
+        categories.push({ categoryId: makeGroupBudgetId(group.name), amount });
+      }
     }
   }
 
@@ -207,32 +265,79 @@ watch(mode, () => {
         {{ t('budget.settings.categoryHint') }}
       </p>
 
-      <div v-if="showCategories" class="mt-3 space-y-4">
-        <div v-for="[groupName, cats] in groupedCategories" :key="groupName">
-          <p
-            class="mb-2 text-xs font-semibold tracking-wider text-slate-400 uppercase dark:text-slate-500"
+      <div v-if="showCategories" class="mt-3 space-y-3">
+        <div v-for="group in expenseGroups" :key="group.name">
+          <!-- Group row — tappable to expand/collapse -->
+          <div
+            class="flex cursor-pointer items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 transition-colors hover:bg-slate-100 dark:bg-slate-700/30 dark:hover:bg-slate-700/50"
+            @click="group.categories.length > 1 && toggleGroupExpand(group.name)"
           >
-            {{ groupName }}
-          </p>
-          <div class="space-y-2">
-            <div
-              v-for="cat in cats"
-              :key="cat.id"
-              class="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-700/30"
+            <span class="text-base">{{ GROUP_EMOJI_MAP[group.name] || '📦' }}</span>
+            <span
+              class="min-w-[80px] flex-1 text-sm font-semibold text-slate-600 dark:text-slate-300"
             >
-              <span class="text-base">{{ CATEGORY_EMOJI_MAP[cat.id] || '' }}</span>
-              <span class="min-w-[100px] text-sm text-slate-600 dark:text-slate-300">
-                {{ cat.name }}
-              </span>
-              <div class="ml-auto w-28">
-                <AmountInput
-                  v-model="categoryAllocations[cat.id]"
-                  :currency-symbol="currSymbol"
-                  font-size="0.9rem"
-                />
+              {{ group.name }}
+            </span>
+
+            <!-- Category amounts exist: read-only sum (expanded or collapsed) -->
+            <span
+              v-if="hasCategoryAmounts(group)"
+              class="font-outfit text-sm font-bold"
+              :class="
+                isGroupExpanded(group.name)
+                  ? 'text-slate-400 dark:text-slate-500'
+                  : 'text-slate-600 dark:text-slate-300'
+              "
+            >
+              {{ currSymbol }}{{ groupCategorySum(group).toLocaleString() }}
+            </span>
+
+            <!-- No category amounts: editable group input -->
+            <div v-else-if="!isGroupExpanded(group.name)" class="w-28" @click.stop>
+              <AmountInput
+                v-model="groupAllocations[group.name]"
+                :currency-symbol="currSymbol"
+                font-size="0.9rem"
+              />
+            </div>
+
+            <!-- Expanded with no amounts yet: show zero sum -->
+            <span v-else class="font-outfit text-sm font-bold text-slate-400 dark:text-slate-500">
+              {{ currSymbol }}0
+            </span>
+
+            <!-- Expand chevron (only for groups with >1 category) -->
+            <span
+              v-if="group.categories.length > 1"
+              class="text-xs text-slate-400 transition-transform duration-200"
+              :class="isGroupExpanded(group.name) ? 'rotate-90' : ''"
+            >
+              &#x25B6;
+            </span>
+          </div>
+
+          <!-- Per-category drill-down -->
+          <ConditionalSection :show="isGroupExpanded(group.name)">
+            <div class="space-y-1.5 pl-4">
+              <div
+                v-for="cat in group.categories"
+                :key="cat.id"
+                class="flex items-center gap-3 rounded-lg px-3 py-1.5"
+              >
+                <span class="text-sm">{{ CATEGORY_EMOJI_MAP[cat.id] || '' }}</span>
+                <span class="min-w-[80px] flex-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ cat.name }}
+                </span>
+                <div class="w-28">
+                  <AmountInput
+                    v-model="categoryAllocations[cat.id]"
+                    :currency-symbol="currSymbol"
+                    font-size="0.85rem"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          </ConditionalSection>
         </div>
       </div>
     </div>

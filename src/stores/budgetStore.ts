@@ -5,7 +5,12 @@ import { useTransactionsStore } from './transactionsStore';
 import { useRecurringStore } from './recurringStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as budgetRepo from '@/services/automerge/repositories/budgetRepository';
-import { getCategoryById } from '@/constants/categories';
+import {
+  getCategoryById,
+  isGroupBudget,
+  getGroupName,
+  getCategoryIdsForGroup,
+} from '@/constants/categories';
 import { toDateInputValue } from '@/utils/date';
 import type { Budget, CreateBudgetInput, UpdateBudgetInput } from '@/types/models';
 
@@ -79,16 +84,35 @@ export const useBudgetStore = defineStore('budget', () => {
     return txStore.filteredExpensesByCategory;
   });
 
-  // Category budget status array
+  // Category budget status array (supports both group-level and category-level entries)
   const categoryBudgetStatus = computed<CategoryBudgetInfo[]>(() => {
     const budget = activeBudget.value;
     if (!budget || budget.categories.length === 0) return [];
 
     return budget.categories
       .map((bc) => {
-        const cat = getCategoryById(bc.categoryId);
-        const spent = spendingByCategory.value.get(bc.categoryId) ?? 0;
-        // spent is already in base currency (converted in transactionsStore)
+        let name: string;
+        let icon: string;
+        let color: string;
+        let spent: number;
+
+        if (isGroupBudget(bc.categoryId)) {
+          // Group-level entry: sum spending across all categories in this group
+          const groupName = getGroupName(bc.categoryId);
+          const catIds = getCategoryIdsForGroup(groupName);
+          spent = catIds.reduce((sum, id) => sum + (spendingByCategory.value.get(id) ?? 0), 0);
+          name = groupName;
+          icon = '';
+          color = '#6B7280';
+        } else {
+          // Individual category entry
+          const cat = getCategoryById(bc.categoryId);
+          spent = spendingByCategory.value.get(bc.categoryId) ?? 0;
+          name = cat?.name ?? bc.categoryId;
+          icon = cat?.icon ?? '';
+          color = cat?.color ?? '#6B7280';
+        }
+
         const percentUsed = bc.amount > 0 ? (spent / bc.amount) * 100 : 0;
 
         let status: CategoryBudgetStatus = 'ok';
@@ -97,9 +121,9 @@ export const useBudgetStore = defineStore('budget', () => {
 
         return {
           categoryId: bc.categoryId,
-          name: cat?.name ?? bc.categoryId,
-          icon: cat?.icon ?? '',
-          color: cat?.color ?? '#6B7280',
+          name,
+          icon,
+          color,
           budgeted: bc.amount,
           spent,
           percentUsed: Math.round(percentUsed),

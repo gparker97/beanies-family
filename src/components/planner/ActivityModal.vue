@@ -9,17 +9,16 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
-import GroupedChipPicker from '@/components/ui/GroupedChipPicker.vue';
+import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
-import { CATEGORY_COLORS } from '@/stores/activityStore';
+import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { addHourToTime, formatNookDate } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
-import type { ChipGroup } from '@/components/ui/GroupedChipPicker.vue';
 import type {
   FamilyActivity,
   ActivityCategory,
@@ -49,78 +48,6 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
 
-// Activity icon chip options — emoji→category mapping (flat for lookups)
-const ACTIVITY_ICON_OPTIONS = [
-  { value: '⚽', label: 'Soccer', icon: '⚽', category: 'sport' as ActivityCategory },
-  { value: '🏈', label: 'Football', icon: '🏈', category: 'sport' as ActivityCategory },
-  { value: '⚾', label: 'Baseball', icon: '⚾', category: 'sport' as ActivityCategory },
-  { value: '🏊', label: 'Swimming', icon: '🏊', category: 'sport' as ActivityCategory },
-  { value: '🥋', label: 'Martial Arts', icon: '🥋', category: 'sport' as ActivityCategory },
-  { value: '🤸', label: 'Gymnastics', icon: '🤸', category: 'sport' as ActivityCategory },
-  { value: '🏃', label: 'Other', icon: '🏃', category: 'sport' as ActivityCategory },
-  { value: '🎹', label: 'Piano', icon: '🎹', category: 'lesson' as ActivityCategory },
-  { value: '📚', label: 'Tutoring', icon: '📚', category: 'lesson' as ActivityCategory },
-  { value: '🎨', label: 'Art', icon: '🎨', category: 'lesson' as ActivityCategory },
-  { value: '🧮', label: 'Math', icon: '🧮', category: 'lesson' as ActivityCategory },
-  { value: '🌐', label: 'Language', icon: '🌐', category: 'lesson' as ActivityCategory },
-  { value: '🎸', label: 'Guitar', icon: '🎸', category: 'lesson' as ActivityCategory },
-  { value: '🔬', label: 'Science', icon: '🔬', category: 'lesson' as ActivityCategory },
-  { value: '📓', label: 'Other', icon: '📓', category: 'lesson' as ActivityCategory },
-  { value: '🏥', label: 'Medical', icon: '🏥', category: 'appointment' as ActivityCategory },
-  { value: '🦷', label: 'Dental', icon: '🦷', category: 'appointment' as ActivityCategory },
-  { value: '📝', label: 'Other', icon: '📝', category: 'appointment' as ActivityCategory },
-  { value: '✈️', label: 'Travel', icon: '✈️', category: 'other' as ActivityCategory },
-  { value: '📦', label: 'Other', icon: '📦', category: 'other' as ActivityCategory },
-];
-
-// Grouped icon options for the GroupedChipPicker
-const ACTIVITY_ICON_GROUPS: ChipGroup[] = [
-  {
-    name: 'Sport',
-    icon: '🏅',
-    items: [
-      { value: '⚽', label: 'Soccer', icon: '⚽' },
-      { value: '🏈', label: 'Football', icon: '🏈' },
-      { value: '⚾', label: 'Baseball', icon: '⚾' },
-      { value: '🏊', label: 'Swimming', icon: '🏊' },
-      { value: '🥋', label: 'Martial Arts', icon: '🥋' },
-      { value: '🤸', label: 'Gymnastics', icon: '🤸' },
-      { value: '🏃', label: 'Other', icon: '🏃' },
-    ],
-  },
-  {
-    name: 'Lesson',
-    icon: '📖',
-    items: [
-      { value: '🎹', label: 'Piano', icon: '🎹' },
-      { value: '📚', label: 'Tutoring', icon: '📚' },
-      { value: '🎨', label: 'Art', icon: '🎨' },
-      { value: '🧮', label: 'Math', icon: '🧮' },
-      { value: '🌐', label: 'Language', icon: '🌐' },
-      { value: '🎸', label: 'Guitar', icon: '🎸' },
-      { value: '🔬', label: 'Science', icon: '🔬' },
-      { value: '📓', label: 'Other', icon: '📓' },
-    ],
-  },
-  {
-    name: 'Appointment',
-    icon: '📋',
-    items: [
-      { value: '🏥', label: 'Medical', icon: '🏥' },
-      { value: '🦷', label: 'Dental', icon: '🦷' },
-      { value: '📝', label: 'Other', icon: '📝' },
-    ],
-  },
-  {
-    name: 'Other',
-    icon: '📦',
-    items: [
-      { value: '✈️', label: 'Travel', icon: '✈️' },
-      { value: '📦', label: 'Other', icon: '📦' },
-    ],
-  },
-];
-
 // Form state
 const icon = ref('');
 const title = ref('');
@@ -132,7 +59,7 @@ const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
 const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
 const daysOfWeek = ref<number[]>([]);
 const recurrenceEndDate = ref('');
-const category = ref<ActivityCategory>('lesson');
+const category = ref<ActivityCategory>('piano');
 const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
 const pickupMemberId = ref<string>('');
@@ -202,7 +129,7 @@ const { isEditing, isSubmitting } = useFormModal(
       reminderMinutes.value = activity.reminderMinutes;
       notes.value = activity.notes ?? '';
       isActive.value = activity.isActive;
-      color.value = activity.color ?? CATEGORY_COLORS[activity.category];
+      color.value = activity.color ?? getActivityCategoryColor(activity.category);
       showMoreDetails.value = hasDetailData(activity);
     },
     onNew: () => {
@@ -216,7 +143,7 @@ const { isEditing, isSubmitting } = useFormModal(
       recurrenceFrequency.value = 'weekly';
       daysOfWeek.value = [];
       recurrenceEndDate.value = '';
-      category.value = 'lesson';
+      category.value = 'piano';
       assigneeIds.value = [];
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
@@ -236,14 +163,11 @@ const { isEditing, isSubmitting } = useFormModal(
   }
 );
 
-// When icon changes, derive category
-watch(icon, (newIcon) => {
-  if (!newIcon) return;
-  const match = ACTIVITY_ICON_OPTIONS.find((e) => e.value === newIcon);
-  if (match) {
-    category.value = match.category;
-    color.value = CATEGORY_COLORS[match.category];
-  }
+// When category changes, auto-set icon and color
+watch(category, (newCategory) => {
+  if (!newCategory) return;
+  icon.value = getActivityFallbackEmoji(newCategory);
+  color.value = getActivityCategoryColor(newCategory);
 });
 
 // Auto-set daysOfWeek from date if empty
@@ -411,7 +335,7 @@ function handleSave() {
 
       <!-- 2. Category picker (grouped) -->
       <FormFieldGroup :label="t('modal.selectCategory')">
-        <GroupedChipPicker v-model="icon" :groups="ACTIVITY_ICON_GROUPS" />
+        <ActivityCategoryPicker v-model="category" />
       </FormFieldGroup>
 
       <!-- 3. Activity title (styled wrapper) -->

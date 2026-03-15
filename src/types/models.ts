@@ -303,7 +303,46 @@ export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
 
 // Family Activity — The Treehouse planner's central entity
-export type ActivityCategory = 'lesson' | 'sport' | 'appointment' | 'social' | 'pickup' | 'other';
+export type ActivityCategory =
+  // School
+  | 'after_school'
+  | 'school_recital'
+  | 'other_school'
+  // Educational
+  | 'tutoring'
+  | 'math'
+  | 'language'
+  | 'science'
+  | 'other_educational'
+  // Sports
+  | 'tennis'
+  | 'badminton'
+  | 'golf_activity'
+  | 'baseball'
+  | 'gym_activity'
+  | 'yoga_activity'
+  | 'gymnastics'
+  | 'other_sports_activity'
+  // Competitions
+  | 'spelling_bee'
+  | 'math_competition'
+  | 'cubing'
+  | 'other_competition'
+  // Lessons
+  | 'piano'
+  | 'guitar'
+  | 'trumpet'
+  | 'drum'
+  | 'music'
+  | 'art'
+  | 'dance'
+  | 'swimming'
+  | 'other_lesson'
+  // Fun
+  | 'birthday'
+  | 'wedding'
+  | 'bar_mitzvah'
+  | 'other_celebration';
 export type ActivityRecurrence = 'weekly' | 'daily' | 'monthly' | 'yearly' | 'none';
 export type FeeSchedule = 'none' | 'per_session' | 'weekly' | 'monthly' | 'termly' | 'yearly';
 export type ReminderMinutes = 0 | 5 | 10 | 15 | 30 | 60 | 120 | 1440;

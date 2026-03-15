@@ -23,6 +23,7 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { getActivityCategoryColor } from '@/constants/activityCategories';
 import type {
   ActivityCategory,
   CreateFamilyMemberInput,
@@ -40,19 +41,9 @@ const { t } = useTranslation();
 const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
 
-/** Event bar color based on activity category (matches sidebar mockup). */
+/** Event bar color based on activity category. */
 function getEventBarColor(category: ActivityCategory): string {
-  switch (category) {
-    case 'lesson':
-    case 'sport':
-      return 'bg-primary-500';
-    case 'appointment':
-      return 'bg-sky-silk-300';
-    case 'social':
-      return 'bg-secondary-500/20';
-    default:
-      return 'bg-primary-500';
-  }
+  return getActivityCategoryColor(category);
 }
 
 /** A highlight item shown on member cards (up to 2 per member). */
@@ -488,7 +479,7 @@ function cancelEditFamilyName() {
               <!-- Color bar -->
               <div
                 class="w-1 flex-shrink-0 rounded-full"
-                :class="getEventBarColor(event.activity.category)"
+                :style="{ backgroundColor: getEventBarColor(event.activity.category) }"
               />
               <div class="min-w-0 flex-1">
                 <div class="text-secondary-500/40 text-xs dark:text-gray-500">

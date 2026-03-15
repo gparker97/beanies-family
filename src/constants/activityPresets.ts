@@ -12,14 +12,19 @@ export interface ActivityPreset {
  * Each preset maps an emoji to a category and default title.
  */
 export const ACTIVITY_PRESETS: ActivityPreset[] = [
-  { icon: '\u{1F3B9}', label: 'Piano', category: 'lesson', defaultTitle: 'Piano Lessons' },
-  { icon: '\u26BD', label: 'Soccer', category: 'sport', defaultTitle: 'Soccer Practice' },
-  { icon: '\u{1F3CA}', label: 'Swimming', category: 'sport', defaultTitle: 'Swimming Lessons' },
-  { icon: '\u{1F3A8}', label: 'Art', category: 'lesson', defaultTitle: 'Art Class' },
-  { icon: '\u{1F94B}', label: 'Martial Arts', category: 'sport', defaultTitle: 'Martial Arts' },
-  { icon: '\u{1F483}', label: 'Dance', category: 'lesson', defaultTitle: 'Dance Class' },
-  { icon: '\u{1F4DA}', label: 'Tutoring', category: 'lesson', defaultTitle: 'Tutoring' },
-  { icon: '\u{1F4E6}', label: 'Other', category: 'other', defaultTitle: 'Activity' },
+  { icon: '🎹', label: 'Piano', category: 'piano', defaultTitle: 'Piano Lessons' },
+  { icon: '🎾', label: 'Tennis', category: 'tennis', defaultTitle: 'Tennis Practice' },
+  { icon: '🎨', label: 'Art', category: 'art', defaultTitle: 'Art Class' },
+  { icon: '💃', label: 'Dance', category: 'dance', defaultTitle: 'Dance Class' },
+  { icon: '📚', label: 'Tutoring', category: 'tutoring', defaultTitle: 'Tutoring' },
+  { icon: '🎂', label: 'Birthday', category: 'birthday', defaultTitle: 'Birthday Party' },
+  {
+    icon: '🏫',
+    label: 'After School',
+    category: 'after_school',
+    defaultTitle: 'After School Activity',
+  },
+  { icon: '📓', label: 'Other', category: 'other_lesson', defaultTitle: 'Activity' },
 ];
 
 /**

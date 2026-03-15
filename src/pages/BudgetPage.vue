@@ -14,7 +14,12 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { confirm } from '@/composables/useConfirm';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { playWhoosh } from '@/composables/useSounds';
-import { CATEGORY_EMOJI_MAP } from '@/constants/categories';
+import {
+  CATEGORY_EMOJI_MAP,
+  GROUP_EMOJI_MAP,
+  isGroupBudget,
+  getGroupName,
+} from '@/constants/categories';
 import { formatMonthYearShort } from '@/utils/date';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -398,7 +403,11 @@ async function handleQuickAdd(data: CreateTransactionInput) {
           >
             <div class="mb-1.5 flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="text-base">{{ CATEGORY_EMOJI_MAP[cat.categoryId] || '' }}</span>
+                <span class="text-base">{{
+                  isGroupBudget(cat.categoryId)
+                    ? GROUP_EMOJI_MAP[getGroupName(cat.categoryId)] || '📦'
+                    : CATEGORY_EMOJI_MAP[cat.categoryId] || ''
+                }}</span>
                 <span class="text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ cat.name }}
                 </span>
