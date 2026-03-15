@@ -137,14 +137,14 @@ export const EXPENSE_CATEGORIES: Category[] = [
     group: 'Charity',
   },
 
-  // Education / Lessons
+  // Education
   {
     id: 'tuition',
     name: 'Tutor / Tuition',
     icon: 'book-open',
     type: 'expense',
     color: '#7e22ce',
-    group: 'Education / Lessons',
+    group: 'Education',
   },
   {
     id: 'school_fees',
@@ -152,15 +152,49 @@ export const EXPENSE_CATEGORIES: Category[] = [
     icon: 'school',
     type: 'expense',
     color: '#6b21a8',
-    group: 'Education / Lessons',
+    group: 'Education',
+  },
+  {
+    id: 'other_education',
+    name: 'Other Education',
+    icon: 'graduation-cap',
+    type: 'expense',
+    color: '#581c87',
+    group: 'Education',
+  },
+
+  // Lessons
+  {
+    id: 'music_lessons',
+    name: 'Music Lessons',
+    icon: 'music',
+    type: 'expense',
+    color: '#a855f7',
+    group: 'Lessons',
+  },
+  {
+    id: 'art_lessons',
+    name: 'Art Lessons',
+    icon: 'palette',
+    type: 'expense',
+    color: '#9333ea',
+    group: 'Lessons',
+  },
+  {
+    id: 'dance_lessons',
+    name: 'Dance Lessons',
+    icon: 'music',
+    type: 'expense',
+    color: '#8b5cf6',
+    group: 'Lessons',
   },
   {
     id: 'other_lessons',
     name: 'Other Lessons',
-    icon: 'graduation-cap',
+    icon: 'book',
     type: 'expense',
-    color: '#581c87',
-    group: 'Education / Lessons',
+    color: '#7c3aed',
+    group: 'Lessons',
   },
 
   // Entertainment
@@ -525,10 +559,15 @@ export const CATEGORY_EMOJI_MAP: Record<string, string> = {
   donations: '💝',
   gifts_given: '🎁',
   other_charity: '🤲',
-  // Expense — Education / Lessons
+  // Expense — Education
   tuition: '📚',
   school_fees: '🏫',
-  other_lessons: '🎓',
+  other_education: '🎓',
+  // Expense — Lessons
+  music_lessons: '🎵',
+  art_lessons: '🎨',
+  dance_lessons: '💃',
+  other_lessons: '📓',
   // Expense — Entertainment
   entertainment: '🎬',
   hobbies: '🎨',
@@ -592,7 +631,8 @@ export const GROUP_EMOJI_MAP: Record<string, string> = {
   Property: '🏡',
   // Expense groups
   Charity: '💝',
-  'Education / Lessons': '🎓',
+  Education: '🎓',
+  Lessons: '📓',
   Entertainment: '🎬',
   Family: '👶',
   Financial: '💳',
