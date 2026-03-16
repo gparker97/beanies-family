@@ -6,6 +6,7 @@ import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
+import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
@@ -386,6 +387,63 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
+      <!-- 3b. Cost + Fee Schedule -->
+      <FormFieldGroup :label="t('modal.costPerSession')">
+        <CurrencyAmountInput
+          v-model:amount="feeAmount"
+          v-model:currency="feeCurrency"
+          font-size="1.1rem"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('planner.field.feeSchedule')">
+        <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+      </FormFieldGroup>
+
+      <!-- Custom period inputs -->
+      <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
+        <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+          t('planner.fee.customPeriod')
+        }}</span>
+        <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
+        <TogglePillGroup
+          v-model="feeCustomPeriodUnit"
+          :options="[
+            { value: 'weeks', label: t('planner.fee.weeks') },
+            { value: 'months', label: t('planner.fee.months') },
+          ]"
+        />
+      </div>
+
+      <!-- Calculated monthly display -->
+      <div
+        v-if="
+          hasCost && feeSchedule !== 'none' && feeSchedule !== 'monthly' && calculatedMonthly > 0
+        "
+        class="flex items-center gap-2"
+      >
+        <span
+          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+        >
+          {{ t('planner.fee.calculatedMonthly') }}
+        </span>
+        <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+          {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
+        </span>
+        <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
+      </div>
+
+      <!-- Recurring payment prompt -->
+      <RecurringPaymentPrompt
+        v-if="hasCost && feeSchedule !== 'none'"
+        v-model="createRecurringPayment"
+        :pay-from-account-id="feePayFromAccountId"
+        :payment-amount="calculatedMonthly"
+        :currency="feeCurrency || 'USD'"
+        :start-date="date"
+        frequency="monthly"
+        @update:pay-from-account-id="feePayFromAccountId = $event"
+      />
+
       <!-- 4. Recurring / One-off toggle -->
       <FormFieldGroup :label="t('modal.schedule')">
         <div class="space-y-3">
@@ -444,12 +502,12 @@ function handleSave() {
       </FormFieldGroup>
 
       <!-- 8. Drop Off Duty / Pick Up Duty -->
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="grid grid-cols-2 gap-4">
         <FormFieldGroup :label="t('planner.field.dropoff')" optional>
-          <FamilyChipPicker v-model="dropoffMemberId" mode="single" compact />
+          <AssigneePickerButton v-model="dropoffMemberId" mode="single" size="sm" align="left" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('planner.field.pickup')" optional>
-          <FamilyChipPicker v-model="pickupMemberId" mode="single" compact />
+          <AssigneePickerButton v-model="pickupMemberId" mode="single" size="sm" align="right" />
         </FormFieldGroup>
       </div>
 
@@ -469,16 +527,6 @@ function handleSave() {
         </button>
 
         <div v-if="showMoreDetails" class="mt-3 space-y-4">
-          <!-- Notes -->
-          <FormFieldGroup :label="t('planner.field.notes')" optional>
-            <textarea
-              v-model="notes"
-              rows="2"
-              class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
-              :placeholder="t('planner.field.notes')"
-            />
-          </FormFieldGroup>
-
           <!-- Instructor -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <FormFieldGroup :label="t('planner.field.instructor')" optional>
@@ -492,65 +540,15 @@ function handleSave() {
             </FormFieldGroup>
           </div>
 
-          <!-- Cost + Currency + Fee Schedule -->
-          <FormFieldGroup :label="t('modal.costPerSession')">
-            <CurrencyAmountInput
-              v-model:amount="feeAmount"
-              v-model:currency="feeCurrency"
-              font-size="1.1rem"
+          <!-- Notes -->
+          <FormFieldGroup :label="t('planner.field.notes')" optional>
+            <textarea
+              v-model="notes"
+              rows="2"
+              class="focus:border-primary-500 w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] transition-all focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+              :placeholder="t('planner.field.notes')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('planner.field.feeSchedule')">
-            <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
-          </FormFieldGroup>
-
-          <!-- Custom period inputs -->
-          <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
-            <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-              t('planner.fee.customPeriod')
-            }}</span>
-            <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
-            <TogglePillGroup
-              v-model="feeCustomPeriodUnit"
-              :options="[
-                { value: 'weeks', label: t('planner.fee.weeks') },
-                { value: 'months', label: t('planner.fee.months') },
-              ]"
-            />
-          </div>
-
-          <!-- Calculated monthly display -->
-          <div
-            v-if="
-              hasCost &&
-              feeSchedule !== 'none' &&
-              feeSchedule !== 'monthly' &&
-              calculatedMonthly > 0
-            "
-            class="flex items-center gap-2"
-          >
-            <span
-              class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
-            >
-              {{ t('planner.fee.calculatedMonthly') }}
-            </span>
-            <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-              {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
-            </span>
-            <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
-          </div>
-
-          <!-- Recurring payment prompt -->
-          <RecurringPaymentPrompt
-            v-if="hasCost && feeSchedule !== 'none'"
-            v-model="createRecurringPayment"
-            :pay-from-account-id="feePayFromAccountId"
-            :payment-amount="calculatedMonthly"
-            :currency="feeCurrency || 'USD'"
-            :start-date="date"
-            frequency="monthly"
-            @update:pay-from-account-id="feePayFromAccountId = $event"
-          />
 
           <!-- Reminder chips -->
           <FormFieldGroup :label="t('planner.field.reminder')" optional>

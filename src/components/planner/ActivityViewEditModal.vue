@@ -324,26 +324,38 @@ const recurrenceLabel = computed(() => {
   return t(`planner.recurrence.${activity.value.recurrence}`);
 });
 
-const DAY_KEYS: Record<number, string> = {
-  0: 'sun',
-  1: 'mon',
-  2: 'tue',
-  3: 'wed',
-  4: 'thu',
-  5: 'fri',
-  6: 'sat',
+const FULL_DAY_NAMES: Record<number, string> = {
+  0: 'Sundays',
+  1: 'Mondays',
+  2: 'Tuesdays',
+  3: 'Wednesdays',
+  4: 'Thursdays',
+  5: 'Fridays',
+  6: 'Saturdays',
 };
 
-const daysOfWeekLabel = computed(() => {
-  if (!activity.value?.daysOfWeek?.length) return '';
-  // Sort days starting from Monday (1,2,3,4,5,6,0)
-  const sorted = [...activity.value.daysOfWeek].sort((a, b) => (a || 7) - (b || 7));
-  return sorted
-    .map((d) => {
-      const key = DAY_KEYS[d] ?? 'sun';
-      return t(`planner.day.${key}` as 'planner.day.sun');
-    })
-    .join(', ');
+const scheduleSummary = computed(() => {
+  if (!activity.value || activity.value.recurrence === 'none') return '';
+  const freq = recurrenceLabel.value;
+  const days = activity.value.daysOfWeek;
+  if (activity.value.recurrence === 'monthly') {
+    const day = new Date(activity.value.date + 'T00:00:00').getDate();
+    const suffix =
+      day === 1 || day === 21 || day === 31
+        ? 'st'
+        : day === 2 || day === 22
+          ? 'nd'
+          : day === 3 || day === 23
+            ? 'rd'
+            : 'th';
+    return `${freq} on the ${day}${suffix}`;
+  }
+  if (!days?.length || activity.value.recurrence !== 'weekly') return freq;
+  const sorted = [...days].sort((a, b) => (a || 7) - (b || 7));
+  const dayNames = sorted.map((d) => FULL_DAY_NAMES[d] ?? 'Sundays');
+  if (dayNames.length === 1) return `${freq} on ${dayNames[0]}`;
+  const last = dayNames.pop();
+  return `${freq} on ${dayNames.join(', ')} and ${last}`;
 });
 
 const endDateFormatted = computed(() => {
@@ -626,17 +638,7 @@ async function confirmReschedule() {
             <span
               class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
             >
-              {{ recurrenceLabel }}
-            </span>
-          </div>
-          <div v-if="daysOfWeekLabel" class="flex items-center gap-2">
-            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-              {{ t('modal.whichDays') }}
-            </span>
-            <span
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-            >
-              {{ daysOfWeekLabel }}
+              {{ scheduleSummary }}
             </span>
           </div>
           <div v-if="endDateFormatted" class="flex items-center gap-2">
