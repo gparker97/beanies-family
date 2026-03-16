@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
@@ -52,6 +53,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const router = useRouter();
 const accountsStore = useAccountsStore();
 const assetsStore = useAssetsStore();
 const activityStore = useActivityStore();
@@ -143,6 +145,9 @@ const amortizationPreview = computed(() => {
   }
   return calculateExtraPayment(linkedLoan.value.outstandingBalance, amount.value ?? 0);
 });
+
+// Whether the transaction is linked to a loan or activity (new or existing)
+const hasActiveLink = computed(() => !!(loanId.value || activityId.value));
 
 const isAmountLocked = computed(() => {
   if (
@@ -261,7 +266,9 @@ const { isEditing, isSubmitting } = useFormModal(
 );
 
 const accountOptions = computed(() =>
-  accountsStore.activeAccounts.map((a) => ({ value: a.id, label: a.name }))
+  accountsStore.activeAccounts
+    .filter((a) => !hasActiveLink.value || a.currency === currency.value)
+    .map((a) => ({ value: a.id, label: a.name }))
 );
 
 const effectiveCategoryType = computed(() => (direction.value === 'in' ? 'income' : 'expense'));
@@ -530,9 +537,18 @@ function handleDelete() {
       </div>
     </div>
 
-    <!-- 1. Direction toggle -->
+    <!-- 1. Direction toggle (locked to outgoing when linked to activity/loan) -->
     <FormFieldGroup :label="t('modal.direction')">
+      <div v-if="hasActiveLink" class="flex items-center gap-2">
+        <span
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center rounded-[11px] bg-gradient-to-r px-4 py-2 text-xs font-semibold text-white shadow-sm"
+        >
+          🧡 {{ t('modal.moneyOut') }}
+        </span>
+        <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+      </div>
       <TogglePillGroup
+        v-else
         v-model="direction"
         :options="[
           { value: 'out', label: '🧡 ' + t('modal.moneyOut'), variant: 'orange' },
@@ -599,6 +615,17 @@ function handleDelete() {
         </div>
         <p class="text-xs text-[var(--color-text-muted)]">{{ t('txLink.amountLocked') }}</p>
       </div>
+      <!-- Linked but amount not locked (one-time extra payment): currency locked, amount editable -->
+      <div v-else-if="hasActiveLink" class="flex items-stretch gap-2">
+        <div
+          class="font-outfit flex h-full w-[82px] flex-shrink-0 items-center justify-center rounded-[16px] bg-[var(--tint-slate-5)] px-3 text-center text-sm font-bold text-[var(--color-text)] dark:bg-slate-700"
+        >
+          {{ currency }} 🔒
+        </div>
+        <div class="min-w-0 flex-1">
+          <AmountInput v-model="amount" :currency-symbol="currency" />
+        </div>
+      </div>
       <CurrencyAmountInput v-else v-model:amount="amount" v-model:currency="currency" />
     </FormFieldGroup>
 
@@ -622,7 +649,18 @@ function handleDelete() {
     <ConditionalSection :show="recurrenceMode === 'recurring' || isEditingRecurring">
       <div class="space-y-4">
         <FormFieldGroup :label="t('modal.howOften')">
-          <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
+          <div v-if="hasActiveLink" class="flex items-center gap-2">
+            <span
+              class="font-outfit bg-secondary-500 inline-flex items-center rounded-[11px] px-4 py-2 text-xs font-semibold text-white shadow-sm dark:bg-slate-200 dark:text-slate-900"
+            >
+              {{
+                frequencyOptions.find((o) => o.value === recurrenceFrequency)?.label ??
+                recurrenceFrequency
+              }}
+            </span>
+            <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+          </div>
+          <FrequencyChips v-else v-model="recurrenceFrequency" :options="frequencyOptions" />
         </FormFieldGroup>
         <!-- Month select (yearly only) -->
         <FormFieldGroup v-if="recurrenceFrequency === 'yearly'" :label="t('form.month')">
@@ -654,7 +692,29 @@ function handleDelete() {
           </div>
         </FormFieldGroup>
         <!-- Start date, day-of-month, end date in a row -->
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
+        <div v-if="hasActiveLink" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FormFieldGroup :label="t('form.startDate')">
+            <div
+              class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+            >
+              <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{
+                startDate
+              }}</span>
+              <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+            </div>
+          </FormFieldGroup>
+          <FormFieldGroup v-if="endDate" :label="t('form.endDate')">
+            <div
+              class="flex items-center gap-2 rounded-[16px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+            >
+              <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">{{
+                endDate
+              }}</span>
+              <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+            </div>
+          </FormFieldGroup>
+        </div>
+        <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <BaseInput v-model="startDate" :label="t('form.startDate')" type="date" required />
           <div v-if="recurrenceFrequency === 'monthly'" class="flex items-end">
             <FormFieldGroup :label="t('transactions.dayOfMonth')">
@@ -709,7 +769,7 @@ function handleDelete() {
         <template v-if="isLinkLocked">
           <FormFieldGroup
             v-if="linkType === 'activity' && activityId"
-            :label="t('txLink.linkPayment')"
+            :label="t('txLink.linkedActivity')"
           >
             <div
               class="flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)] dark:bg-slate-700"
@@ -718,16 +778,39 @@ function handleDelete() {
               <span class="font-semibold">{{
                 activityStore?.activities?.find((a) => a.id === activityId)?.title ?? activityId
               }}</span>
-              <span class="ml-auto text-xs text-[var(--color-text-muted)]">🔒</span>
+              <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+              <button
+                type="button"
+                class="hover:text-primary-500 ml-auto text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
+                @click="
+                  emit('close');
+                  router.push({ path: '/planner', query: { activity: activityId } });
+                "
+              >
+                {{ t('action.view') }} &rarr;
+              </button>
             </div>
           </FormFieldGroup>
-          <FormFieldGroup v-if="linkType === 'loan' && linkedLoan" :label="t('txLink.linkPayment')">
+          <FormFieldGroup v-if="linkType === 'loan' && linkedLoan" :label="t('txLink.linkedLoan')">
             <div
               class="flex items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-sm text-[var(--color-text)] dark:bg-slate-700"
             >
               <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }}</span>
               <span class="font-semibold">{{ linkedLoan.name }}</span>
-              <span class="ml-auto text-xs text-[var(--color-text-muted)]">🔒</span>
+              <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+              <button
+                type="button"
+                class="hover:text-primary-500 ml-auto text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
+                @click="
+                  emit('close');
+                  router.push({
+                    path: linkedLoan.type === 'asset' ? '/assets' : '/accounts',
+                    query: { [linkedLoan.type === 'asset' ? 'asset' : 'account']: loanId },
+                  });
+                "
+              >
+                {{ t('action.view') }} &rarr;
+              </button>
             </div>
           </FormFieldGroup>
         </template>

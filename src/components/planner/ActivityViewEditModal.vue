@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
+import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { chooseScope } from '@/composables/useRecurringEditScope';
@@ -48,6 +49,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const router = useRouter();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
 const transactionsStore = useTransactionsStore();
@@ -363,10 +365,11 @@ const linkedTransactions = computed(() => {
   if (!activity.value) return [];
   const actId = activity.value.id;
   const riId = activity.value.linkedRecurringItemId;
-  // Match by activityId OR by recurringItemId (for transactions generated from the linked recurring item)
-  return transactionsStore.transactions.filter(
-    (tx) => tx.activityId === actId || (riId && tx.recurringItemId === riId)
-  );
+  // Match by activityId OR by recurringItemId, sorted most recent first, limited to 3
+  return transactionsStore.transactions
+    .filter((tx) => tx.activityId === actId || (riId && tx.recurringItemId === riId))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
 });
 
 const feeLabel = computed(() => {
@@ -1134,55 +1137,71 @@ async function confirmReschedule() {
       </FormFieldGroup>
 
       <!-- Linked Recurring Payment -->
-      <FormFieldGroup v-if="linkedRecurringItem" :label="t('recurringPrompt.createPayment')">
-        <div
-          class="flex items-center justify-between rounded-xl bg-[var(--tint-orange-8)] px-3 py-2"
-        >
-          <div class="text-sm text-[var(--color-text)]">
-            <span class="font-outfit font-bold"
-              >{{ linkedRecurringItem.currency }}
-              {{
-                linkedRecurringItem.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
-              }}/{{ linkedRecurringItem.frequency === 'yearly' ? 'yr' : 'mo' }}</span
-            >
-            <span v-if="linkedPayFromAccount" class="text-[var(--color-text-muted)]">
-              &middot; from {{ linkedPayFromAccount.name }}
-            </span>
-          </div>
-          <span
-            class="inline-block rounded-lg px-2 py-0.5 text-xs font-semibold"
-            :class="
-              linkedRecurringItem.isActive
-                ? 'text-primary-500 bg-[var(--tint-orange-8)]'
-                : 'bg-gray-200 text-gray-500 dark:bg-slate-600 dark:text-gray-400'
-            "
+      <FormFieldGroup v-if="linkedRecurringItem" :label="t('txLink.monthlyTransaction')">
+        <div class="space-y-1">
+          <div
+            class="flex items-center justify-between rounded-xl bg-[var(--tint-orange-8)] px-3 py-2"
           >
-            {{ linkedRecurringItem.isActive ? t('recurring.active') : t('recurring.paused') }}
-          </span>
+            <div class="text-sm text-[var(--color-text)]">
+              <span class="font-outfit font-bold"
+                >{{ linkedRecurringItem.currency }}
+                {{
+                  linkedRecurringItem.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                }}/{{ linkedRecurringItem.frequency === 'yearly' ? 'yr' : 'mo' }}</span
+              >
+              <span v-if="linkedPayFromAccount" class="text-[var(--color-text-muted)]">
+                &middot; from {{ linkedPayFromAccount.name }}
+              </span>
+            </div>
+            <button
+              type="button"
+              class="hover:text-primary-500 text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
+              @click="
+                emit('close');
+                router.push({
+                  path: '/transactions',
+                  query: { recurringItem: linkedRecurringItem.id },
+                });
+              "
+            >
+              {{ t('action.view') }} &rarr;
+            </button>
+          </div>
         </div>
       </FormFieldGroup>
 
-      <!-- Linked Transactions -->
+      <!-- Recent Transactions -->
       <div v-if="linkedTransactions.length > 0" class="space-y-2">
         <div
           class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
         >
-          {{ t('txLink.linkedTransactions') }}
+          {{ t('txLink.recentTransactions') }}
         </div>
-        <div
+        <button
           v-for="tx in linkedTransactions"
           :key="tx.id"
-          class="flex items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 dark:bg-slate-700"
+          type="button"
+          class="group flex w-full items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-8)] dark:bg-slate-700 dark:hover:bg-slate-600"
+          @click="
+            emit('close');
+            router.push({ path: '/transactions', query: { view: tx.id } });
+          "
         >
           <div class="text-sm text-[var(--color-text)]">
             <span class="text-[var(--color-text-muted)]">{{ tx.date.slice(0, 10) }}</span>
             &middot; {{ tx.description || tx.category }}
           </div>
-          <div class="font-outfit text-sm font-bold text-[var(--color-text)]">
-            {{ tx.currency }}
-            {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+          <div class="flex items-center gap-2">
+            <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+              {{ tx.currency }}
+              {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+            </span>
+            <span
+              class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
+              >&rarr;</span
+            >
           </div>
-        </div>
+        </button>
       </div>
 
       <!-- Created by — subtle footer -->

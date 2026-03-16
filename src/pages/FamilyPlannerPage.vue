@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, nextTick, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
@@ -28,6 +28,7 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
 const activityStore = useActivityStore();
@@ -41,6 +42,16 @@ const {
   handleViewOpenEdit: scopedViewOpenEdit,
   handleScopedSave,
 } = useActivityScopeEdit();
+
+// Open activity view modal from query param (e.g. /planner?activity=abc)
+onMounted(() => {
+  const activityId = route.query.activity as string | undefined;
+  if (activityId) {
+    openViewModal(activityId);
+    // Clean up query param so refreshing doesn't re-open
+    router.replace({ query: {} });
+  }
+});
 
 function toggleAllMembers() {
   if (!memberFilterStore.isAllSelected) memberFilterStore.selectAll();
