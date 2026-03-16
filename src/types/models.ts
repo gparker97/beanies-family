@@ -334,6 +334,10 @@ export type ActivityCategory =
   | 'baseball'
   | 'gym_activity'
   | 'yoga_activity'
+  | 'soccer'
+  | 'football'
+  | 'rugby'
+  | 'multi_sport'
   | 'gymnastics'
   | 'other_sports_activity'
   // Competitions
@@ -355,7 +359,15 @@ export type ActivityCategory =
   | 'birthday'
   | 'wedding'
   | 'bar_mitzvah'
-  | 'other_celebration';
+  | 'other_celebration'
+  // Appointments
+  | 'doctor'
+  | 'dentist'
+  | 'eye_exam'
+  | 'haircut'
+  | 'other_appointment'
+  // Other
+  | 'other_activity';
 export type ActivityRecurrence = 'weekly' | 'daily' | 'monthly' | 'yearly' | 'none';
 export type FeeSchedule =
   | 'none'
