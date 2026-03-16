@@ -13,6 +13,7 @@ import ActivityLinkDropdown from '@/components/ui/ActivityLinkDropdown.vue';
 import LoanLinkDropdown from '@/components/ui/LoanLinkDropdown.vue';
 import EntityLinkDropdown from '@/components/ui/EntityLinkDropdown.vue';
 import AmortizationBreakdown from '@/components/ui/AmortizationBreakdown.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -546,6 +547,7 @@ function handleDelete() {
           🧡 {{ t('modal.moneyOut') }}
         </span>
         <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+        <InfoHintBadge :text="t('txLink.hintDirection')" />
       </div>
       <TogglePillGroup
         v-else
@@ -612,18 +614,21 @@ function handleDelete() {
             {{ currency }} {{ amount?.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
           </span>
           <span class="text-sm text-[var(--color-text-muted)]">🔒</span>
+          <InfoHintBadge :text="t('txLink.amountLocked')" />
         </div>
-        <p class="text-xs text-[var(--color-text-muted)]">{{ t('txLink.amountLocked') }}</p>
       </div>
       <!-- Linked but amount not locked (one-time extra payment): currency locked, amount editable -->
       <div v-else-if="hasActiveLink" class="flex items-stretch gap-2">
         <div
-          class="font-outfit flex h-full w-[82px] flex-shrink-0 items-center justify-center rounded-[16px] bg-[var(--tint-slate-5)] px-3 text-center text-sm font-bold text-[var(--color-text)] dark:bg-slate-700"
+          class="font-outfit flex h-full w-[82px] flex-shrink-0 items-center justify-center gap-1 rounded-[16px] bg-[var(--tint-slate-5)] px-3 text-center text-sm font-bold text-[var(--color-text)] dark:bg-slate-700"
         >
           {{ currency }} 🔒
         </div>
         <div class="min-w-0 flex-1">
           <AmountInput v-model="amount" :currency-symbol="currency" />
+        </div>
+        <div class="flex items-center">
+          <InfoHintBadge :text="t('txLink.hintCurrency')" />
         </div>
       </div>
       <CurrencyAmountInput v-else v-model:amount="amount" v-model:currency="currency" />
@@ -659,6 +664,7 @@ function handleDelete() {
               }}
             </span>
             <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+            <InfoHintBadge :text="t('txLink.hintFrequency')" />
           </div>
           <FrequencyChips v-else v-model="recurrenceFrequency" :options="frequencyOptions" />
         </FormFieldGroup>
@@ -701,6 +707,7 @@ function handleDelete() {
                 startDate
               }}</span>
               <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+              <InfoHintBadge :text="t('txLink.hintSchedule')" />
             </div>
           </FormFieldGroup>
           <FormFieldGroup v-if="endDate" :label="t('form.endDate')">
@@ -779,6 +786,7 @@ function handleDelete() {
                 activityStore?.activities?.find((a) => a.id === activityId)?.title ?? activityId
               }}</span>
               <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+              <InfoHintBadge :text="t('txLink.hintLinkedActivity')" />
               <button
                 type="button"
                 class="hover:text-primary-500 ml-auto text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
@@ -798,6 +806,7 @@ function handleDelete() {
               <span>{{ linkedLoan.type === 'asset' ? '🏠' : '🏦' }}</span>
               <span class="font-semibold">{{ linkedLoan.name }}</span>
               <span class="text-xs text-[var(--color-text-muted)]">🔒</span>
+              <InfoHintBadge :text="t('txLink.hintLinkedLoan')" />
               <button
                 type="button"
                 class="hover:text-primary-500 ml-auto text-xs font-semibold text-[var(--color-text-muted)] transition-colors"

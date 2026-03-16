@@ -21,6 +21,7 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import AmountInput from '@/components/ui/AmountInput.vue';
 import CategoryChipPicker from '@/components/ui/CategoryChipPicker.vue';
 import AmortizationBreakdown from '@/components/ui/AmortizationBreakdown.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import type { Transaction } from '@/types/models';
 
@@ -408,6 +409,7 @@ async function handleDelete() {
                 class="text-xs text-[var(--color-text-muted)]"
                 >🔒</span
               >
+              <InfoHintBadge v-if="transaction.recurringItemId" :text="t('txLink.hintDateView')" />
             </div>
           </template>
           <template #edit>
