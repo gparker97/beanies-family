@@ -187,12 +187,13 @@ export const useActivityStore = defineStore('activities', () => {
       startDate: activity.date,
       frequency: freq,
     });
-    if (newItemId !== activity.linkedRecurringItemId) {
-      await activityRepo.updateActivity(activity.id, {
-        ...(newItemId ? { linkedRecurringItemId: newItemId } : {}),
-      });
+    // Sync linkedRecurringItemId on the activity (clear with '' when removed)
+    const currentId = activity.linkedRecurringItemId || '';
+    const nextId = newItemId || '';
+    if (nextId !== currentId) {
+      await activityRepo.updateActivity(activity.id, { linkedRecurringItemId: nextId });
       activities.value = activities.value.map((a) =>
-        a.id === activity.id ? { ...a, linkedRecurringItemId: newItemId } : a
+        a.id === activity.id ? { ...a, linkedRecurringItemId: nextId } : a
       );
     }
   }

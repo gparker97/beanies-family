@@ -18,6 +18,7 @@ import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import { confirm } from '@/composables/useConfirm';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import type {
   FamilyActivity,
@@ -34,6 +35,7 @@ const { canEditActivities } = usePermissions();
 const activityStore = useActivityStore();
 const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
+const transactionsStore = useTransactionsStore();
 const memberFilterStore = useMemberFilterStore();
 const {
   viewingActivity,
@@ -114,24 +116,33 @@ function handleViewOpenEdit(activity: FamilyActivity) {
 async function handleSave(
   data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }
 ) {
-  // Track whether a new linked payment is being created
+  // Track payment changes (adding or removing linked recurring payment)
+  const isUpdate = 'id' in data && 'data' in data;
   const isAddingPayment =
-    'id' in data &&
-    'data' in data &&
-    data.data.payFromAccountId &&
-    !editingActivity.value?.linkedRecurringItemId;
+    isUpdate && data.data.payFromAccountId && !editingActivity.value?.linkedRecurringItemId;
+  const isRemovingPayment =
+    isUpdate && !data.data.payFromAccountId && !!editingActivity.value?.linkedRecurringItemId;
+  const isPaymentChange = isAddingPayment || isRemovingPayment;
 
-  if ('id' in data && 'data' in data) {
+  if (isUpdate) {
+    // When removing a linked payment, delete generated transactions BEFORE the activity update
+    // (must happen here because activityStore can't import transactionsStore — circular dep)
+    if (isRemovingPayment && editingActivity.value?.linkedRecurringItemId) {
+      await transactionsStore.deleteTransactionsByRecurringItemId(
+        editingActivity.value.linkedRecurringItemId
+      );
+    }
+
     if (
       editingOccurrenceDate.value &&
       editingActivity.value?.recurrence !== 'none' &&
-      !isAddingPayment
+      !isPaymentChange
     ) {
       // Recurring occurrence edit (not payment-related) — show scope modal
       const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
       if (!saved) return; // cancelled — keep modal open
     } else {
-      // Direct update: non-recurring, OR adding a linked payment (always applies to template)
+      // Direct update: non-recurring, adding/removing payment (always applies to template)
       await activityStore.updateActivity(data.id, data.data);
     }
   } else {
@@ -142,7 +153,7 @@ async function handleSave(
 
   // Show success confirmation when a new linked payment was created
   if (isAddingPayment) {
-    await nextTick(); // let store sync complete
+    await nextTick();
     const savedActivity = activityStore.activities.find(
       (a) => a.id === (data as { id: string }).id
     );
@@ -165,6 +176,17 @@ async function handleSave(
         }
       }
     }
+  }
+
+  // Show confirmation when a linked payment was removed
+  if (isRemovingPayment) {
+    await nextTick();
+    await confirm({
+      title: 'recurringPrompt.paymentRemoved',
+      message: 'recurringPrompt.paymentRemovedDetail',
+      variant: 'info',
+      showCancel: false,
+    });
   }
 
   editingActivity.value = null;

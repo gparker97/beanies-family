@@ -21,6 +21,8 @@ import { useProjectedTransactions } from '@/composables/useProjectedTransactions
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
 import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -46,6 +48,8 @@ import {
 const route = useRoute();
 const router = useRouter();
 const transactionsStore = useTransactionsStore();
+const accountsStore = useAccountsStore();
+const activityStore = useActivityStore();
 const assetsStore = useAssetsStore();
 const goalsStore = useGoalsStore();
 const settingsStore = useSettingsStore();
@@ -102,16 +106,17 @@ const monthTransactions = computed<DisplayTransaction[]>(() => {
     isDateBetween(tx.date, monthStart.value, monthEnd.value)
   );
 
-  // Build set of existing real transaction keys for dedup
-  const existingKeys = new Set(
-    actual
-      .filter((tx) => tx.recurringItemId)
-      .map((tx) => `${tx.recurringItemId}-${toDateInputValue(new Date(tx.date))}`)
+  // Build set of recurring item IDs that already have a real transaction this month.
+  // Dedup by recurringItemId alone (not date) — if a real transaction exists for a
+  // recurring item in this month, suppress its projection regardless of exact date.
+  // This prevents "ghost" projections when a transaction's date is moved within the month.
+  const existingRecurringIds = new Set(
+    actual.filter((tx) => tx.recurringItemId).map((tx) => tx.recurringItemId!)
   );
 
-  // Only include projections that don't already have a real transaction
+  // Only include projections whose recurring item has no real transaction this month
   const deduped = projectedTransactions.value.filter(
-    (tx) => !existingKeys.has(`${tx.recurringItemId}-${tx.date}`)
+    (tx) => !existingRecurringIds.has(tx.recurringItemId!)
   );
 
   const merged = [...actual, ...deduped];
@@ -412,6 +417,33 @@ async function deleteRecurringItemById(id: string) {
       message: 'recurring.deleteConfirm',
     })
   ) {
+    // Clear linkedRecurringItemId on the parent entity before deleting
+    // Search by linkedRecurringItemId directly (more reliable than ri.activityId/loanId
+    // which may not be set on older items)
+    const parentActivity = activityStore.activities.find((a) => a.linkedRecurringItemId === id);
+    if (parentActivity) {
+      await activityStore.updateActivity(parentActivity.id, {
+        linkedRecurringItemId: '' as any,
+        payFromAccountId: '' as any,
+      });
+    }
+    const parentAsset = assetsStore.assets.find((a) => a.loan?.linkedRecurringItemId === id);
+    if (parentAsset?.loan) {
+      await assetsStore.updateAsset(parentAsset.id, {
+        loan: {
+          ...parentAsset.loan,
+          linkedRecurringItemId: undefined,
+          payFromAccountId: undefined,
+        },
+      });
+    }
+    const parentAccount = accountsStore.accounts.find((a) => a.linkedRecurringItemId === id);
+    if (parentAccount) {
+      await accountsStore.updateAccount(parentAccount.id, {
+        linkedRecurringItemId: '' as any,
+        payFromAccountId: '' as any,
+      });
+    }
     // Delete all transactions generated from this recurring item
     await transactionsStore.deleteTransactionsByRecurringItemId(id);
     // Delete the recurring template itself

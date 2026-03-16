@@ -60,7 +60,7 @@ const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
 const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
 const daysOfWeek = ref<number[]>([]);
 const recurrenceEndDate = ref('');
-const category = ref<ActivityCategory>('piano');
+const category = ref<ActivityCategory>('' as ActivityCategory);
 const assigneeIds = ref<string[]>([]);
 const dropoffMemberId = ref<string>('');
 const pickupMemberId = ref<string>('');
@@ -146,7 +146,7 @@ const { isEditing, isSubmitting } = useFormModal(
       recurrenceFrequency.value = 'weekly';
       daysOfWeek.value = [];
       recurrenceEndDate.value = '';
-      category.value = 'piano';
+      category.value = '' as ActivityCategory;
       assigneeIds.value = [];
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
@@ -281,9 +281,9 @@ function handleSave() {
     feeSchedule: hasCost.value ? feeSchedule.value : ('none' as FeeSchedule),
     feeAmount: hasCost.value ? feeAmount.value : undefined,
     feeCurrency: hasCost.value ? feeCurrency.value : undefined,
-    ...(hasCost.value && feePayFromAccountId.value
+    ...(hasCost.value && createRecurringPayment.value && feePayFromAccountId.value
       ? { payFromAccountId: feePayFromAccountId.value }
-      : {}),
+      : { payFromAccountId: '' }),
     instructorName: instructorName.value.trim() || undefined,
     instructorContact: instructorContact.value.trim() || undefined,
     reminderMinutes: reminderMinutes.value,

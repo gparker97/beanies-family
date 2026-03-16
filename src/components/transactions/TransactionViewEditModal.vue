@@ -316,10 +316,13 @@ async function handleDelete() {
         </template>
       </InlineEditField>
 
-      <!-- Amount — inline editable -->
+      <!-- Amount — inline editable (locked for linked recurring transactions) -->
       <FormFieldGroup :label="t('form.amount')">
         <InlineEditField
           :editing="editingField === 'amount'"
+          :disabled="
+            !!(transaction.recurringItemId && (transaction.loanId || transaction.activityId))
+          "
           tint-color="orange"
           @start-edit="startEdit('amount')"
         >
@@ -387,17 +390,25 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Date — inline editable -->
+      <!-- Date — inline editable (locked for recurring transactions) -->
       <FormFieldGroup :label="t('form.date')">
         <InlineEditField
           :editing="editingField === 'date'"
+          :disabled="!!transaction.recurringItemId"
           tint-color="orange"
           @start-edit="startEdit('date')"
         >
           <template #view>
-            <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
-              {{ formatDate(transaction.date) }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
+                {{ formatDate(transaction.date) }}
+              </span>
+              <span
+                v-if="transaction.recurringItemId"
+                class="text-xs text-[var(--color-text-muted)]"
+                >🔒</span
+              >
+            </div>
           </template>
           <template #edit>
             <div class="flex items-center gap-2">
