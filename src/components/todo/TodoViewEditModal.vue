@@ -227,8 +227,14 @@ function handleAssigneeChange(value: string | string[]) {
 // Toggle complete/reopen
 async function handleToggleComplete() {
   if (!todo.value) return;
+  const wasOpen = !todo.value.completed;
   await todoStore.toggleComplete(todo.value.id, familyStore.currentMember?.id ?? '');
   playPop();
+  // If completing (not reopening), close modal after a short delay
+  // to let the celebration animation start
+  if (wasOpen) {
+    setTimeout(() => emit('close'), 300);
+  }
 }
 
 // Close/Done/Delete handlers
@@ -320,36 +326,22 @@ async function handleDelete() {
         </template>
       </InlineEditField>
 
-      <!-- Status + toggle -->
+      <!-- Status badge -->
       <FormFieldGroup :label="t('todo.status')">
-        <div class="flex items-center gap-3">
-          <span
-            v-if="todo.completed"
-            class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-green-700"
-            style="background: var(--tint-success-10)"
-          >
-            ✓ {{ t('todo.status.completed') }}
-          </span>
-          <span
-            v-else
-            class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700"
-            style="background: var(--tint-purple-15)"
-          >
-            {{ t('todo.status.open') }}
-          </span>
-          <button
-            type="button"
-            class="font-outfit rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
-            :class="
-              todo.completed
-                ? 'text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20'
-                : 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-            "
-            @click="handleToggleComplete"
-          >
-            {{ todo.completed ? t('todo.reopenTask') : t('action.markCompleted') }}
-          </button>
-        </div>
+        <span
+          v-if="todo.completed"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-green-700"
+          style="background: var(--tint-success-10)"
+        >
+          ✓ {{ t('todo.status.completed') }}
+        </span>
+        <span
+          v-else
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700"
+          style="background: var(--tint-purple-15)"
+        >
+          {{ t('todo.status.open') }}
+        </span>
       </FormFieldGroup>
 
       <!-- Due date — inline editable -->
@@ -581,6 +573,28 @@ async function handleDelete() {
             {{ viewCompletedBy.name }}
           </span>
         </FormFieldGroup>
+      </div>
+
+      <!-- Complete / Reopen action (bottom of modal) -->
+      <div class="border-t border-gray-100 pt-3 dark:border-slate-700">
+        <button
+          v-if="!todo.completed"
+          type="button"
+          class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
+          style="background: linear-gradient(135deg, #27ae60, #2ecc71)"
+          @click="handleToggleComplete"
+        >
+          <span>✓</span>
+          {{ t('action.markCompleted') }}
+        </button>
+        <button
+          v-else
+          type="button"
+          class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-purple-600 transition-colors hover:bg-purple-50 active:bg-purple-100 dark:hover:bg-purple-900/20"
+          @click="handleToggleComplete"
+        >
+          {{ t('todo.reopenTask') }}
+        </button>
       </div>
     </div>
   </BeanieFormModal>

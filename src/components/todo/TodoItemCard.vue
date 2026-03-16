@@ -63,26 +63,26 @@ const timeAgo = computed(() => {
   <!-- Completed task card -->
   <div
     v-if="todo.completed"
-    class="group flex items-center gap-4 rounded-2xl p-4 opacity-50"
+    class="group flex items-center gap-3 rounded-2xl p-3 opacity-50 md:gap-4 md:p-4"
     style="background: var(--tint-slate-5)"
   >
     <!-- Green checkbox -->
     <button
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg md:h-7 md:w-7"
       style="background: #27ae60"
       @click="emit('toggle', todo.id)"
     >
-      <span class="text-xs font-bold text-white">✓</span>
+      <span class="text-[10px] font-bold text-white md:text-xs">✓</span>
     </button>
 
     <!-- Content (clickable for view) -->
     <div class="min-w-0 flex-1 cursor-pointer" @click="emit('view', todo)">
-      <p class="font-outfit text-base font-semibold line-through">
+      <p class="font-outfit text-sm font-semibold line-through md:text-base">
         {{ todo.title }}
       </p>
       <p
         v-if="todo.description"
-        class="mt-0.5 line-clamp-2 text-sm leading-relaxed text-[var(--color-text-muted)]"
+        class="mt-0.5 line-clamp-1 text-xs leading-relaxed text-[var(--color-text-muted)] md:line-clamp-2 md:text-sm"
       >
         {{ todo.description }}
       </p>
@@ -108,16 +108,16 @@ const timeAgo = computed(() => {
   <!-- Open task card -->
   <div
     v-else
-    class="group flex items-center gap-4 rounded-2xl border p-4 transition-all"
+    class="group flex items-center gap-3 rounded-2xl border p-3 transition-all md:gap-4 md:p-4"
     :class="
       isOverdue
         ? 'border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50'
         : 'border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-800'
     "
   >
-    <!-- Checkbox -->
+    <!-- Checkbox (smaller on mobile) -->
     <button
-      class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
+      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors md:h-7 md:w-7"
       :class="
         isOverdue
           ? 'border-red-400 hover:bg-red-100 dark:border-red-500'
@@ -128,47 +128,53 @@ const timeAgo = computed(() => {
 
     <!-- Content (clickable for view) -->
     <div class="min-w-0 flex-1 cursor-pointer" @click="emit('view', todo)">
-      <p class="font-outfit text-base font-semibold text-[var(--color-text)]">
+      <p class="font-outfit text-sm font-semibold text-[var(--color-text)] md:text-base">
         {{ todo.title }}
       </p>
+
+      <!-- Description (1 line on mobile, 2 on desktop) -->
       <p
         v-if="todo.description"
-        class="mt-0.5 line-clamp-2 text-sm leading-relaxed text-[var(--color-text-muted)]"
+        class="mt-0.5 line-clamp-1 text-xs leading-relaxed text-[var(--color-text-muted)] md:line-clamp-2 md:text-sm"
       >
         {{ todo.description }}
       </p>
-      <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
-        <!-- Date — orange pill with overdue tag when past due -->
+
+      <!-- Metadata row — compact on mobile, full on desktop -->
+      <div class="mt-1 flex flex-wrap items-center gap-1.5 md:mt-1.5 md:gap-2.5">
+        <!-- Date — compact on mobile, full on desktop -->
         <span
           v-if="formattedDate && isOverdue"
-          class="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
+          class="inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[10px] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
         >
           ⏰{{ formattedDate }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
-          <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
+          <span
+            class="hidden rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase md:inline"
+          >
             {{ t('todo.overdue') }}
           </span>
         </span>
         <span
           v-else-if="formattedDate"
-          class="text-xs font-semibold"
+          class="text-[10px] font-semibold md:text-xs"
           :style="{ color: 'var(--color-primary-500)' }"
         >
           📅 {{ formattedDate }}<template v-if="todo.dueTime">, {{ todo.dueTime }}</template>
         </span>
-
-        <!-- No date set -->
-        <span v-else class="text-xs opacity-35">{{ t('todo.noDateSet') }}</span>
+        <span v-else class="text-[10px] opacity-35 md:text-xs">{{ t('todo.noDateSet') }}</span>
 
         <!-- Assignee chip(s) -->
         <MemberChip v-for="mid in normalizeAssignees(todo)" :key="mid" :member-id="mid" />
 
-        <!-- Time ago -->
-        <span class="text-xs opacity-35">{{ timeAgo }}</span>
+        <!-- Time ago (desktop only) -->
+        <span class="hidden text-xs opacity-35 md:inline">{{ timeAgo }}</span>
       </div>
     </div>
 
-    <!-- Action buttons -->
-    <div class="flex shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+    <!-- Action buttons (hidden on mobile — accessible via view modal) -->
+    <div
+      class="hidden shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 md:flex"
+    >
       <button
         class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
         style="background: var(--tint-slate-5)"

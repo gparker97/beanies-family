@@ -94,11 +94,15 @@ function applySorting(items: TodoItem[]): TodoItem[] {
 }
 
 // Actions
-async function handleQuickAdd(payload: { title: string; dueDate?: string; assigneeId?: string }) {
+async function handleQuickAdd(payload: {
+  title: string;
+  dueDate?: string;
+  assigneeIds?: string[];
+}) {
   await todoStore.createTodo({
     title: payload.title,
     dueDate: payload.dueDate,
-    ...(payload.assigneeId ? toAssigneePayload([payload.assigneeId]) : {}),
+    ...(payload.assigneeIds?.length ? toAssigneePayload(payload.assigneeIds) : {}),
     completed: false,
     createdBy: currentMemberId.value,
   });

@@ -7,6 +7,7 @@ import { formatNookDate } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
 import type { TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
@@ -16,7 +17,8 @@ const familyStore = useFamilyStore();
 // ── Quick-add state ─────────────────────────────────────────────────────────
 const newTaskTitle = ref('');
 const newTaskDate = ref('');
-const newTaskAssignee = ref('');
+const newTaskAssignees = ref<string[]>([]);
+const dateInputFocused = ref(false);
 
 // ── Display ─────────────────────────────────────────────────────────────────
 const MAX_VISIBLE = 8;
@@ -69,13 +71,13 @@ async function addTask() {
   await todoStore.createTodo({
     title,
     dueDate: newTaskDate.value || undefined,
-    ...(newTaskAssignee.value ? toAssigneePayload([newTaskAssignee.value]) : {}),
+    ...(newTaskAssignees.value.length ? toAssigneePayload(newTaskAssignees.value) : {}),
     completed: false,
     createdBy: familyStore.currentMember?.id || '',
   });
   newTaskTitle.value = '';
   newTaskDate.value = '';
-  newTaskAssignee.value = '';
+  newTaskAssignees.value = [];
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -152,62 +154,58 @@ async function toggleComplete(todoId: string) {
           :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
         >
           <span class="text-base">📅</span>
-          <input
-            v-model="newTaskDate"
-            type="date"
-            class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-            :style="{ color: newTaskDate ? 'var(--color-primary)' : 'var(--color-text)' }"
-          />
+          <div class="relative">
+            <input
+              v-model="newTaskDate"
+              type="date"
+              class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+              :style="{
+                color: newTaskDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
+              }"
+              @focus="dateInputFocused = true"
+              @blur="dateInputFocused = false"
+            />
+            <span
+              v-if="!newTaskDate && !dateInputFocused"
+              class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
+            >
+              {{ t('todo.selectDueDate') }}
+            </span>
+          </div>
         </div>
-        <!-- Assign dropdown (desktop) -->
-        <div
-          class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
-          :class="newTaskAssignee ? 'bg-[var(--tint-purple-8)]' : ''"
-          :style="!newTaskAssignee ? 'background: var(--tint-slate-5)' : undefined"
-        >
-          <span class="text-base">👤</span>
-          <select
-            v-model="newTaskAssignee"
-            class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold text-[var(--color-text)] shadow-none focus:shadow-none focus:ring-0"
-          >
-            <option value="">{{ t('todo.assignTo') }}</option>
-            <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
-              {{ member.name }}
-            </option>
-          </select>
+        <!-- Assignee (desktop) -->
+        <div class="hidden sm:flex">
+          <AssigneePickerButton v-model="newTaskAssignees" size="sm" />
         </div>
       </div>
-      <!-- Row 2: Date + Assignee (mobile only) -->
-      <div class="flex gap-2 sm:hidden">
+      <!-- Row 2: Date + Assignee on same line (mobile only) -->
+      <div class="flex items-center gap-2 sm:hidden">
         <div
-          class="flex flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
+          class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
           :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
           :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
         >
-          <span class="text-base">📅</span>
-          <input
-            v-model="newTaskDate"
-            type="date"
-            class="beanies-input font-outfit min-w-0 flex-1 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-            :style="{ color: newTaskDate ? 'var(--color-primary)' : 'var(--color-text)' }"
-          />
+          <span class="text-sm">📅</span>
+          <div class="relative min-w-0 flex-1">
+            <input
+              v-model="newTaskDate"
+              type="date"
+              class="beanies-input font-outfit w-full min-w-0 cursor-pointer border-none bg-transparent py-2 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
+              :style="{
+                color: newTaskDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
+              }"
+              @focus="dateInputFocused = true"
+              @blur="dateInputFocused = false"
+            />
+            <span
+              v-if="!newTaskDate && !dateInputFocused"
+              class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-1 text-xs font-semibold text-[var(--color-text)]"
+            >
+              {{ t('todo.selectDueDate') }}
+            </span>
+          </div>
         </div>
-        <div
-          class="flex flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
-          :class="newTaskAssignee ? 'bg-[var(--tint-purple-8)]' : ''"
-          :style="!newTaskAssignee ? 'background: var(--tint-slate-5)' : undefined"
-        >
-          <span class="text-base">👤</span>
-          <select
-            v-model="newTaskAssignee"
-            class="beanies-input font-outfit min-w-0 flex-1 cursor-pointer border-none bg-transparent py-2.5 text-xs font-semibold text-[var(--color-text)] shadow-none focus:shadow-none focus:ring-0"
-          >
-            <option value="">{{ t('todo.assignTo') }}</option>
-            <option v-for="member in familyStore.members" :key="member.id" :value="member.id">
-              {{ member.name }}
-            </option>
-          </select>
-        </div>
+        <AssigneePickerButton v-model="newTaskAssignees" size="sm" />
       </div>
     </div>
 
@@ -240,23 +238,25 @@ async function toggleComplete(todoId: string) {
           </p>
           <p
             v-if="todo.description"
-            class="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[var(--color-text-muted)]"
+            class="mt-0.5 line-clamp-1 text-xs leading-relaxed text-[var(--color-text-muted)] md:line-clamp-2"
           >
             {{ todo.description }}
           </p>
-          <div class="mt-1 flex flex-wrap items-center gap-2">
+          <div class="mt-1 flex flex-wrap items-center gap-1.5 md:gap-2">
             <span
               v-if="todo.dueDate && isOverdue(todo)"
-              class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--color-primary-500)] px-2.5 py-0.5 text-xs font-semibold text-white"
+              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[10px] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
             >
               ⏰ {{ formattedDate(todo.dueDate) }}
-              <span class="rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase">
+              <span
+                class="hidden rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase md:inline"
+              >
                 {{ t('todo.overdue') }}
               </span>
             </span>
             <span
               v-else-if="todo.dueDate"
-              class="font-outfit text-xs font-semibold"
+              class="font-outfit text-[10px] font-semibold md:text-xs"
               :style="{ color: 'var(--color-primary-500)' }"
             >
               📅 {{ formattedDate(todo.dueDate) }}
