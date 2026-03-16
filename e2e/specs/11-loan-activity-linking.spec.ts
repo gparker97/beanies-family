@@ -115,9 +115,9 @@ test.describe('Loan & Activity Linking', () => {
     await page.getByText(ui('recurringPrompt.createPayment')).click();
 
     // Wait for Pay From section to expand
-    await expect(page.getByText(ui('recurringPrompt.payFrom'))).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(
+      page.locator('div[role="dialog"]').getByText(ui('recurringPrompt.payFrom')).first()
+    ).toBeVisible({ timeout: 5000 });
 
     // Select the pay-from account from the EntityLinkDropdown
     const accountBtn = page
