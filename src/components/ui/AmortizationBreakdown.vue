@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import type { CurrencyCode } from '@/types/models';
@@ -19,10 +20,20 @@ function fmt(amount: number): string {
 
 <template>
   <div class="space-y-2 rounded-2xl bg-[var(--tint-orange-8)] p-4">
-    <div
-      class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text-muted)] uppercase"
-    >
-      {{ t('txLink.amortizationBreakdown') }}
+    <div class="flex items-center gap-2">
+      <span
+        class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text-muted)] uppercase"
+      >
+        {{ t('txLink.amortizationBreakdown') }}
+      </span>
+      <InfoHintBadge
+        :text="t('txLink.hintAmortizationIntro')"
+        :items="[
+          t('txLink.hintAmortizationInterest'),
+          t('txLink.hintAmortizationPrincipal'),
+          t('txLink.hintAmortizationOverTime'),
+        ]"
+      />
     </div>
     <div class="grid grid-cols-3 gap-2 text-sm text-[var(--color-text)]">
       <div>

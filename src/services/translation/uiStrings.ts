@@ -519,6 +519,52 @@ const STRING_DEFS = {
   'txLink.monthlyTransaction': { en: 'Monthly Transaction', beanie: 'monthly transaction' },
   'txLink.recentTransactions': { en: 'Recent Transactions', beanie: 'recent transactions' },
   'txLink.linkedTransactions': { en: 'Linked Transactions', beanie: 'linked transactions' },
+  'txLink.hintDirection': {
+    en: 'Linked payments are always outgoing. To change, remove the link from the activity or loan.',
+    beanie: 'linked payments are always outgoing',
+  },
+  'txLink.hintCurrency': {
+    en: 'Currency is set by the linked activity or loan and cannot be changed here.',
+    beanie: 'currency is set by the linked item',
+  },
+  'txLink.hintFrequency': {
+    en: 'Frequency is managed by the linked activity or loan. Edit the source to change.',
+    beanie: 'frequency is managed by the linked item',
+  },
+  'txLink.hintSchedule': {
+    en: 'Schedule dates are managed by the linked activity or loan.',
+    beanie: 'schedule is managed by the linked item',
+  },
+  'txLink.hintLinkedActivity': {
+    en: 'This transaction is linked to the activity above. To unlink, disable the monthly payment from the activity.',
+    beanie: 'linked to the activity above — disable monthly payment to unlink',
+  },
+  'txLink.hintLinkedLoan': {
+    en: 'This transaction is linked to the loan above. Payments automatically reduce the outstanding balance.',
+    beanie: 'linked to the loan above — payments reduce the balance',
+  },
+  'txLink.hintDateView': {
+    en: 'Date is managed by the recurring schedule and cannot be changed for individual transactions.',
+    beanie: 'date is managed by the recurring schedule',
+  },
+  'txLink.hintAmortizationIntro': {
+    en: 'Each payment is split into interest and principal using standard amortization:',
+    beanie: 'Each payment is split into interest and principal using standard amortization:',
+  },
+  'txLink.hintAmortizationInterest': {
+    en: 'Interest = outstanding balance \u00d7 (annual rate \u00f7 12). This is the cost of borrowing for the month.',
+    beanie:
+      'Interest = outstanding balance \u00d7 (annual rate \u00f7 12). This is the cost of borrowing for the month.',
+  },
+  'txLink.hintAmortizationPrincipal': {
+    en: 'Principal = payment \u2212 interest. This portion reduces your outstanding balance.',
+    beanie: 'Principal = payment \u2212 interest. This portion reduces your outstanding balance.',
+  },
+  'txLink.hintAmortizationOverTime': {
+    en: 'As the balance decreases, more of each payment goes to principal and less to interest.',
+    beanie:
+      'As the balance decreases, more of each payment goes to principal and less to interest.',
+  },
 
   // Recurring Payment Prompt
   'recurringPrompt.createPayment': {
