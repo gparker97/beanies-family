@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import ToggleSwitch from './ToggleSwitch.vue';
 import ConditionalSection from './ConditionalSection.vue';
 import EntityLinkDropdown from './EntityLinkDropdown.vue';
+import InfoHintBadge from './InfoHintBadge.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
@@ -65,10 +66,11 @@ const summaryText = computed(() => {
       class="flex cursor-pointer items-center justify-between"
       @click="emit('update:modelValue', !modelValue)"
     >
-      <div>
-        <div class="font-outfit text-sm font-semibold text-[var(--color-text)]">
+      <div class="flex items-center gap-1.5">
+        <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
           {{ t('recurringPrompt.createPayment') }}
-        </div>
+        </span>
+        <InfoHintBadge :text="t('recurringPrompt.createPaymentHint')" />
       </div>
       <ToggleSwitch
         :model-value="modelValue"
