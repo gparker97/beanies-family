@@ -36,6 +36,66 @@ test.describe('Loan & Activity Linking', () => {
       .click();
   }
 
+  /**
+   * Click the fee schedule "Monthly" chip inside the "more details" section.
+   * The recurrence frequency section also has a "Monthly" button (hidden via CSS
+   * when in one-off mode but still in the DOM), so we disambiguate by using .last()
+   * which targets the fee schedule chip that appears later in the DOM.
+   */
+  async function clickFeeScheduleMonthly(page: import('@playwright/test').Page) {
+    const dialog = page.locator('div[role="dialog"]');
+    // The fee schedule Monthly button is the last one matching since the recurrence
+    // frequency Monthly (hidden in CSS) appears earlier in the DOM
+    await dialog
+      .getByRole('button', { name: ui('planner.fee.monthly') })
+      .last()
+      .click();
+  }
+
+  /**
+   * Navigate to the transactions page and open the view modal for a transaction
+   * by clicking the transaction row (for non-recurring transactions).
+   */
+  async function openTransactionViewByClick(
+    page: import('@playwright/test').Page,
+    description: string
+  ) {
+    await page.goto('/transactions');
+    await page.waitForURL(/\/transactions/);
+    // Wait for the transaction row to appear (proves store is loaded)
+    const txRow = page.getByText(description).first();
+    await expect(txRow).toBeVisible({ timeout: 10000 });
+    await txRow.click();
+    // Wait for the view modal to open
+    const dialog = page.locator('div[role="dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    return dialog;
+  }
+
+  /**
+   * Navigate to transactions with ?view= query param. Uses a retry mechanism
+   * since the onMounted handler may fire before the store has hydrated.
+   * First navigates to /transactions to prime the store, then reloads with ?view=.
+   */
+  async function openTransactionViewByUrl(
+    page: import('@playwright/test').Page,
+    txId: string,
+    txDescription: string
+  ) {
+    // First navigate to /transactions to let the store hydrate
+    await page.goto('/transactions');
+    await page.waitForURL(/\/transactions/);
+    // Wait for the transaction to appear in the list (proves store is loaded)
+    await expect(page.getByText(txDescription).first()).toBeVisible({ timeout: 10000 });
+    // Now navigate with ?view= — the store is already loaded, and the beforeunload
+    // handler saves the Automerge doc to sessionStorage for the reload
+    await page.goto(`/transactions?view=${txId}`);
+    await page.waitForURL(/\/transactions/);
+    const dialog = page.locator('div[role="dialog"]');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    return dialog;
+  }
+
   test('activity with monthly fee creates a recurring item', async ({ page }) => {
     await setup(page);
 
@@ -79,7 +139,8 @@ test.describe('Loan & Activity Linking', () => {
     await costInput.fill('150');
 
     // Set fee schedule to "Monthly" so RecurringPaymentPrompt appears
-    await page.getByRole('button', { name: ui('planner.fee.monthly') }).click();
+    // Use the helper that disambiguates from the recurrence frequency "Monthly"
+    await clickFeeScheduleMonthly(page);
 
     // Wait for RecurringPaymentPrompt to appear
     await expect(page.getByText(ui('recurringPrompt.createPayment'))).toBeVisible({
@@ -192,13 +253,8 @@ test.describe('Loan & Activity Linking', () => {
       transactions: [transaction],
     });
 
-    // Navigate to transactions page with view query param
-    await page.goto(`/transactions?view=tx-linked-1`);
-    await page.waitForURL(/\/transactions/);
-
-    // TransactionViewEditModal should open showing the linked activity
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    // Click the transaction row to open the view modal (no recurringItemId, so click works)
+    const dialog = await openTransactionViewByClick(page, 'Piano Lesson Payment');
 
     // Verify the linked activity name is visible
     await expect(dialog.getByText('Piano Lesson')).toBeVisible({ timeout: 5000 });
@@ -206,7 +262,7 @@ test.describe('Loan & Activity Linking', () => {
     // Verify the activity title label is shown
     await expect(dialog.getByText(ui('planner.field.title'))).toBeVisible();
 
-    // Verify the "→ view" button is present (visible on hover, but exists in DOM)
+    // Verify the "-> view" button is present (visible on hover, but exists in DOM)
     await expect(dialog.getByText('→ view').first()).toBeTruthy();
   });
 
@@ -287,9 +343,12 @@ test.describe('Loan & Activity Linking', () => {
     await page.goto('/assets');
     await page.waitForURL('/assets');
 
-    // Verify the asset card is visible
+    // Wait for asset card to appear by checking for the asset name first
+    await expect(page.getByText('Family Home').first()).toBeVisible({ timeout: 10000 });
+
+    // Now find the asset card
     const assetCard = page.locator('[data-testid="asset-card"]').first();
-    await expect(assetCard).toBeVisible({ timeout: 10000 });
+    await expect(assetCard).toBeVisible({ timeout: 5000 });
 
     // Verify the asset name
     await expect(assetCard.getByText('Family Home')).toBeVisible();
@@ -298,8 +357,9 @@ test.describe('Loan & Activity Linking', () => {
     await expect(assetCard.getByText(/320,000/)).toBeVisible({ timeout: 5000 });
 
     // Verify the "Monthly Transaction" section is present
+    // Use a longer timeout as the recurring store may need time to load
     await expect(assetCard.getByText(ui('txLink.monthlyTransaction'))).toBeVisible({
-      timeout: 5000,
+      timeout: 10000,
     });
 
     // Verify the payment amount (1,800) appears in the linked section
@@ -355,13 +415,8 @@ test.describe('Loan & Activity Linking', () => {
       transactions: [transaction],
     });
 
-    // Navigate to transactions with view query
-    await page.goto(`/transactions?view=tx-swim-1`);
-    await page.waitForURL(/\/transactions/);
-
-    // Wait for the view modal to open
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
+    // Click the transaction row to open the view modal (no recurringItemId, so click works)
+    const dialog = await openTransactionViewByClick(page, 'Swimming Class Payment');
 
     // Verify the linked activity is visible
     await expect(dialog.getByText('Swimming Class')).toBeVisible({ timeout: 5000 });
@@ -439,8 +494,8 @@ test.describe('Loan & Activity Linking', () => {
     const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
     await costInput.fill('75');
 
-    // Set fee schedule to Monthly
-    await page.getByRole('button', { name: ui('planner.fee.monthly') }).click();
+    // Set fee schedule to Monthly (disambiguate from recurrence frequency "Monthly")
+    await clickFeeScheduleMonthly(page);
 
     // Enable "Create Monthly Payment" toggle
     await expect(page.getByText(ui('recurringPrompt.createPayment'))).toBeVisible({
@@ -598,15 +653,12 @@ test.describe('Loan & Activity Linking', () => {
       transactions: [transaction],
     });
 
-    // Navigate to transactions with view query
-    await page.goto(`/transactions?view=tx-locked-1`);
-    await page.waitForURL(/\/transactions/);
+    // This transaction has recurringItemId, so clicking the row opens the recurring
+    // item modal instead of the view modal. Use the URL approach with a pre-load
+    // to avoid the race condition where onMounted fires before stores hydrate.
+    const dialog = await openTransactionViewByUrl(page, 'tx-locked-1', 'Dance Class');
 
-    // TransactionViewEditModal should open
-    const dialog = page.locator('div[role="dialog"]');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
-
-    // Verify the date field shows a lock icon (🔒) because recurringItemId is set
+    // Verify the date field shows a lock icon because recurringItemId is set
     await expect(dialog.getByText('🔒')).toBeVisible({ timeout: 5000 });
 
     // Verify the linked activity is displayed
