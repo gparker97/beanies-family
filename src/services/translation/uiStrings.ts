@@ -542,6 +542,14 @@ const STRING_DEFS = {
     en: 'View Transactions',
     beanie: 'view transactions',
   },
+  'recurringPrompt.paymentRemoved': {
+    en: 'Monthly Payment Removed',
+    beanie: 'monthly payment removed',
+  },
+  'recurringPrompt.paymentRemovedDetail': {
+    en: 'The recurring payment and all future transactions have been removed for this activity',
+    beanie: 'the recurring payment and all future transactions have been removed',
+  },
 
   // Loan Account Fields
   'loanAccount.details': { en: 'Loan Details', beanie: 'loan details' },

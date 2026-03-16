@@ -1,11 +1,13 @@
 <script setup lang="ts">
-withDefaults(
+const props = withDefaults(
   defineProps<{
     editing: boolean;
+    disabled?: boolean;
     tintColor?: 'purple' | 'orange' | 'green';
     alignItems?: 'center' | 'start';
   }>(),
   {
+    disabled: false,
     tintColor: 'purple',
     alignItems: 'center',
   }
@@ -26,9 +28,13 @@ const tintMap = {
   <div
     class="group/field rounded-lg px-1 py-0.5 transition-colors"
     :class="
-      editing ? '' : `cursor-pointer ${tintMap[tintColor]} [@media(hover:hover)]:cursor-pointer`
+      editing
+        ? ''
+        : props.disabled
+          ? 'cursor-default'
+          : `cursor-pointer ${tintMap[tintColor]} [@media(hover:hover)]:cursor-pointer`
     "
-    @click="!editing && $emit('start-edit')"
+    @click="!editing && !props.disabled && $emit('start-edit')"
   >
     <!-- View mode -->
     <div
@@ -38,6 +44,7 @@ const tintMap = {
     >
       <slot name="view" />
       <svg
+        v-if="!props.disabled"
         class="h-3.5 w-3.5 shrink-0 text-[var(--color-text-muted)] opacity-0 [@media(hover:hover)]:group-hover/field:opacity-40"
         :class="alignItems === 'start' ? 'mt-0.5' : ''"
         fill="none"
