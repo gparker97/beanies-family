@@ -189,8 +189,8 @@ test.describe('Loan & Activity Linking', () => {
       timeout: 5000,
     });
 
-    // Verify the payment amount (200) appears
-    await expect(viewDialog.getByText(/200/)).toBeVisible();
+    // Verify the payment amount appears in the monthly transaction section
+    await expect(viewDialog.getByText(/200\.00\/mo/)).toBeVisible();
   });
 
   test('clicking linked transaction in activity modal navigates to transactions', async ({
