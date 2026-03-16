@@ -625,3 +625,68 @@ describe('recurringProcessor - Loan Payment Generation', () => {
     }
   });
 });
+
+// --- Activity ID Passthrough ---
+
+describe('recurringProcessor - Activity ID Passthrough', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('should pass activityId through to the generated transaction', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+
+    const recurringWithActivity: RecurringItem = {
+      id: 'recurring-activity-1',
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 200,
+      currency: 'USD',
+      category: 'lesson_fees',
+      description: 'Swimming Lessons',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      activityId: 'activity-swim-1',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringWithActivity]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({
+      id: 'tx-activity-1',
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 200,
+      currency: 'USD',
+      category: 'lesson_fees',
+      date: '2024-01-15T00:00:00.000Z',
+      description: 'Swimming Lessons',
+      isReconciled: false,
+      recurringItemId: 'recurring-activity-1',
+      activityId: 'activity-swim-1',
+      createdAt: '2024-01-15T00:00:00.000Z',
+      updatedAt: '2024-01-15T00:00:00.000Z',
+    });
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount, balance: 800 });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(1);
+    // Verify the transaction input includes activityId
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityId: 'activity-swim-1',
+        recurringItemId: 'recurring-activity-1',
+      })
+    );
+  });
+});
