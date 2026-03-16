@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-15",
-    "translationCount": 1552
+    "lastUpdated": "2026-03-16",
+    "translationCount": 1572
   },
   "translations": {
     "app.name": {
@@ -7765,6 +7765,106 @@
       "translation": "游泳",
       "hash": "fydqb",
       "lastUpdated": "2026-03-15"
+    },
+    "action.view": {
+      "translation": "查看",
+      "hash": "1l58l",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.linkedActivity": {
+      "translation": "链接的活动",
+      "hash": "orrpkm",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.monthlyTransaction": {
+      "translation": "用户月交易手续费",
+      "hash": "nzpe6j",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.recentTransactions": {
+      "translation": "最近交易",
+      "hash": "8dpeyu",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintDirection": {
+      "translation": "关联的付款始终是出站的。如需更改，请从活动或贷款中删除链接。",
+      "hash": "o5822i",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintCurrency": {
+      "translation": "货币由关联的活动或贷款设置，无法在此处更改。",
+      "hash": "sfbn95",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintFrequency": {
+      "translation": "频率由关联的活动或贷款管理。编辑要更改的源。",
+      "hash": "itdx93",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintSchedule": {
+      "translation": "计划日期由关联的活动或贷款管理。",
+      "hash": "92bgvi",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintLinkedActivity": {
+      "translation": "此交易已关联到上述活动。要取消关联，请从活动中禁用每月付款。",
+      "hash": "fbbk2r",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintLinkedLoan": {
+      "translation": "此交易与上述贷款相关联。付款会自动减少未付余额。",
+      "hash": "nzqgen",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintDateView": {
+      "translation": "日期由定期计划管理，不能为单个交易更改。",
+      "hash": "5et73j",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintAmortizationIntro": {
+      "translation": "每笔付款按标准摊销分为利息和本金：",
+      "hash": "wim4zs",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintAmortizationInterest": {
+      "translation": "利息=未清余额\\ u00d7 （年利率\\ u00f7 12 ）。这是当月的借款成本。",
+      "hash": "huf7ae",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintAmortizationPrincipal": {
+      "translation": "本金=支付\\ u2212利息。此部分会减少您的未结余额。",
+      "hash": "bc25re",
+      "lastUpdated": "2026-03-16"
+    },
+    "txLink.hintAmortizationOverTime": {
+      "translation": "随着余额的减少，每笔付款的本金增加，利息减少。",
+      "hash": "4e37q5",
+      "lastUpdated": "2026-03-16"
+    },
+    "recurringPrompt.paymentCreated": {
+      "translation": "每月付款已创建",
+      "hash": "b4uqt",
+      "lastUpdated": "2026-03-16"
+    },
+    "recurringPrompt.paymentCreatedDetail": {
+      "translation": "已为此活动设置定期付款",
+      "hash": "abus4l",
+      "lastUpdated": "2026-03-16"
+    },
+    "recurringPrompt.viewTransactions": {
+      "translation": "查看交易",
+      "hash": "q4yqk0",
+      "lastUpdated": "2026-03-16"
+    },
+    "recurringPrompt.paymentRemoved": {
+      "translation": "每月付款已删除",
+      "hash": "qjhlf",
+      "lastUpdated": "2026-03-16"
+    },
+    "recurringPrompt.paymentRemovedDetail": {
+      "translation": "已删除此活动的定期付款和所有未来交易",
+      "hash": "oai22s",
+      "lastUpdated": "2026-03-16"
     }
   }
 }
