@@ -572,10 +572,6 @@ const STRING_DEFS = {
     beanie: 'create monthly payment',
   },
   'recurringPrompt.payFrom': { en: 'Pay From', beanie: 'pay from' },
-  'recurringPrompt.manualSetup': {
-    en: 'For per-session, weekly, or termly fees, set up recurring payments manually from transactions',
-    beanie: 'for per-session, weekly, or termly fees, set up recurring payments from transactions',
-  },
   'recurringPrompt.paymentCreated': {
     en: 'Monthly Payment Created',
     beanie: 'monthly payment created',
@@ -2464,11 +2460,22 @@ const STRING_DEFS = {
 
   // Planner — Fee schedule labels
   'planner.fee.none': { en: 'No fees', beanie: 'no fees' },
-  'planner.fee.per_session': { en: 'Per session', beanie: 'per session' },
+  'planner.fee.per_session': { en: 'Per Session', beanie: 'per session' },
   'planner.fee.weekly': { en: 'Weekly', beanie: 'weekly' },
   'planner.fee.monthly': { en: 'Monthly', beanie: 'monthly' },
-  'planner.fee.termly': { en: 'Per term', beanie: 'per term' },
+  'planner.fee.quarterly': { en: 'Quarterly', beanie: 'quarterly' },
   'planner.fee.yearly': { en: 'Yearly', beanie: 'yearly' },
+  'planner.fee.custom': { en: 'Custom', beanie: 'custom' },
+  'planner.fee.termly': { en: 'Per Term', beanie: 'per term' },
+  'planner.fee.calculatedMonthly': { en: 'Monthly Charge', beanie: 'monthly charge' },
+  'planner.fee.monthlyCalcHint': {
+    en: 'Calculated monthly equivalent based on your fee schedule. Linked transactions always use this monthly amount for consistent tracking.',
+    beanie:
+      'Calculated monthly equivalent based on your fee schedule. Linked transactions always use this monthly amount for consistent tracking.',
+  },
+  'planner.fee.customPeriod': { en: 'Every', beanie: 'every' },
+  'planner.fee.weeks': { en: 'Weeks', beanie: 'weeks' },
+  'planner.fee.months': { en: 'Months', beanie: 'months' },
 
   // Planner — Form fields
   'planner.field.title': { en: 'Activity Title', beanie: 'activity title' },

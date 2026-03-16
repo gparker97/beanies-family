@@ -5,6 +5,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { activityCategoryToExpenseCategory } from '@/constants/categories';
+import { calculateMonthlyFee } from '@/utils/finance';
 import { useSettingsStore } from './settingsStore';
 import { toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -174,18 +175,24 @@ export const useActivityStore = defineStore('activities', () => {
   async function syncLinkedRecurringPayment(activity: FamilyActivity) {
     const enabled = !!(activity.payFromAccountId && activity.feeAmount);
     const settingsStore = useSettingsStore();
-    const freq = activity.feeSchedule === 'yearly' ? 'yearly' : 'monthly';
+    const monthlyAmount = calculateMonthlyFee({
+      feeSchedule: activity.feeSchedule,
+      feeAmount: activity.feeAmount ?? 0,
+      sessionsPerWeek: activity.daysOfWeek?.length || 1,
+      feeCustomPeriod: activity.feeCustomPeriod,
+      feeCustomPeriodUnit: activity.feeCustomPeriodUnit,
+    });
     const newItemId = await syncEntityLinkedRecurringItem({
       enabled,
       existingItemId: activity.linkedRecurringItemId,
       accountId: activity.payFromAccountId,
-      amount: activity.feeAmount ?? 0,
+      amount: monthlyAmount,
       currency: (activity.feeCurrency || settingsStore.displayCurrency) as CurrencyCode,
       category: activityCategoryToExpenseCategory(activity.category) || 'other_lessons',
       description: `${activity.title} Fee`,
       activityId: activity.id,
       startDate: activity.date,
-      frequency: freq,
+      frequency: 'monthly',
     });
     // Sync linkedRecurringItemId on the activity (clear with '' when removed)
     const currentId = activity.linkedRecurringItemId || '';

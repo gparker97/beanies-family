@@ -357,7 +357,15 @@ export type ActivityCategory =
   | 'bar_mitzvah'
   | 'other_celebration';
 export type ActivityRecurrence = 'weekly' | 'daily' | 'monthly' | 'yearly' | 'none';
-export type FeeSchedule = 'none' | 'per_session' | 'weekly' | 'monthly' | 'termly' | 'yearly';
+export type FeeSchedule =
+  | 'none'
+  | 'per_session'
+  | 'weekly'
+  | 'monthly'
+  | 'quarterly'
+  | 'yearly'
+  | 'custom'
+  | 'termly'; // @deprecated — legacy, treated as monthly passthrough
 export type ReminderMinutes = 0 | 5 | 10 | 15 | 30 | 60 | 120 | 1440;
 
 export interface FamilyActivity {
@@ -394,6 +402,8 @@ export interface FamilyActivity {
   feeSchedule: FeeSchedule;
   feeAmount?: number;
   feeCurrency?: CurrencyCode;
+  feeCustomPeriod?: number; // e.g. 6 for "every 6 weeks" (custom schedule only)
+  feeCustomPeriodUnit?: 'weeks' | 'months'; // unit for custom period
   /** @deprecated Use payFromAccountId instead — the account's memberId identifies the payer */
   feePayerId?: UUID;
   payFromAccountId?: UUID; // Account to pay from for linked recurring payment

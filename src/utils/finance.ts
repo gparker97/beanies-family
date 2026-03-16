@@ -16,6 +16,59 @@ export function computeGoalAllocRaw(
 }
 
 /**
+ * Calculate the monthly equivalent of a fee charged at any frequency.
+ * Used by ActivityModal (UI preview) and activityStore (recurring item sync).
+ */
+export function calculateMonthlyFee(opts: {
+  feeSchedule: string;
+  feeAmount: number;
+  sessionsPerWeek?: number;
+  feeCustomPeriod?: number;
+  feeCustomPeriodUnit?: 'weeks' | 'months';
+}): number {
+  const {
+    feeSchedule,
+    feeAmount,
+    sessionsPerWeek = 1,
+    feeCustomPeriod,
+    feeCustomPeriodUnit,
+  } = opts;
+  if (!feeAmount || feeAmount <= 0) return 0;
+
+  let monthly: number;
+  switch (feeSchedule) {
+    case 'per_session':
+      monthly = (feeAmount * Math.max(sessionsPerWeek, 1) * 52) / 12;
+      break;
+    case 'weekly':
+      monthly = (feeAmount * 52) / 12;
+      break;
+    case 'monthly':
+      monthly = feeAmount;
+      break;
+    case 'quarterly':
+      monthly = feeAmount / 3;
+      break;
+    case 'yearly':
+      monthly = feeAmount / 12;
+      break;
+    case 'custom':
+      if (feeCustomPeriodUnit === 'weeks' && feeCustomPeriod && feeCustomPeriod > 0) {
+        monthly = (feeAmount / feeCustomPeriod) * (52 / 12);
+      } else if (feeCustomPeriodUnit === 'months' && feeCustomPeriod && feeCustomPeriod > 0) {
+        monthly = feeAmount / feeCustomPeriod;
+      } else {
+        monthly = feeAmount;
+      }
+      break;
+    default:
+      // Legacy 'termly' and unknown — passthrough
+      monthly = feeAmount;
+  }
+  return Math.round(monthly * 100) / 100;
+}
+
+/**
  * Calculate how a transaction affects an account balance.
  * Income adds, expense subtracts, transfer debits source and credits destination.
  */
