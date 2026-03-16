@@ -3,12 +3,10 @@ import { ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useFamilyStore } from '@/stores/familyStore';
-import { formatNookDate } from '@/utils/date';
-import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
+import { toAssigneePayload } from '@/utils/assignees';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
-import type { TodoItem } from '@/types/models';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -48,23 +46,6 @@ const selectedTodo = computed(() =>
 );
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-function isOverdue(todo: TodoItem): boolean {
-  if (todo.completed || !todo.dueDate) return false;
-  const now = new Date();
-  const dueDate = new Date(todo.dueDate);
-  if (todo.dueTime) {
-    const parts = todo.dueTime.split(':').map(Number);
-    dueDate.setHours(parts[0] ?? 23, parts[1] ?? 59, 0, 0);
-  } else {
-    dueDate.setHours(23, 59, 59, 999);
-  }
-  return now > dueDate;
-}
-
-function formattedDate(dueDate: string): string {
-  return formatNookDate(dueDate);
-}
-
 async function addTask() {
   const title = newTaskTitle.value.trim();
   if (!title) return;
@@ -211,60 +192,14 @@ async function toggleComplete(todoId: string) {
 
     <!-- Todo items -->
     <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <div
+      <TodoItemRow
         v-for="todo in displayTodos"
         :key="todo.id"
-        class="group flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 transition-all"
-        :class="
-          isOverdue(todo)
-            ? 'border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:hover:bg-red-950/50'
-            : 'border-[var(--tint-slate-10)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-slate-700 dark:hover:bg-slate-600'
-        "
-        @click="selectedTodoId = todo.id"
-      >
-        <button
-          type="button"
-          class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
-          :class="
-            isOverdue(todo)
-              ? 'border-red-400 hover:bg-red-100 dark:border-red-500'
-              : 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]'
-          "
-          @click.stop="toggleComplete(todo.id)"
-        />
-        <div class="min-w-0 flex-1">
-          <p class="font-outfit truncate text-sm font-semibold text-[var(--color-text)]">
-            {{ todo.title }}
-          </p>
-          <p
-            v-if="todo.description"
-            class="mt-0.5 line-clamp-1 text-xs leading-relaxed text-[var(--color-text-muted)] md:line-clamp-2"
-          >
-            {{ todo.description }}
-          </p>
-          <div class="mt-1 flex flex-wrap items-center gap-1.5 md:gap-2">
-            <span
-              v-if="todo.dueDate && isOverdue(todo)"
-              class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--color-primary-500)] px-2 py-0.5 text-[10px] font-semibold text-white md:gap-1.5 md:px-2.5 md:text-xs"
-            >
-              ⏰ {{ formattedDate(todo.dueDate) }}
-              <span
-                class="hidden rounded-full bg-white/25 px-1.5 py-px text-xs font-bold uppercase md:inline"
-              >
-                {{ t('todo.overdue') }}
-              </span>
-            </span>
-            <span
-              v-else-if="todo.dueDate"
-              class="font-outfit text-[10px] font-semibold md:text-xs"
-              :style="{ color: 'var(--color-primary-500)' }"
-            >
-              📅 {{ formattedDate(todo.dueDate) }}
-            </span>
-            <MemberChip v-for="mid in normalizeAssignees(todo)" :key="mid" :member-id="mid" />
-          </div>
-        </div>
-      </div>
+        :todo="todo"
+        compact
+        @toggle="toggleComplete($event)"
+        @view="selectedTodoId = $event.id"
+      />
     </div>
 
     <!-- View more footer -->
