@@ -115,27 +115,19 @@ test.describe('Loan & Activity Linking', () => {
       page.locator('div[role="dialog"]').getByText(ui('recurringPrompt.payFrom')).first()
     ).toBeVisible({ timeout: 5000 });
 
-    // Select the pay-from account from the EntityLinkDropdown
-    const accountBtn = page
+    // Select the pay-from account from the EntityLinkDropdown.
+    // The dropdown trigger shows placeholder text initially — click it to open,
+    // then select the account option via mousedown.
+    const dropdownTrigger = page
       .locator('div[role="dialog"]')
-      .getByRole('button', { name: new RegExp(accountName, 'i') });
-    const accountBtnVisible = await accountBtn
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-    if (accountBtnVisible) {
-      await accountBtn.click();
-    }
+      .getByRole('button', { name: new RegExp(ui('recurringPrompt.payFrom'), 'i') });
+    await dropdownTrigger.waitFor({ state: 'visible', timeout: 5000 });
+    await dropdownTrigger.click();
 
-    // If a dropdown appeared with the account, click it
+    // Wait for the dropdown options to appear, then select the account
     const accountOption = page.getByRole('button', { name: new RegExp(accountName, 'i') });
-    const optionVisible = await accountOption
-      .waitFor({ state: 'visible', timeout: 2000 })
-      .then(() => true)
-      .catch(() => false);
-    if (optionVisible) {
-      await accountOption.click();
-    }
+    await accountOption.waitFor({ state: 'visible', timeout: 5000 });
+    await accountOption.dispatchEvent('mousedown');
 
     // Save the activity
     await page.getByRole('button', { name: /^add activity$/i }).click();
@@ -306,16 +298,16 @@ test.describe('Loan & Activity Linking', () => {
       page.locator('div[role="dialog"]').getByText(ui('recurringPrompt.payFrom')).first()
     ).toBeVisible({ timeout: 5000 });
 
-    const accountBtn = page
+    // Open the EntityLinkDropdown and select the account
+    const dropdownTrigger2 = page
       .locator('div[role="dialog"]')
-      .getByRole('button', { name: /Integrity Checking/i });
-    const accountBtnVisible = await accountBtn
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
-    if (accountBtnVisible) {
-      await accountBtn.click();
-    }
+      .getByRole('button', { name: new RegExp(ui('recurringPrompt.payFrom'), 'i') });
+    await dropdownTrigger2.waitFor({ state: 'visible', timeout: 5000 });
+    await dropdownTrigger2.click();
+
+    const accountOption2 = page.getByRole('button', { name: /Integrity Checking/i });
+    await accountOption2.waitFor({ state: 'visible', timeout: 5000 });
+    await accountOption2.dispatchEvent('mousedown');
 
     // Save
     await page.getByRole('button', { name: ui('modal.saveActivity') }).click();

@@ -94,8 +94,8 @@ test.describe('Onboarding Wizard', () => {
     await page.getByTestId('onboarding-next').click();
     await expect(page.getByText(/family life/i)).toBeVisible({ timeout: 5000 });
 
-    // Click an activity preset chip (e.g., Soccer)
-    await page.getByRole('button', { name: /soccer/i }).click();
+    // Click an activity preset chip (e.g., Piano)
+    await page.getByRole('button', { name: /piano/i }).click();
 
     // Should show the activity card with day selectors
     await expect(page.getByTestId('onboarding-activity-card')).toBeVisible();
