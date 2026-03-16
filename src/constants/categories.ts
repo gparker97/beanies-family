@@ -267,6 +267,22 @@ export const EXPENSE_CATEGORIES: Category[] = [
     color: '#db2777',
     group: 'Financial',
   },
+  {
+    id: 'credit_card_spending',
+    name: 'Credit Card Spending',
+    icon: 'credit-card',
+    type: 'expense',
+    color: '#be185d',
+    group: 'Financial',
+  },
+  {
+    id: 'other_financial',
+    name: 'Other Financial',
+    icon: 'dollar-sign',
+    type: 'expense',
+    color: '#a21caf',
+    group: 'Financial',
+  },
 
   // Food
   {
@@ -674,16 +690,25 @@ export function getCategoriesGrouped(type: 'income' | 'expense'): CategoryGroup[
     groupMap.set(groupName, existing);
   }
 
-  // Convert to array and sort by group name
+  // Convert to array, sort categories within groups (Other * last), sort groups (Other last)
   const groups: CategoryGroup[] = [];
   for (const [name, cats] of groupMap.entries()) {
     groups.push({
       name,
-      categories: cats.sort((a, b) => a.name.localeCompare(b.name)),
+      categories: cats.sort((a, b) => {
+        const aIsOther = a.name.toLowerCase().startsWith('other');
+        const bIsOther = b.name.toLowerCase().startsWith('other');
+        if (aIsOther !== bIsOther) return aIsOther ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      }),
     });
   }
 
-  return groups.sort((a, b) => a.name.localeCompare(b.name));
+  return groups.sort((a, b) => {
+    if (a.name === 'Other') return 1;
+    if (b.name === 'Other') return -1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 /** Get the list of category IDs belonging to a given expense group name */
@@ -735,6 +760,10 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     baseball: 'sports_team',
     gym_activity: 'gym',
     yoga_activity: 'yoga',
+    soccer: 'sports_team',
+    football: 'sports_team',
+    rugby: 'sports_team',
+    multi_sport: 'sports_team',
     gymnastics: 'sports_team',
     other_sports_activity: 'other_sports',
     // Competitions → Education
@@ -751,6 +780,14 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     wedding: 'entertainment',
     bar_mitzvah: 'entertainment',
     other_celebration: 'entertainment',
+    // Appointments → Medical / Personal
+    doctor: 'healthcare',
+    dentist: 'dental',
+    eye_exam: 'healthcare',
+    haircut: 'personal_care',
+    other_appointment: 'other_personal',
+    // Other
+    other_activity: 'other_expense',
   };
   return mapping[activityCategory];
 }
