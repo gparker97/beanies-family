@@ -1393,3 +1393,177 @@ describe('transactionsStore - Loan Balance Reduction', () => {
     expect(transactionRepo.updateTransaction).not.toHaveBeenCalled();
   });
 });
+
+// --- Activity Linking ---
+
+describe('transactionsStore - Activity Linking', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('should store activityId when creating a transaction with activityId', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    accountsStore.accounts.push({ ...mockAccount });
+
+    const txWithActivity: Transaction = {
+      ...mockTransaction,
+      id: 'activity-tx-1',
+      activityId: 'activity-swim-1',
+    };
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(txWithActivity);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
+      ...mockAccount,
+      balance: 900,
+    });
+
+    const result = await transactionsStore.createTransaction({
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 100,
+      currency: 'USD',
+      category: 'lesson_fees',
+      date: '2024-01-15T00:00:00.000Z',
+      description: 'Swimming lesson fee',
+      isReconciled: false,
+      activityId: 'activity-swim-1',
+    });
+
+    expect(result).not.toBeNull();
+    // Verify the activityId was passed through to the repository
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityId: 'activity-swim-1',
+      })
+    );
+  });
+
+  it('should store activityId when updating a transaction to add activityId', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    accountsStore.accounts.push({ ...mockAccount });
+    transactionsStore.transactions.push({ ...mockTransaction });
+
+    const updatedTx: Transaction = {
+      ...mockTransaction,
+      activityId: 'activity-piano-1',
+    };
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTx);
+
+    const result = await transactionsStore.updateTransaction('test-transaction-1', {
+      activityId: 'activity-piano-1',
+    });
+
+    expect(result).not.toBeNull();
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith(
+      'test-transaction-1',
+      expect.objectContaining({
+        activityId: 'activity-piano-1',
+      })
+    );
+  });
+
+  it('should handle updating loanId: restore old loan balance and reduce new loan balance', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    // Two standalone loan accounts
+    const oldLoan: Account = {
+      ...mockLoanAccount,
+      id: 'old-loan-1',
+      name: 'Old Loan',
+      balance: 14662.5, // Already reduced by a previous payment
+      interestRate: 5,
+      monthlyPayment: 400,
+    };
+    const newLoan: Account = {
+      ...mockLoanAccount,
+      id: 'new-loan-1',
+      name: 'New Loan',
+      balance: 20000,
+      interestRate: 4,
+      monthlyPayment: 500,
+    };
+
+    accountsStore.accounts.push({ ...mockAccount });
+    accountsStore.accounts.push(oldLoan);
+    accountsStore.accounts.push(newLoan);
+
+    // Existing transaction linked to old loan with stored amortization
+    const existingTx: Transaction = {
+      ...mockTransaction,
+      id: 'loan-switch-tx',
+      type: 'expense',
+      amount: 400,
+      category: 'loan_payment',
+      loanId: 'old-loan-1',
+      loanInterestPortion: 62.5,
+      loanPrincipalPortion: 337.5,
+      recurringItemId: 'recurring-old-loan',
+    };
+    transactionsStore.transactions.push(existingTx);
+
+    // The updated transaction returned from repo
+    const updatedTx: Transaction = {
+      ...existingTx,
+      loanId: 'new-loan-1',
+    };
+    vi.mocked(transactionRepo.updateTransaction).mockResolvedValue(updatedTx);
+
+    // updateAccount calls for balance adjustments
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({} as any);
+
+    await transactionsStore.updateTransaction('loan-switch-tx', {
+      loanId: 'new-loan-1',
+    });
+
+    // Verify the update was called with the new loanId
+    expect(transactionRepo.updateTransaction).toHaveBeenCalledWith(
+      'loan-switch-tx',
+      expect.objectContaining({
+        loanId: 'new-loan-1',
+      })
+    );
+  });
+
+  it('should not change loan balances when deleting a transaction with only activityId', async () => {
+    const transactionsStore = useTransactionsStore();
+    const accountsStore = useAccountsStore();
+
+    accountsStore.accounts.push({ ...mockAccount });
+
+    // Transaction linked to an activity but NOT a loan
+    const activityOnlyTx: Transaction = {
+      ...mockTransaction,
+      id: 'activity-only-tx',
+      type: 'expense',
+      amount: 150,
+      category: 'lesson_fees',
+      activityId: 'activity-dance-1',
+      // No loanId, no loanInterestPortion, no loanPrincipalPortion
+    };
+    transactionsStore.transactions.push(activityOnlyTx);
+
+    vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true);
+    vi.mocked(accountRepo.updateAccount).mockResolvedValue({
+      ...mockAccount,
+      balance: 1150, // Balance restored after expense deletion
+    });
+
+    const result = await transactionsStore.deleteTransaction('activity-only-tx');
+
+    expect(result).toBe(true);
+    // Source account balance should be restored (expense deleted → add back)
+    expect(accountRepo.updateAccount).toHaveBeenCalledWith(
+      'test-account-1',
+      expect.objectContaining({ balance: 1150 })
+    );
+    // No asset update should occur (no loan involved)
+    expect(assetRepo.updateAsset).not.toHaveBeenCalled();
+    // updateAccount should only be called once (for the source account, not for any loan)
+    expect(accountRepo.updateAccount).toHaveBeenCalledTimes(1);
+  });
+});
