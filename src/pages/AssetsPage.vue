@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 
@@ -16,11 +16,18 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getAssetTypeIcon } from '@/constants/icons';
 import { useAssetsStore } from '@/stores/assetsStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import type { Asset, AssetType, CreateAssetInput, UpdateAssetInput } from '@/types/models';
 
 const route = useRoute();
+const router = useRouter();
 const assetsStore = useAssetsStore();
+const recurringStore = useRecurringStore();
+const transactionsStore = useTransactionsStore();
+const accountsStore = useAccountsStore();
 const settingsStore = useSettingsStore();
 const { formatMasked, isUnlocked } = usePrivacyMode();
 const { t } = useTranslation();
@@ -204,6 +211,25 @@ function getEquityPercent(asset: Asset): number {
     0,
     ((asset.currentValue - asset.loan.outstandingBalance) / asset.currentValue) * 100
   );
+}
+
+function getLinkedRecurringItem(asset: Asset) {
+  if (!asset.loan?.linkedRecurringItemId) return null;
+  return recurringStore.getRecurringItemById(asset.loan.linkedRecurringItemId) ?? null;
+}
+
+function getLinkedPayFromAccount(asset: Asset) {
+  if (!asset.loan?.payFromAccountId) return null;
+  return accountsStore.accounts.find((a) => a.id === asset.loan!.payFromAccountId) ?? null;
+}
+
+function getRecentLoanTransactions(asset: Asset) {
+  const riId = asset.loan?.linkedRecurringItemId;
+  if (!riId) return [];
+  return transactionsStore.transactions
+    .filter((tx) => tx.loanId === asset.id || tx.recurringItemId === riId)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 3);
 }
 
 // Stat card subtitles
@@ -491,6 +517,95 @@ const appreciationSubtitle = computed(() => {
                   }}<span v-if="asset.loan.lenderCountry">
                     &middot; {{ asset.loan.lenderCountry }}</span
                   >
+                </div>
+              </div>
+            </div>
+
+            <!-- Linked Payments (separate from loan info box) -->
+            <div
+              v-if="
+                asset.loan?.hasLoan &&
+                (getLinkedRecurringItem(asset) || getRecentLoanTransactions(asset).length > 0)
+              "
+              class="mb-4 rounded-xl border border-gray-100 bg-[var(--tint-slate-5)] p-3 dark:border-slate-700 dark:bg-slate-800/50"
+            >
+              <!-- Monthly Transaction -->
+              <div v-if="getLinkedRecurringItem(asset)">
+                <div class="flex items-center justify-between">
+                  <span
+                    class="font-outfit text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase"
+                    >{{ t('txLink.monthlyTransaction') }}</span
+                  >
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+                    @click.stop="
+                      router.push({
+                        path: '/transactions',
+                        query: { recurringItem: asset.loan!.linkedRecurringItemId },
+                      })
+                    "
+                  >
+                    {{ t('action.view') }} &rarr;
+                  </button>
+                </div>
+                <div class="mt-1 text-xs text-[var(--color-text)]">
+                  <span class="font-outfit font-bold">
+                    <CurrencyAmount
+                      :amount="getLinkedRecurringItem(asset)!.amount"
+                      :currency="asset.currency"
+                      type="neutral"
+                      size="sm"
+                    />/{{ getLinkedRecurringItem(asset)!.frequency === 'yearly' ? 'yr' : 'mo' }}
+                  </span>
+                  <span
+                    v-if="getLinkedPayFromAccount(asset)"
+                    class="text-[var(--color-text-muted)]"
+                  >
+                    &middot; from {{ getLinkedPayFromAccount(asset)!.name }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Recent Transactions -->
+              <div
+                v-if="getRecentLoanTransactions(asset).length > 0"
+                :class="
+                  getLinkedRecurringItem(asset)
+                    ? 'mt-3 border-t border-gray-200/60 pt-2 dark:border-slate-700'
+                    : ''
+                "
+              >
+                <span
+                  class="font-outfit text-xs font-semibold tracking-wide text-[var(--color-text-muted)] uppercase"
+                  >{{ t('txLink.recentTransactions') }}</span
+                >
+                <div class="mt-1 space-y-1">
+                  <button
+                    v-for="tx in getRecentLoanTransactions(asset)"
+                    :key="tx.id"
+                    type="button"
+                    class="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-[var(--tint-slate-8)]"
+                    @click.stop="router.push({ path: '/transactions', query: { view: tx.id } })"
+                  >
+                    <span class="text-[var(--color-text)]">
+                      <span class="text-[var(--color-text-muted)]">{{ tx.date.slice(0, 10) }}</span>
+                      &middot; {{ tx.description || tx.category }}
+                    </span>
+                    <span class="flex items-center gap-2">
+                      <span class="font-outfit font-semibold text-[var(--color-text)]">
+                        <CurrencyAmount
+                          :amount="tx.amount"
+                          :currency="tx.currency"
+                          type="neutral"
+                          size="sm"
+                        />
+                      </span>
+                      <span class="text-primary-500 text-xs font-semibold">{{
+                        t('action.view')
+                      }}</span>
+                    </span>
+                  </button>
                 </div>
               </div>
             </div>
