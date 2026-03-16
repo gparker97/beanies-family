@@ -8,7 +8,6 @@ import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
-import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
@@ -60,7 +59,7 @@ const date = ref('');
 const startTime = ref('');
 const endTime = ref('');
 const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
-const recurrenceFrequency = ref<'weekly' | 'biweekly' | 'monthly'>('weekly');
+const recurrenceFrequency = ref<'weekly' | 'monthly'>('weekly');
 const daysOfWeek = ref<number[]>([]);
 const recurrenceEndDate = ref('');
 const category = ref<ActivityCategory>('' as ActivityCategory);
@@ -86,7 +85,7 @@ const showMoreDetails = ref(false);
 // Map recurrence mode + frequency to ActivityRecurrence
 const effectiveRecurrence = computed<ActivityRecurrence>(() => {
   if (recurrenceMode.value === 'one-off') return 'none';
-  return recurrenceFrequency.value === 'biweekly' ? 'weekly' : recurrenceFrequency.value;
+  return recurrenceFrequency.value;
 });
 
 // Check if any "more details" field has data (for auto-expand in edit mode)
@@ -241,7 +240,6 @@ const reminderChipOptions = [
 
 const frequencyOptions = [
   { value: 'weekly', label: t('planner.recurrence.weekly') },
-  { value: 'biweekly', label: t('planner.recurrence.biweekly') },
   { value: 'monthly', label: t('planner.recurrence.monthly') },
 ];
 
@@ -390,27 +388,20 @@ function handleSave() {
 
       <!-- 4. Recurring / One-off toggle -->
       <FormFieldGroup :label="t('modal.schedule')">
-        <TogglePillGroup
-          v-model="recurrenceMode"
-          :options="[
-            { value: 'recurring', label: t('modal.recurring') },
-            { value: 'one-off', label: t('modal.oneOff') },
-          ]"
-        />
-      </FormFieldGroup>
-
-      <!-- 5. Recurring details -->
-      <ConditionalSection :show="recurrenceMode === 'recurring'">
-        <div class="space-y-4">
-          <FormFieldGroup :label="t('modal.whichDays')">
-            <DayOfWeekSelector v-model="daysOfWeek" />
-          </FormFieldGroup>
-
-          <FormFieldGroup :label="t('modal.howOften')">
+        <div class="space-y-3">
+          <TogglePillGroup
+            v-model="recurrenceMode"
+            :options="[
+              { value: 'recurring', label: t('modal.recurring') },
+              { value: 'one-off', label: t('modal.oneOff') },
+            ]"
+          />
+          <template v-if="recurrenceMode === 'recurring'">
             <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
-          </FormFieldGroup>
+            <DayOfWeekSelector v-if="recurrenceFrequency === 'weekly'" v-model="daysOfWeek" />
+          </template>
         </div>
-      </ConditionalSection>
+      </FormFieldGroup>
 
       <!-- 6. Date + Times -->
       <!-- Recurring: Start Date / End Date row, then Start Time / End Time row -->

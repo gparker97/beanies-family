@@ -149,6 +149,28 @@ async function handleSave(
     await activityStore.createActivity(data as CreateFamilyActivityInput);
   }
 
+  // When fee amount changes on a linked activity, update future materialized transactions
+  // to match the new monthly amount (past transactions are historical and unchanged)
+  if (isUpdate && !isRemovingPayment) {
+    await nextTick();
+    const savedActivity = activityStore.activities.find(
+      (a) => a.id === (data as { id: string }).id
+    );
+    if (savedActivity?.linkedRecurringItemId) {
+      const ri = recurringStore.getRecurringItemById(savedActivity.linkedRecurringItemId);
+      if (ri) {
+        const today = new Date().toISOString().slice(0, 10);
+        const futureTxs = transactionsStore.transactions.filter(
+          (tx) =>
+            tx.recurringItemId === ri.id && tx.date.slice(0, 10) >= today && tx.amount !== ri.amount
+        );
+        for (const tx of futureTxs) {
+          await transactionsStore.updateTransaction(tx.id, { amount: ri.amount });
+        }
+      }
+    }
+  }
+
   showModal.value = false;
 
   // Show success confirmation when a new linked payment was created
