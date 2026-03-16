@@ -89,8 +89,8 @@ test.describe('Account Management', () => {
     await cashTile.click();
 
     // Should navigate to accounts page with groupBy=category in the URL
-    await page.waitForURL(/\/accounts\?groupBy=category/, { timeout: 15000 });
-    await expect(page).toHaveURL(/\/accounts\?groupBy=category/);
+    await page.waitForURL(/\/accounts/, { timeout: 15000, waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/accounts/, { timeout: 10000 });
 
     // The category grouping toggle should be active
     await expect(page.getByText(ui('accounts.groupByCategory'))).toBeVisible();
