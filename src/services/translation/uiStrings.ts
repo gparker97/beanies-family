@@ -571,6 +571,11 @@ const STRING_DEFS = {
     en: 'Create Monthly Payment',
     beanie: 'create monthly payment',
   },
+  'recurringPrompt.createPaymentHint': {
+    en: 'Enable this to automatically create a recurring monthly transaction linked to this item. This helps you accurately track your spending each month and keeps your payments and activities connected — so you always know where your money is going.',
+    beanie:
+      'Enable this to automatically create a recurring monthly transaction linked to this item. This helps you accurately track your spending each month and keeps your payments and activities connected — so you always know where your money is going.',
+  },
   'recurringPrompt.payFrom': { en: 'Pay From', beanie: 'pay from' },
   'recurringPrompt.paymentCreated': {
     en: 'Monthly Payment Created',
