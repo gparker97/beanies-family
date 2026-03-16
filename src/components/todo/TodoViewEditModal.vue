@@ -274,7 +274,7 @@ async function handleDelete() {
     icon="✅"
     icon-bg="var(--tint-purple-12)"
     size="narrow"
-    :save-label="t('action.done')"
+    :save-label="t('action.close')"
     save-gradient="purple"
     :show-delete="true"
     @close="handleClose"

@@ -6,6 +6,7 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
+import { isTodoOverdue } from '@/utils/todo';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -96,9 +97,9 @@ export function useCriticalItems() {
 
       const dueDate = todo.dueDate?.split('T')[0] ?? '';
       const hasDate = dueDate !== '';
-      const isOverdue = hasDate && dueDate < todayStr.value;
+      const isOverdue = isTodoOverdue(todo);
       const isDueToday = dueDate === todayStr.value;
-      const isFuture = hasDate && dueDate > todayStr.value;
+      const isFuture = hasDate && !isOverdue && !isDueToday;
 
       // Skip todos with a future due date
       if (isFuture) continue;
