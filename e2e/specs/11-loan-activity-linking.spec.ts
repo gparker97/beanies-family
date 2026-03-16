@@ -39,16 +39,15 @@ test.describe('Loan & Activity Linking', () => {
   }
 
   /**
-   * Click the fee schedule "Monthly" chip inside the "more details" section.
-   * The recurrence frequency section also has a "Monthly" button (hidden via CSS
-   * when in one-off mode but still in the DOM), so we disambiguate by using .last()
-   * which targets the fee schedule chip that appears later in the DOM.
+   * Click the fee schedule "Monthly" chip.
+   * The fee schedule section is now above the recurrence section, so the first
+   * "Monthly" button in the DOM is the fee schedule chip.
    */
   async function clickFeeScheduleMonthly(page: import('@playwright/test').Page) {
     const dialog = page.locator('div[role="dialog"]');
     await dialog
       .getByRole('button', { name: ui('planner.fee.monthly') })
-      .last()
+      .first()
       .click();
   }
 
@@ -90,21 +89,18 @@ test.describe('Loan & Activity Linking', () => {
     // Select assignee
     await selectAssignee(page);
 
+    // Set cost amount (now above the schedule section)
+    const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
+    await costInput.fill(amount.toString());
+
+    // Set fee schedule to "Monthly" (fee chips are now above the schedule toggle)
+    await clickFeeScheduleMonthly(page);
+
     // Switch to one-off mode
     await page.getByRole('button', { name: /one-off/i }).click();
 
     // Fill date
     await page.locator('input[type="date"]').fill('2026-04-15');
-
-    // Expand "Add more details" to reveal cost fields
-    await page.getByText(ui('planner.field.moreDetails')).click();
-
-    // Set cost amount
-    const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
-    await costInput.fill(amount.toString());
-
-    // Set fee schedule to "Monthly"
-    await clickFeeScheduleMonthly(page);
 
     // Wait for RecurringPaymentPrompt to appear
     await expect(page.getByText(ui('recurringPrompt.createPayment'))).toBeVisible({
@@ -292,10 +288,7 @@ test.describe('Loan & Activity Linking', () => {
     // Wait for ActivityModal (edit mode) to open
     await expect(page.getByText(ui('planner.editActivity'))).toBeVisible({ timeout: 5000 });
 
-    // Expand "Add more details"
-    await page.getByText(ui('planner.field.moreDetails')).click();
-
-    // Set cost amount
+    // Set cost amount (now visible by default, above schedule section)
     const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
     await costInput.fill('75');
 
@@ -309,9 +302,9 @@ test.describe('Loan & Activity Linking', () => {
     await page.getByText(ui('recurringPrompt.createPayment')).click();
 
     // Select pay-from account
-    await expect(page.getByText(ui('recurringPrompt.payFrom'))).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(
+      page.locator('div[role="dialog"]').getByText(ui('recurringPrompt.payFrom')).first()
+    ).toBeVisible({ timeout: 5000 });
 
     const accountBtn = page
       .locator('div[role="dialog"]')
@@ -353,24 +346,7 @@ test.describe('Loan & Activity Linking', () => {
         timeout: 5000,
       });
 
-      // Expand "Add more details" if not already expanded
-      const moreDetailsText = page.getByText(ui('planner.field.moreDetails'));
-      const moreDetailsVisible = await moreDetailsText
-        .waitFor({ state: 'visible', timeout: 2000 })
-        .then(() => true)
-        .catch(() => false);
-      if (moreDetailsVisible) {
-        const costVisible = await page
-          .locator('div[role="dialog"]')
-          .locator('input[type="number"]')
-          .first()
-          .isVisible();
-        if (!costVisible) {
-          await moreDetailsText.click();
-        }
-      }
-
-      // Disable the "Create Monthly Payment" toggle
+      // Disable the "Create Monthly Payment" toggle (cost section is now visible by default)
       await expect(page.getByText(ui('recurringPrompt.createPayment'))).toBeVisible({
         timeout: 5000,
       });
