@@ -215,28 +215,12 @@ test.describe('Loan & Activity Linking', () => {
       timeout: 5000,
     });
 
-    // Click the "View ->" link on the monthly transaction section
-    // The view link may be rendered as a button or anchor
-    const viewLink = viewDialog.getByText('→ view').or(viewDialog.getByText('→ View'));
-    const viewLinkVisible = await viewLink
-      .first()
-      .waitFor({ state: 'visible', timeout: 3000 })
-      .then(() => true)
-      .catch(() => false);
+    // Click the "View →" link on the monthly transaction section
+    const viewLink = viewDialog.getByRole('button', { name: /view/i }).last();
+    await viewLink.click({ timeout: 10000 });
 
-    if (viewLinkVisible) {
-      await viewLink.first().click();
-
-      // Verify navigation to transactions page
-      await page.waitForURL(/\/transactions/, { timeout: 10000 });
-    } else {
-      // If the view link requires hover, hover first then click
-      const monthlySection = viewDialog.getByText(ui('txLink.monthlyTransaction'));
-      await monthlySection.hover();
-      const viewLinkAfterHover = viewDialog.getByText('→ view').or(viewDialog.getByText('→ View'));
-      await viewLinkAfterHover.first().click();
-      await page.waitForURL(/\/transactions/, { timeout: 10000 });
-    }
+    // Verify navigation to transactions page
+    await page.waitForURL(/\/transactions/, { timeout: 10000 });
   });
 
   test('data integrity — creating and deleting linked payment', async ({ page }) => {
@@ -270,7 +254,7 @@ test.describe('Loan & Activity Linking', () => {
     // Now open the created activity to edit it and add a monthly payment
     const activityTitle = page.getByText('Guitar Lesson');
     await expect(activityTitle.first()).toBeVisible({ timeout: 5000 });
-    await activityTitle.first().click();
+    await activityTitle.first().click({ force: true });
 
     // The ActivityViewEditModal should open — click Edit
     const viewDialog = page.locator('div[role="dialog"]');
