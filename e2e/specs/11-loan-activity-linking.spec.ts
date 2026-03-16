@@ -254,7 +254,7 @@ test.describe('Loan & Activity Linking', () => {
     // Now open the created activity to edit it and add a monthly payment
     const activityTitle = page.getByText('Guitar Lesson');
     await expect(activityTitle.first()).toBeVisible({ timeout: 5000 });
-    await activityTitle.first().click({ force: true });
+    await activityTitle.first().click();
 
     // The ActivityViewEditModal should open — click Edit
     const viewDialog = page.locator('div[role="dialog"]');
@@ -293,9 +293,15 @@ test.describe('Loan & Activity Linking', () => {
     await accountOption2.waitFor({ state: 'visible', timeout: 5000 });
     await accountOption2.dispatchEvent('mousedown');
 
-    // Save
+    // Save — this triggers a "Payment Created" confirmation modal
     await page.getByRole('button', { name: ui('modal.saveActivity') }).click();
     await expect(page.getByText(ui('planner.editActivity'))).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss the "Payment Created" confirmation modal
+    const confirmClose = page.getByRole('button', { name: ui('action.close') });
+    await confirmClose.waitFor({ state: 'visible', timeout: 5000 });
+    await confirmClose.click();
+    await confirmClose.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 
     // Verify: recurringItem was created with correct activityId
     data = await dbHelper.exportData();

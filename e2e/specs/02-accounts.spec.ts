@@ -83,15 +83,20 @@ test.describe('Account Management', () => {
     await dashboardPage.goto();
     await dashboardPage.unlockPrivacyMode();
 
-    // Wait for breakdown card to appear and click the Cash category tile
+    // Wait for breakdown card to appear and click the Cash category tile to expand it
     const cashTile = page.getByText(ui('dashboard.breakdown.cash'), { exact: true });
     await expect(cashTile).toBeVisible({ timeout: 10000 });
     await cashTile.click();
 
+    // Click the "View all accounts →" link inside the expanded detail
+    const viewLink = page.getByRole('link', { name: /accounts/i });
+    await expect(viewLink).toBeVisible({ timeout: 5000 });
+    await viewLink.click();
+
     // Should navigate to accounts page (SPA client-side routing)
-    await expect(page).toHaveURL(/\/accounts/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/accounts/, { timeout: 10000 });
 
     // The category grouping toggle should be active
-    await expect(page.getByText(ui('accounts.groupByCategory'))).toBeVisible();
+    await expect(page.getByText(ui('accounts.groupByCategory'))).toBeVisible({ timeout: 5000 });
   });
 });
