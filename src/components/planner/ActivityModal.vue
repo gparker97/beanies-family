@@ -13,6 +13,9 @@ import ActivityCategoryPicker from '@/components/ui/ActivityCategoryPicker.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
+import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { calculateMonthlyFee } from '@/utils/finance';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -68,6 +71,8 @@ const location = ref('');
 const feeSchedule = ref<FeeSchedule>('none');
 const feeAmount = ref<number | undefined>(undefined);
 const feeCurrency = ref('');
+const feeCustomPeriod = ref<number | undefined>(undefined);
+const feeCustomPeriodUnit = ref<'weeks' | 'months'>('weeks');
 const createRecurringPayment = ref(false);
 const feePayFromAccountId = ref('');
 const instructorName = ref('');
@@ -127,6 +132,8 @@ const { isEditing, isSubmitting } = useFormModal(
       feeCurrency.value = activity.feeCurrency ?? settingsStore.displayCurrency;
       createRecurringPayment.value = !!activity.linkedRecurringItemId;
       feePayFromAccountId.value = activity.payFromAccountId ?? '';
+      feeCustomPeriod.value = activity.feeCustomPeriod;
+      feeCustomPeriodUnit.value = activity.feeCustomPeriodUnit ?? 'weeks';
       instructorName.value = activity.instructorName ?? '';
       instructorContact.value = activity.instructorContact ?? '';
       reminderMinutes.value = activity.reminderMinutes;
@@ -156,6 +163,8 @@ const { isEditing, isSubmitting } = useFormModal(
       feeCurrency.value = settingsStore.displayCurrency;
       createRecurringPayment.value = false;
       feePayFromAccountId.value = '';
+      feeCustomPeriod.value = undefined;
+      feeCustomPeriodUnit.value = 'weeks';
       instructorName.value = '';
       instructorContact.value = '';
       reminderMinutes.value = 0;
@@ -214,10 +223,12 @@ function todayStr() {
 }
 
 const feeScheduleChipOptions = computed(() =>
-  (['per_session', 'weekly', 'monthly', 'termly', 'yearly'] as FeeSchedule[]).map((f) => ({
-    value: f,
-    label: t(`planner.fee.${f}` as const),
-  }))
+  (['per_session', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'] as FeeSchedule[]).map(
+    (f) => ({
+      value: f,
+      label: t(`planner.fee.${f}` as const),
+    })
+  )
 );
 
 const reminderChipOptions = [
@@ -236,10 +247,27 @@ const frequencyOptions = [
 
 const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
 
+const calculatedMonthly = computed(() => {
+  if (!hasCost.value || feeSchedule.value === 'none') return 0;
+  return calculateMonthlyFee({
+    feeSchedule: feeSchedule.value,
+    feeAmount: feeAmount.value ?? 0,
+    sessionsPerWeek: daysOfWeek.value.length || 1,
+    feeCustomPeriod: feeCustomPeriod.value,
+    feeCustomPeriodUnit: feeCustomPeriodUnit.value,
+  });
+});
+
 const canSave = computed(() => {
   if (!title.value.trim() || !date.value) return false;
   if (assigneeIds.value.length === 0) return false;
   if (hasCost.value && feeSchedule.value === 'none') return false;
+  if (
+    hasCost.value &&
+    feeSchedule.value === 'custom' &&
+    (!feeCustomPeriod.value || feeCustomPeriod.value <= 0)
+  )
+    return false;
   return true;
 });
 
@@ -281,6 +309,9 @@ function handleSave() {
     feeSchedule: hasCost.value ? feeSchedule.value : ('none' as FeeSchedule),
     feeAmount: hasCost.value ? feeAmount.value : undefined,
     feeCurrency: hasCost.value ? feeCurrency.value : undefined,
+    ...(hasCost.value && feeSchedule.value === 'custom' && feeCustomPeriod.value
+      ? { feeCustomPeriod: feeCustomPeriod.value, feeCustomPeriodUnit: feeCustomPeriodUnit.value }
+      : {}),
     ...(hasCost.value && createRecurringPayment.value && feePayFromAccountId.value
       ? { payFromAccountId: feePayFromAccountId.value }
       : { payFromAccountId: '' }),
@@ -482,28 +513,53 @@ function handleSave() {
             <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
           </FormFieldGroup>
 
-          <!-- Recurring payment prompt (only for monthly/yearly fee schedules) -->
-          <RecurringPaymentPrompt
-            v-if="hasCost && (feeSchedule === 'monthly' || feeSchedule === 'yearly')"
-            v-model="createRecurringPayment"
-            :pay-from-account-id="feePayFromAccountId"
-            :payment-amount="feeAmount ?? 0"
-            :currency="feeCurrency || 'USD'"
-            :start-date="date"
-            :frequency="feeSchedule === 'yearly' ? 'yearly' : 'monthly'"
-            @update:pay-from-account-id="feePayFromAccountId = $event"
-          />
-          <p
+          <!-- Custom period inputs -->
+          <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
+            <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+              t('planner.fee.customPeriod')
+            }}</span>
+            <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
+            <TogglePillGroup
+              v-model="feeCustomPeriodUnit"
+              :options="[
+                { value: 'weeks', label: t('planner.fee.weeks') },
+                { value: 'months', label: t('planner.fee.months') },
+              ]"
+            />
+          </div>
+
+          <!-- Calculated monthly display -->
+          <div
             v-if="
               hasCost &&
               feeSchedule !== 'none' &&
               feeSchedule !== 'monthly' &&
-              feeSchedule !== 'yearly'
+              calculatedMonthly > 0
             "
-            class="text-xs text-[var(--color-text-muted)]"
+            class="flex items-center gap-2"
           >
-            {{ t('recurringPrompt.manualSetup') }}
-          </p>
+            <span
+              class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+            >
+              {{ t('planner.fee.calculatedMonthly') }}
+            </span>
+            <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+              {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
+            </span>
+            <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
+          </div>
+
+          <!-- Recurring payment prompt -->
+          <RecurringPaymentPrompt
+            v-if="hasCost && feeSchedule !== 'none'"
+            v-model="createRecurringPayment"
+            :pay-from-account-id="feePayFromAccountId"
+            :payment-amount="calculatedMonthly"
+            :currency="feeCurrency || 'USD'"
+            :start-date="date"
+            frequency="monthly"
+            @update:pay-from-account-id="feePayFromAccountId = $event"
+          />
 
           <!-- Reminder chips -->
           <FormFieldGroup :label="t('planner.field.reminder')" optional>
