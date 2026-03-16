@@ -79,6 +79,15 @@ onMounted(() => {
     const tx = transactionsStore.transactions.find((t) => t.id === viewId);
     if (tx) viewingTransaction.value = tx;
   }
+  const riId = route.query.recurringItem as string | undefined;
+  if (riId) {
+    const ri = recurringStore.getRecurringItemById(riId);
+    if (ri) openEditRecurringModal(ri);
+  }
+  // Clean up query params so refresh doesn't re-open
+  if (viewId || riId) {
+    router.replace({ query: {} });
+  }
 });
 
 // ── Computeds ─────────────────────────────────────────────────────────────

@@ -166,6 +166,7 @@ const STRING_DEFS = {
   'action.confirm': { en: 'Confirm', beanie: 'confirm' },
   'action.close': { en: 'Close', beanie: 'close' },
   'action.done': { en: 'Done', beanie: 'done' },
+  'action.view': { en: 'View', beanie: 'view' },
   'action.back': { en: 'Back', beanie: 'back' },
   'action.change': { en: 'Change', beanie: 'change' },
   'action.next': { en: 'Next', beanie: 'next' },
@@ -514,6 +515,9 @@ const STRING_DEFS = {
     beanie: 'extra payment \u2014 all goes to principal',
   },
   'txLink.linkedLoan': { en: 'Linked Loan', beanie: 'linked loan' },
+  'txLink.linkedActivity': { en: 'Linked Activity', beanie: 'linked activity' },
+  'txLink.monthlyTransaction': { en: 'Monthly Transaction', beanie: 'monthly transaction' },
+  'txLink.recentTransactions': { en: 'Recent Transactions', beanie: 'recent transactions' },
   'txLink.linkedTransactions': { en: 'Linked Transactions', beanie: 'linked transactions' },
 
   // Recurring Payment Prompt
