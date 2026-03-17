@@ -146,6 +146,14 @@ export const useSettingsStore = defineStore('settings', () => {
     error.value = null;
     try {
       settings.value = await settingsRepo.setBaseCurrency(currency);
+      // Keep display currency in sync with base currency
+      settings.value = await settingsRepo.setDisplayCurrency(currency);
+      // Ensure base currency is the first preferred currency
+      const current = settings.value.preferredCurrencies ?? [];
+      const withoutBase = current.filter((c) => c !== currency);
+      settings.value = await settingsRepo.setPreferredCurrencies(
+        [currency, ...withoutBase].slice(0, 4)
+      );
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Failed to update base currency';
     } finally {
