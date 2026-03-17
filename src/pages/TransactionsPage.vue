@@ -670,7 +670,14 @@ function handleMaterializedRecurringClick(tx: DisplayTransaction) {
 
 function handleViewOpenEdit(transaction: Transaction) {
   viewingTransaction.value = null;
-  openEditModal(transaction);
+  const tx = transaction as DisplayTransaction;
+  if (tx.isProjected) {
+    handleProjectedClick(tx);
+  } else if (tx.recurringItemId) {
+    handleMaterializedRecurringClick(tx);
+  } else {
+    openEditModal(transaction);
+  }
 }
 
 function isRecurringItemInactive(tx: DisplayTransaction): boolean {
@@ -832,17 +839,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                 : 'border-[var(--tint-slate-5)]',
               isRecurringItemInactive(tx) ? 'opacity-60 hover:opacity-100' : '',
             ]"
-            @click="
-              () => {
-                if (tx.isProjected) {
-                  handleProjectedClick(tx);
-                } else if (tx.recurringItemId) {
-                  handleMaterializedRecurringClick(tx);
-                } else {
-                  viewingTransaction = tx;
-                }
-              }
-            "
+            @click="viewingTransaction = tx"
           >
             <!-- Icon (desktop) -->
             <div

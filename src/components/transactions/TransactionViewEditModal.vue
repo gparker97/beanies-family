@@ -14,6 +14,8 @@ import { findLoanDetails } from '@/utils/loanPayment';
 import { getCategoryById, CATEGORY_EMOJI_MAP } from '@/constants/categories';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { formatDate } from '@/utils/date';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { formatFrequency } from '@/services/recurring/recurringProcessor';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -46,6 +48,7 @@ const accountsStore = useAccountsStore();
 const assetsStore = useAssetsStore();
 const activityStore = useActivityStore();
 const goalsStore = useGoalsStore();
+const recurringStore = useRecurringStore();
 const { getMemberNameByAccountId } = useMemberInfo();
 
 // Live-lookup from store so display stays reactive after inline edits
@@ -159,6 +162,13 @@ const accountName = computed(() => {
   return account?.name ?? getMemberNameByAccountId(transaction.value.accountId);
 });
 
+const linkedRecurringItem = computed(() => {
+  if (!transaction.value?.recurringItemId) return null;
+  return (
+    recurringStore.recurringItems.find((r) => r.id === transaction.value!.recurringItemId) ?? null
+  );
+});
+
 const linkedActivity = computed(() => {
   if (!transaction.value?.activityId) return null;
   return activityStore.activities.find((a) => a.id === transaction.value!.activityId);
@@ -263,7 +273,7 @@ async function handleDelete() {
     :icon="categoryEmoji || '💰'"
     icon-bg="var(--tint-slate-5)"
     size="narrow"
-    :save-label="t('action.done')"
+    :save-label="t('action.close')"
     save-gradient="orange"
     :show-delete="true"
     @close="handleClose"
@@ -448,6 +458,15 @@ async function handleDelete() {
         </span>
       </FormFieldGroup>
 
+      <!-- Recurrence schedule — read-only -->
+      <FormFieldGroup v-if="linkedRecurringItem" :label="t('transactions.filterRecurring')">
+        <span
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+        >
+          🔁 {{ formatFrequency(linkedRecurringItem) }}
+        </span>
+      </FormFieldGroup>
+
       <!-- Linked activity — clickable -->
       <FormFieldGroup v-if="linkedActivity" :label="t('planner.field.title')">
         <button
@@ -504,15 +523,16 @@ async function handleDelete() {
           ✓ {{ t('transactions.reconciled') }}
         </span>
       </FormFieldGroup>
+    </div>
 
-      <!-- Edit button -->
+    <template #footer-start>
       <button
         type="button"
-        class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-700"
+        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
         @click="handleOpenEdit"
       >
-        {{ t('action.edit') }}
+        ✏️ {{ t('action.edit') }}
       </button>
-    </div>
+    </template>
   </BeanieFormModal>
 </template>
