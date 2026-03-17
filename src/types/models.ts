@@ -388,6 +388,8 @@ export interface FamilyActivity {
 
   // Schedule
   date: ISODateString; // Start date / next occurrence
+  endDate?: ISODateString; // End date for multi-day all-day activities
+  isAllDay?: boolean; // All-day activity (no specific times)
   startTime?: string; // HH:mm
   endTime?: string; // HH:mm
   recurrence: ActivityRecurrence;
