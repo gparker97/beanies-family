@@ -5,6 +5,7 @@ import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
+import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
@@ -66,7 +67,7 @@ function toggleMember(id: string) {
   }
 }
 
-const activeView = ref('month');
+const activeView = ref('week');
 const showInactive = ref(false);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
@@ -76,17 +77,24 @@ const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
 
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
+const weeklyViewRef = ref<InstanceType<typeof WeeklyCalendarView> | null>(null);
 
 const headerSubtitle = computed(() => {
+  if (activeView.value === 'week') {
+    const label = weeklyViewRef.value?.weekLabel ?? '';
+    const count = weeklyViewRef.value?.activityCount ?? 0;
+    return t('planner.subtitle').replace('{month}', label).replace('{count}', String(count));
+  }
   const month = calendarGridRef.value?.monthLabel ?? '';
   const count = calendarGridRef.value?.activityCount ?? 0;
   return t('planner.subtitle').replace('{month}', month).replace('{count}', String(count));
 });
 
-function openAddModal(date?: string) {
+function openAddModal(date?: string, time?: string) {
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
   selectedDate.value = date;
+  defaultStartTime.value = time;
   showModal.value = true;
 }
 
@@ -274,11 +282,22 @@ function handleActivitySwapped(newId: string) {
       />
     </div>
 
-    <!-- Calendar grid -->
+    <!-- Calendar views (conditional on activeView) -->
     <CalendarGrid
+      v-if="activeView === 'month'"
       ref="calendarGridRef"
       :selected-date="sidebarDate ?? undefined"
       @select-date="handleCalendarDateClick"
+    />
+
+    <WeeklyCalendarView
+      v-else-if="activeView === 'week'"
+      ref="weeklyViewRef"
+      :selected-date="sidebarDate ?? undefined"
+      @select-date="handleCalendarDateClick"
+      @add-activity="(date: string, time?: string) => openAddModal(date, time)"
+      @view-activity="(id: string, date: string) => openViewModal(id, date)"
+      @view-todo="openTodoViewModal"
     />
 
     <!-- Two-column layout: Upcoming + Todo preview -->
@@ -287,8 +306,8 @@ function handleActivitySwapped(newId: string) {
       <TodoPreview @view="openTodoViewModal" />
     </div>
 
-    <!-- Inactive activities toggle -->
-    <div v-if="activityStore.inactiveActivities.length > 0">
+    <!-- Inactive activities toggle (month view only) -->
+    <div v-if="activeView === 'month' && activityStore.inactiveActivities.length > 0">
       <button
         type="button"
         class="text-secondary-500/50 hover:text-secondary-500 flex items-center gap-2 text-sm transition-colors dark:text-gray-500 dark:hover:text-gray-300"
@@ -330,6 +349,7 @@ function handleActivitySwapped(newId: string) {
       @close="sidebarDate = null"
       @add-activity="handleSidebarAdd"
       @edit-activity="handleSidebarEdit"
+      @view-todo="openTodoViewModal"
     />
 
     <!-- Activity modal -->
