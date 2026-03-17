@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-13
-> **Updated by:** Claude (Assets visual polish, E2E ui() string resolver migration)
+> **Last updated:** 2026-03-17
+> **Updated by:** Claude (Weekly calendar view, all-day activities, shared component extractions)
 
 ## Current Phase
 
@@ -55,6 +55,20 @@
 - Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards (merged todos + planner activities with view-first modals), inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed (view-first modals for todos + transactions). Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### Weekly Calendar View & Planner Enhancements (2026-03-17)
+
+- **Weekly calendar view** (`WeeklyCalendarView.vue`): 7-column hourly time grid with activity blocks positioned at time slots, current time indicator, auto-scroll to now. Mobile: horizontal day tab strip with card list
+- **Shared component extractions (DRY)**: `ActivityListCard.vue` (eliminated 3× card duplication), `CalendarNavBar.vue` (shared prev/next/today nav), `useCalendarNavigation.ts` composable (week navigation + time grid positioning + overlap grouping)
+- **All-day activities**: `isAllDay` and `endDate` fields on FamilyActivity model. ActivityModal checkbox to toggle all-day mode (hides time pickers, shows optional end date for multi-day). Multi-day all-day activities span across day columns as a single bar in weekly view
+- **TodoItemRow shared component**: Extracted from TodoItemCard and NookTodoWidget, reused in DayAgendaSidebar and weekly view for todo display
+- **DayAgendaSidebar enhanced**: Added "Tasks Due" purple section showing todos for selected date
+- **Form validation UX**: `FormFieldGroup` error prop with orange ring highlight. ActivityModal highlights missing required fields on save attempt instead of disabling save button
+- **InlineEditField z-index fix**: Active edit controls layer above neighboring grid cells
+- **Todo modal button**: Changed "Done" to "Close" in TodoViewEditModal to avoid confusion with completing
+- **ViewToggle**: Removed day/agenda options (redundant with weekly + sidebar). Default view changed to week
+- **E2E tests updated**: Planner tests adapted for week-view default with scoped selectors
+- Plan: `docs/plans/2026-03-17-weekly-daily-calendar-views.md`
 
 ### Assets Page Visual Polish (2026-03-13)
 
@@ -844,12 +858,12 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 ### New Issues Created
 
 | Issue | Title                                                           | Priority |
-| ----- | --------------------------------------------------------------- | -------- | ------- |
-| #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     | ✅ Done |
-| #98   | Family Planner 📅: calendar and scheduling hub                  | High     |
-| #99   | Family To-Do ✅: standalone task management page                | High     | ✅ Done |
-| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     | ✅ Done |
-| #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   | ✅ Done |
+| ----- | --------------------------------------------------------------- | -------- | ------------------------------------------------------ |
+| #97   | Family Nook 🏡: home screen with schedule, events, to-do widget | High     | ✅ Done                                                |
+| #98   | Family Planner 📅: calendar and scheduling hub                  | High     | 🔧 In Progress (weekly view done, month view existing) |
+| #99   | Family To-Do ✅: standalone task management page                | High     | ✅ Done                                                |
+| #100  | Sidebar accordion restructure: Piggy Bank + Treehouse           | High     | ✅ Done                                                |
+| #101  | Mobile bottom tab bar: 5-tab layout                             | Medium   | ✅ Done                                                |
 
 ### Existing Issues Updated
 
@@ -972,4 +986,6 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | 2026-03-08 | Currency conversion staleness fix (critical)                | App init rate refresh now reloads Vue store after completion; `exchangeRates` computed picks most recent rates between per-family (synced) and device-local by comparing timestamps                                                                                                                                                        |
 | 2026-03-12 | Passkey progressive platform fallback                       | Restored `authenticatorAttachment: 'platform'` as first attempt (ensures "save on this device" prompt), with progressive fallback: retry without attachment + hints for Android OEMs (Honor/MagicOS), then retry without PRF extension. Fixes issue where removing platform constraint caused phones to only show "save on another device" |
 | 2026-03-08 | Passkey Android credential manager compatibility            | Removed `authenticatorAttachment: 'platform'` (fails on Honor/MagicOS OEM credential managers), added `hints: ['client-device']` for Chrome 128+, auto-retry without PRF extension on `NotReadableError`, user-friendly error messages for credential manager failures                                                                     |
+| 2026-03-17 | Weekly calendar view as default planner view                | Week view provides more at-a-glance utility than month view on desktop/tablet. Month view retained for overview. Day/agenda views removed as redundant (sidebar + weekly cover the use cases). DRY extraction of shared components before building new views                                                                               |
+| 2026-03-17 | All-day multi-day activities with spanning display          | `isAllDay` + `endDate` fields on FamilyActivity; expandRecurring generates per-day occurrences; WeeklyCalendarView renders as single spanning bar using CSS grid column placement instead of per-day pills                                                                                                                                 |
 | 2026-03-08 | Join/load flow loading spinners                             | Added BeanieSpinner to all async gaps: file picker, invite token decryption, password creation step. Replaced CSS border spinners with branded BeanieSpinner. Buttons use `:loading` prop for spinner display. Fixed both JoinPodView and LoadPodView                                                                                      |
