@@ -22,9 +22,14 @@ test.describe('Family Planner', () => {
     await page.goto('/');
     await bypassLoginIfNeeded(page);
 
-    // Navigate to planner
+    // Navigate to planner (defaults to week view)
     await page.goto('/planner');
     await page.waitForURL('/planner');
+  }
+
+  /** Switch to month view by clicking the Month toggle button. */
+  async function switchToMonthView(page: import('@playwright/test').Page) {
+    await page.getByRole('button', { name: /^month$/i }).click();
   }
 
   /** Select the first family member chip in the activity modal (required for multi-owner). */
@@ -49,8 +54,9 @@ test.describe('Family Planner', () => {
     // Add activity button
     await expect(page.getByRole('button', { name: /\+ add activity/i })).toBeVisible();
 
-    // View toggle pills
+    // View toggle pills (default is week view)
     await expect(page.getByText(/^month$/i)).toBeVisible();
+    await expect(page.getByText(/^week$/i)).toBeVisible();
 
     // Upcoming section
     await expect(page.getByRole('heading', { name: /upcoming activities/i })).toBeVisible();
@@ -175,6 +181,9 @@ test.describe('Family Planner', () => {
   test('should show activity dots on the calendar grid', async ({ page }) => {
     await setupPlanner(page);
 
+    // Switch to month view (dots only appear in month view)
+    await switchToMonthView(page);
+
     // Create an activity for today so it shows on the current month view
     await page.getByRole('button', { name: /\+ add activity/i }).click();
 
@@ -214,7 +223,8 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
 
     // The activity should appear in the upcoming activities section
-    await expect(page.getByText('Upcoming Test')).toBeVisible({ timeout: 5000 });
+    const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
+    await expect(upcomingSection.getByText('Upcoming Test')).toBeVisible({ timeout: 5000 });
   });
 
   test('should edit an existing activity', async ({ page }) => {
@@ -234,7 +244,8 @@ test.describe('Family Planner', () => {
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
 
     // Click on the activity in the upcoming list — opens view modal first
-    await page.getByText('Original Title').click();
+    const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
+    await upcomingSection.getByText('Original Title').click();
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click "Edit" button in view modal to open the full edit modal
@@ -254,8 +265,9 @@ test.describe('Family Planner', () => {
     expect(exported.activities![0].title).toBe('Updated Title');
 
     // Updated title should be visible in the upcoming list
-    await expect(page.getByText('Updated Title')).toBeVisible();
-    await expect(page.getByText('Original Title')).not.toBeVisible();
+    const upcomingAfterEdit = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
+    await expect(upcomingAfterEdit.getByText('Updated Title')).toBeVisible();
+    await expect(upcomingAfterEdit.getByText('Original Title')).not.toBeVisible();
   });
 
   test('should delete an activity with confirmation', async ({ page }) => {
@@ -274,8 +286,9 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
     await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
 
-    // Click on the activity — opens view modal
-    await page.getByText('To Delete').click();
+    // Click on the activity in the upcoming list — opens view modal
+    const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
+    await upcomingSection.getByText('To Delete').click();
     await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
 
     // Click the delete button in the view modal footer (🗑️ with aria-label="delete")
@@ -307,6 +320,9 @@ test.describe('Family Planner', () => {
 
   test('should navigate months with prev/next buttons', async ({ page }) => {
     await setupPlanner(page);
+
+    // Switch to month view for month navigation test
+    await switchToMonthView(page);
 
     // Get current month name — target the h3 inside the calendar grid specifically
     const monthHeading = page.locator('h3.font-outfit.text-lg.font-bold');
