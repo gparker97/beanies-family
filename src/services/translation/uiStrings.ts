@@ -1074,6 +1074,18 @@ const STRING_DEFS = {
     en: 'Are you sure you want to delete this transaction?',
     beanie: 'remove this transaction for good?',
   },
+  'transactions.createdTitle': {
+    en: 'Transaction Created',
+    beanie: 'transaction created',
+  },
+  'transactions.createdMessage': {
+    en: 'Your transaction has been created!',
+    beanie: 'your transaction has been created!',
+  },
+  'transactions.nextMonthPreview': {
+    en: 'Coming Up Next Month',
+    beanie: 'beans sprouting next month',
+  },
   'transactions.descriptionPlaceholder': {
     en: 'e.g., Grocery shopping',
     beanie: 'e.g., grocery shopping',
@@ -2387,6 +2399,14 @@ const STRING_DEFS = {
   'planner.deleteConfirm': {
     en: 'Are you sure you want to delete this activity?',
     beanie: 'are you sure you want to delete this activity?',
+  },
+  'planner.activityCreatedTitle': {
+    en: 'Activity Created',
+    beanie: 'activity created',
+  },
+  'planner.activityCreatedMessage': {
+    en: 'Your activity has been created!',
+    beanie: 'your activity has been created!',
   },
   'planner.noActivities': { en: 'No activities yet', beanie: 'no activities yet' },
   'planner.noActivitiesHint': {

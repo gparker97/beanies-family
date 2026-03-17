@@ -6,6 +6,8 @@ import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import { BaseCard } from '@/components/ui';
+import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
+import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
@@ -20,7 +22,12 @@ import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useProjectedTransactions } from '@/composables/useProjectedTransactions';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getCategoryById } from '@/constants/categories';
-import { formatFrequency, processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { getCurrencyInfo } from '@/constants/currencies';
+import {
+  formatFrequency,
+  getDueDatesInRange,
+  processRecurringItems,
+} from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -75,6 +82,14 @@ const editingRecurringItem = ref<RecurringItem | null>(null);
 // Deferred projected-transaction editing state (scope is asked at save time)
 const pendingProjectedTx = ref<DisplayTransaction | null>(null);
 const addModalInitialValues = ref<Partial<CreateTransactionInput> | null>(null);
+
+// Transaction created confirmation modal
+const createdConfirm = ref<{
+  open: boolean;
+  title: string;
+  message: string;
+  details: ConfirmDetail[];
+}>({ open: false, title: '', message: '', details: [] });
 
 // Open view modal from query param (e.g. navigated from Dashboard)
 onMounted(() => {
@@ -161,6 +176,48 @@ const groupedTransactions = computed(() => {
     }
   }
   return groups;
+});
+
+// Next month's projected recurring transactions (preview of what's coming)
+const nextMonthProjected = computed<DisplayTransaction[]>(() => {
+  // Only show when viewing current month (not past or future months)
+  const now = new Date();
+  const viewingYear = selectedMonth.value.getFullYear();
+  const viewingMonth = selectedMonth.value.getMonth();
+  if (viewingYear !== now.getFullYear() || viewingMonth !== now.getMonth()) return [];
+
+  const nextMonth = new Date(viewingYear, viewingMonth + 1, 1);
+  const nextStart = getStartOfMonth(nextMonth);
+  const nextEnd = getEndOfMonth(nextMonth);
+  const projected: DisplayTransaction[] = [];
+
+  for (const item of recurringStore.filteredActiveItems) {
+    for (const date of getDueDatesInRange(item, nextStart, nextEnd)) {
+      projected.push({
+        id: `next-projected-${item.id}-${toDateInputValue(date)}`,
+        accountId: item.accountId,
+        type: item.type,
+        amount: item.amount,
+        currency: item.currency,
+        category: item.category,
+        date: toDateInputValue(date),
+        description: item.description,
+        recurringItemId: item.id,
+        isReconciled: false,
+        isProjected: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  projected.sort((a, b) => a.date.localeCompare(b.date));
+  return projected;
+});
+
+const nextMonthLabel = computed(() => {
+  const next = new Date(selectedMonth.value.getFullYear(), selectedMonth.value.getMonth() + 1, 1);
+  return formatMonthYear(next);
 });
 
 // Summary computeds
@@ -257,7 +314,62 @@ async function handleTransactionSave(
   } else {
     if (!(await transactionsStore.createTransaction(data))) return;
     closeAddModal();
+    showCreatedConfirmation({
+      description: data.description,
+      amount: data.amount,
+      currency: data.currency,
+      date: data.date,
+      type: data.type,
+      category: data.category,
+    });
   }
+}
+
+function formatAmountWithCurrency(amount: number, currency: string): string {
+  const info = getCurrencyInfo(currency as any);
+  if (!info) return `${currency} ${amount.toFixed(2)}`;
+  const formatted = amount.toFixed(info.decimals);
+  return info.symbolPosition === 'before'
+    ? `${info.symbol}${formatted}`
+    : `${formatted} ${info.symbol}`;
+}
+
+function showCreatedConfirmation(opts: {
+  description: string;
+  amount: number;
+  currency: string;
+  date: string;
+  type: string;
+  category: string;
+  recurring?: string | null;
+}) {
+  const d = new Date(opts.date + 'T00:00:00');
+  const dateStr = d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const details: ConfirmDetail[] = [
+    { label: t('transactions.title'), value: opts.description },
+    {
+      label: t('form.amount'),
+      value: formatAmountWithCurrency(opts.amount, opts.currency),
+      highlight: opts.type === 'income',
+    },
+    { label: t('form.type'), value: t(`transactions.type.${opts.type}` as any) },
+    { label: t('form.category'), value: getCategoryName(opts.category) },
+    { label: opts.recurring ? t('form.startDate') : t('form.date'), value: dateStr },
+  ];
+  if (opts.recurring) {
+    details.push({ label: t('transactions.filterRecurring'), value: opts.recurring });
+  }
+  createdConfirm.value = {
+    open: true,
+    title: t('transactions.createdTitle'),
+    message: t('transactions.createdMessage'),
+    details,
+  };
 }
 
 function handleViewActivity(activityId: string) {
@@ -277,11 +389,15 @@ function handleViewLoan(loanId: string) {
 }
 
 async function handleTransactionDelete(id: string) {
-  // Capture recurring item before closing the modal (which clears the ref)
+  // Capture state before closing the modal (which clears refs)
   const wasEditingRecurring = editingRecurringItem.value;
+  const wasPendingTx = pendingProjectedTx.value;
   closeEditModal();
 
-  if (wasEditingRecurring) {
+  if (wasEditingRecurring && wasPendingTx) {
+    // Materialized or projected recurring — use scope picker
+    await handleScopedRecurringDelete(wasEditingRecurring.id, wasPendingTx);
+  } else if (wasEditingRecurring) {
     await deleteRecurringItemById(id);
   } else {
     if (
@@ -416,6 +532,20 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
       await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
     }
     closeAddModal();
+    showCreatedConfirmation({
+      description: data.description,
+      amount: data.amount,
+      currency: data.currency,
+      date: data.startDate,
+      type: data.type,
+      category: data.category,
+      recurring: formatFrequency({
+        ...data,
+        id: '',
+        createdAt: '',
+        updatedAt: '',
+      } as RecurringItem),
+    });
   }
 }
 
@@ -467,6 +597,49 @@ async function deleteRecurringItemById(id: string) {
       playWhoosh();
     }
   }
+}
+
+/** Scope-aware delete for materialized/projected recurring transactions */
+async function handleScopedRecurringDelete(recurringItemId: string, tx: DisplayTransaction) {
+  const scope = await chooseScope();
+  if (!scope) return;
+
+  if (scope === 'all') {
+    await deleteRecurringItemById(recurringItemId);
+  } else if (scope === 'this-only') {
+    if (!tx.isProjected) {
+      // Materialized — delete just this transaction
+      if (await transactionsStore.deleteTransaction(tx.id)) {
+        playWhoosh();
+      }
+    }
+    // Projected transactions don't exist in DB — nothing to delete for "this only"
+  } else if (scope === 'this-and-future') {
+    // Set the recurring item's end date to the day before this occurrence
+    const endDate = new Date(tx.date + 'T00:00:00');
+    endDate.setDate(endDate.getDate() - 1);
+    const item = recurringStore.recurringItems.find((r) => r.id === recurringItemId);
+    if (item) {
+      await recurringStore.updateRecurringItem(recurringItemId, {
+        ...item,
+        recurrenceEndDate: toDateInputValue(endDate),
+      } as any);
+    }
+    // Delete materialized transactions on or after this date
+    const futureTxs = transactionsStore.transactions.filter(
+      (t) => t.recurringItemId === recurringItemId && t.date >= tx.date
+    );
+    for (const ftx of futureTxs) {
+      await transactionsStore.deleteTransaction(ftx.id);
+    }
+    playWhoosh();
+  }
+}
+
+/** Delete a recurring transaction from the action buttons (scope-aware) */
+async function handleRecurringDelete(tx: DisplayTransaction) {
+  if (!tx.recurringItemId) return;
+  await handleScopedRecurringDelete(tx.recurringItemId, tx);
 }
 
 // Helper to find the recurring item for a transaction (for edit button)
@@ -814,7 +987,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                   size="sm"
                   @click.stop
                   @edit="() => handleMaterializedRecurringClick(tx)"
-                  @delete="deleteRecurringItemById(tx.recurringItemId!)"
+                  @delete="() => handleRecurringDelete(tx)"
                 />
               </template>
               <template v-else>
@@ -830,6 +1003,57 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         </div>
       </template>
     </BaseCard>
+
+    <!-- Next month preview -->
+    <div v-if="nextMonthProjected.length > 0" class="space-y-2.5">
+      <div class="flex items-center gap-2">
+        <h3 class="font-outfit text-sm font-bold tracking-wide text-[var(--color-text)] opacity-40">
+          {{ t('transactions.nextMonthPreview') }}
+        </h3>
+        <span
+          class="font-outfit rounded-full bg-[var(--tint-slate-5)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] opacity-30 dark:bg-slate-700"
+        >
+          {{ nextMonthLabel }}
+        </span>
+      </div>
+
+      <BaseCard :padding="false">
+        <div
+          v-for="tx in nextMonthProjected"
+          :key="tx.id"
+          class="flex cursor-pointer items-center gap-3 border-b border-dashed border-[var(--tint-slate-5)] px-4 py-3 opacity-50 transition-opacity hover:opacity-80 dark:border-slate-700"
+          @click="handleProjectedClick(tx)"
+        >
+          <CategoryIcon :category="tx.category" size="sm" />
+          <div class="min-w-0 flex-1">
+            <p
+              class="font-outfit truncate text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+            >
+              {{ tx.description }}
+            </p>
+            <p class="text-xs text-[var(--color-text)] opacity-40">
+              {{
+                new Date(tx.date + 'T00:00:00').toLocaleDateString('en-US', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                })
+              }}
+              <span v-if="tx.recurringItemId" class="ml-1">
+                &middot; {{ getRecurringFrequencyLabel(tx) }}
+              </span>
+            </p>
+          </div>
+          <span
+            class="font-outfit text-sm font-semibold"
+            :class="tx.type === 'income' ? 'text-[#27ae60]' : 'text-[var(--color-text)]'"
+          >
+            {{ tx.type === 'income' ? '+' : '-'
+            }}{{ formatAmountWithCurrency(tx.amount, tx.currency) }}
+          </span>
+        </div>
+      </BaseCard>
+    </div>
 
     <!-- Add Transaction Modal -->
     <TransactionModal
@@ -860,6 +1084,15 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       @open-edit="handleViewOpenEdit"
       @view-activity="handleViewActivity"
       @view-loan="handleViewLoan"
+    />
+
+    <!-- Transaction Created Confirmation -->
+    <CreatedConfirmModal
+      :open="createdConfirm.open"
+      :title="createdConfirm.title"
+      :message="createdConfirm.message"
+      :details="createdConfirm.details"
+      @close="createdConfirm.open = false"
     />
   </div>
 </template>
