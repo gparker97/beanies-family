@@ -24,6 +24,22 @@ const familyStore = useFamilyStore();
 const show = ref(false);
 const el = ref<HTMLElement>();
 
+// Close other AssigneePickerButton instances when this one opens
+const CLOSE_EVENT = 'assignee-picker-close';
+
+function openPicker() {
+  // Broadcast close to all other pickers before opening
+  document.dispatchEvent(new CustomEvent(CLOSE_EVENT, { detail: el.value }));
+  show.value = true;
+}
+
+function onOtherPickerOpen(e: Event) {
+  const source = (e as CustomEvent).detail;
+  if (source !== el.value) {
+    show.value = false;
+  }
+}
+
 const selectedMembers = computed(() => {
   const ids = Array.isArray(props.modelValue)
     ? props.modelValue
@@ -55,8 +71,14 @@ function onDocClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onDocClick));
-onUnmounted(() => document.removeEventListener('click', onDocClick));
+onMounted(() => {
+  document.addEventListener('click', onDocClick);
+  document.addEventListener(CLOSE_EVENT, onOtherPickerOpen);
+});
+onUnmounted(() => {
+  document.removeEventListener('click', onDocClick);
+  document.removeEventListener(CLOSE_EVENT, onOtherPickerOpen);
+});
 </script>
 
 <template>
@@ -69,7 +91,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
         hasSelection ? 'bg-[var(--tint-purple-8)]' : 'hover:bg-[var(--tint-slate-10)]',
       ]"
       :style="!hasSelection ? 'background: var(--tint-slate-5)' : undefined"
-      @click.stop="show = !show"
+      @click.stop="show ? (show = false) : openPicker()"
     >
       <template v-if="selectedMembers.length > 0">
         <span
@@ -96,7 +118,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
     <!-- Popover -->
     <div
       v-if="show"
-      class="absolute top-full z-50 mt-2 w-max min-w-[200px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-slate-600 dark:bg-slate-700"
+      class="absolute top-full z-50 mt-2 max-w-[280px] min-w-[200px] rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-slate-600 dark:bg-slate-700"
       :class="align === 'left' ? 'left-0' : 'right-0'"
       @click.stop
     >
