@@ -80,7 +80,11 @@ export class TransactionsPage {
 
     // Save — button text is "Add Transaction"
     await dialog.getByRole('button', { name: ui('modal.addTransaction') }).click();
-    await expect(dialog).toHaveCount(0);
+
+    // Dismiss the "Transaction Created" confirmation modal
+    const confirmDialog = this.page.locator('[role="dialog"]');
+    await confirmDialog.getByRole('button', { name: ui('action.ok') }).click();
+    await expect(confirmDialog).toHaveCount(0);
   }
 
   async getTransactionCount(): Promise<number> {

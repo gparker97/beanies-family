@@ -32,6 +32,13 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^month$/i }).click();
   }
 
+  /** Dismiss the "Activity Created" confirmation modal that appears after saving a new activity. */
+  async function dismissCreatedConfirm(page: import('@playwright/test').Page) {
+    const okButton = page.locator('[role="dialog"]').getByRole('button', { name: /^ok$/i });
+    await okButton.click({ timeout: 5000 });
+    await expect(okButton).not.toBeVisible({ timeout: 3000 });
+  }
+
   /** Select the first family member chip in the activity modal (required for multi-owner). */
   async function selectAssignee(page: import('@playwright/test').Page) {
     // Click the first "John Doe" button — the assignee picker (not dropoff/pickup pickers below)
@@ -84,8 +91,8 @@ test.describe('Family Planner', () => {
     // Save — use exact regex to avoid conflict with "+ add activity" header button
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
-    // Modal should close
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Activity should be persisted — verify in IndexedDB
     const exported = await dbHelper.exportData();
@@ -116,8 +123,8 @@ test.describe('Family Planner', () => {
     // Save — use exact regex to avoid conflict with "+ add activity" header button
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
-    // Modal should close
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Verify persistence
     const exported = await dbHelper.exportData();
@@ -163,8 +170,8 @@ test.describe('Family Planner', () => {
     // Save — use exact regex to avoid conflict with "+ add activity" header button
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
-    // Modal should close
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Verify persistence — daysOfWeek should contain [1, 3] (Mon, Wed)
     const exported = await dbHelper.exportData();
@@ -196,8 +203,8 @@ test.describe('Family Planner', () => {
     await page.locator('input[type="date"]').fill(todayStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
-    // Wait for modal to close
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Calendar grid should have at least one activity dot (5px circles)
     // The dots are small span elements inside the calendar buttons
@@ -220,7 +227,8 @@ test.describe('Family Planner', () => {
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // The activity should appear in the upcoming activities section
     const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
@@ -241,7 +249,9 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Click on the activity in the upcoming list — opens view modal first
     const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
@@ -284,7 +294,9 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /one-off/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Click on the activity in the upcoming list — opens view modal
     const upcomingSection = page.locator('h3', { hasText: /upcoming activities/i }).locator('..');
@@ -375,7 +387,9 @@ test.describe('Family Planner', () => {
 
     // Save — use exact regex to avoid conflict with "+ add activity" header button
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Verify all fields persisted
     const exported = await dbHelper.exportData();
@@ -408,7 +422,9 @@ test.describe('Family Planner', () => {
 
     // Save
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Verify persistence — recurrenceEndDate should be saved
     const exported = await dbHelper.exportData();
@@ -432,7 +448,9 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Click the first occurrence in the upcoming list — opens view modal
     await page.getByText('Weekly Lesson').first().click();
@@ -476,7 +494,9 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Click the first occurrence → view modal → Edit → edit modal opens directly
     await page.getByText('Piano Class').first().click();
@@ -518,7 +538,9 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Click the first occurrence → view modal → Edit → edit modal opens directly
     await page.getByText('Soccer Training').first().click();
@@ -560,7 +582,9 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss confirmation modal
+    await dismissCreatedConfirm(page);
 
     // Click the first occurrence in the upcoming list — opens view modal
     await page.getByText('Reschedule Test').first().click();

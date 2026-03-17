@@ -22,7 +22,9 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useBreakpoint } from '@/composables/useBreakpoint';
-import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
+import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
+import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -78,6 +80,14 @@ const editingOccurrenceDate = ref<string | undefined>(undefined);
 const selectedDate = ref<string | undefined>(undefined);
 const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
+
+// Activity created confirmation modal
+const createdConfirm = ref<{
+  open: boolean;
+  title: string;
+  message: string;
+  details: ConfirmDetail[];
+}>({ open: false, title: '', message: '', details: [] });
 
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
 const weeklyViewRef = ref<InstanceType<typeof WeeklyCalendarView> | null>(null);
@@ -157,7 +167,10 @@ async function handleSave(
       await activityStore.updateActivity(data.id, data.data);
     }
   } else {
-    await activityStore.createActivity(data as CreateFamilyActivityInput);
+    const created = await activityStore.createActivity(data as CreateFamilyActivityInput);
+    if (created) {
+      showActivityCreatedConfirmation(data as CreateFamilyActivityInput);
+    }
   }
 
   // When fee amount changes on a linked activity, update future materialized transactions
@@ -224,6 +237,43 @@ async function handleSave(
 
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
+}
+
+function showActivityCreatedConfirmation(data: CreateFamilyActivityInput) {
+  const d = new Date(data.date + 'T00:00:00');
+  const dateStr = d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  const details: ConfirmDetail[] = [
+    { label: t('planner.field.title'), value: data.title },
+    { label: t('form.category'), value: getActivityCategoryName(data.category) },
+    { label: t('form.date'), value: dateStr },
+  ];
+  if (data.startTime) {
+    const time = data.endTime ? `${data.startTime} - ${data.endTime}` : data.startTime;
+    details.push({ label: t('planner.field.startTime'), value: time });
+  }
+  if (data.isAllDay) {
+    details.push({ label: t('planner.allDay'), value: '✓' });
+  }
+  if (data.recurrence !== 'none') {
+    details.push({
+      label: t('planner.field.recurrence'),
+      value: t(`planner.recurrence.${data.recurrence}` as any),
+    });
+  }
+  if (data.location) {
+    details.push({ label: t('planner.field.location'), value: data.location });
+  }
+  createdConfirm.value = {
+    open: true,
+    title: t('planner.activityCreatedTitle'),
+    message: t('planner.activityCreatedMessage'),
+    details,
+  };
 }
 
 async function handleDelete() {
@@ -381,6 +431,15 @@ function handleActivitySwapped(newId: string) {
       @close="viewingActivity = null"
       @open-edit="handleViewOpenEdit"
       @activity-swapped="handleActivitySwapped"
+    />
+
+    <!-- Activity Created Confirmation -->
+    <CreatedConfirmModal
+      :open="createdConfirm.open"
+      :title="createdConfirm.title"
+      :message="createdConfirm.message"
+      :details="createdConfirm.details"
+      @close="createdConfirm.open = false"
     />
   </div>
 </template>
