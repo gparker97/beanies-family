@@ -121,9 +121,11 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
   { id: 'football', name: 'Football', emoji: '🏈', color: '#86EFAC', group: 'Sports' },
   { id: 'golf_activity', name: 'Golf', emoji: '⛳', color: '#15803D', group: 'Sports' },
   { id: 'gymnastics', name: 'Gymnastics', emoji: '🤸', color: '#10B981', group: 'Sports' },
+  { id: 'mma', name: 'MMA', emoji: '🥊', color: '#047857', group: 'Sports' },
   { id: 'multi_sport', name: 'Multi Sport', emoji: '🏅', color: '#065F46', group: 'Sports' },
   { id: 'rugby', name: 'Rugby', emoji: '🏉', color: '#34D399', group: 'Sports' },
   { id: 'soccer', name: 'Soccer', emoji: '⚽', color: '#4ADE80', group: 'Sports' },
+  { id: 'taekwondo', name: 'Taekwondo', emoji: '🥋', color: '#0F766E', group: 'Sports' },
   { id: 'tennis', name: 'Tennis', emoji: '🎾', color: '#22C55E', group: 'Sports' },
   { id: 'gym_activity', name: 'Training', emoji: '🏋️', color: '#059669', group: 'Sports' },
   { id: 'yoga_activity', name: 'Yoga / Pilates', emoji: '🧘', color: '#0D9488', group: 'Sports' },
@@ -222,4 +224,9 @@ export function getActivityCategoriesGrouped(): ActivityCategoryGroup[] {
 /** Look up the color for a category, falling back to group-based color */
 export function getActivityCategoryColor(id: string): string {
   return ACTIVITY_COLORS[id] ?? '#6B7280';
+}
+
+/** Look up the human-readable name for a category ID */
+export function getActivityCategoryName(id: string): string {
+  return _categoryMap.get(id)?.name ?? id;
 }

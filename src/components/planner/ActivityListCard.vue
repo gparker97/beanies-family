@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
+import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { normalizeAssignees } from '@/utils/assignees';
 import { toDateInputValue } from '@/utils/date';
 import MemberChip from '@/components/ui/MemberChip.vue';
@@ -38,11 +39,10 @@ function formatDisplayDate(dateStr: string): string {
     :style="{ borderLeftColor: getActivityColor(activity) }"
     @click="$emit('click')"
   >
-    <!-- Category dot -->
-    <span
-      class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
-      :style="{ backgroundColor: getActivityColor(activity) }"
-    />
+    <!-- Category icon -->
+    <span class="flex-shrink-0 text-base leading-none">
+      {{ activity.icon ?? getActivityFallbackEmoji(activity.category) }}
+    </span>
 
     <div class="min-w-0 flex-1">
       <!-- Line 1: Title + optional date -->
