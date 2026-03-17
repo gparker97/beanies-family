@@ -27,6 +27,7 @@ type EditableField =
   | 'title'
   | 'assignee'
   | 'date'
+  | 'endDate'
   | 'startTime'
   | 'endTime'
   | 'location'
@@ -68,6 +69,7 @@ const activity = computed(() =>
 const draftTitle = ref('');
 const draftAssigneeIds = ref<string[]>([]);
 const draftDate = ref('');
+const draftEndDate = ref('');
 const draftStartTime = ref('');
 const draftEndTime = ref('');
 const draftLocation = ref('');
@@ -102,6 +104,9 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           break;
         case 'date':
           draftDate.value = activity.value.date?.split('T')[0] ?? '';
+          break;
+        case 'endDate':
+          draftEndDate.value = activity.value.endDate?.split('T')[0] ?? '';
           break;
         case 'startTime':
           draftStartTime.value = activity.value.startTime ?? '';
@@ -168,6 +173,15 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           const cur = activity.value.date?.split('T')[0] ?? null;
           if (val !== cur) {
             update.date = val;
+            changed = true;
+          }
+          break;
+        }
+        case 'endDate': {
+          const val = draftEndDate.value || null;
+          const cur = activity.value.endDate?.split('T')[0] ?? null;
+          if (val !== cur) {
+            update.endDate = val;
             changed = true;
           }
           break;
@@ -316,6 +330,13 @@ const viewFormattedDate = computed(() => {
   if (!activity.value?.date) return null;
   return formatDate(activity.value.date);
 });
+
+const viewFormattedEndDate = computed(() => {
+  if (!activity.value?.endDate) return null;
+  return formatDate(activity.value.endDate);
+});
+
+const viewIsAllDay = computed(() => activity.value?.isAllDay ?? false);
 
 const isRecurring = computed(() => activity.value?.recurrence !== 'none');
 
@@ -762,7 +783,11 @@ async function confirmReschedule() {
       <!-- Date & Times — combined row -->
       <div :class="!isRecurring ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 gap-4'">
         <!-- Date (only for one-off activities) -->
-        <FormFieldGroup v-if="!isRecurring" :label="t('planner.field.dateOnly')">
+        <!-- Start date (non-recurring only) -->
+        <FormFieldGroup
+          v-if="!isRecurring"
+          :label="viewIsAllDay ? t('planner.field.date') : t('planner.field.dateOnly')"
+        >
           <InlineEditField
             :editing="editingField === 'date'"
             tint-color="orange"
@@ -805,57 +830,118 @@ async function confirmReschedule() {
             </template>
           </InlineEditField>
         </FormFieldGroup>
-        <FormFieldGroup :label="t('modal.startTime')">
+
+        <!-- End date (all-day non-recurring only) -->
+        <FormFieldGroup v-if="!isRecurring && viewIsAllDay" :label="t('planner.field.endDate')">
           <InlineEditField
-            :editing="editingField === 'startTime'"
+            :editing="editingField === 'endDate'"
             tint-color="orange"
-            @start-edit="startEdit('startTime')"
+            @start-edit="startEdit('endDate')"
           >
             <template #view>
               <span
-                v-if="activity.startTime"
+                v-if="viewFormattedEndDate"
                 class="font-outfit text-sm font-semibold text-[var(--color-text)]"
               >
-                {{ activity.startTime }}
+                {{ viewFormattedEndDate }}
               </span>
               <span v-else class="text-sm text-[var(--color-text-muted)]">
-                {{ t('modal.selectTime') }}
+                {{ t('planner.field.dateOnly') }}
               </span>
             </template>
             <template #edit>
-              <TimePresetPicker
-                :model-value="draftStartTime"
-                @update:model-value="handleStartTimeChange"
-              />
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <BaseInput
+                    v-model="draftEndDate"
+                    type="date"
+                    :min="activity.date"
+                    class="rounded-[14px] ring-2 ring-orange-500/30"
+                    @keydown="handleInputKeydown('endDate')($event)"
+                  />
+                </div>
+                <button
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  @click.stop="saveField('endDate')"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
             </template>
           </InlineEditField>
         </FormFieldGroup>
 
-        <FormFieldGroup :label="t('modal.endTime')">
-          <InlineEditField
-            :editing="editingField === 'endTime'"
-            tint-color="orange"
-            @start-edit="startEdit('endTime')"
+        <!-- All-day badge (shown instead of time fields) -->
+        <FormFieldGroup v-if="viewIsAllDay" :label="t('planner.allDay')">
+          <span
+            class="font-outfit text-primary-500 inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-orange-8)] px-3 py-1.5 text-xs font-semibold"
           >
-            <template #view>
-              <span
-                v-if="activity.endTime"
-                class="font-outfit text-sm font-semibold text-[var(--color-text)]"
-              >
-                {{ activity.endTime }}
-              </span>
-              <span v-else class="text-sm text-[var(--color-text-muted)]">
-                {{ t('modal.selectTime') }}
-              </span>
-            </template>
-            <template #edit>
-              <TimePresetPicker
-                :model-value="draftEndTime"
-                @update:model-value="handleEndTimeChange"
-              />
-            </template>
-          </InlineEditField>
+            ☀️ {{ t('planner.allDay') }}
+          </span>
         </FormFieldGroup>
+
+        <!-- Start / End time (hidden for all-day activities) -->
+        <template v-if="!viewIsAllDay">
+          <FormFieldGroup :label="t('modal.startTime')">
+            <InlineEditField
+              :editing="editingField === 'startTime'"
+              tint-color="orange"
+              @start-edit="startEdit('startTime')"
+            >
+              <template #view>
+                <span
+                  v-if="activity.startTime"
+                  class="font-outfit text-sm font-semibold text-[var(--color-text)]"
+                >
+                  {{ activity.startTime }}
+                </span>
+                <span v-else class="text-sm text-[var(--color-text-muted)]">
+                  {{ t('modal.selectTime') }}
+                </span>
+              </template>
+              <template #edit>
+                <TimePresetPicker
+                  :model-value="draftStartTime"
+                  @update:model-value="handleStartTimeChange"
+                />
+              </template>
+            </InlineEditField>
+          </FormFieldGroup>
+
+          <FormFieldGroup :label="t('modal.endTime')">
+            <InlineEditField
+              :editing="editingField === 'endTime'"
+              tint-color="orange"
+              @start-edit="startEdit('endTime')"
+            >
+              <template #view>
+                <span
+                  v-if="activity.endTime"
+                  class="font-outfit text-sm font-semibold text-[var(--color-text)]"
+                >
+                  {{ activity.endTime }}
+                </span>
+                <span v-else class="text-sm text-[var(--color-text-muted)]">
+                  {{ t('modal.selectTime') }}
+                </span>
+              </template>
+              <template #edit>
+                <TimePresetPicker
+                  :model-value="draftEndTime"
+                  @update:model-value="handleEndTimeChange"
+                />
+              </template>
+            </InlineEditField>
+          </FormFieldGroup>
+        </template>
       </div>
 
       <!-- Location — only shown when populated -->

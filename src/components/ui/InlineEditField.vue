@@ -29,7 +29,7 @@ const tintMap = {
     class="group/field rounded-lg px-1 py-0.5 transition-colors"
     :class="
       editing
-        ? ''
+        ? 'relative z-10'
         : props.disabled
           ? 'cursor-default'
           : `cursor-pointer ${tintMap[tintColor]} [@media(hover:hover)]:cursor-pointer`

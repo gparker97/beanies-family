@@ -2404,6 +2404,10 @@ const STRING_DEFS = {
   'planner.comingSoon': { en: 'Coming soon', beanie: 'coming soon' },
   'planner.tasksDue': { en: 'Tasks Due', beanie: 'tasks due' },
   'planner.allDay': { en: 'All Day', beanie: 'all day' },
+  'planner.allDayHint': {
+    en: 'No specific start or end time',
+    beanie: 'no specific start or end time',
+  },
   'planner.agenda': { en: 'Agenda', beanie: 'agenda' },
 
   // Planner — View toggle

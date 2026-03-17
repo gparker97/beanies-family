@@ -57,6 +57,8 @@ const icon = ref('');
 const title = ref('');
 const description = ref('');
 const date = ref('');
+const endDate = ref('');
+const isAllDay = ref(false);
 const startTime = ref('');
 const endTime = ref('');
 const recurrenceMode = ref<'recurring' | 'one-off'>('recurring');
@@ -82,6 +84,7 @@ const notes = ref('');
 const isActive = ref(true);
 const color = ref('');
 const showMoreDetails = ref(false);
+const showErrors = ref(false);
 
 // Map recurrence mode + frequency to ActivityRecurrence
 const effectiveRecurrence = computed<ActivityRecurrence>(() => {
@@ -111,6 +114,8 @@ const { isEditing, isSubmitting } = useFormModal(
       title.value = activity.title;
       description.value = activity.description ?? '';
       date.value = activity.date;
+      endDate.value = activity.endDate ?? '';
+      isAllDay.value = activity.isAllDay ?? false;
       startTime.value = activity.startTime ?? '';
       endTime.value = activity.endTime ?? '';
       recurrenceMode.value = activity.recurrence === 'none' ? 'one-off' : 'recurring';
@@ -141,12 +146,15 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = activity.isActive;
       color.value = activity.color ?? getActivityCategoryColor(activity.category);
       showMoreDetails.value = hasDetailData(activity);
+      showErrors.value = false;
     },
     onNew: () => {
       icon.value = '';
       title.value = '';
       description.value = '';
       date.value = props.defaultDate ?? todayStr();
+      endDate.value = '';
+      isAllDay.value = false;
       startTime.value = props.defaultStartTime ?? '09:00';
       endTime.value = addHourToTime(startTime.value);
       recurrenceMode.value = 'recurring';
@@ -172,6 +180,7 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       color.value = '';
       showMoreDetails.value = false;
+      showErrors.value = false;
     },
   }
 );
@@ -270,6 +279,11 @@ const canSave = computed(() => {
   return true;
 });
 
+// Per-field error flags (only visible after attempted save)
+const errorAssignees = computed(() => showErrors.value && assigneeIds.value.length === 0);
+const errorTitle = computed(() => showErrors.value && !title.value.trim());
+const errorDate = computed(() => showErrors.value && !date.value);
+
 const modalTitle = computed(() =>
   isEditing.value ? t('planner.editActivity') : t('planner.newActivity')
 );
@@ -279,7 +293,11 @@ const saveLabel = computed(() =>
 );
 
 function handleSave() {
-  if (!canSave.value) return;
+  if (!canSave.value) {
+    showErrors.value = true;
+    return;
+  }
+  showErrors.value = false;
 
   const currentMember = familyStore.currentMember ?? familyStore.owner;
   const assigneePayload = toAssigneePayload(assigneeIds.value);
@@ -289,8 +307,10 @@ function handleSave() {
     icon: icon.value || undefined,
     description: description.value.trim() || undefined,
     date: date.value,
-    startTime: startTime.value || undefined,
-    endTime: endTime.value || undefined,
+    endDate: isAllDay.value && endDate.value ? endDate.value : undefined,
+    isAllDay: isAllDay.value || undefined,
+    startTime: isAllDay.value ? undefined : startTime.value || undefined,
+    endTime: isAllDay.value ? undefined : endTime.value || undefined,
     recurrence: effectiveRecurrence.value,
     daysOfWeek:
       recurrenceMode.value === 'recurring' && effectiveRecurrence.value === 'weekly'
@@ -340,7 +360,7 @@ function handleSave() {
     :icon="icon || '📋'"
     icon-bg="var(--tint-orange-8)"
     :save-label="readOnly ? t('action.close') : saveLabel"
-    :save-disabled="readOnly ? false : !canSave"
+    :save-disabled="false"
     :is-submitting="isSubmitting"
     :show-delete="isEditing && !readOnly"
     @close="emit('close')"
@@ -364,7 +384,7 @@ function handleSave() {
       </div>
 
       <!-- 1. Who? -->
-      <FormFieldGroup :label="t('modal.whosGoing')" required>
+      <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
         <FamilyChipPicker v-model="assigneeIds" mode="multi" />
       </FormFieldGroup>
 
@@ -374,7 +394,7 @@ function handleSave() {
       </FormFieldGroup>
 
       <!-- 3. Activity title (styled wrapper) -->
-      <FormFieldGroup :label="t('modal.whatsTheActivity')" required>
+      <FormFieldGroup :label="t('modal.whatsTheActivity')" required :error="errorTitle">
         <div
           class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
         >
@@ -461,18 +481,32 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
+      <!-- 5b. All-day toggle -->
+      <FormFieldGroup :label="t('planner.allDay')">
+        <label class="inline-flex cursor-pointer items-center gap-2.5">
+          <input
+            v-model="isAllDay"
+            type="checkbox"
+            class="text-primary-500 focus:ring-primary-500/30 h-5 w-5 rounded-lg border-gray-300 transition dark:border-slate-600 dark:bg-slate-700"
+          />
+          <span class="text-sm text-[var(--color-text-muted)]">
+            {{ t('planner.allDayHint') }}
+          </span>
+        </label>
+      </FormFieldGroup>
+
       <!-- 6. Date + Times -->
       <!-- Recurring: Start Date / End Date row, then Start Time / End Time row -->
       <template v-if="recurrenceMode === 'recurring'">
         <div class="grid grid-cols-2 gap-4">
-          <FormFieldGroup :label="t('planner.field.date')" required>
+          <FormFieldGroup :label="t('planner.field.date')" required :error="errorDate">
             <BaseInput v-model="date" type="date" required />
           </FormFieldGroup>
           <FormFieldGroup :label="t('planner.field.endDate')" optional>
             <BaseInput v-model="recurrenceEndDate" type="date" :min="date" />
           </FormFieldGroup>
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div v-if="!isAllDay" class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('modal.startTime')">
             <TimePresetPicker v-model="startTime" />
           </FormFieldGroup>
@@ -481,10 +515,18 @@ function handleSave() {
           </FormFieldGroup>
         </div>
       </template>
-      <!-- One-off: Date + Start Time + End Time on one row -->
+      <!-- One-off: Date (+ optional end date if all-day), or Date + times -->
       <template v-else>
-        <div class="grid grid-cols-3 gap-3">
-          <FormFieldGroup :label="t('planner.field.dateOnly')" required>
+        <div v-if="isAllDay" class="grid grid-cols-2 gap-4">
+          <FormFieldGroup :label="t('planner.field.dateOnly')" required :error="errorDate">
+            <BaseInput v-model="date" type="date" required />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('planner.field.endDate')" optional>
+            <BaseInput v-model="endDate" type="date" :min="date" />
+          </FormFieldGroup>
+        </div>
+        <div v-else class="grid grid-cols-3 gap-3">
+          <FormFieldGroup :label="t('planner.field.dateOnly')" required :error="errorDate">
             <BaseInput v-model="date" type="date" required />
           </FormFieldGroup>
           <FormFieldGroup :label="t('modal.startTime')">
