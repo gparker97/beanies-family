@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
-import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import ActivityListCard from '@/components/planner/ActivityListCard.vue';
+import TodoItemRow from '@/components/todo/TodoItemRow.vue';
+import { useActivityStore } from '@/stores/activityStore';
+import { useTodoStore } from '@/stores/todoStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { toDateInputValue as formatDate } from '@/utils/date';
-import { normalizeAssignees } from '@/utils/assignees';
-import type { ActivityRecurrence } from '@/types/models';
+import { toDateInputValue } from '@/utils/date';
+import type { TodoItem } from '@/types/models';
 
 const props = defineProps<{
   date: string;
@@ -17,10 +18,12 @@ const emit = defineEmits<{
   close: [];
   'add-activity': [];
   'edit-activity': [id: string, date: string];
+  'view-todo': [todo: TodoItem];
 }>();
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
+const todoStore = useTodoStore();
 
 /** Format the selected date as a readable header (e.g. "Saturday, March 15") */
 const dateHeader = computed(() => {
@@ -43,6 +46,11 @@ const dayActivities = computed(() => {
     .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
 });
 
+/** Todos due on the selected day */
+const dayTodos = computed(() =>
+  todoStore.filteredScheduledTodos.filter((t) => t.dueDate?.slice(0, 10) === props.date)
+);
+
 /** Upcoming activities in the next 14 days after the selected date */
 const upcomingActivities = computed(() => {
   const start = new Date(props.date + 'T00:00:00');
@@ -53,13 +61,13 @@ const upcomingActivities = computed(() => {
 
   const results: { activity: (typeof dayActivities.value)[0]['activity']; date: string }[] = [];
 
-  // We need to check up to 2 months to cover the 14-day window
+  // Check up to 2 months to cover the 14-day window
   for (let i = 0; i < 2; i++) {
     const y = nextDay.getFullYear();
     const m = nextDay.getMonth() + i;
     const occurrences = activityStore.monthActivities(y, m);
     for (const occ of occurrences) {
-      if (occ.date > props.date && occ.date <= formatDate(endDate)) {
+      if (occ.date > props.date && occ.date <= toDateInputValue(endDate)) {
         results.push(occ);
       }
     }
@@ -82,15 +90,6 @@ const upcomingActivities = computed(() => {
     })
     .slice(0, 10);
 });
-
-function formatDisplayDate(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function recurrenceLabel(recurrence: ActivityRecurrence) {
-  return t(`planner.recurrence.${recurrence}` as const);
-}
 </script>
 
 <template>
@@ -104,49 +103,13 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
 
     <!-- Day's activities -->
     <div v-if="dayActivities.length > 0" class="space-y-1.5">
-      <button
+      <ActivityListCard
         v-for="(occ, i) in dayActivities"
         :key="`${occ.activity.id}-${i}`"
-        type="button"
-        class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-700"
-        :style="{ borderLeftColor: getActivityColor(occ.activity) }"
+        :activity="occ.activity"
+        :date="occ.date"
         @click="emit('edit-activity', occ.activity.id, occ.date)"
-      >
-        <!-- Category dot -->
-        <span
-          class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
-          :style="{ backgroundColor: getActivityColor(occ.activity) }"
-        />
-
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center justify-between gap-2">
-            <h4
-              class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-100"
-            >
-              {{ occ.activity.title }}
-            </h4>
-          </div>
-
-          <div class="mt-0.5 flex items-center gap-2">
-            <span v-if="occ.activity.startTime" class="text-primary-500 text-xs font-medium">
-              {{ occ.activity.startTime
-              }}{{ occ.activity.endTime ? ` - ${occ.activity.endTime}` : '' }}
-            </span>
-            <span
-              v-if="occ.activity.recurrence !== 'none'"
-              class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"
-            >
-              {{ recurrenceLabel(occ.activity.recurrence) }}
-            </span>
-            <span class="flex-1" />
-            <MemberChip
-              v-for="mid in normalizeAssignees(occ.activity)"
-              :key="mid"
-              :member-id="mid"
-            />
-          </div>
-        </div>
-      </button>
+      />
     </div>
 
     <!-- Empty state -->
@@ -154,6 +117,30 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
       <p class="text-secondary-500/40 text-sm dark:text-gray-500">
         {{ t('planner.noActivitiesForDay') }}
       </p>
+    </div>
+
+    <!-- Tasks due on this day -->
+    <div
+      v-if="dayTodos.length > 0"
+      class="mt-4 rounded-2xl border-l-4 p-3"
+      style="
+        background: linear-gradient(135deg, white 85%, rgb(155 89 182 / 6%));
+        border-left-color: #9b59b6;
+      "
+    >
+      <h4 class="font-outfit mb-2 text-sm font-semibold" style="color: #9b59b6">
+        ✅ {{ t('planner.tasksDue') }}
+      </h4>
+      <div class="space-y-1.5">
+        <TodoItemRow
+          v-for="todo in dayTodos"
+          :key="todo.id"
+          :todo="todo"
+          compact
+          @toggle="() => {}"
+          @view="emit('view-todo', todo)"
+        />
+      </div>
     </div>
 
     <!-- Add Activity button -->
@@ -172,51 +159,14 @@ function recurrenceLabel(recurrence: ActivityRecurrence) {
       </h3>
 
       <div class="space-y-1.5">
-        <button
+        <ActivityListCard
           v-for="(occ, i) in upcomingActivities"
           :key="`upcoming-${occ.activity.id}-${occ.date}-${i}`"
-          type="button"
-          class="flex w-full cursor-pointer items-center gap-2.5 rounded-2xl border-l-4 bg-white px-3 py-2.5 text-left shadow-[0_4px_20px_rgba(44,62,80,0.05)] transition-all hover:shadow-[0_6px_24px_rgba(44,62,80,0.08)] dark:bg-slate-700"
-          :style="{ borderLeftColor: getActivityColor(occ.activity) }"
+          :activity="occ.activity"
+          :date="occ.date"
+          show-date
           @click="emit('edit-activity', occ.activity.id, occ.date)"
-        >
-          <span
-            class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
-            :style="{ backgroundColor: getActivityColor(occ.activity) }"
-          />
-
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center justify-between gap-2">
-              <h4
-                class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-100"
-              >
-                {{ occ.activity.title }}
-              </h4>
-              <span class="text-secondary-500/40 flex-shrink-0 text-xs dark:text-gray-500">
-                {{ formatDisplayDate(occ.date) }}
-              </span>
-            </div>
-
-            <div class="mt-0.5 flex items-center gap-2">
-              <span v-if="occ.activity.startTime" class="text-primary-500 text-xs font-medium">
-                {{ occ.activity.startTime
-                }}{{ occ.activity.endTime ? ' - ' + occ.activity.endTime : '' }}
-              </span>
-              <span
-                v-if="occ.activity.recurrence !== 'none'"
-                class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"
-              >
-                {{ recurrenceLabel(occ.activity.recurrence) }}
-              </span>
-              <span class="flex-1" />
-              <MemberChip
-                v-for="mid in normalizeAssignees(occ.activity)"
-                :key="mid"
-                :member-id="mid"
-              />
-            </div>
-          </div>
-        </button>
+        />
       </div>
     </div>
   </BaseSidePanel>

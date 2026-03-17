@@ -1,0 +1,404 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
+import ActivityListCard from '@/components/planner/ActivityListCard.vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
+import {
+  useWeekNavigation,
+  useTimeGrid,
+  groupOverlapping,
+} from '@/composables/useCalendarNavigation';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useTranslation } from '@/composables/useTranslation';
+import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useTodoStore } from '@/stores/todoStore';
+import { normalizeAssignees } from '@/utils/assignees';
+import { toDateInputValue } from '@/utils/date';
+import type { FamilyActivity, TodoItem } from '@/types/models';
+
+defineProps<{ selectedDate?: string }>();
+const emit = defineEmits<{
+  'select-date': [date: string];
+  'add-activity': [date: string, time?: string];
+  'view-activity': [id: string, date: string];
+  'view-todo': [todo: TodoItem];
+}>();
+
+const { t } = useTranslation();
+const { isMobile } = useBreakpoint();
+const activityStore = useActivityStore();
+const todoStore = useTodoStore();
+
+const referenceDate = ref(new Date());
+const { weekDays, weekLabel, prevWeek, nextWeek, goToToday } = useWeekNavigation(referenceDate);
+
+// Mobile: selected day within the week
+const selectedMobileDay = ref(toDateInputValue(new Date()));
+
+// ── Data ────────────────────────────────────────────────────────────────────
+
+type Occurrence = { activity: FamilyActivity; date: string };
+
+const weekActivities = computed(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return new Map<string, Occurrence[]>();
+
+  const months = new Set<string>();
+  for (const d of days) months.add(`${d.date.getFullYear()}-${d.date.getMonth()}`);
+
+  const allOccurrences: Occurrence[] = [];
+  for (const key of months) {
+    const [y, m] = key.split('-').map(Number);
+    allOccurrences.push(...activityStore.monthActivities(y!, m!));
+  }
+
+  const dateSet = new Set(days.map((d) => d.dateStr));
+  const map = new Map<string, Occurrence[]>();
+  for (const d of days) map.set(d.dateStr, []);
+  for (const occ of allOccurrences) {
+    if (dateSet.has(occ.date)) map.get(occ.date)!.push(occ);
+  }
+  return map;
+});
+
+const weekTodos = computed(() => {
+  const dateSet = new Set(weekDays.value.map((d) => d.dateStr));
+  const map = new Map<string, TodoItem[]>();
+  for (const d of weekDays.value) map.set(d.dateStr, []);
+  for (const todo of todoStore.filteredScheduledTodos) {
+    const dueDate = todo.dueDate?.slice(0, 10) ?? '';
+    if (dateSet.has(dueDate)) map.get(dueDate)!.push(todo);
+  }
+  return map;
+});
+
+const activityCount = computed(() => {
+  let count = 0;
+  for (const arr of weekActivities.value.values()) count += arr.length;
+  return count;
+});
+
+// Time grid
+const allTimedActivities = computed(() => {
+  const items: { startTime?: string; endTime?: string }[] = [];
+  for (const arr of weekActivities.value.values()) {
+    for (const occ of arr) {
+      if (occ.activity.startTime) items.push(occ.activity);
+    }
+  }
+  return items;
+});
+
+const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } =
+  useTimeGrid(allTimedActivities);
+
+// Current time indicator
+const nowMinutes = ref(0);
+let nowTimer: ReturnType<typeof setInterval> | null = null;
+
+function updateNow() {
+  const now = new Date();
+  nowMinutes.value = now.getHours() * 60 + now.getMinutes();
+}
+
+const nowIndicatorTop = computed(() => {
+  const start = hours.value[0] ?? 7;
+  return `${((nowMinutes.value - start * 60) / 60) * ROW_HEIGHT}px`;
+});
+
+const showNowIndicator = computed(() => {
+  const h = Math.floor(nowMinutes.value / 60);
+  const start = hours.value[0] ?? 7;
+  const end = hours.value[hours.value.length - 1] ?? 19;
+  return h >= start && h <= end;
+});
+
+// Auto-scroll to current time
+const gridRef = ref<HTMLElement | null>(null);
+
+onMounted(async () => {
+  updateNow();
+  nowTimer = setInterval(updateNow, 60000);
+  await nextTick();
+  if (gridRef.value) {
+    const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
+    const start = hours.value[0] ?? 7;
+    gridRef.value.scrollTop = Math.max(0, (scrollHour - start) * ROW_HEIGHT);
+  }
+});
+
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer);
+});
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+const DAY_ABBREVS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function dayAbbrev(date: Date): string {
+  return DAY_ABBREVS[date.getDay()]!;
+}
+
+function getTimedForDay(dateStr: string): Occurrence[] {
+  return (weekActivities.value.get(dateStr) ?? [])
+    .filter((o) => o.activity.startTime)
+    .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
+}
+
+function getUntimedForDay(dateStr: string): Occurrence[] {
+  return (weekActivities.value.get(dateStr) ?? []).filter((o) => !o.activity.startTime);
+}
+
+function hasUntimedContent(dateStr: string): boolean {
+  return getUntimedForDay(dateStr).length > 0 || (weekTodos.value.get(dateStr)?.length ?? 0) > 0;
+}
+
+function handleEmptySlotClick(dateStr: string, hour: number) {
+  emit('add-activity', dateStr, `${String(hour).padStart(2, '0')}:00`);
+}
+
+// Mobile: activities for selected day
+const mobileDayActivities = computed(() =>
+  (weekActivities.value.get(selectedMobileDay.value) ?? []).sort((a, b) =>
+    (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? '')
+  )
+);
+
+defineExpose({ weekLabel, activityCount });
+</script>
+
+<template>
+  <div class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800">
+    <CalendarNavBar :label="weekLabel" @prev="prevWeek" @next="nextWeek" @today="goToToday" />
+
+    <!-- ── Desktop: Time Grid ──────────────────────────────────────────── -->
+    <template v-if="!isMobile">
+      <!-- Day headers -->
+      <div class="mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px">
+        <div />
+        <button
+          v-for="day in weekDays"
+          :key="day.dateStr"
+          type="button"
+          class="cursor-pointer rounded-xl py-2 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700/50"
+          :class="selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : ''"
+          @click="emit('select-date', day.dateStr)"
+        >
+          <span
+            class="font-outfit text-secondary-500/50 block text-xs font-semibold uppercase dark:text-gray-500"
+          >
+            {{ dayAbbrev(day.date) }}
+          </span>
+          <span
+            class="font-outfit mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
+            :class="
+              day.isToday
+                ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
+                : 'text-secondary-500 dark:text-gray-200'
+            "
+          >
+            {{ day.date.getDate() }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Untimed / all-day items row -->
+      <div
+        v-if="weekDays.some((d) => hasUntimedContent(d.dateStr))"
+        class="mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5 dark:border-slate-600/40 dark:bg-slate-700/30"
+      >
+        <div class="flex items-center justify-center">
+          <span
+            class="font-outfit text-secondary-500/40 text-xs font-semibold uppercase dark:text-gray-500"
+          >
+            {{ t('planner.allDay') }}
+          </span>
+        </div>
+        <div
+          v-for="day in weekDays"
+          :key="'untimed-' + day.dateStr"
+          class="min-h-[24px] min-w-0 overflow-hidden px-0.5"
+        >
+          <div
+            v-for="occ in getUntimedForDay(day.dateStr)"
+            :key="occ.activity.id"
+            class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+            :style="{
+              borderLeftColor: getActivityColor(occ.activity),
+              background: getActivityColor(occ.activity) + '15',
+            }"
+            @click="emit('view-activity', occ.activity.id, day.dateStr)"
+          >
+            {{ occ.activity.title }}
+          </div>
+          <div
+            v-for="todo in weekTodos.get(day.dateStr) ?? []"
+            :key="todo.id"
+            class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+            style=" background: rgb(155 89 182 / 8%);border-left-color: #9b59b6"
+            @click="emit('view-todo', todo)"
+          >
+            {{ todo.title }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Scrollable time grid -->
+      <div ref="gridRef" class="relative max-h-[600px] overflow-y-auto">
+        <!-- Grid container: hour labels + 7 day columns -->
+        <div
+          class="grid grid-cols-[56px_repeat(7,1fr)] gap-px"
+          :style="{ height: totalHeight + 'px' }"
+        >
+          <!-- Hour labels column -->
+          <div class="relative">
+            <div
+              v-for="(hour, hi) in hours"
+              :key="hour"
+              class="absolute right-0 pr-2"
+              :style="{ top: `${hi * ROW_HEIGHT}px`, height: ROW_HEIGHT + 'px' }"
+            >
+              <span class="text-secondary-500/30 text-xs leading-none dark:text-gray-600">
+                {{ formatHourLabel(hour) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Day columns -->
+          <div v-for="day in weekDays" :key="'col-' + day.dateStr" class="relative">
+            <!-- Hour row borders (clickable to add activity) -->
+            <div
+              v-for="(hour, hi) in hours"
+              :key="hour"
+              class="group/slot absolute inset-x-0 cursor-pointer border-t border-gray-100 transition-all hover:bg-[rgba(241,93,34,0.08)] dark:border-slate-700/50 dark:hover:bg-[rgba(241,93,34,0.12)]"
+              :style="{ top: `${hi * ROW_HEIGHT}px`, height: ROW_HEIGHT + 'px' }"
+              @click="handleEmptySlotClick(day.dateStr, hour)"
+            >
+              <span
+                class="from-primary-500/80 to-terracotta-400/80 pointer-events-none flex h-full items-center justify-center rounded-xl bg-gradient-to-r bg-clip-text text-2xl font-black text-transparent opacity-0 transition-all group-hover/slot:scale-110 group-hover/slot:opacity-50"
+              >
+                +
+              </span>
+            </div>
+
+            <!-- Activity blocks -->
+            <template
+              v-for="(group, gi) in groupOverlapping(
+                getTimedForDay(day.dateStr).map((o) => o.activity)
+              )"
+              :key="gi"
+            >
+              <div
+                v-for="(activity, ai) in group"
+                :key="activity.id"
+                class="absolute z-10 cursor-pointer overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
+                :style="{
+                  ...getPosition(activity.startTime!, activity.endTime),
+                  left: `${(ai / group.length) * 100}%`,
+                  width: `calc(${100 / group.length}% - 2px)`,
+                  borderLeftColor: getActivityColor(activity),
+                  background: getActivityColor(activity) + '18',
+                }"
+                @click.stop="emit('view-activity', activity.id, day.dateStr)"
+              >
+                <span
+                  class="font-outfit block truncate text-xs font-semibold"
+                  style="color: var(--color-text)"
+                >
+                  {{ activity.title }}
+                </span>
+                <span class="text-primary-500 block text-xs opacity-70">
+                  {{ activity.startTime }}{{ activity.endTime ? `-${activity.endTime}` : '' }}
+                </span>
+                <div v-if="normalizeAssignees(activity).length > 0" class="mt-0.5 flex gap-0.5">
+                  <MemberChip
+                    v-for="mid in normalizeAssignees(activity).slice(0, 2)"
+                    :key="mid"
+                    :member-id="mid"
+                  />
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Current time indicator -->
+        <div
+          v-if="showNowIndicator"
+          class="bg-primary-500 pointer-events-none absolute right-0 z-20 h-[2px]"
+          :style="{ top: nowIndicatorTop, left: '56px' }"
+        >
+          <div
+            class="bg-primary-500 absolute -top-[4px] -left-[4px] h-[10px] w-[10px] rounded-full"
+          />
+        </div>
+      </div>
+    </template>
+
+    <!-- ── Mobile: Day Tab Strip + Card List ──────────────────────────── -->
+    <template v-else>
+      <div class="mb-4 flex gap-1 overflow-x-auto pb-1">
+        <button
+          v-for="day in weekDays"
+          :key="day.dateStr"
+          type="button"
+          class="font-outfit flex shrink-0 flex-col items-center rounded-2xl px-3 py-2 text-xs font-semibold transition-all"
+          :class="
+            selectedMobileDay === day.dateStr
+              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
+              : day.isToday
+                ? 'bg-primary-500/10 text-primary-500'
+                : 'text-secondary-500/50 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-slate-700'
+          "
+          @click="selectedMobileDay = day.dateStr"
+        >
+          <span class="uppercase">{{ dayAbbrev(day.date) }}</span>
+          <span class="mt-0.5 text-sm font-bold">{{ day.date.getDate() }}</span>
+        </button>
+      </div>
+
+      <div class="space-y-1.5">
+        <ActivityListCard
+          v-for="(occ, i) in mobileDayActivities"
+          :key="`${occ.activity.id}-${i}`"
+          :activity="occ.activity"
+          :date="occ.date"
+          @click="emit('view-activity', occ.activity.id, occ.date)"
+        />
+        <div
+          v-if="
+            mobileDayActivities.length === 0 &&
+            (weekTodos.get(selectedMobileDay)?.length ?? 0) === 0
+          "
+          class="rounded-2xl bg-gray-50 py-8 text-center dark:bg-slate-700/50"
+        >
+          <p class="text-secondary-500/40 text-sm dark:text-gray-500">
+            {{ t('planner.noActivitiesForDay') }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Mobile todos -->
+      <div
+        v-if="(weekTodos.get(selectedMobileDay)?.length ?? 0) > 0"
+        class="mt-3 rounded-2xl border-l-4 p-3"
+        style="
+          background: linear-gradient(135deg, white 85%, rgb(155 89 182 / 6%));
+          border-left-color: #9b59b6;
+        "
+      >
+        <h4 class="font-outfit mb-2 text-sm font-semibold" style="color: #9b59b6">
+          ✅ {{ t('planner.tasksDue') }}
+        </h4>
+        <div
+          v-for="todo in weekTodos.get(selectedMobileDay)"
+          :key="todo.id"
+          class="cursor-pointer truncate rounded-md border-l-2 px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+          style=" background: rgb(155 89 182 / 8%);border-left-color: #9b59b6"
+          @click="emit('view-todo', todo)"
+        >
+          {{ todo.title }}
+        </div>
+      </div>
+    </template>
+  </div>
+</template>
