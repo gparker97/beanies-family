@@ -21,6 +21,7 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -30,6 +31,7 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
+const { isMobile } = useBreakpoint();
 const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
@@ -67,7 +69,7 @@ function toggleMember(id: string) {
   }
 }
 
-const activeView = ref('week');
+const activeView = ref(isMobile.value ? 'month' : 'week');
 const showInactive = ref(false);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
