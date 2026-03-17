@@ -22,6 +22,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import type {
   FamilyActivity,
   CreateFamilyActivityInput,
@@ -331,7 +332,9 @@ function handleActivitySwapped(newId: string) {
           style="border-left-color: #95a5a6"
           @click="openViewModal(activity.id)"
         >
-          <span class="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full bg-gray-400" />
+          <span class="flex-shrink-0 text-base leading-none opacity-50">
+            {{ activity.icon ?? getActivityFallbackEmoji(activity.category) }}
+          </span>
           <span
             class="font-outfit text-secondary-500/60 min-w-0 flex-1 truncate text-sm font-semibold dark:text-gray-400"
           >
