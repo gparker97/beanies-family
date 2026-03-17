@@ -1201,6 +1201,8 @@ const STRING_DEFS = {
     beanie: 'select up to 4 currencies to show in the header',
   },
   'settings.addCurrency': { en: 'Add currency...', beanie: 'add currency...' },
+  'settings.searchCurrencies': { en: 'Search currencies...', beanie: 'search currencies...' },
+  'settings.selected': { en: 'Selected', beanie: 'selected' },
   'settings.familyDataOptions': { en: 'Family Data Options', beanie: 'family data options' },
   'settings.familyDataDescription': {
     en: "Your family's financial data is encrypted and safely stored in a file you control.",

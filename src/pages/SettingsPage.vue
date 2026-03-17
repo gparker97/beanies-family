@@ -56,24 +56,31 @@ const isProcessingEncryption = ref(false);
 // ── Currency ─────────────────────────────────────────────────────────────────
 const { currencyOptions } = useCurrencyOptions();
 
-const availableForPreferred = computed(() =>
-  CURRENCIES.filter((c) => !(settingsStore.preferredCurrencies || []).includes(c.code)).map(
-    (c) => ({
-      value: c.code,
-      label: `${c.code} - ${c.name}`,
-    })
-  )
-);
+const currencySearch = ref('');
 
-function addPreferredCurrency(code: string | number) {
-  const current = settingsStore.preferredCurrencies || [];
-  if (current.length >= 4) return;
-  settingsStore.setPreferredCurrencies([...current, code as string]);
-}
+const searchResults = computed(() => {
+  const q = currencySearch.value.toLowerCase().trim();
+  if (!q) return [];
+  const preferred = new Set(settingsStore.preferredCurrencies || []);
+  return CURRENCIES.filter(
+    (c) =>
+      !preferred.has(c.code) &&
+      (c.code.toLowerCase().includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        c.symbol.toLowerCase().includes(q))
+  );
+});
 
-function removePreferredCurrency(code: string) {
+const preferredCount = computed(() => (settingsStore.preferredCurrencies || []).length);
+
+function togglePreferredCurrency(code: string) {
   const current = settingsStore.preferredCurrencies || [];
-  settingsStore.setPreferredCurrencies(current.filter((c) => c !== code));
+  if (current.includes(code as any)) {
+    settingsStore.setPreferredCurrencies(current.filter((c) => c !== code));
+  } else {
+    if (current.length >= 4) return;
+    settingsStore.setPreferredCurrencies([...current, code as string]);
+  }
 }
 
 // ── Theme / Toggles ──────────────────────────────────────────────────────────
@@ -274,20 +281,6 @@ async function handleClearData() {
     <!-- ── Settings Card Grid ──────────────────────────────────────────── -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <SettingsCard
-        icon="🔒"
-        :title="t('settings.card.security')"
-        :description="t('settings.card.securityDesc')"
-        icon-bg="var(--tint-orange-8)"
-        @click="showSecurity = true"
-      />
-      <SettingsCard
-        icon="👨‍👩‍👧"
-        :title="t('settings.card.familyMembers')"
-        :description="t('settings.card.familyMembersDesc')"
-        icon-bg="var(--tint-orange-8)"
-        @click="router.push('/family')"
-      />
-      <SettingsCard
         icon="🎨"
         :title="t('settings.card.appearance')"
         :description="t('settings.card.appearanceDesc')"
@@ -303,6 +296,14 @@ async function handleClearData() {
       />
       <SettingsCard
         v-if="canManagePod"
+        icon="📤"
+        :title="t('settings.card.dataManagement')"
+        :description="t('settings.card.dataManagementDesc')"
+        icon-bg="var(--tint-slate-05)"
+        @click="showDataManagement = true"
+      />
+      <SettingsCard
+        v-if="canManagePod"
         icon="💾"
         :title="t('settings.card.familyData')"
         :description="t('settings.card.familyDataDesc')"
@@ -310,12 +311,18 @@ async function handleClearData() {
         @click="showFamilyData = true"
       />
       <SettingsCard
-        v-if="canManagePod"
-        icon="📤"
-        :title="t('settings.card.dataManagement')"
-        :description="t('settings.card.dataManagementDesc')"
-        icon-bg="var(--tint-slate-05)"
-        @click="showDataManagement = true"
+        icon="👨‍👩‍👧"
+        :title="t('settings.card.familyMembers')"
+        :description="t('settings.card.familyMembersDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="router.push('/family')"
+      />
+      <SettingsCard
+        icon="🔒"
+        :title="t('settings.card.security')"
+        :description="t('settings.card.securityDesc')"
+        icon-bg="var(--tint-orange-8)"
+        @click="showSecurity = true"
       />
     </div>
 
@@ -564,33 +571,86 @@ async function handleClearData() {
             {{ t('settings.preferredCurrenciesHint') }}
           </p>
 
-          <div
-            v-if="(settingsStore.preferredCurrencies || []).length > 0"
-            class="mb-2 flex flex-wrap gap-1.5"
-          >
+          <!-- Selected currency chips -->
+          <div v-if="preferredCount > 0" class="mb-3 flex flex-wrap gap-1.5">
             <span
               v-for="code in settingsStore.preferredCurrencies"
               :key="code"
-              class="bg-primary-500/10 text-primary-500 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+              class="font-outfit inline-flex items-center gap-1.5 rounded-full border-2 border-[#F15D22] bg-[rgba(241,93,34,0.08)] px-3 py-1.5 text-xs font-semibold text-[#F15D22] dark:bg-[rgba(241,93,34,0.15)]"
             >
-              {{ getCurrencyInfo(code)?.symbol }} {{ code }}
+              <span class="text-sm leading-none">{{ getCurrencyInfo(code)?.symbol }}</span>
+              {{ code }}
               <button
                 type="button"
-                class="text-primary-500/60 hover:text-primary-500 ml-0.5 cursor-pointer"
-                @click="removePreferredCurrency(code)"
+                class="ml-0.5 cursor-pointer opacity-60 transition-opacity hover:opacity-100"
+                @click="togglePreferredCurrency(code)"
               >
                 &times;
               </button>
             </span>
           </div>
 
-          <BaseSelect
-            v-if="(settingsStore.preferredCurrencies || []).length < 4"
-            model-value=""
-            :options="availableForPreferred"
-            :placeholder="t('settings.addCurrency')"
-            @update:model-value="addPreferredCurrency"
-          />
+          <!-- Search to add -->
+          <div v-if="preferredCount < 4" class="relative">
+            <input
+              v-model="currencySearch"
+              type="text"
+              class="font-outfit w-full rounded-xl border border-gray-200 bg-white py-2 pr-3 pl-9 text-sm text-gray-700 placeholder-gray-400 transition-colors outline-none focus:border-[#F15D22]/40 focus:ring-2 focus:ring-[#F15D22]/10 dark:border-slate-600 dark:bg-slate-700 dark:text-gray-200 dark:placeholder-gray-500"
+              :placeholder="t('settings.searchCurrencies')"
+            />
+            <svg
+              class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
+
+            <!-- Search results dropdown -->
+            <div
+              v-if="currencySearch.trim().length > 0 && searchResults.length > 0"
+              class="absolute top-full left-0 z-10 mt-1.5 max-h-[200px] w-full overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700"
+            >
+              <button
+                v-for="curr in searchResults"
+                :key="curr.code"
+                type="button"
+                class="font-outfit flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors hover:bg-[rgba(241,93,34,0.04)] dark:hover:bg-slate-600"
+                @click="
+                  togglePreferredCurrency(curr.code);
+                  currencySearch = '';
+                "
+              >
+                <span
+                  class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gray-100 text-base dark:bg-slate-600"
+                >
+                  {{ curr.symbol }}
+                </span>
+                <div>
+                  <span class="font-semibold text-gray-800 dark:text-gray-100">{{
+                    curr.code
+                  }}</span>
+                  <span class="ml-1.5 text-gray-400 dark:text-gray-400">{{ curr.name }}</span>
+                </div>
+              </button>
+            </div>
+
+            <!-- No results -->
+            <div
+              v-if="currencySearch.trim().length > 0 && searchResults.length === 0"
+              class="absolute top-full left-0 z-10 mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-4 text-center shadow-lg dark:border-slate-600 dark:bg-slate-700"
+            >
+              <p class="text-xs text-gray-400 dark:text-gray-500">{{ t('empty.noResults') }}</p>
+            </div>
+          </div>
+
+          <!-- Selection count -->
+          <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            {{ preferredCount }} / 4 {{ t('settings.selected') }}
+          </p>
         </div>
 
         <!-- Exchange Rates (inline, no BaseCard wrapper) -->
