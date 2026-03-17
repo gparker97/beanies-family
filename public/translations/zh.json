@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-17",
-    "translationCount": 1582
+    "translationCount": 1583
   },
   "translations": {
     "app.name": {
@@ -7914,6 +7914,11 @@
     "planner.fee.months": {
       "translation": "月份",
       "hash": "wtlalp",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.allDayHint": {
+      "translation": "没有具体的开始或结束时间",
+      "hash": "q6gqgu",
       "lastUpdated": "2026-03-17"
     }
   }
