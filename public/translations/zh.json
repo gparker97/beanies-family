@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-16",
-    "translationCount": 1572
+    "lastUpdated": "2026-03-17",
+    "translationCount": 1582
   },
   "translations": {
     "app.name": {
@@ -4077,9 +4077,9 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.fee.per_session": {
-      "translation": "每个会话",
-      "hash": "r0ox9v",
-      "lastUpdated": "2026-03-03"
+      "translation": "每学期",
+      "hash": "ghbu0d",
+      "lastUpdated": "2026-03-17"
     },
     "planner.fee.weekly": {
       "translation": "每週",
@@ -4093,8 +4093,8 @@
     },
     "planner.fee.termly": {
       "translation": "每学期",
-      "hash": "74s6un",
-      "lastUpdated": "2026-03-03"
+      "hash": "747r9r",
+      "lastUpdated": "2026-03-17"
     },
     "planner.fee.yearly": {
       "translation": "每年",
@@ -7726,11 +7726,6 @@
       "hash": "mqtcv6",
       "lastUpdated": "2026-03-15"
     },
-    "recurringPrompt.manualSetup": {
-      "translation": "对于每会话、每周或每学期费用，请通过交易手动设置定期付款",
-      "hash": "1ww1h2",
-      "lastUpdated": "2026-03-15"
-    },
     "loanAccount.details": {
       "translation": "借款资料",
       "hash": "aq2pri",
@@ -7865,6 +7860,61 @@
       "translation": "已删除此活动的定期付款和所有未来交易",
       "hash": "oai22s",
       "lastUpdated": "2026-03-16"
+    },
+    "recurringPrompt.createPaymentHint": {
+      "translation": "启用此选项可自动创建链接到此项目的定期月度交易。这有助于您每月准确跟踪您的支出，并使您的付款和活动保持联系，以便您始终了解资金的用途。",
+      "hash": "hczw7f",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.tasksDue": {
+      "translation": "到期任务",
+      "hash": "ymszq6",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.allDay": {
+      "translation": "全天",
+      "hash": "cf2jx9",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.agenda": {
+      "translation": "议程 (Agenda) ",
+      "hash": "wef2gc",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.quarterly": {
+      "translation": "每季度",
+      "hash": "fifbbt",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.custom": {
+      "translation": "自定义",
+      "hash": "xkgi35",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.calculatedMonthly": {
+      "translation": "每月收费",
+      "hash": "741dgn",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.monthlyCalcHint": {
+      "translation": "根据您的费用计划计算的每月等值金额。关联交易始终使用此每月金额进行一致跟踪。",
+      "hash": "xcblek",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.customPeriod": {
+      "translation": "每个",
+      "hash": "143b3v",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.weeks": {
+      "translation": "星期",
+      "hash": "1doqu7",
+      "lastUpdated": "2026-03-17"
+    },
+    "planner.fee.months": {
+      "translation": "月份",
+      "hash": "wtlalp",
+      "lastUpdated": "2026-03-17"
     }
   }
 }

@@ -2402,6 +2402,9 @@ const STRING_DEFS = {
   'planner.noInactive': { en: 'No inactive activities', beanie: 'no inactive activities' },
   'planner.showInactive': { en: 'Show inactive', beanie: 'show inactive' },
   'planner.comingSoon': { en: 'Coming soon', beanie: 'coming soon' },
+  'planner.tasksDue': { en: 'Tasks Due', beanie: 'tasks due' },
+  'planner.allDay': { en: 'All Day', beanie: 'all day' },
+  'planner.agenda': { en: 'Agenda', beanie: 'agenda' },
 
   // Planner — View toggle
   'planner.view.month': { en: 'Month', beanie: 'month' },
