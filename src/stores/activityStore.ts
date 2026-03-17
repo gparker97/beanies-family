@@ -76,8 +76,19 @@ export const useActivityStore = defineStore('activities', () => {
     const effectiveEnd = endDate && endDate < monthEnd ? endDate : monthEnd;
 
     if (activity.recurrence === 'none') {
-      // One-off: only include if it falls in this month
-      if (startDate >= monthStart && startDate <= monthEnd) {
+      // Multi-day all-day: expand to each day in the date range
+      if (activity.isAllDay && activity.endDate) {
+        const rangeEnd = parseLocalDate(activity.endDate);
+        const cursor = new Date(Math.max(startDate.getTime(), monthStart.getTime()));
+        const limit = rangeEnd < monthEnd ? rangeEnd : monthEnd;
+        while (cursor <= limit) {
+          if (cursor >= startDate) {
+            results.push({ activity, date: formatDate(cursor) });
+          }
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      } else if (startDate >= monthStart && startDate <= monthEnd) {
+        // Single-day one-off
         results.push({ activity, date: activity.date });
       }
     } else if (activity.recurrence === 'daily') {

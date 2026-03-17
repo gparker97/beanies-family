@@ -144,13 +144,81 @@ function getTimedForDay(dateStr: string): Occurrence[] {
     .sort((a, b) => (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? ''));
 }
 
+// Multi-day all-day activities: compute spanning bars
+interface SpanningActivity {
+  activity: FamilyActivity;
+  startCol: number; // 0-indexed column within the week (0–6)
+  span: number; // number of columns to span
+}
+
+const spanningActivities = computed<SpanningActivity[]>(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return [];
+
+  // Collect unique multi-day all-day activities that appear this week
+  const seen = new Set<string>();
+  const spans: SpanningActivity[] = [];
+
+  for (let col = 0; col < 7; col++) {
+    const dateStr = days[col]!.dateStr;
+    const occs = weekActivities.value.get(dateStr) ?? [];
+    for (const occ of occs) {
+      const a = occ.activity;
+      if (!a.isAllDay || !a.endDate || seen.has(a.id)) continue;
+      seen.add(a.id);
+
+      // Find the column range this activity covers within the visible week
+      const actStart = a.date;
+      const actEnd = a.endDate;
+      let startCol = 0;
+      let endCol = 6;
+      for (let i = 0; i < 7; i++) {
+        if (days[i]!.dateStr >= actStart && startCol === 0 && i > 0) startCol = i;
+        if (days[i]!.dateStr <= actEnd) endCol = i;
+      }
+      // Clamp: activity may start before or extend after the visible week
+      startCol = days.findIndex((d) => d.dateStr >= actStart);
+      if (startCol < 0) startCol = 0;
+      const endIdx = [...days].reverse().findIndex((d) => d.dateStr <= actEnd);
+      endCol = endIdx >= 0 ? 6 - endIdx : 6;
+
+      const span = endCol - startCol + 1;
+      if (span >= 2) {
+        spans.push({ activity: a, startCol, span });
+      }
+    }
+  }
+  return spans;
+});
+
+// IDs of multi-day spanning activities (to exclude from per-day untimed lists)
+const spanningActivityIds = computed(
+  () => new Set(spanningActivities.value.map((s) => s.activity.id))
+);
+
 function getUntimedForDay(dateStr: string): Occurrence[] {
-  return (weekActivities.value.get(dateStr) ?? []).filter((o) => !o.activity.startTime);
+  return (weekActivities.value.get(dateStr) ?? []).filter(
+    (o) => !o.activity.startTime && !spanningActivityIds.value.has(o.activity.id)
+  );
 }
 
 function hasUntimedContent(dateStr: string): boolean {
-  return getUntimedForDay(dateStr).length > 0 || (weekTodos.value.get(dateStr)?.length ?? 0) > 0;
+  return (
+    getUntimedForDay(dateStr).length > 0 ||
+    (weekTodos.value.get(dateStr)?.length ?? 0) > 0 ||
+    spanningActivities.value.some((s) => {
+      const days = weekDays.value;
+      const dayCol = days.findIndex((d) => d.dateStr === dateStr);
+      return dayCol >= s.startCol && dayCol < s.startCol + s.span;
+    })
+  );
 }
+
+// Check if there are ANY spanning activities or per-day untimed content
+const hasAnyUntimedContent = computed(
+  () =>
+    spanningActivities.value.length > 0 || weekDays.value.some((d) => hasUntimedContent(d.dateStr))
+);
 
 function handleEmptySlotClick(dateStr: string, hour: number) {
   emit('add-activity', dateStr, `${String(hour).padStart(2, '0')}:00`);
@@ -203,8 +271,8 @@ defineExpose({ weekLabel, activityCount });
 
       <!-- Untimed / all-day items row -->
       <div
-        v-if="weekDays.some((d) => hasUntimedContent(d.dateStr))"
-        class="mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5 dark:border-slate-600/40 dark:bg-slate-700/30"
+        v-if="hasAnyUntimedContent"
+        class="relative mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5 dark:border-slate-600/40 dark:bg-slate-700/30"
       >
         <div class="flex items-center justify-center">
           <span
@@ -213,33 +281,56 @@ defineExpose({ weekLabel, activityCount });
             {{ t('planner.allDay') }}
           </span>
         </div>
+
+        <!-- Spanning multi-day activities (positioned across columns) -->
         <div
-          v-for="day in weekDays"
-          :key="'untimed-' + day.dateStr"
-          class="min-h-[24px] min-w-0 overflow-hidden px-0.5"
+          v-for="span in spanningActivities"
+          :key="'span-' + span.activity.id"
+          class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80"
+          :style="{
+            gridColumn: `${span.startCol + 2} / span ${span.span}`,
+            background: getActivityColor(span.activity) + '20',
+            color: getActivityColor(span.activity),
+            borderLeft: `3px solid ${getActivityColor(span.activity)}`,
+          }"
+          @click="emit('view-activity', span.activity.id, span.activity.date)"
         >
-          <div
-            v-for="occ in getUntimedForDay(day.dateStr)"
-            :key="occ.activity.id"
-            class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-            :style="{
-              borderLeftColor: getActivityColor(occ.activity),
-              background: getActivityColor(occ.activity) + '15',
-            }"
-            @click="emit('view-activity', occ.activity.id, day.dateStr)"
-          >
-            {{ occ.activity.title }}
-          </div>
-          <div
-            v-for="todo in weekTodos.get(day.dateStr) ?? []"
-            :key="todo.id"
-            class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-            style=" background: rgb(155 89 182 / 8%);border-left-color: #9b59b6"
-            @click="emit('view-todo', todo)"
-          >
-            {{ todo.title }}
-          </div>
+          {{ span.activity.title }}
         </div>
+
+        <!-- Per-day single-day untimed activities + todos -->
+        <template v-for="(day, di) in weekDays" :key="'untimed-' + day.dateStr">
+          <div
+            v-if="
+              getUntimedForDay(day.dateStr).length > 0 ||
+              (weekTodos.get(day.dateStr)?.length ?? 0) > 0
+            "
+            class="min-w-0 overflow-hidden px-0.5"
+            :style="{ gridColumn: `${di + 2}` }"
+          >
+            <div
+              v-for="occ in getUntimedForDay(day.dateStr)"
+              :key="occ.activity.id"
+              class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+              :style="{
+                borderLeftColor: getActivityColor(occ.activity),
+                background: getActivityColor(occ.activity) + '15',
+              }"
+              @click="emit('view-activity', occ.activity.id, day.dateStr)"
+            >
+              {{ occ.activity.title }}
+            </div>
+            <div
+              v-for="todo in weekTodos.get(day.dateStr) ?? []"
+              :key="todo.id"
+              class="mb-0.5 cursor-pointer truncate rounded-md border-l-2 px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+              style="background: rgb(155 89 182 / 8%); border-left-color: #9b59b6"
+              @click="emit('view-todo', todo)"
+            >
+              {{ todo.title }}
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Scrollable time grid -->
@@ -393,7 +484,7 @@ defineExpose({ weekLabel, activityCount });
           v-for="todo in weekTodos.get(selectedMobileDay)"
           :key="todo.id"
           class="cursor-pointer truncate rounded-md border-l-2 px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
-          style=" background: rgb(155 89 182 / 8%);border-left-color: #9b59b6"
+          style="background: rgb(155 89 182 / 8%); border-left-color: #9b59b6"
           @click="emit('view-todo', todo)"
         >
           {{ todo.title }}
