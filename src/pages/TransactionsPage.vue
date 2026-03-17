@@ -354,18 +354,34 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
         if (!(await recurringStore.updateRecurringItem(itemId, data))) return;
         await syncLinkedTransactions(itemId, data);
       } else if (scope === 'this-only') {
-        // Materialize a one-off transaction from the edited recurring data
-        await transactionsStore.createTransaction({
-          accountId: data.accountId,
-          type: data.type,
-          amount: data.amount,
-          currency: data.currency,
-          category: data.category,
-          date: projectedDate,
-          description: data.description,
-          isReconciled: false,
-          recurringItemId: pendingProjectedTx.value.recurringItemId,
-        });
+        const existingTx = pendingProjectedTx.value.isProjected
+          ? null
+          : transactionsStore.transactions.find((t) => t.id === pendingProjectedTx.value!.id);
+
+        if (existingTx) {
+          // Materialized transaction — update the existing record in place
+          await transactionsStore.updateTransaction(existingTx.id, {
+            accountId: data.accountId,
+            type: data.type,
+            amount: data.amount,
+            currency: data.currency,
+            category: data.category,
+            description: data.description,
+          });
+        } else {
+          // Projected transaction — materialize a one-off transaction
+          await transactionsStore.createTransaction({
+            accountId: data.accountId,
+            type: data.type,
+            amount: data.amount,
+            currency: data.currency,
+            category: data.category,
+            date: projectedDate,
+            description: data.description,
+            isReconciled: false,
+            recurringItemId: pendingProjectedTx.value.recurringItemId,
+          });
+        }
       } else if (scope === 'this-and-future') {
         const newItem = await recurringStore.splitRecurringItem(itemId, projectedDate);
         if (!newItem) return;
@@ -459,11 +475,22 @@ function getRecurringItem(tx: DisplayTransaction): RecurringItem | undefined {
   return recurringStore.recurringItems.find((r) => r.id === tx.recurringItemId);
 }
 
-// ── Projected transaction click handler ────────────────────────────────────
+// ── Recurring transaction click handlers ───────────────────────────────────
 // Scope modal is deferred to save time — open the edit modal directly.
 function handleProjectedClick(tx: DisplayTransaction) {
   const ri = getRecurringItem(tx);
   if (!ri) return;
+  pendingProjectedTx.value = tx;
+  openEditRecurringModal(ri);
+}
+
+/** Materialized recurring transaction — also needs scope picker on save */
+function handleMaterializedRecurringClick(tx: DisplayTransaction) {
+  const ri = getRecurringItem(tx);
+  if (!ri) {
+    openEditModal(tx as Transaction);
+    return;
+  }
   pendingProjectedTx.value = tx;
   openEditRecurringModal(ri);
 }
@@ -637,9 +664,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                 if (tx.isProjected) {
                   handleProjectedClick(tx);
                 } else if (tx.recurringItemId) {
-                  const ri = getRecurringItem(tx);
-                  if (ri) openEditRecurringModal(ri);
-                  else openEditModal(tx);
+                  handleMaterializedRecurringClick(tx);
                 } else {
                   viewingTransaction = tx;
                 }
@@ -788,13 +813,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                 <ActionButtons
                   size="sm"
                   @click.stop
-                  @edit="
-                    () => {
-                      const ri = getRecurringItem(tx);
-                      if (ri) openEditRecurringModal(ri);
-                      else openEditModal(tx);
-                    }
-                  "
+                  @edit="() => handleMaterializedRecurringClick(tx)"
                   @delete="deleteRecurringItemById(tx.recurringItemId!)"
                 />
               </template>
