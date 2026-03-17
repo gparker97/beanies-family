@@ -132,8 +132,10 @@ test.describe('Loan & Activity Linking', () => {
     // Save the activity
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
-    // Modal should close
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+    // Dismiss the "Activity Created" confirmation modal
+    const confirmOk = page.locator('[role="dialog"]').getByRole('button', { name: /^ok$/i });
+    await confirmOk.click({ timeout: 5000 });
+    await expect(confirmOk).not.toBeVisible({ timeout: 3000 });
   }
 
   test('activity with monthly fee creates a recurring item', async ({ page }) => {
@@ -242,7 +244,11 @@ test.describe('Loan & Activity Linking', () => {
 
     // Save without cost
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await expect(page.getByText(/new activity/i)).not.toBeVisible({ timeout: 5000 });
+
+    // Dismiss the "Activity Created" confirmation modal
+    const confirmOk2 = page.locator('[role="dialog"]').getByRole('button', { name: /^ok$/i });
+    await confirmOk2.click({ timeout: 5000 });
+    await expect(confirmOk2).not.toBeVisible({ timeout: 3000 });
 
     // Verify activity was created without recurring item
     let data = await dbHelper.exportData();
