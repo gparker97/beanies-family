@@ -12,6 +12,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
+import { getActivityCategoryName } from '@/constants/activityCategories';
 import { formatDate, addHourToTime, toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
@@ -49,7 +50,7 @@ const emit = defineEmits<{
   'activity-swapped': [newId: string];
 }>();
 
-const { t } = useTranslation();
+const { t, isBeanieMode } = useTranslation();
 const router = useRouter();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
@@ -632,7 +633,11 @@ async function confirmReschedule() {
           :style="{ background: activityColor }"
         >
           {{ activity.icon }} {{ t(`planner.field.category`) }}:
-          {{ activity.category }}
+          {{
+            isBeanieMode
+              ? getActivityCategoryName(activity.category).toLowerCase()
+              : getActivityCategoryName(activity.category)
+          }}
         </span>
         <span
           class="font-outfit inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"

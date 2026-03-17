@@ -765,6 +765,8 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     rugby: 'sports_team',
     multi_sport: 'sports_team',
     gymnastics: 'sports_team',
+    mma: 'sports_team',
+    taekwondo: 'sports_team',
     other_sports_activity: 'other_sports',
     // Competitions → Education
     spelling_bee: 'other_education',

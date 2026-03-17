@@ -7,7 +7,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { toDateInputValue } from '@/utils/date';
-import type { TodoItem } from '@/types/models';
+import type { FamilyActivity, TodoItem } from '@/types/models';
 
 const props = defineProps<{
   date: string;
@@ -90,6 +90,36 @@ const upcomingActivities = computed(() => {
     })
     .slice(0, 10);
 });
+
+/** Group upcoming activities by date for clearer visual separation */
+const groupedUpcoming = computed(() => {
+  const groups: {
+    date: string;
+    label: string;
+    items: { activity: FamilyActivity; date: string }[];
+  }[] = [];
+  let currentDate = '';
+
+  for (const occ of upcomingActivities.value) {
+    if (occ.date !== currentDate) {
+      currentDate = occ.date;
+      groups.push({ date: occ.date, label: formatGroupDate(occ.date), items: [] });
+    }
+    groups[groups.length - 1]!.items.push(occ);
+  }
+
+  return groups;
+});
+
+function formatGroupDate(dateStr: string): string {
+  const today = toDateInputValue(new Date());
+  if (dateStr === today) return t('date.today');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
 </script>
 
 <template>
@@ -158,15 +188,23 @@ const upcomingActivities = computed(() => {
         {{ t('planner.upcomingAfterDay') }}
       </h3>
 
-      <div class="space-y-1.5">
-        <ActivityListCard
-          v-for="(occ, i) in upcomingActivities"
-          :key="`upcoming-${occ.activity.id}-${occ.date}-${i}`"
-          :activity="occ.activity"
-          :date="occ.date"
-          show-date
-          @click="emit('edit-activity', occ.activity.id, occ.date)"
-        />
+      <div class="space-y-3">
+        <div v-for="group in groupedUpcoming" :key="group.date">
+          <p
+            class="font-outfit text-secondary-500/50 mb-1.5 text-xs font-semibold tracking-wide uppercase dark:text-gray-500"
+          >
+            {{ group.label }}
+          </p>
+          <div class="space-y-1.5">
+            <ActivityListCard
+              v-for="(occ, i) in group.items"
+              :key="`upcoming-${occ.activity.id}-${occ.date}-${i}`"
+              :activity="occ.activity"
+              :date="occ.date"
+              @click="emit('edit-activity', occ.activity.id, occ.date)"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </BaseSidePanel>

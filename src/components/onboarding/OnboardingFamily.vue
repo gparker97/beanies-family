@@ -12,6 +12,7 @@ import { toAssigneePayload } from '@/utils/assignees';
 import { useTranslation } from '@/composables/useTranslation';
 import { addHourToTime, formatTime12 } from '@/utils/date';
 import { ACTIVITY_PRESETS, type ActivityPreset } from '@/constants/activityPresets';
+import { getActivityCategoryName } from '@/constants/activityCategories';
 import type { CurrencyCode, ActivityCategory } from '@/types/models';
 
 defineEmits<{
@@ -19,7 +20,7 @@ defineEmits<{
   back: [];
 }>();
 
-const { t } = useTranslation();
+const { t, isBeanieMode } = useTranslation();
 const settingsStore = useSettingsStore();
 const familyStore = useFamilyStore();
 const activityStore = useActivityStore();
@@ -259,7 +260,11 @@ function formatDaysShort(days: number[]): string {
               <span v-if="activity.fee"> · {{ `$${activity.fee}/mo` }}</span>
             </div>
           </div>
-          <span class="ob-added-category">{{ activity.category }}</span>
+          <span class="ob-added-category">{{
+            isBeanieMode
+              ? getActivityCategoryName(activity.category).toLowerCase()
+              : getActivityCategoryName(activity.category)
+          }}</span>
           <span class="text-xs font-bold" style="color: #27ae60">✓</span>
         </div>
 
