@@ -632,7 +632,7 @@ async function confirmReschedule() {
           class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white"
           :style="{ background: activityColor }"
         >
-          {{ activity.icon }} {{ t(`planner.field.category`) }}:
+          {{ activity.icon }}
           {{
             isBeanieMode
               ? getActivityCategoryName(activity.category).toLowerCase()
