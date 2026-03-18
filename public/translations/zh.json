@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-17",
-    "translationCount": 1583
+    "lastUpdated": "2026-03-18",
+    "translationCount": 1590
   },
   "translations": {
     "app.name": {
@@ -7920,6 +7920,41 @@
       "translation": "没有具体的开始或结束时间",
       "hash": "q6gqgu",
       "lastUpdated": "2026-03-17"
+    },
+    "transactions.createdTitle": {
+      "translation": "交易已创建",
+      "hash": "ysmpnq",
+      "lastUpdated": "2026-03-18"
+    },
+    "transactions.createdMessage": {
+      "translation": "您的交易已创建！",
+      "hash": "c43oko",
+      "lastUpdated": "2026-03-18"
+    },
+    "transactions.nextMonthPreview": {
+      "translation": "下个月即将到来",
+      "hash": "8dk3tz",
+      "lastUpdated": "2026-03-18"
+    },
+    "settings.searchCurrencies": {
+      "translation": "搜索货币",
+      "hash": "gn4pfd",
+      "lastUpdated": "2026-03-18"
+    },
+    "settings.selected": {
+      "translation": "已选择",
+      "hash": "krx2nv",
+      "lastUpdated": "2026-03-18"
+    },
+    "planner.activityCreatedTitle": {
+      "translation": "活动已创建",
+      "hash": "dwjm53",
+      "lastUpdated": "2026-03-18"
+    },
+    "planner.activityCreatedMessage": {
+      "translation": "您的活动已创建！",
+      "hash": "3982wz",
+      "lastUpdated": "2026-03-18"
     }
   }
 }
