@@ -1,8 +1,8 @@
 # beanies.family
 
-A local-first family finance and life planner. Track your money, your kids' activities, and everything in between — all without giving up your data.
+An awesome (in my opinion) family finance and life planner. Helps you track your family finances, share them with your life partner(s), stay on top of all your family plans, and everything in between, all without giving up your precious data to some random corporation. It all stays with you.
 
-To learn more about what beanies is and why it exists, visit [beanies.family/home](https://beanies.family/home).
+To learn more about beanies and why it exists, visit [beanies.family/home](https://beanies.family/home).
 
 ## Run it locally
 
@@ -15,9 +15,9 @@ npm install
 npm run dev
 ```
 
-That's it. Open `http://localhost:5173` in your browser and you're good to go.
+Open `http://localhost:5173` in your browser and you're good to go.
 
-Your data stays on your machine in the browser's IndexedDB. Nothing phones home, nothing gets sent anywhere.
+Your data stays on your machine in the browser's IndexedDB a or (if you set it up) on your personal cloud provider (i.e. google drive).
 
 ## Build for production
 
