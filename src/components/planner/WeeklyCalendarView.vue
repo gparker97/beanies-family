@@ -381,7 +381,7 @@ defineExpose({ weekLabel, activityCount });
               <div
                 v-for="(activity, ai) in group"
                 :key="activity.id"
-                class="absolute z-10 cursor-pointer overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
+                class="absolute z-10 flex cursor-pointer flex-wrap items-start gap-x-1.5 gap-y-0 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
                 :style="{
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
@@ -392,15 +392,15 @@ defineExpose({ weekLabel, activityCount });
                 @click.stop="emit('view-activity', activity.id, day.dateStr)"
               >
                 <span
-                  class="font-outfit block truncate text-xs font-semibold"
+                  class="font-outfit w-full truncate text-xs font-semibold"
                   style="color: var(--color-text)"
                 >
                   {{ activity.title }}
                 </span>
-                <span class="text-primary-500 block text-xs opacity-70">
+                <span class="text-primary-500 text-xs leading-tight opacity-70">
                   {{ activity.startTime }}{{ activity.endTime ? `-${activity.endTime}` : '' }}
                 </span>
-                <div v-if="normalizeAssignees(activity).length > 0" class="mt-0.5 flex gap-0.5">
+                <div v-if="normalizeAssignees(activity).length > 0" class="flex gap-0.5">
                   <MemberChip
                     v-for="mid in normalizeAssignees(activity).slice(0, 2)"
                     :key="mid"
