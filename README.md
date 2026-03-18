@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` in your browser and you're good to go.
+Open `http://localhost:5173` in your browser and you're good to go (to store data files locally).
 
 Your data stays on your machine in the browser's IndexedDB a or (if you set it up) on your personal cloud provider (i.e. google drive).
 
