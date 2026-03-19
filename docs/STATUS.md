@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-17
-> **Updated by:** Claude (Weekly calendar view, all-day activities, shared component extractions)
+> **Last updated:** 2026-03-19
+> **Updated by:** Claude (Nook "This Week" card grouped by day/date)
 
 ## Current Phase
 
@@ -52,9 +52,13 @@
 - Settings page (currency, theme, sync, encryption)
 - First-run setup wizard
 - Multi-currency display with global display currency selector
-- Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards (merged todos + planner activities with view-first modals), inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed (view-first modals for todos + transactions). Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
+- Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards (merged todos + planner activities with view-first modals, "This Week" card grouped by day/date matching planner sidebar pattern), inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed (view-first modals for todos + transactions). Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### Nook Schedule Card Grouping (2026-03-19)
+
+- **"This Week" card grouped by day/date**: Items in the ScheduleCards "This Week" panel are now grouped under date headers (Today, Tomorrow, weekday + date), matching the existing pattern in DayAgendaSidebar and UpcomingActivities. Removes per-item date display in favor of group headers for clearer temporal context
 
 ### Weekly Calendar View & Planner Enhancements (2026-03-17)
 
