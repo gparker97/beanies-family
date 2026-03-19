@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-18",
-    "translationCount": 1590
+    "lastUpdated": "2026-03-19",
+    "translationCount": 1595
   },
   "translations": {
     "app.name": {
@@ -5626,16 +5626,6 @@
       "hash": "tq9f0j",
       "lastUpdated": "2026-03-06"
     },
-    "invite.shareEmail.label": {
-      "translation": "与家庭成员共享文件",
-      "hash": "ft0t5r",
-      "lastUpdated": "2026-03-06"
-    },
-    "invite.shareEmail.description": {
-      "translation": "（可选）输入他们的Google帐户电子邮件，以便编辑者访问您的家庭数据文件。如果跳过此操作，请从Google云端硬盘手动共享文件。",
-      "hash": "mz8r9v",
-      "lastUpdated": "2026-03-06"
-    },
     "invite.shareEmail.placeholder": {
       "translation": "family.member@gmail.com",
       "hash": "7epkd1",
@@ -7955,6 +7945,41 @@
       "translation": "您的活动已创建！",
       "hash": "3982wz",
       "lastUpdated": "2026-03-18"
+    },
+    "invite.step1.title": {
+      "translation": "准备家庭数据文件",
+      "hash": "6facci",
+      "lastUpdated": "2026-03-19"
+    },
+    "invite.step1.desc": {
+      "translation": "您的家庭成员需要访问家庭数据文件才能加入。如果他们还没有访问权限，请立即与他们分享。",
+      "hash": "8nnedq",
+      "lastUpdated": "2026-03-19"
+    },
+    "invite.step1.encrypted": {
+      "translation": "别担心，文件已加密。只有拥有邀请链接的家庭成员才能解锁。",
+      "hash": "o5y0u2",
+      "lastUpdated": "2026-03-19"
+    },
+    "invite.step1.childTip": {
+      "translation": "邀请孩子？您可以在他们的设备上使用自己的帐户登录云提供商，以便他们可以访问该文件。他们仍然只有您授权的权限，无需担心。",
+      "hash": "l1z9y7",
+      "lastUpdated": "2026-03-19"
+    },
+    "invite.step2.title": {
+      "translation": "发送魔术链接",
+      "hash": "410yb0",
+      "lastUpdated": "2026-03-19"
+    },
+    "invite.whatNext.title": {
+      "translation": "接下來會發生什麼？",
+      "hash": "9brjs1",
+      "lastUpdated": "2026-03-19"
+    },
+    "invite.whatNext.desc": {
+      "translation": "他们打开链接，选择密码，然后加入Pod。登录后，他们可以随时使用自己的账号登录。",
+      "hash": "593697",
+      "lastUpdated": "2026-03-19"
     }
   }
 }
