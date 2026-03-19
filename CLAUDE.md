@@ -13,6 +13,7 @@
 > - `docs/PERFORMANCE.md` — Client-side performance thresholds and mitigation strategies
 > - `docs/adr/` — Architectural Decision Records (ADRs) for all major design decisions
 > - `docs/plans/` — Accepted implementation plans (saved before work begins, kept as historical record)
+> - `docs/prompts/` — Prompt archive (all user prompts logged per task with timestamps and categories)
 >
 > **Brand:**
 >
@@ -313,6 +314,16 @@ Every issue must have relevant labels applied. When creating or triaging issues,
 4. **Area** (if applicable — pick all that apply): `area: ui`, `area: data`, `area: sync`, `area: brand`, `area: i18n`, `area: pwa`
 5. **Special** (as needed): `security`, `auth`, `privacy`
 6. **Status** (managed during implementation): Apply `in-progress` when work begins, replace with `ready-for-testing` when implementation is complete and ready for review
+
+## Prompt Archive
+
+All user prompts must be logged to `docs/prompts/`. See `docs/prompts/README.md` for the full format and conventions. In brief:
+
+1. **One file per task/feature/bug** in `docs/prompts/YYYY-MM/YYYY-MM-DD-<short-slug>.md`
+2. **Log every user prompt** (verbatim or close paraphrase) with a timestamp
+3. **Include frontmatter**: `date`, `category`, `issue`, `plan`, `tags`
+4. **Add an Outcome section** once work is complete
+5. **Append to existing file** if continuing work on the same task in a later session
 
 ## Plans Archive
 
