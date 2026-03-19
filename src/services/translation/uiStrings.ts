@@ -1855,15 +1855,38 @@ const STRING_DEFS = {
     beanie: "couldn't open the picker. try loading the file yourself",
   },
 
+  // Invite modal — stepped flow
+  'invite.step1.title': {
+    en: 'Prepare the Family Data File',
+    beanie: 'prepare the pod',
+  },
+  'invite.step1.desc': {
+    en: "Your family member needs access to the family data file before they can join. If they don't already have access, share it with them now.",
+    beanie:
+      "your beanie needs access to the family pod before they can join. share it now if they don't have it yet.",
+  },
+  'invite.step1.encrypted': {
+    en: "Don't worry — the file is encrypted. Only family members with the invite link can unlock it.",
+    beanie: "don't worry — the pod is encrypted. only beanies with the magic link can open it.",
+  },
+  'invite.step1.childTip': {
+    en: "Inviting a child? You can sign into your cloud provider with your own account on their device so they can access the file. They'll still only have permissions you authorize — no need to worry.",
+    beanie:
+      "inviting a little bean? sign into your cloud on their device so they can reach the pod. they'll only see what you allow!",
+  },
+  'invite.step2.title': {
+    en: 'Send the Magic Link',
+    beanie: 'send the magic link',
+  },
+  'invite.whatNext.title': {
+    en: 'What Happens Next?',
+    beanie: 'what happens next?',
+  },
+  'invite.whatNext.desc': {
+    en: 'They open the link, choose a password, and join the pod. Once in, they can sign in anytime with their own account.',
+    beanie: 'they open the link, pick a password, and hop into the pod. easy peasy!',
+  },
   // Invite modal — email sharing
-  'invite.shareEmail.label': {
-    en: 'Share File with Family Member',
-    beanie: 'share the pod',
-  },
-  'invite.shareEmail.description': {
-    en: 'Optionally enter their Google account email to give them Editor access to your family data file. If you skip this, share the file manually from Google Drive.',
-    beanie: 'drop their email to share your bean pod, or share it yourself from google drive',
-  },
   'invite.shareEmail.placeholder': {
     en: 'family.member@gmail.com',
     beanie: 'bean@example.com',
