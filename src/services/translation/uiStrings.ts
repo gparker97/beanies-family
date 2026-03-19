@@ -1872,7 +1872,7 @@ const STRING_DEFS = {
   'invite.step1.childTip': {
     en: "Inviting a child? You can sign into your cloud provider with your own account on their device so they can access the file. They'll still only have permissions you authorize — no need to worry.",
     beanie:
-      "inviting a little bean? sign into your cloud on their device so they can reach the pod. they'll only see what you allow!",
+      "inviting a little bean? share with their cloud storage account, or you can sign into your account on their device so they can reach the pod. they'll only see what you allow!",
   },
   'invite.step2.title': {
     en: 'Send the Magic Link',
