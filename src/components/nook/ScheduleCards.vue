@@ -132,9 +132,39 @@ const weekItems = computed<ScheduleItem[]>(() => {
 });
 
 const MAX_WEEK_VISIBLE = 6;
-const visibleWeekItems = computed(() => weekItems.value.slice(0, MAX_WEEK_VISIBLE));
 const hasMoreWeekItems = computed(() => weekItems.value.length > MAX_WEEK_VISIBLE);
 const hiddenWeekCount = computed(() => weekItems.value.length - MAX_WEEK_VISIBLE);
+
+function formatGroupDate(dateStr: string): string {
+  if (dateStr === todayStr.value) return t('date.today');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+interface WeekGroup {
+  date: string;
+  label: string;
+  items: ScheduleItem[];
+}
+
+const groupedWeekItems = computed<WeekGroup[]>(() => {
+  const visible = weekItems.value.slice(0, MAX_WEEK_VISIBLE);
+  const groups: WeekGroup[] = [];
+  let currentDate = '';
+
+  for (const item of visible) {
+    if (item.date !== currentDate) {
+      currentDate = item.date;
+      groups.push({ date: item.date, label: formatGroupDate(item.date), items: [] });
+    }
+    groups[groups.length - 1]!.items.push(item);
+  }
+
+  return groups;
+});
 
 function handleClick(item: ScheduleItem) {
   if (item.type === 'todo') emit('open-todo', item.id);
@@ -216,27 +246,35 @@ function handleClick(item: ScheduleItem) {
       </div>
 
       <!-- Content -->
-      <div v-if="weekItems.length > 0" class="flex flex-col gap-3">
-        <div
-          v-for="item in visibleWeekItems"
-          :key="`${item.type}-${item.id}`"
-          class="flex cursor-pointer items-center gap-3 rounded-xl transition-colors hover:bg-[rgba(241,93,34,0.08)]"
-          @click="handleClick(item)"
-        >
-          <div
-            class="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[12px] bg-[rgba(241,93,34,0.08)]"
+      <div v-if="weekItems.length > 0" class="flex flex-col gap-4">
+        <div v-for="group in groupedWeekItems" :key="group.date">
+          <p
+            class="font-outfit text-secondary-500/50 mb-1.5 text-xs font-semibold tracking-wide uppercase dark:text-gray-500"
           >
-            <span class="text-sm">{{ item.icon }}</span>
-          </div>
-          <div class="min-w-0 flex-1">
+            {{ group.label }}
+          </p>
+          <div class="flex flex-col gap-2">
             <div
-              class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
+              v-for="item in group.items"
+              :key="`${item.type}-${item.id}`"
+              class="flex cursor-pointer items-center gap-3 rounded-xl transition-colors hover:bg-[rgba(241,93,34,0.08)]"
+              @click="handleClick(item)"
             >
-              {{ item.title }}
-            </div>
-            <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
-              {{ item.time ? item.time + (item.endTime ? ' - ' + item.endTime : '') + ' · ' : ''
-              }}{{ item.displayDate }}
+              <div
+                class="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-[12px] bg-[rgba(241,93,34,0.08)]"
+              >
+                <span class="text-sm">{{ item.icon }}</span>
+              </div>
+              <div class="min-w-0 flex-1">
+                <div
+                  class="text-secondary-500 truncate text-sm leading-tight font-semibold dark:text-gray-200"
+                >
+                  {{ item.title }}
+                </div>
+                <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
+                  {{ item.time ? item.time + (item.endTime ? ' - ' + item.endTime : '') : '' }}
+                </div>
+              </div>
             </div>
           </div>
         </div>

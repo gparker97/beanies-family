@@ -688,7 +688,7 @@ The Create Pod flow (`src/components/login/CreatePodView.vue`) is a 3-step wizar
 
 ## Login & Authentication Flow — The Pod Journey
 
-The v6 UI framework introduces a **six-screen authentication flow** built around the Pod concept (an encrypted `.beanpod` data file). All screens are defined in `docs/brand/beanies-ui-framework-proposal-v6.html`.
+The UI framework introduces a **six-screen authentication flow** built around the Pod concept (an encrypted `.beanpod` data file). All screens are defined in `docs/brand/beanies-ui-framework-proposal-v7.html`.
 
 ### Screen Flow
 
@@ -739,8 +739,7 @@ Single input accepting `BEAN-XXXX` code or `beanies.family/join/...` link. Dark 
 ## Reference
 
 - Full CIG v2: `docs/brand/beanies-cig-v2.html`
-- UI framework proposal (v7): `docs/brand/beanies-ui-framework-proposal-v7.html`
-- UI framework proposal (v6): `docs/brand/beanies-ui-framework-proposal-v6.html`
-- UI framework proposal (v5): `docs/brand/beanies-ui-framework-proposal-v5.html`
+- UI framework (v7): [beanies-ui-framework-proposal-v7.html](../../docs/brand/beanies-ui-framework-proposal-v7.html) — current UI framework defining page layouts, navigation, component patterns, and interaction design
+- Modals framework (v1): [beanies-modals-framework-proposal-v1.html](../../docs/brand/beanies-modals-framework-proposal-v1.html) — modal system design and conventions
 - Brand assets: `public/brand/`
 - Issue #22: Full rebranding task tracking

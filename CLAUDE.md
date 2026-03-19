@@ -18,10 +18,10 @@
 > **Brand:**
 >
 > - `docs/brand/beanies-cig-v2.html` — Corporate Identity Guidelines v2 (colors, typography, logo rules, voice, UI system, navigation, mobile)
-> - `.claude/skills/beanies-theme.md` — Brand theme skill (use for all UI copy, component design, and image generation)
+> - `.claude/skills/beanies-theme/SKILL.md` — Brand theme skill (use for all UI copy, component design, and image generation)
 >
 > **IMPORTANT — UI Work:**
-> Always consult `.claude/skills/beanies-theme.md` before any UI work (components, modals, styling, copy). It contains the complete design system, modal conventions, color rules, and component patterns. All modals must use the three-tier modal system (BaseModal → BeanieFormModal → ConfirmModal).
+> Always consult `.claude/skills/beanies-theme/SKILL.md` before any UI work (components, modals, styling, copy). It contains the complete design system, modal conventions, color rules, and component patterns. All modals must use the three-tier modal system (BaseModal → BeanieFormModal → ConfirmModal).
 
 ## Project Overview
 
@@ -39,7 +39,7 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **Voice:** Simple, friendly, comforting, secure, familiar. Say "counting beans..." not "Loading..."
 - **Golden rule:** The beanies hold hands and are never separated; never rotate the arrow.
 - **Full guidelines:** `docs/brand/beanies-cig-v2.html`
-- **Theme skill:** `.claude/skills/beanies-theme.md` — consult for all UI copy and component design
+- **Theme skill:** `.claude/skills/beanies-theme/SKILL.md` — consult for all UI copy and component design
 - **Typography standard:** Six-level scale from Display (`text-3xl`/`text-4xl`) to Caption (`text-xs`). Minimum 12px. Standard Tailwind classes only — no custom `text-[X.Xrem]`. See theme skill for full spec.
 
 ## Technology Stack
@@ -245,8 +245,8 @@ npm run lint
 - **Stores**: Use Pinia composition API style
 - **Types**: Centralized in `src/types/models.ts`
 - **CSS**: Tailwind utility classes, custom CSS variables for theming
-- **Typography**: Follow the six-level scale (Display/Page Title/Section Title/Item Title/Body/Caption). Use only standard Tailwind text classes (`text-xs` through `text-4xl`). Never use custom `text-[X.Xrem]` for font sizes. Minimum font size is `text-xs` (12px). See `.claude/skills/beanies-theme.md` for the full standard.
-- **Text casing**: Dual standard in `uiStrings.ts` — `en` values use Title Case for labels/headers and Sentence case for full sentences (standard English). `beanie` values are all lowercase (the cosmetic overlay for beanie mode). Every entry must have both `en` and `beanie`. CSS `uppercase` handles visual uppercasing for section headers and form labels. See `.claude/skills/beanies-theme.md` § Text Casing Standard.
+- **Typography**: Follow the six-level scale (Display/Page Title/Section Title/Item Title/Body/Caption). Use only standard Tailwind text classes (`text-xs` through `text-4xl`). Never use custom `text-[X.Xrem]` for font sizes. Minimum font size is `text-xs` (12px). See `.claude/skills/beanies-theme/SKILL.md` for the full standard.
+- **Text casing**: Dual standard in `uiStrings.ts` — `en` values use Title Case for labels/headers and Sentence case for full sentences (standard English). `beanie` values are all lowercase (the cosmetic overlay for beanie mode). Every entry must have both `en` and `beanie`. CSS `uppercase` handles visual uppercasing for section headers and form labels. See `.claude/skills/beanies-theme/SKILL.md` § Text Casing Standard.
 - **UI Text / i18n**: All user-visible text **must** go through the translation system — never hardcode English strings in templates. Define strings in `src/services/translation/uiStrings.ts` and use `{{ t('key') }}` in templates via `useTranslation()`. This enables Chinese translation, beanie mode overrides, and future languages. See ADR-008 for details.
 - **Translation script sync**: When modifying the structure of `uiStrings.ts` (renaming objects, changing export patterns, etc.), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm parsing still works. The script parses TypeScript at the text level and will silently break if the format changes. See `docs/TRANSLATION.md` for full pipeline docs.
 - **Plans**: When plan mode is used, save the accepted plan to `docs/plans/` before implementation begins (see Plans Archive below).
@@ -362,7 +362,7 @@ Implementation plans created during plan mode must be saved to `docs/plans/` **b
 - This is a Phase 1 MVP - prioritize core functionality
 - All data operations go through Pinia stores -> Automerge repositories
 - Use existing UI components from `src/components/ui/`
-- **UI theme**: Always read `.claude/skills/beanies-theme.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
+- **UI theme**: Always read `.claude/skills/beanies-theme/SKILL.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
 - Follow Vue 3 Composition API patterns
 - Maintain TypeScript type safety
 - Use Tailwind CSS for styling
