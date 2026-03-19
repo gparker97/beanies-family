@@ -534,6 +534,7 @@ function cancelEditFamilyName() {
     <BaseModal
       :open="showInviteModal"
       :title="t('login.inviteTitle')"
+      size="lg"
       @close="showInviteModal = false"
     >
       <div class="space-y-5">
@@ -541,69 +542,132 @@ function cancelEditFamilyName() {
           {{ t('login.inviteDesc') }}
         </p>
 
-        <!-- Invite link + QR code -->
-        <InviteLinkCard :link="inviteLink" :qr-url="inviteQrUrl" :loading="isGeneratingInvite" />
-
-        <!-- Optional email sharing (Google Drive only) -->
-        <div v-if="syncStore.storageProviderType === 'google_drive'" class="space-y-2">
-          <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {{ t('invite.shareEmail.label') }}
-          </p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            {{ t('invite.shareEmail.description') }}
-          </p>
-          <div class="flex gap-2">
-            <BaseInput
-              v-model="shareEmail"
-              type="email"
-              :placeholder="t('invite.shareEmail.placeholder')"
-              class="flex-1"
-            />
-            <BaseButton
-              :loading="isSharing"
-              :disabled="!isValidEmail(shareEmail)"
-              @click="handleShareWithEmail"
+        <!-- Step 1: Prepare the family data pod file -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-2.5">
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#F15D22] to-[#E67E22] text-xs font-bold text-white"
             >
-              {{ t('invite.shareEmail.button') }}
-            </BaseButton>
+              1
+            </div>
+            <h3 class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+              {{ t('invite.step1.title') }}
+            </h3>
           </div>
-          <p
-            v-if="shareResult === 'success'"
-            class="text-xs text-emerald-600 dark:text-emerald-400"
-          >
-            {{ t('invite.shareEmail.success') }}
-          </p>
-          <p v-if="shareResult === 'error'" class="text-xs text-red-500">
-            {{ t('invite.shareEmail.error') }}
-          </p>
+
+          <div class="ml-8">
+            <p class="mb-3 text-xs text-slate-500 dark:text-slate-400">
+              {{ t('invite.step1.desc') }}
+            </p>
+
+            <!-- Google Drive: auto-share file access -->
+            <div
+              v-if="syncStore.storageProviderType === 'google_drive'"
+              class="space-y-3 rounded-2xl bg-gradient-to-br from-[var(--tint-silk-10)] to-[var(--tint-silk-20)] p-4 dark:from-slate-700/40 dark:to-slate-700/20"
+            >
+              <div class="flex gap-2">
+                <BaseInput
+                  v-model="shareEmail"
+                  type="email"
+                  :placeholder="t('invite.shareEmail.placeholder')"
+                  class="flex-1"
+                />
+                <BaseButton
+                  :loading="isSharing"
+                  :disabled="!isValidEmail(shareEmail)"
+                  @click="handleShareWithEmail"
+                >
+                  {{ t('invite.shareEmail.button') }}
+                </BaseButton>
+              </div>
+              <p
+                v-if="shareResult === 'success'"
+                class="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"
+              >
+                <span>✓</span>
+                {{ t('invite.shareEmail.success') }}
+              </p>
+              <p v-if="shareResult === 'error'" class="text-xs text-[#F15D22]">
+                {{ t('invite.shareEmail.error') }}
+              </p>
+
+              <!-- Encrypted file reassurance -->
+              <div class="flex items-start gap-2 rounded-xl bg-white/60 p-2.5 dark:bg-slate-800/40">
+                <span class="flex-shrink-0 text-xs">🔒</span>
+                <p class="text-xs text-slate-400 dark:text-slate-500">
+                  {{ t('invite.step1.encrypted') }}
+                </p>
+              </div>
+
+              <!-- Child sharing tip -->
+              <div class="flex items-start gap-2 rounded-xl bg-white/60 p-2.5 dark:bg-slate-800/40">
+                <span class="flex-shrink-0 text-xs">👶</span>
+                <p class="text-xs text-slate-400 dark:text-slate-500">
+                  {{ t('invite.step1.childTip') }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Local storage: manual file sharing reminder -->
+            <div
+              v-else
+              class="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-[var(--tint-orange-8)] to-[var(--tint-silk-10)] p-4 dark:from-slate-700/40 dark:to-slate-700/20"
+            >
+              <div
+                class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[var(--tint-orange-15)]"
+              >
+                <span class="text-sm">📁</span>
+              </div>
+              <div class="space-y-1">
+                <p class="text-sm text-slate-700 dark:text-slate-300">
+                  {{ t('join.shareFileNote') }}
+                </p>
+                <p class="text-xs text-slate-400 dark:text-slate-500">
+                  {{ t('invite.step1.encrypted') }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- File sharing info card -->
-        <div class="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 dark:bg-amber-900/20">
-          <div
-            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-amber-100 dark:bg-amber-800/30"
-          >
-            <svg
-              class="h-4 w-4 text-amber-600 dark:text-amber-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        <!-- Step 2: Send the magic link -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-2.5">
+            <div
+              class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#AED6F1] to-[#87CEEB] text-xs font-bold text-[#2C3E50]"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+              2
+            </div>
+            <h3 class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
+              {{ t('invite.step2.title') }}
+            </h3>
           </div>
-          <p class="text-sm text-amber-800 dark:text-amber-200">
-            {{
-              syncStore.storageProviderType === 'google_drive'
-                ? t('join.shareFileNoteCloud')
-                : t('join.shareFileNote')
-            }}
-          </p>
+          <div class="ml-8">
+            <InviteLinkCard
+              :link="inviteLink"
+              :qr-url="inviteQrUrl"
+              :loading="isGeneratingInvite"
+            />
+          </div>
+        </div>
+
+        <!-- What happens next — info card -->
+        <div
+          class="flex items-start gap-3 rounded-2xl bg-gradient-to-br from-[var(--tint-silk-10)] to-white p-4 dark:from-slate-700/30 dark:to-slate-800/50"
+        >
+          <div
+            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px] bg-[var(--tint-silk-20)]"
+          >
+            <span class="text-sm">💡</span>
+          </div>
+          <div class="space-y-1">
+            <p class="text-xs font-medium text-slate-600 dark:text-slate-300">
+              {{ t('invite.whatNext.title') }}
+            </p>
+            <p class="text-xs text-slate-400 dark:text-slate-500">
+              {{ t('invite.whatNext.desc') }}
+            </p>
+          </div>
         </div>
       </div>
 
