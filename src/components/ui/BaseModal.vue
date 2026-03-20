@@ -102,7 +102,7 @@ onUnmounted(() => {
             v-if="open"
             role="dialog"
             aria-modal="true"
-            class="relative flex w-full flex-col bg-white shadow-xl dark:bg-slate-800"
+            class="relative flex w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-slate-800"
             :class="
               isFullscreen
                 ? 'h-full max-h-full rounded-none'
