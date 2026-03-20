@@ -113,7 +113,7 @@ function setExpanded(id: string, value: boolean) {
     />
     <button
       type="button"
-      class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--vacation-teal)] to-[var(--vacation-teal-deep)] text-lg font-bold text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
+      class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--vacation-teal)] to-[var(--vacation-teal-deep)] text-lg font-bold text-white shadow-sm transition-transform hover:scale-105 active:scale-95"
       @click="quickAddIdea"
     >
       +

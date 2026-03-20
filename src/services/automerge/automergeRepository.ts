@@ -45,13 +45,13 @@ export function createAutomergeRepository<
 
   async function getAll(): Promise<Entity[]> {
     const doc = getDoc();
-    const collection = doc[collectionName] as Record<string, Entity>;
+    const collection = (doc[collectionName] ?? {}) as Record<string, Entity>;
     return Object.values(collection).map(transform);
   }
 
   async function getById(id: string): Promise<Entity | undefined> {
     const doc = getDoc();
-    const collection = doc[collectionName] as Record<string, Entity>;
+    const collection = (doc[collectionName] ?? {}) as Record<string, Entity>;
     const item = collection[id];
     return item ? transform(item) : undefined;
   }
@@ -69,6 +69,10 @@ export function createAutomergeRepository<
 
     const id = (entity as unknown as { id: string }).id;
     changeDoc((d) => {
+      // Initialize collection if missing (backward compat with older beanpod files)
+      if (!d[collectionName]) {
+        (d as unknown as Record<string, unknown>)[collectionName] = {};
+      }
       const collection = d[collectionName] as Record<string, Entity>;
       collection[id] = entity;
     });
