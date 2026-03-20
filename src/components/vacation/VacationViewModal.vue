@@ -475,13 +475,14 @@ function handleVote(ideaId: string) {
         </div>
       </div>
 
-      <!-- Accommodation gap warning -->
-      <div
+      <!-- Accommodation gap warning — click to edit accommodation (step 3) -->
+      <button
         v-if="accommodationGaps.length > 0"
-        class="mb-4 flex items-start gap-2 rounded-xl border border-dashed border-[rgba(241,93,34,0.2)] bg-[var(--tint-orange-8)] px-3 py-2.5 dark:bg-orange-900/10"
+        class="mb-4 flex w-full cursor-pointer items-start gap-2 rounded-xl border border-dashed border-[rgba(241,93,34,0.2)] bg-[var(--tint-orange-8)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--tint-orange-15)] dark:bg-orange-900/10"
+        @click="handleEditInWizard(3)"
       >
         <span class="mt-0.5 text-sm">🏨</span>
-        <div>
+        <div class="flex-1">
           <span class="font-outfit text-xs font-semibold text-[var(--heritage-orange)]">
             {{ accommodationGaps.length }} {{ t('vacation.nightsNoAccommodation' as any) }}
           </span>
@@ -494,7 +495,8 @@ function handleVote(ideaId: string) {
             }}{{ accommodationGaps.length > 3 ? '...' : '' }}
           </span>
         </div>
-      </div>
+        <span class="mt-0.5 text-xs text-[var(--heritage-orange)] opacity-50">✏️</span>
+      </button>
 
       <!-- Timeline header -->
       <div class="mb-3 flex items-center gap-2">
@@ -587,10 +589,11 @@ function handleVote(ideaId: string) {
         <div class="font-outfit text-[10px] font-semibold tracking-wide text-[#B8860B] uppercase">
           🤔 {{ t('vacation.stillDeciding' as any) }}
         </div>
-        <div
+        <button
           v-for="item in unbookedItems"
           :key="item.id"
-          class="flex items-center gap-2 rounded-xl border border-dashed border-[rgba(184,134,11,0.18)] bg-[var(--vacation-gold-tint)] px-3 py-2.5"
+          class="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgba(184,134,11,0.18)] bg-[var(--vacation-gold-tint)] px-3 py-2.5 text-left transition-colors hover:bg-[rgba(255,217,61,0.2)]"
+          @click="handleEditInWizard(item.stepNumber)"
         >
           <span class="text-sm">{{ item.icon }}</span>
           <div class="flex-1">
@@ -599,13 +602,8 @@ function handleVote(ideaId: string) {
               {{ t('vacation.notBookedYet' as any) }}
             </small>
           </div>
-          <button
-            class="font-outfit text-[10px] font-semibold text-[var(--vacation-teal)]"
-            @click="handleEditInWizard(item.stepNumber)"
-          >
-            ✏️
-          </button>
-        </div>
+          <span class="text-xs text-[#B8860B] opacity-40">✏️</span>
+        </button>
       </div>
 
       <!-- Bucket list -->
