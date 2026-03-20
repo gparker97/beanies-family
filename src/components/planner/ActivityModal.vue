@@ -387,10 +387,10 @@ function handleSave() {
       <!-- Vacation toggle bar -->
       <div
         v-if="!isEditing"
-        class="cursor-pointer border-b px-4 py-3 transition-all duration-200 hover:opacity-90"
+        class="cursor-pointer rounded-2xl border px-4 py-3 transition-all duration-200 hover:shadow-sm"
         style="
-          background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 6%));
-          border-color: rgb(0 180 216 / 10%);
+          background: linear-gradient(135deg, rgb(0 180 216 / 12%), rgb(255 217 61 / 10%));
+          border-color: rgb(0 180 216 / 18%);
         "
         @click="
           emit('start-vacation-wizard', {
@@ -409,21 +409,11 @@ function handleSave() {
             >
               {{ t('vacation.planningATrip') }}
             </span>
-            <span class="block text-[10px] text-[var(--color-text-muted)] opacity-50">
+            <span class="block text-[10px] text-[var(--color-text-muted)] opacity-60">
               {{ t('vacation.planningSubtitle') }}
             </span>
           </div>
-          <ToggleSwitch
-            :model-value="false"
-            size="sm"
-            @click.stop="
-              emit('start-vacation-wizard', {
-                assigneeIds: [...assigneeIds],
-                date: date,
-              });
-              emit('close');
-            "
-          />
+          <span class="text-sm font-semibold" style="color: var(--vacation-teal)">›</span>
         </div>
       </div>
 

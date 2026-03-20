@@ -13,6 +13,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDateShort } from '@/utils/date';
 import { bookingProgress } from '@/utils/vacation';
+import { generateUUID } from '@/utils/id';
 import type {
   FamilyVacation,
   VacationTripType,
@@ -134,6 +135,51 @@ function goBack() {
   }
 }
 
+function splitCombinedFlights(segments: VacationTravelSegment[]): VacationTravelSegment[] {
+  const result: VacationTravelSegment[] = [];
+  for (const seg of segments) {
+    if (seg.type === 'flight_outbound' && seg.returnDepartureDate) {
+      // Create outbound entry (strip return* fields)
+      const {
+        returnAirline: _ra,
+        returnFlightNumber: _rfn,
+        returnDepartureAirport: _rda,
+        returnArrivalAirport: _raa,
+        returnDepartureDate: _rdd,
+        returnDepartureTime: _rdt,
+        returnArrivalDate: _rad,
+        returnArrivalTime: _rat,
+        returnBookingReference: _rbr,
+        ...outbound
+      } = seg;
+      result.push({
+        ...outbound,
+        title: t('vacation.travel.outboundFlight') as string,
+      });
+      // Create return entry
+      result.push({
+        id: generateUUID(),
+        type: 'flight_return',
+        title: t('vacation.travel.returnFlight') as string,
+        status: seg.returnBookingReference ? 'booked' : seg.status,
+        sortDate: seg.returnDepartureDate,
+        airline: seg.returnAirline,
+        flightNumber: seg.returnFlightNumber,
+        departureAirport: seg.returnDepartureAirport,
+        arrivalAirport: seg.returnArrivalAirport,
+        departureDate: seg.returnDepartureDate,
+        departureTime: seg.returnDepartureTime,
+        arrivalDate: seg.returnArrivalDate,
+        arrivalTime: seg.returnArrivalTime,
+        bookingReference: seg.returnBookingReference,
+      });
+    } else {
+      result.push(seg);
+    }
+  }
+  return result;
+}
+
 async function handleSave() {
   if (!canGoNext.value && currentStep.value === 1) {
     showErrors.value = true;
@@ -144,12 +190,14 @@ async function handleSave() {
   try {
     let saved: FamilyVacation | null;
 
+    const processedSegments = splitCombinedFlights([...travelSegments.value]);
+
     if (isEditing.value && props.vacation) {
       saved = await vacationStore.updateVacation(props.vacation.id, {
         name: name.value.trim(),
         tripType: tripType.value,
         assigneeIds: [...assigneeIds.value],
-        travelSegments: [...travelSegments.value],
+        travelSegments: processedSegments,
         accommodations: [...accommodations.value],
         transportation: [...transportation.value],
         ideas: [...ideas.value],
@@ -159,7 +207,7 @@ async function handleSave() {
         name: name.value.trim(),
         tripType: tripType.value,
         assigneeIds: [...assigneeIds.value],
-        travelSegments: [...travelSegments.value],
+        travelSegments: processedSegments,
         accommodations: [...accommodations.value],
         transportation: [...transportation.value],
         ideas: [...ideas.value],
@@ -183,27 +231,61 @@ function showCelebration(vacation: FamilyVacation) {
       ? `${formatDateShort(vacation.startDate)} – ${formatDateShort(vacation.endDate)}`
       : t('vacation.status.pending');
 
+  const details: ConfirmDetail[] = [
+    { label: t('vacation.celebration.trip'), value: vacation.name },
+    { label: t('vacation.celebration.when'), value: dateRange },
+    {
+      label: t('vacation.celebration.who'),
+      value: `${t('vacation.celebration.allBeans')} (${vacation.assigneeIds.length})`,
+    },
+  ];
+
+  // Add first flight summary
+  const firstFlight = vacation.travelSegments.find(
+    (s) => s.type === 'flight_outbound' || s.type === 'flight_other'
+  );
+  if (firstFlight) {
+    const flightParts: string[] = [];
+    if (firstFlight.airline) flightParts.push(firstFlight.airline);
+    if (firstFlight.flightNumber) flightParts.push(firstFlight.flightNumber);
+    if (firstFlight.departureDate) flightParts.push(formatDateShort(firstFlight.departureDate));
+    if (flightParts.length > 0) {
+      details.push({ label: '✈️', value: flightParts.join(' · ') });
+    }
+  }
+
+  // Add first accommodation summary
+  const firstStay = vacation.accommodations[0];
+  if (firstStay) {
+    const stayParts: string[] = [];
+    if (firstStay.name) stayParts.push(firstStay.name);
+    if (firstStay.checkInDate && firstStay.checkOutDate) {
+      stayParts.push(
+        `${formatDateShort(firstStay.checkInDate)} – ${formatDateShort(firstStay.checkOutDate)}`
+      );
+    }
+    if (stayParts.length > 0) {
+      details.push({ label: '🏨', value: stayParts.join(' · ') });
+    }
+  }
+
+  details.push(
+    {
+      label: t('vacation.celebration.booked'),
+      value: `${progress.booked} / ${progress.total}`,
+      highlight: true,
+    },
+    {
+      label: t('vacation.celebration.ideas'),
+      value: `${vacation.ideas.length}`,
+    }
+  );
+
   celebration.value = {
     open: true,
     title: t('vacation.bonVoyage'),
     message: t('vacation.savedMessage'),
-    details: [
-      { label: t('vacation.celebration.trip'), value: vacation.name },
-      { label: t('vacation.celebration.when'), value: dateRange },
-      {
-        label: t('vacation.celebration.who'),
-        value: `${t('vacation.celebration.allBeans')} (${vacation.assigneeIds.length})`,
-      },
-      {
-        label: t('vacation.celebration.booked'),
-        value: `${progress.booked} / ${progress.total}`,
-        highlight: true,
-      },
-      {
-        label: t('vacation.celebration.ideas'),
-        value: `${vacation.ideas.length}`,
-      },
-    ],
+    details,
   };
 }
 
@@ -245,14 +327,25 @@ const saveLabel = computed(() => {
     "
   >
     <template #footer-start>
-      <button
-        v-if="currentStep > 1"
-        type="button"
-        class="font-outfit rounded-2xl border border-[var(--tint-slate-10)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--color-text-muted)] transition-all hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-400"
-        @click="goBack"
-      >
-        ← {{ t('vacation.back') }}
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          v-if="currentStep > 1"
+          type="button"
+          class="font-outfit rounded-2xl border border-[var(--tint-slate-10)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--color-text-muted)] transition-all hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-400"
+          @click="goBack"
+        >
+          ← {{ t('vacation.back') }}
+        </button>
+        <button
+          v-if="isEditing && currentStep < 5"
+          type="button"
+          class="font-outfit rounded-2xl px-4 py-3 text-xs font-semibold text-white"
+          style="background: linear-gradient(135deg, #00b4d8, #0096b7)"
+          @click="handleSave"
+        >
+          {{ t('action.save') }}
+        </button>
+      </div>
     </template>
 
     <!-- Wizard progress bar -->

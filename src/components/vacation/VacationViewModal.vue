@@ -7,7 +7,14 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
-import { formatNookDate, formatDateShort, extractDatePart } from '@/utils/date';
+import {
+  formatNookDate,
+  formatDateShort,
+  extractDatePart,
+  parseLocalDate,
+  addDays,
+  toDateInputValue,
+} from '@/utils/date';
 import { bookingProgress, daysUntilTrip, tripDurationDays } from '@/utils/vacation';
 import type { FamilyVacation } from '@/types/models';
 
@@ -67,6 +74,33 @@ const assignees = computed(() =>
     .map((id) => familyStore.members.find((m) => m.id === id))
     .filter(Boolean)
 );
+
+const accommodationGaps = computed(() => {
+  if (!vacation.value?.startDate || !vacation.value?.endDate) return [];
+  const start = parseLocalDate(extractDatePart(vacation.value.startDate));
+  const end = parseLocalDate(extractDatePart(vacation.value.endDate));
+  const coveredDates = new Set<string>();
+
+  for (const acc of vacation.value.accommodations) {
+    if (acc.checkInDate && acc.checkOutDate) {
+      let d = parseLocalDate(extractDatePart(acc.checkInDate));
+      const out = parseLocalDate(extractDatePart(acc.checkOutDate));
+      while (d < out) {
+        coveredDates.add(toDateInputValue(d));
+        d = addDays(d, 1);
+      }
+    }
+  }
+
+  const gaps: string[] = [];
+  let d = new Date(start);
+  while (d <= end) {
+    const dateStr = toDateInputValue(d);
+    if (!coveredDates.has(dateStr)) gaps.push(dateStr);
+    d = addDays(d, 1);
+  }
+  return gaps;
+});
 
 // Timeline: merge all segments, sort by date, group by date header
 interface TimelineItem {
@@ -216,7 +250,7 @@ function handleVote(ideaId: string) {
 </script>
 
 <template>
-  <BaseModal :open="open" size="2xl" fullscreen-mobile @close="$emit('close')">
+  <BaseModal :open="open" size="2xl" :closable="false" fullscreen-mobile @close="$emit('close')">
     <template v-if="vacation" #header>
       <!-- Custom teal hero header -->
       <div class="vacation-view-hero relative w-full overflow-hidden px-6 py-5">
@@ -295,6 +329,27 @@ function handleVote(ideaId: string) {
             class="font-outfit text-xs font-semibold whitespace-nowrap text-[var(--vacation-teal)]"
           >
             {{ progress.booked }} {{ t('vacation.progress' as any) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Accommodation gap warning -->
+      <div
+        v-if="accommodationGaps.length > 0"
+        class="mb-4 flex items-start gap-2 rounded-xl border border-dashed border-[rgba(241,93,34,0.2)] bg-[var(--tint-orange-8)] px-3 py-2.5 dark:bg-orange-900/10"
+      >
+        <span class="mt-0.5 text-sm">🏨</span>
+        <div>
+          <span class="font-outfit text-xs font-semibold text-[var(--heritage-orange)]">
+            {{ accommodationGaps.length }} {{ t('vacation.nightsNoAccommodation' as any) }}
+          </span>
+          <span class="block text-[10px] text-[var(--color-text-muted)]">
+            {{
+              accommodationGaps
+                .slice(0, 3)
+                .map((d) => formatNookDate(d))
+                .join(', ')
+            }}{{ accommodationGaps.length > 3 ? '...' : '' }}
           </span>
         </div>
       </div>
@@ -477,19 +532,12 @@ function handleVote(ideaId: string) {
     </template>
 
     <template v-if="vacation" #footer>
-      <div class="flex w-full items-center gap-2">
+      <div class="flex w-full">
         <button
           class="font-outfit flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-[var(--tint-slate-10)] bg-white px-4 py-3 text-xs font-semibold text-gray-500 transition-colors hover:border-[var(--vacation-teal)] hover:text-[var(--vacation-teal)] dark:bg-slate-800 dark:text-gray-400"
           @click="emit('edit', vacation!, 1)"
         >
           ✏️ {{ t('vacation.editAll' as any) }}
-        </button>
-        <button
-          class="font-outfit flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-2xl px-4 py-3 text-xs font-semibold text-white opacity-50"
-          style="background: linear-gradient(135deg, #00b4d8, #0077b6)"
-          disabled
-        >
-          📤 {{ t('vacation.share' as any) }}
         </button>
       </div>
     </template>
