@@ -110,10 +110,7 @@ async function handleDelete() {
         {{ subtitle }}
       </span>
 
-      <span
-        v-if="keyValue && collapsed"
-        class="hidden text-xs text-gray-500 sm:inline dark:text-gray-400"
-      >
+      <span v-if="keyValue && collapsed" class="truncate text-xs text-gray-400 dark:text-gray-500">
         {{ keyValue }}
       </span>
 
