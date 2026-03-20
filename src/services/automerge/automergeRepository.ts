@@ -69,10 +69,6 @@ export function createAutomergeRepository<
 
     const id = (entity as unknown as { id: string }).id;
     changeDoc((d) => {
-      // Initialize collection if missing (backward compat with older beanpod files)
-      if (!d[collectionName]) {
-        (d as unknown as Record<string, unknown>)[collectionName] = {};
-      }
       const collection = d[collectionName] as Record<string, Entity>;
       collection[id] = entity;
     });
