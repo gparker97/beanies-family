@@ -8,6 +8,7 @@ import type {
   RecurringItem,
   TodoItem,
   FamilyActivity,
+  FamilyVacation,
   Settings,
 } from './models';
 
@@ -26,6 +27,7 @@ export interface FamilyDocument {
   recurringItems: Record<string, RecurringItem>;
   todos: Record<string, TodoItem>;
   activities: Record<string, FamilyActivity>;
+  vacations: Record<string, FamilyVacation>;
   settings: Settings | null;
 }
 

@@ -3254,6 +3254,259 @@ const STRING_DEFS = {
 
   // Navigation
   'nav.help': { en: 'Help', beanie: 'help' },
+
+  // ── Vacation Planner ──────────────────────────────────────────────────────
+
+  // Toggle & entry
+  'vacation.planningATrip': { en: 'Planning a Trip?', beanie: 'planning a trip?' },
+  'vacation.planningSubtitle': {
+    en: 'Flights, hotels, ideas & more',
+    beanie: 'flights, hotels, ideas & more',
+  },
+
+  // Wizard
+  'vacation.wizardTitle': { en: 'Plan a Vacation', beanie: 'plan a vacation' },
+  'vacation.wizardTitleEdit': { en: 'Edit Vacation', beanie: 'edit vacation' },
+  'vacation.step.trip': { en: 'Trip', beanie: 'trip' },
+  'vacation.step.travel': { en: 'Travel', beanie: 'travel' },
+  'vacation.step.stay': { en: 'Stay', beanie: 'stay' },
+  'vacation.step.gettingAround': { en: 'Getting Around', beanie: 'getting around' },
+  'vacation.step.ideas': { en: 'Ideas', beanie: 'ideas' },
+
+  // Step 1
+  'vacation.step1.title': {
+    en: 'Where Are the Beans Going?',
+    beanie: 'where are the beans going?',
+  },
+  'vacation.step1.subtitle': {
+    en: 'Pick your adventure type and give it a name!',
+    beanie: 'pick your adventure type and give it a name!',
+  },
+  'vacation.field.vacationName': { en: 'Vacation Name', beanie: 'vacation name' },
+  'vacation.field.vacationNamePlaceholder': {
+    en: 'e.g. bali beach bonanza',
+    beanie: 'e.g. bali beach bonanza',
+  },
+  'vacation.field.tripType': { en: 'Trip Type', beanie: 'trip type' },
+  'vacation.field.whosGoing': { en: "Who's Going?", beanie: "who's going?" },
+
+  // Trip types
+  'vacation.type.fly_and_stay': { en: 'Fly & Stay', beanie: 'fly & stay' },
+  'vacation.type.fly_and_stay.desc': {
+    en: 'Flight + hotel',
+    beanie: 'flight + hotel',
+  },
+  'vacation.type.cruise': { en: 'Cruise', beanie: 'cruise' },
+  'vacation.type.cruise.desc': { en: 'Set sail, matey!', beanie: 'set sail, matey!' },
+  'vacation.type.road_trip': { en: 'Road Trip', beanie: 'road trip' },
+  'vacation.type.road_trip.desc': {
+    en: 'Snacks & singalongs',
+    beanie: 'snacks & singalongs',
+  },
+  'vacation.type.combo': { en: 'Combo Trip', beanie: 'combo trip' },
+  'vacation.type.combo.desc': { en: 'Mix & match!', beanie: 'mix & match!' },
+  'vacation.type.camping': { en: 'Camping', beanie: 'camping' },
+  'vacation.type.camping.desc': { en: 'Under the stars', beanie: 'under the stars' },
+  'vacation.type.adventure': { en: 'Adventure', beanie: 'adventure' },
+  'vacation.type.adventure.desc': {
+    en: 'Hiking, ski, explore',
+    beanie: 'hiking, ski, explore',
+  },
+
+  // Step 2 - Travel
+  'vacation.step2.title': {
+    en: 'How Are We Getting There?',
+    beanie: 'how are we getting there?',
+  },
+  'vacation.step2.subtitle': {
+    en: 'Sorted by date \u2014 expand any card for full details',
+    beanie: 'sorted by date \u2014 expand any card for full details',
+  },
+  'vacation.travel.addFlight': { en: 'Flight', beanie: 'flight' },
+  'vacation.travel.addCruise': { en: 'Cruise', beanie: 'cruise' },
+  'vacation.travel.addTrain': { en: 'Train', beanie: 'train' },
+  'vacation.travel.addFerry': { en: 'Ferry', beanie: 'ferry' },
+  'vacation.travel.outboundFlight': { en: 'Outbound Flight', beanie: 'outbound flight' },
+  'vacation.travel.returnFlight': { en: 'Return Flight', beanie: 'return flight' },
+
+  // Travel fields
+  'vacation.field.airline': { en: 'Airline', beanie: 'airline' },
+  'vacation.field.flightNumber': { en: 'Flight Number', beanie: 'flight number' },
+  'vacation.field.departureAirport': { en: 'From', beanie: 'from' },
+  'vacation.field.arrivalAirport': { en: 'To', beanie: 'to' },
+  'vacation.field.departureDate': { en: 'Departure Date', beanie: 'departure date' },
+  'vacation.field.departureTime': { en: 'Departure Time', beanie: 'departure time' },
+  'vacation.field.arrivalDate': { en: 'Arrival Date', beanie: 'arrival date' },
+  'vacation.field.arrivalTime': { en: 'Arrival Time', beanie: 'arrival time' },
+  'vacation.field.bookingReference': { en: 'Booking Reference', beanie: 'booking reference' },
+  'vacation.field.cruiseLine': { en: 'Cruise Line', beanie: 'cruise line' },
+  'vacation.field.shipName': { en: 'Ship Name', beanie: 'ship name' },
+  'vacation.field.departurePort': { en: 'Departure Port', beanie: 'departure port' },
+  'vacation.field.cabinNumber': { en: 'Cabin Number', beanie: 'cabin number' },
+  'vacation.field.embarkationDate': { en: 'Embarkation', beanie: 'embarkation' },
+  'vacation.field.disembarkationDate': { en: 'Disembarkation', beanie: 'disembarkation' },
+  'vacation.field.operator': { en: 'Operator', beanie: 'operator' },
+  'vacation.field.route': { en: 'Route', beanie: 'route' },
+  'vacation.field.departureStation': { en: 'From Station', beanie: 'from station' },
+  'vacation.field.arrivalStation': { en: 'To Station', beanie: 'to station' },
+
+  // Step 3 - Accommodation
+  'vacation.step3.title': { en: 'Pillow Fort HQ', beanie: 'pillow fort HQ' },
+  'vacation.step3.subtitle': {
+    en: 'Select what you need \u2014 add details for each',
+    beanie: 'select what you need \u2014 add details for each',
+  },
+  'vacation.accommodation.hotel': { en: 'Hotel', beanie: 'hotel' },
+  'vacation.accommodation.airbnb': { en: 'Airbnb / Rental', beanie: 'airbnb / rental' },
+  'vacation.accommodation.campground': { en: 'Campground', beanie: 'campground' },
+  'vacation.accommodation.family_friends': {
+    en: 'Family / Friends',
+    beanie: 'family / friends',
+  },
+  'vacation.field.hotelName': { en: 'Hotel Name', beanie: 'hotel name' },
+  'vacation.field.propertyName': { en: 'Property Name', beanie: 'property name' },
+  'vacation.field.address': { en: 'Address', beanie: 'address' },
+  'vacation.field.checkIn': { en: 'Check-in', beanie: 'check-in' },
+  'vacation.field.checkOut': { en: 'Check-out', beanie: 'check-out' },
+  'vacation.field.confirmationNumber': {
+    en: 'Confirmation Number',
+    beanie: 'confirmation number',
+  },
+  'vacation.field.roomType': { en: 'Room Type', beanie: 'room type' },
+  'vacation.field.contactPhone': { en: 'Contact Phone', beanie: 'contact phone' },
+  'vacation.addAnotherStay': { en: 'Add Another Stay', beanie: 'add another stay' },
+
+  // Step 4 - Transportation
+  'vacation.step4.title': {
+    en: 'Bean Transportation Dept.',
+    beanie: 'bean transportation dept.',
+  },
+  'vacation.step4.subtitle': {
+    en: 'Select what you need \u2014 skip the rest!',
+    beanie: 'select what you need \u2014 skip the rest!',
+  },
+  'vacation.transport.airport_shuttle': { en: 'Airport Shuttle', beanie: 'airport shuttle' },
+  'vacation.transport.rental_car': { en: 'Rental Car', beanie: 'rental car' },
+  'vacation.transport.taxi_rideshare': { en: 'Taxi / Rideshare', beanie: 'taxi / rideshare' },
+  'vacation.transport.train': { en: 'Train', beanie: 'train' },
+  'vacation.transport.bus': { en: 'Bus', beanie: 'bus' },
+  'vacation.field.pickupDate': { en: 'Pickup Date', beanie: 'pickup date' },
+  'vacation.field.pickupTime': { en: 'Pickup Time', beanie: 'pickup time' },
+  'vacation.field.returnDate': { en: 'Return Date', beanie: 'return date' },
+
+  // Step 5 - Ideas
+  'vacation.step5.title': { en: 'Bean Bucket List!', beanie: 'bean bucket list!' },
+  'vacation.step5.subtitle': {
+    en: 'What do the beans want to see and do?',
+    beanie: 'what do the beans want to see and do?',
+  },
+  'vacation.ideas.addPlaceholder': {
+    en: 'Add an idea... what should we do?',
+    beanie: 'add an idea... what should we do?',
+  },
+  'vacation.ideas.category.beach': { en: 'Beach', beanie: 'beach' },
+  'vacation.ideas.category.activity': { en: 'Activity', beanie: 'activity' },
+  'vacation.ideas.category.food': { en: 'Food', beanie: 'food' },
+  'vacation.ideas.category.sightseeing': { en: 'Sightseeing', beanie: 'sightseeing' },
+  'vacation.ideas.category.shopping': { en: 'Shopping', beanie: 'shopping' },
+  'vacation.ideas.category.nightlife': { en: 'Nightlife', beanie: 'nightlife' },
+  'vacation.ideas.estimatedCost': { en: 'Estimated Cost', beanie: 'estimated cost' },
+  'vacation.ideas.free': { en: 'Free', beanie: 'free' },
+  'vacation.ideas.paid': { en: 'Paid', beanie: 'paid' },
+  'vacation.ideas.duration': { en: 'Duration', beanie: 'duration' },
+  'vacation.ideas.needsBooking': { en: 'Needs Booking', beanie: 'needs booking' },
+  'vacation.ideas.noBookingNeeded': { en: 'No Booking Needed', beanie: 'no booking needed' },
+  'vacation.ideas.whosInterested': { en: "Who's Interested", beanie: "who's interested" },
+  'vacation.ideas.votes': { en: 'Votes', beanie: 'votes' },
+  'vacation.ideas.saveIdea': { en: 'Save Idea', beanie: 'save idea' },
+
+  // Segment statuses
+  'vacation.status.booked': { en: 'Booked', beanie: 'booked' },
+  'vacation.status.pending': { en: 'Pending', beanie: 'pending' },
+  'vacation.status.not_booked': { en: 'Not Booked', beanie: 'not booked' },
+  'vacation.status.researching': { en: 'Researching', beanie: 'researching' },
+
+  // Wizard navigation
+  'vacation.next': { en: 'Next', beanie: 'next' },
+  'vacation.back': { en: 'Back', beanie: 'back' },
+  'vacation.saveVacation': {
+    en: 'Save Vacation!',
+    beanie: 'save vacation!',
+  },
+
+  // Celebration
+  'vacation.bonVoyage': { en: 'Bon Voyage, Beans!', beanie: 'bon voyage, beans!' },
+  'vacation.savedMessage': {
+    en: 'Your vacation is saved and ready to share with the family',
+    beanie: 'your vacation is saved and ready to share with the family',
+  },
+  'vacation.daysUntil': { en: 'Days Until Takeoff', beanie: 'days until takeoff' },
+  'vacation.celebration.trip': { en: 'Trip', beanie: 'trip' },
+  'vacation.celebration.when': { en: 'When', beanie: 'when' },
+  'vacation.celebration.who': { en: 'Who', beanie: 'who' },
+  'vacation.celebration.booked': { en: 'Booked', beanie: 'booked' },
+  'vacation.celebration.ideas': { en: 'Ideas', beanie: 'ideas' },
+  'vacation.celebration.allBeans': { en: 'All Beans!', beanie: 'all beans!' },
+
+  // View modal
+  'vacation.viewTitle': { en: 'Vacation Details', beanie: 'vacation details' },
+  'vacation.timeline': { en: 'Your Trip Timeline', beanie: 'your trip timeline' },
+  'vacation.timelineSortedBy': {
+    en: 'Sorted by date \u2014 tap to copy \u2014 click fields to edit inline',
+    beanie: 'sorted by date \u2014 tap to copy \u2014 click fields to edit inline',
+  },
+  'vacation.bucketList': { en: 'Bean Bucket List', beanie: 'bean bucket list' },
+  'vacation.editAll': { en: 'Edit All', beanie: 'edit all' },
+  'vacation.editInWizard': { en: 'Edit in Wizard', beanie: 'edit in wizard' },
+  'vacation.share': { en: 'Share', beanie: 'share' },
+  'vacation.copied': { en: 'Copied!', beanie: 'copied!' },
+  'vacation.progress': { en: 'Booked', beanie: 'booked' },
+  'vacation.notBookedYet': {
+    en: 'Not booked yet \u2014 we\u2019ll remind you later!',
+    beanie: 'not booked yet \u2014 we\u2019ll remind you later!',
+  },
+  'vacation.stillDeciding': { en: 'Still deciding', beanie: 'still deciding' },
+
+  // Sidebar
+  'vacation.upcoming': { en: 'Upcoming Vacations', beanie: 'upcoming vacations' },
+  'vacation.daysAway': { en: 'Days Away', beanie: 'days away' },
+  'vacation.inProgress': { en: 'In Progress', beanie: 'in progress' },
+  'vacation.itemsNeedBooking': {
+    en: 'Items Need Booking',
+    beanie: 'items need booking',
+  },
+
+  // Day agenda
+  'vacation.dayContext': { en: 'Day', beanie: 'day' },
+  'vacation.ofTrip': { en: 'of Trip', beanie: 'of trip' },
+
+  // Duration options
+  'vacation.duration.30min': { en: '30 Min', beanie: '30 min' },
+  'vacation.duration.1hr': { en: '1 Hour', beanie: '1 hour' },
+  'vacation.duration.2hrs': { en: '2 Hours', beanie: '2 hours' },
+  'vacation.duration.half_day': { en: 'Half Day', beanie: 'half day' },
+  'vacation.duration.full_day': { en: 'Full Day', beanie: 'full day' },
+
+  // Schedule tab bar
+  'vacation.scheduleRecurring': { en: 'Recurring', beanie: 'recurring' },
+  'vacation.scheduleRecurringDesc': {
+    en: 'Repeats weekly or monthly',
+    beanie: 'repeats weekly or monthly',
+  },
+  'vacation.scheduleOneTime': { en: 'One-Time', beanie: 'one-time' },
+  'vacation.scheduleOneTimeDesc': { en: 'Happens once', beanie: 'happens once' },
+
+  // Common vacation fields
+  'vacation.field.notes': { en: 'Notes', beanie: 'notes' },
+  'vacation.field.status': { en: 'Status', beanie: 'status' },
+  'vacation.field.title': { en: 'Title', beanie: 'title' },
+
+  // Delete
+  'vacation.deleteTitle': { en: 'Delete Vacation?', beanie: 'delete vacation?' },
+  'vacation.deleteMessage': {
+    en: 'This will permanently remove this vacation and all its details.',
+    beanie: 'this will permanently remove this vacation and all its details.',
+  },
 } satisfies Record<string, StringEntry>;
 
 /**
