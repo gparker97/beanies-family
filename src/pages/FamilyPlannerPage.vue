@@ -24,6 +24,7 @@ import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
+import VacationViewModal from '@/components/vacation/VacationViewModal.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import type {
@@ -99,10 +100,25 @@ const vacationWizardDefaults = ref<{ assigneeIds: string[]; date: string }>({
   assigneeIds: [],
   date: '',
 });
+const editingVacation = ref<import('@/types/models').FamilyVacation | null>(null);
+const editVacationStep = ref<number | undefined>(undefined);
+
+// Vacation view modal state
+const showVacationView = ref(false);
+const viewingVacationId = ref<string | undefined>(undefined);
 
 function handleStartVacationWizard(defaults: { assigneeIds: string[]; date: string }) {
   showModal.value = false;
   vacationWizardDefaults.value = defaults;
+  editingVacation.value = null;
+  editVacationStep.value = undefined;
+  showVacationWizard.value = true;
+}
+
+function handleVacationEdit(vacation: import('@/types/models').FamilyVacation, step?: number) {
+  showVacationView.value = false;
+  editingVacation.value = vacation;
+  editVacationStep.value = step;
   showVacationWizard.value = true;
 }
 
@@ -441,10 +457,28 @@ function handleActivitySwapped(newId: string) {
     <!-- Vacation wizard -->
     <VacationWizard
       :open="showVacationWizard"
+      :vacation="editingVacation"
+      :edit-step="editVacationStep"
       :default-assignee-ids="vacationWizardDefaults.assigneeIds"
       :default-date="vacationWizardDefaults.date"
-      @close="showVacationWizard = false"
-      @saved="showVacationWizard = false"
+      @close="
+        showVacationWizard = false;
+        editingVacation = null;
+        editVacationStep = undefined;
+      "
+      @saved="
+        showVacationWizard = false;
+        editingVacation = null;
+        editVacationStep = undefined;
+      "
+    />
+
+    <!-- Vacation view modal -->
+    <VacationViewModal
+      :open="showVacationView"
+      :vacation-id="viewingVacationId"
+      @close="showVacationView = false"
+      @edit="handleVacationEdit"
     />
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
