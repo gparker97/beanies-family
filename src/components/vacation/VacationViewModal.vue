@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import BaseModal from '@/components/ui/BaseModal.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import VacationIdeaCard from './VacationIdeaCard.vue';
 import { useVacationStore } from '@/stores/vacationStore';
@@ -250,27 +250,26 @@ function handleVote(ideaId: string) {
 </script>
 
 <template>
-  <BaseModal :open="open" size="2xl" fullscreen-mobile @close="$emit('close')">
+  <BeanieFormModal
+    :open="open"
+    :title="vacation?.name ?? ''"
+    :icon="tripEmoji"
+    icon-bg="var(--vacation-teal-tint)"
+    size="wide"
+    save-gradient="teal"
+    :save-label="t('vacation.editAll' as any)"
+    :save-disabled="false"
+    @close="$emit('close')"
+    @save="vacation && emit('edit', vacation, 1)"
+  >
     <template v-if="vacation" #default>
-      <!-- Hero header — inside body slot, pulled edge-to-edge with negative margins -->
-      <div class="vacation-view-hero">
-        <div class="relative z-10 flex items-start justify-between">
-          <div>
-            <span class="text-3xl" style="filter: drop-shadow(0 2px 8px rgb(0 0 0 / 15%))">
-              {{ tripEmoji }}
-            </span>
-            <h3 class="font-outfit mt-2 text-xl font-bold text-white">{{ vacation.name }}</h3>
-          </div>
-          <button
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15 text-white/80"
-            @click="$emit('close')"
-          >
-            ✕
-          </button>
-        </div>
-
+      <!-- Hero info banner -->
+      <div
+        class="relative overflow-hidden rounded-2xl px-4 py-3"
+        style="background: linear-gradient(135deg, #00b4d8, #0077b6)"
+      >
         <!-- Meta pills -->
-        <div class="relative z-10 mt-3 flex flex-wrap items-center gap-2">
+        <div class="relative z-10 flex flex-wrap items-center gap-2">
           <span
             v-if="dateRange"
             class="font-outfit inline-flex items-center gap-1 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur"
@@ -292,7 +291,7 @@ function handleVote(ideaId: string) {
         </div>
 
         <!-- Assignee avatars -->
-        <div v-if="assignees.length" class="relative z-10 mt-3 flex items-center gap-1">
+        <div v-if="assignees.length" class="relative z-10 mt-2.5 flex items-center gap-1">
           <span
             v-for="member in assignees"
             :key="member!.id"
@@ -527,27 +526,5 @@ function handleVote(ideaId: string) {
         </div>
       </Transition>
     </template>
-
-    <template v-if="vacation" #footer>
-      <div class="flex w-full">
-        <button
-          class="font-outfit flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-[var(--tint-slate-10)] bg-white px-4 py-3 text-xs font-semibold text-gray-500 transition-colors hover:border-[var(--vacation-teal)] hover:text-[var(--vacation-teal)] dark:bg-slate-800 dark:text-gray-400"
-          @click="emit('edit', vacation!, 1)"
-        >
-          ✏️ {{ t('vacation.editAll' as any) }}
-        </button>
-      </div>
-    </template>
-  </BaseModal>
+  </BeanieFormModal>
 </template>
-
-<style scoped>
-.vacation-view-hero {
-  background: linear-gradient(135deg, #00b4d8, #0077b6);
-  border-radius: 1.5rem 1.5rem 0 0;
-  margin: -1.5rem -1.5rem 1.5rem;
-  overflow: hidden;
-  padding: 1.5rem;
-  position: relative;
-}
-</style>
