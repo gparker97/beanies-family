@@ -253,23 +253,42 @@ function handleVote(ideaId: string) {
   <BeanieFormModal
     :open="open"
     :title="vacation?.name ?? ''"
-    :icon="tripEmoji"
-    icon-bg="var(--vacation-teal-tint)"
     size="wide"
     save-gradient="teal"
     :save-label="t('vacation.editAll' as any)"
     :save-disabled="false"
+    custom-header
     @close="$emit('close')"
     @save="vacation && emit('edit', vacation, 1)"
   >
-    <template v-if="vacation" #default>
-      <!-- Hero info banner -->
+    <!-- Custom teal hero header (fixed, non-scrolling) -->
+    <template v-if="vacation" #custom-header>
       <div
-        class="relative overflow-hidden rounded-2xl px-4 py-3"
+        class="relative overflow-hidden px-6 py-4"
         style="background: linear-gradient(135deg, #00b4d8, #0077b6)"
       >
+        <div class="relative z-10 flex items-center gap-3">
+          <!-- Trip emoji -->
+          <div
+            class="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[14px] bg-white/15 text-xl"
+          >
+            {{ tripEmoji }}
+          </div>
+          <!-- Title -->
+          <h2 class="font-outfit flex-1 text-lg font-bold text-white">
+            {{ vacation.name }}
+          </h2>
+          <!-- Close button -->
+          <button
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+            @click="$emit('close')"
+          >
+            ✕
+          </button>
+        </div>
+
         <!-- Meta pills -->
-        <div class="relative z-10 flex flex-wrap items-center gap-2">
+        <div class="relative z-10 mt-3 flex flex-wrap items-center gap-2">
           <span
             v-if="dateRange"
             class="font-outfit inline-flex items-center gap-1 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur"
@@ -308,6 +327,9 @@ function handleVote(ideaId: string) {
           style="background: radial-gradient(circle, rgb(255 217 61 / 20%), transparent 70%)"
         />
       </div>
+    </template>
+
+    <template v-if="vacation" #default>
       <!-- Progress -->
       <div v-if="progress && progress.total > 0" class="mb-4">
         <div
