@@ -87,13 +87,18 @@ async function handleDelete() {
         {{ t(statusConfig.key as any) }}
       </span>
 
-      <input
-        v-if="!readOnly"
-        :value="title"
-        class="font-outfit min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold text-slate-900 outline-none focus:border-b focus:border-dashed focus:border-slate-400 dark:text-gray-100"
-        @input="emit('update:title', ($event.target as HTMLInputElement).value)"
-        @click.stop
-      />
+      <div v-if="!readOnly" class="group/title relative min-w-0 flex-1" @click.stop>
+        <input
+          :value="title"
+          class="font-outfit w-full border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
+          @input="emit('update:title', ($event.target as HTMLInputElement).value)"
+        />
+        <span
+          class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/title:opacity-100 dark:text-slate-500"
+        >
+          ✏️
+        </span>
+      </div>
       <span
         v-else
         class="font-outfit min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-gray-100"
