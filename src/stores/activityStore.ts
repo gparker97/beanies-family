@@ -153,6 +153,7 @@ export const useActivityStore = defineStore('activities', () => {
 
   /**
    * Get upcoming activities from today, limited to `limit` items.
+   * Excludes vacation-linked activities (they appear as sidebar cards instead).
    */
   const upcomingActivities = computed(() => {
     const today = new Date();
@@ -160,6 +161,8 @@ export const useActivityStore = defineStore('activities', () => {
 
     // Look ahead 90 days
     for (const a of filteredActivities.value) {
+      // Skip vacation-linked activities — they display as vacation bars/cards
+      if (a.vacationId) continue;
       for (let i = 0; i < 3; i++) {
         const y = today.getFullYear();
         const m = today.getMonth() + i;
@@ -251,6 +254,14 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   async function deleteActivity(id: string): Promise<boolean> {
+    // Prevent standalone deletion of vacation-linked activities
+    const activity = activities.value.find((a) => a.id === id);
+    if (activity?.vacationId) {
+      console.warn(
+        'Cannot delete a vacation-linked activity directly. Use vacationStore.deleteVacation() instead.'
+      );
+      return false;
+    }
     const result = await wrapAsync(isLoading, error, async () => {
       const success = await activityRepo.deleteActivity(id);
       if (success) {

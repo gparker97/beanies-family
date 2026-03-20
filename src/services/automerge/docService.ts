@@ -48,6 +48,7 @@ export function initDoc(): Automerge.Doc<FamilyDocument> {
     recurringItems: {},
     todos: {},
     activities: {},
+    vacations: {},
     settings: null,
   };
   currentDoc = Automerge.from(
