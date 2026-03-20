@@ -93,15 +93,19 @@ test.describe('Loan & Activity Linking', () => {
     // so "Monthly" click below targets the fee schedule chip, not the frequency chip)
     await page.getByRole('button', { name: /one-time/i }).click();
 
+    // Wait for the one-time date field to appear (ConditionalSection animation)
+    const dateInput = page.locator('div[role="dialog"]').locator('input[type="date"]');
+    await dateInput.first().waitFor({ state: 'visible', timeout: 5000 });
+
+    // Fill date
+    await dateInput.first().fill('2026-04-15');
+
     // Set cost amount
     const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
     await costInput.fill(amount.toString());
 
     // Set fee schedule to "Monthly"
     await clickFeeScheduleMonthly(page);
-
-    // Fill date
-    await page.locator('input[type="date"]').fill('2026-04-15');
 
     // Wait for RecurringPaymentPrompt to appear
     await expect(page.getByText(ui('recurringPrompt.createPayment'))).toBeVisible({
