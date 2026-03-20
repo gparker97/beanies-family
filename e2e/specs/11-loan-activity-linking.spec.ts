@@ -89,15 +89,16 @@ test.describe('Loan & Activity Linking', () => {
     // Select assignee
     await selectAssignee(page);
 
-    // Set cost amount (now above the schedule section)
+    // Switch to one-time mode FIRST (hides recurring frequency section
+    // so "Monthly" click below targets the fee schedule chip, not the frequency chip)
+    await page.getByRole('button', { name: /one-time/i }).click();
+
+    // Set cost amount
     const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
     await costInput.fill(amount.toString());
 
-    // Set fee schedule to "Monthly" (fee chips are now above the schedule toggle)
+    // Set fee schedule to "Monthly"
     await clickFeeScheduleMonthly(page);
-
-    // Switch to one-off mode
-    await page.getByRole('button', { name: /one-time/i }).click();
 
     // Fill date
     await page.locator('input[type="date"]').fill('2026-04-15');
