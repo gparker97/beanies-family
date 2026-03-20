@@ -3468,6 +3468,21 @@ const STRING_DEFS = {
   'vacation.celebration.booked': { en: 'Booked', beanie: 'booked' },
   'vacation.celebration.ideas': { en: 'Ideas', beanie: 'ideas' },
   'vacation.celebration.allBeans': { en: 'All Beans!', beanie: 'all beans!' },
+  'vacation.celebration.going': { en: 'going', beanie: 'going' },
+  'vacation.celebration.letsGo': { en: "Awesome, Let's Go!", beanie: "awesome, let's go!" },
+  'vacation.celebration.daysToTakeoff': {
+    en: 'days until takeoff!',
+    beanie: 'days until takeoff!',
+  },
+  'vacation.celebration.todo': { en: 'To-Do', beanie: 'to-do' },
+  'vacation.celebration.itemsNeedBooking': {
+    en: 'items need booking',
+    beanie: 'items need booking',
+  },
+  'vacation.celebration.onBucketList': {
+    en: 'on the bucket list',
+    beanie: 'on the bucket list',
+  },
 
   // View modal
   'vacation.viewTitle': { en: 'Vacation Details', beanie: 'vacation details' },
@@ -3482,7 +3497,7 @@ const STRING_DEFS = {
     en: 'night(s) without accommodation',
     beanie: 'night(s) without accommodation',
   },
-  'vacation.editInWizard': { en: 'Edit in Wizard', beanie: 'edit in wizard' },
+  'vacation.editInWizard': { en: 'Edit Plan', beanie: 'edit plan' },
   'vacation.share': { en: 'Share', beanie: 'share' },
   'vacation.copied': { en: 'Copied!', beanie: 'copied!' },
   'vacation.progress': { en: 'Booked', beanie: 'booked' },

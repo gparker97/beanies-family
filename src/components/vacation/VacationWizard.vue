@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import BaseModal from '@/components/ui/BaseModal.vue';
 import VacationStep1 from './VacationStep1.vue';
 import VacationStep2 from './VacationStep2.vue';
 import VacationStep3 from './VacationStep3.vue';
 import VacationStep4 from './VacationStep4.vue';
 import VacationStep5 from './VacationStep5.vue';
-import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
-import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDateShort } from '@/utils/date';
-import { bookingProgress } from '@/utils/vacation';
+import { bookingProgress, tripTypeEmoji, daysUntilTrip } from '@/utils/vacation';
 import { generateUUID } from '@/utils/id';
 import type {
   FamilyVacation,
@@ -55,12 +54,29 @@ const transportation = ref<VacationTransportation[]>([]);
 const ideas = ref<VacationIdea[]>([]);
 
 // Celebration modal
-const celebration = ref<{
-  open: boolean;
-  title: string;
-  message: string;
-  details: ConfirmDetail[];
-}>({ open: false, title: '', message: '', details: [] });
+const celebrationOpen = ref(false);
+const savedVacation = ref<FamilyVacation | null>(null);
+
+const celebrationEmoji = computed(() => tripTypeEmoji(savedVacation.value?.tripType));
+const celebrationDateRange = computed(() => {
+  const v = savedVacation.value;
+  if (!v?.startDate || !v?.endDate) return t('vacation.status.pending');
+  return `${formatDateShort(v.startDate)} – ${formatDateShort(v.endDate)}`;
+});
+const celebrationCountdown = computed(() => {
+  const v = savedVacation.value;
+  if (!v?.startDate) return null;
+  const days = daysUntilTrip(v.startDate);
+  return days > 0 ? days : null;
+});
+const celebrationProgress = computed(() => {
+  if (!savedVacation.value) return { booked: 0, total: 0 };
+  return bookingProgress(savedVacation.value);
+});
+const celebrationTodoCount = computed(() => {
+  const p = celebrationProgress.value;
+  return p.total - p.booked;
+});
 
 const isEditing = computed(() => !!props.vacation);
 const currentMemberId = computed(
@@ -225,72 +241,13 @@ async function handleSave() {
 }
 
 function showCelebration(vacation: FamilyVacation) {
-  const progress = bookingProgress(vacation);
-  const dateRange =
-    vacation.startDate && vacation.endDate
-      ? `${formatDateShort(vacation.startDate)} – ${formatDateShort(vacation.endDate)}`
-      : t('vacation.status.pending');
-
-  const details: ConfirmDetail[] = [
-    { label: t('vacation.celebration.trip'), value: vacation.name },
-    { label: t('vacation.celebration.when'), value: dateRange },
-    {
-      label: t('vacation.celebration.who'),
-      value: `${t('vacation.celebration.allBeans')} (${vacation.assigneeIds.length})`,
-    },
-  ];
-
-  // Add first flight summary
-  const firstFlight = vacation.travelSegments.find(
-    (s) => s.type === 'flight_outbound' || s.type === 'flight_other'
-  );
-  if (firstFlight) {
-    const flightParts: string[] = [];
-    if (firstFlight.airline) flightParts.push(firstFlight.airline);
-    if (firstFlight.flightNumber) flightParts.push(firstFlight.flightNumber);
-    if (firstFlight.departureDate) flightParts.push(formatDateShort(firstFlight.departureDate));
-    if (flightParts.length > 0) {
-      details.push({ label: '✈️', value: flightParts.join(' · ') });
-    }
-  }
-
-  // Add first accommodation summary
-  const firstStay = vacation.accommodations[0];
-  if (firstStay) {
-    const stayParts: string[] = [];
-    if (firstStay.name) stayParts.push(firstStay.name);
-    if (firstStay.checkInDate && firstStay.checkOutDate) {
-      stayParts.push(
-        `${formatDateShort(firstStay.checkInDate)} – ${formatDateShort(firstStay.checkOutDate)}`
-      );
-    }
-    if (stayParts.length > 0) {
-      details.push({ label: '🏨', value: stayParts.join(' · ') });
-    }
-  }
-
-  details.push(
-    {
-      label: t('vacation.celebration.booked'),
-      value: `${progress.booked} / ${progress.total}`,
-      highlight: true,
-    },
-    {
-      label: t('vacation.celebration.ideas'),
-      value: `${vacation.ideas.length}`,
-    }
-  );
-
-  celebration.value = {
-    open: true,
-    title: t('vacation.bonVoyage'),
-    message: t('vacation.savedMessage'),
-    details,
-  };
+  savedVacation.value = vacation;
+  celebrationOpen.value = true;
 }
 
 function handleCelebrationClose() {
-  celebration.value.open = false;
+  celebrationOpen.value = false;
+  savedVacation.value = null;
   emit('close');
 }
 
@@ -417,11 +374,227 @@ const saveLabel = computed(() => {
   </BeanieFormModal>
 
   <!-- Celebration modal -->
-  <CreatedConfirmModal
-    :open="celebration.open"
-    :title="celebration.title"
-    :message="celebration.message"
-    :details="celebration.details"
-    @close="handleCelebrationClose"
-  />
+  <BaseModal :open="celebrationOpen" size="md" layer="overlay" :closable="false">
+    <div class="cele-body relative text-center">
+      <!-- Confetti -->
+      <div class="confetti-container">
+        <div class="confetti-piece" style=" animation-delay: 0s; background: #00b4d8;left: 5%" />
+        <div class="confetti-piece" style=" animation-delay: 0.2s; background: #ffd93d;left: 15%" />
+        <div class="confetti-piece" style=" animation-delay: 0.4s; background: #f15d22;left: 28%" />
+        <div class="confetti-piece" style=" animation-delay: 0.1s; background: #27ae60;left: 40%" />
+        <div class="confetti-piece" style=" animation-delay: 0.5s; background: #00b4d8;left: 52%" />
+        <div class="confetti-piece" style=" animation-delay: 0.3s; background: #ffd93d;left: 65%" />
+        <div class="confetti-piece" style=" animation-delay: 0.6s; background: #f15d22;left: 75%" />
+        <div
+          class="confetti-piece"
+          style=" animation-delay: 0.15s; background: #27ae60;left: 85%"
+        />
+        <div
+          class="confetti-piece"
+          style=" animation-delay: 0.45s; background: #00b4d8; border-radius: 50%;left: 92%"
+        />
+        <div
+          class="confetti-piece"
+          style=" animation-delay: 0.7s; background: #ffd93d; border-radius: 50%;left: 48%"
+        />
+      </div>
+
+      <!-- Trip emoji circle -->
+      <div class="cele-img">{{ celebrationEmoji }}</div>
+
+      <!-- Title & subtitle -->
+      <div class="font-outfit mb-1 text-xl font-bold">{{ t('vacation.bonVoyage') }}</div>
+      <div class="mb-4 text-sm text-[rgba(44,62,80,0.45)] dark:text-gray-400">
+        {{ t('vacation.savedMessage') }}
+      </div>
+
+      <!-- Countdown pill -->
+      <div v-if="celebrationCountdown" class="mb-4">
+        <span class="cele-countdown">
+          ✈️ {{ celebrationCountdown }} {{ t('vacation.celebration.daysToTakeoff') }}
+        </span>
+      </div>
+
+      <!-- Details grid -->
+      <div class="w-full rounded-[14px] bg-white p-3.5 text-left dark:bg-[var(--tint-slate-5)]">
+        <div class="cele-row">
+          <span class="cele-emoji">🚢</span>
+          <span class="cele-lbl">{{ t('vacation.celebration.trip') }}</span>
+          <span class="cele-val">{{ savedVacation?.name }}</span>
+        </div>
+        <div class="cele-row">
+          <span class="cele-emoji">📅</span>
+          <span class="cele-lbl">{{ t('vacation.celebration.when') }}</span>
+          <span class="cele-val">{{ celebrationDateRange }}</span>
+        </div>
+        <div class="cele-row">
+          <span class="cele-emoji">👨‍👩‍👧‍👦</span>
+          <span class="cele-lbl">{{ t('vacation.celebration.who') }}</span>
+          <span class="cele-val">
+            {{ t('vacation.celebration.allBeans') }} ({{ savedVacation?.assigneeIds.length }}
+            {{ t('vacation.celebration.going') }})
+          </span>
+        </div>
+        <div class="cele-row">
+          <span class="cele-emoji">✅</span>
+          <span class="cele-lbl">{{ t('vacation.celebration.booked') }}</span>
+          <span class="cele-val text-[#27ae60]">
+            {{ celebrationProgress.booked }} of {{ celebrationProgress.total }} items
+          </span>
+        </div>
+        <div v-if="celebrationTodoCount > 0" class="cele-row">
+          <span class="cele-emoji">⏳</span>
+          <span class="cele-lbl">{{ t('vacation.celebration.todo') }}</span>
+          <span class="cele-val text-[#b8860b]">
+            {{ celebrationTodoCount }} {{ t('vacation.celebration.itemsNeedBooking') }}
+          </span>
+        </div>
+        <div class="cele-row border-b-0!">
+          <span class="cele-emoji">💡</span>
+          <span class="cele-lbl">{{ t('vacation.celebration.ideas') }}</span>
+          <span class="cele-val">
+            {{ savedVacation?.ideas.length ?? 0 }} {{ t('vacation.celebration.onBucketList') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer with teal button -->
+    <div class="flex justify-center px-6 pt-2 pb-6">
+      <button
+        type="button"
+        class="font-outfit w-full max-w-[260px] cursor-pointer rounded-2xl border-none px-6 py-3 text-sm font-bold text-white shadow-md transition-all hover:opacity-90"
+        style="background: linear-gradient(135deg, #00b4d8, #0096b7)"
+        @click="handleCelebrationClose"
+      >
+        {{ t('vacation.celebration.letsGo') }} 🌴
+      </button>
+    </div>
+  </BaseModal>
 </template>
+
+<style scoped>
+/* Celebration body */
+.cele-body {
+  background: linear-gradient(180deg, white, var(--cloud-white));
+  overflow: hidden;
+  padding: 28px 24px 8px;
+}
+
+:is(.dark) .cele-body {
+  background: linear-gradient(180deg, var(--tint-slate-5), transparent);
+}
+
+/* Trip emoji circle with bounce-in */
+.cele-img {
+  align-items: center;
+  animation: cele-bounce 0.6s ease-out;
+  background: linear-gradient(135deg, rgb(0 180 216 / 8%), rgb(255 217 61 / 8%));
+  border-radius: 50%;
+  display: flex;
+  font-size: 56px;
+  height: 120px;
+  justify-content: center;
+  margin: 0 auto 16px;
+  width: 120px;
+}
+
+@keyframes cele-bounce {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-15deg);
+  }
+
+  50% {
+    transform: scale(1.15) rotate(5deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+/* Countdown pill */
+.cele-countdown {
+  align-items: center;
+  background: linear-gradient(135deg, #00b4d8, #0096b7);
+  border-radius: 12px;
+  color: white;
+  display: inline-flex;
+  font-family: Outfit, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 5px;
+  padding: 6px 16px;
+}
+
+/* Detail rows */
+.cele-row {
+  align-items: center;
+  border-bottom: 1px solid rgb(44 62 80 / 4%);
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+:is(.dark) .cele-row {
+  border-bottom-color: rgb(255 255 255 / 6%);
+}
+
+.cele-emoji {
+  font-size: 14px;
+  text-align: center;
+  width: 22px;
+}
+
+.cele-lbl {
+  color: rgb(44 62 80 / 35%);
+  font-family: Outfit, sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 50px;
+  text-transform: uppercase;
+}
+
+:is(.dark) .cele-lbl {
+  color: rgb(255 255 255 / 35%);
+}
+
+.cele-val {
+  flex: 1;
+  font-family: Outfit, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Confetti */
+.confetti-container {
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+}
+
+.confetti-piece {
+  animation: confetti-fall 2s ease-out forwards;
+  border-radius: 2px;
+  height: 8px;
+  opacity: 0;
+  position: absolute;
+  top: -10px;
+  width: 8px;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(-20px) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(300px) rotate(720deg);
+  }
+}
+</style>
