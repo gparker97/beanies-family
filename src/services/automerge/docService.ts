@@ -76,26 +76,27 @@ const ALL_COLLECTIONS: Array<Exclude<keyof FamilyDocument, 'settings'>> = [
 ];
 
 /**
+ * Migrate a loaded document: initialize any collections missing from older beanpod files.
+ * Uses Automerge.change() so mutations go through the proxy and persist correctly.
+ */
+function migrateDoc(doc: Automerge.Doc<FamilyDocument>): Automerge.Doc<FamilyDocument> {
+  const missing = ALL_COLLECTIONS.filter((name) => doc[name] === undefined || doc[name] === null);
+  if (missing.length === 0) return doc;
+
+  return Automerge.change(doc, 'migrate: add missing collections', (d) => {
+    for (const name of missing) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (d as any)[name] = {};
+    }
+  });
+}
+
+/**
  * Load a document from a binary (Uint8Array).
  * Migrates older documents by initializing any missing collections.
  */
 export function loadDoc(binary: Uint8Array): Automerge.Doc<FamilyDocument> {
-  currentDoc = Automerge.load<FamilyDocument>(binary);
-
-  // Migrate: initialize any collections that don't exist in older beanpod files.
-  // Must use Automerge.change() so mutations go through the proxy and persist.
-  const missingCollections = ALL_COLLECTIONS.filter(
-    (name) => currentDoc![name] === undefined || currentDoc![name] === null
-  );
-  if (missingCollections.length > 0) {
-    currentDoc = Automerge.change(currentDoc, 'migrate: add missing collections', (d) => {
-      for (const name of missingCollections) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (d as any)[name] = {};
-      }
-    });
-  }
-
+  currentDoc = migrateDoc(Automerge.load<FamilyDocument>(binary));
   bumpVersion();
   return currentDoc;
 }
@@ -140,7 +141,7 @@ export function changeDoc(
 export function mergeDoc(remote: Automerge.Doc<FamilyDocument>): Automerge.Doc<FamilyDocument> {
   if (!currentDoc)
     throw new Error('No Automerge document loaded. Call initDoc() or loadDoc() first.');
-  currentDoc = Automerge.merge(Automerge.clone(currentDoc), remote);
+  currentDoc = migrateDoc(Automerge.merge(Automerge.clone(currentDoc), remote));
   bumpVersion();
   schedulePersist();
   return currentDoc;
@@ -148,9 +149,10 @@ export function mergeDoc(remote: Automerge.Doc<FamilyDocument>): Automerge.Doc<F
 
 /**
  * Replace the current document entirely (e.g. after loading from file).
+ * Migrates older documents by initializing any missing collections.
  */
 export function replaceDoc(doc: Automerge.Doc<FamilyDocument>): void {
-  currentDoc = doc;
+  currentDoc = migrateDoc(doc);
   bumpVersion();
 }
 
