@@ -208,6 +208,16 @@ export function toDateInputValue(date: Date): string {
  * Format an HH:mm time string to 12-hour format (e.g. "4pm", "3:30pm").
  * Omits minutes when they are :00 for a cleaner display.
  */
+/**
+ * Number of days between two date strings (YYYY-MM-DD or ISO).
+ * Always returns a non-negative integer.
+ */
+export function daysBetween(a: string, b: string): number {
+  const dateA = parseLocalDate(extractDatePart(a));
+  const dateB = parseLocalDate(extractDatePart(b));
+  return Math.abs(Math.round((dateB.getTime() - dateA.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
 export function formatTime12(time: string): string {
   if (!time) return '';
   const [h, m] = time.split(':').map(Number);

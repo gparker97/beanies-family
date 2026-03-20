@@ -7,4 +7,5 @@ export * from './budgetRepository';
 export * from './recurringItemRepository';
 export * from './todoRepository';
 export * from './activityRepository';
+export * from './vacationRepository';
 export * from './settingsRepository';

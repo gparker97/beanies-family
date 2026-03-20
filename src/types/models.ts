@@ -438,11 +438,162 @@ export interface FamilyActivity {
   createdBy: UUID;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+
+  // Vacation link (set when this activity is auto-created as a vacation calendar entry)
+  vacationId?: UUID;
 }
 
 export type CreateFamilyActivityInput = Omit<FamilyActivity, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateFamilyActivityInput = Partial<
   Omit<FamilyActivity, 'id' | 'createdAt' | 'updatedAt'>
+>;
+
+// ---------------------------------------------------------------------------
+// Vacation Planning
+// ---------------------------------------------------------------------------
+
+export type VacationTripType =
+  | 'fly_and_stay'
+  | 'cruise'
+  | 'road_trip'
+  | 'combo'
+  | 'camping'
+  | 'adventure';
+
+export type VacationSegmentStatus = 'booked' | 'pending' | 'not_booked' | 'researching';
+
+export type VacationIdeaCategory =
+  | 'beach'
+  | 'activity'
+  | 'food'
+  | 'sightseeing'
+  | 'shopping'
+  | 'nightlife';
+
+export type VacationTravelType =
+  | 'flight_outbound'
+  | 'flight_return'
+  | 'flight_other'
+  | 'cruise'
+  | 'train'
+  | 'ferry';
+
+export type VacationAccommodationType = 'hotel' | 'airbnb' | 'campground' | 'family_friends';
+
+export type VacationTransportationType =
+  | 'airport_shuttle'
+  | 'rental_car'
+  | 'taxi_rideshare'
+  | 'train'
+  | 'bus';
+
+export interface VacationTravelSegment {
+  id: UUID;
+  type: VacationTravelType;
+  title: string;
+  status: VacationSegmentStatus;
+  sortDate?: ISODateString;
+  bookingReference?: string;
+  notes?: string;
+
+  // Flight fields
+  airline?: string;
+  flightNumber?: string;
+  departureAirport?: string;
+  arrivalAirport?: string;
+  departureDate?: ISODateString;
+  departureTime?: string;
+  arrivalDate?: ISODateString;
+  arrivalTime?: string;
+
+  // Cruise fields
+  cruiseLine?: string;
+  shipName?: string;
+  departurePort?: string;
+  cabinNumber?: string;
+  embarkationDate?: ISODateString;
+  disembarkationDate?: ISODateString;
+
+  // Train/Ferry fields
+  operator?: string;
+  route?: string;
+  departureStation?: string;
+  arrivalStation?: string;
+}
+
+export interface VacationAccommodation {
+  id: UUID;
+  type: VacationAccommodationType;
+  title: string;
+  status: VacationSegmentStatus;
+  name?: string;
+  address?: string;
+  checkInDate?: ISODateString;
+  checkOutDate?: ISODateString;
+  confirmationNumber?: string;
+  roomType?: string;
+  contactPhone?: string;
+  notes?: string;
+}
+
+export interface VacationTransportation {
+  id: UUID;
+  type: VacationTransportationType;
+  title: string;
+  status: VacationSegmentStatus;
+  bookingReference?: string;
+  pickupDate?: ISODateString;
+  pickupTime?: string;
+  returnDate?: ISODateString;
+  notes?: string;
+}
+
+export interface VacationIdeaVote {
+  memberId: UUID;
+  votedAt: ISODateString;
+}
+
+export interface VacationIdea {
+  id: UUID;
+  title: string;
+  description?: string;
+  category?: VacationIdeaCategory;
+  location?: string;
+  suggestedDate?: ISODateString;
+  estimatedCost?: number;
+  costType?: 'free' | 'paid';
+  duration?: '30min' | '1hr' | '2hrs' | 'half_day' | 'full_day';
+  needsBooking?: boolean;
+  notes?: string;
+  votes: VacationIdeaVote[];
+  createdBy: UUID;
+  createdAt: ISODateString;
+}
+
+export interface FamilyVacation {
+  id: UUID;
+  activityId: UUID; // Linked FamilyActivity for calendar display
+  name: string;
+  tripType: VacationTripType;
+  assigneeIds: UUID[];
+
+  travelSegments: VacationTravelSegment[];
+  accommodations: VacationAccommodation[];
+  transportation: VacationTransportation[];
+  ideas: VacationIdea[];
+
+  // Derived from segment dates (computed on create/update)
+  startDate?: ISODateString;
+  endDate?: ISODateString;
+
+  createdBy: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateFamilyVacationInput = Omit<FamilyVacation, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateFamilyVacationInput = Partial<
+  Omit<FamilyVacation, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
 // Exchange rate for currency conversion
