@@ -13,6 +13,8 @@ interface Props {
   saveDisabled?: boolean;
   isSubmitting?: boolean;
   showDelete?: boolean;
+  /** When true, uses the #custom-header slot edge-to-edge (no padding/border) */
+  customHeader?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -24,6 +26,7 @@ const props = withDefaults(defineProps<Props>(), {
   saveDisabled: false,
   isSubmitting: false,
   showDelete: false,
+  customHeader: false,
 });
 
 const emit = defineEmits<{
@@ -42,11 +45,13 @@ const modalSize = props.size === 'narrow' ? 'lg' : props.size === 'wide' ? '2xl'
     :open="open"
     :size="modalSize"
     :closable="!isSubmitting"
+    :custom-header="customHeader"
     fullscreen-mobile
     @close="emit('close')"
   >
     <template #header>
-      <div class="flex w-full items-center gap-3">
+      <slot v-if="customHeader" name="custom-header" />
+      <div v-else class="flex w-full items-center gap-3">
         <!-- Icon box -->
         <div
           v-if="icon"

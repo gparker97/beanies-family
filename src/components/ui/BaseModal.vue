@@ -11,6 +11,8 @@ interface Props {
   fullscreenMobile?: boolean;
   /** z-index layer: 'base' (z-50) for normal modals, 'overlay' (z-[60]) for modals that stack on top of other modals */
   layer?: 'base' | 'overlay';
+  /** When true, the header slot renders edge-to-edge without padding or border */
+  customHeader?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -18,6 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
   closable: true,
   fullscreenMobile: false,
   layer: 'base',
+  customHeader: false,
 });
 
 const layerClass = computed(() => (props.layer === 'overlay' ? 'z-[60]' : 'z-50'));
@@ -112,7 +115,12 @@ onUnmounted(() => {
             <!-- Header -->
             <div
               v-if="title || $slots.header"
-              class="flex shrink-0 items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700"
+              class="shrink-0"
+              :class="
+                customHeader
+                  ? ''
+                  : 'flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-slate-700'
+              "
             >
               <slot name="header">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -121,7 +129,7 @@ onUnmounted(() => {
               </slot>
 
               <button
-                v-if="closable"
+                v-if="closable && !customHeader"
                 type="button"
                 class="rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
                 @click="close"
