@@ -127,7 +127,13 @@ onMounted(async () => {
   if (gridRef.value) {
     const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
     const start = hours.value[0] ?? 7;
-    gridRef.value.scrollTop = Math.max(0, (scrollHour - start) * ROW_HEIGHT);
+    const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT);
+    const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
+    // Scroll the page so the current time area is visible, accounting for header
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+      mainEl.scrollTop = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
+    }
   }
 });
 
@@ -357,8 +363,8 @@ defineExpose({ weekLabel, activityCount });
         </template>
       </div>
 
-      <!-- Scrollable time grid -->
-      <div ref="gridRef" class="relative max-h-[600px] overflow-y-auto">
+      <!-- Time grid — renders at full height, page scrolls naturally -->
+      <div ref="gridRef" class="relative">
         <!-- Grid container: hour labels + 7 day columns -->
         <div
           class="grid grid-cols-[56px_repeat(7,1fr)] gap-px"
