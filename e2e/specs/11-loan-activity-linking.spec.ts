@@ -40,15 +40,12 @@ test.describe('Loan & Activity Linking', () => {
 
   /**
    * Click the fee schedule "Monthly" chip.
-   * The fee schedule section is now above the recurrence section, so the first
-   * "Monthly" button in the DOM is the fee schedule chip.
+   * Use exact: true to avoid matching the Recurring schedule-mode button
+   * whose description ("Repeats weekly or monthly") also contains "Monthly".
    */
   async function clickFeeScheduleMonthly(page: import('@playwright/test').Page) {
     const dialog = page.locator('div[role="dialog"]');
-    await dialog
-      .getByRole('button', { name: ui('planner.fee.monthly') })
-      .first()
-      .click();
+    await dialog.getByRole('button', { name: ui('planner.fee.monthly'), exact: true }).click();
   }
 
   /** Create an account through the UI so the RecurringPaymentPrompt has something to select. */
@@ -89,15 +86,13 @@ test.describe('Loan & Activity Linking', () => {
     // Select assignee
     await selectAssignee(page);
 
-    // Switch to one-time mode FIRST (hides recurring frequency section
-    // so "Monthly" click below targets the fee schedule chip, not the frequency chip)
-    await page.getByRole('button', { name: /one-time/i }).click();
-
-    // Wait for the one-time date field to appear (ConditionalSection animation)
-    const dateInput = page.locator('div[role="dialog"]').locator('input[type="date"]');
-    await dateInput.first().waitFor({ state: 'visible', timeout: 5000 });
+    // Switch to one-time mode FIRST so only one "Monthly" button exists in the DOM
+    const dialog = page.locator('div[role="dialog"]');
+    await dialog.getByRole('button', { name: /one-time/i }).click();
 
     // Fill date
+    const dateInput = dialog.locator('input[type="date"]');
+    await dateInput.first().waitFor({ state: 'visible', timeout: 5000 });
     await dateInput.first().fill('2026-04-15');
 
     // Set cost amount
