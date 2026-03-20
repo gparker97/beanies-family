@@ -83,7 +83,7 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
 
     // Switch to one-off mode
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
 
     // Fill date
     await page.locator('input[type="date"]').fill('2026-03-15');
@@ -199,7 +199,7 @@ test.describe('Family Planner', () => {
 
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Today Activity');
     await selectAssignee(page);
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
     await page.locator('input[type="date"]').fill(todayStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
@@ -223,7 +223,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Upcoming Test');
     await selectAssignee(page);
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
@@ -246,7 +246,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Original Title');
     await selectAssignee(page);
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
@@ -291,7 +291,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('To Delete');
     await selectAssignee(page);
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
     await page.locator('input[type="date"]').fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
