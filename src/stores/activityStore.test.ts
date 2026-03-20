@@ -226,6 +226,18 @@ describe('activityStore', () => {
 
       expect(result).toBe(false);
     });
+
+    it('should prevent deletion of vacation-linked activities', async () => {
+      const store = useActivityStore();
+      const vacLinked = makeActivity({ vacationId: 'vac-1' });
+      store.activities.push(vacLinked);
+
+      const result = await store.deleteActivity(vacLinked.id);
+
+      expect(result).toBe(false);
+      expect(store.activities).toHaveLength(1);
+      expect(activityRepo.deleteActivity).not.toHaveBeenCalled();
+    });
   });
 
   // ── Getters ──
