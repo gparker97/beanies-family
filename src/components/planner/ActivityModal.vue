@@ -384,6 +384,49 @@ function handleSave() {
         </div>
       </div>
 
+      <!-- Vacation toggle bar -->
+      <div
+        v-if="!isEditing"
+        class="cursor-pointer border-b px-4 py-3 transition-all duration-200 hover:opacity-90"
+        style="
+          background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 6%));
+          border-color: rgb(0 180 216 / 10%);
+        "
+        @click="
+          emit('start-vacation-wizard', {
+            assigneeIds: [...assigneeIds],
+            date: date,
+          });
+          emit('close');
+        "
+      >
+        <div class="flex items-center gap-3">
+          <span class="text-xl" style="animation: sway 3s ease-in-out infinite">🏖️</span>
+          <div class="min-w-0 flex-1">
+            <span
+              class="font-outfit block text-xs font-semibold"
+              style="color: var(--vacation-teal)"
+            >
+              {{ t('vacation.planningATrip') }}
+            </span>
+            <span class="block text-[10px] text-[var(--color-text-muted)] opacity-50">
+              {{ t('vacation.planningSubtitle') }}
+            </span>
+          </div>
+          <ToggleSwitch
+            :model-value="false"
+            size="sm"
+            @click.stop="
+              emit('start-vacation-wizard', {
+                assigneeIds: [...assigneeIds],
+                date: date,
+              });
+              emit('close');
+            "
+          />
+        </div>
+      </div>
+
       <!-- 1. Who? -->
       <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
         <FamilyChipPicker v-model="assigneeIds" mode="multi" />
@@ -444,33 +487,6 @@ function handleSave() {
             />
           </button>
         </div>
-      </div>
-
-      <!-- 1c. Vacation toggle (one-time + new activity only) -->
-      <div
-        v-if="recurrenceMode === 'one-off' && !isEditing"
-        class="flex cursor-pointer items-center gap-3 rounded-2xl border-b border-[var(--vacation-teal-15)] px-4 py-3 transition-all duration-200 hover:opacity-90"
-        style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 6%))"
-        @click="
-          emit('start-vacation-wizard', {
-            assigneeIds: [...assigneeIds],
-            date: date,
-          });
-          emit('close');
-        "
-      >
-        <span class="text-xl" style="animation: sway 3s ease-in-out infinite">🏖️</span>
-        <div class="flex-1">
-          <span class="font-outfit block text-xs font-bold" style="color: var(--vacation-teal)">
-            {{ t('vacation.planningATrip') }}
-          </span>
-          <span class="text-[10px] text-[var(--color-text-muted)] opacity-50">
-            {{ t('vacation.planningSubtitle') }}
-          </span>
-        </div>
-        <span class="font-outfit text-xs font-semibold" style="color: var(--vacation-teal)">
-          ›
-        </span>
       </div>
 
       <!-- 2. Category picker (grouped) -->
