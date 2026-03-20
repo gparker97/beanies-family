@@ -137,25 +137,42 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
     updated[index] = { ...updated[index]!, disembarkationDate: value };
   }
 
-  // Auto-populate return flight from outbound flight data
+  // Auto-populate return flight from outbound flight data.
+  // Uses the PREVIOUS outbound value to detect if the return field was auto-set
+  // (if return field matches prev outbound value or is empty, it's safe to overwrite).
   if (current.type === 'flight_outbound') {
     const retIdx = updated.findIndex((s) => s.type === 'flight_return');
     if (retIdx >= 0) {
       const ret = updated[retIdx]!;
-      // Invert from/to: outbound arrival → return departure, outbound departure → return arrival
-      if (field === 'arrivalAirport' && !ret.departureAirport) {
-        updated[retIdx] = { ...ret, departureAirport: value };
+      const prevValue = current[field as keyof VacationTravelSegment] as string | undefined;
+
+      // Invert from/to: outbound arrival → return departure
+      if (field === 'arrivalAirport') {
+        const prev = prevValue ?? '';
+        if (!ret.departureAirport || ret.departureAirport === prev) {
+          updated[retIdx] = { ...updated[retIdx]!, departureAirport: value };
+        }
       }
-      if (field === 'departureAirport' && !ret.arrivalAirport) {
-        updated[retIdx] = { ...updated[retIdx]!, arrivalAirport: value };
+      // Invert from/to: outbound departure → return arrival
+      if (field === 'departureAirport') {
+        const prev = prevValue ?? '';
+        if (!ret.arrivalAirport || ret.arrivalAirport === prev) {
+          updated[retIdx] = { ...updated[retIdx]!, arrivalAirport: value };
+        }
       }
       // Copy booking reference
-      if (field === 'bookingReference' && !ret.bookingReference) {
-        updated[retIdx] = { ...updated[retIdx]!, bookingReference: value };
+      if (field === 'bookingReference') {
+        const prev = prevValue ?? '';
+        if (!ret.bookingReference || ret.bookingReference === prev) {
+          updated[retIdx] = { ...updated[retIdx]!, bookingReference: value };
+        }
       }
       // Copy airline
-      if (field === 'airline' && !ret.airline) {
-        updated[retIdx] = { ...updated[retIdx]!, airline: value };
+      if (field === 'airline') {
+        const prev = prevValue ?? '';
+        if (!ret.airline || ret.airline === prev) {
+          updated[retIdx] = { ...updated[retIdx]!, airline: value };
+        }
       }
     }
   }
