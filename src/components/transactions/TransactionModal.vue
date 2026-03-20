@@ -538,6 +538,66 @@ function handleDelete() {
       </div>
     </div>
 
+    <!-- 0. Recurring / One-time tab bar (top of form, hidden when editing a recurring item) -->
+    <div
+      v-if="!isEditingRecurring"
+      class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50"
+    >
+      <div class="grid grid-cols-2 gap-1.5">
+        <button
+          v-for="opt in [
+            {
+              value: 'recurring',
+              icon: '🔁',
+              label: t('vacation.scheduleRecurring'),
+              desc: t('vacation.scheduleRecurringDesc'),
+            },
+            {
+              value: 'one-time',
+              icon: '📌',
+              label: t('vacation.scheduleOneTime'),
+              desc: t('vacation.scheduleOneTimeDesc'),
+            },
+          ]"
+          :key="opt.value"
+          type="button"
+          class="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200"
+          :class="
+            recurrenceMode === opt.value
+              ? 'border-primary-500 border-2 bg-white shadow-sm dark:bg-slate-600'
+              : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-slate-600/40'
+          "
+          @click="recurrenceMode = opt.value as 'recurring' | 'one-time'"
+        >
+          <span class="text-lg leading-none">{{ opt.icon }}</span>
+          <span
+            class="font-outfit text-xs font-bold"
+            :class="
+              recurrenceMode === opt.value
+                ? 'text-[var(--color-text)] dark:text-gray-100'
+                : 'text-[var(--color-text)] opacity-35 dark:text-gray-400'
+            "
+          >
+            {{ opt.label }}
+          </span>
+          <span
+            class="text-[10px]"
+            :class="
+              recurrenceMode === opt.value
+                ? 'text-[var(--color-text-muted)]'
+                : 'opacity-25 dark:text-gray-500'
+            "
+          >
+            {{ opt.desc }}
+          </span>
+          <span
+            v-if="recurrenceMode === opt.value"
+            class="bg-primary-500 absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
+          />
+        </button>
+      </div>
+    </div>
+
     <!-- 1. Direction toggle (locked to outgoing when linked to activity/loan) -->
     <FormFieldGroup :label="t('modal.direction')">
       <div v-if="hasActiveLink" class="flex items-center gap-2">
@@ -637,17 +697,6 @@ function handleDelete() {
     <!-- 5. Category chips (two-level drill-down) -->
     <FormFieldGroup :label="t('form.category')" required>
       <CategoryChipPicker v-model="category" :type="effectiveCategoryType" />
-    </FormFieldGroup>
-
-    <!-- 6. Recurring / One-time toggle (hidden when editing a recurring item) -->
-    <FormFieldGroup v-if="!isEditingRecurring" :label="t('modal.schedule')">
-      <TogglePillGroup
-        v-model="recurrenceMode"
-        :options="[
-          { value: 'recurring', label: t('modal.recurring') },
-          { value: 'one-time', label: t('modal.oneTime') },
-        ]"
-      />
     </FormFieldGroup>
 
     <!-- 7. Recurring details -->
