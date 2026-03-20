@@ -9,6 +9,7 @@ import { useGoalsStore } from './goalsStore';
 import { useRecurringStore } from './recurringStore';
 import { useTodoStore } from './todoStore';
 import { useActivityStore } from './activityStore';
+import { useVacationStore } from './vacationStore';
 import { useBudgetStore } from './budgetStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
@@ -1036,6 +1037,7 @@ export const useSyncStore = defineStore('sync', () => {
       const recurringStore = useRecurringStore();
       const todoStore = useTodoStore();
       const activityStore = useActivityStore();
+      const vacationStore = useVacationStore();
       const budgetStore = useBudgetStore();
 
       // Snapshot permission state before reload for diagnostics
@@ -1052,6 +1054,7 @@ export const useSyncStore = defineStore('sync', () => {
         recurringStore.loadRecurringItems(),
         todoStore.loadTodos(),
         activityStore.loadActivities(),
+        vacationStore.loadVacations(),
         budgetStore.loadBudgets(),
       ]);
 
