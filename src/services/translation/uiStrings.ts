@@ -3331,6 +3331,9 @@ const STRING_DEFS = {
   'vacation.travel.addFerry': { en: 'Ferry', beanie: 'ferry' },
   'vacation.travel.outboundFlight': { en: 'Outbound Flight', beanie: 'outbound flight' },
   'vacation.travel.returnFlight': { en: 'Return Flight', beanie: 'return flight' },
+  'vacation.travel.flights': { en: 'Flights', beanie: 'flights' },
+  'vacation.travel.outbound': { en: 'Outbound', beanie: 'outbound' },
+  'vacation.travel.return': { en: 'Return', beanie: 'return' },
 
   // Travel fields
   'vacation.field.airline': { en: 'Airline', beanie: 'airline' },
@@ -3475,6 +3478,10 @@ const STRING_DEFS = {
   },
   'vacation.bucketList': { en: 'Bean Bucket List', beanie: 'bean bucket list' },
   'vacation.editAll': { en: 'Edit All', beanie: 'edit all' },
+  'vacation.nightsNoAccommodation': {
+    en: 'night(s) without accommodation',
+    beanie: 'night(s) without accommodation',
+  },
   'vacation.editInWizard': { en: 'Edit in Wizard', beanie: 'edit in wizard' },
   'vacation.share': { en: 'Share', beanie: 'share' },
   'vacation.copied': { en: 'Copied!', beanie: 'copied!' },

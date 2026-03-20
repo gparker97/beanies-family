@@ -506,6 +506,17 @@ export interface VacationTravelSegment {
   arrivalDate?: ISODateString;
   arrivalTime?: string;
 
+  // Return flight fields (used in combined flight entry, split on save)
+  returnAirline?: string;
+  returnFlightNumber?: string;
+  returnDepartureAirport?: string;
+  returnArrivalAirport?: string;
+  returnDepartureDate?: ISODateString;
+  returnDepartureTime?: string;
+  returnArrivalDate?: ISODateString;
+  returnArrivalTime?: string;
+  returnBookingReference?: string;
+
   // Cruise fields
   cruiseLine?: string;
   shipName?: string;
