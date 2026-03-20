@@ -6,7 +6,10 @@ import { formatDateShort, addHourToTime } from '@/utils/date';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import { AIRLINES } from '@/constants/airlines';
+import { AIRPORTS } from '@/constants/airports';
 import type {
   VacationTravelSegment,
   VacationTravelType,
@@ -53,6 +56,20 @@ const statusOptions = computed(() => [
   { value: 'not_booked', label: t('vacation.status.not_booked') },
   { value: 'researching', label: t('vacation.status.researching') },
 ]);
+
+const airlineOptions = computed(() =>
+  AIRLINES.map((a) => ({
+    value: `${a.name} (${a.code})`,
+    label: `${a.name} (${a.code})`,
+  }))
+);
+
+const airportOptions = computed(() =>
+  AIRPORTS.map((a) => ({
+    value: `${a.city} (${a.code})`,
+    label: `${a.city} - ${a.name} (${a.code})`,
+  }))
+);
 
 const sortedSegments = computed(() =>
   [...props.segments]
@@ -235,14 +252,18 @@ function removeSegment(index: number) {
       <!-- Flight fields (all flight types use the same standard fields) -->
       <template v-if="isFlightType(seg.type)">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.airline')" required>
-            <BaseInput
-              :model-value="seg.airline ?? ''"
-              :placeholder="t('vacation.field.airline')"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'airline', String($event))"
-            />
-          </FormFieldGroup>
+          <BaseCombobox
+            :model-value="seg.airline ?? ''"
+            :options="airlineOptions"
+            :label="t('vacation.field.airline')"
+            :placeholder="t('vacation.field.airline')"
+            :search-placeholder="t('vacation.field.airline')"
+            required
+            other-value="__other__"
+            :other-label="t('form.other' as any) || 'Other'"
+            :other-placeholder="t('vacation.field.airline')"
+            @update:model-value="updateSegment(idx, 'airline', String($event))"
+          />
           <FormFieldGroup :label="t('vacation.field.flightNumber')" required>
             <BaseInput
               :model-value="seg.flightNumber ?? ''"
@@ -253,22 +274,30 @@ function removeSegment(index: number) {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureAirport')" required>
-            <BaseInput
-              :model-value="seg.departureAirport ?? ''"
-              :placeholder="t('vacation.field.departureAirport')"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'departureAirport', String($event))"
-            />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalAirport')" required>
-            <BaseInput
-              :model-value="seg.arrivalAirport ?? ''"
-              :placeholder="t('vacation.field.arrivalAirport')"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'arrivalAirport', String($event))"
-            />
-          </FormFieldGroup>
+          <BaseCombobox
+            :model-value="seg.departureAirport ?? ''"
+            :options="airportOptions"
+            :label="t('vacation.field.departureAirport')"
+            :placeholder="t('vacation.field.departureAirport')"
+            :search-placeholder="t('vacation.field.departureAirport')"
+            required
+            other-value="__other__"
+            :other-label="t('form.other' as any) || 'Other'"
+            :other-placeholder="t('vacation.field.departureAirport')"
+            @update:model-value="updateSegment(idx, 'departureAirport', String($event))"
+          />
+          <BaseCombobox
+            :model-value="seg.arrivalAirport ?? ''"
+            :options="airportOptions"
+            :label="t('vacation.field.arrivalAirport')"
+            :placeholder="t('vacation.field.arrivalAirport')"
+            :search-placeholder="t('vacation.field.arrivalAirport')"
+            required
+            other-value="__other__"
+            :other-label="t('form.other' as any) || 'Other'"
+            :other-placeholder="t('vacation.field.arrivalAirport')"
+            @update:model-value="updateSegment(idx, 'arrivalAirport', String($event))"
+          />
         </div>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup :label="t('vacation.field.departureDate')">
