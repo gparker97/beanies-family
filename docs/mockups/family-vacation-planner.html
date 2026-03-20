@@ -1,0 +1,1596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beanies.family — family vacation planner mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --deep-slate: #2C3E50;
+    --heritage-orange: #F15D22;
+    --sky-silk: #AED6F1;
+    --terracotta: #E67E22;
+    --cloud-white: #F8F9FA;
+    --green-confirm: #27AE60;
+    --purple-accent: #9B59B6;
+    --tint-orange-8: rgba(241, 93, 34, 0.08);
+    --tint-orange-15: rgba(241, 93, 34, 0.15);
+    --tint-silk-20: rgba(174, 214, 241, 0.2);
+    --tint-slate-5: rgba(44, 62, 80, 0.05);
+    --tint-slate-10: rgba(44, 62, 80, 0.1);
+    --vacation-teal: #00B4D8;
+    --vacation-teal-tint: rgba(0, 180, 216, 0.08);
+    --vacation-teal-tint-15: rgba(0, 180, 216, 0.15);
+    --vacation-gold: #FFD93D;
+    --vacation-gold-tint: rgba(255, 217, 61, 0.12);
+    --vacation-gradient: linear-gradient(135deg, #00B4D8, #0077B6);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: #E8ECF0; color: var(--deep-slate); line-height: 1.5; }
+  h1,h2,h3,h4,h5,h6 { font-family: 'Outfit', sans-serif; }
+
+  /* NAV */
+  .mockup-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; background: var(--deep-slate); padding: 12px 24px; display: flex; align-items: center; gap: 12px; overflow-x: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+  .mockup-nav-logo { font-family: 'Outfit'; font-weight: 700; font-size: 14px; color: var(--heritage-orange); white-space: nowrap; margin-right: 8px; }
+  .mockup-nav button { font-family: 'Outfit'; font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,0.15); background: transparent; color: rgba(255,255,255,0.7); cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+  .mockup-nav button:hover { border-color: var(--heritage-orange); color: white; }
+  .mockup-nav button.active { background: var(--heritage-orange); border-color: var(--heritage-orange); color: white; }
+
+  .screen { display: none; padding: 72px 24px 40px; min-height: 100vh; }
+  .screen.active { display: block; }
+  .screen-title { text-align: center; margin-bottom: 28px; }
+  .screen-title h2 { font-size: 22px; font-weight: 700; color: var(--deep-slate); margin-bottom: 4px; }
+  .screen-title p { font-size: 13px; color: rgba(44,62,80,0.45); }
+
+  /* MODAL */
+  .modal-backdrop { display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal-shell { background: white; border-radius: 24px; width: 100%; max-width: 520px; margin: 0 auto; box-shadow: 0 24px 80px rgba(44,62,80,0.15), 0 4px 20px rgba(44,62,80,0.08); overflow: hidden; }
+  .modal-shell.wide { max-width: 580px; }
+  .modal-header { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid rgba(44,62,80,0.06); }
+  .modal-icon-box { width: 44px; height: 44px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+  .modal-icon-box.orange { background: var(--tint-orange-8); }
+  .modal-icon-box.vacation { background: var(--vacation-teal-tint); }
+  .modal-header-text h3 { font-size: 18px; font-weight: 600; line-height: 1.2; }
+  .modal-header-text p { font-size: 11px; color: rgba(44,62,80,0.4); margin-top: 1px; }
+  .modal-close { margin-left: auto; width: 32px; height: 32px; border-radius: 10px; border: none; background: var(--tint-slate-5); color: rgba(44,62,80,0.4); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .modal-body { padding: 20px 24px; background: var(--cloud-white); max-height: 65vh; overflow-y: auto; }
+  .modal-footer { padding: 16px 24px; display: flex; align-items: center; gap: 12px; border-top: 1px solid rgba(44,62,80,0.06); background: white; }
+
+  /* FORM */
+  .fg { margin-bottom: 18px; }
+  .fl { font-family: 'Outfit'; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(44,62,80,0.4); margin-bottom: 7px; display: flex; align-items: center; gap: 6px; }
+  .badge { font-size: 9px; font-weight: 600; padding: 1px 6px; border-radius: 6px; text-transform: uppercase; }
+  .badge-r { background: var(--tint-orange-15); color: var(--heritage-orange); }
+  .badge-o { background: var(--tint-slate-5); color: rgba(44,62,80,0.35); }
+  .fi { width: 100%; padding: 11px 15px; border-radius: 12px; border: 1.5px solid rgba(44,62,80,0.1); background: white; font-family: 'Inter'; font-size: 13px; color: var(--deep-slate); outline: none; transition: all 0.15s; }
+  .fi:focus { border-color: var(--heritage-orange); box-shadow: 0 0 0 3px var(--tint-orange-8); }
+  .fi.vf:focus { border-color: var(--vacation-teal); box-shadow: 0 0 0 3px var(--vacation-teal-tint); }
+  .fi::placeholder { color: rgba(44,62,80,0.28); }
+  textarea.fi { resize: vertical; min-height: 60px; }
+  .fr { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* BUTTONS */
+  .btn { font-family: 'Outfit'; font-weight: 600; font-size: 14px; padding: 13px 24px; border-radius: 16px; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-p { flex: 1; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta)); color: white; box-shadow: 0 4px 12px rgba(241,93,34,0.2); }
+  .btn-v { flex: 1; background: var(--vacation-gradient); color: white; box-shadow: 0 4px 12px rgba(0,180,216,0.2); }
+  .btn-o { background: transparent; border: 1.5px solid rgba(44,62,80,0.12); color: rgba(44,62,80,0.6); padding: 12px 20px; }
+
+  /* CHIPS */
+  .cr { display: flex; gap: 8px; flex-wrap: wrap; }
+  .mc { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 20px; border: 1.5px solid rgba(44,62,80,0.1); background: white; font-family: 'Outfit'; font-size: 12px; font-weight: 500; color: var(--deep-slate); cursor: pointer; transition: all 0.15s; }
+  .mc:hover { border-color: var(--heritage-orange); }
+  .mc.sel { border-color: var(--heritage-orange); background: var(--tint-orange-8); }
+  .mc .dot { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; color: white; font-weight: 700; }
+
+  /* VACATION TOGGLE */
+  .vac-toggle { margin: -20px -24px 18px -24px; padding: 13px 24px; background: linear-gradient(135deg, rgba(0,180,216,0.06), rgba(255,217,61,0.06)); border-bottom: 1px solid rgba(0,180,216,0.1); display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; transition: all 0.2s; }
+  .vac-toggle:hover { background: linear-gradient(135deg, rgba(0,180,216,0.1), rgba(255,217,61,0.1)); }
+  .vac-toggle-icon { font-size: 22px; animation: sway 3s ease-in-out infinite; }
+  @keyframes sway { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }
+  .vac-toggle-text span { font-family: 'Outfit'; font-size: 13px; font-weight: 600; color: var(--vacation-teal); display: block; line-height: 1.2; }
+  .vac-toggle-text small { font-size: 11px; color: rgba(44,62,80,0.4); }
+  .vac-toggle-sw { width: 46px; height: 26px; border-radius: 13px; background: rgba(44,62,80,0.1); position: relative; transition: all 0.3s; flex-shrink: 0; margin-left: auto; }
+  .vac-toggle-sw::after { content:''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: all 0.3s; }
+  .vac-toggle.active .vac-toggle-sw { background: var(--vacation-gradient); }
+  .vac-toggle.active .vac-toggle-sw::after { left: 23px; }
+
+  /* SCHEDULE TAB BAR */
+  .sched-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: var(--tint-slate-5); border-radius: 16px; padding: 6px; margin-bottom: 18px; }
+  .sched-tab { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 11px 10px 10px; border-radius: 12px; border: 2px solid transparent; background: transparent; cursor: pointer; transition: all 0.2s; position: relative; font-family: inherit; }
+  .sched-tab:hover { background: rgba(255,255,255,0.6); }
+  .sched-tab.active { background: white; border-color: var(--heritage-orange); box-shadow: 0 2px 12px rgba(241,93,34,0.1); }
+  .sched-tab-icon { font-size: 20px; line-height: 1; margin-bottom: 2px; }
+  .sched-tab-lbl { font-family: 'Outfit'; font-size: 13px; font-weight: 700; color: rgba(44,62,80,0.35); transition: color 0.2s; }
+  .sched-tab.active .sched-tab-lbl { color: var(--deep-slate); }
+  .sched-tab-desc { font-family: 'Inter'; font-size: 10px; color: rgba(44,62,80,0.25); transition: color 0.2s; }
+  .sched-tab.active .sched-tab-desc { color: rgba(44,62,80,0.4); }
+  .sched-tab.active::after { content:''; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: var(--heritage-orange); }
+
+  /* VACATION TYPE CARDS */
+  .vtype-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .vtype { padding: 14px 10px; border-radius: 14px; border: 2px solid rgba(44,62,80,0.06); background: white; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+  .vtype:hover { border-color: rgba(0,180,216,0.2); box-shadow: 0 4px 14px rgba(0,180,216,0.08); transform: translateY(-2px); }
+  .vtype.sel { border-color: var(--vacation-teal); background: linear-gradient(135deg, rgba(0,180,216,0.04), rgba(0,119,182,0.04)); box-shadow: 0 4px 14px rgba(0,180,216,0.12); }
+  .vtype.sel::before { content:'✓'; position: absolute; top: 6px; right: 8px; width: 18px; height: 18px; border-radius: 50%; background: var(--vacation-teal); color: white; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .vtype-emoji { font-size: 28px; margin-bottom: 6px; display: block; }
+  .vtype-name { font-family: 'Outfit'; font-size: 12px; font-weight: 600; color: var(--deep-slate); display: block; }
+  .vtype-desc { font-size: 10px; color: rgba(44,62,80,0.35); margin-top: 1px; }
+
+  /* WIZARD STEPPER */
+  .wiz-bar { display: flex; align-items: center; gap: 0; margin: -20px -24px 18px -24px; padding: 14px 24px; background: white; border-bottom: 1px solid rgba(44,62,80,0.06); overflow-x: auto; }
+  .wiz-s { display: flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; padding: 5px 10px; border-radius: 10px; transition: all 0.2s; }
+  .wiz-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Outfit'; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .wiz-s.future .wiz-dot { background: var(--tint-slate-5); color: rgba(44,62,80,0.3); }
+  .wiz-s.cur .wiz-dot { background: var(--vacation-gradient); color: white; box-shadow: 0 2px 8px rgba(0,180,216,0.3); }
+  .wiz-s.done .wiz-dot { background: rgba(39,174,96,0.12); color: var(--green-confirm); }
+  .wiz-lbl { font-family: 'Outfit'; font-size: 11px; font-weight: 600; }
+  .wiz-s.future .wiz-lbl { color: rgba(44,62,80,0.3); }
+  .wiz-s.cur .wiz-lbl { color: var(--vacation-teal); }
+  .wiz-s.done .wiz-lbl { color: var(--green-confirm); }
+  .wiz-con { width: 20px; height: 2px; background: rgba(44,62,80,0.06); flex-shrink: 0; }
+  .wiz-con.done { background: rgba(39,174,96,0.2); }
+
+  .step-hdr { text-align: center; margin-bottom: 18px; }
+  .step-hdr-emoji { font-size: 32px; display: block; margin-bottom: 6px; }
+  .step-hdr h4 { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
+  .step-hdr p { font-size: 12px; color: rgba(44,62,80,0.4); }
+
+  /* COLLAPSIBLE SEGMENT CARD */
+  .seg { background: white; border-radius: 14px; border: 1.5px solid rgba(44,62,80,0.07); overflow: hidden; margin-bottom: 10px; transition: all 0.2s; }
+  .seg:hover { box-shadow: 0 3px 14px rgba(44,62,80,0.05); }
+  .seg-hdr { display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer; user-select: none; }
+  .seg-hdr .emoji { font-size: 18px; }
+  .seg-hdr .title { flex: 1; font-family: 'Outfit'; font-size: 13px; font-weight: 600; }
+  .seg-hdr .sub { font-size: 11px; color: rgba(44,62,80,0.4); font-weight: 400; margin-left: 3px; }
+  .seg-hdr .kv { font-family: 'Inter'; font-size: 11px; color: rgba(44,62,80,0.45); margin-left: auto; white-space: nowrap; }
+  .seg-hdr .kv strong { font-family: 'Outfit'; font-weight: 600; color: var(--deep-slate); }
+  .seg-st { font-family: 'Outfit'; font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 7px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .seg-st.booked { background: rgba(39,174,96,0.1); color: var(--green-confirm); }
+  .seg-st.pending { background: var(--vacation-gold-tint); color: #B8860B; }
+  .seg-st.nb { background: var(--tint-slate-5); color: rgba(44,62,80,0.35); }
+  .seg-exp { font-size: 12px; color: rgba(44,62,80,0.25); transition: transform 0.2s; margin-left: 6px; }
+  .seg-body { padding: 0 14px 14px; border-top: 1px solid rgba(44,62,80,0.04); padding-top: 12px; }
+  .seg-body .fg { margin-bottom: 12px; }
+  .seg-body .fg:last-child { margin-bottom: 0; }
+
+  /* NOT BOOKED */
+  .nb-card { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 12px; background: var(--vacation-gold-tint); border: 1.5px dashed rgba(184,134,11,0.18); margin-bottom: 10px; cursor: pointer; }
+  .nb-card .emoji { font-size: 15px; }
+  .nb-card span { font-family: 'Outfit'; font-size: 12px; font-weight: 600; color: #B8860B; }
+  .nb-card small { font-size: 10px; color: rgba(184,134,11,0.55); display: block; font-family: 'Inter'; font-weight: 400; }
+  .nb-chk { margin-left: auto; width: 17px; height: 17px; border-radius: 5px; border: 2px solid rgba(184,134,11,0.3); background: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .nb-chk.on { background: #B8860B; border-color: #B8860B; color: white; font-size: 10px; }
+
+  /* ADD-ON PILL SELECTOR (slides 4, 5) */
+  .addon-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .addon-pill { display: inline-flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid rgba(44,62,80,0.08); background: white; font-family: 'Outfit'; font-size: 12px; font-weight: 500; color: rgba(44,62,80,0.55); cursor: pointer; transition: all 0.15s; }
+  .addon-pill:hover { border-color: rgba(0,180,216,0.2); }
+  .addon-pill.sel { border-color: var(--vacation-teal); background: var(--vacation-teal-tint); color: var(--vacation-teal); font-weight: 600; }
+  .addon-pill .pill-check { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid rgba(44,62,80,0.15); display: flex; align-items: center; justify-content: center; font-size: 9px; transition: all 0.15s; }
+  .addon-pill.sel .pill-check { background: var(--vacation-teal); border-color: var(--vacation-teal); color: white; }
+
+  /* IDEAS */
+  .idea { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: white; border-radius: 12px; border: 1.5px solid rgba(44,62,80,0.05); margin-bottom: 8px; }
+  .idea-vote { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 32px; }
+  .idea-vote button { background: none; border: none; cursor: pointer; font-size: 14px; padding: 1px; opacity: 0.3; transition: all 0.15s; }
+  .idea-vote button:hover,.idea-vote button.voted { opacity: 1; }
+  .idea-vote .cnt { font-family: 'Outfit'; font-size: 13px; font-weight: 700; color: var(--vacation-teal); }
+  .idea-content { flex: 1; }
+  .idea-title { font-family: 'Outfit'; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .idea-desc { font-size: 11px; color: rgba(44,62,80,0.45); margin-bottom: 4px; }
+  .idea-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .idea-tag { font-family: 'Outfit'; font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 6px; background: var(--vacation-teal-tint); color: var(--vacation-teal); }
+  .idea-author { font-size: 10px; color: rgba(44,62,80,0.3); display: flex; align-items: center; gap: 3px; }
+  .idea-author-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 7px; color: white; font-weight: 700; }
+
+  /* VIEW MODAL */
+  .view-hero { background: linear-gradient(135deg, #00B4D8, #0077B6); padding: 22px 24px 18px; position: relative; overflow: hidden; }
+  .view-hero::before { content:''; position: absolute; top: -40px; right: -40px; width: 140px; height: 140px; background: radial-gradient(circle, rgba(255,217,61,0.2), transparent 70%); border-radius: 50%; }
+  .view-hero-top { display: flex; align-items: flex-start; justify-content: space-between; position: relative; z-index: 1; }
+  .view-hero-emoji { font-size: 36px; margin-bottom: 10px; display: block; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.15)); }
+  .view-hero h3 { font-family: 'Outfit'; font-size: 20px; font-weight: 700; color: white; margin-bottom: 2px; }
+  .view-hero-dest { font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 10px; }
+  .view-hero-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1; }
+  .view-hero-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 9px; background: rgba(255,255,255,0.18); backdrop-filter: blur(4px); font-family: 'Outfit'; font-size: 11px; font-weight: 600; color: white; }
+  .view-hero-close { width: 30px; height: 30px; border-radius: 10px; border: none; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .view-hero-av { width: 24px; height: 24px; border-radius: 50%; border: 2px solid rgba(0,180,216,0.6); display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: white; margin-right: -5px; }
+  .view-body { padding: 0; background: var(--cloud-white); max-height: 55vh; overflow-y: auto; }
+  .view-sec { padding: 14px 24px; border-bottom: 1px solid rgba(44,62,80,0.05); }
+  .view-sec:last-child { border-bottom: none; }
+  .view-sec-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; cursor: pointer; }
+  .view-sec-icon { width: 28px; height: 28px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .view-sec-title { font-family: 'Outfit'; font-size: 13px; font-weight: 600; }
+  .view-sec-sub { font-size: 10px; color: rgba(44,62,80,0.4); }
+  .view-sec-exp { margin-left: auto; font-size: 11px; color: rgba(44,62,80,0.25); }
+
+  /* View collapsible card */
+  .vc { background: white; border-radius: 12px; border: 1.5px solid rgba(44,62,80,0.05); margin-bottom: 8px; overflow: hidden; }
+  .vc-hdr { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; }
+  .vc-hdr .emoji { font-size: 15px; }
+  .vc-hdr .title { font-family: 'Outfit'; font-size: 12px; font-weight: 600; }
+  .vc-hdr .kv { font-family: 'Inter'; font-size: 11px; color: rgba(44,62,80,0.45); margin-left: auto; white-space: nowrap; }
+  .vc-hdr .kv strong { font-family: 'Outfit'; font-weight: 600; color: var(--deep-slate); }
+  .vc-body { padding: 0 12px 10px; border-top: 1px solid rgba(44,62,80,0.04); padding-top: 10px; }
+  .vc-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .vc-row + .vc-row { border-top: 1px solid rgba(44,62,80,0.03); }
+  .vc-lbl { font-family: 'Outfit'; font-size: 10px; font-weight: 500; color: rgba(44,62,80,0.38); min-width: 70px; flex-shrink: 0; }
+  .vc-val { font-family: 'Inter'; font-size: 12px; color: var(--deep-slate); flex: 1; }
+
+  /* Copyable */
+  .cp { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 7px; background: white; border: 1.5px solid rgba(44,62,80,0.07); cursor: pointer; transition: all 0.2s; position: relative; font-family: 'Outfit'; font-size: 12px; font-weight: 600; color: var(--deep-slate); }
+  .cp:hover { border-color: var(--vacation-teal); background: var(--vacation-teal-tint); }
+  .cp:active { transform: scale(0.97); }
+  .cp .ci { font-size: 10px; opacity: 0.3; }
+  .cp:hover .ci { opacity: 0.7; }
+  .cp-toast { position: absolute; top: -24px; left: 50%; transform: translateX(-50%) translateY(4px); background: var(--deep-slate); color: white; font-family: 'Outfit'; font-size: 9px; font-weight: 600; padding: 2px 8px; border-radius: 5px; white-space: nowrap; opacity: 0; pointer-events: none; transition: all 0.25s cubic-bezier(0.175,0.885,0.32,1.275); }
+  .cp.copied .cp-toast { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .view-nb { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-radius: 10px; background: var(--vacation-gold-tint); border: 1.5px dashed rgba(184,134,11,0.12); margin-bottom: 8px; }
+  .view-nb .emoji { font-size: 14px; }
+  .view-nb span { font-family: 'Outfit'; font-size: 11px; font-weight: 600; color: #B8860B; }
+  .view-nb small { font-size: 10px; color: rgba(184,134,11,0.55); display: block; }
+
+  .view-footer { padding: 14px 24px; display: flex; align-items: center; gap: 8px; border-top: 1px solid rgba(44,62,80,0.06); background: white; }
+  .vf-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 11px 14px; border-radius: 13px; border: 1.5px solid rgba(44,62,80,0.1); background: white; font-family: 'Outfit'; font-size: 12px; font-weight: 600; color: rgba(44,62,80,0.55); cursor: pointer; transition: all 0.15s; }
+  .vf-btn:hover { border-color: var(--vacation-teal); color: var(--vacation-teal); background: var(--vacation-teal-tint); }
+  .vf-btn.pri { background: var(--vacation-gradient); border-color: transparent; color: white; }
+
+  /* SECTION DIVIDER */
+  .sdiv { display: flex; align-items: center; gap: 12px; margin: 18px 0 12px; }
+  .sdiv::before,.sdiv::after { content:''; flex: 1; height: 1px; background: rgba(44,62,80,0.06); }
+  .sdiv span { font-family: 'Outfit'; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(44,62,80,0.25); white-space: nowrap; }
+
+  /* PROGRESS */
+  .prog { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: white; border-radius: 12px; border: 1.5px solid rgba(44,62,80,0.05); }
+  .prog-track { flex: 1; height: 7px; border-radius: 4px; background: rgba(44,62,80,0.06); overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 4px; background: var(--vacation-gradient); transition: width 0.5s; }
+  .prog-lbl { font-family: 'Outfit'; font-size: 11px; font-weight: 600; color: var(--vacation-teal); white-space: nowrap; }
+
+  /* PLANNER PAGE */
+  .planner-layout { display: grid; grid-template-columns: 1fr 300px; gap: 20px; max-width: 1080px; margin: 0 auto; }
+  .planner-main { min-width: 0; }
+  .planner-sidebar { display: flex; flex-direction: column; gap: 14px; }
+  .sb-sec { background: white; border-radius: 20px; padding: 16px; box-shadow: 0 4px 20px rgba(44,62,80,0.04); }
+  .sb-title { font-family: 'Outfit'; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(44,62,80,0.35); margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+
+  /* Vacation sidebar card */
+  .vac-card { background: linear-gradient(135deg, rgba(0,180,216,0.05), rgba(255,217,61,0.04)); border: 1.5px solid rgba(0,180,216,0.12); border-radius: 16px; padding: 14px; cursor: pointer; transition: all 0.25s; position: relative; overflow: hidden; margin-bottom: 8px; }
+  .vac-card:hover { border-color: var(--vacation-teal); box-shadow: 0 4px 16px rgba(0,180,216,0.1); transform: translateY(-1px); }
+  .vac-card::before { content:''; position: absolute; top: -16px; right: -16px; width: 60px; height: 60px; background: radial-gradient(circle, rgba(255,217,61,0.12), transparent 70%); border-radius: 50%; }
+  .vac-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; position: relative; }
+  .vac-card-emoji { font-size: 24px; animation: bg 2s ease-in-out infinite; }
+  @keyframes bg { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+  .vac-card-name { font-family: 'Outfit'; font-size: 14px; font-weight: 700; line-height: 1.2; }
+  .vac-card-dest { font-size: 11px; color: var(--vacation-teal); font-weight: 500; }
+  .vac-card-dates { font-family: 'Outfit'; font-size: 11px; font-weight: 500; color: rgba(44,62,80,0.5); margin-bottom: 8px; }
+  .vac-countdown { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 7px; background: var(--vacation-gradient); color: white; font-family: 'Outfit'; font-size: 10px; font-weight: 700; }
+  .vac-pending { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 5px; background: var(--vacation-gold-tint); font-family: 'Outfit'; font-size: 9px; font-weight: 600; color: #B8860B; margin-top: 6px; }
+
+  /* CALENDAR */
+  .cal-shell { background: white; border-radius: 20px; padding: 16px; box-shadow: 0 4px 20px rgba(44,62,80,0.04); }
+  .cal-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cal-month { font-family: 'Outfit'; font-size: 18px; font-weight: 700; }
+  .cal-nav { display: flex; gap: 6px; }
+  .cal-nav button { width: 30px; height: 30px; border-radius: 9px; border: 1.5px solid rgba(44,62,80,0.08); background: white; color: rgba(44,62,80,0.4); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .cal-wk { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-bottom: 2px; }
+  .cal-wd { text-align: center; font-family: 'Outfit'; font-size: 10px; font-weight: 600; color: rgba(44,62,80,0.3); text-transform: uppercase; padding: 3px 0; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-d { aspect-ratio: 1; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 5px 3px; cursor: pointer; transition: all 0.15s; position: relative; }
+  .cal-d:hover { background: var(--tint-slate-5); }
+  .cal-d .dn { font-family: 'Outfit'; font-size: 12px; font-weight: 600; line-height: 1; margin-bottom: 3px; }
+  .cal-d.om .dn { color: rgba(44,62,80,0.18); }
+  .cal-d.today .dn { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta)); color: white; display: flex; align-items: center; justify-content: center; }
+  .dd { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
+  .dd span { width: 4px; height: 4px; border-radius: 50%; }
+
+  /* Vacation span bar on calendar */
+  .vac-span-row { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-top: 2px; }
+  .vac-span { background: linear-gradient(90deg, rgba(0,180,216,0.12), rgba(0,180,216,0.06)); border: 1.5px solid rgba(0,180,216,0.18); border-radius: 7px; padding: 2px 8px; display: flex; align-items: center; gap: 3px; cursor: pointer; transition: all 0.2s; height: 22px; }
+  .vac-span:hover { background: linear-gradient(90deg, rgba(0,180,216,0.18), rgba(0,180,216,0.1)); border-color: var(--vacation-teal); }
+  .vac-span .emoji { font-size: 11px; }
+  .vac-span .label { font-family: 'Outfit'; font-size: 9px; font-weight: 600; color: var(--vacation-teal); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* PLANNER HEADER (matching real site) */
+  .ph { display: flex; flex-col: column; gap: 3px; margin-bottom: 12px; }
+  .ph-sub { font-size: 13px; color: rgba(44,62,80,0.35); }
+  .ph-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .ph-add { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 14px; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta)); color: white; font-family: 'Outfit'; font-size: 12px; font-weight: 600; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(241,93,34,0.18); }
+  .view-tog { display: inline-flex; border-radius: 10px; background: var(--tint-slate-5); padding: 3px; }
+  .view-tog button { font-family: 'Outfit'; font-size: 11px; font-weight: 600; padding: 5px 14px; border-radius: 8px; border: none; background: transparent; color: rgba(44,62,80,0.4); cursor: pointer; }
+  .view-tog button.active { background: white; color: var(--deep-slate); box-shadow: 0 2px 6px rgba(44,62,80,0.06); }
+  /* Member filter — compact dropdown-style */
+  .mf-compact { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 10px; background: var(--tint-slate-5); cursor: pointer; transition: all 0.15s; }
+  .mf-compact:hover { background: var(--tint-slate-10); }
+  .mf-compact .mf-avatars { display: flex; margin-right: 2px; }
+  .mf-compact .mf-av { width: 18px; height: 18px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; color: white; margin-right: -4px; border: 1.5px solid white; }
+  .mf-compact .mf-lbl { font-family: 'Outfit'; font-size: 11px; font-weight: 600; color: rgba(44,62,80,0.5); }
+  .mf-compact .mf-arrow { font-size: 10px; color: rgba(44,62,80,0.3); }
+
+  /* CELEBRATION */
+  .cele-body { text-align: center; padding: 28px 24px; background: linear-gradient(180deg, white, var(--cloud-white)); position: relative; }
+  .cele-img { width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(0,180,216,0.08), rgba(255,217,61,0.08)); font-size: 56px; animation: cele 0.6s ease-out; }
+  @keyframes cele { 0%{transform:scale(0.3) rotate(-15deg);opacity:0} 50%{transform:scale(1.15) rotate(5deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
+  .cele-title { font-family: 'Outfit'; font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .cele-sub { font-size: 13px; color: rgba(44,62,80,0.45); margin-bottom: 16px; }
+  .cele-details { background: white; border-radius: 14px; padding: 14px; text-align: left; display: inline-block; width: 100%; }
+  .cele-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(44,62,80,0.04); }
+  .cele-row:last-child { border-bottom: none; }
+  .cele-row .emoji { font-size: 14px; width: 22px; text-align: center; }
+  .cele-row .lbl { font-family: 'Outfit'; font-size: 10px; font-weight: 600; color: rgba(44,62,80,0.35); text-transform: uppercase; min-width: 50px; }
+  .cele-row .val { font-family: 'Outfit'; font-size: 12px; font-weight: 600; flex: 1; }
+
+  /* Confetti */
+  .confetti-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; overflow: hidden; }
+  .confetti { position: absolute; width: 8px; height: 8px; border-radius: 2px; animation: cf 2s ease-out forwards; opacity: 0; }
+  @keyframes cf { 0%{opacity:1;transform:translateY(-20px) rotate(0)} 100%{opacity:0;transform:translateY(300px) rotate(720deg)} }
+
+  /* IDEA VIEW/EDIT MODAL */
+  .idea-modal-hero { background: linear-gradient(135deg, rgba(0,180,216,0.06), rgba(255,217,61,0.05)); padding: 20px 24px 16px; border-bottom: 1px solid rgba(44,62,80,0.06); display: flex; align-items: flex-start; gap: 14px; }
+  .idea-modal-vote { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .idea-modal-vote button { background: none; border: none; cursor: pointer; font-size: 24px; transition: transform 0.15s; }
+  .idea-modal-vote button:hover { transform: scale(1.15); }
+  .idea-modal-vote .cnt { font-family: 'Outfit'; font-size: 18px; font-weight: 800; color: var(--vacation-teal); }
+  .idea-modal-vote .lbl { font-family: 'Outfit'; font-size: 9px; font-weight: 600; color: rgba(44,62,80,0.3); text-transform: uppercase; }
+  .idea-modal-title-input { font-family: 'Outfit'; font-size: 18px; font-weight: 700; color: var(--deep-slate); background: transparent; border: none; outline: none; width: 100%; }
+  .idea-modal-author { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(44,62,80,0.4); margin-top: 4px; }
+
+  /* Calendar inline vacation bar */
+  .cal-vac-bar { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; margin-top: -2px; margin-bottom: 2px; }
+  .cal-vac-span { background: linear-gradient(90deg, var(--vacation-teal), #0077B6); border-radius: 5px; padding: 1px 6px; display: flex; align-items: center; gap: 3px; height: 18px; cursor: pointer; transition: all 0.15s; }
+  .cal-vac-span:hover { filter: brightness(1.1); box-shadow: 0 2px 8px rgba(0,180,216,0.2); }
+  .cal-vac-span .emoji { font-size: 9px; }
+  .cal-vac-span .label { font-family: 'Outfit'; font-size: 8px; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-vac-span-cont { background: linear-gradient(90deg, #0077B6, #005f8f); border-radius: 0; height: 18px; display: flex; align-items: center; padding: 0 6px; cursor: pointer; }
+  .cal-vac-span-start { border-radius: 5px 0 0 5px; }
+  .cal-vac-span-end { border-radius: 0 5px 5px 0; }
+  .cal-vac-span-mid { border-radius: 0; }
+
+  /* Inline edit elements */
+  .vc-edit-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; }
+  .vc-edit-row + .vc-edit-row { border-top: 1px solid rgba(44,62,80,0.03); }
+  .vc-edit-input { font-family: 'Inter'; font-size: 12px; color: var(--deep-slate); background: transparent; border: none; border-bottom: 1.5px dashed rgba(0,180,216,0.2); outline: none; padding: 2px 0; flex: 1; transition: all 0.15s; }
+  .vc-edit-input:focus { border-bottom-color: var(--vacation-teal); border-bottom-style: solid; }
+  .vc-edit-input:hover { border-bottom-color: rgba(0,180,216,0.4); }
+  .vc-section-edit { display: inline-flex; align-items: center; gap: 3px; padding: 4px 10px; border-radius: 8px; background: var(--vacation-teal-tint); border: none; font-family: 'Outfit'; font-size: 10px; font-weight: 600; color: var(--vacation-teal); cursor: pointer; transition: all 0.15s; margin-top: 6px; }
+  .vc-section-edit:hover { background: var(--vacation-teal-tint-15); }
+
+  @media (max-width:900px) { .planner-layout { grid-template-columns: 1fr; } .planner-sidebar { order: -1; } }
+  @media (max-width:600px) { .vtype-grid { grid-template-columns: repeat(2,1fr); } .fr { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<nav class="mockup-nav">
+  <span class="mockup-nav-logo">beanies.family</span>
+  <button class="active" onclick="showScreen('s1')">1. activity toggle</button>
+  <button onclick="showScreen('s2')">2. vacation type</button>
+  <button onclick="showScreen('s3')">3. travel details</button>
+  <button onclick="showScreen('s4')">4. accommodation</button>
+  <button onclick="showScreen('s5')">5. getting around</button>
+  <button onclick="showScreen('s6')">6. ideas & bucket list</button>
+  <button onclick="showScreen('s7')">7. confirmation</button>
+  <button onclick="showScreen('s8')">8. vacation view</button>
+  <button onclick="showScreen('s9')">9. planner page</button>
+</nav>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 1 — ACTIVITY MODAL WITH VACATION TOGGLE
+     ════════════════════════════════════════════════════ -->
+<div id="s1" class="screen active">
+  <div class="screen-title">
+    <h2>activity modal — vacation toggle</h2>
+    <p>the vacation toggle + schedule mode bar sit at the top of the existing activity form</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell">
+      <div class="modal-header">
+        <div class="modal-icon-box orange">📋</div>
+        <div class="modal-header-text"><h3>new activity</h3></div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- vacation toggle -->
+        <div class="vac-toggle" onclick="this.classList.toggle('active')">
+          <span class="vac-toggle-icon">🏖️</span>
+          <div class="vac-toggle-text">
+            <span>make it a family vacation!</span>
+            <small>plan a trip with flights, hotels, ideas & more</small>
+          </div>
+          <div class="vac-toggle-sw"></div>
+        </div>
+
+        <!-- schedule mode tab bar -->
+        <div class="sched-bar">
+          <button class="sched-tab active" onclick="selTab(this)">
+            <span class="sched-tab-icon">🔁</span>
+            <span class="sched-tab-lbl">recurring</span>
+            <span class="sched-tab-desc">repeats weekly or monthly</span>
+          </button>
+          <button class="sched-tab" onclick="selTab(this)">
+            <span class="sched-tab-icon">📌</span>
+            <span class="sched-tab-lbl">one-time</span>
+            <span class="sched-tab-desc">single date event</span>
+          </button>
+        </div>
+
+        <!-- 1. who's going? -->
+        <div class="fg">
+          <div class="fl">who's going? <span class="badge badge-r">required</span></div>
+          <div class="cr">
+            <span class="mc sel"><span class="dot" style="background:#3498DB">G</span> greg</span>
+            <span class="mc"><span class="dot" style="background:#E74C8B">L</span> lisa</span>
+            <span class="mc sel"><span class="dot" style="background:#F39C12">E</span> emma</span>
+            <span class="mc"><span class="dot" style="background:#27AE60">J</span> jack</span>
+          </div>
+        </div>
+
+        <!-- 2. category -->
+        <div class="fg">
+          <div class="fl">select category</div>
+          <div style="display:flex;flex-direction:column;gap:5px;">
+            <div style="font-family:'Outfit';font-size:9px;font-weight:600;text-transform:uppercase;color:rgba(44,62,80,0.25);letter-spacing:0.06em">sports</div>
+            <div class="cr" style="margin-bottom:3px">
+              <span class="mc sel" style="border-color:var(--heritage-orange);background:var(--tint-orange-8)">⚽ soccer</span>
+              <span class="mc">🎾 tennis</span>
+              <span class="mc">🏊 swimming</span>
+              <span class="mc">🤸 gymnastics</span>
+              <span class="mc">⛳ golf</span>
+            </div>
+            <div style="font-family:'Outfit';font-size:9px;font-weight:600;text-transform:uppercase;color:rgba(44,62,80,0.25);letter-spacing:0.06em">lessons</div>
+            <div class="cr" style="margin-bottom:3px">
+              <span class="mc">🎹 piano</span>
+              <span class="mc">🎸 guitar</span>
+              <span class="mc">💃 dance</span>
+              <span class="mc">🎨 art</span>
+            </div>
+            <div style="font-family:'Outfit';font-size:9px;font-weight:600;text-transform:uppercase;color:rgba(44,62,80,0.25);letter-spacing:0.06em">school & educational</div>
+            <div class="cr" style="margin-bottom:3px">
+              <span class="mc">📚 tutoring</span>
+              <span class="mc">🏫 after school</span>
+              <span class="mc">🔬 science</span>
+              <span class="mc">🗣️ language</span>
+            </div>
+            <div style="font-family:'Outfit';font-size:9px;font-weight:600;text-transform:uppercase;color:rgba(44,62,80,0.25);letter-spacing:0.06em">more</div>
+            <div class="cr">
+              <span class="mc">🎂 birthday</span>
+              <span class="mc">🏥 doctor</span>
+              <span class="mc">💇 haircut</span>
+              <span class="mc">📎 other</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. title -->
+        <div class="fg">
+          <div class="fl">what's the activity? <span class="badge badge-r">required</span></div>
+          <div style="background:var(--tint-slate-5);border-radius:16px;border:2px solid transparent;padding:11px 15px">
+            <input type="text" value="soccer practice" style="font-family:'Outfit';font-size:18px;font-weight:700;color:var(--deep-slate);background:transparent;border:none;outline:none;width:100%" placeholder="what's the activity?" />
+          </div>
+        </div>
+
+        <!-- 3b. cost -->
+        <div class="fg">
+          <div class="fl">cost per session</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="display:flex;align-items:center;gap:5px;background:var(--tint-slate-5);border-radius:12px;padding:9px 13px;flex:1;border:1.5px solid rgba(44,62,80,0.06)">
+              <span style="font-family:'Outfit';font-size:13px;font-weight:600;color:rgba(44,62,80,0.35)">$</span>
+              <input type="text" value="25.00" style="font-family:'Outfit';font-size:16px;font-weight:700;color:var(--deep-slate);background:transparent;border:none;outline:none;width:70px" />
+            </div>
+            <div style="background:var(--tint-slate-5);border-radius:12px;padding:9px 13px;border:1.5px solid rgba(44,62,80,0.06)">
+              <span style="font-family:'Outfit';font-size:12px;font-weight:600">USD 🇺🇸</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- fee schedule -->
+        <div class="fg">
+          <div class="fl">fee schedule</div>
+          <div class="cr">
+            <span class="mc sel" style="border-color:var(--heritage-orange);background:var(--tint-orange-8);color:var(--heritage-orange)">per session</span>
+            <span class="mc">weekly</span>
+            <span class="mc">monthly</span>
+            <span class="mc">quarterly</span>
+            <span class="mc">yearly</span>
+            <span class="mc">custom</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:14px">
+          <span style="font-family:'Outfit';font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(44,62,80,0.3)">≈ monthly</span>
+          <span style="font-family:'Outfit';font-size:13px;font-weight:700">$100.00 USD/mo</span>
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--tint-slate-10);font-size:9px;color:rgba(44,62,80,0.35);cursor:help" title="based on 1 session/week × $25">?</span>
+        </div>
+
+        <!-- 4. frequency + days (shown because recurring is selected) -->
+        <div class="fg">
+          <div class="fl">frequency</div>
+          <div class="cr" style="margin-bottom:8px">
+            <span class="mc sel" style="border-color:var(--heritage-orange);background:var(--tint-orange-8);color:var(--heritage-orange)">weekly</span>
+            <span class="mc">monthly</span>
+          </div>
+          <div class="fl" style="margin-top:2px">days</div>
+          <div style="display:flex;gap:5px">
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:var(--tint-slate-5);color:rgba(44,62,80,0.35);cursor:pointer">S</span>
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:var(--tint-slate-5);color:rgba(44,62,80,0.35);cursor:pointer">M</span>
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:white;cursor:pointer;box-shadow:0 2px 8px rgba(241,93,34,0.2)">T</span>
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:var(--tint-slate-5);color:rgba(44,62,80,0.35);cursor:pointer">W</span>
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:white;cursor:pointer;box-shadow:0 2px 8px rgba(241,93,34,0.2)">T</span>
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:var(--tint-slate-5);color:rgba(44,62,80,0.35);cursor:pointer">F</span>
+            <span style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Outfit';font-size:11px;font-weight:600;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));color:white;cursor:pointer;box-shadow:0 2px 8px rgba(241,93,34,0.2)">S</span>
+          </div>
+        </div>
+
+        <!-- 5. all day -->
+        <div class="fg">
+          <div class="fl">all day</div>
+          <label style="display:inline-flex;align-items:center;gap:9px;cursor:pointer">
+            <input type="checkbox" style="width:17px;height:17px;border-radius:6px;accent-color:var(--heritage-orange)" />
+            <span style="font-size:12px;color:rgba(44,62,80,0.5)">no specific start/end time</span>
+          </label>
+        </div>
+
+        <!-- 6. dates + times -->
+        <div class="fr" style="margin-bottom:12px">
+          <div class="fg" style="margin-bottom:0"><div class="fl">start date <span class="badge badge-r">required</span></div><input class="fi" type="date" value="2026-03-24" /></div>
+          <div class="fg" style="margin-bottom:0"><div class="fl">end date <span class="badge badge-o">optional</span></div><input class="fi" type="date" /></div>
+        </div>
+        <div class="fr" style="margin-bottom:14px">
+          <div class="fg" style="margin-bottom:0">
+            <div class="fl">start time</div>
+            <div style="display:flex;align-items:center;background:white;border:1.5px solid rgba(44,62,80,0.1);border-radius:12px;padding:9px 13px">
+              <span style="font-family:'Outfit';font-size:13px;font-weight:600">4:00 PM</span>
+              <span style="margin-left:auto;font-size:11px;color:rgba(44,62,80,0.25)">▾</span>
+            </div>
+          </div>
+          <div class="fg" style="margin-bottom:0">
+            <div class="fl">end time</div>
+            <div style="display:flex;align-items:center;background:white;border:1.5px solid rgba(44,62,80,0.1);border-radius:12px;padding:9px 13px">
+              <span style="font-family:'Outfit';font-size:13px;font-weight:600">5:00 PM</span>
+              <span style="margin-left:auto;font-size:11px;color:rgba(44,62,80,0.25)">▾</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. location -->
+        <div class="fg"><div class="fl">location <span class="badge badge-o">optional</span></div><input class="fi" value="riverside soccer fields" /></div>
+
+        <!-- 8. drop-off / pick-up -->
+        <div class="fr" style="margin-bottom:14px">
+          <div class="fg" style="margin-bottom:0">
+            <div class="fl">drop-off duty <span class="badge badge-o">optional</span></div>
+            <div style="display:flex;align-items:center;gap:7px;background:white;border:1.5px solid rgba(44,62,80,0.1);border-radius:12px;padding:7px 11px;cursor:pointer">
+              <span style="background:#3498DB;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:white;font-weight:700">G</span>
+              <span style="font-family:'Outfit';font-size:12px;font-weight:500">greg</span>
+              <span style="margin-left:auto;font-size:10px;color:rgba(44,62,80,0.25)">▾</span>
+            </div>
+          </div>
+          <div class="fg" style="margin-bottom:0">
+            <div class="fl">pick-up duty <span class="badge badge-o">optional</span></div>
+            <div style="display:flex;align-items:center;gap:7px;background:white;border:1.5px solid rgba(44,62,80,0.1);border-radius:12px;padding:7px 11px;cursor:pointer">
+              <span style="background:#E74C8B;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:white;font-weight:700">L</span>
+              <span style="font-family:'Outfit';font-size:12px;font-weight:500">lisa</span>
+              <span style="margin-left:auto;font-size:10px;color:rgba(44,62,80,0.25)">▾</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 9. more details (collapsed) -->
+        <div>
+          <button type="button" style="font-family:'Outfit';font-size:12px;font-weight:600;color:var(--heritage-orange);background:none;border:none;cursor:pointer" onclick="var d=document.getElementById('md1');d.style.display=d.style.display==='none'?'flex':'none';this.querySelector('span').textContent=d.style.display==='none'?'▸':'▾'">
+            more details <span>▸</span>
+          </button>
+          <div id="md1" style="display:none;margin-top:10px;flex-direction:column;gap:14px">
+            <div class="fr">
+              <div class="fg" style="margin-bottom:0"><div class="fl">instructor <span class="badge badge-o">optional</span></div><input class="fi" placeholder="instructor" value="coach martinez" /></div>
+              <div class="fg" style="margin-bottom:0"><div class="fl">contact <span class="badge badge-o">optional</span></div><input class="fi" placeholder="phone or email" value="555-0142" /></div>
+            </div>
+            <div class="fg" style="margin-bottom:0"><div class="fl">notes <span class="badge badge-o">optional</span></div><textarea class="fi" rows="2" style="min-height:48px">bring shin guards and water bottle. practice jersey is yellow.</textarea></div>
+            <div class="fg" style="margin-bottom:0">
+              <div class="fl">reminder <span class="badge badge-o">optional</span></div>
+              <div class="cr">
+                <span class="mc">none</span>
+                <span class="mc sel" style="border-color:var(--heritage-orange);background:var(--tint-orange-8);color:var(--heritage-orange)">15 min</span>
+                <span class="mc">30 min</span>
+                <span class="mc">1 hour</span>
+                <span class="mc">1 day</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;background:var(--tint-slate-5);border-radius:12px;padding:10px 14px">
+              <span style="font-family:'Outfit';font-size:12px;font-weight:600">active</span>
+              <div style="width:42px;height:24px;border-radius:12px;background:linear-gradient(135deg,var(--heritage-orange),var(--terracotta));position:relative;cursor:pointer"><div style="position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;background:white;box-shadow:0 2px 4px rgba(0,0,0,0.12)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-p" style="flex:1">add activity</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 2 — VACATION TYPE (Step 1)
+     ════════════════════════════════════════════════════ -->
+<div id="s2" class="screen">
+  <div class="screen-title">
+    <h2>step 1 — pick your adventure!</h2>
+    <p>destination field removed — name + trip type is enough. destination comes from travel details.</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell wide">
+      <div class="modal-header">
+        <div class="modal-icon-box vacation">🌴</div>
+        <div class="modal-header-text"><h3>plan a family vacation!</h3><p>let's make some memories, beans ✨</p></div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="wiz-bar">
+        <div class="wiz-s cur"><div class="wiz-dot">1</div><span class="wiz-lbl">trip</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">2</div><span class="wiz-lbl">travel</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">3</div><span class="wiz-lbl">stay</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">4</div><span class="wiz-lbl">getting around</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">5</div><span class="wiz-lbl">ideas</span></div>
+      </div>
+      <div class="modal-body">
+        <div class="step-hdr">
+          <span class="step-hdr-emoji">🗺️</span>
+          <h4>where are the beans going?</h4>
+          <p>pick your adventure type and give it a name!</p>
+        </div>
+        <div class="fg">
+          <div class="fl">vacation name <span class="badge badge-r">required</span></div>
+          <input class="fi vf" placeholder="e.g. bali beach bonanza 🏝️" value="caribbean cruise 2026" />
+        </div>
+        <div class="fg">
+          <div class="fl">trip type</div>
+          <div class="vtype-grid">
+            <div class="vtype" onclick="selVT(this)"><span class="vtype-emoji">✈️</span><span class="vtype-name">fly & stay</span><div class="vtype-desc">flight + hotel</div></div>
+            <div class="vtype sel" onclick="selVT(this)"><span class="vtype-emoji">🚢</span><span class="vtype-name">cruise</span><div class="vtype-desc">set sail, matey!</div></div>
+            <div class="vtype" onclick="selVT(this)"><span class="vtype-emoji">🚗</span><span class="vtype-name">road trip</span><div class="vtype-desc">snacks & singalongs</div></div>
+            <div class="vtype" onclick="selVT(this)"><span class="vtype-emoji">🎒</span><span class="vtype-name">combo trip</span><div class="vtype-desc">mix & match!</div></div>
+            <div class="vtype" onclick="selVT(this)"><span class="vtype-emoji">🏕️</span><span class="vtype-name">camping</span><div class="vtype-desc">under the stars</div></div>
+            <div class="vtype" onclick="selVT(this)"><span class="vtype-emoji">🏔️</span><span class="vtype-name">adventure</span><div class="vtype-desc">hiking, ski, explore</div></div>
+          </div>
+        </div>
+        <div class="fg">
+          <div class="fl">who's going? <span class="badge badge-r">required</span></div>
+          <div class="cr">
+            <span class="mc sel"><span class="dot" style="background:#3498DB">G</span> greg</span>
+            <span class="mc sel"><span class="dot" style="background:#E74C8B">L</span> lisa</span>
+            <span class="mc sel"><span class="dot" style="background:#F39C12">E</span> emma</span>
+            <span class="mc sel"><span class="dot" style="background:#27AE60">J</span> jack</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:10px">
+        <button class="btn btn-o">cancel</button>
+        <button class="btn btn-v">next: travel details →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 3 — TRAVEL DETAILS (Step 2)
+     Cruise type selected: shows cruise + flights, sorted by date. Collapsible cards.
+     ════════════════════════════════════════════════════ -->
+<div id="s3" class="screen">
+  <div class="screen-title">
+    <h2>step 2 — travel details</h2>
+    <p>segments auto-populated for cruise type. sorted by date. collapsible — key details visible when collapsed.</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell wide">
+      <div class="modal-header">
+        <div class="modal-icon-box vacation">🚢</div>
+        <div class="modal-header-text"><h3>caribbean cruise 2026</h3><p>cruise</p></div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="wiz-bar">
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">trip</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s cur"><div class="wiz-dot">2</div><span class="wiz-lbl">travel</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">3</div><span class="wiz-lbl">stay</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">4</div><span class="wiz-lbl">getting around</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">5</div><span class="wiz-lbl">ideas</span></div>
+      </div>
+      <div class="modal-body">
+        <div class="step-hdr">
+          <span class="step-hdr-emoji">✈️</span>
+          <h4>how are we getting there?</h4>
+          <p>sorted by date — expand any card for full details</p>
+        </div>
+
+        <!-- 1. outbound flight — jul 11, 8:30am — COLLAPSED with key details -->
+        <div class="seg">
+          <div class="seg-hdr" onclick="toggleSeg(this)">
+            <span class="emoji">🛫</span>
+            <span class="title">outbound flight</span>
+            <span class="kv"><strong>DL 1842</strong> · jul 11 · 8:30am</span>
+            <span class="seg-st booked">✓ booked</span>
+            <span class="seg-exp">▸</span>
+          </div>
+        </div>
+
+        <!-- 2. cruise — jul 11 – jul 18 — EXPANDED -->
+        <div class="seg">
+          <div class="seg-hdr" onclick="toggleSeg(this)">
+            <span class="emoji">🚢</span>
+            <span class="title">cruise <span class="sub">— the main event!</span></span>
+            <span class="kv"><strong>RC-2026-88421</strong> · jul 11–18</span>
+            <span class="seg-st booked">✓ booked</span>
+            <span class="seg-exp">▾</span>
+          </div>
+          <div class="seg-body">
+            <div class="fr">
+              <div class="fg"><div class="fl">cruise line</div><input class="fi vf" value="royal caribbean" /></div>
+              <div class="fg"><div class="fl">ship name</div><input class="fi vf" value="wonder of the seas" /></div>
+            </div>
+            <div class="fr">
+              <div class="fg"><div class="fl">departure port</div><input class="fi vf" value="san juan, PR" /></div>
+              <div class="fg"><div class="fl">cabin #</div><input class="fi vf" value="D-428" /></div>
+            </div>
+            <div class="fr">
+              <div class="fg"><div class="fl">embarkation</div><input class="fi vf" type="date" value="2026-07-11" /></div>
+              <div class="fg"><div class="fl">disembarkation</div><input class="fi vf" type="date" value="2026-07-18" /></div>
+            </div>
+            <div class="fg"><div class="fl">booking number</div><input class="fi vf" value="RC-2026-88421" /></div>
+          </div>
+        </div>
+
+        <!-- 3. return flight — not booked — dashed -->
+        <div class="seg" style="border-style:dashed;border-color:rgba(184,134,11,0.2)">
+          <div class="seg-hdr">
+            <span class="emoji">🛬</span>
+            <span class="title">return flight</span>
+            <span class="seg-st nb">not booked</span>
+            <span class="seg-exp">▸</span>
+          </div>
+        </div>
+        <div class="nb-card" style="margin-top:4px">
+          <span class="emoji">💡</span>
+          <div style="flex:1"><span>return flight not booked yet</span><small>we'll remind you to book it later!</small></div>
+          <div class="nb-chk on">✓</div>
+        </div>
+
+        <div class="sdiv"><span>add more travel legs</span></div>
+        <div class="cr" style="justify-content:center">
+          <span class="mc" style="border-style:dashed;color:rgba(44,62,80,0.35)">+ 🚂 train</span>
+          <span class="mc" style="border-style:dashed;color:rgba(44,62,80,0.35)">+ ⛴️ ferry</span>
+          <span class="mc" style="border-style:dashed;color:rgba(44,62,80,0.35)">+ ✈️ another flight</span>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:10px">
+        <button class="btn btn-o">← back</button>
+        <button class="btn btn-v">next: where we're staying →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 4 — ACCOMMODATION (Step 3)
+     Select what you need first, then forms appear.
+     ════════════════════════════════════════════════════ -->
+<div id="s4" class="screen">
+  <div class="screen-title">
+    <h2>step 3 — where we're staying</h2>
+    <p>select what you need first — only selected accommodation types show detail forms below</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell wide">
+      <div class="modal-header">
+        <div class="modal-icon-box vacation">🚢</div>
+        <div class="modal-header-text"><h3>caribbean cruise 2026</h3><p>cruise</p></div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="wiz-bar">
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">trip</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">travel</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s cur"><div class="wiz-dot">3</div><span class="wiz-lbl">stay</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">4</div><span class="wiz-lbl">getting around</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">5</div><span class="wiz-lbl">ideas</span></div>
+      </div>
+      <div class="modal-body">
+        <div class="step-hdr">
+          <span class="step-hdr-emoji">🏨</span>
+          <h4>pillow fort HQ</h4>
+          <p>select what you need — add details for each</p>
+        </div>
+
+        <!-- Add-on pill selector -->
+        <div class="fl">what do you need?</div>
+        <div class="addon-pills">
+          <span class="addon-pill sel" onclick="togPill(this)"><span class="pill-check">✓</span> 🏨 hotel</span>
+          <span class="addon-pill" onclick="togPill(this)"><span class="pill-check"></span> 🏠 airbnb / rental</span>
+          <span class="addon-pill" onclick="togPill(this)"><span class="pill-check"></span> 🏕️ campground</span>
+          <span class="addon-pill" onclick="togPill(this)"><span class="pill-check"></span> 👨‍👩‍👧 family / friends</span>
+        </div>
+
+        <!-- Hotel card — expanded (selected above) -->
+        <div class="seg">
+          <div class="seg-hdr" onclick="toggleSeg(this)">
+            <span class="emoji">🏨</span>
+            <span class="title">pre-cruise hotel</span>
+            <span class="kv"><strong>CVH-44892</strong> · jul 10–11</span>
+            <span class="seg-st booked">✓ booked</span>
+            <span class="seg-exp">▾</span>
+          </div>
+          <div class="seg-body">
+            <div class="fg"><div class="fl">hotel name</div><input class="fi vf" value="condado vanderbilt hotel" /></div>
+            <div class="fg"><div class="fl">address</div><input class="fi vf" value="1055 ashford ave, san juan, PR" /></div>
+            <div class="fr">
+              <div class="fg"><div class="fl">check-in</div><input class="fi vf" type="date" value="2026-07-10" /></div>
+              <div class="fg"><div class="fl">check-out</div><input class="fi vf" type="date" value="2026-07-11" /></div>
+            </div>
+            <div class="fr">
+              <div class="fg"><div class="fl">confirmation #</div><input class="fi vf" value="CVH-44892" /></div>
+              <div class="fg"><div class="fl">room type</div><input class="fi vf" value="family suite — ocean view" /></div>
+            </div>
+            <div class="fg"><div class="fl">contact / phone <span class="badge badge-o">optional</span></div><input class="fi vf" value="+1 (787) 721-5500" /></div>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:8px">
+          <button class="btn btn-o" style="font-size:12px;padding:9px 16px">+ add another stay</button>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:10px">
+        <button class="btn btn-o">← back</button>
+        <button class="btn btn-v">next: getting around →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 5 — GETTING AROUND (Step 4)
+     Select what you need first.
+     ════════════════════════════════════════════════════ -->
+<div id="s5" class="screen">
+  <div class="screen-title">
+    <h2>step 4 — getting around</h2>
+    <p>select transportation types first — only selected ones show detail forms</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell wide">
+      <div class="modal-header">
+        <div class="modal-icon-box vacation">🚢</div>
+        <div class="modal-header-text"><h3>caribbean cruise 2026</h3><p>cruise</p></div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="wiz-bar">
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">trip</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">travel</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">stay</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s cur"><div class="wiz-dot">4</div><span class="wiz-lbl">getting around</span></div>
+        <div class="wiz-con"></div>
+        <div class="wiz-s future"><div class="wiz-dot">5</div><span class="wiz-lbl">ideas</span></div>
+      </div>
+      <div class="modal-body">
+        <div class="step-hdr">
+          <span class="step-hdr-emoji">🚕</span>
+          <h4>bean transportation dept.</h4>
+          <p>select what you need — skip the rest!</p>
+        </div>
+
+        <div class="fl">what do you need?</div>
+        <div class="addon-pills">
+          <span class="addon-pill sel" onclick="togPill(this)"><span class="pill-check">✓</span> 🚐 airport shuttle</span>
+          <span class="addon-pill sel" onclick="togPill(this)"><span class="pill-check">✓</span> 🚗 rental car</span>
+          <span class="addon-pill" onclick="togPill(this)"><span class="pill-check"></span> 🚕 taxi / rideshare</span>
+          <span class="addon-pill" onclick="togPill(this)"><span class="pill-check"></span> 🚂 train</span>
+          <span class="addon-pill" onclick="togPill(this)"><span class="pill-check"></span> 🚌 bus</span>
+        </div>
+
+        <!-- Shuttle — booked, collapsed -->
+        <div class="seg">
+          <div class="seg-hdr" onclick="toggleSeg(this)">
+            <span class="emoji">🚐</span>
+            <span class="title">airport → hotel shuttle</span>
+            <span class="kv"><strong>ISPR-7782</strong> · jul 11</span>
+            <span class="seg-st booked">✓ booked</span>
+            <span class="seg-exp">▸</span>
+          </div>
+        </div>
+
+        <!-- Rental car — researching, expanded -->
+        <div class="seg" style="border-color:rgba(184,134,11,0.15);border-style:dashed">
+          <div class="seg-hdr" onclick="toggleSeg(this)">
+            <span class="emoji">🚗</span>
+            <span class="title">rental car <span class="sub">— for port day exploring</span></span>
+            <span class="seg-st pending">🔍 researching</span>
+            <span class="seg-exp">▾</span>
+          </div>
+          <div class="seg-body">
+            <div class="nb-card" style="margin-bottom:10px">
+              <span class="emoji">📝</span>
+              <div style="flex:1"><span>not finalized yet</span><small>we'll remind you as the trip gets closer!</small></div>
+              <div class="nb-chk on">✓</div>
+            </div>
+            <div class="fg"><div class="fl">notes</div><textarea class="fi vf" style="min-height:50px">checking prices for st. thomas port day. lisa looking at hertz vs budget. need car seat for jack!</textarea></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:10px">
+        <button class="btn btn-o">← back</button>
+        <button class="btn btn-v">next: things to do →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 6 — IDEAS & BUCKET LIST (Step 5)
+     Category as a small inline tag, not filter pills.
+     ════════════════════════════════════════════════════ -->
+<div id="s6" class="screen">
+  <div class="screen-title">
+    <h2>step 5 — things to do!</h2>
+    <p>quick-add creates the title. tap any idea to open the view/edit modal (shown on right) for full details.</p>
+  </div>
+  <div style="display:flex;gap:24px;justify-content:center;align-items:flex-start;flex-wrap:wrap;padding:0 8px">
+    <!-- LEFT: Ideas list in wizard -->
+    <div class="modal-shell wide" style="flex:1;min-width:320px;max-width:580px">
+      <div class="modal-header">
+        <div class="modal-icon-box vacation">🚢</div>
+        <div class="modal-header-text"><h3>caribbean cruise 2026</h3><p>cruise</p></div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="wiz-bar">
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">trip</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">travel</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">stay</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s done"><div class="wiz-dot">✓</div><span class="wiz-lbl">getting around</span></div>
+        <div class="wiz-con done"></div>
+        <div class="wiz-s cur"><div class="wiz-dot">5</div><span class="wiz-lbl">ideas</span></div>
+      </div>
+      <div class="modal-body">
+        <div class="step-hdr">
+          <span class="step-hdr-emoji">🌟</span>
+          <h4>bean bucket list!</h4>
+          <p>what do the beans want to see and do? tap an idea to add details.</p>
+        </div>
+
+        <div class="idea" style="border-color:var(--vacation-teal);border-width:2px;background:rgba(0,180,216,0.02)">
+          <div class="idea-vote"><button class="voted">❤️</button><span class="cnt">4</span></div>
+          <div class="idea-content">
+            <div class="idea-title">snorkel at trunk bay 🐠</div>
+            <div class="idea-desc">the underwater snorkeling trail in st. john — perfect for kids!</div>
+            <div class="idea-meta">
+              <span class="idea-tag">🏖️ beach</span>
+              <span class="idea-tag" style="background:rgba(39,174,96,0.08);color:#27AE60">🆓 free</span>
+              <span class="idea-author"><span class="idea-author-dot" style="background:#3498DB">G</span> greg</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="idea">
+          <div class="idea-vote"><button class="voted">❤️</button><span class="cnt">3</span></div>
+          <div class="idea-content">
+            <div class="idea-title">pirate ship excursion ☠️</div>
+            <div class="idea-desc">kids dress up as pirates, sword fighting, and treasure hunt!</div>
+            <div class="idea-meta">
+              <span class="idea-tag">🎭 activity</span>
+              <span class="idea-tag" style="background:var(--tint-orange-8);color:var(--heritage-orange)">💰 ~$120</span>
+              <span class="idea-author"><span class="idea-author-dot" style="background:#F39C12">E</span> emma</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="idea">
+          <div class="idea-vote"><button>🤍</button><span class="cnt">2</span></div>
+          <div class="idea-content">
+            <div class="idea-title">magens bay beach day 🌴</div>
+            <div class="idea-desc">one of the best beaches in the world! calm water for the little beans.</div>
+            <div class="idea-meta">
+              <span class="idea-tag">🏖️ beach</span>
+              <span class="idea-author"><span class="idea-author-dot" style="background:#E74C8B">L</span> lisa</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="idea">
+          <div class="idea-vote"><button>🤍</button><span class="cnt">1</span></div>
+          <div class="idea-content">
+            <div class="idea-title">find the best ice cream 🍦</div>
+            <div class="idea-desc">try a different ice cream shop at every port. vote for the winner!</div>
+            <div class="idea-meta">
+              <span class="idea-tag">🍽️ food</span>
+              <span class="idea-author"><span class="idea-author-dot" style="background:#27AE60">J</span> jack</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <input class="fi vf" placeholder="add an idea... what should we do? 🤩" style="flex:1" />
+          <button style="width:42px;height:42px;border-radius:12px;background:var(--vacation-gradient);border:none;color:white;font-size:18px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center">+</button>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:10px">
+        <button class="btn btn-o">← back</button>
+        <button class="btn btn-v">🎉 save vacation!</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Idea view/edit modal (opens when you tap an idea) -->
+    <div class="modal-shell" style="flex:0 0 380px;max-width:400px">
+      <div class="idea-modal-hero">
+        <div class="idea-modal-vote">
+          <button>❤️</button>
+          <span class="cnt">4</span>
+          <span class="lbl">votes</span>
+        </div>
+        <div style="flex:1">
+          <input class="idea-modal-title-input" value="snorkel at trunk bay 🐠" />
+          <div class="idea-modal-author">
+            <span class="idea-author-dot" style="background:#3498DB">G</span> added by greg · mar 18
+          </div>
+        </div>
+        <button class="modal-close" style="flex-shrink:0">✕</button>
+      </div>
+      <div class="modal-body" style="max-height:50vh">
+        <!-- Category -->
+        <div class="fg">
+          <div class="fl">category</div>
+          <div class="cr">
+            <span class="mc sel" style="border-color:var(--vacation-teal);background:var(--vacation-teal-tint);color:var(--vacation-teal)">🏖️ beach</span>
+            <span class="mc">🎭 activity</span>
+            <span class="mc">🍽️ food</span>
+            <span class="mc">📸 sightseeing</span>
+            <span class="mc">🛍️ shopping</span>
+            <span class="mc">🎉 nightlife</span>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="fg">
+          <div class="fl">description</div>
+          <textarea class="fi vf" rows="3">the underwater snorkeling trail in st. john — perfect for kids! clear water and loads of fish. we can rent gear at the beach shack.</textarea>
+        </div>
+
+        <!-- Port / Location -->
+        <div class="fg">
+          <div class="fl">port / location <span class="badge badge-o">optional</span></div>
+          <input class="fi vf" value="st. john, USVI — trunk bay" />
+        </div>
+
+        <!-- Which day? -->
+        <div class="fg">
+          <div class="fl">which day? <span class="badge badge-o">optional</span></div>
+          <input class="fi vf" type="date" value="2026-07-14" />
+        </div>
+
+        <!-- Cost -->
+        <div class="fg">
+          <div class="fl">estimated cost</div>
+          <div class="fr">
+            <div>
+              <div class="cr">
+                <span class="mc sel" style="border-color:var(--green-confirm);background:rgba(39,174,96,0.08);color:var(--green-confirm)">🆓 free</span>
+                <span class="mc">💰 paid</span>
+              </div>
+            </div>
+            <div>
+              <div style="display:flex;align-items:center;gap:5px;background:var(--tint-slate-5);border-radius:10px;padding:8px 12px;opacity:0.35">
+                <span style="font-family:'Outfit';font-size:12px;font-weight:600;color:rgba(44,62,80,0.4)">$</span>
+                <input type="text" value="0" disabled style="font-family:'Outfit';font-size:14px;font-weight:700;color:var(--deep-slate);background:transparent;border:none;outline:none;width:50px" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Duration -->
+        <div class="fg">
+          <div class="fl">duration <span class="badge badge-o">optional</span></div>
+          <div class="cr">
+            <span class="mc">30 min</span>
+            <span class="mc">1 hr</span>
+            <span class="mc sel" style="border-color:var(--vacation-teal);background:var(--vacation-teal-tint);color:var(--vacation-teal)">2 hrs</span>
+            <span class="mc">half day</span>
+            <span class="mc">full day</span>
+          </div>
+        </div>
+
+        <!-- Booking info -->
+        <div class="fg">
+          <div class="fl">booking / reservation <span class="badge badge-o">optional</span></div>
+          <div class="cr" style="margin-bottom:8px">
+            <span class="mc sel" style="border-color:var(--green-confirm);background:rgba(39,174,96,0.08);color:var(--green-confirm)">✓ no booking needed</span>
+            <span class="mc">📋 needs booking</span>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="fg">
+          <div class="fl">notes <span class="badge badge-o">optional</span></div>
+          <textarea class="fi vf" rows="2" placeholder="any extra details...">bring waterproof camera! check tide times — low tide is best for snorkeling the trail.</textarea>
+        </div>
+
+        <!-- Who voted -->
+        <div class="fg">
+          <div class="fl">who's interested</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span class="idea-author-dot" style="background:#3498DB;width:22px;height:22px;font-size:9px">G</span>
+            <span class="idea-author-dot" style="background:#E74C8B;width:22px;height:22px;font-size:9px">L</span>
+            <span class="idea-author-dot" style="background:#F39C12;width:22px;height:22px;font-size:9px">E</span>
+            <span class="idea-author-dot" style="background:#27AE60;width:22px;height:22px;font-size:9px">J</span>
+            <span style="font-family:'Outfit';font-size:11px;font-weight:500;color:rgba(44,62,80,0.4);margin-left:4px">everyone!</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="gap:8px">
+        <button style="background:none;border:none;font-size:16px;cursor:pointer;padding:8px;border-radius:10px;opacity:0.4" title="delete idea">🗑️</button>
+        <button class="btn btn-v" style="flex:1">save idea</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 7 — CELEBRATION CONFIRMATION
+     ════════════════════════════════════════════════════ -->
+<div id="s7" class="screen">
+  <div class="screen-title">
+    <h2>vacation created!</h2>
+    <p>fun, clean summary with beanie celebration image and countdown</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell">
+      <div class="cele-body" style="position:relative">
+        <div class="confetti-container" id="confetti-container"></div>
+        <!-- beanie celebration circle -->
+        <div class="cele-img">🏖️</div>
+        <div class="cele-title">bon voyage, beans!</div>
+        <div class="cele-sub">your vacation is saved and ready to share with the family</div>
+
+        <div style="margin-bottom:16px">
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:6px 16px;border-radius:12px;background:var(--vacation-gradient);color:white;font-family:'Outfit';font-size:14px;font-weight:700">✈️ 113 days until takeoff!</span>
+        </div>
+
+        <div class="cele-details">
+          <div class="cele-row"><span class="emoji">🚢</span><span class="lbl">trip</span><span class="val">caribbean cruise 2026</span></div>
+          <div class="cele-row"><span class="emoji">📅</span><span class="lbl">when</span><span class="val">jul 10 – jul 18, 2026</span></div>
+          <div class="cele-row"><span class="emoji">👨‍👩‍👧‍👦</span><span class="lbl">who</span><span class="val">all beans! (4 going)</span></div>
+          <div class="cele-row"><span class="emoji">✅</span><span class="lbl">booked</span><span class="val" style="color:var(--green-confirm)">4 of 6 items</span></div>
+          <div class="cele-row"><span class="emoji">⏳</span><span class="lbl">to-do</span><span class="val" style="color:#B8860B">2 items need booking</span></div>
+          <div class="cele-row"><span class="emoji">💡</span><span class="lbl">ideas</span><span class="val">4 on the bucket list</span></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:center">
+        <button class="btn btn-v" style="max-width:260px">awesome, let's go! 🌴</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 8 — VACATION VIEW MODAL (collapsible sections)
+     ════════════════════════════════════════════════════ -->
+<div id="s8" class="screen">
+  <div class="screen-title">
+    <h2>vacation view — all details at a glance</h2>
+    <p>inline-editable fields (dashed underline). each expanded card has an "edit in wizard" button. tap codes to copy.</p>
+  </div>
+  <div class="modal-backdrop">
+    <div class="modal-shell" style="max-width:560px">
+      <!-- Hero -->
+      <div class="view-hero">
+        <div class="view-hero-top">
+          <div>
+            <span class="view-hero-emoji">🚢</span>
+            <h3>caribbean cruise 2026</h3>
+            <div class="view-hero-dest">📍 eastern caribbean</div>
+          </div>
+          <button class="view-hero-close">✕</button>
+        </div>
+        <div class="view-hero-meta">
+          <span class="view-hero-pill">📅 jul 10 – 18</span>
+          <span class="view-hero-pill">🌴 9 days</span>
+          <span class="view-hero-pill">✈️ 113 days!</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:12px;position:relative;z-index:1">
+          <span class="view-hero-av" style="background:#3498DB">G</span>
+          <span class="view-hero-av" style="background:#E74C8B">L</span>
+          <span class="view-hero-av" style="background:#F39C12">E</span>
+          <span class="view-hero-av" style="background:#27AE60">J</span>
+          <span style="font-size:11px;color:rgba(255,255,255,0.65);margin-left:8px;font-family:'Outfit';font-weight:500">all beans going!</span>
+        </div>
+      </div>
+
+      <div class="view-body">
+        <!-- Progress -->
+        <div class="view-sec" style="padding-top:12px;padding-bottom:12px">
+          <div class="prog"><span style="font-size:13px">📋</span><div class="prog-track"><div class="prog-fill" style="width:67%"></div></div><span class="prog-lbl">4 of 6 booked</span></div>
+        </div>
+
+        <!-- CHRONOLOGICAL TIMELINE -->
+        <div class="view-sec">
+          <div class="view-sec-hdr">
+            <div class="view-sec-icon" style="background:var(--vacation-teal-tint)">📅</div>
+            <div><div class="view-sec-title">your trip timeline</div><div class="view-sec-sub">sorted by date · tap to copy · click fields to edit inline</div></div>
+          </div>
+
+          <!-- DATE: jul 10 -->
+          <div style="font-family:'Outfit';font-size:10px;font-weight:600;color:rgba(44,62,80,0.35);text-transform:uppercase;letter-spacing:0.05em;padding:8px 0 4px;margin-top:4px;border-top:1px dashed rgba(44,62,80,0.06)">thu, jul 10</div>
+
+          <!-- Hotel check-in — EXPANDED with inline editable fields -->
+          <div class="vc">
+            <div class="vc-hdr" onclick="toggleVC(this)">
+              <span class="emoji">🏨</span>
+              <span class="title">hotel check-in</span>
+              <span class="kv"><strong>CVH-44892</strong> · condado vanderbilt</span>
+              <span class="seg-st booked" style="font-size:8px">✓</span>
+              <span class="seg-exp">▾</span>
+            </div>
+            <div class="vc-body">
+              <div class="vc-edit-row"><span class="vc-lbl">hotel</span><input class="vc-edit-input" value="condado vanderbilt hotel" style="font-weight:500" /></div>
+              <div class="vc-edit-row"><span class="vc-lbl">room</span><input class="vc-edit-input" value="family suite — ocean view" /></div>
+              <div class="vc-edit-row"><span class="vc-lbl">address</span><span class="vc-val"><span class="cp" onclick="copyV(this,'1055 Ashford Ave, San Juan, PR')" style="font-weight:400;font-family:'Inter';font-size:11px">1055 ashford ave, san juan <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+              <div class="vc-edit-row"><span class="vc-lbl">confirmation</span><span class="vc-val"><span class="cp" onclick="copyV(this,'CVH-44892')">CVH-44892 <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+              <div class="vc-edit-row"><span class="vc-lbl">phone</span><span class="vc-val"><span class="cp" onclick="copyV(this,'+1 (787) 721-5500')" style="font-weight:400;font-family:'Inter';font-size:11px">+1 (787) 721-5500 <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+              <div class="vc-edit-row"><span class="vc-lbl">notes</span><input class="vc-edit-input" placeholder="add a note..." value="" style="color:rgba(44,62,80,0.3)" /></div>
+              <button class="vc-section-edit">✏️ edit in wizard → stay</button>
+            </div>
+          </div>
+
+          <!-- DATE: jul 11 -->
+          <div style="font-family:'Outfit';font-size:10px;font-weight:600;color:rgba(44,62,80,0.35);text-transform:uppercase;letter-spacing:0.05em;padding:8px 0 4px;margin-top:4px;border-top:1px dashed rgba(44,62,80,0.06)">fri, jul 11</div>
+
+          <!-- Outbound flight — EXPANDED with inline editable -->
+          <div class="vc">
+            <div class="vc-hdr" onclick="toggleVC(this)">
+              <span class="emoji">🛫</span>
+              <span class="title">outbound flight</span>
+              <span class="kv"><strong>DL 1842</strong> · 8:30am · JFK → SJU</span>
+              <span class="seg-st booked" style="font-size:8px">✓</span>
+              <span class="seg-exp">▾</span>
+            </div>
+            <div class="vc-body">
+              <div class="vc-edit-row"><span class="vc-lbl">airline</span><input class="vc-edit-input" value="delta airlines" /></div>
+              <div class="vc-edit-row"><span class="vc-lbl">flight</span><span class="vc-val"><span class="cp" onclick="copyV(this,'DL 1842')">DL 1842 <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+              <div class="vc-edit-row"><span class="vc-lbl">route</span><input class="vc-edit-input" value="JFK → SJU" style="font-weight:500" /></div>
+              <div class="vc-edit-row"><span class="vc-lbl">date</span><input class="vc-edit-input" type="date" value="2026-07-11" style="font-weight:500" /></div>
+              <div class="vc-edit-row"><span class="vc-lbl">time</span><input class="vc-edit-input" type="time" value="08:30" style="font-weight:500" /></div>
+              <div class="vc-edit-row"><span class="vc-lbl">booking</span><span class="vc-val"><span class="cp" onclick="copyV(this,'GKXT4R')">GKXT4R <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+              <div class="vc-edit-row"><span class="vc-lbl">notes</span><input class="vc-edit-input" value="terminal 4 — check-in by 6:30am" /></div>
+              <button class="vc-section-edit">✏️ edit in wizard → travel</button>
+            </div>
+          </div>
+
+          <!-- Airport shuttle — collapsed -->
+          <div class="vc">
+            <div class="vc-hdr" onclick="toggleVC(this)">
+              <span class="emoji">🚐</span>
+              <span class="title">airport → hotel shuttle</span>
+              <span class="kv"><strong>ISPR-7782</strong> · island shuttle PR</span>
+              <span class="seg-st booked" style="font-size:8px">✓</span>
+              <span class="seg-exp">▸</span>
+            </div>
+          </div>
+
+          <!-- Hotel check-out -->
+          <div class="vc">
+            <div class="vc-hdr">
+              <span class="emoji">🏨</span>
+              <span class="title">hotel check-out</span>
+              <span class="kv">condado vanderbilt</span>
+            </div>
+          </div>
+
+          <!-- Cruise embark — collapsed -->
+          <div class="vc">
+            <div class="vc-hdr" onclick="toggleVC(this)">
+              <span class="emoji">🚢</span>
+              <span class="title">cruise embarkation</span>
+              <span class="kv"><strong>D-428</strong> · royal caribbean</span>
+              <span class="seg-st booked" style="font-size:8px">✓</span>
+              <span class="seg-exp">▸</span>
+            </div>
+          </div>
+
+          <!-- DATE: jul 11–18 (at sea) -->
+          <div style="font-family:'Outfit';font-size:10px;font-weight:600;color:var(--vacation-teal);text-transform:uppercase;letter-spacing:0.05em;padding:8px 0 4px;margin-top:4px;border-top:1px dashed rgba(0,180,216,0.15);display:flex;align-items:center;gap:6px">🚢 jul 11 – jul 18 · at sea</div>
+
+          <!-- DATE: jul 18 -->
+          <div style="font-family:'Outfit';font-size:10px;font-weight:600;color:rgba(44,62,80,0.35);text-transform:uppercase;letter-spacing:0.05em;padding:8px 0 4px;margin-top:4px;border-top:1px dashed rgba(44,62,80,0.06)">sat, jul 18</div>
+
+          <!-- Cruise disembark -->
+          <div class="vc">
+            <div class="vc-hdr">
+              <span class="emoji">🚢</span>
+              <span class="title">cruise disembarkation</span>
+              <span class="kv">san juan, PR</span>
+              <span class="seg-st booked" style="font-size:8px">✓</span>
+            </div>
+          </div>
+
+          <!-- GAP: post-cruise hotel not booked -->
+          <div class="view-nb">
+            <span class="emoji">🏨</span>
+            <div style="flex:1"><span>post-cruise hotel — still deciding</span><small>gap: no stay booked for jul 18</small></div>
+            <span style="font-size:13px">🤔</span>
+          </div>
+
+          <!-- GAP: return flight not booked -->
+          <div class="view-nb">
+            <span class="emoji">🛬</span>
+            <div style="flex:1"><span>return flight — not booked yet</span><small>gap: no way home booked!</small></div>
+            <span style="font-size:13px">⏳</span>
+          </div>
+
+          <!-- GAP: rental car researching -->
+          <div class="view-nb">
+            <span class="emoji">🚗</span>
+            <div style="flex:1"><span>rental car — still researching</span><small>for port day excursion</small></div>
+            <span style="font-size:13px">🔍</span>
+          </div>
+        </div>
+
+        <!-- 🌟 BUCKET LIST with inline edit + wizard link -->
+        <div class="view-sec">
+          <div class="view-sec-hdr" onclick="toggleViewSec(this)">
+            <div class="view-sec-icon" style="background:var(--vacation-gold-tint)">🌟</div>
+            <div><div class="view-sec-title">bean bucket list</div><div class="view-sec-sub">4 ideas · tap to edit inline</div></div>
+            <span class="view-sec-exp">▾</span>
+          </div>
+          <div style="background:white;border-radius:12px;border:1.5px solid rgba(44,62,80,0.05);padding:3px 12px">
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(44,62,80,0.03)">
+              <span style="font-size:12px">❤️</span>
+              <span style="font-family:'Outfit';font-size:11px;font-weight:700;color:var(--vacation-teal);min-width:16px">4</span>
+              <input class="vc-edit-input" value="snorkel at trunk bay 🐠" style="font-family:'Outfit';font-size:12px;font-weight:500" />
+              <span class="idea-author-dot" style="background:#3498DB;width:16px;height:16px;font-size:7px;flex-shrink:0">G</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(44,62,80,0.03)">
+              <span style="font-size:12px">❤️</span>
+              <span style="font-family:'Outfit';font-size:11px;font-weight:700;color:var(--vacation-teal);min-width:16px">3</span>
+              <input class="vc-edit-input" value="pirate ship excursion ☠️" style="font-family:'Outfit';font-size:12px;font-weight:500" />
+              <span class="idea-author-dot" style="background:#F39C12;width:16px;height:16px;font-size:7px;flex-shrink:0">E</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(44,62,80,0.03)">
+              <span style="font-size:12px">🤍</span>
+              <span style="font-family:'Outfit';font-size:11px;font-weight:700;color:var(--vacation-teal);min-width:16px">2</span>
+              <input class="vc-edit-input" value="magens bay beach day 🌴" style="font-family:'Outfit';font-size:12px;font-weight:500" />
+              <span class="idea-author-dot" style="background:#E74C8B;width:16px;height:16px;font-size:7px;flex-shrink:0">L</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:7px 0">
+              <span style="font-size:12px">🤍</span>
+              <span style="font-family:'Outfit';font-size:11px;font-weight:700;color:var(--vacation-teal);min-width:16px">1</span>
+              <input class="vc-edit-input" value="find the best ice cream 🍦" style="font-family:'Outfit';font-size:12px;font-weight:500" />
+              <span class="idea-author-dot" style="background:#27AE60;width:16px;height:16px;font-size:7px;flex-shrink:0">J</span>
+            </div>
+          </div>
+          <button class="vc-section-edit" style="margin-top:8px">✏️ edit in wizard → ideas</button>
+        </div>
+      </div>
+
+      <div class="view-footer">
+        <button class="vf-btn">✏️ edit all</button>
+        <button class="vf-btn">💡 ideas</button>
+        <button class="vf-btn pri">📤 share</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     SCREEN 9 — PLANNER PAGE (matching real site layout)
+     ════════════════════════════════════════════════════ -->
+<div id="s9" class="screen">
+  <div class="screen-title">
+    <h2>planner page — vacation on calendar & sidebar</h2>
+    <p>matches real FamilyPlannerPage layout. member filter collapsed to save space. vacation card prominent in sidebar.</p>
+  </div>
+
+  <div class="planner-layout">
+    <div class="planner-main">
+      <!-- Header: subtitle + add button (matches real layout) -->
+      <div class="ph-row">
+        <span class="ph-sub">what are the beans up to?</span>
+        <button class="ph-add">+ add activity</button>
+      </div>
+
+      <!-- View toggle + compact member filter (space-efficient redesign) -->
+      <div class="ph-row">
+        <div class="view-tog">
+          <button class="active">month</button>
+          <button>week</button>
+        </div>
+        <!-- Compact member filter: avatars + dropdown instead of full chip row -->
+        <div class="mf-compact">
+          <div class="mf-avatars">
+            <span class="mf-av" style="background:#3498DB">G</span>
+            <span class="mf-av" style="background:#E74C8B">L</span>
+            <span class="mf-av" style="background:#F39C12">E</span>
+            <span class="mf-av" style="background:#27AE60">J</span>
+          </div>
+          <span class="mf-lbl">all members</span>
+          <span class="mf-arrow">▾</span>
+        </div>
+      </div>
+
+      <!-- Calendar -->
+      <div class="cal-shell">
+        <div class="cal-hdr">
+          <div class="cal-month">july 2026</div>
+          <div class="cal-nav"><button>‹</button><button>›</button></div>
+        </div>
+        <div class="cal-wk">
+          <div class="cal-wd">sun</div><div class="cal-wd">mon</div><div class="cal-wd">tue</div><div class="cal-wd">wed</div><div class="cal-wd">thu</div><div class="cal-wd">fri</div><div class="cal-wd">sat</div>
+        </div>
+        <div class="cal-grid">
+          <!-- Week 1 -->
+          <div class="cal-d om"><span class="dn">28</span></div>
+          <div class="cal-d om"><span class="dn">29</span></div>
+          <div class="cal-d om"><span class="dn">30</span></div>
+          <div class="cal-d"><span class="dn">1</span><div class="dd"><span style="background:#3498DB"></span></div></div>
+          <div class="cal-d"><span class="dn">2</span></div>
+          <div class="cal-d"><span class="dn">3</span><div class="dd"><span style="background:#E74C3C"></span><span style="background:#27AE60"></span></div></div>
+          <div class="cal-d"><span class="dn">4</span></div>
+          <!-- Week 2: days — vacation starts fri 10 -->
+          <div class="cal-d"><span class="dn">5</span></div>
+          <div class="cal-d"><span class="dn">6</span><div class="dd"><span style="background:#3498DB"></span></div></div>
+          <div class="cal-d"><span class="dn">7</span><div class="dd"><span style="background:#9B59B6"></span></div></div>
+          <div class="cal-d"><span class="dn">8</span><div class="dd"><span style="background:#3498DB"></span></div></div>
+          <div class="cal-d"><span class="dn">9</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">10</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">11</span></div>
+          <!-- Vacation bar: sits directly below days 10-11, connected by tint -->
+          <div style="grid-column:1/6"></div>
+          <div class="cal-vac-span" style="grid-column:6/8;border-radius:0 0 5px 5px;background:linear-gradient(90deg,var(--vacation-teal),#0096b7);margin-top:-2px"><span class="emoji">🚢</span><span class="label">caribbean cruise...</span></div>
+          <!-- Week 3: vacation week — days tinted -->
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">12</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">13</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">14</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">15</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">16</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">17</span></div>
+          <div class="cal-d" style="background:var(--vacation-teal-tint);border-radius:10px 10px 0 0"><span class="dn">18</span></div>
+          <!-- Vacation bar: full-width below days 12-18, connected by tint -->
+          <div class="cal-vac-span" style="grid-column:1/8;border-radius:0 0 5px 5px;background:linear-gradient(90deg,#0096b7,#0077B6);margin-top:-2px"><span class="emoji">🚢</span><span class="label">caribbean cruise 2026 — eastern caribbean</span></div>
+          <!-- Week 4 -->
+          <div class="cal-d"><span class="dn">19</span></div>
+          <div class="cal-d"><span class="dn">20</span><div class="dd"><span style="background:#3498DB"></span></div></div>
+          <div class="cal-d"><span class="dn">21</span></div>
+          <div class="cal-d"><span class="dn">22</span><div class="dd"><span style="background:#E74C3C"></span></div></div>
+          <div class="cal-d"><span class="dn">23</span></div>
+          <div class="cal-d"><span class="dn">24</span><div class="dd"><span style="background:#9B59B6"></span><span style="background:#27AE60"></span></div></div>
+          <div class="cal-d"><span class="dn">25</span></div>
+          <!-- Week 5 -->
+          <div class="cal-d"><span class="dn">26</span></div>
+          <div class="cal-d"><span class="dn">27</span><div class="dd"><span style="background:#3498DB"></span></div></div>
+          <div class="cal-d"><span class="dn">28</span></div>
+          <div class="cal-d"><span class="dn">29</span></div>
+          <div class="cal-d"><span class="dn">30</span></div>
+          <div class="cal-d"><span class="dn">31</span></div>
+          <div class="cal-d om"><span class="dn">1</span></div>
+        </div>
+      </div>
+
+      <!-- Two-column: Upcoming + Todo (matches real grid-cols-2 layout) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+        <div class="sb-sec">
+          <div class="sb-title">📋 upcoming activities</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(44,62,80,0.04)">
+            <div style="width:3px;height:32px;border-radius:2px;background:#3498DB"></div>
+            <div style="flex:1"><div style="font-family:'Outfit';font-size:12px;font-weight:600">⚽ soccer practice</div><div style="font-size:10px;color:rgba(44,62,80,0.35)">tomorrow · 4:00 PM</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(44,62,80,0.04)">
+            <div style="width:3px;height:32px;border-radius:2px;background:#9B59B6"></div>
+            <div style="flex:1"><div style="font-family:'Outfit';font-size:12px;font-weight:600">🎹 piano lesson</div><div style="font-size:10px;color:rgba(44,62,80,0.35)">wed · 3:30 PM</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
+            <div style="width:3px;height:32px;border-radius:2px;background:#E74C3C"></div>
+            <div style="flex:1"><div style="font-family:'Outfit';font-size:12px;font-weight:600">🏥 dentist — emma</div><div style="font-size:10px;color:rgba(44,62,80,0.35)">fri · 10:00 AM</div></div>
+          </div>
+        </div>
+        <div class="sb-sec">
+          <div class="sb-title">✅ to-do preview</div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(44,62,80,0.04)">
+            <div style="width:16px;height:16px;border-radius:4px;border:1.5px solid rgba(44,62,80,0.15)"></div>
+            <div style="flex:1"><div style="font-family:'Outfit';font-size:12px;font-weight:600">pack sunscreen & beach toys</div><div style="font-size:10px;color:rgba(44,62,80,0.35)">due jul 8</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(44,62,80,0.04)">
+            <div style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--green-confirm);background:rgba(39,174,96,0.1);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--green-confirm)">✓</div>
+            <div style="flex:1;opacity:0.5"><div style="font-family:'Outfit';font-size:12px;font-weight:600;text-decoration:line-through">renew passports</div><div style="font-size:10px;color:rgba(44,62,80,0.35)">done mar 15</div></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:8px 0">
+            <div style="width:16px;height:16px;border-radius:4px;border:1.5px solid rgba(44,62,80,0.15)"></div>
+            <div style="flex:1"><div style="font-family:'Outfit';font-size:12px;font-weight:600">book return flight</div><div style="font-size:10px;color:#B8860B">⚠️ vacation item — not booked</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="planner-sidebar">
+      <!-- Upcoming Vacations -->
+      <div class="sb-sec" style="background:linear-gradient(180deg,white,rgba(0,180,216,0.02))">
+        <div class="sb-title">✈️ upcoming vacations</div>
+        <div class="vac-card">
+          <div class="vac-card-top">
+            <span class="vac-card-emoji">🚢</span>
+            <div>
+              <div class="vac-card-name">caribbean cruise 2026</div>
+              <div class="vac-card-dest">📍 eastern caribbean</div>
+            </div>
+          </div>
+          <div class="vac-card-dates">📅 jul 10 – jul 18, 2026</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span class="vac-countdown">✈️ 113 days!</span>
+            <div style="display:flex;margin-left:auto">
+              <span class="view-hero-av" style="background:#3498DB;width:18px;height:18px;font-size:7px;border-width:1.5px">G</span>
+              <span class="view-hero-av" style="background:#E74C8B;width:18px;height:18px;font-size:7px;border-width:1.5px">L</span>
+              <span class="view-hero-av" style="background:#F39C12;width:18px;height:18px;font-size:7px;border-width:1.5px">E</span>
+              <span class="view-hero-av" style="background:#27AE60;width:18px;height:18px;font-size:7px;border-width:1.5px">J</span>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div class="prog-track" style="height:5px"><div class="prog-fill" style="width:67%;height:100%;border-radius:3px"></div></div>
+            <span class="prog-lbl" style="font-size:10px">4/6 booked</span>
+          </div>
+          <div class="vac-pending">⏳ 2 items need booking</div>
+        </div>
+
+        <div class="vac-card" style="opacity:0.85">
+          <div class="vac-card-top">
+            <span class="vac-card-emoji">⛷️</span>
+            <div>
+              <div class="vac-card-name">ski trip — vermont</div>
+              <div class="vac-card-dest">📍 stowe, VT</div>
+            </div>
+          </div>
+          <div class="vac-card-dates">📅 dec 20 – dec 27, 2026</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span class="vac-countdown" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">⛷️ 275 days!</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <div class="prog-track" style="height:5px"><div class="prog-fill" style="width:20%;height:100%;border-radius:3px;background:linear-gradient(135deg,#A78BFA,#7C3AED)"></div></div>
+            <span class="prog-lbl" style="font-size:10px;color:#7C3AED">1/5 booked</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.mockup-nav button').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    if (id === 's7') setTimeout(spawnConfetti, 300);
+  }
+  function selTab(btn) { btn.parentElement.querySelectorAll('.sched-tab').forEach(t => t.classList.remove('active')); btn.classList.add('active'); }
+  function selVT(card) { card.parentElement.querySelectorAll('.vtype').forEach(c => c.classList.remove('sel')); card.classList.add('sel'); }
+  function togPill(pill) { pill.classList.toggle('sel'); var ch = pill.querySelector('.pill-check'); ch.textContent = pill.classList.contains('sel') ? '✓' : ''; }
+  function toggleSeg(hdr) { var body = hdr.nextElementSibling; if (body && body.classList.contains('seg-body')) { body.style.display = body.style.display === 'none' ? 'block' : 'none'; hdr.querySelector('.seg-exp').textContent = body.style.display === 'none' ? '▸' : '▾'; } }
+  function toggleVC(hdr) { var body = hdr.nextElementSibling; if (body && body.classList.contains('vc-body')) { body.style.display = body.style.display === 'none' ? 'block' : 'none'; hdr.querySelector('.seg-exp').textContent = body.style.display === 'none' ? '▸' : '▾'; } }
+  function toggleViewSec(hdr) { var exp = hdr.querySelector('.view-sec-exp'); exp.textContent = exp.textContent === '▾' ? '▸' : '▾'; }
+  function copyV(el, text) { if (navigator.clipboard) navigator.clipboard.writeText(text); el.classList.add('copied'); setTimeout(() => el.classList.remove('copied'), 1200); }
+  function spawnConfetti() {
+    var c = document.getElementById('confetti-container'); if (!c) return; c.innerHTML = '';
+    var colors = ['#00B4D8','#FFD93D','#FF6B6B','#F15D22','#27AE60','#9B59B6','#AED6F1'];
+    for (var i = 0; i < 40; i++) { var d = document.createElement('div'); d.className = 'confetti'; d.style.left = Math.random()*100+'%'; d.style.top = '-10px'; d.style.background = colors[Math.floor(Math.random()*colors.length)]; d.style.animationDelay = Math.random()*0.8+'s'; d.style.animationDuration = (1.5+Math.random())+'s'; d.style.width = (6+Math.random()*6)+'px'; d.style.height = (6+Math.random()*6)+'px'; d.style.borderRadius = Math.random()>0.5?'50%':'2px'; c.appendChild(d); }
+  }
+</script>
+</body>
+</html>
