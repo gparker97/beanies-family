@@ -10,6 +10,9 @@ import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { AIRLINES } from '@/constants/airlines';
 import { AIRPORTS } from '@/constants/airports';
+import { CRUISE_LINES } from '@/constants/cruiseLines';
+import { CRUISE_SHIPS } from '@/constants/cruiseShips';
+import { CRUISE_PORTS } from '@/constants/cruisePorts';
 import type {
   VacationTravelSegment,
   VacationTravelType,
@@ -68,6 +71,29 @@ const airportOptions = computed(() =>
   AIRPORTS.map((a) => ({
     value: `${a.city} (${a.code})`,
     label: `${a.city} - ${a.name} (${a.code})`,
+  }))
+);
+
+const cruiseLineOptions = computed(() =>
+  CRUISE_LINES.map((c) => ({
+    value: c.name,
+    label: `${c.name} (${c.shortName})`,
+  }))
+);
+
+// Filter ships by selected cruise line when available
+function cruiseShipOptions(cruiseLine?: string) {
+  const ships = cruiseLine ? CRUISE_SHIPS.filter((s) => s.cruiseLine === cruiseLine) : CRUISE_SHIPS;
+  return ships.map((s) => ({
+    value: s.name,
+    label: cruiseLine ? s.name : `${s.name} — ${s.cruiseLine}`,
+  }));
+}
+
+const cruisePortOptions = computed(() =>
+  CRUISE_PORTS.map((p) => ({
+    value: `${p.city} — ${p.name}`,
+    label: `${p.city} — ${p.name}, ${p.country}`,
   }))
 );
 
@@ -169,15 +195,19 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
   if (field === 'departureDate' || field === 'embarkationDate') {
     updated[index] = { ...updated[index]!, sortDate: value };
   }
-  // Auto-populate arrival from departure when arrival is empty
-  if (field === 'departureDate' && !current.arrivalDate) {
-    updated[index] = { ...updated[index]!, arrivalDate: value };
+  // Auto-populate arrival from departure when arrival is empty or was auto-set to old departure
+  if (field === 'departureDate') {
+    if (!current.arrivalDate || current.arrivalDate === current.departureDate) {
+      updated[index] = { ...updated[index]!, arrivalDate: value };
+    }
   }
   if (field === 'departureTime' && !current.arrivalTime) {
     updated[index] = { ...updated[index]!, arrivalTime: addHourToTime(value) };
   }
-  if (field === 'embarkationDate' && !current.disembarkationDate) {
-    updated[index] = { ...updated[index]!, disembarkationDate: value };
+  if (field === 'embarkationDate') {
+    if (!current.disembarkationDate || current.disembarkationDate === current.embarkationDate) {
+      updated[index] = { ...updated[index]!, disembarkationDate: value };
+    }
   }
 
   // Auto-populate return flight from outbound flight data.
@@ -374,32 +404,41 @@ function removeSegment(index: number) {
       <!-- Cruise fields -->
       <template v-else-if="seg.type === 'cruise'">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.cruiseLine')">
-            <BaseInput
-              :model-value="seg.cruiseLine ?? ''"
-              :placeholder="t('vacation.field.cruiseLine')"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'cruiseLine', String($event))"
-            />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.shipName')">
-            <BaseInput
-              :model-value="seg.shipName ?? ''"
-              :placeholder="t('vacation.field.shipName')"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'shipName', String($event))"
-            />
-          </FormFieldGroup>
+          <BaseCombobox
+            :model-value="seg.cruiseLine ?? ''"
+            :options="cruiseLineOptions"
+            :label="t('vacation.field.cruiseLine')"
+            :placeholder="t('vacation.field.cruiseLine')"
+            :search-placeholder="t('vacation.field.cruiseLine')"
+            other-value="__other__"
+            :other-label="t('form.other' as any) || 'Other'"
+            :other-placeholder="t('vacation.field.cruiseLine')"
+            @update:model-value="updateSegment(idx, 'cruiseLine', String($event))"
+          />
+          <BaseCombobox
+            :model-value="seg.shipName ?? ''"
+            :options="cruiseShipOptions(seg.cruiseLine)"
+            :label="t('vacation.field.shipName')"
+            :placeholder="t('vacation.field.shipName')"
+            :search-placeholder="t('vacation.field.shipName')"
+            other-value="__other__"
+            :other-label="t('form.other' as any) || 'Other'"
+            :other-placeholder="t('vacation.field.shipName')"
+            @update:model-value="updateSegment(idx, 'shipName', String($event))"
+          />
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departurePort')">
-            <BaseInput
-              :model-value="seg.departurePort ?? ''"
-              :placeholder="t('vacation.field.departurePort')"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'departurePort', String($event))"
-            />
-          </FormFieldGroup>
+          <BaseCombobox
+            :model-value="seg.departurePort ?? ''"
+            :options="cruisePortOptions"
+            :label="t('vacation.field.departurePort')"
+            :placeholder="t('vacation.field.departurePort')"
+            :search-placeholder="t('vacation.field.departurePort')"
+            other-value="__other__"
+            :other-label="t('form.other' as any) || 'Other'"
+            :other-placeholder="t('vacation.field.departurePort')"
+            @update:model-value="updateSegment(idx, 'departurePort', String($event))"
+          />
           <FormFieldGroup :label="t('vacation.field.cabinNumber')">
             <BaseInput
               :model-value="seg.cabinNumber ?? ''"

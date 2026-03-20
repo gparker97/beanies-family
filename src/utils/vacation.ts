@@ -35,11 +35,14 @@ export function computeVacationDates(v: {
   const dates: string[] = [];
 
   for (const seg of v.travelSegments) {
+    const hasRealDates =
+      seg.departureDate || seg.arrivalDate || seg.embarkationDate || seg.disembarkationDate;
     if (seg.departureDate) dates.push(extractDatePart(seg.departureDate));
     if (seg.arrivalDate) dates.push(extractDatePart(seg.arrivalDate));
     if (seg.embarkationDate) dates.push(extractDatePart(seg.embarkationDate));
     if (seg.disembarkationDate) dates.push(extractDatePart(seg.disembarkationDate));
-    if (seg.sortDate) dates.push(extractDatePart(seg.sortDate));
+    // sortDate is a UI sort helper — only use as fallback when no real dates exist on this segment
+    if (!hasRealDates && seg.sortDate) dates.push(extractDatePart(seg.sortDate));
   }
 
   for (const acc of v.accommodations) {
