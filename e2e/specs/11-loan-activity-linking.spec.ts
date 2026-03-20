@@ -97,7 +97,7 @@ test.describe('Loan & Activity Linking', () => {
     await clickFeeScheduleMonthly(page);
 
     // Switch to one-off mode
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
 
     // Fill date
     await page.locator('input[type="date"]').fill('2026-04-15');
@@ -239,7 +239,7 @@ test.describe('Loan & Activity Linking', () => {
     await expect(page.getByText(/new activity/i)).toBeVisible();
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Guitar Lesson');
     await selectAssignee(page);
-    await page.getByRole('button', { name: /one-off/i }).click();
+    await page.getByRole('button', { name: /one-time/i }).click();
     await page.locator('input[type="date"]').fill('2026-04-20');
 
     // Save without cost
