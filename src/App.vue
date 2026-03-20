@@ -31,6 +31,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { useBudgetStore } from '@/stores/budgetStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -51,6 +52,7 @@ const assetsStore = useAssetsStore();
 const goalsStore = useGoalsStore();
 const todoStore = useTodoStore();
 const activityStore = useActivityStore();
+const vacationStore = useVacationStore();
 const budgetStore = useBudgetStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
@@ -316,6 +318,7 @@ async function loadFamilyData() {
         recurringStore.loadRecurringItems(),
         todoStore.loadTodos(),
         activityStore.loadActivities(),
+        vacationStore.loadVacations(),
         budgetStore.loadBudgets(),
       ]);
 
