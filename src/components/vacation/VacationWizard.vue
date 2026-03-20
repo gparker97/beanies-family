@@ -12,7 +12,6 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDateShort } from '@/utils/date';
 import { bookingProgress, tripTypeEmoji, daysUntilTrip } from '@/utils/vacation';
-import { generateUUID } from '@/utils/id';
 import type {
   FamilyVacation,
   VacationTripType,
@@ -151,51 +150,6 @@ function goBack() {
   }
 }
 
-function splitCombinedFlights(segments: VacationTravelSegment[]): VacationTravelSegment[] {
-  const result: VacationTravelSegment[] = [];
-  for (const seg of segments) {
-    if (seg.type === 'flight_outbound' && seg.returnDepartureDate) {
-      // Create outbound entry (strip return* fields)
-      const {
-        returnAirline: _ra,
-        returnFlightNumber: _rfn,
-        returnDepartureAirport: _rda,
-        returnArrivalAirport: _raa,
-        returnDepartureDate: _rdd,
-        returnDepartureTime: _rdt,
-        returnArrivalDate: _rad,
-        returnArrivalTime: _rat,
-        returnBookingReference: _rbr,
-        ...outbound
-      } = seg;
-      result.push({
-        ...outbound,
-        title: t('vacation.travel.outboundFlight') as string,
-      });
-      // Create return entry
-      result.push({
-        id: generateUUID(),
-        type: 'flight_return',
-        title: t('vacation.travel.returnFlight') as string,
-        status: seg.returnBookingReference ? 'booked' : seg.status,
-        sortDate: seg.returnDepartureDate,
-        airline: seg.returnAirline,
-        flightNumber: seg.returnFlightNumber,
-        departureAirport: seg.returnDepartureAirport,
-        arrivalAirport: seg.returnArrivalAirport,
-        departureDate: seg.returnDepartureDate,
-        departureTime: seg.returnDepartureTime,
-        arrivalDate: seg.returnArrivalDate,
-        arrivalTime: seg.returnArrivalTime,
-        bookingReference: seg.returnBookingReference,
-      });
-    } else {
-      result.push(seg);
-    }
-  }
-  return result;
-}
-
 async function handleSave() {
   if (!canGoNext.value && currentStep.value === 1) {
     showErrors.value = true;
@@ -206,14 +160,12 @@ async function handleSave() {
   try {
     let saved: FamilyVacation | null;
 
-    const processedSegments = splitCombinedFlights([...travelSegments.value]);
-
     if (isEditing.value && props.vacation) {
       saved = await vacationStore.updateVacation(props.vacation.id, {
         name: name.value.trim(),
         tripType: tripType.value,
         assigneeIds: [...assigneeIds.value],
-        travelSegments: processedSegments,
+        travelSegments: [...travelSegments.value],
         accommodations: [...accommodations.value],
         transportation: [...transportation.value],
         ideas: [...ideas.value],
@@ -223,7 +175,7 @@ async function handleSave() {
         name: name.value.trim(),
         tripType: tripType.value,
         assigneeIds: [...assigneeIds.value],
-        travelSegments: processedSegments,
+        travelSegments: [...travelSegments.value],
         accommodations: [...accommodations.value],
         transportation: [...transportation.value],
         ideas: [...ideas.value],
@@ -378,24 +330,24 @@ const saveLabel = computed(() => {
     <div class="cele-body relative text-center">
       <!-- Confetti -->
       <div class="confetti-container">
-        <div class="confetti-piece" style=" animation-delay: 0s; background: #00b4d8;left: 5%" />
-        <div class="confetti-piece" style=" animation-delay: 0.2s; background: #ffd93d;left: 15%" />
-        <div class="confetti-piece" style=" animation-delay: 0.4s; background: #f15d22;left: 28%" />
-        <div class="confetti-piece" style=" animation-delay: 0.1s; background: #27ae60;left: 40%" />
-        <div class="confetti-piece" style=" animation-delay: 0.5s; background: #00b4d8;left: 52%" />
-        <div class="confetti-piece" style=" animation-delay: 0.3s; background: #ffd93d;left: 65%" />
-        <div class="confetti-piece" style=" animation-delay: 0.6s; background: #f15d22;left: 75%" />
+        <div class="confetti-piece" style="animation-delay: 0s; background: #00b4d8; left: 5%" />
+        <div class="confetti-piece" style="animation-delay: 0.2s; background: #ffd93d; left: 15%" />
+        <div class="confetti-piece" style="animation-delay: 0.4s; background: #f15d22; left: 28%" />
+        <div class="confetti-piece" style="animation-delay: 0.1s; background: #27ae60; left: 40%" />
+        <div class="confetti-piece" style="animation-delay: 0.5s; background: #00b4d8; left: 52%" />
+        <div class="confetti-piece" style="animation-delay: 0.3s; background: #ffd93d; left: 65%" />
+        <div class="confetti-piece" style="animation-delay: 0.6s; background: #f15d22; left: 75%" />
         <div
           class="confetti-piece"
-          style=" animation-delay: 0.15s; background: #27ae60;left: 85%"
+          style="animation-delay: 0.15s; background: #27ae60; left: 85%"
         />
         <div
           class="confetti-piece"
-          style=" animation-delay: 0.45s; background: #00b4d8; border-radius: 50%;left: 92%"
+          style="animation-delay: 0.45s; background: #00b4d8; border-radius: 50%; left: 92%"
         />
         <div
           class="confetti-piece"
-          style=" animation-delay: 0.7s; background: #ffd93d; border-radius: 50%;left: 48%"
+          style="animation-delay: 0.7s; background: #ffd93d; border-radius: 50%; left: 48%"
         />
       </div>
 
