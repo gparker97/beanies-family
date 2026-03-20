@@ -1,10 +1,26 @@
 import { parseLocalDate, extractDatePart } from '@/utils/date';
 import type {
   FamilyVacation,
+  VacationTripType,
   VacationTravelSegment,
   VacationAccommodation,
   VacationTransportation,
 } from '@/types/models';
+
+/** Emoji lookup for vacation trip types */
+const TRIP_TYPE_EMOJIS: Record<VacationTripType, string> = {
+  fly_and_stay: '✈️',
+  cruise: '🚢',
+  road_trip: '🚗',
+  combo: '🎒',
+  camping: '🏕️',
+  adventure: '🏔️',
+};
+
+/** Get the emoji for a vacation trip type, defaulting to ✈️ */
+export function tripTypeEmoji(tripType?: string): string {
+  return TRIP_TYPE_EMOJIS[tripType as VacationTripType] ?? '✈️';
+}
 
 /**
  * Derive the overall start and end dates from all vacation segments.

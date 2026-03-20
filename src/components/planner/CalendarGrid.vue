@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { extractDatePart } from '@/utils/date';
+import { tripTypeEmoji } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import type { ActivityCategory } from '@/types/models';
 
@@ -10,10 +13,14 @@ const props = defineProps<{
   selectedDate?: string;
 }>();
 
-const emit = defineEmits<{ selectDate: [date: string] }>();
+const emit = defineEmits<{
+  selectDate: [date: string];
+  'vacation-click': [vacationId: string];
+}>();
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
+const vacationStore = useVacationStore();
 const settingsStore = useSettingsStore();
 
 const today = new Date();
@@ -80,8 +87,10 @@ const calendarDays = computed(() => {
   const monthOccurrences = activityStore.monthActivities(year, month);
 
   // Build a map of date -> activity info (category + optional color override)
+  // Skip vacation-linked activities — they render as span bars instead
   const dateActivities = new Map<string, Array<{ category: ActivityCategory; color?: string }>>();
   for (const occ of monthOccurrences) {
+    if (occ.activity.vacationId) continue;
     if (!dateActivities.has(occ.date)) {
       dateActivities.set(occ.date, []);
     }
@@ -137,6 +146,77 @@ const calendarDays = computed(() => {
   return days;
 });
 
+// Set of date strings that fall within any vacation (for tinting cells)
+const vacationDateSet = computed(() => {
+  const set = new Set<string>();
+  for (const v of vacationStore.vacations) {
+    if (!v.startDate || !v.endDate) continue;
+    const start = extractDatePart(v.startDate);
+    const end = extractDatePart(v.endDate);
+    for (const cell of calendarDays.value) {
+      if (cell.date >= start && cell.date <= end) {
+        set.add(cell.date);
+      }
+    }
+  }
+  return set;
+});
+
+// Vacation span bars for each week row
+const vacationSpans = computed(() => {
+  const spans: Array<{
+    vacationId: string;
+    name: string;
+    emoji: string;
+    startCol: number;
+    endCol: number;
+    weekIndex: number;
+  }> = [];
+
+  const days = calendarDays.value;
+  const weeksCount = Math.ceil(days.length / 7);
+
+  for (const v of vacationStore.vacations) {
+    if (!v.startDate || !v.endDate) continue;
+    const vStart = extractDatePart(v.startDate);
+    const vEnd = extractDatePart(v.endDate);
+
+    for (let w = 0; w < weeksCount; w++) {
+      let startCol = -1;
+      let endCol = -1;
+      for (let d = 0; d < 7; d++) {
+        const cell = days[w * 7 + d];
+        if (!cell) continue;
+        if (cell.date >= vStart && cell.date <= vEnd) {
+          if (startCol < 0) startCol = d;
+          endCol = d;
+        }
+      }
+      if (startCol >= 0) {
+        spans.push({
+          vacationId: v.id,
+          name: v.name,
+          emoji: tripTypeEmoji(v.tripType),
+          startCol,
+          endCol,
+          weekIndex: w,
+        });
+      }
+    }
+  }
+  return spans;
+});
+
+// Group vacation spans by week row for template rendering
+const vacationSpansByWeek = computed(() => {
+  const map = new Map<number, typeof vacationSpans.value>();
+  for (const span of vacationSpans.value) {
+    if (!map.has(span.weekIndex)) map.set(span.weekIndex, []);
+    map.get(span.weekIndex)!.push(span);
+  }
+  return map;
+});
+
 const activityCount = computed(() => {
   return activityStore.monthActivities(currentYear.value, currentMonth.value).length;
 });
@@ -185,52 +265,79 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
       </div>
     </div>
 
-    <!-- Calendar grid -->
-    <div class="grid grid-cols-7 gap-0">
-      <button
-        v-for="(cell, idx) in calendarDays"
-        :key="idx"
-        type="button"
-        class="relative flex h-[60px] cursor-pointer flex-col items-center justify-start rounded-xl pt-1.5 transition-colors md:h-[72px]"
-        :class="[
-          cell.isCurrentMonth
-            ? 'text-secondary-500 dark:text-gray-200'
-            : 'text-secondary-500/20 dark:text-gray-600',
-          cell.weekRow === todayWeekRow && cell.isCurrentMonth
-            ? 'bg-[rgba(241,93,34,0.04)]'
-            : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
-          props.selectedDate === cell.date ? 'ring-primary-500 ring-2 ring-inset' : '',
-        ]"
-        @click="handleDayClick(cell.date)"
-      >
-        <!-- Day number -->
-        <span
-          class="font-outfit flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
-          :class="
-            cell.isToday
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
-              : ''
-          "
+    <!-- Calendar grid with vacation overlays -->
+    <div class="relative">
+      <div class="grid grid-cols-7 gap-0">
+        <button
+          v-for="(cell, idx) in calendarDays"
+          :key="idx"
+          type="button"
+          class="relative flex h-[60px] cursor-pointer flex-col items-center justify-start rounded-xl pt-1.5 transition-colors md:h-[72px]"
+          :class="[
+            cell.isCurrentMonth
+              ? 'text-secondary-500 dark:text-gray-200'
+              : 'text-secondary-500/20 dark:text-gray-600',
+            vacationDateSet.has(cell.date)
+              ? 'bg-[var(--vacation-teal-tint)]'
+              : cell.weekRow === todayWeekRow && cell.isCurrentMonth
+                ? 'bg-[rgba(241,93,34,0.04)]'
+                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50',
+            props.selectedDate === cell.date ? 'ring-primary-500 ring-2 ring-inset' : '',
+          ]"
+          @click="handleDayClick(cell.date)"
         >
-          {{ cell.day }}
-        </span>
-
-        <!-- Activity dots -->
-        <div v-if="cell.activities.length > 0" class="mt-0.5 flex items-center gap-[3px]">
+          <!-- Day number -->
           <span
-            v-for="(act, i) in cell.activities.slice(0, 4)"
-            :key="i"
-            class="inline-block h-[5px] w-[5px] rounded-full"
-            :style="{ backgroundColor: act.color ?? CATEGORY_COLORS[act.category] }"
-          />
-          <span
-            v-if="cell.activities.length > 4"
-            class="text-secondary-500/30 text-xs dark:text-gray-500"
+            class="font-outfit flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
+            :class="
+              cell.isToday
+                ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
+                : ''
+            "
           >
-            +{{ cell.activities.length - 4 }}
+            {{ cell.day }}
+          </span>
+
+          <!-- Activity dots -->
+          <div v-if="cell.activities.length > 0" class="mt-0.5 flex items-center gap-[3px]">
+            <span
+              v-for="(act, i) in cell.activities.slice(0, 4)"
+              :key="i"
+              class="inline-block h-[5px] w-[5px] rounded-full"
+              :style="{ backgroundColor: act.color ?? CATEGORY_COLORS[act.category] }"
+            />
+            <span
+              v-if="cell.activities.length > 4"
+              class="text-secondary-500/30 text-xs dark:text-gray-500"
+            >
+              +{{ cell.activities.length - 4 }}
+            </span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Vacation span bars overlaid per week row -->
+      <template v-for="[weekIdx, spans] in vacationSpansByWeek" :key="'vw-' + weekIdx">
+        <div
+          v-for="span in spans"
+          :key="'vs-' + span.vacationId + '-' + weekIdx"
+          class="pointer-events-auto absolute flex h-5 cursor-pointer items-center rounded-lg px-2 opacity-80 transition-opacity hover:opacity-100"
+          style="background: linear-gradient(to right, var(--vacation-teal), #0077b6); opacity: 0.2"
+          :style="{
+            left: `${(span.startCol / 7) * 100}%`,
+            width: `${((span.endCol - span.startCol + 1) / 7) * 100}%`,
+            bottom: `calc(100% - ${(weekIdx + 1) * 60}px + 2px)`,
+          }"
+          @click.stop="emit('vacation-click', span.vacationId)"
+        >
+          <span
+            class="font-outfit truncate text-[10px] font-semibold text-white"
+            style="text-shadow: 0 1px 2px rgb(0 0 0 / 30%)"
+          >
+            {{ span.emoji }} {{ span.name }}
           </span>
         </div>
-      </button>
+      </template>
     </div>
   </div>
 </template>
