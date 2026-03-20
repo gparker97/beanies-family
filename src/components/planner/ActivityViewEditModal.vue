@@ -48,6 +48,7 @@ const emit = defineEmits<{
   deleted: [id: string];
   'open-edit': [activity: FamilyActivity];
   'activity-swapped': [newId: string];
+  'open-vacation': [vacationId: string];
 }>();
 
 const { t, isBeanieMode } = useTranslation();
@@ -309,14 +310,20 @@ const scopeResolved = ref(false);
 // After "this-only" or "this-and-future", inline edits target the new entity
 const effectiveTargetId = ref<string | null>(null);
 
-// Reset when activity changes
+// Reset when activity changes; redirect vacation-linked activities to VacationViewModal
 watch(
   () => props.activity,
-  () => {
+  (newActivity) => {
     editingField.value = null;
     scopeResolved.value = false;
     effectiveTargetId.value = null;
     showReschedule.value = false;
+
+    // Vacation guard: redirect to vacation modal instead
+    if (newActivity?.vacationId) {
+      emit('open-vacation', newActivity.vacationId);
+      emit('close');
+    }
   }
 );
 

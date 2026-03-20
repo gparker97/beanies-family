@@ -11,9 +11,11 @@ import {
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
 import { toDateInputValue } from '@/utils/date';
+import { tripTypeEmoji } from '@/utils/vacation';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
 defineProps<{ selectedDate?: string }>();
@@ -22,11 +24,13 @@ const emit = defineEmits<{
   'add-activity': [date: string, time?: string];
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
+  'vacation-click': [vacationId: string];
 }>();
 
 const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
+const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 
 const referenceDate = ref(new Date());
@@ -287,15 +291,35 @@ defineExpose({ weekLabel, activityCount });
           v-for="span in spanningActivities"
           :key="'span-' + span.activity.id"
           class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80"
-          :style="{
-            gridColumn: `${span.startCol + 2} / span ${span.span}`,
-            background: getActivityColor(span.activity) + '20',
-            color: getActivityColor(span.activity),
-            borderLeft: `3px solid ${getActivityColor(span.activity)}`,
-          }"
-          @click="emit('view-activity', span.activity.id, span.activity.date)"
+          :style="
+            span.activity.vacationId
+              ? {
+                  gridColumn: `${span.startCol + 2} / span ${span.span}`,
+                  background: 'linear-gradient(to right, var(--vacation-teal), #0077B6)',
+                  color: 'white',
+                  borderLeft: '3px solid var(--vacation-teal)',
+                  opacity: 0.85,
+                }
+              : {
+                  gridColumn: `${span.startCol + 2} / span ${span.span}`,
+                  background: getActivityColor(span.activity) + '20',
+                  color: getActivityColor(span.activity),
+                  borderLeft: `3px solid ${getActivityColor(span.activity)}`,
+                }
+          "
+          @click="
+            span.activity.vacationId
+              ? emit('vacation-click', span.activity.vacationId)
+              : emit('view-activity', span.activity.id, span.activity.date)
+          "
         >
-          {{ span.activity.title }}
+          <template v-if="span.activity.vacationId">
+            {{ tripTypeEmoji(vacationStore.getVacationById(span.activity.vacationId)?.tripType) }}
+            {{ span.activity.title }}
+          </template>
+          <template v-else>
+            {{ span.activity.title }}
+          </template>
         </div>
 
         <!-- Per-day single-day untimed activities + todos -->

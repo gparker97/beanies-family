@@ -8,6 +8,7 @@ import type {
   RecurringItem,
   TodoItem,
   FamilyActivity,
+  FamilyVacation,
   Settings,
 } from '@/types/models';
 
@@ -21,6 +22,7 @@ export interface ExportedData {
   recurringItems: RecurringItem[];
   todos: TodoItem[];
   activities: FamilyActivity[];
+  vacations?: FamilyVacation[];
   settings: Settings | undefined;
 }
 
