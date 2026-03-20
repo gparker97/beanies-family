@@ -92,6 +92,19 @@ const createdConfirm = ref<{
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
 const weeklyViewRef = ref<InstanceType<typeof WeeklyCalendarView> | null>(null);
 
+// Vacation wizard state
+const showVacationWizard = ref(false);
+const vacationWizardDefaults = ref<{ assigneeIds: string[]; date: string }>({
+  assigneeIds: [],
+  date: '',
+});
+
+function handleStartVacationWizard(defaults: { assigneeIds: string[]; date: string }) {
+  showModal.value = false;
+  vacationWizardDefaults.value = defaults;
+  showVacationWizard.value = true;
+}
+
 const headerSubtitle = computed(() => {
   if (activeView.value === 'week') {
     const label = weeklyViewRef.value?.weekLabel ?? '';
@@ -421,6 +434,7 @@ function handleActivitySwapped(newId: string) {
       "
       @save="handleSave"
       @delete="handleDelete"
+      @start-vacation-wizard="handleStartVacationWizard"
     />
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />

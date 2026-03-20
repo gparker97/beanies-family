@@ -46,6 +46,7 @@ const emit = defineEmits<{
   close: [];
   save: [data: CreateFamilyActivityInput | { id: string; data: UpdateFamilyActivityInput }];
   delete: [];
+  'start-vacation-wizard': [defaults: { assigneeIds: string[]; date: string }];
 }>();
 
 const { t } = useTranslation();
@@ -388,6 +389,90 @@ function handleSave() {
         <FamilyChipPicker v-model="assigneeIds" mode="multi" />
       </FormFieldGroup>
 
+      <!-- 1b. Schedule mode tab bar (recurring / one-time) -->
+      <div class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50">
+        <div class="grid grid-cols-2 gap-1.5">
+          <button
+            v-for="opt in [
+              {
+                value: 'recurring',
+                icon: '🔁',
+                label: t('vacation.scheduleRecurring'),
+                desc: t('vacation.scheduleRecurringDesc'),
+              },
+              {
+                value: 'one-off',
+                icon: '📌',
+                label: t('vacation.scheduleOneTime'),
+                desc: t('vacation.scheduleOneTimeDesc'),
+              },
+            ]"
+            :key="opt.value"
+            type="button"
+            class="relative flex flex-col items-center gap-0.5 rounded-xl px-3 py-2.5 transition-all duration-200"
+            :class="
+              recurrenceMode === opt.value
+                ? 'border-primary-500 border-2 bg-white shadow-sm dark:bg-slate-600'
+                : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-slate-600/40'
+            "
+            @click="recurrenceMode = opt.value as 'recurring' | 'one-off'"
+          >
+            <span class="text-lg leading-none">{{ opt.icon }}</span>
+            <span
+              class="font-outfit text-xs font-bold"
+              :class="
+                recurrenceMode === opt.value
+                  ? 'text-[var(--color-text)] dark:text-gray-100'
+                  : 'text-[var(--color-text)] opacity-35 dark:text-gray-400'
+              "
+            >
+              {{ opt.label }}
+            </span>
+            <span
+              class="text-[10px]"
+              :class="
+                recurrenceMode === opt.value
+                  ? 'text-[var(--color-text-muted)]'
+                  : 'opacity-25 dark:text-gray-500'
+              "
+            >
+              {{ opt.desc }}
+            </span>
+            <span
+              v-if="recurrenceMode === opt.value"
+              class="bg-primary-500 absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
+            />
+          </button>
+        </div>
+      </div>
+
+      <!-- 1c. Vacation toggle (one-time + new activity only) -->
+      <div
+        v-if="recurrenceMode === 'one-off' && !isEditing"
+        class="flex cursor-pointer items-center gap-3 rounded-2xl border-b border-[var(--vacation-teal-15)] px-4 py-3 transition-all duration-200 hover:opacity-90"
+        style="background: linear-gradient(135deg, rgb(0 180 216 / 6%), rgb(255 217 61 / 6%))"
+        @click="
+          emit('start-vacation-wizard', {
+            assigneeIds: [...assigneeIds],
+            date: date,
+          });
+          emit('close');
+        "
+      >
+        <span class="text-xl" style="animation: sway 3s ease-in-out infinite">🏖️</span>
+        <div class="flex-1">
+          <span class="font-outfit block text-xs font-bold" style="color: var(--vacation-teal)">
+            {{ t('vacation.planningATrip') }}
+          </span>
+          <span class="text-[10px] text-[var(--color-text-muted)] opacity-50">
+            {{ t('vacation.planningSubtitle') }}
+          </span>
+        </div>
+        <span class="font-outfit text-xs font-semibold" style="color: var(--vacation-teal)">
+          ›
+        </span>
+      </div>
+
       <!-- 2. Category picker (grouped) -->
       <FormFieldGroup :label="t('modal.selectCategory')">
         <ActivityCategoryPicker v-model="category" />
@@ -464,22 +549,15 @@ function handleSave() {
         @update:pay-from-account-id="feePayFromAccountId = $event"
       />
 
-      <!-- 4. Recurring / One-off toggle -->
-      <FormFieldGroup :label="t('modal.schedule')">
-        <div class="space-y-3">
-          <TogglePillGroup
-            v-model="recurrenceMode"
-            :options="[
-              { value: 'recurring', label: t('modal.recurring') },
-              { value: 'one-off', label: t('modal.oneOff') },
-            ]"
-          />
-          <template v-if="recurrenceMode === 'recurring'">
+      <!-- 4. Recurring frequency + day-of-week (shown only for recurring mode) -->
+      <template v-if="recurrenceMode === 'recurring'">
+        <FormFieldGroup :label="t('modal.schedule')">
+          <div class="space-y-3">
             <FrequencyChips v-model="recurrenceFrequency" :options="frequencyOptions" />
             <DayOfWeekSelector v-if="recurrenceFrequency === 'weekly'" v-model="daysOfWeek" />
-          </template>
-        </div>
-      </FormFieldGroup>
+          </div>
+        </FormFieldGroup>
+      </template>
 
       <!-- 5b. All-day toggle -->
       <FormFieldGroup :label="t('planner.allDay')">
