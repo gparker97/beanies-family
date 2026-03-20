@@ -136,6 +136,30 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
   if (field === 'embarkationDate' && !current.disembarkationDate) {
     updated[index] = { ...updated[index]!, disembarkationDate: value };
   }
+
+  // Auto-populate return flight from outbound flight data
+  if (current.type === 'flight_outbound') {
+    const retIdx = updated.findIndex((s) => s.type === 'flight_return');
+    if (retIdx >= 0) {
+      const ret = updated[retIdx]!;
+      // Invert from/to: outbound arrival → return departure, outbound departure → return arrival
+      if (field === 'arrivalAirport' && !ret.departureAirport) {
+        updated[retIdx] = { ...ret, departureAirport: value };
+      }
+      if (field === 'departureAirport' && !ret.arrivalAirport) {
+        updated[retIdx] = { ...updated[retIdx]!, arrivalAirport: value };
+      }
+      // Copy booking reference
+      if (field === 'bookingReference' && !ret.bookingReference) {
+        updated[retIdx] = { ...updated[retIdx]!, bookingReference: value };
+      }
+      // Copy airline
+      if (field === 'airline' && !ret.airline) {
+        updated[retIdx] = { ...updated[retIdx]!, airline: value };
+      }
+    }
+  }
+
   emit('update:segments', updated);
 }
 
@@ -194,7 +218,7 @@ function removeSegment(index: number) {
       <!-- Flight fields (all flight types use the same standard fields) -->
       <template v-if="isFlightType(seg.type)">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.airline')">
+          <FormFieldGroup :label="t('vacation.field.airline')" required>
             <BaseInput
               :model-value="seg.airline ?? ''"
               :placeholder="t('vacation.field.airline')"
@@ -202,7 +226,7 @@ function removeSegment(index: number) {
               @update:model-value="updateSegment(idx, 'airline', String($event))"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.flightNumber')">
+          <FormFieldGroup :label="t('vacation.field.flightNumber')" required>
             <BaseInput
               :model-value="seg.flightNumber ?? ''"
               :placeholder="t('vacation.field.flightNumber')"
@@ -212,7 +236,7 @@ function removeSegment(index: number) {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureAirport')">
+          <FormFieldGroup :label="t('vacation.field.departureAirport')" required>
             <BaseInput
               :model-value="seg.departureAirport ?? ''"
               :placeholder="t('vacation.field.departureAirport')"
@@ -220,7 +244,7 @@ function removeSegment(index: number) {
               @update:model-value="updateSegment(idx, 'departureAirport', String($event))"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalAirport')">
+          <FormFieldGroup :label="t('vacation.field.arrivalAirport')" required>
             <BaseInput
               :model-value="seg.arrivalAirport ?? ''"
               :placeholder="t('vacation.field.arrivalAirport')"
