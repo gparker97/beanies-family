@@ -102,6 +102,7 @@ interface TimelineItem {
   kind: 'travel' | 'accommodation' | 'transportation';
   icon: string;
   title: string;
+  keyValue: string;
   status: 'booked' | 'pending' | 'not_booked' | 'researching';
   sortDate: string;
   stepNumber: number;
@@ -133,6 +134,42 @@ const transportIcons: Record<string, string> = {
   bus: '🚌',
 };
 
+function buildTravelKeyValue(seg: {
+  type?: string;
+  airline?: string;
+  flightNumber?: string;
+  departureAirport?: string;
+  arrivalAirport?: string;
+  departureTime?: string;
+  cruiseLine?: string;
+  shipName?: string;
+  operator?: string;
+  route?: string;
+}): string {
+  const p: string[] = [];
+  const isF = seg.type?.startsWith('flight');
+  if (isF) {
+    if (seg.airline) {
+      const code = seg.airline.match(/\(([A-Z0-9]{2})\)/)?.[1] ?? seg.airline.split(' ')[0];
+      p.push(seg.flightNumber ? `${code} ${seg.flightNumber}` : code!);
+    }
+    if (seg.departureAirport && seg.arrivalAirport) {
+      const from = seg.departureAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.departureAirport;
+      const to = seg.arrivalAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.arrivalAirport;
+      p.push(`${from}→${to}`);
+    }
+    if (seg.departureTime) p.push(seg.departureTime);
+  } else if (seg.type === 'cruise') {
+    if (seg.cruiseLine) p.push(seg.cruiseLine);
+    if (seg.shipName) p.push(seg.shipName);
+  } else {
+    if (seg.operator) p.push(seg.operator);
+    if (seg.route) p.push(seg.route);
+    if (seg.departureTime) p.push(seg.departureTime);
+  }
+  return p.join(' · ');
+}
+
 const timelineItems = computed<TimelineItem[]>(() => {
   if (!vacation.value) return [];
   const items: TimelineItem[] = [];
@@ -149,6 +186,7 @@ const timelineItems = computed<TimelineItem[]>(() => {
       kind: 'travel',
       icon: travelIcons[seg.type] ?? '✈️',
       title: seg.title,
+      keyValue: buildTravelKeyValue(seg),
       status: seg.status,
       sortDate: date ? extractDatePart(date) : '9999-12-31',
       stepNumber: 2,
@@ -164,11 +202,20 @@ const timelineItems = computed<TimelineItem[]>(() => {
       copyFields.push({ label: 'confirmation', value: acc.confirmationNumber });
     if (acc.contactPhone) copyFields.push({ label: 'phone', value: acc.contactPhone });
 
+    const accomParts: string[] = [];
+    if (acc.name) accomParts.push(acc.name);
+    if (acc.checkInDate && acc.checkOutDate)
+      accomParts.push(
+        `${formatDateShort(acc.checkInDate).toLowerCase()} – ${formatDateShort(acc.checkOutDate).toLowerCase()}`
+      );
+    if (acc.confirmationNumber) accomParts.push(acc.confirmationNumber);
+
     items.push({
       id: acc.id,
       kind: 'accommodation',
       icon: accomIcons[acc.type] ?? '🏨',
       title: acc.title,
+      keyValue: accomParts.join(' · '),
       status: acc.status,
       sortDate: date ? extractDatePart(date) : '9999-12-31',
       stepNumber: 3,
@@ -183,11 +230,18 @@ const timelineItems = computed<TimelineItem[]>(() => {
     if (trans.bookingReference)
       copyFields.push({ label: 'booking', value: trans.bookingReference });
 
+    const transParts: string[] = [];
+    if (trans.agencyName) transParts.push(trans.agencyName);
+    else if (trans.operator) transParts.push(trans.operator);
+    if (trans.pickupTime) transParts.push(trans.pickupTime);
+    if (trans.bookingReference) transParts.push(trans.bookingReference);
+
     items.push({
       id: trans.id,
       kind: 'transportation',
       icon: transportIcons[trans.type] ?? '🚐',
       title: trans.title,
+      keyValue: transParts.join(' · '),
       status: trans.status,
       sortDate: date ? extractDatePart(date) : '9999-12-31',
       stepNumber: 4,
@@ -400,6 +454,7 @@ function handleVote(ideaId: string) {
             :icon="item.icon"
             :title="item.title"
             :status="item.status"
+            :key-value="item.keyValue"
             :collapsed="isCollapsed(item.id)"
             :read-only="true"
             @update:collapsed="setCollapsed(item.id, $event)"
