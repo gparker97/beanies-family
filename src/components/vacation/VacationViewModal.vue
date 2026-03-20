@@ -250,7 +250,7 @@ function handleVote(ideaId: string) {
 </script>
 
 <template>
-  <BaseModal :open="open" size="2xl" :closable="false" fullscreen-mobile @close="$emit('close')">
+  <BaseModal :open="open" size="2xl" fullscreen-mobile @close="$emit('close')">
     <template v-if="vacation" #default>
       <!-- Hero header — inside body slot, pulled edge-to-edge with negative margins -->
       <div class="vacation-view-hero">
