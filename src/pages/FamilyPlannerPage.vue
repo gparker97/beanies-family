@@ -13,6 +13,7 @@ import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vu
 import DayAgendaSidebar from '@/components/planner/DayAgendaSidebar.vue';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import { useActivityStore } from '@/stores/activityStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
@@ -23,6 +24,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
+import VacationSidebarCard from '@/components/vacation/VacationSidebarCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import VacationViewModal from '@/components/vacation/VacationViewModal.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
@@ -45,6 +47,7 @@ const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
 const memberFilterStore = useMemberFilterStore();
+const vacationStore = useVacationStore();
 const {
   viewingActivity,
   viewingOccurrenceDate,
@@ -55,6 +58,7 @@ const {
 
 // Open activity view modal from query param (e.g. /planner?activity=abc)
 onMounted(() => {
+  vacationStore.loadVacations();
   const activityId = route.query.activity as string | undefined;
   if (activityId) {
     openViewModal(activityId);
@@ -113,6 +117,11 @@ function handleStartVacationWizard(defaults: { assigneeIds: string[]; date: stri
   editingVacation.value = null;
   editVacationStep.value = undefined;
   showVacationWizard.value = true;
+}
+
+function handleVacationClick(id: string) {
+  viewingVacationId.value = id;
+  showVacationView.value = true;
 }
 
 function handleVacationEdit(vacation: import('@/types/models').FamilyVacation, step?: number) {
@@ -371,6 +380,7 @@ function handleActivitySwapped(newId: string) {
       ref="calendarGridRef"
       :selected-date="sidebarDate ?? undefined"
       @select-date="handleCalendarDateClick"
+      @vacation-click="handleVacationClick"
     />
 
     <WeeklyCalendarView
@@ -381,7 +391,25 @@ function handleActivitySwapped(newId: string) {
       @add-activity="(date: string, time?: string) => openAddModal(date, time)"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
       @view-todo="openTodoViewModal"
+      @vacation-click="handleVacationClick"
     />
+
+    <!-- Upcoming vacations -->
+    <div v-if="vacationStore.upcomingVacations.length > 0" class="mb-4">
+      <h3
+        class="font-outfit mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider text-[var(--color-text-muted)] uppercase opacity-40"
+      >
+        ✈️ {{ t('vacation.upcoming') }}
+      </h3>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <VacationSidebarCard
+          v-for="vacation in vacationStore.upcomingVacations"
+          :key="vacation.id"
+          :vacation="vacation"
+          @click="handleVacationClick(vacation.id)"
+        />
+      </div>
+    </div>
 
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -435,6 +463,7 @@ function handleActivitySwapped(newId: string) {
       @add-activity="handleSidebarAdd"
       @edit-activity="handleSidebarEdit"
       @view-todo="openTodoViewModal"
+      @vacation-click="handleVacationClick"
     />
 
     <!-- Activity modal -->
@@ -489,6 +518,7 @@ function handleActivitySwapped(newId: string) {
       @close="viewingActivity = null"
       @open-edit="handleViewOpenEdit"
       @activity-swapped="handleActivitySwapped"
+      @open-vacation="handleVacationClick"
     />
 
     <!-- Activity Created Confirmation -->

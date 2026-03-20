@@ -4,9 +4,11 @@ import BaseSidePanel from '@/components/ui/BaseSidePanel.vue';
 import ActivityListCard from '@/components/planner/ActivityListCard.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import { useActivityStore } from '@/stores/activityStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, isDateBetween, extractDatePart } from '@/utils/date';
+import { tripTypeEmoji, tripDurationDays } from '@/utils/vacation';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
 const props = defineProps<{
@@ -19,10 +21,12 @@ const emit = defineEmits<{
   'add-activity': [];
   'edit-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
+  'vacation-click': [vacationId: string];
 }>();
 
 const { t } = useTranslation();
 const activityStore = useActivityStore();
+const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 
 /** Format the selected date as a readable header (e.g. "Saturday, March 15") */
@@ -50,6 +54,31 @@ const dayActivities = computed(() => {
 const dayTodos = computed(() =>
   todoStore.filteredScheduledTodos.filter((t) => t.dueDate?.slice(0, 10) === props.date)
 );
+
+/** Active vacation on the selected day (if any) */
+const activeVacation = computed(() => {
+  for (const v of vacationStore.vacations) {
+    if (!v.startDate || !v.endDate) continue;
+    if (isDateBetween(props.date, v.startDate, v.endDate)) {
+      return v;
+    }
+  }
+  return null;
+});
+
+/** Day number within the vacation (1-based) */
+const vacationDayNumber = computed(() => {
+  if (!activeVacation.value?.startDate) return 0;
+  const start = new Date(extractDatePart(activeVacation.value.startDate) + 'T00:00:00');
+  const current = new Date(props.date + 'T00:00:00');
+  return Math.floor((current.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+});
+
+/** Total days for the active vacation */
+const vacationTotalDays = computed(() => {
+  if (!activeVacation.value?.startDate || !activeVacation.value?.endDate) return 0;
+  return tripDurationDays(activeVacation.value.startDate, activeVacation.value.endDate);
+});
 
 /** Upcoming activities in the next 14 days after the selected date */
 const upcomingActivities = computed(() => {
@@ -129,6 +158,32 @@ function formatGroupDate(dateStr: string): string {
       <h3 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
         {{ dateHeader }}
       </h3>
+    </div>
+
+    <!-- Vacation context banner -->
+    <div
+      v-if="activeVacation"
+      class="mb-4 cursor-pointer rounded-2xl p-3 transition-opacity hover:opacity-90"
+      style="background: var(--vacation-teal-tint)"
+      @click="emit('vacation-click', activeVacation.id)"
+    >
+      <div class="flex items-center gap-2">
+        <span class="text-lg">{{ tripTypeEmoji(activeVacation.tripType) }}</span>
+        <div class="min-w-0 flex-1">
+          <span
+            class="font-outfit block truncate text-sm font-bold"
+            style="color: var(--vacation-teal)"
+          >
+            {{ activeVacation.name }}
+          </span>
+          <span class="text-xs" style="color: var(--vacation-teal); opacity: 0.7">
+            day {{ vacationDayNumber }} of {{ vacationTotalDays }}
+          </span>
+        </div>
+        <span class="font-outfit text-xs font-semibold" style="color: var(--vacation-teal)">
+          ›
+        </span>
+      </div>
     </div>
 
     <!-- Day's activities -->
