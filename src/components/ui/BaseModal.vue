@@ -6,7 +6,7 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 interface Props {
   open: boolean;
   title?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   closable?: boolean;
   fullscreenMobile?: boolean;
   /** z-index layer: 'base' (z-50) for normal modals, 'overlay' (z-[60]) for modals that stack on top of other modals */
@@ -35,6 +35,7 @@ const sizeClasses = {
   lg: 'max-w-lg',
   xl: 'max-w-xl',
   '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
 };
 
 function close() {

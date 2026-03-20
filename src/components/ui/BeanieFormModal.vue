@@ -7,9 +7,9 @@ interface Props {
   title: string;
   icon?: string;
   iconBg?: string;
-  size?: 'default' | 'narrow';
+  size?: 'default' | 'narrow' | 'wide';
   saveLabel?: string;
-  saveGradient?: 'orange' | 'purple';
+  saveGradient?: 'orange' | 'purple' | 'teal';
   saveDisabled?: boolean;
   isSubmitting?: boolean;
   showDelete?: boolean;
@@ -34,7 +34,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
-const modalSize = props.size === 'narrow' ? 'lg' : 'xl';
+const modalSize = props.size === 'narrow' ? 'lg' : props.size === 'wide' ? '2xl' : 'xl';
 </script>
 
 <template>
@@ -98,7 +98,9 @@ const modalSize = props.size === 'narrow' ? 'lg' : 'xl';
           :class="
             saveGradient === 'purple'
               ? 'bg-gradient-to-r from-purple-500 to-purple-400 hover:from-purple-600 hover:to-purple-500'
-              : 'from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 bg-gradient-to-r'
+              : saveGradient === 'teal'
+                ? 'bg-gradient-to-r from-[#00B4D8] to-[#0096B7] hover:from-[#0096B7] hover:to-[#007A96]'
+                : 'from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 bg-gradient-to-r'
           "
           :disabled="saveDisabled || isSubmitting"
           @click="emit('save')"

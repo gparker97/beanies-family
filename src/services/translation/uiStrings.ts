@@ -3393,6 +3393,7 @@ const STRING_DEFS = {
   'vacation.field.pickupDate': { en: 'Pickup Date', beanie: 'pickup date' },
   'vacation.field.pickupTime': { en: 'Pickup Time', beanie: 'pickup time' },
   'vacation.field.returnDate': { en: 'Return Date', beanie: 'return date' },
+  'vacation.addAnotherTransport': { en: 'Add Another Transport', beanie: 'add another transport' },
 
   // Step 5 - Ideas
   'vacation.step5.title': { en: 'Bean Bucket List!', beanie: 'bean bucket list!' },
@@ -3495,6 +3496,21 @@ const STRING_DEFS = {
   },
   'vacation.scheduleOneTime': { en: 'One-Time', beanie: 'one-time' },
   'vacation.scheduleOneTimeDesc': { en: 'Happens once', beanie: 'happens once' },
+
+  // Segment type labels
+  'vacation.segment.flight': { en: 'Flight', beanie: 'flight' },
+  'vacation.segment.cruise': { en: 'Cruise', beanie: 'cruise' },
+  'vacation.segment.train': { en: 'Train', beanie: 'train' },
+  'vacation.segment.ferry': { en: 'Ferry', beanie: 'ferry' },
+
+  // Ideas empty state
+  'vacation.ideas.empty': {
+    en: 'No ideas yet \u2014 add your first one above!',
+    beanie: 'no ideas yet \u2014 add your first one above!',
+  },
+
+  // Notes placeholder
+  'vacation.field.notesPlaceholder': { en: 'Add notes...', beanie: 'add notes...' },
 
   // Common vacation fields
   'vacation.field.notes': { en: 'Notes', beanie: 'notes' },
