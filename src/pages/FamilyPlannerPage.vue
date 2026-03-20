@@ -58,7 +58,6 @@ const {
 
 // Open activity view modal from query param (e.g. /planner?activity=abc)
 onMounted(() => {
-  vacationStore.loadVacations();
   const activityId = route.query.activity as string | undefined;
   if (activityId) {
     openViewModal(activityId);
