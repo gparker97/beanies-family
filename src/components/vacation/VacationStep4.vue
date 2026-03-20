@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { formatDateShort } from '@/utils/date';
 import type {
   VacationTransportation,
   VacationTransportationType,
@@ -97,6 +98,16 @@ function removeItem(index: number) {
   emit('update:transportation', updated);
 }
 
+function buildTransportKeyValue(item: VacationTransportation): string {
+  const parts: string[] = [];
+  if (item.agencyName) parts.push(item.agencyName);
+  else if (item.operator) parts.push(item.operator);
+  if (item.pickupDate) parts.push(formatDateShort(item.pickupDate).toLowerCase());
+  if (item.pickupTime) parts.push(item.pickupTime);
+  if (item.bookingReference) parts.push(item.bookingReference);
+  return parts.join(' · ');
+}
+
 function isTrainOrBus(type: VacationTransportationType): boolean {
   return type === 'train' || type === 'bus';
 }
@@ -149,6 +160,7 @@ function isTrainOrBus(type: VacationTransportationType): boolean {
       :icon="emojiMap[item.type]"
       :title="item.title"
       :status="item.status"
+      :key-value="buildTransportKeyValue(item)"
       :collapsed="collapsedMap[item.id] ?? false"
       deletable
       @update:title="updateItem(index, 'title', $event)"

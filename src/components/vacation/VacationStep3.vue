@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { formatDateShort } from '@/utils/date';
 import type {
   VacationAccommodation,
   VacationAccommodationType,
@@ -105,6 +106,20 @@ function removeItem(index: number) {
   emit('update:accommodations', updated);
 }
 
+function buildAccomKeyValue(item: VacationAccommodation): string {
+  const parts: string[] = [];
+  if (item.name) parts.push(item.name);
+  if (item.checkInDate && item.checkOutDate) {
+    parts.push(
+      `${formatDateShort(item.checkInDate).toLowerCase()} – ${formatDateShort(item.checkOutDate).toLowerCase()}`
+    );
+  } else if (item.checkInDate) {
+    parts.push(formatDateShort(item.checkInDate).toLowerCase());
+  }
+  if (item.confirmationNumber) parts.push(item.confirmationNumber);
+  return parts.join(' · ');
+}
+
 function showsRoomType(type: VacationAccommodationType): boolean {
   return type === 'hotel' || type === 'airbnb';
 }
@@ -165,6 +180,7 @@ function showsBreakfast(type: VacationAccommodationType): boolean {
       :icon="emojiMap[item.type]"
       :title="item.title"
       :status="item.status"
+      :key-value="buildAccomKeyValue(item)"
       :collapsed="collapsedMap[item.id] ?? false"
       deletable
       @update:title="updateItem(index, 'title', $event)"

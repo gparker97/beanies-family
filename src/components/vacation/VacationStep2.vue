@@ -88,8 +88,34 @@ function segmentIcon(type: VacationTravelType): string {
 
 function buildKeyValue(seg: VacationTravelSegment): string {
   const parts: string[] = [];
-  if (seg.bookingReference) parts.push(seg.bookingReference);
-  if (seg.sortDate) parts.push(formatDateShort(seg.sortDate).toLowerCase());
+  // Flight: show airline code + flight#, route, departure time
+  if (isFlightType(seg.type)) {
+    if (seg.airline) {
+      const codeMatch = seg.airline.match(/\(([A-Z0-9]{2})\)/);
+      const code = codeMatch ? codeMatch[1] : seg.airline.split(' ')[0];
+      parts.push(seg.flightNumber ? `${code} ${seg.flightNumber}` : code!);
+    }
+    if (seg.departureAirport && seg.arrivalAirport) {
+      const from = seg.departureAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.departureAirport;
+      const to = seg.arrivalAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.arrivalAirport;
+      parts.push(`${from}→${to}`);
+    }
+    if (seg.departureDate) parts.push(formatDateShort(seg.departureDate).toLowerCase());
+    if (seg.departureTime) parts.push(seg.departureTime);
+  }
+  // Cruise: line + ship, embarkation date
+  else if (seg.type === 'cruise') {
+    if (seg.cruiseLine) parts.push(seg.cruiseLine);
+    if (seg.shipName) parts.push(seg.shipName);
+    if (seg.embarkationDate) parts.push(formatDateShort(seg.embarkationDate).toLowerCase());
+  }
+  // Train/Ferry: operator, route, departure
+  else {
+    if (seg.operator) parts.push(seg.operator);
+    if (seg.route) parts.push(seg.route);
+    if (seg.departureDate) parts.push(formatDateShort(seg.departureDate).toLowerCase());
+    if (seg.departureTime) parts.push(seg.departureTime);
+  }
   return parts.join(' · ');
 }
 
