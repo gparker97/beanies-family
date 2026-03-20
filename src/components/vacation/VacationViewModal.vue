@@ -610,37 +610,49 @@ function handleVote(ideaId: string) {
 
       <!-- Bucket list -->
       <div v-if="vacation.ideas.length > 0" class="mt-6">
-        <button
-          class="mb-3 flex w-full items-center gap-2"
-          @click="bucketListOpen = !bucketListOpen"
-        >
-          <div
-            class="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--vacation-gold-tint)] text-sm"
+        <div class="mb-3 flex items-center gap-2">
+          <button class="flex flex-1 items-center gap-2" @click="bucketListOpen = !bucketListOpen">
+            <div
+              class="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--vacation-gold-tint)] text-sm"
+            >
+              🌟
+            </div>
+            <span
+              class="font-outfit text-xs font-semibold tracking-wide text-[var(--color-text)] uppercase dark:text-gray-100"
+            >
+              {{ t('vacation.bucketList' as any) }}
+            </span>
+            <span class="text-xs text-gray-400">{{ vacation.ideas.length }}</span>
+            <span
+              class="text-xs text-gray-400 transition-transform"
+              :class="{ 'rotate-90': !bucketListOpen }"
+            >
+              ▸
+            </span>
+          </button>
+          <!-- Edit ideas link -->
+          <button
+            class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[var(--vacation-teal-tint)] px-2.5 py-1 text-[10px] font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-15)]"
+            @click="handleEditInWizard(5)"
           >
-            🌟
-          </div>
-          <span
-            class="font-outfit text-xs font-semibold tracking-wide text-[var(--color-text)] uppercase dark:text-gray-100"
-          >
-            {{ t('vacation.bucketList' as any) }}
-          </span>
-          <span
-            class="ml-auto text-xs text-gray-400 transition-transform"
-            :class="{ 'rotate-90': !bucketListOpen }"
-          >
-            ▸
-          </span>
-        </button>
+            ✏️ {{ t('vacation.editInWizard' as any) }}
+          </button>
+        </div>
 
         <div v-if="bucketListOpen" class="space-y-2">
-          <VacationIdeaCard
+          <div
             v-for="idea in vacation.ideas"
             :key="idea.id"
-            :idea="idea"
-            :current-member-id="familyStore.currentMemberId ?? ''"
-            :read-only="true"
-            @vote="handleVote(idea.id)"
-          />
+            class="cursor-pointer"
+            @click="handleEditInWizard(5)"
+          >
+            <VacationIdeaCard
+              :idea="idea"
+              :current-member-id="familyStore.currentMemberId ?? ''"
+              :read-only="true"
+              @vote="handleVote(idea.id)"
+            />
+          </div>
         </div>
       </div>
 
