@@ -97,6 +97,13 @@ const accommodationGaps = computed(() => {
 });
 
 // Timeline: merge all segments, sort by date, group by date header
+interface DetailRow {
+  label: string;
+  value: string;
+  copyable?: boolean;
+  mapLink?: boolean;
+}
+
 interface TimelineItem {
   id: string;
   kind: 'travel' | 'accommodation' | 'transportation';
@@ -106,8 +113,7 @@ interface TimelineItem {
   status: 'booked' | 'pending' | 'not_booked' | 'researching';
   sortDate: string;
   stepNumber: number;
-  copyFields: { label: string; value: string }[];
-  data: Record<string, unknown>;
+  detailRows: DetailRow[];
 }
 
 const travelIcons: Record<string, string> = {
@@ -170,17 +176,57 @@ function buildTravelKeyValue(seg: {
   return p.join(' · ');
 }
 
+/** Build detail rows for a travel segment — only includes populated fields */
+function travelDetailRows(seg: import('@/types/models').VacationTravelSegment): DetailRow[] {
+  const rows: DetailRow[] = [];
+  const isF = seg.type?.startsWith('flight');
+  if (isF) {
+    if (seg.airline) rows.push({ label: 'airline', value: seg.airline });
+    if (seg.flightNumber) rows.push({ label: 'flight #', value: seg.flightNumber, copyable: true });
+    if (seg.departureAirport) rows.push({ label: 'from', value: seg.departureAirport });
+    if (seg.arrivalAirport) rows.push({ label: 'to', value: seg.arrivalAirport });
+    if (seg.departureDate)
+      rows.push({
+        label: 'departs',
+        value: `${formatDateShort(seg.departureDate)}${seg.departureTime ? ' · ' + seg.departureTime : ''}`,
+      });
+    if (seg.arrivalDate)
+      rows.push({
+        label: 'arrives',
+        value: `${formatDateShort(seg.arrivalDate)}${seg.arrivalTime ? ' · ' + seg.arrivalTime : ''}`,
+      });
+  } else if (seg.type === 'cruise') {
+    if (seg.cruiseLine) rows.push({ label: 'cruise line', value: seg.cruiseLine });
+    if (seg.shipName) rows.push({ label: 'ship', value: seg.shipName });
+    if (seg.departurePort) rows.push({ label: 'port', value: seg.departurePort });
+    if (seg.cabinNumber) rows.push({ label: 'cabin', value: seg.cabinNumber, copyable: true });
+    if (seg.embarkationDate)
+      rows.push({ label: 'embark', value: formatDateShort(seg.embarkationDate) });
+    if (seg.disembarkationDate)
+      rows.push({ label: 'disembark', value: formatDateShort(seg.disembarkationDate) });
+  } else {
+    if (seg.operator) rows.push({ label: 'operator', value: seg.operator });
+    if (seg.route) rows.push({ label: 'route', value: seg.route });
+    if (seg.departureStation) rows.push({ label: 'from', value: seg.departureStation });
+    if (seg.arrivalStation) rows.push({ label: 'to', value: seg.arrivalStation });
+    if (seg.departureDate)
+      rows.push({
+        label: 'departs',
+        value: `${formatDateShort(seg.departureDate)}${seg.departureTime ? ' · ' + seg.departureTime : ''}`,
+      });
+  }
+  if (seg.bookingReference)
+    rows.push({ label: 'booking ref', value: seg.bookingReference, copyable: true });
+  if (seg.notes) rows.push({ label: 'notes', value: seg.notes });
+  return rows;
+}
+
 const timelineItems = computed<TimelineItem[]>(() => {
   if (!vacation.value) return [];
   const items: TimelineItem[] = [];
 
   for (const seg of vacation.value.travelSegments) {
     const date = seg.sortDate ?? seg.departureDate ?? seg.embarkationDate ?? '';
-    const copyFields: { label: string; value: string }[] = [];
-    if (seg.bookingReference) copyFields.push({ label: 'booking', value: seg.bookingReference });
-    if (seg.flightNumber) copyFields.push({ label: 'flight', value: seg.flightNumber });
-    if (seg.cabinNumber) copyFields.push({ label: 'cabin', value: seg.cabinNumber });
-
     items.push({
       id: seg.id,
       kind: 'travel',
@@ -190,63 +236,91 @@ const timelineItems = computed<TimelineItem[]>(() => {
       status: seg.status,
       sortDate: date ? extractDatePart(date) : '9999-12-31',
       stepNumber: 2,
-      copyFields,
-      data: seg as unknown as Record<string, unknown>,
+      detailRows: travelDetailRows(seg),
     });
   }
 
   for (const acc of vacation.value.accommodations) {
     const date = acc.checkInDate ?? '';
-    const copyFields: { label: string; value: string }[] = [];
+    const rows: DetailRow[] = [];
+    if (acc.name) rows.push({ label: 'name', value: acc.name });
+    if (acc.address) rows.push({ label: 'address', value: acc.address, mapLink: true });
+    if (acc.checkInDate) rows.push({ label: 'check-in', value: formatDateShort(acc.checkInDate) });
+    if (acc.checkOutDate)
+      rows.push({ label: 'check-out', value: formatDateShort(acc.checkOutDate) });
+    if (acc.roomType) rows.push({ label: 'room', value: acc.roomType });
     if (acc.confirmationNumber)
-      copyFields.push({ label: 'confirmation', value: acc.confirmationNumber });
-    if (acc.contactPhone) copyFields.push({ label: 'phone', value: acc.contactPhone });
+      rows.push({ label: 'confirmation', value: acc.confirmationNumber, copyable: true });
+    if (acc.contactPhone) rows.push({ label: 'phone', value: acc.contactPhone, copyable: true });
+    if (acc.breakfastIncluded) rows.push({ label: 'breakfast', value: 'included' });
+    if (acc.notes) rows.push({ label: 'notes', value: acc.notes });
 
-    const accomParts: string[] = [];
-    if (acc.name) accomParts.push(acc.name);
+    const kvParts: string[] = [];
+    if (acc.name) kvParts.push(acc.name);
     if (acc.checkInDate && acc.checkOutDate)
-      accomParts.push(
+      kvParts.push(
         `${formatDateShort(acc.checkInDate).toLowerCase()} – ${formatDateShort(acc.checkOutDate).toLowerCase()}`
       );
-    if (acc.confirmationNumber) accomParts.push(acc.confirmationNumber);
+    if (acc.confirmationNumber) kvParts.push(acc.confirmationNumber);
 
     items.push({
       id: acc.id,
       kind: 'accommodation',
       icon: accomIcons[acc.type] ?? '🏨',
       title: acc.title,
-      keyValue: accomParts.join(' · '),
+      keyValue: kvParts.join(' · '),
       status: acc.status,
       sortDate: date ? extractDatePart(date) : '9999-12-31',
       stepNumber: 3,
-      copyFields,
-      data: acc as unknown as Record<string, unknown>,
+      detailRows: rows,
     });
   }
 
   for (const trans of vacation.value.transportation) {
-    const date = trans.pickupDate ?? '';
-    const copyFields: { label: string; value: string }[] = [];
+    const date = trans.pickupDate ?? trans.departureDate ?? '';
+    const rows: DetailRow[] = [];
+    if (trans.agencyName) rows.push({ label: 'company', value: trans.agencyName });
+    if (trans.agencyAddress)
+      rows.push({ label: 'address', value: trans.agencyAddress, mapLink: true });
+    if (trans.operator) rows.push({ label: 'operator', value: trans.operator });
+    if (trans.route) rows.push({ label: 'route', value: trans.route });
+    if (trans.departureStation) rows.push({ label: 'from', value: trans.departureStation });
+    if (trans.arrivalStation) rows.push({ label: 'to', value: trans.arrivalStation });
+    if (trans.pickupDate)
+      rows.push({
+        label: 'pickup',
+        value: `${formatDateShort(trans.pickupDate)}${trans.pickupTime ? ' · ' + trans.pickupTime : ''}`,
+      });
+    if (trans.returnDate)
+      rows.push({
+        label: 'return',
+        value: `${formatDateShort(trans.returnDate)}${trans.returnTime ? ' · ' + trans.returnTime : ''}`,
+      });
+    if (trans.departureDate && !trans.pickupDate)
+      rows.push({
+        label: 'departs',
+        value: `${formatDateShort(trans.departureDate)}${trans.departureTime ? ' · ' + trans.departureTime : ''}`,
+      });
     if (trans.bookingReference)
-      copyFields.push({ label: 'booking', value: trans.bookingReference });
+      rows.push({ label: 'booking ref', value: trans.bookingReference, copyable: true });
+    if (trans.notes) rows.push({ label: 'notes', value: trans.notes });
 
-    const transParts: string[] = [];
-    if (trans.agencyName) transParts.push(trans.agencyName);
-    else if (trans.operator) transParts.push(trans.operator);
-    if (trans.pickupTime) transParts.push(trans.pickupTime);
-    if (trans.bookingReference) transParts.push(trans.bookingReference);
+    const kvParts: string[] = [];
+    if (trans.agencyName) kvParts.push(trans.agencyName);
+    else if (trans.operator) kvParts.push(trans.operator);
+    if (trans.pickupTime) kvParts.push(trans.pickupTime);
+    if (trans.bookingReference) kvParts.push(trans.bookingReference);
 
     items.push({
       id: trans.id,
       kind: 'transportation',
       icon: transportIcons[trans.type] ?? '🚐',
       title: trans.title,
-      keyValue: transParts.join(' · '),
+      keyValue: kvParts.join(' · '),
       status: trans.status,
       sortDate: date ? extractDatePart(date) : '9999-12-31',
       stepNumber: 4,
-      copyFields,
-      data: trans as unknown as Record<string, unknown>,
+      detailRows: rows,
     });
   }
 
@@ -459,65 +533,51 @@ function handleVote(ideaId: string) {
             :read-only="true"
             @update:collapsed="setCollapsed(item.id, $event)"
           >
-            <!-- Read-only field rows -->
-            <div class="space-y-1">
-              <!-- Copyable fields -->
-              <div
-                v-for="field in item.copyFields"
-                :key="field.label"
-                class="flex items-center gap-2 py-1"
-              >
+            <!-- Detail rows — compact 2-column grid showing all populated fields -->
+            <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+              <template v-for="row in item.detailRows" :key="row.label">
                 <span
-                  class="font-outfit min-w-[70px] shrink-0 text-[10px] font-medium text-gray-400"
+                  class="font-outfit self-center text-[10px] font-medium text-gray-400 dark:text-gray-500"
                 >
-                  {{ field.label }}
+                  {{ row.label }}
                 </span>
+                <!-- Copyable value -->
                 <button
-                  class="font-outfit inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:bg-slate-700 dark:text-white"
-                  @click="copy(field.value)"
+                  v-if="row.copyable"
+                  class="font-outfit inline-flex w-fit cursor-pointer items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:bg-slate-700 dark:text-white"
+                  @click="copy(row.value)"
                 >
-                  {{ field.value }}
+                  {{ row.value }}
                   <span class="text-[10px] opacity-30">📋</span>
                 </button>
-              </div>
-
-              <!-- Address link to Google Maps -->
-              <div
-                v-if="
-                  (item.kind === 'accommodation' && item.data.address) ||
-                  (item.kind === 'transportation' && item.data.agencyAddress)
-                "
-                class="flex items-center gap-2 py-1"
-              >
-                <span
-                  class="font-outfit min-w-[70px] shrink-0 text-[10px] font-medium text-gray-400"
-                >
-                  {{
-                    item.kind === 'accommodation'
-                      ? t('vacation.field.address' as any)
-                      : t('vacation.field.agencyAddress' as any)
-                  }}
-                </span>
+                <!-- Map link -->
                 <a
-                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(item.kind === 'accommodation' ? item.data.address : item.data.agencyAddress))}`"
+                  v-else-if="row.mapLink"
+                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="font-outfit inline-flex items-center gap-1 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:bg-slate-700 dark:text-white"
+                  class="font-outfit inline-flex w-fit items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:bg-slate-700 dark:text-white"
                   :title="t('vacation.field.openInMaps')"
                 >
-                  {{ item.kind === 'accommodation' ? item.data.address : item.data.agencyAddress }}
+                  {{ row.value }}
                   <span class="text-[10px] opacity-40">📍</span>
                 </a>
-              </div>
-
-              <!-- Edit in wizard link -->
-              <button
-                class="font-outfit mt-1 inline-flex items-center gap-1 rounded-lg bg-[var(--vacation-teal-tint)] px-2.5 py-1 text-[10px] font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-tint-15)]"
-                @click="handleEditInWizard(item.stepNumber)"
-              >
-                ✏️ {{ t('vacation.editInWizard' as any) }}
-              </button>
+                <!-- Plain value -->
+                <span
+                  v-else
+                  class="self-center text-xs text-[var(--color-text)] dark:text-gray-200"
+                >
+                  {{ row.value }}
+                </span>
+              </template>
             </div>
+            <!-- Edit in wizard link -->
+            <button
+              class="font-outfit mt-2 inline-flex items-center gap-1 rounded-lg bg-[var(--vacation-teal-tint)] px-2.5 py-1 text-[10px] font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-15)]"
+              @click="handleEditInWizard(item.stepNumber)"
+            >
+              ✏️ {{ t('vacation.editInWizard' as any) }}
+            </button>
           </VacationSegmentCard>
         </template>
       </div>
