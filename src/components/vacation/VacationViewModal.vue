@@ -15,7 +15,7 @@ import {
   addDays,
   toDateInputValue,
 } from '@/utils/date';
-import { bookingProgress, daysUntilTrip, tripDurationDays } from '@/utils/vacation';
+import { bookingProgress, daysUntilTrip } from '@/utils/vacation';
 import type { FamilyVacation } from '@/types/models';
 
 interface Props {
@@ -54,12 +54,6 @@ const progress = computed(() => (vacation.value ? bookingProgress(vacation.value
 
 const countdown = computed(() =>
   vacation.value?.startDate ? daysUntilTrip(vacation.value.startDate) : null
-);
-
-const duration = computed(() =>
-  vacation.value?.startDate && vacation.value?.endDate
-    ? tripDurationDays(vacation.value.startDate, vacation.value.endDate)
-    : null
 );
 
 const dateRange = computed(() => {
@@ -264,7 +258,7 @@ function handleVote(ideaId: string) {
     <!-- Custom teal hero header (fixed, non-scrolling) -->
     <template v-if="vacation" #custom-header>
       <div
-        class="relative overflow-hidden px-6 py-4"
+        class="relative overflow-hidden rounded-t-3xl px-6 py-4"
         style="background: linear-gradient(135deg, #00b4d8, #0077b6)"
       >
         <div class="relative z-10 flex items-center gap-3">
@@ -296,28 +290,30 @@ function handleVote(ideaId: string) {
             📅 {{ dateRange }}
           </span>
           <span
-            v-if="duration"
-            class="font-outfit inline-flex items-center gap-1 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur"
-          >
-            🌴 {{ duration }} {{ t('vacation.days' as any) || 'days' }}
-          </span>
-          <span
             v-if="countdown !== null && countdown > 0"
             class="font-outfit inline-flex items-center gap-1 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur"
           >
-            ✈️ {{ countdown }} {{ t('vacation.days' as any) || 'days' }}!
+            ✈️ in {{ countdown }} {{ t('vacation.days' as any) || 'days' }}!
           </span>
         </div>
 
-        <!-- Assignee avatars -->
-        <div v-if="assignees.length" class="relative z-10 mt-2.5 flex items-center gap-1">
+        <!-- Assignee chips -->
+        <div
+          v-if="assignees.length"
+          class="relative z-10 mt-2.5 flex flex-wrap items-center gap-1.5"
+        >
           <span
             v-for="member in assignees"
             :key="member!.id"
-            class="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[rgba(0,180,216,0.6)] text-[9px] font-bold text-white"
-            :style="{ backgroundColor: member!.color }"
+            class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur"
           >
-            {{ member!.name.charAt(0).toUpperCase() }}
+            <span
+              class="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white"
+              :style="{ backgroundColor: member!.color }"
+            >
+              {{ member!.name.charAt(0).toUpperCase() }}
+            </span>
+            {{ member!.name }}
           </span>
         </div>
 
