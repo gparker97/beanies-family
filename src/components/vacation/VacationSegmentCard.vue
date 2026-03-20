@@ -123,7 +123,7 @@ async function handleDelete() {
     <!-- Collapsible body -->
     <div
       class="overflow-hidden transition-all duration-300"
-      :class="collapsed ? 'max-h-0 opacity-0' : 'max-h-[600px] opacity-100'"
+      :class="collapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'"
     >
       <div class="px-4 pb-4">
         <slot />

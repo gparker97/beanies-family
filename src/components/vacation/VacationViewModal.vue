@@ -253,7 +253,7 @@ function handleVote(ideaId: string) {
   <BaseModal :open="open" size="2xl" :closable="false" fullscreen-mobile @close="$emit('close')">
     <template v-if="vacation" #header>
       <!-- Custom teal hero header -->
-      <div class="vacation-view-hero relative w-full overflow-hidden px-6 py-5">
+      <div class="vacation-view-hero relative w-full overflow-hidden">
         <div class="relative z-10 flex items-start justify-between">
           <div>
             <span class="text-3xl" style="filter: drop-shadow(0 2px 8px rgb(0 0 0 / 15%))">
@@ -547,7 +547,8 @@ function handleVote(ideaId: string) {
 <style scoped>
 .vacation-view-hero {
   background: linear-gradient(135deg, #00b4d8, #0077b6);
-  margin: -1rem -1.5rem 0;
-  padding: 1.25rem 1.5rem;
+  margin: -1rem -1.5rem;
+  padding: 1.375rem 1.5rem 1.125rem;
+  position: relative;
 }
 </style>

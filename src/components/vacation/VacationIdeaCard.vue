@@ -92,7 +92,7 @@ function patch(fields: Partial<VacationIdea>) {
     <div class="flex cursor-pointer items-center gap-2 p-3" @click="toggleExpanded">
       <!-- Vote heart -->
       <button
-        class="cursor-pointer border-none bg-transparent text-lg transition-transform hover:scale-110"
+        class="cursor-pointer border-none bg-white text-lg transition-transform hover:scale-110 dark:bg-slate-700"
         @click.stop="$emit('vote')"
       >
         {{ hasVoted ? '❤️' : '🤍' }}
@@ -185,7 +185,7 @@ function patch(fields: Partial<VacationIdea>) {
           :placeholder="t('vacation.ideas.descriptionPlaceholder')"
           :disabled="readOnly"
           rows="2"
-          class="w-full resize-none rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:text-white"
+          class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
           @input="patch({ description: ($event.target as HTMLTextAreaElement).value })"
         />
       </FormFieldGroup>
@@ -297,7 +297,7 @@ function patch(fields: Partial<VacationIdea>) {
           :placeholder="t('vacation.field.notesPlaceholder')"
           :disabled="readOnly"
           rows="2"
-          class="w-full resize-none rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:text-white"
+          class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
           @input="patch({ notes: ($event.target as HTMLTextAreaElement).value })"
         />
       </FormFieldGroup>
@@ -323,10 +323,30 @@ function patch(fields: Partial<VacationIdea>) {
         </div>
       </FormFieldGroup>
 
+      <!-- Action buttons -->
+      <div
+        v-if="!readOnly"
+        class="flex items-center gap-2 border-t border-[var(--tint-slate-5)] pt-3"
+      >
+        <button
+          class="font-outfit flex-1 rounded-xl py-2 text-xs font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)]"
+          @click="$emit('update:expanded', false)"
+        >
+          {{ t('action.close' as any) || 'close' }}
+        </button>
+        <button
+          class="font-outfit flex-1 rounded-xl py-2 text-xs font-semibold text-white"
+          style="background: linear-gradient(135deg, #00b4d8, #0096b7)"
+          @click="$emit('update:expanded', false)"
+        >
+          {{ t('vacation.ideas.saveIdea' as any) }}
+        </button>
+      </div>
+
       <!-- Delete -->
       <button
         v-if="!readOnly"
-        class="text-xs font-medium text-red-500 hover:text-red-600"
+        class="mt-1 text-[10px] font-medium text-red-400 hover:text-red-500"
         @click="$emit('delete')"
       >
         {{ t('common.delete') }}
