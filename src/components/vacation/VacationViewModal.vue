@@ -75,6 +75,7 @@ const accommodationGaps = computed(() => {
   const end = parseLocalDate(extractDatePart(vacation.value.endDate));
   const coveredDates = new Set<string>();
 
+  // Accommodation check-in to check-out (exclusive of checkout day)
   for (const acc of vacation.value.accommodations) {
     if (acc.checkInDate && acc.checkOutDate) {
       let d = parseLocalDate(extractDatePart(acc.checkInDate));
@@ -86,11 +87,43 @@ const accommodationGaps = computed(() => {
     }
   }
 
+  // Cruise ships include accommodation — cover embarkation→disembarkation dates
+  for (const seg of vacation.value.travelSegments) {
+    if (seg.type === 'cruise' && seg.embarkationDate && seg.disembarkationDate) {
+      let d = parseLocalDate(extractDatePart(seg.embarkationDate));
+      const out = parseLocalDate(extractDatePart(seg.disembarkationDate));
+      while (d < out) {
+        coveredDates.add(toDateInputValue(d));
+        d = addDays(d, 1);
+      }
+    }
+  }
+
+  // Overnight flights cover the departure night (departs one day, arrives the next)
+  for (const seg of vacation.value.travelSegments) {
+    if (seg.type?.startsWith('flight') && seg.departureDate && seg.arrivalDate) {
+      const dep = extractDatePart(seg.departureDate);
+      const arr = extractDatePart(seg.arrivalDate);
+      if (arr > dep) {
+        // Flight spans overnight — cover departure date through the night before arrival
+        let d = parseLocalDate(dep);
+        const arrDate = parseLocalDate(arr);
+        while (d < arrDate) {
+          coveredDates.add(toDateInputValue(d));
+          d = addDays(d, 1);
+        }
+      }
+    }
+  }
+
+  // The last day of the trip (return travel day) doesn't need accommodation
+  const endStr = toDateInputValue(end);
+
   const gaps: string[] = [];
   let d = new Date(start);
-  while (d <= end) {
+  while (d < end) {
     const dateStr = toDateInputValue(d);
-    if (!coveredDates.has(dateStr)) gaps.push(dateStr);
+    if (dateStr !== endStr && !coveredDates.has(dateStr)) gaps.push(dateStr);
     d = addDays(d, 1);
   }
   return gaps;
@@ -146,9 +179,12 @@ function buildTravelKeyValue(seg: {
   flightNumber?: string;
   departureAirport?: string;
   arrivalAirport?: string;
+  departureDate?: string;
   departureTime?: string;
   cruiseLine?: string;
   shipName?: string;
+  embarkationDate?: string;
+  disembarkationDate?: string;
   operator?: string;
   route?: string;
 }): string {
@@ -164,14 +200,32 @@ function buildTravelKeyValue(seg: {
       const to = seg.arrivalAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.arrivalAirport;
       p.push(`${from}→${to}`);
     }
-    if (seg.departureTime) p.push(seg.departureTime);
+    if (seg.departureDate) {
+      const datePart = formatDateShort(seg.departureDate).toLowerCase();
+      p.push(seg.departureTime ? `${datePart} · ${seg.departureTime}` : datePart);
+    } else if (seg.departureTime) {
+      p.push(seg.departureTime);
+    }
   } else if (seg.type === 'cruise') {
     if (seg.cruiseLine) p.push(seg.cruiseLine);
     if (seg.shipName) p.push(seg.shipName);
+    if (seg.embarkationDate && seg.disembarkationDate) {
+      p.push(
+        `${formatDateShort(seg.embarkationDate).toLowerCase()} – ${formatDateShort(seg.disembarkationDate).toLowerCase()}`
+      );
+    } else if (seg.embarkationDate) {
+      p.push(formatDateShort(seg.embarkationDate).toLowerCase());
+    }
   } else {
+    // Train / Ferry
     if (seg.operator) p.push(seg.operator);
     if (seg.route) p.push(seg.route);
-    if (seg.departureTime) p.push(seg.departureTime);
+    if (seg.departureDate) {
+      const datePart = formatDateShort(seg.departureDate).toLowerCase();
+      p.push(seg.departureTime ? `${datePart} · ${seg.departureTime}` : datePart);
+    } else if (seg.departureTime) {
+      p.push(seg.departureTime);
+    }
   }
   return p.join(' · ');
 }
@@ -308,7 +362,33 @@ const timelineItems = computed<TimelineItem[]>(() => {
     const kvParts: string[] = [];
     if (trans.agencyName) kvParts.push(trans.agencyName);
     else if (trans.operator) kvParts.push(trans.operator);
-    if (trans.pickupTime) kvParts.push(trans.pickupTime);
+    if (trans.route) kvParts.push(trans.route);
+    if (trans.type === 'rental_car') {
+      // Rental car: show pickup – return date range
+      if (trans.pickupDate && trans.returnDate) {
+        kvParts.push(
+          `${formatDateShort(trans.pickupDate).toLowerCase()} – ${formatDateShort(trans.returnDate).toLowerCase()}`
+        );
+      } else if (trans.pickupDate) {
+        kvParts.push(formatDateShort(trans.pickupDate).toLowerCase());
+      }
+    } else if (trans.type === 'train' || trans.type === 'bus') {
+      // Train/Bus: show departure date + time
+      if (trans.departureDate) {
+        const datePart = formatDateShort(trans.departureDate).toLowerCase();
+        kvParts.push(trans.departureTime ? `${datePart} · ${trans.departureTime}` : datePart);
+      } else if (trans.departureTime) {
+        kvParts.push(trans.departureTime);
+      }
+    } else {
+      // Shuttle / Taxi: show pickup date + time
+      if (trans.pickupDate) {
+        const datePart = formatDateShort(trans.pickupDate).toLowerCase();
+        kvParts.push(trans.pickupTime ? `${datePart} · ${trans.pickupTime}` : datePart);
+      } else if (trans.pickupTime) {
+        kvParts.push(trans.pickupTime);
+      }
+    }
     if (trans.bookingReference) kvParts.push(trans.bookingReference);
 
     items.push({
@@ -383,10 +463,19 @@ function handleVote(ideaId: string) {
     @close="$emit('close')"
     @save="vacation && emit('edit', vacation, 1)"
   >
+    <template #footer-start>
+      <button
+        type="button"
+        class="font-outfit rounded-2xl border border-[var(--tint-slate-10)] bg-transparent px-5 py-3 text-sm font-semibold text-[var(--color-text-muted)] transition-all hover:bg-[var(--tint-slate-5)] dark:border-slate-600 dark:text-gray-400"
+        @click="$emit('close')"
+      >
+        {{ t('action.close') }}
+      </button>
+    </template>
     <!-- Custom teal hero header (fixed, non-scrolling) -->
     <template v-if="vacation" #custom-header>
       <div
-        class="relative overflow-hidden rounded-t-3xl px-6 py-4"
+        class="relative overflow-hidden px-6 py-4 sm:rounded-t-3xl"
         style="background: linear-gradient(135deg, #00b4d8, #0077b6)"
       >
         <div class="relative z-10 flex items-center gap-3">
@@ -633,7 +722,7 @@ function handleVote(ideaId: string) {
             class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[var(--vacation-teal-tint)] px-2.5 py-1 text-[10px] font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-15)]"
             @click="handleEditInWizard(5)"
           >
-            ✏️ {{ t('vacation.editInWizard' as any) }}
+            ✏️ {{ t('vacation.editIdeas' as any) }}
           </button>
         </div>
 

@@ -248,11 +248,10 @@ const saveLabel = computed(() => {
         <button
           v-if="isEditing && currentStep < 5"
           type="button"
-          class="font-outfit rounded-2xl px-4 py-3 text-xs font-semibold text-white"
-          style="background: linear-gradient(135deg, #00b4d8, #0096b7)"
+          class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 rounded-2xl bg-gradient-to-r px-4 py-3 text-xs font-semibold text-white shadow-sm transition-all hover:shadow-md"
           @click="handleSave"
         >
-          {{ t('action.save') }}
+          {{ t('action.saveAndClose') }}
         </button>
       </div>
     </template>

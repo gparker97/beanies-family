@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-19",
-    "translationCount": 1595
+    "lastUpdated": "2026-03-20",
+    "translationCount": 1773
   },
   "translations": {
     "app.name": {
@@ -7980,6 +7980,896 @@
       "translation": "他们打开链接，选择密码，然后加入Pod。登录后，他们可以随时使用自己的账号登录。",
       "hash": "593697",
       "lastUpdated": "2026-03-19"
+    },
+    "vacation.planningATrip": {
+      "translation": "让它成为一个家庭度假！",
+      "hash": "4i2hyi",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.planningSubtitle": {
+      "translation": "规划行程，了解机票、酒店、创意等",
+      "hash": "9vzqy0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.wizardTitle": {
+      "translation": "计划度假",
+      "hash": "qrf40j",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.wizardTitleEdit": {
+      "translation": "编辑假期",
+      "hash": "ewil9v",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step.trip": {
+      "translation": "行程",
+      "hash": "1k211",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step.travel": {
+      "translation": "旅行",
+      "hash": "tguthi",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step.stay": {
+      "translation": "接着来",
+      "hash": "1jgc9",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step.gettingAround": {
+      "translation": "交通出行",
+      "hash": "x6yrmx",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step.ideas": {
+      "translation": "建议",
+      "hash": "15yzb0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step1.title": {
+      "translation": "豆子要去哪里？",
+      "hash": "7vvsga",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step1.subtitle": {
+      "translation": "选择您的探险类型并为其命名！",
+      "hash": "qfywhs",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.vacationName": {
+      "translation": "假期名称",
+      "hash": "ouyivm",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.vacationNamePlaceholder": {
+      "translation": "例如：巴厘岛海滩富丽堂皇",
+      "hash": "q33emc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.tripType": {
+      "translation": "行程类型",
+      "hash": "pkxhed",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.whosGoing": {
+      "translation": "谁要去？",
+      "hash": "rgaqm3",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.fly_and_stay": {
+      "translation": "飞行与住宿",
+      "hash": "mqajds",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.fly_and_stay.desc": {
+      "translation": "机票+酒店",
+      "hash": "1nyl1t",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.cruise": {
+      "translation": "巡航",
+      "hash": "xiu67p",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.cruise.desc": {
+      "translation": "扬帆起航，伙计！",
+      "hash": "twlrlc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.road_trip": {
+      "translation": "《公路之旅》（Road Trip）",
+      "hash": "husbvp",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.road_trip.desc": {
+      "translation": "小吃和歌唱",
+      "hash": "ng4fpi",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.combo": {
+      "translation": "组合行程",
+      "hash": "vz201j",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.combo.desc": {
+      "translation": "混搭",
+      "hash": "ep3st6",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.camping": {
+      "translation": "露营 ",
+      "hash": "yer4nz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.camping.desc": {
+      "translation": "星空下",
+      "hash": "u7vp8q",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.adventure": {
+      "translation": "冒險",
+      "hash": "lnv568",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.type.adventure.desc": {
+      "translation": "徒步、滑雪、探索",
+      "hash": "yznd7q",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step2.title": {
+      "translation": "我们如何到达那里？",
+      "hash": "2xpnd9",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step2.subtitle": {
+      "translation": "按日期排序\\ u2014展开任意卡片以查看完整详情",
+      "hash": "ew3908",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.addFlight": {
+      "translation": "飞行",
+      "hash": "yugk9c",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.addCruise": {
+      "translation": "巡航",
+      "hash": "xiu67p",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.addTrain": {
+      "translation": "火车",
+      "hash": "1c9kvc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.addFerry": {
+      "translation": "渡船",
+      "hash": "14cika",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.outboundFlight": {
+      "translation": "离港航班",
+      "hash": "u9osps",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.returnFlight": {
+      "translation": "回程飞机",
+      "hash": "m5k5eo",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.flights": {
+      "translation": "航班",
+      "hash": "erkmhv",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.outbound": {
+      "translation": "出站",
+      "hash": "20gw7k",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.travel.return": {
+      "translation": "退货",
+      "hash": "ulr9o0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.airline": {
+      "translation": "航空公司",
+      "hash": "b4lr1a",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.flightNumber": {
+      "translation": "航班号",
+      "hash": "k3y48p",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.departureAirport": {
+      "translation": "从",
+      "hash": "1b4cq",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.arrivalAirport": {
+      "translation": "To",
+      "hash": "23f",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.departureDate": {
+      "translation": "起飞日期",
+      "hash": "v91ahy",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.departureTime": {
+      "translation": "出发时间",
+      "hash": "v8qwxz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.arrivalDate": {
+      "translation": "到达日期",
+      "hash": "yz9n4b",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.arrivalTime": {
+      "translation": "抵达时间",
+      "hash": "yyz9kc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.bookingReference": {
+      "translation": "预订参考",
+      "hash": "ekx14s",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.cruiseLine": {
+      "translation": "邮轮公司",
+      "hash": "uu21sx",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.shipName": {
+      "translation": "船名：",
+      "hash": "jnzea9",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.departurePort": {
+      "translation": "出发港",
+      "hash": "v8tcb7",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.cabinNumber": {
+      "translation": "舱房号",
+      "hash": "vqn59c",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.embarkationDate": {
+      "translation": "登机",
+      "hash": "vls03v",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.disembarkationDate": {
+      "translation": "上岸",
+      "hash": "vo2o2v",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.operator": {
+      "translation": "经营者",
+      "hash": "77j1vg",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.route": {
+      "translation": "<g id=\"Bold\">专业：</g>",
+      "hash": "1b4ht5",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.departureStation": {
+      "translation": "从车站出发",
+      "hash": "rnrhz2",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.arrivalStation": {
+      "translation": "到车站",
+      "hash": "qniqa7",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step3.title": {
+      "translation": "枕头堡总部",
+      "hash": "xjcloh",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step3.subtitle": {
+      "translation": "选择您需要的内容\\ u2014为每个选项添加详细信息",
+      "hash": "mhzpo6",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.accommodation.hotel": {
+      "translation": "酒店",
+      "hash": "15mis4",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.accommodation.airbnb": {
+      "translation": "爱彼迎/租赁",
+      "hash": "7jx7p3",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.accommodation.campground": {
+      "translation": "营地",
+      "hash": "e5d8x4",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.accommodation.family_friends": {
+      "translation": "家人/朋友",
+      "hash": "nqudbc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.hotelName": {
+      "translation": "酒店名称",
+      "hash": "o12xc9",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.propertyName": {
+      "translation": "属性名称",
+      "hash": "4mjqbu",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.campgroundName": {
+      "translation": "露营地名称",
+      "hash": "8o50v1",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.hostName": {
+      "translation": "房主名",
+      "hash": "kaqzur",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.breakfastIncluded": {
+      "translation": "包括早餐",
+      "hash": "9z6pi9",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.address": {
+      "translation": "通讯地址",
+      "hash": "8js9uc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.checkIn": {
+      "translation": "已签到",
+      "hash": "qhhdm2",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.checkOut": {
+      "translation": "退房",
+      "hash": "vbdt07",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.confirmationNumber": {
+      "translation": "确认数",
+      "hash": "hcf4pg",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.roomType": {
+      "translation": "房间类型",
+      "hash": "eievz3",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.contactPhone": {
+      "translation": "联系人电话",
+      "hash": "19yj82",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.addAnotherStay": {
+      "translation": "请添加其他邮箱",
+      "hash": "kqmaxh",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step4.title": {
+      "translation": "豆类运输部",
+      "hash": "5gnobf",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step4.subtitle": {
+      "translation": "选择您需要的内容\\ u2014跳过其余部分！",
+      "hash": "nrgwxa",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.transport.airport_shuttle": {
+      "translation": "机场班车",
+      "hash": "tk5lwk",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.transport.rental_car": {
+      "translation": "租车",
+      "hash": "1f9ck8",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.transport.taxi_rideshare": {
+      "translation": "出租车/共乘",
+      "hash": "47f5f8",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.transport.train": {
+      "translation": "火车",
+      "hash": "1c9kvc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.transport.bus": {
+      "translation": "公交车",
+      "hash": "1fts",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.pickupDate": {
+      "translation": "取货日期",
+      "hash": "t8u7rm",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.pickupTime": {
+      "translation": "取货时间",
+      "hash": "t94lbl",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.returnDate": {
+      "translation": "退回日期",
+      "hash": "20mrha",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.returnTime": {
+      "translation": "返程时间",
+      "hash": "20x519",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.agencyName": {
+      "translation": "代理商名称",
+      "hash": "z6gsee",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.agencyAddress": {
+      "translation": "代理人地址",
+      "hash": "1d0f1j",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.addAnotherTransport": {
+      "translation": "新增其他交通工具",
+      "hash": "fb1jgz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step5.title": {
+      "translation": "Bean Bucket List ！",
+      "hash": "pp8u71",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.step5.subtitle": {
+      "translation": "豆子想看什么和做什么？",
+      "hash": "45y6pw",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.addPlaceholder": {
+      "translation": "添加一个想法……我们该怎么办？",
+      "hash": "uflo0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category.beach": {
+      "translation": "沙滩",
+      "hash": "124z7n",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category.food": {
+      "translation": "食物",
+      "hash": "1b24e",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category.sightseeing": {
+      "translation": "观光",
+      "hash": "5zntyk",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category.shopping": {
+      "translation": "購物",
+      "hash": "4mlg1k",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category.nightlife": {
+      "translation": "夜生活",
+      "hash": "fagfm4",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.estimatedCost": {
+      "translation": "估算成本",
+      "hash": "rc7g4x",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.free": {
+      "translation": "免费",
+      "hash": "1b43w",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.paid": {
+      "translation": "已付款",
+      "hash": "1h5gs",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.duration": {
+      "translation": "课时",
+      "hash": "vvi6vg",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.needsBooking": {
+      "translation": "需要预订",
+      "hash": "9gph0q",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.noBookingNeeded": {
+      "translation": "无需预订",
+      "hash": "m97xhh",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.whosInterested": {
+      "translation": "谁感兴趣",
+      "hash": "sxefb5",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.votes": {
+      "translation": "票数",
+      "hash": "1dbn3d",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.saveIdea": {
+      "translation": "保存创意",
+      "hash": "z7c1x6",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.descriptionPlaceholder": {
+      "translation": "这个想法是关于什么的？",
+      "hash": "swjz1l",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.category": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.whichDay": {
+      "translation": "哪一天？",
+      "hash": "1918xy",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.bookingNeeded": {
+      "translation": "需要预订吗？",
+      "hash": "fu4kdf",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.addedBy": {
+      "translation": "上传者",
+      "hash": "jabfc9",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.status.booked": {
+      "translation": "已预订",
+      "hash": "x01d9k",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.status.pending": {
+      "translation": "待定",
+      "hash": "g8p2lz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.status.not_booked": {
+      "translation": "如果尚未预订",
+      "hash": "9hmlqj",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.status.researching": {
+      "translation": "研究",
+      "hash": "ygsrwn",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.next": {
+      "translation": "下一頁",
+      "hash": "1fytv",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.back": {
+      "translation": "后退",
+      "hash": "187if",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.saveVacation": {
+      "translation": "节省假期！",
+      "hash": "jca4n3",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.bonVoyage": {
+      "translation": "祝您旅途愉快，豆子！",
+      "hash": "98muxc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.savedMessage": {
+      "translation": "您的假期已保存，可以与家人分享了",
+      "hash": "mznye",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.daysUntil": {
+      "translation": "起飞前天数",
+      "hash": "jy7otf",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.trip": {
+      "translation": "行程",
+      "hash": "1k211",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.when": {
+      "translation": "何时",
+      "hash": "1lrh6",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.who": {
+      "translation": "对象",
+      "hash": "1v32",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.booked": {
+      "translation": "已预订",
+      "hash": "x01d9k",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.ideas": {
+      "translation": "建议",
+      "hash": "15yzb0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.allBeans": {
+      "translation": "所有豆子！",
+      "hash": "xr6j4t",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.going": {
+      "translation": "要去",
+      "hash": "1mnx8a",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.letsGo": {
+      "translation": "真棒，我们走吧！",
+      "hash": "nae6gn",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.daysToTakeoff": {
+      "translation": "距离起飞还有天！",
+      "hash": "flaa6c",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.todo": {
+      "translation": "待办事项",
+      "hash": "1c6kgt",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.itemsNeedBooking": {
+      "translation": "需要预订的商品",
+      "hash": "3mfe3z",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.celebration.onBucketList": {
+      "translation": "在愿望清单上",
+      "hash": "mxqafw",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.viewTitle": {
+      "translation": "度假详情",
+      "hash": "x3tzi7",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.timeline": {
+      "translation": "您的行程时间表",
+      "hash": "p0ah1r",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.timelineSortedBy": {
+      "translation": "按日期排序\\ u2014轻点以复制\\ u2014单击字段以内联编辑",
+      "hash": "geghg0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.bucketList": {
+      "translation": "Bean Bucket List",
+      "hash": "5etkuc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.editAll": {
+      "translation": "编辑套餐",
+      "hash": "uolwdo",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.nightsNoAccommodation": {
+      "translation": "未住宿晚数",
+      "hash": "uo5lkw",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.editInWizard": {
+      "translation": "编辑套餐",
+      "hash": "1aus1r",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.editIdeas": {
+      "translation": "编辑创意",
+      "hash": "uslhru",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.share": {
+      "translation": "共享",
+      "hash": "1bjem7",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.copied": {
+      "translation": "已复制！",
+      "hash": "rqllj7",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.progress": {
+      "translation": "已预订",
+      "hash": "x01d9k",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.notBookedYet": {
+      "translation": "尚未预订\\ u2014我们\\ u2019会稍后提醒您！",
+      "hash": "w6el6p",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.stillDeciding": {
+      "translation": "还未决定",
+      "hash": "1gn5v",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.upcoming": {
+      "translation": "即将到来的假期",
+      "hash": "ekwuz2",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.daysAway": {
+      "translation": "距离天数",
+      "hash": "y077qh",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.inProgress": {
+      "translation": "进行中",
+      "hash": "ig5c8o",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.itemsNeedBooking": {
+      "translation": "需要预订的商品",
+      "hash": "6pcq7l",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.dayContext": {
+      "translation": "白天",
+      "hash": "1gu4",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ofTrip": {
+      "translation": "行程/",
+      "hash": "qowvf6",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.duration.30min": {
+      "translation": "30分钟",
+      "hash": "owaxv3",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.duration.1hr": {
+      "translation": "1 小时",
+      "hash": "nq58k3",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.duration.2hrs": {
+      "translation": "2 小时",
+      "hash": "v5by4f",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.duration.half_day": {
+      "translation": "半天",
+      "hash": "5d0rz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.duration.full_day": {
+      "translation": "全天",
+      "hash": "n20cqz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.scheduleRecurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.scheduleRecurringDesc": {
+      "translation": "每周或每月重复",
+      "hash": "uco153",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.scheduleOneTime": {
+      "translation": "一次性",
+      "hash": "xem3o4",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.scheduleOneTimeDesc": {
+      "translation": "发生一次",
+      "hash": "deuyi8",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.segment.flight": {
+      "translation": "飞行",
+      "hash": "yugk9c",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.segment.cruise": {
+      "translation": "巡航",
+      "hash": "xiu67p",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.segment.train": {
+      "translation": "火车",
+      "hash": "1c9kvc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.segment.ferry": {
+      "translation": "渡船",
+      "hash": "14cika",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.ideas.empty": {
+      "translation": "还没有创意\\ u2014在上面添加您的第一个创意！",
+      "hash": "1zsmc1",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.notesPlaceholder": {
+      "translation": "添加注释",
+      "hash": "vci1n0",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.description": {
+      "translation": "描述",
+      "hash": "xqskk",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.location": {
+      "translation": "港口/地点",
+      "hash": "br683p",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.status": {
+      "translation": "状态",
+      "hash": "twsvse",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.title": {
+      "translation": "Title",
+      "hash": "1c4854",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.field.openInMaps": {
+      "translation": "在地图中打开",
+      "hash": "byafaf",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.deleteTitle": {
+      "translation": "删除假期？",
+      "hash": "cs8tgz",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.deleteMessage": {
+      "translation": "这将永久删除此假期及其所有详细信息。",
+      "hash": "26dbzc",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.deleteSegmentTitle": {
+      "translation": "删除此项目？",
+      "hash": "awjw1r",
+      "lastUpdated": "2026-03-20"
+    },
+    "vacation.deleteSegmentMessage": {
+      "translation": "这将从您的度假计划中删除此项目。",
+      "hash": "xq1xuc",
+      "lastUpdated": "2026-03-20"
     }
   }
 }

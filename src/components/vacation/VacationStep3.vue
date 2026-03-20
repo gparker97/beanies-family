@@ -70,6 +70,7 @@ function addItem(type: VacationAccommodationType) {
 
 function togglePill(type: VacationAccommodationType) {
   if (hasType(type)) {
+    // Deselect: remove only if all items of this type are empty
     const items = props.accommodations.filter((a) => a.type === type);
     const allEmpty = items.every(
       (a) => !a.name && !a.address && !a.checkInDate && !a.checkOutDate && !a.confirmationNumber
@@ -81,7 +82,23 @@ function togglePill(type: VacationAccommodationType) {
       );
     }
   } else {
-    addItem(type);
+    // Single-select: replace current type (if empty) or just add the new type
+    const currentItems = props.accommodations;
+    const allEmpty = currentItems.every(
+      (a) => !a.name && !a.address && !a.checkInDate && !a.checkOutDate && !a.confirmationNumber
+    );
+    if (allEmpty) {
+      // Replace all empty items with the new type
+      const item: VacationAccommodation = {
+        id: generateUUID(),
+        type,
+        title: t(`vacation.accommodation.${type}` as any),
+        status: 'not_booked',
+      };
+      emit('update:accommodations', [item]);
+    } else {
+      addItem(type);
+    }
   }
 }
 

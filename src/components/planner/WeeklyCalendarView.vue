@@ -14,7 +14,7 @@ import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, extractDatePart } from '@/utils/date';
 import { tripTypeEmoji } from '@/utils/vacation';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
@@ -56,10 +56,12 @@ const weekActivities = computed(() => {
     allOccurrences.push(...activityStore.monthActivities(y!, m!));
   }
 
+  // Skip vacation-linked activities — they render as vacation span bars instead
   const dateSet = new Set(days.map((d) => d.dateStr));
   const map = new Map<string, Occurrence[]>();
   for (const d of days) map.set(d.dateStr, []);
   for (const occ of allOccurrences) {
+    if (occ.activity.vacationId) continue;
     if (dateSet.has(occ.date)) map.get(occ.date)!.push(occ);
   }
   return map;
@@ -206,6 +208,45 @@ const spanningActivityIds = computed(
   () => new Set(spanningActivities.value.map((s) => s.activity.id))
 );
 
+// Vacation span bars — read directly from vacationStore (matches CalendarGrid approach)
+interface VacationSpan {
+  vacationId: string;
+  name: string;
+  emoji: string;
+  startCol: number;
+  span: number;
+}
+
+const vacationSpans = computed<VacationSpan[]>(() => {
+  const days = weekDays.value;
+  if (days.length === 0) return [];
+
+  const spans: VacationSpan[] = [];
+  for (const v of vacationStore.vacations) {
+    if (!v.startDate || !v.endDate) continue;
+    const vStart = extractDatePart(v.startDate);
+    const vEnd = extractDatePart(v.endDate);
+
+    const startIdx = days.findIndex((d) => d.dateStr >= vStart);
+    if (startIdx < 0) continue; // vacation starts after this week
+    if (days[days.length - 1]!.dateStr < vStart) continue;
+    if (days[0]!.dateStr > vEnd) continue; // vacation ended before this week
+
+    const startCol = startIdx;
+    const endIdx = [...days].reverse().findIndex((d) => d.dateStr <= vEnd);
+    const endCol = endIdx >= 0 ? days.length - 1 - endIdx : days.length - 1;
+
+    spans.push({
+      vacationId: v.id,
+      name: v.name,
+      emoji: tripTypeEmoji(v.tripType),
+      startCol,
+      span: endCol - startCol + 1,
+    });
+  }
+  return spans;
+});
+
 function getUntimedForDay(dateStr: string): Occurrence[] {
   return (weekActivities.value.get(dateStr) ?? []).filter(
     (o) => !o.activity.startTime && !spanningActivityIds.value.has(o.activity.id)
@@ -224,10 +265,12 @@ function hasUntimedContent(dateStr: string): boolean {
   );
 }
 
-// Check if there are ANY spanning activities or per-day untimed content
+// Check if there are ANY spanning activities, vacation spans, or per-day untimed content
 const hasAnyUntimedContent = computed(
   () =>
-    spanningActivities.value.length > 0 || weekDays.value.some((d) => hasUntimedContent(d.dateStr))
+    spanningActivities.value.length > 0 ||
+    vacationSpans.value.length > 0 ||
+    weekDays.value.some((d) => hasUntimedContent(d.dateStr))
 );
 
 function handleEmptySlotClick(dateStr: string, hour: number) {
@@ -292,40 +335,36 @@ defineExpose({ weekLabel, activityCount });
           </span>
         </div>
 
+        <!-- Vacation span bars (from vacationStore directly) -->
+        <div
+          v-for="vs in vacationSpans"
+          :key="'vacation-' + vs.vacationId"
+          class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs font-semibold text-white transition-opacity hover:opacity-80"
+          :style="{
+            gridColumn: `${vs.startCol + 2} / span ${vs.span}`,
+            background: 'linear-gradient(to right, var(--vacation-teal), #0077B6)',
+            borderLeft: '3px solid var(--vacation-teal)',
+            opacity: 0.85,
+          }"
+          @click="emit('vacation-click', vs.vacationId)"
+        >
+          {{ vs.emoji }} {{ vs.name }}
+        </div>
+
         <!-- Spanning multi-day activities (positioned across columns) -->
         <div
           v-for="span in spanningActivities"
           :key="'span-' + span.activity.id"
           class="cursor-pointer truncate rounded-md px-2 py-0.5 text-xs font-semibold transition-opacity hover:opacity-80"
-          :style="
-            span.activity.vacationId
-              ? {
-                  gridColumn: `${span.startCol + 2} / span ${span.span}`,
-                  background: 'linear-gradient(to right, var(--vacation-teal), #0077B6)',
-                  color: 'white',
-                  borderLeft: '3px solid var(--vacation-teal)',
-                  opacity: 0.85,
-                }
-              : {
-                  gridColumn: `${span.startCol + 2} / span ${span.span}`,
-                  background: getActivityColor(span.activity) + '20',
-                  color: getActivityColor(span.activity),
-                  borderLeft: `3px solid ${getActivityColor(span.activity)}`,
-                }
-          "
-          @click="
-            span.activity.vacationId
-              ? emit('vacation-click', span.activity.vacationId)
-              : emit('view-activity', span.activity.id, span.activity.date)
-          "
+          :style="{
+            gridColumn: `${span.startCol + 2} / span ${span.span}`,
+            background: getActivityColor(span.activity) + '20',
+            color: getActivityColor(span.activity),
+            borderLeft: `3px solid ${getActivityColor(span.activity)}`,
+          }"
+          @click="emit('view-activity', span.activity.id, span.activity.date)"
         >
-          <template v-if="span.activity.vacationId">
-            {{ tripTypeEmoji(vacationStore.getVacationById(span.activity.vacationId)?.tripType) }}
-            {{ span.activity.title }}
-          </template>
-          <template v-else>
-            {{ span.activity.title }}
-          </template>
+          {{ span.activity.title }}
         </div>
 
         <!-- Per-day single-day untimed activities + todos -->
@@ -478,6 +517,20 @@ defineExpose({ weekLabel, activityCount });
       </div>
 
       <div class="space-y-1.5">
+        <!-- Vacation bars for selected day -->
+        <div
+          v-for="vs in vacationSpans.filter(
+            (s) =>
+              weekDays[s.startCol]!.dateStr <= selectedMobileDay &&
+              weekDays[Math.min(s.startCol + s.span - 1, 6)]!.dateStr >= selectedMobileDay
+          )"
+          :key="'mob-vac-' + vs.vacationId"
+          class="cursor-pointer truncate rounded-2xl px-3 py-2.5 text-sm font-semibold text-white"
+          style="background: linear-gradient(to right, var(--vacation-teal), #0077b6)"
+          @click="emit('vacation-click', vs.vacationId)"
+        >
+          {{ vs.emoji }} {{ vs.name }}
+        </div>
         <ActivityListCard
           v-for="(occ, i) in mobileDayActivities"
           :key="`${occ.activity.id}-${i}`"
@@ -488,6 +541,11 @@ defineExpose({ weekLabel, activityCount });
         <div
           v-if="
             mobileDayActivities.length === 0 &&
+            vacationSpans.filter(
+              (s) =>
+                weekDays[s.startCol]!.dateStr <= selectedMobileDay &&
+                weekDays[Math.min(s.startCol + s.span - 1, 6)]!.dateStr >= selectedMobileDay
+            ).length === 0 &&
             (weekTodos.get(selectedMobileDay)?.length ?? 0) === 0
           "
           class="rounded-2xl bg-gray-50 py-8 text-center dark:bg-slate-700/50"

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
@@ -47,6 +48,7 @@ const accountsStore = useAccountsStore();
 const recurringStore = useRecurringStore();
 const transactionsStore = useTransactionsStore();
 const memberFilterStore = useMemberFilterStore();
+const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 const {
   viewingActivity,
@@ -77,8 +79,15 @@ function toggleMember(id: string) {
   }
 }
 
+const activeMemberNames = computed(() =>
+  familyStore.members
+    .filter((m) => memberFilterStore.isMemberSelected(m.id) && !memberFilterStore.isAllSelected)
+    .map((m) => m.name)
+);
+
 const activeView = ref(isMobile.value ? 'month' : 'week');
 const showInactive = ref(false);
+const showMemberFilterMobile = ref(false);
 const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const editingOccurrenceDate = ref<string | undefined>(undefined);
@@ -345,33 +354,141 @@ function handleActivitySwapped(newId: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
+    <!-- Header row: subtitle + filters + add button -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <p class="text-secondary-500/40 text-sm dark:text-gray-500">
+      <p class="text-secondary-500/40 hidden text-sm sm:block dark:text-gray-500">
         {{ headerSubtitle }}
       </p>
-      <button
-        v-if="canEditActivities"
-        type="button"
-        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
-        @click="openAddModal()"
-      >
-        {{ t('planner.addActivity') }}
-      </button>
+      <div class="flex items-center gap-2">
+        <!-- Compact member filter (mobile: dropdown, desktop: inline chips) -->
+        <div class="hidden sm:flex">
+          <MemberChipFilter
+            :is-all-active="memberFilterStore.isAllSelected"
+            :is-member-active="
+              (id: string) =>
+                memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
+            "
+            @select-all="toggleAllMembers"
+            @select-member="toggleMember"
+          />
+        </div>
+        <!-- Mobile: compact member filter button -->
+        <div class="relative sm:hidden">
+          <button
+            type="button"
+            class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-medium transition-all"
+            :class="
+              memberFilterStore.isAllSelected
+                ? 'bg-[var(--tint-slate-5)] text-[var(--color-text)]/65 dark:bg-slate-700 dark:text-gray-400'
+                : 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
+            "
+            @click="showMemberFilterMobile = !showMemberFilterMobile"
+          >
+            <span class="text-base">👨‍👩‍👧</span>
+            {{
+              memberFilterStore.isAllSelected
+                ? t('filter.allMembers')
+                : activeMemberNames.length === 1
+                  ? activeMemberNames[0]
+                  : `${activeMemberNames.length} ${t('filter.members' as any)}`
+            }}
+            <span class="text-xs opacity-60">▾</span>
+          </button>
+          <!-- Mobile dropdown backdrop -->
+          <div
+            v-if="showMemberFilterMobile"
+            class="fixed inset-0 z-20"
+            @click="showMemberFilterMobile = false"
+          />
+          <!-- Mobile dropdown -->
+          <Transition
+            enter-active-class="transition-all duration-150"
+            enter-from-class="opacity-0 -translate-y-1"
+            leave-active-class="transition-all duration-100"
+            leave-to-class="opacity-0 -translate-y-1"
+          >
+            <div
+              v-if="showMemberFilterMobile"
+              class="absolute top-full left-0 z-30 mt-1.5 min-w-[200px] rounded-2xl border border-gray-200/60 bg-white p-2 shadow-lg dark:border-slate-600 dark:bg-slate-800"
+            >
+              <button
+                type="button"
+                class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+                :class="
+                  memberFilterStore.isAllSelected
+                    ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
+                    : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
+                "
+                @click="
+                  toggleAllMembers();
+                  showMemberFilterMobile = false;
+                "
+              >
+                <span class="text-base">👨‍👩‍👧</span>
+                {{ t('filter.allMembers') }}
+              </button>
+              <button
+                v-for="member in familyStore.members"
+                :key="member.id"
+                type="button"
+                class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
+                :class="
+                  memberFilterStore.isMemberSelected(member.id) && !memberFilterStore.isAllSelected
+                    ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
+                    : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)] dark:text-gray-300 dark:hover:bg-slate-700'
+                "
+                @click="toggleMember(member.id)"
+              >
+                <span
+                  class="inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white"
+                  :style="{
+                    backgroundColor: member.color,
+                  }"
+                >
+                  {{ member.name.charAt(0).toUpperCase() }}
+                </span>
+                {{ member.name }}
+              </button>
+            </div>
+          </Transition>
+        </div>
+        <button
+          v-if="canEditActivities"
+          type="button"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          @click="openAddModal()"
+        >
+          {{ t('planner.addActivity') }}
+        </button>
+      </div>
     </div>
 
-    <!-- View toggle + Member filter -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <ViewToggle :active-view="activeView" @update:active-view="activeView = $event" />
-      <MemberChipFilter
-        :is-all-active="memberFilterStore.isAllSelected"
-        :is-member-active="
-          (id: string) => memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
-        "
-        @select-all="toggleAllMembers"
-        @select-member="toggleMember"
-      />
+    <!-- Upcoming vacations — prominent card above calendar (matches mockup slide 9) -->
+    <div
+      v-if="vacationStore.upcomingVacations.length > 0"
+      class="rounded-[20px] bg-white p-4 shadow-[0_4px_20px_rgba(44,62,80,0.04)] dark:bg-slate-800 dark:shadow-none"
+      style="background: linear-gradient(180deg, white, rgb(0 180 216 / 2%))"
+    >
+      <h3
+        class="font-outfit mb-3 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.05em] text-[var(--color-text-muted)] uppercase opacity-50"
+      >
+        ✈️ {{ t('vacation.upcoming') }}
+      </h3>
+      <div
+        class="flex snap-x gap-3 overflow-x-auto pb-1 sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:pb-0"
+      >
+        <VacationSidebarCard
+          v-for="vacation in vacationStore.upcomingVacations"
+          :key="vacation.id"
+          class="w-[280px] shrink-0 snap-start sm:w-auto sm:shrink"
+          :vacation="vacation"
+          @click="handleVacationClick(vacation.id)"
+        />
+      </div>
     </div>
+
+    <!-- View toggle (compact, directly above calendar) -->
+    <ViewToggle :active-view="activeView" @update:active-view="activeView = $event" />
 
     <!-- Calendar views (conditional on activeView) -->
     <CalendarGrid
@@ -392,23 +509,6 @@ function handleActivitySwapped(newId: string) {
       @view-todo="openTodoViewModal"
       @vacation-click="handleVacationClick"
     />
-
-    <!-- Upcoming vacations -->
-    <div v-if="vacationStore.upcomingVacations.length > 0" class="mb-4">
-      <h3
-        class="font-outfit mb-3 flex items-center gap-2 text-xs font-semibold tracking-wider text-[var(--color-text-muted)] uppercase opacity-40"
-      >
-        ✈️ {{ t('vacation.upcoming') }}
-      </h3>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <VacationSidebarCard
-          v-for="vacation in vacationStore.upcomingVacations"
-          :key="vacation.id"
-          :vacation="vacation"
-          @click="handleVacationClick(vacation.id)"
-        />
-      </div>
-    </div>
 
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">

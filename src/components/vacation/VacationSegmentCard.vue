@@ -77,49 +77,55 @@ async function handleDelete() {
     "
   >
     <!-- Header -->
-    <div class="flex cursor-pointer items-center gap-2 px-4 py-3" @click="toggleCollapse">
-      <span class="text-base">{{ icon }}</span>
+    <div class="cursor-pointer px-4 py-3" @click="toggleCollapse">
+      <div class="flex items-center gap-2">
+        <span class="text-base">{{ icon }}</span>
 
-      <span
-        class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
-        :class="[statusConfig.bg, statusConfig.text]"
-      >
-        {{ t(statusConfig.key as any) }}
-      </span>
-
-      <div v-if="!readOnly" class="group/title relative min-w-0 flex-1" @click.stop>
-        <input
-          :value="title"
-          class="font-outfit w-full border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
-          @input="emit('update:title', ($event.target as HTMLInputElement).value)"
-        />
         <span
-          class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/title:opacity-100 dark:text-slate-500"
+          class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+          :class="[statusConfig.bg, statusConfig.text]"
         >
-          ✏️
+          {{ t(statusConfig.key as any) }}
         </span>
+
+        <div v-if="!readOnly" class="group/title relative min-w-0 flex-1" @click.stop>
+          <input
+            :value="title"
+            class="font-outfit w-full border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
+            @input="emit('update:title', ($event.target as HTMLInputElement).value)"
+          />
+          <span
+            class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/title:opacity-100 dark:text-slate-500"
+          >
+            ✏️
+          </span>
+        </div>
+        <span
+          v-else
+          class="font-outfit min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-gray-100"
+        >
+          {{ title }}
+        </span>
+
+        <span v-if="subtitle" class="hidden text-xs text-gray-500 sm:inline dark:text-gray-400">
+          {{ subtitle }}
+        </span>
+
+        <button
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-base text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+          @click.stop="toggleCollapse"
+        >
+          <span class="transition-transform" :class="{ 'rotate-90': !collapsed }">▸</span>
+        </button>
       </div>
-      <span
-        v-else
-        class="font-outfit min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-gray-100"
+
+      <!-- Key info line — shown below title when collapsed -->
+      <div
+        v-if="keyValue && collapsed"
+        class="mt-1 truncate pl-8 text-xs text-gray-400 dark:text-gray-500"
       >
-        {{ title }}
-      </span>
-
-      <span v-if="subtitle" class="hidden text-xs text-gray-500 sm:inline dark:text-gray-400">
-        {{ subtitle }}
-      </span>
-
-      <span v-if="keyValue && collapsed" class="truncate text-xs text-gray-400 dark:text-gray-500">
         {{ keyValue }}
-      </span>
-
-      <button
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-base text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
-        @click.stop="toggleCollapse"
-      >
-        <span class="transition-transform" :class="{ 'rotate-90': !collapsed }">▸</span>
-      </button>
+      </div>
     </div>
 
     <!-- Collapsible body -->
