@@ -76,7 +76,7 @@ export class TransactionsPage {
     }
 
     // Switch schedule to "One-time" (default is "Recurring")
-    await dialog.getByRole('button', { name: ui('modal.oneTime') }).click();
+    await dialog.getByRole('button', { name: /one-time/i }).click();
 
     // Save — button text is "Add Transaction"
     await dialog.getByRole('button', { name: ui('modal.addTransaction') }).click();
