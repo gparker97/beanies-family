@@ -23,6 +23,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
+import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import type {
@@ -435,6 +436,15 @@ function handleActivitySwapped(newId: string) {
       @save="handleSave"
       @delete="handleDelete"
       @start-vacation-wizard="handleStartVacationWizard"
+    />
+
+    <!-- Vacation wizard -->
+    <VacationWizard
+      :open="showVacationWizard"
+      :default-assignee-ids="vacationWizardDefaults.assigneeIds"
+      :default-date="vacationWizardDefaults.date"
+      @close="showVacationWizard = false"
+      @saved="showVacationWizard = false"
     />
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
