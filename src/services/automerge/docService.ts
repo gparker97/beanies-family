@@ -85,8 +85,7 @@ function migrateDoc(doc: Automerge.Doc<FamilyDocument>): Automerge.Doc<FamilyDoc
 
   return Automerge.change(doc, 'migrate: add missing collections', (d) => {
     for (const name of missing) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (d as any)[name] = {};
+      (d as unknown as Record<string, unknown>)[name] = {};
     }
   });
 }
