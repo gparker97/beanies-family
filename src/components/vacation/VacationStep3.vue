@@ -22,6 +22,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 
 const collapsedMap = ref<Record<string, boolean>>({});
+const showAddPicker = ref(false);
 
 const accommodationTypes: { type: VacationAccommodationType; emoji: string; key: string }[] = [
   { type: 'hotel', emoji: '🏨', key: 'hotel' },
@@ -44,6 +45,13 @@ const emojiMap: Record<VacationAccommodationType, string> = {
   family_friends: '👨‍👩‍👧',
 };
 
+const nameFieldKey: Record<VacationAccommodationType, string> = {
+  hotel: 'vacation.field.hotelName',
+  airbnb: 'vacation.field.propertyName',
+  campground: 'vacation.field.campgroundName',
+  family_friends: 'vacation.field.hostName',
+};
+
 function hasType(type: VacationAccommodationType): boolean {
   return props.accommodations.some((a) => a.type === type);
 }
@@ -55,6 +63,7 @@ function addItem(type: VacationAccommodationType) {
     title: t(`vacation.accommodation.${type}` as any),
     status: 'not_booked',
   };
+  showAddPicker.value = false;
   emit('update:accommodations', [...props.accommodations, item]);
 }
 
@@ -75,15 +84,37 @@ function togglePill(type: VacationAccommodationType) {
   }
 }
 
-function updateItem(index: number, field: keyof VacationAccommodation, value: string) {
+function updateItem(index: number, field: keyof VacationAccommodation, value: string | boolean) {
   const updated = [...props.accommodations];
   updated[index] = { ...updated[index]!, [field]: value };
   emit('update:accommodations', updated);
 }
 
+function updateStatus(index: number, value: string) {
+  const current = props.accommodations[index]!;
+  // Single-select: clicking current status resets to 'not_booked'
+  if (current.status === value) {
+    updateItem(index, 'status', 'not_booked');
+  } else {
+    updateItem(index, 'status', value);
+  }
+}
+
 function removeItem(index: number) {
   const updated = props.accommodations.filter((_, i) => i !== index);
   emit('update:accommodations', updated);
+}
+
+function showsRoomType(type: VacationAccommodationType): boolean {
+  return type === 'hotel' || type === 'airbnb';
+}
+
+function showsConfirmationNumber(type: VacationAccommodationType): boolean {
+  return type !== 'family_friends';
+}
+
+function showsBreakfast(type: VacationAccommodationType): boolean {
+  return type === 'hotel';
 }
 </script>
 
@@ -141,7 +172,26 @@ function removeItem(index: number) {
       @delete="removeItem(index)"
     >
       <div class="space-y-3">
-        <FormFieldGroup :label="t('vacation.field.hotelName')">
+        <!-- Status selector (top of card) -->
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="s in statusOptions"
+            :key="s.value"
+            type="button"
+            class="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all"
+            :class="
+              item.status === s.value
+                ? 'bg-[var(--vacation-teal)] text-white'
+                : 'bg-[var(--tint-slate-5)] text-gray-500 hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+            "
+            @click="updateStatus(index, s.value)"
+          >
+            {{ t(s.key as any) }}
+          </button>
+        </div>
+
+        <!-- Name field (label changes by type) -->
+        <FormFieldGroup :label="t(nameFieldKey[item.type] as any)">
           <BaseInput
             :model-value="item.name ?? ''"
             class="vacation-teal-input"
@@ -150,11 +200,24 @@ function removeItem(index: number) {
         </FormFieldGroup>
 
         <FormFieldGroup :label="t('vacation.field.address')">
-          <BaseInput
-            :model-value="item.address ?? ''"
-            class="vacation-teal-input"
-            @update:model-value="updateItem(index, 'address', String($event))"
-          />
+          <div class="relative">
+            <BaseInput
+              :model-value="item.address ?? ''"
+              class="vacation-teal-input"
+              @update:model-value="updateItem(index, 'address', String($event))"
+            />
+            <a
+              v-if="item.address"
+              :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="absolute top-1/2 right-2 -translate-y-1/2 text-sm opacity-40 transition-opacity hover:opacity-80"
+              :title="t('vacation.field.openInMaps')"
+              @click.stop
+            >
+              📍
+            </a>
+          </div>
         </FormFieldGroup>
 
         <div class="grid grid-cols-2 gap-3">
@@ -176,7 +239,10 @@ function removeItem(index: number) {
           </FormFieldGroup>
         </div>
 
-        <FormFieldGroup :label="t('vacation.field.confirmationNumber')">
+        <FormFieldGroup
+          v-if="showsConfirmationNumber(item.type)"
+          :label="t('vacation.field.confirmationNumber')"
+        >
           <BaseInput
             :model-value="item.confirmationNumber ?? ''"
             class="vacation-teal-input"
@@ -184,13 +250,32 @@ function removeItem(index: number) {
           />
         </FormFieldGroup>
 
-        <FormFieldGroup :label="t('vacation.field.roomType')">
+        <FormFieldGroup v-if="showsRoomType(item.type)" :label="t('vacation.field.roomType')">
           <BaseInput
             :model-value="item.roomType ?? ''"
             class="vacation-teal-input"
             @update:model-value="updateItem(index, 'roomType', String($event))"
           />
         </FormFieldGroup>
+
+        <!-- Breakfast Included (hotel only) -->
+        <div v-if="showsBreakfast(item.type)" class="flex items-center gap-2">
+          <input
+            :id="`breakfast-${item.id}`"
+            type="checkbox"
+            :checked="item.breakfastIncluded ?? false"
+            class="h-4 w-4 rounded border-gray-300 text-[var(--vacation-teal)] focus:ring-[var(--vacation-teal)]"
+            @change="
+              updateItem(index, 'breakfastIncluded', ($event.target as HTMLInputElement).checked)
+            "
+          />
+          <label
+            :for="`breakfast-${item.id}`"
+            class="text-sm font-medium text-[var(--color-text)] dark:text-gray-200"
+          >
+            {{ t('vacation.field.breakfastIncluded') }}
+          </label>
+        </div>
 
         <FormFieldGroup :label="t('vacation.field.contactPhone')">
           <BaseInput
@@ -208,36 +293,34 @@ function removeItem(index: number) {
             @update:model-value="updateItem(index, 'notes', String($event))"
           />
         </FormFieldGroup>
-
-        <!-- Status selector -->
-        <div class="flex flex-wrap gap-1.5">
-          <button
-            v-for="s in statusOptions"
-            :key="s.value"
-            type="button"
-            class="rounded-lg px-2.5 py-1 text-xs font-semibold transition-all"
-            :class="
-              item.status === s.value
-                ? 'bg-[var(--vacation-teal)] text-white'
-                : 'bg-[var(--tint-slate-5)] text-gray-500 hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
-            "
-            @click="updateItem(index, 'status', s.value)"
-          >
-            {{ t(s.key as any) }}
-          </button>
-        </div>
       </div>
     </VacationSegmentCard>
 
-    <!-- Add Another Stay button -->
-    <button
-      v-if="accommodations.length > 0"
-      type="button"
-      class="w-full rounded-xl border border-dashed border-[var(--vacation-teal-15)] py-2.5 text-sm font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-tint)] dark:hover:bg-[var(--vacation-teal-15)]"
-      @click="addItem(accommodations[accommodations.length - 1]!.type)"
-    >
-      + {{ t('vacation.addAnotherStay') }}
-    </button>
+    <!-- Add Another Stay button with mini picker -->
+    <div v-if="accommodations.length > 0">
+      <button
+        type="button"
+        class="w-full rounded-xl border border-dashed border-[var(--vacation-teal-15)] py-2.5 text-sm font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-tint)] dark:hover:bg-[var(--vacation-teal-15)]"
+        @click="showAddPicker = !showAddPicker"
+      >
+        + {{ t('vacation.addAnotherStay') }}
+      </button>
+      <!-- Mini type picker -->
+      <div v-if="showAddPicker" class="mt-2 flex flex-wrap justify-center gap-2">
+        <button
+          v-for="at in accommodationTypes"
+          :key="at.type"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-1.5 text-sm transition-all hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:border-slate-700 dark:bg-slate-800 dark:hover:border-[var(--vacation-teal)]"
+          @click="addItem(at.type)"
+        >
+          <span>{{ at.emoji }}</span>
+          <span class="font-outfit font-semibold text-[var(--color-text)] dark:text-gray-100">
+            {{ t(`vacation.accommodation.${at.key}` as any) }}
+          </span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 

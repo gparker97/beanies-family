@@ -357,6 +357,35 @@ function handleVote(ideaId: string) {
                 </button>
               </div>
 
+              <!-- Address link to Google Maps -->
+              <div
+                v-if="
+                  (item.kind === 'accommodation' && item.data.address) ||
+                  (item.kind === 'transportation' && item.data.agencyAddress)
+                "
+                class="flex items-center gap-2 py-1"
+              >
+                <span
+                  class="font-outfit min-w-[70px] shrink-0 text-[10px] font-medium text-gray-400"
+                >
+                  {{
+                    item.kind === 'accommodation'
+                      ? t('vacation.field.address' as any)
+                      : t('vacation.field.agencyAddress' as any)
+                  }}
+                </span>
+                <a
+                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(String(item.kind === 'accommodation' ? item.data.address : item.data.agencyAddress))}`"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="font-outfit inline-flex items-center gap-1 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:bg-slate-700 dark:text-white"
+                  :title="t('vacation.field.openInMaps')"
+                >
+                  {{ item.kind === 'accommodation' ? item.data.address : item.data.agencyAddress }}
+                  <span class="text-[10px] opacity-40">📍</span>
+                </a>
+              </div>
+
               <!-- Edit in wizard link -->
               <button
                 class="font-outfit mt-1 inline-flex items-center gap-1 rounded-lg bg-[var(--vacation-teal-tint)] px-2.5 py-1 text-[10px] font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-tint-15)]"

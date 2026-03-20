@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
-import { formatDateShort } from '@/utils/date';
+import { formatDateShort, addHourToTime } from '@/utils/date';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -104,6 +104,16 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
   if (field === 'departureDate' || field === 'embarkationDate') {
     updated[index] = { ...updated[index]!, sortDate: value };
   }
+  // Auto-populate arrival from departure when arrival is empty
+  if (field === 'departureDate' && !current.arrivalDate) {
+    updated[index] = { ...updated[index]!, arrivalDate: value };
+  }
+  if (field === 'departureTime' && !current.arrivalTime) {
+    updated[index] = { ...updated[index]!, arrivalTime: addHourToTime(value) };
+  }
+  if (field === 'embarkationDate' && !current.disembarkationDate) {
+    updated[index] = { ...updated[index]!, disembarkationDate: value };
+  }
   emit('update:segments', updated);
 }
 
@@ -148,6 +158,17 @@ function removeSegment(index: number) {
       @update:collapsed="collapsedMap[seg.id] = $event"
       @delete="removeSegment(idx)"
     >
+      <!-- Status selector -->
+      <div class="mb-3">
+        <FormFieldGroup :label="t('vacation.field.status')">
+          <TogglePillGroup
+            :model-value="seg.status"
+            :options="statusOptions"
+            @update:model-value="updateSegmentStatus(idx, $event)"
+          />
+        </FormFieldGroup>
+      </div>
+
       <!-- Flight fields -->
       <template v-if="isFlightType(seg.type)">
         <div class="grid grid-cols-2 gap-3">
@@ -363,17 +384,6 @@ function removeSegment(index: number) {
           />
         </FormFieldGroup>
       </template>
-
-      <!-- Status selector -->
-      <div class="mt-3">
-        <FormFieldGroup :label="t('vacation.field.status')">
-          <TogglePillGroup
-            :model-value="seg.status"
-            :options="statusOptions"
-            @update:model-value="updateSegmentStatus(idx, $event)"
-          />
-        </FormFieldGroup>
-      </div>
 
       <!-- Notes -->
       <div class="mt-3">

@@ -533,6 +533,7 @@ export interface VacationAccommodation {
   confirmationNumber?: string;
   roomType?: string;
   contactPhone?: string;
+  breakfastIncluded?: boolean;
   notes?: string;
 }
 
@@ -545,6 +546,16 @@ export interface VacationTransportation {
   pickupDate?: ISODateString;
   pickupTime?: string;
   returnDate?: ISODateString;
+  returnTime?: string;
+  agencyName?: string;
+  agencyAddress?: string;
+  // Train/Bus fields
+  operator?: string;
+  route?: string;
+  departureStation?: string;
+  arrivalStation?: string;
+  departureDate?: ISODateString;
+  departureTime?: string;
   notes?: string;
 }
 

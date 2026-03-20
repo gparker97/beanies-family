@@ -3258,10 +3258,13 @@ const STRING_DEFS = {
   // ── Vacation Planner ──────────────────────────────────────────────────────
 
   // Toggle & entry
-  'vacation.planningATrip': { en: 'Planning a Trip?', beanie: 'planning a trip?' },
+  'vacation.planningATrip': {
+    en: 'Make It a Family Vacation!',
+    beanie: 'make it a family vacation!',
+  },
   'vacation.planningSubtitle': {
-    en: 'Flights, hotels, ideas & more',
-    beanie: 'flights, hotels, ideas & more',
+    en: 'Plan a trip with flights, hotels, ideas & more',
+    beanie: 'plan a trip with flights, hotels, ideas & more',
   },
 
   // Wizard
@@ -3365,6 +3368,9 @@ const STRING_DEFS = {
   },
   'vacation.field.hotelName': { en: 'Hotel Name', beanie: 'hotel name' },
   'vacation.field.propertyName': { en: 'Property Name', beanie: 'property name' },
+  'vacation.field.campgroundName': { en: 'Campground Name', beanie: 'campground name' },
+  'vacation.field.hostName': { en: 'Host Name', beanie: 'host name' },
+  'vacation.field.breakfastIncluded': { en: 'Breakfast Included', beanie: 'breakfast included' },
   'vacation.field.address': { en: 'Address', beanie: 'address' },
   'vacation.field.checkIn': { en: 'Check-in', beanie: 'check-in' },
   'vacation.field.checkOut': { en: 'Check-out', beanie: 'check-out' },
@@ -3393,6 +3399,9 @@ const STRING_DEFS = {
   'vacation.field.pickupDate': { en: 'Pickup Date', beanie: 'pickup date' },
   'vacation.field.pickupTime': { en: 'Pickup Time', beanie: 'pickup time' },
   'vacation.field.returnDate': { en: 'Return Date', beanie: 'return date' },
+  'vacation.field.returnTime': { en: 'Return Time', beanie: 'return time' },
+  'vacation.field.agencyName': { en: 'Agency Name', beanie: 'agency name' },
+  'vacation.field.agencyAddress': { en: 'Agency Address', beanie: 'agency address' },
   'vacation.addAnotherTransport': { en: 'Add Another Transport', beanie: 'add another transport' },
 
   // Step 5 - Ideas
@@ -3420,6 +3429,14 @@ const STRING_DEFS = {
   'vacation.ideas.whosInterested': { en: "Who's Interested", beanie: "who's interested" },
   'vacation.ideas.votes': { en: 'Votes', beanie: 'votes' },
   'vacation.ideas.saveIdea': { en: 'Save Idea', beanie: 'save idea' },
+  'vacation.ideas.descriptionPlaceholder': {
+    en: "What's this idea about?",
+    beanie: "what's this idea about?",
+  },
+  'vacation.ideas.category': { en: 'Category', beanie: 'category' },
+  'vacation.ideas.whichDay': { en: 'Which Day?', beanie: 'which day?' },
+  'vacation.ideas.bookingNeeded': { en: 'Booking Needed?', beanie: 'booking needed?' },
+  'vacation.ideas.addedBy': { en: 'Added by', beanie: 'added by' },
 
   // Segment statuses
   'vacation.status.booked': { en: 'Booked', beanie: 'booked' },
@@ -3513,15 +3530,23 @@ const STRING_DEFS = {
   'vacation.field.notesPlaceholder': { en: 'Add notes...', beanie: 'add notes...' },
 
   // Common vacation fields
+  'vacation.field.description': { en: 'Description', beanie: 'description' },
+  'vacation.field.location': { en: 'Port / Location', beanie: 'port / location' },
   'vacation.field.notes': { en: 'Notes', beanie: 'notes' },
   'vacation.field.status': { en: 'Status', beanie: 'status' },
   'vacation.field.title': { en: 'Title', beanie: 'title' },
+  'vacation.field.openInMaps': { en: 'Open in Google Maps', beanie: 'open in google maps' },
 
   // Delete
   'vacation.deleteTitle': { en: 'Delete Vacation?', beanie: 'delete vacation?' },
   'vacation.deleteMessage': {
     en: 'This will permanently remove this vacation and all its details.',
     beanie: 'this will permanently remove this vacation and all its details.',
+  },
+  'vacation.deleteSegmentTitle': { en: 'Delete This Item?', beanie: 'delete this item?' },
+  'vacation.deleteSegmentMessage': {
+    en: 'This will remove this item from your vacation plan.',
+    beanie: 'this will remove this item from your vacation plan.',
   },
 } satisfies Record<string, StringEntry>;
 
