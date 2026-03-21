@@ -81,11 +81,11 @@ function getNextBirthday(month: number, day: number): { date: Date; daysAway: nu
 const milestones = computed<Milestone[]>(() => {
   const items: Milestone[] = [];
 
-  // 1. Birthdays from family members with dateOfBirth (within 90 days)
+  // 1. Birthdays from family members with dateOfBirth (within 30 days)
   for (const member of familyStore.members) {
     if (!member.dateOfBirth) continue;
     const { date, daysAway } = getNextBirthday(member.dateOfBirth.month, member.dateOfBirth.day);
-    if (daysAway <= 90) {
+    if (daysAway <= 30) {
       let label: string;
       if (member.dateOfBirth.year) {
         const age = date.getFullYear() - member.dateOfBirth.year;

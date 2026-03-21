@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import BaseModal from '@/components/ui/BaseModal.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useConfirm } from '@/composables/useConfirm';
 import { useTranslation } from '@/composables/useTranslation';
@@ -40,15 +39,25 @@ const { state, handleConfirm, handleCancel } = useConfirm();
       </p>
     </div>
 
-    <!-- Footer -->
+    <!-- Footer — uses native buttons to avoid click event delegation issues -->
     <template #footer>
       <div class="flex justify-end gap-3">
-        <BaseButton v-if="state.showCancel" variant="ghost" size="sm" @click="handleCancel">
+        <button
+          v-if="state.showCancel"
+          type="button"
+          class="inline-flex items-center justify-center rounded-2xl bg-transparent px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+          @click="handleCancel"
+        >
           {{ state.cancelLabel ? t(state.cancelLabel) : t('action.cancel') }}
-        </BaseButton>
-        <BaseButton
-          :variant="state.variant === 'danger' ? 'danger' : 'primary'"
-          size="sm"
+        </button>
+        <button
+          type="button"
+          class="inline-flex touch-manipulation items-center justify-center rounded-2xl px-3 py-1.5 text-sm font-medium text-white transition-colors"
+          :class="
+            state.variant === 'danger'
+              ? 'bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600'
+              : 'bg-primary-500 hover:bg-primary-600'
+          "
           @click="handleConfirm"
         >
           {{
@@ -58,7 +67,7 @@ const { state, handleConfirm, handleCancel } = useConfirm();
                 ? t('action.delete')
                 : t('action.ok')
           }}
-        </BaseButton>
+        </button>
       </div>
     </template>
   </BaseModal>

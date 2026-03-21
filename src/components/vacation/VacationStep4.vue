@@ -28,7 +28,6 @@ const transportTypes: { type: VacationTransportationType; emoji: string; key: st
   { type: 'airport_shuttle', emoji: '🚐', key: 'airport_shuttle' },
   { type: 'rental_car', emoji: '🚗', key: 'rental_car' },
   { type: 'taxi_rideshare', emoji: '🚕', key: 'taxi_rideshare' },
-  { type: 'train', emoji: '🚅', key: 'train' },
   { type: 'bus', emoji: '🚌', key: 'bus' },
 ];
 
@@ -41,7 +40,6 @@ const emojiMap: Record<VacationTransportationType, string> = {
   airport_shuttle: '🚐',
   rental_car: '🚗',
   taxi_rideshare: '🚕',
-  train: '🚅',
   bus: '🚌',
 };
 
@@ -86,8 +84,8 @@ function buildTransportKeyValue(item: VacationTransportation): string {
   return parts.join(' · ');
 }
 
-function isTrainOrBus(type: VacationTransportationType): boolean {
-  return type === 'train' || type === 'bus';
+function isBus(type: VacationTransportationType): boolean {
+  return type === 'bus';
 }
 </script>
 
@@ -138,7 +136,7 @@ function isTrainOrBus(type: VacationTransportationType): boolean {
         </div>
 
         <!-- Train/Bus fields -->
-        <template v-if="isTrainOrBus(item.type)">
+        <template v-if="isBus(item.type)">
           <div class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('vacation.field.operator')">
               <BaseInput

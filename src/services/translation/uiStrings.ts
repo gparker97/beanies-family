@@ -1968,6 +1968,7 @@ const STRING_DEFS = {
   'todo.unassigned': { en: 'Unassigned', beanie: 'unassigned' },
   'todo.allBeans': { en: 'All Beans', beanie: 'all beans' },
   'todo.selectDueDate': { en: 'Due Date', beanie: 'due date' },
+  'todo.who': { en: 'Who', beanie: 'who' },
   'todo.dueDate': { en: 'Due date', beanie: 'due date' },
   'todo.dueTime': { en: 'Time', beanie: 'time' },
   'todo.description': { en: 'Description', beanie: 'description' },
