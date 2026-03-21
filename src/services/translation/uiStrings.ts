@@ -3631,6 +3631,7 @@ const STRING_DEFS = {
     en: 'No accommodation booked for this night',
     beanie: 'no accommodation booked for this night',
   },
+  'travel.hint': { en: 'Helpful Hint', beanie: 'helpful hint' },
   'travel.ideas': { en: 'Bean Bucket List', beanie: 'bean bucket list' },
   'travel.ideasTeaser': { en: 'Ideas', beanie: 'ideas' },
   'travel.quickAddIdea': { en: 'Quick-add an idea...', beanie: 'quick-add an idea...' },

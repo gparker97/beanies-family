@@ -24,6 +24,7 @@ import {
   daysUntilTrip,
   tripCountdownKey,
   computeAccommodationGaps,
+  computeTimelineHints,
 } from '@/utils/vacation';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
@@ -81,6 +82,18 @@ type TimelineEntry =
   | { type: 'group'; data: (typeof groupedByDate)['value'][number] }
   | { type: 'gap'; date: string; label: string };
 
+/** Hints keyed by item ID — used to tint affected segment cards */
+const hintMap = computed(() =>
+  selectedVacation.value ? computeTimelineHints(selectedVacation.value) : new Map()
+);
+
+/** Which hint tooltip is currently expanded */
+const expandedHintId = ref<string | null>(null);
+
+function toggleHint(id: string) {
+  expandedHintId.value = expandedHintId.value === id ? null : id;
+}
+
 const mergedTimeline = computed<TimelineEntry[]>(() => {
   const entries: TimelineEntry[] = [];
   for (const g of groupedByDate.value) {
@@ -93,7 +106,6 @@ const mergedTimeline = computed<TimelineEntry[]>(() => {
     const dateA = a.type === 'group' ? a.data.date : a.date;
     const dateB = b.type === 'group' ? b.data.date : b.date;
     if (dateA !== dateB) return dateA.localeCompare(dateB);
-    // Groups before gaps on the same date
     return a.type === 'group' ? -1 : 1;
   });
   return entries;
@@ -714,8 +726,11 @@ function addQuickIdea() {
                     :collapsed="isCollapsed(item.id)"
                     :read-only="false"
                     show-edit
+                    :hint="hintMap.get(item.id)?.message"
+                    :hint-expanded="expandedHintId === item.id"
                     @update:collapsed="setCollapsed(item.id, $event)"
                     @edit="openEditModal(item)"
+                    @toggle-hint="toggleHint(item.id)"
                   >
                     <!-- Detail rows — click.stop on interactive elements to prevent edit -->
                     <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" @click.stop>

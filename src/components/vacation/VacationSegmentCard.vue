@@ -17,6 +17,10 @@ interface Props {
   deletable?: boolean;
   /** Show the edit pencil button (for view/detail contexts, not inline editing wizards) */
   showEdit?: boolean;
+  /** Helpful hint message (overlap warning) — shown on click of indicator */
+  hint?: string;
+  /** Whether the hint tooltip is currently visible */
+  hintExpanded?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -24,6 +28,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   'update:title': [value: string];
   'update:collapsed': [value: boolean];
+  'toggle-hint': [];
   edit: [];
   delete: [];
 }>();
@@ -60,8 +65,29 @@ async function handleDelete() {
 
 <template>
   <div
-    class="group/card rounded-2xl border border-[var(--tint-slate-10)] bg-white transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
+    class="group/card rounded-2xl border bg-white transition-shadow hover:shadow-md dark:bg-slate-800"
+    :class="
+      hint
+        ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-900/5'
+        : 'border-[var(--tint-slate-10)] dark:border-slate-700'
+    "
   >
+    <!-- Hint tooltip (expanded) -->
+    <Transition
+      enter-active-class="transition-all duration-150 ease-out"
+      enter-from-class="opacity-0 -translate-y-1"
+      leave-active-class="transition-all duration-100 ease-in"
+      leave-to-class="opacity-0 -translate-y-1"
+    >
+      <div
+        v-if="hint && hintExpanded"
+        class="flex items-start gap-2 border-b border-amber-200/40 bg-amber-50/60 px-4 py-2.5 dark:border-amber-500/10 dark:bg-amber-900/10"
+      >
+        <span class="mt-0.5 text-xs">⚠️</span>
+        <span class="text-[11px] text-amber-800 dark:text-amber-300">{{ hint }}</span>
+      </div>
+    </Transition>
+
     <!-- Header -->
     <div class="cursor-pointer px-4 py-3" @click="toggleCollapse">
       <div class="flex items-center gap-2">
@@ -101,6 +127,21 @@ async function handleDelete() {
 
         <!-- Spacer to push actions to right -->
         <div class="flex-1" />
+
+        <!-- Hint indicator — always visible when hint exists -->
+        <button
+          v-if="hint"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm transition-all"
+          :class="
+            hintExpanded
+              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
+              : 'text-amber-400 hover:bg-amber-50 hover:text-amber-500 dark:text-amber-500 dark:hover:bg-amber-900/20'
+          "
+          title="Scheduling hint"
+          @click.stop="$emit('toggle-hint')"
+        >
+          ⚠️
+        </button>
 
         <!-- Edit button — always visible on mobile, hover-reveal on desktop -->
         <button

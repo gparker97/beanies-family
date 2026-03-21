@@ -169,6 +169,131 @@ export function computeAccommodationGaps(v: FamilyVacation): string[] {
   return gaps;
 }
 
+// ── Timeline helpful hints (overlap detection) ──────────────────────────────
+
+export interface TimelineHint {
+  /** Short description of the overlap */
+  message: string;
+  /** IDs of all items affected by this hint */
+  affectedIds: string[];
+}
+
+/** Date range helper */
+function dateRange(startDate?: string, endDate?: string): { start: string; end: string } | null {
+  if (!startDate || !endDate) return null;
+  return { start: extractDatePart(startDate), end: extractDatePart(endDate) };
+}
+
+/** Check if two date ranges overlap */
+function rangesOverlap(
+  a: { start: string; end: string },
+  b: { start: string; end: string }
+): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+/**
+ * Detect planning overlaps that may indicate booking errors.
+ * Returns a map of item ID → hint message for items that have overlap issues.
+ * Each affected item gets its own hint entry so the UI can tint individual cards.
+ */
+export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHint> {
+  const hintMap = new Map<string, TimelineHint>();
+
+  function addHint(id: string, message: string, affectedIds: string[]) {
+    const existing = hintMap.get(id);
+    if (existing) {
+      // Append to existing hint
+      existing.message += '; ' + message;
+      for (const aid of affectedIds) {
+        if (!existing.affectedIds.includes(aid)) existing.affectedIds.push(aid);
+      }
+    } else {
+      hintMap.set(id, { message, affectedIds: [...affectedIds] });
+    }
+  }
+
+  // Build date ranges for accommodations
+  const accItems = v.accommodations
+    .map((acc) => ({
+      id: acc.id,
+      range: dateRange(acc.checkInDate, acc.checkOutDate),
+      title: acc.title || acc.name || 'accommodation',
+    }))
+    .filter(
+      (a): a is { id: string; range: { start: string; end: string }; title: string } => !!a.range
+    );
+
+  // Build date ranges for cruises
+  const cruiseItems = v.travelSegments
+    .filter((s) => s.type === 'cruise')
+    .map((s) => ({
+      id: s.id,
+      range: dateRange(s.embarkationDate, s.disembarkationDate),
+      title: s.title || 'cruise',
+    }))
+    .filter(
+      (c): c is { id: string; range: { start: string; end: string }; title: string } => !!c.range
+    );
+
+  // Build date ranges for flights
+  const flightItems = v.travelSegments
+    .filter((s) => s.type?.startsWith('flight'))
+    .map((s) => ({
+      id: s.id,
+      range: dateRange(s.departureDate, s.arrivalDate ?? s.departureDate),
+      title: s.title || 'flight',
+    }))
+    .filter(
+      (f): f is { id: string; range: { start: string; end: string }; title: string } => !!f.range
+    );
+
+  // 1. Accommodation vs accommodation overlaps
+  for (let i = 0; i < accItems.length; i++) {
+    for (let j = i + 1; j < accItems.length; j++) {
+      const a = accItems[i]!;
+      const b = accItems[j]!;
+      if (rangesOverlap(a.range, b.range)) {
+        const msg = `Overlaps with "${b.title}" — double-booked nights?`;
+        const msgB = `Overlaps with "${a.title}" — double-booked nights?`;
+        addHint(a.id, msg, [a.id, b.id]);
+        addHint(b.id, msgB, [a.id, b.id]);
+      }
+    }
+  }
+
+  // 2. Accommodation vs cruise overlaps
+  for (const acc of accItems) {
+    for (const cruise of cruiseItems) {
+      if (rangesOverlap(acc.range, cruise.range)) {
+        addHint(acc.id, `Overlaps with "${cruise.title}" — cruise includes accommodation`, [
+          acc.id,
+          cruise.id,
+        ]);
+        addHint(cruise.id, `"${acc.title}" booked during cruise — cruise includes accommodation`, [
+          acc.id,
+          cruise.id,
+        ]);
+      }
+    }
+  }
+
+  // 3. Flights during a cruise
+  for (const flight of flightItems) {
+    for (const cruise of cruiseItems) {
+      if (flight.range.start >= cruise.range.start && flight.range.start < cruise.range.end) {
+        addHint(flight.id, `Scheduled during "${cruise.title}" — is this intentional?`, [
+          flight.id,
+          cruise.id,
+        ]);
+        addHint(cruise.id, `"${flight.title}" scheduled during cruise`, [flight.id, cruise.id]);
+      }
+    }
+  }
+
+  return hintMap;
+}
+
 /**
  * Translation key suffix for trip-type-appropriate countdown label.
  * Returns a key like 'travel.countdown.fly_and_stay' for use with t().
