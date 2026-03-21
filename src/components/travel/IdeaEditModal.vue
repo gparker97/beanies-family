@@ -137,12 +137,7 @@ function handleSave() {
     @delete="$emit('delete')"
   >
     <div class="space-y-5">
-      <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
-        <BaseInput v-model="title" />
-      </FormFieldGroup>
-
-      <!-- Category pills -->
+      <!-- Category pills (above title) -->
       <FormFieldGroup :label="t('vacation.ideas.category')">
         <div class="flex flex-wrap gap-1.5">
           <button
@@ -160,6 +155,11 @@ function handleSave() {
             {{ cat.emoji }} {{ t(`vacation.ideas.category.${cat.key}`) }}
           </button>
         </div>
+      </FormFieldGroup>
+
+      <!-- Title -->
+      <FormFieldGroup :label="t('vacation.field.title')">
+        <BaseInput v-model="title" />
       </FormFieldGroup>
 
       <!-- Description -->

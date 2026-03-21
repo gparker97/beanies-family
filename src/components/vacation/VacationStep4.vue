@@ -112,7 +112,7 @@ function isTrainOrBus(type: VacationTransportationType): boolean {
       :title="item.title"
       :status="item.status"
       :key-value="buildTransportKeyValue(item)"
-      :collapsed="collapsedMap[item.id] ?? false"
+      :collapsed="collapsedMap[item.id] ?? true"
       deletable
       @update:title="updateItem(index, 'title', $event)"
       @update:collapsed="collapsedMap[item.id] = $event"

@@ -144,18 +144,18 @@ async function handleSave() {
     @save="handleSave"
   >
     <div class="space-y-5">
-      <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
-        <BaseInput v-model="title" />
-      </FormFieldGroup>
-
-      <!-- Status -->
+      <!-- Status (top) -->
       <FormFieldGroup :label="t('vacation.field.status')">
         <TogglePillGroup
           :model-value="status"
           :options="statusOptions"
           @update:model-value="status = $event as VacationSegmentStatus"
         />
+      </FormFieldGroup>
+
+      <!-- Title -->
+      <FormFieldGroup :label="t('vacation.field.title')">
+        <BaseInput v-model="title" />
       </FormFieldGroup>
 
       <!-- Train/Bus fields -->

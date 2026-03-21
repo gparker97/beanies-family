@@ -58,6 +58,12 @@ const notes = ref('');
 const carType = ref('');
 const carLabel = ref('');
 const leavingTime = ref('');
+const activityCategory = ref('');
+const description = ref('');
+const location = ref('');
+const link = ref('');
+const startTime = ref('');
+const activityDuration = ref('');
 
 const { isEditing, isSubmitting } = useFormModal(
   () => props.segment,
@@ -90,6 +96,12 @@ const { isEditing, isSubmitting } = useFormModal(
       carType.value = seg.carType ?? '';
       carLabel.value = seg.carLabel ?? '';
       leavingTime.value = seg.leavingTime ?? '';
+      activityCategory.value = seg.activityCategory ?? '';
+      description.value = seg.description ?? '';
+      location.value = seg.location ?? '';
+      link.value = seg.link ?? '';
+      startTime.value = seg.startTime ?? '';
+      activityDuration.value = seg.duration ?? '';
     },
     onNew() {
       title.value = '';
@@ -118,6 +130,12 @@ const { isEditing, isSubmitting } = useFormModal(
       carType.value = '';
       carLabel.value = '';
       leavingTime.value = '';
+      activityCategory.value = '';
+      description.value = '';
+      location.value = '';
+      link.value = '';
+      startTime.value = '';
+      activityDuration.value = '';
     },
   }
 );
@@ -141,9 +159,19 @@ const carTypeOptions = computed(() => [
 const isFlight = computed(() => props.segment?.type?.startsWith('flight'));
 const isCruise = computed(() => props.segment?.type === 'cruise');
 const isCar = computed(() => props.segment?.type === 'car');
+const isActivity = computed(() => props.segment?.type === 'activity');
 const isTrainFerry = computed(
   () => props.segment?.type === 'train' || props.segment?.type === 'ferry'
 );
+
+const activityCategoryOptions = computed(() => [
+  { value: 'show_musical', label: `🎭 ${t('vacation.activityCategory.show_musical')}` },
+  { value: 'theme_park', label: `🎢 ${t('vacation.activityCategory.theme_park')}` },
+  { value: 'sporting_event', label: `🏟️ ${t('vacation.activityCategory.sporting_event')}` },
+  { value: 'concert', label: `🎵 ${t('vacation.activityCategory.concert')}` },
+  { value: 'excursion', label: `🚤 ${t('vacation.activityCategory.excursion')}` },
+  { value: 'other', label: `✨ ${t('vacation.activityCategory.other')}` },
+]);
 
 function handleDepartureTimeChange(val: string | number) {
   const v = String(val);
@@ -201,6 +229,14 @@ async function handleSave() {
       carType: (carType.value as 'family_car' | 'rental_car' | 'other') || undefined,
       carLabel: carLabel.value,
       leavingTime: leavingTime.value,
+      activityCategory: activityCategory.value
+        ? (activityCategory.value as import('@/types/models').VacationActivityCategory)
+        : undefined,
+      description: description.value || undefined,
+      location: location.value || undefined,
+      link: link.value || undefined,
+      startTime: startTime.value || undefined,
+      duration: activityDuration.value || undefined,
       sortDate,
     };
     await vacationStore.updateVacation(props.vacationId, { travelSegments: segments });
@@ -223,18 +259,38 @@ async function handleSave() {
     @save="handleSave"
   >
     <div class="space-y-5">
-      <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
-        <BaseInput v-model="title" />
-      </FormFieldGroup>
-
-      <!-- Status -->
+      <!-- Status (top) -->
       <FormFieldGroup :label="t('vacation.field.status')">
         <TogglePillGroup
           :model-value="status"
           :options="statusOptions"
           @update:model-value="status = $event as VacationSegmentStatus"
         />
+      </FormFieldGroup>
+
+      <!-- Activity type (above title, only for activities) -->
+      <FormFieldGroup v-if="isActivity" :label="t('vacation.field.activityCategory')">
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="cat in activityCategoryOptions"
+            :key="cat.value"
+            type="button"
+            class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+            :class="
+              activityCategory === cat.value
+                ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
+                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+            "
+            @click="activityCategory = cat.value"
+          >
+            {{ cat.label }}
+          </button>
+        </div>
+      </FormFieldGroup>
+
+      <!-- Title -->
+      <FormFieldGroup :label="t('vacation.field.title')">
+        <BaseInput v-model="title" />
       </FormFieldGroup>
 
       <!-- ═══ Flight fields — compact layout ═══ -->
@@ -372,6 +428,74 @@ async function handleSave() {
         <FormFieldGroup :label="t('vacation.field.departureDate')">
           <BaseInput v-model="departureDate" type="date" />
         </FormFieldGroup>
+      </template>
+
+      <!-- ═══ Activity fields ═══ -->
+      <template v-if="isActivity">
+        <!-- Description -->
+        <FormFieldGroup :label="t('vacation.field.description')" :optional="true">
+          <textarea
+            v-model="description"
+            rows="2"
+            class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          />
+        </FormFieldGroup>
+
+        <!-- Date + Time + Duration -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <FormFieldGroup :label="t('form.date')">
+            <BaseInput v-model="departureDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.startTime')">
+            <BaseInput v-model="startTime" type="time" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.duration')" :optional="true">
+            <BaseInput v-model="activityDuration" placeholder="e.g. 2 hours" />
+          </FormFieldGroup>
+        </div>
+
+        <!-- Location (own row, with maps link) -->
+        <FormFieldGroup :label="t('vacation.field.location')" :optional="true">
+          <div class="relative">
+            <BaseInput v-model="location" />
+            <a
+              v-if="location"
+              :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="absolute top-1/2 right-2 -translate-y-1/2 text-sm opacity-40 transition-opacity hover:opacity-80"
+              title="Open in Maps"
+              @click.stop
+            >
+              📍
+            </a>
+          </div>
+        </FormFieldGroup>
+
+        <!-- Booking ref + Link (same row) -->
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.bookingReference')">
+            <BaseInput
+              v-model="bookingReference"
+              :placeholder="t('vacation.field.bookingReference')"
+            />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.link')" :optional="true">
+            <div class="flex items-center gap-2">
+              <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+              <a
+                v-if="link"
+                :href="link.startsWith('http') ? link : `https://${link}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+                title="Visit link"
+              >
+                🔗
+              </a>
+            </div>
+          </FormFieldGroup>
+        </div>
       </template>
 
       <!-- ═══ Train/Ferry fields ═══ -->

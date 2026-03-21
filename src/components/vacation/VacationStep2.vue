@@ -46,6 +46,7 @@ const segmentIcons: Record<VacationTravelType, string> = {
   train: '🚅',
   ferry: '⛴️',
   car: '🚗',
+  activity: '🎭',
 };
 
 const defaultTitles: Record<VacationTravelType, string> = {
@@ -56,6 +57,7 @@ const defaultTitles: Record<VacationTravelType, string> = {
   train: 'train',
   ferry: 'ferry',
   car: 'car',
+  activity: 'activity',
 };
 
 const statusOptions = computed(() => [
@@ -74,9 +76,11 @@ const carTypeOptions = computed(() => [
   { value: 'other', label: t('vacation.carType.other') },
 ]);
 
+/** Only show travel segments (not activities) on this step */
 const sortedSegments = computed(() =>
   [...props.segments]
     .map((seg, idx) => ({ seg, idx }))
+    .filter(({ seg }) => seg.type !== 'activity')
     .sort((a, b) => {
       if (!a.seg.sortDate && !b.seg.sortDate) return 0;
       if (!a.seg.sortDate) return 1;

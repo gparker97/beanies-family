@@ -16,6 +16,8 @@ export interface DetailRow {
   copyable?: boolean;
   /** Show map link icon */
   mapLink?: boolean;
+  /** Render as a clickable external link */
+  isLink?: boolean;
 }
 
 export interface TimelineItem {
@@ -49,6 +51,16 @@ export const travelIcons: Record<string, string> = {
   train: '🚅',
   ferry: '⛴️',
   car: '🚗',
+  activity: '🎭',
+};
+
+export const activityCategoryIcons: Record<string, string> = {
+  show_musical: '🎭',
+  theme_park: '🎢',
+  sporting_event: '🏟️',
+  concert: '🎵',
+  excursion: '🚤',
+  other: '✨',
 };
 
 export const accomIcons: Record<string, string> = {
@@ -82,6 +94,9 @@ export function buildTravelKeyValue(seg: {
   disembarkationDate?: string;
   operator?: string;
   route?: string;
+  startTime?: string;
+  location?: string;
+  description?: string;
 }): string {
   const p: string[] = [];
   const isF = seg.type?.startsWith('flight');
@@ -111,6 +126,10 @@ export function buildTravelKeyValue(seg: {
     } else if (seg.embarkationDate) {
       p.push(formatDateShort(seg.embarkationDate).toLowerCase());
     }
+  } else if (seg.type === 'activity') {
+    if (seg.location) p.push(seg.location);
+    if (seg.startTime) p.push(seg.startTime);
+    if (seg.description) p.push(seg.description.slice(0, 40));
   } else {
     // Train / Ferry
     if (seg.operator) p.push(seg.operator);
@@ -204,6 +223,23 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
         field: 'leavingTime',
         inputType: 'time',
       });
+  } else if (seg.type === 'activity') {
+    if (seg.activityCategory)
+      rows.push({ label: 'type', value: seg.activityCategory.replace(/_/g, ' ') });
+    if (seg.description)
+      rows.push({ label: 'details', value: seg.description, field: 'description' });
+    if (seg.departureDate)
+      rows.push({
+        label: 'date',
+        value: seg.departureDate,
+        field: 'departureDate',
+        inputType: 'date',
+      });
+    if (seg.startTime)
+      rows.push({ label: 'time', value: seg.startTime, field: 'startTime', inputType: 'time' });
+    if (seg.duration) rows.push({ label: 'duration', value: seg.duration, field: 'duration' });
+    if (seg.location) rows.push({ label: 'location', value: seg.location, mapLink: true });
+    if (seg.link) rows.push({ label: 'link', value: seg.link, isLink: true });
   } else {
     // Train / Ferry
     if (seg.operator) rows.push({ label: 'operator', value: seg.operator, field: 'operator' });
@@ -253,7 +289,10 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       items.push({
         id: seg.id,
         kind: 'travel',
-        icon: travelIcons[seg.type] ?? '✈️',
+        icon:
+          seg.type === 'activity' && seg.activityCategory
+            ? (activityCategoryIcons[seg.activityCategory] ?? '🎭')
+            : (travelIcons[seg.type] ?? '✈️'),
         title: seg.title,
         keyValue: buildTravelKeyValue(seg),
         status: seg.status,
