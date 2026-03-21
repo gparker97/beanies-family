@@ -54,6 +54,8 @@ const showLocalFileWarning = ref(false);
 
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
+const isAddingMember = ref(false);
+const isFinishing = ref(false);
 const newMemberName = ref('');
 const newMemberRole = ref<'parent' | 'child'>('parent');
 const dobMonth = ref('');
@@ -197,6 +199,11 @@ async function handleChooseGoogleDriveStorage() {
   }
 }
 
+function handleDriveModalContinue() {
+  showDriveResultModal.value = false;
+  handleStep2Next();
+}
+
 async function handleStep2Next() {
   formError.value = null;
 
@@ -235,6 +242,8 @@ async function handleAddMember() {
     return;
   }
 
+  isAddingMember.value = true;
+
   const dateOfBirth: DateOfBirth | undefined =
     dobMonth.value && dobDay.value
       ? {
@@ -266,6 +275,7 @@ async function handleAddMember() {
   } else {
     formError.value = t('loginV6.addMemberFailed');
   }
+  isAddingMember.value = false;
 }
 
 async function handleRemoveMember(memberId: string) {
@@ -281,6 +291,7 @@ function getNextColor(): string {
 }
 
 async function handleFinish() {
+  isFinishing.value = true;
   // Save to file if configured — the doc + family key are initialized by createNewFile() in Step 2
   if (syncStore.isConfigured) {
     let saved = await syncStore.syncNow(true);
@@ -866,14 +877,20 @@ function handleBack() {
         <BaseButton
           class="w-full"
           variant="secondary"
-          :disabled="!newMemberName || !dobMonth || !dobDay"
+          :disabled="!newMemberName || !dobMonth || !dobDay || isAddingMember"
+          :loading="isAddingMember"
           @click="handleAddMember"
         >
           🫘 {{ t('loginV6.addMember') }}
         </BaseButton>
       </div>
 
-      <BaseButton class="mt-6 w-full" @click="handleFinish">
+      <BaseButton
+        class="mt-6 w-full"
+        :disabled="isFinishing"
+        :loading="isFinishing"
+        @click="handleFinish"
+      >
         {{ t('loginV6.finish') }}
       </BaseButton>
       <button
@@ -987,28 +1004,6 @@ function handleBack() {
             </p>
           </div>
 
-          <!-- Open folder in Drive link -->
-          <a
-            :href="
-              syncStore.driveFolderId
-                ? `https://drive.google.com/drive/folders/${syncStore.driveFolderId}`
-                : 'https://drive.google.com'
-            "
-            target="_blank"
-            rel="noopener noreferrer"
-            class="flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 dark:border-blue-800/40 dark:bg-blue-900/15 dark:text-blue-400 dark:hover:bg-blue-900/30"
-          >
-            {{ t('googleDrive.openInDrive') }}
-            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
-          </a>
-
           <!-- Sharing hint — prominent callout -->
           <div
             class="border-primary-500/25 bg-primary-500/[0.06] dark:border-primary-500/15 dark:bg-primary-500/[0.08] rounded-xl border p-3"
@@ -1026,9 +1021,32 @@ function handleBack() {
           </div>
         </div>
 
-        <BaseButton class="mt-4 w-full" @click="showDriveResultModal = false">
-          {{ t('action.ok') }}
+        <!-- Primary action: continue to next step -->
+        <BaseButton class="mt-4 w-full" @click="handleDriveModalContinue">
+          {{ t('loginV6.createNext') }}
         </BaseButton>
+
+        <!-- Secondary: view in Drive (informational, de-emphasized) -->
+        <a
+          :href="
+            syncStore.driveFolderId
+              ? `https://drive.google.com/drive/folders/${syncStore.driveFolderId}`
+              : 'https://drive.google.com'
+          "
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-2 flex items-center justify-center gap-1.5 text-xs text-gray-400 transition-colors hover:text-blue-500 dark:text-gray-500"
+        >
+          {{ t('googleDrive.openInDrive') }}
+          <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+            />
+          </svg>
+        </a>
       </template>
 
       <!-- Failure -->
