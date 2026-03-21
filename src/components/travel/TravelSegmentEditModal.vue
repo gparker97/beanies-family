@@ -15,6 +15,7 @@ import {
   buildCruiseLineOptions,
   buildCruiseShipOptions,
   buildCruisePortOptions,
+  buildTravelSegmentTitle,
 } from '@/utils/vacation';
 import type { VacationTravelSegment, VacationSegmentStatus } from '@/types/models';
 
@@ -173,6 +174,29 @@ const activityCategoryOptions = computed(() => [
   { value: 'other', label: `✨ ${t('vacation.activityCategory.other')}` },
 ]);
 
+/** Auto-generated title based on current form fields (non-activity types) */
+const autoTitle = computed(() =>
+  buildTravelSegmentTitle({
+    type: props.segment?.type,
+    departureAirport: departureAirport.value,
+    arrivalAirport: arrivalAirport.value,
+    operator: operator.value,
+    route: route.value,
+    departureStation: departureStation.value,
+    arrivalStation: arrivalStation.value,
+    cruiseLine: cruiseLine.value,
+    carType: carType.value,
+    carLabel: carLabel.value,
+    title: title.value,
+    activityCategory: activityCategory.value,
+  })
+);
+
+/** The title to save — auto-generated for non-activities, user-entered for activities */
+const effectiveTitle = computed(() =>
+  props.segment?.type === 'activity' ? title.value : autoTitle.value
+);
+
 function handleDepartureTimeChange(val: string | number) {
   const v = String(val);
   departureTime.value = v;
@@ -202,7 +226,7 @@ async function handleSave() {
     const sortDate = departureDate.value || embarkationDate.value || '';
     segments[props.segmentIndex] = {
       ...segments[props.segmentIndex]!,
-      title: title.value,
+      title: effectiveTitle.value,
       status: status.value,
       airline: airline.value,
       flightNumber: flightNumber.value,
@@ -288,10 +312,16 @@ async function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')" required>
+      <!-- Title: editable for activities, auto-generated for others -->
+      <FormFieldGroup v-if="isActivity" :label="t('vacation.field.title')" required>
         <BaseInput v-model="title" />
       </FormFieldGroup>
+      <div
+        v-else
+        class="font-outfit rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800 dark:bg-slate-700 dark:text-gray-200"
+      >
+        {{ autoTitle }}
+      </div>
 
       <!-- ═══ Flight fields — compact layout ═══ -->
       <template v-if="isFlight">

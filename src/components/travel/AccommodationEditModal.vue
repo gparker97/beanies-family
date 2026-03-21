@@ -7,6 +7,7 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useVacationStore } from '@/stores/vacationStore';
+import { buildAccommodationTitle } from '@/utils/vacation';
 import type { VacationAccommodation, VacationSegmentStatus } from '@/types/models';
 
 interface Props {
@@ -82,6 +83,10 @@ const nameFieldLabel = computed(() => {
   return t('vacation.field.hotelName');
 });
 
+const autoTitle = computed(() =>
+  buildAccommodationTitle({ type: props.accommodation?.type, name: name.value })
+);
+
 async function handleSave() {
   if (!props.vacationId || props.accommodationIndex < 0) return;
   isSubmitting.value = true;
@@ -91,7 +96,7 @@ async function handleSave() {
     const accommodations = [...vacation.accommodations];
     accommodations[props.accommodationIndex] = {
       ...accommodations[props.accommodationIndex]!,
-      title: title.value,
+      title: autoTitle.value,
       status: status.value,
       name: name.value,
       address: address.value,
@@ -132,10 +137,12 @@ async function handleSave() {
         />
       </FormFieldGroup>
 
-      <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')" required>
-        <BaseInput v-model="title" />
-      </FormFieldGroup>
+      <!-- Auto-generated title -->
+      <div
+        class="font-outfit rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800 dark:bg-slate-700 dark:text-gray-200"
+      >
+        {{ autoTitle }}
+      </div>
 
       <!-- Name (type-specific label) -->
       <FormFieldGroup :label="nameFieldLabel">

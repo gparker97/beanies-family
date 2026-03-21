@@ -1,6 +1,11 @@
 import { computed, type ComputedRef } from 'vue';
 import { formatNookDate, formatDateShort, extractDatePart } from '@/utils/date';
-import { computeAccommodationGaps } from '@/utils/vacation';
+import {
+  computeAccommodationGaps,
+  buildTravelSegmentTitle,
+  buildAccommodationTitle,
+  buildTransportationTitle,
+} from '@/utils/vacation';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
 // ── Shared types ────────────────────────────────────────────────────────────
@@ -104,11 +109,6 @@ export function buildTravelKeyValue(seg: {
       const code = seg.airline.match(/\(([A-Z0-9]{2})\)/)?.[1] ?? seg.airline.split(' ')[0];
       p.push(seg.flightNumber ? `${code} ${seg.flightNumber}` : code!);
     }
-    if (seg.departureAirport && seg.arrivalAirport) {
-      const from = seg.departureAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.departureAirport;
-      const to = seg.arrivalAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.arrivalAirport;
-      p.push(`${from}→${to}`);
-    }
     if (seg.departureDate) {
       const datePart = formatDateShort(seg.departureDate).toLowerCase();
       p.push(seg.departureTime ? `${datePart} · ${seg.departureTime}` : datePart);
@@ -116,7 +116,6 @@ export function buildTravelKeyValue(seg: {
       p.push(seg.departureTime);
     }
   } else if (seg.type === 'cruise') {
-    if (seg.cruiseLine) p.push(seg.cruiseLine);
     if (seg.shipName) p.push(seg.shipName);
     if (seg.embarkationDate && seg.disembarkationDate) {
       p.push(
@@ -291,7 +290,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
           seg.type === 'activity' && seg.activityCategory
             ? (activityCategoryIcons[seg.activityCategory] ?? '🎭')
             : (travelIcons[seg.type] ?? '✈️'),
-        title: seg.title,
+        title: seg.type === 'activity' ? seg.title || 'activity' : buildTravelSegmentTitle(seg),
         keyValue: buildTravelKeyValue(seg),
         status: seg.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
@@ -305,7 +304,6 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       const acc = v.accommodations[i]!;
       const date = acc.checkInDate || '';
       const rows: DetailRow[] = [];
-      if (acc.name) rows.push({ label: 'name', value: acc.name });
       if (acc.address) rows.push({ label: 'address', value: acc.address, mapLink: true });
       if (acc.checkInDate)
         rows.push({
@@ -330,7 +328,6 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       if (acc.notes) rows.push({ label: 'notes', value: acc.notes, field: 'notes' });
 
       const kvParts: string[] = [];
-      if (acc.name) kvParts.push(acc.name);
       if (acc.checkInDate && acc.checkOutDate)
         kvParts.push(
           `${formatDateShort(acc.checkInDate).toLowerCase()} – ${formatDateShort(acc.checkOutDate).toLowerCase()}`
@@ -341,7 +338,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         id: acc.id,
         kind: 'accommodation',
         icon: accomIcons[acc.type] ?? '🏨',
-        title: acc.title,
+        title: buildAccommodationTitle(acc),
         keyValue: kvParts.join(' · '),
         status: acc.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
@@ -355,7 +352,6 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       const trans = v.transportation[i]!;
       const date = trans.pickupDate || trans.departureDate || '';
       const rows: DetailRow[] = [];
-      if (trans.agencyName) rows.push({ label: 'company', value: trans.agencyName });
       if (trans.agencyAddress)
         rows.push({ label: 'address', value: trans.agencyAddress, mapLink: true });
       if (trans.operator) rows.push({ label: 'operator', value: trans.operator });
@@ -409,8 +405,6 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       if (trans.notes) rows.push({ label: 'notes', value: trans.notes, field: 'notes' });
 
       const kvParts: string[] = [];
-      if (trans.agencyName) kvParts.push(trans.agencyName);
-      else if (trans.operator) kvParts.push(trans.operator);
       if (trans.route) kvParts.push(trans.route);
       if (trans.type === 'rental_car') {
         if (trans.pickupDate && trans.returnDate) {
@@ -441,7 +435,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         id: trans.id,
         kind: 'transportation',
         icon: transportIcons[trans.type] ?? '🚐',
-        title: trans.title,
+        title: buildTransportationTitle(trans),
         keyValue: kvParts.join(' · '),
         status: trans.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
