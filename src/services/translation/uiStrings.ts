@@ -3455,6 +3455,8 @@ const STRING_DEFS = {
   'vacation.ideas.category': { en: 'Category', beanie: 'category' },
   'vacation.ideas.whichDay': { en: 'Which Day?', beanie: 'which day?' },
   'vacation.ideas.bookingNeeded': { en: 'Booking Needed?', beanie: 'booking needed?' },
+  'vacation.ideas.planned': { en: 'Status', beanie: 'status' },
+  'vacation.ideas.plannedSection': { en: 'Planned', beanie: 'planned' },
   'vacation.ideas.addedBy': { en: 'Added by', beanie: 'added by' },
 
   // Segment statuses
