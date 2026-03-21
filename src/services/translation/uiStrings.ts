@@ -3570,7 +3570,8 @@ const STRING_DEFS = {
 
   // Common vacation fields
   'vacation.field.description': { en: 'Description', beanie: 'description' },
-  'vacation.field.location': { en: 'Port / Location', beanie: 'port / location' },
+  'vacation.field.location': { en: 'Location', beanie: 'location' },
+  'vacation.field.link': { en: 'Link', beanie: 'link' },
   'vacation.field.notes': { en: 'Notes', beanie: 'notes' },
   'vacation.field.status': { en: 'Status', beanie: 'status' },
   'vacation.field.title': { en: 'Title', beanie: 'title' },

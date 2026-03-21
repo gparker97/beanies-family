@@ -37,6 +37,7 @@ const estimatedCost = ref<number | undefined>(0);
 const estimatedCostCurrency = ref<CurrencyCode>('USD');
 const duration = ref<string>('');
 const needsBooking = ref<boolean | undefined>(undefined);
+const link = ref('');
 const notes = ref('');
 
 const { isEditing } = useFormModal(
@@ -55,6 +56,7 @@ const { isEditing } = useFormModal(
         idea.estimatedCostCurrency ?? (settingsStore.displayCurrency as CurrencyCode);
       duration.value = idea.duration ?? '';
       needsBooking.value = idea.needsBooking;
+      link.value = idea.link ?? '';
       notes.value = idea.notes ?? '';
     },
     onNew() {
@@ -68,6 +70,7 @@ const { isEditing } = useFormModal(
       estimatedCostCurrency.value = settingsStore.displayCurrency as CurrencyCode;
       duration.value = '';
       needsBooking.value = undefined;
+      link.value = '';
       notes.value = '';
     },
   }
@@ -92,6 +95,15 @@ const voters = computed(() => {
     .filter(Boolean);
 });
 
+function normalizeLink(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+const normalizedLink = computed(() => normalizeLink(link.value));
+
 function handleSave() {
   if (!props.idea) return;
   emit('save', {
@@ -106,6 +118,7 @@ function handleSave() {
     estimatedCostCurrency: costType.value === 'paid' ? estimatedCostCurrency.value : undefined,
     duration: (duration.value as VacationIdea['duration']) || undefined,
     needsBooking: needsBooking.value,
+    link: normalizedLink.value || undefined,
     notes: notes.value || undefined,
   });
 }
@@ -159,64 +172,81 @@ function handleSave() {
         />
       </FormFieldGroup>
 
-      <!-- Location -->
-      <FormFieldGroup :label="t('vacation.field.location')" :optional="true">
-        <BaseInput v-model="location" :placeholder="t('vacation.ideas.category.sightseeing')" />
-      </FormFieldGroup>
+      <!-- Date + Location -->
+      <div class="grid grid-cols-2 gap-3">
+        <FormFieldGroup :label="t('vacation.ideas.whichDay')" :optional="true">
+          <BaseInput v-model="suggestedDate" type="date" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.field.location')" :optional="true">
+          <BaseInput v-model="location" placeholder="e.g. Downtown, Beach..." />
+        </FormFieldGroup>
+      </div>
 
-      <!-- Which day? -->
-      <FormFieldGroup :label="t('vacation.ideas.whichDay')" :optional="true">
-        <BaseInput v-model="suggestedDate" type="date" />
-      </FormFieldGroup>
-
-      <!-- Estimated cost -->
-      <FormFieldGroup :label="t('vacation.ideas.estimatedCost')">
-        <div class="flex flex-wrap items-center gap-2">
-          <button
-            v-for="ct in ['free', 'paid'] as const"
-            :key="ct"
-            type="button"
-            class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="
-              costType === ct
-                ? ct === 'free'
-                  ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
-                  : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
-            "
-            @click="costType = ct"
+      <!-- Link -->
+      <FormFieldGroup :label="t('vacation.field.link')" :optional="true">
+        <div class="flex items-center gap-2">
+          <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+          <a
+            v-if="normalizedLink"
+            :href="normalizedLink"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+            title="Visit link"
           >
-            {{ ct === 'free' ? '🆓' : '💰' }} {{ t(`vacation.ideas.${ct}`) }}
-          </button>
-        </div>
-        <CurrencyAmountInput
-          v-if="costType === 'paid'"
-          v-model:amount="estimatedCost"
-          v-model:currency="estimatedCostCurrency"
-          class="mt-2 max-w-[280px]"
-          font-size="0.95rem"
-        />
-      </FormFieldGroup>
-
-      <!-- Duration pills -->
-      <FormFieldGroup :label="t('vacation.ideas.duration')" :optional="true">
-        <div class="flex flex-wrap gap-1.5">
-          <button
-            v-for="dur in durations"
-            :key="dur"
-            type="button"
-            class="rounded-full border px-2 py-1 text-xs font-medium transition-colors"
-            :class="
-              duration === dur
-                ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
-            "
-            @click="duration = dur"
-          >
-            {{ t(`vacation.duration.${dur}`) }}
-          </button>
+            🔗
+          </a>
         </div>
       </FormFieldGroup>
+
+      <!-- Cost + Duration (side by side) -->
+      <div class="grid grid-cols-2 gap-3">
+        <FormFieldGroup :label="t('vacation.ideas.estimatedCost')">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button
+              v-for="ct in ['free', 'paid'] as const"
+              :key="ct"
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="
+                costType === ct
+                  ? ct === 'free'
+                    ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                    : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
+                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+              "
+              @click="costType = ct"
+            >
+              {{ ct === 'free' ? '🆓' : '💰' }} {{ t(`vacation.ideas.${ct}`) }}
+            </button>
+          </div>
+          <CurrencyAmountInput
+            v-if="costType === 'paid'"
+            v-model:amount="estimatedCost"
+            v-model:currency="estimatedCostCurrency"
+            class="mt-2"
+            font-size="0.95rem"
+          />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.ideas.duration')" :optional="true">
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="dur in durations"
+              :key="dur"
+              type="button"
+              class="rounded-full border px-2 py-1 text-xs font-medium transition-colors"
+              :class="
+                duration === dur
+                  ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
+                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+              "
+              @click="duration = dur"
+            >
+              {{ t(`vacation.duration.${dur}`) }}
+            </button>
+          </div>
+        </FormFieldGroup>
+      </div>
 
       <!-- Booking needed -->
       <FormFieldGroup :label="t('vacation.ideas.bookingNeeded')" :optional="true">

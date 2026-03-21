@@ -139,6 +139,16 @@ function patch(fields: Partial<VacationIdea>) {
           >
             {{ costTag }}
           </span>
+          <a
+            v-if="idea.link"
+            :href="idea.link"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-0.5 rounded-full bg-[rgba(0,180,216,0.08)] px-2 py-0.5 text-[9px] font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+            @click.stop
+          >
+            🔗 link
+          </a>
           <span
             v-if="author"
             class="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-muted)]"
