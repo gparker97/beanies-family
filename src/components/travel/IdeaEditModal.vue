@@ -37,6 +37,7 @@ const estimatedCost = ref<number | undefined>(0);
 const estimatedCostCurrency = ref<CurrencyCode>('USD');
 const duration = ref<string>('');
 const needsBooking = ref<boolean | undefined>(undefined);
+const isPlanned = ref(false);
 const link = ref('');
 const notes = ref('');
 
@@ -56,6 +57,7 @@ const { isEditing } = useFormModal(
         idea.estimatedCostCurrency ?? (settingsStore.displayCurrency as CurrencyCode);
       duration.value = idea.duration ?? '';
       needsBooking.value = idea.needsBooking;
+      isPlanned.value = idea.isPlanned ?? false;
       link.value = idea.link ?? '';
       notes.value = idea.notes ?? '';
     },
@@ -70,6 +72,7 @@ const { isEditing } = useFormModal(
       estimatedCostCurrency.value = settingsStore.displayCurrency as CurrencyCode;
       duration.value = '';
       needsBooking.value = undefined;
+      isPlanned.value = false;
       link.value = '';
       notes.value = '';
     },
@@ -118,6 +121,7 @@ function handleSave() {
     estimatedCostCurrency: costType.value === 'paid' ? estimatedCostCurrency.value : undefined,
     duration: (duration.value as VacationIdea['duration']) || undefined,
     needsBooking: needsBooking.value,
+    isPlanned: isPlanned.value || undefined,
     link: normalizedLink.value || undefined,
     notes: notes.value || undefined,
   });
@@ -131,8 +135,9 @@ function handleSave() {
     icon="🌟"
     icon-bg="bg-[rgba(255,217,61,0.1)]"
     save-gradient="teal"
+    :save-label="t('action.close')"
     :show-delete="isEditing"
-    @close="$emit('close')"
+    @close="handleSave"
     @save="handleSave"
     @delete="$emit('delete')"
   >
@@ -199,7 +204,7 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- Cost + Duration (side by side) -->
+      <!-- Cost toggle + Duration (side by side) -->
       <div class="grid grid-cols-2 gap-3">
         <FormFieldGroup :label="t('vacation.ideas.estimatedCost')">
           <div class="flex flex-wrap items-center gap-1.5">
@@ -220,13 +225,6 @@ function handleSave() {
               {{ ct === 'free' ? '🆓' : '💰' }} {{ t(`vacation.ideas.${ct}`) }}
             </button>
           </div>
-          <CurrencyAmountInput
-            v-if="costType === 'paid'"
-            v-model:amount="estimatedCost"
-            v-model:currency="estimatedCostCurrency"
-            class="mt-2"
-            font-size="0.95rem"
-          />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.ideas.duration')">
           <div class="flex flex-wrap gap-1.5">
@@ -248,35 +246,59 @@ function handleSave() {
         </FormFieldGroup>
       </div>
 
-      <!-- Booking needed -->
-      <FormFieldGroup :label="t('vacation.ideas.bookingNeeded')">
-        <div class="flex flex-wrap gap-1.5">
+      <!-- Price input (own row when paid — full width for mobile) -->
+      <CurrencyAmountInput
+        v-if="costType === 'paid'"
+        v-model:amount="estimatedCost"
+        v-model:currency="estimatedCostCurrency"
+        font-size="0.95rem"
+      />
+
+      <!-- Booking needed + Planned (side by side) -->
+      <div class="grid grid-cols-2 gap-3">
+        <FormFieldGroup :label="t('vacation.ideas.bookingNeeded')">
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="
+                needsBooking === false
+                  ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+              "
+              @click="needsBooking = false"
+            >
+              ✓ {{ t('vacation.ideas.noBookingNeeded') }}
+            </button>
+            <button
+              type="button"
+              class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="
+                needsBooking === true
+                  ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
+                  : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
+              "
+              @click="needsBooking = true"
+            >
+              📋 {{ t('vacation.ideas.needsBooking') }}
+            </button>
+          </div>
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.ideas.planned')">
           <button
             type="button"
             class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
             :class="
-              needsBooking === false
+              isPlanned
                 ? 'border-[#27AE60] bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
                 : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
             "
-            @click="needsBooking = false"
+            @click="isPlanned = !isPlanned"
           >
-            ✓ {{ t('vacation.ideas.noBookingNeeded') }}
+            {{ isPlanned ? '✓ planned' : 'mark as planned' }}
           </button>
-          <button
-            type="button"
-            class="rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="
-              needsBooking === true
-                ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-15)] text-[var(--vacation-teal)]'
-                : 'border-gray-200 text-gray-500 dark:border-slate-600 dark:text-slate-400'
-            "
-            @click="needsBooking = true"
-          >
-            📋 {{ t('vacation.ideas.needsBooking') }}
-          </button>
-        </div>
-      </FormFieldGroup>
+        </FormFieldGroup>
+      </div>
 
       <!-- Notes -->
       <FormFieldGroup :label="t('vacation.field.notes')">
@@ -288,17 +310,21 @@ function handleSave() {
         />
       </FormFieldGroup>
 
-      <!-- Who's interested -->
+      <!-- Who's interested (full name chips) -->
       <FormFieldGroup v-if="voters.length" :label="t('vacation.ideas.whosInterested')">
-        <div class="flex items-center gap-1.5">
+        <div class="flex flex-wrap items-center gap-1.5">
           <span
             v-for="voter in voters"
             :key="voter!.id"
-            class="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
-            :style="{ backgroundColor: voter!.color }"
-            :title="voter!.name"
+            class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-slate-5)] px-2.5 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300"
           >
-            {{ voter!.name.charAt(0).toUpperCase() }}
+            <span
+              class="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[8px] font-bold text-white"
+              :style="{ backgroundColor: voter!.color }"
+            >
+              {{ voter!.name.charAt(0).toUpperCase() }}
+            </span>
+            {{ voter!.name }}
           </span>
         </div>
       </FormFieldGroup>
