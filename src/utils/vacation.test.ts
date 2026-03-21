@@ -169,8 +169,8 @@ describe('bookingProgress', () => {
         makeTravelSegment({ status: 'booked' }),
         makeTravelSegment({ id: 'seg-2', status: 'pending' }),
       ],
-      accommodations: [makeAccommodation({ status: 'not_booked' })],
-      transportation: [makeTransportation({ status: 'researching' })],
+      accommodations: [makeAccommodation({ status: 'pending' })],
+      transportation: [makeTransportation({ status: 'pending' })],
     });
     const result = bookingProgress(v);
     expect(result).toEqual({ booked: 1, total: 4, percent: 25 });

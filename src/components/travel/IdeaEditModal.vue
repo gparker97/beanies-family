@@ -3,10 +3,12 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFamilyStore } from '@/stores/familyStore';
-import type { VacationIdea, VacationIdeaCategory } from '@/types/models';
+import { useSettingsStore } from '@/stores/settingsStore';
+import type { VacationIdea, VacationIdeaCategory, CurrencyCode } from '@/types/models';
 
 interface Props {
   open: boolean;
@@ -23,6 +25,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const settingsStore = useSettingsStore();
 
 const title = ref('');
 const description = ref('');
@@ -30,7 +33,8 @@ const category = ref<VacationIdeaCategory | undefined>(undefined);
 const location = ref('');
 const suggestedDate = ref('');
 const costType = ref<'free' | 'paid' | undefined>(undefined);
-const estimatedCost = ref(0);
+const estimatedCost = ref<number | undefined>(0);
+const estimatedCostCurrency = ref<CurrencyCode>('USD');
 const duration = ref<string>('');
 const needsBooking = ref<boolean | undefined>(undefined);
 const notes = ref('');
@@ -47,6 +51,8 @@ const { isEditing } = useFormModal(
       suggestedDate.value = idea.suggestedDate ?? '';
       costType.value = idea.costType;
       estimatedCost.value = idea.estimatedCost ?? 0;
+      estimatedCostCurrency.value =
+        idea.estimatedCostCurrency ?? (settingsStore.displayCurrency as CurrencyCode);
       duration.value = idea.duration ?? '';
       needsBooking.value = idea.needsBooking;
       notes.value = idea.notes ?? '';
@@ -59,6 +65,7 @@ const { isEditing } = useFormModal(
       suggestedDate.value = '';
       costType.value = undefined;
       estimatedCost.value = 0;
+      estimatedCostCurrency.value = settingsStore.displayCurrency as CurrencyCode;
       duration.value = '';
       needsBooking.value = undefined;
       notes.value = '';
@@ -73,6 +80,7 @@ const categories: { key: VacationIdeaCategory; emoji: string }[] = [
   { key: 'sightseeing', emoji: '📸' },
   { key: 'shopping', emoji: '🛍️' },
   { key: 'nightlife', emoji: '🎉' },
+  { key: 'other', emoji: '✨' },
 ];
 
 const durations = ['30min', '1hr', '2hrs', 'half_day', 'full_day'] as const;
@@ -94,7 +102,8 @@ function handleSave() {
     location: location.value || undefined,
     suggestedDate: suggestedDate.value || undefined,
     costType: costType.value,
-    estimatedCost: costType.value === 'paid' ? estimatedCost.value : undefined,
+    estimatedCost: costType.value === 'paid' ? estimatedCost.value || undefined : undefined,
+    estimatedCostCurrency: costType.value === 'paid' ? estimatedCostCurrency.value : undefined,
     duration: (duration.value as VacationIdea['duration']) || undefined,
     needsBooking: needsBooking.value,
     notes: notes.value || undefined,
@@ -162,7 +171,7 @@ function handleSave() {
 
       <!-- Estimated cost -->
       <FormFieldGroup :label="t('vacation.ideas.estimatedCost')">
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <button
             v-for="ct in ['free', 'paid'] as const"
             :key="ct"
@@ -179,13 +188,14 @@ function handleSave() {
           >
             {{ ct === 'free' ? '🆓' : '💰' }} {{ t(`vacation.ideas.${ct}`) }}
           </button>
-          <BaseInput
-            v-if="costType === 'paid'"
-            v-model="estimatedCost"
-            type="number"
-            class="!w-24"
-          />
         </div>
+        <CurrencyAmountInput
+          v-if="costType === 'paid'"
+          v-model:amount="estimatedCost"
+          v-model:currency="estimatedCostCurrency"
+          class="mt-2 max-w-[280px]"
+          font-size="0.95rem"
+        />
       </FormFieldGroup>
 
       <!-- Duration pills -->

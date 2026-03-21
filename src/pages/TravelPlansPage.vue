@@ -14,10 +14,17 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
+import { confirm } from '@/composables/useConfirm';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import { formatDateShort, formatNookDate } from '@/utils/date';
-import { tripTypeEmoji, bookingProgress, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
+import {
+  tripTypeEmoji,
+  bookingProgress,
+  daysUntilTrip,
+  tripCountdownKey,
+  computeAccommodationGaps,
+} from '@/utils/vacation';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
@@ -69,6 +76,29 @@ const selectedVacation = computed(() =>
 
 const { groupedByDate, accommodationGaps, unbookedItems } = useVacationTimeline(selectedVacation);
 
+/** Merged timeline: interleave date groups with gap warnings at correct positions */
+type TimelineEntry =
+  | { type: 'group'; data: (typeof groupedByDate)['value'][number] }
+  | { type: 'gap'; date: string; label: string };
+
+const mergedTimeline = computed<TimelineEntry[]>(() => {
+  const entries: TimelineEntry[] = [];
+  for (const g of groupedByDate.value) {
+    entries.push({ type: 'group', data: g });
+  }
+  for (const gapDate of accommodationGaps.value) {
+    entries.push({ type: 'gap', date: gapDate, label: formatNookDate(gapDate) });
+  }
+  entries.sort((a, b) => {
+    const dateA = a.type === 'group' ? a.data.date : a.date;
+    const dateB = b.type === 'group' ? b.data.date : b.date;
+    if (dateA !== dateB) return dateA.localeCompare(dateB);
+    // Groups before gaps on the same date
+    return a.type === 'group' ? -1 : 1;
+  });
+  return entries;
+});
+
 const upcomingVacations = computed(() => vacationStore.upcomingVacations);
 
 const pastVacations = computed(() => {
@@ -112,6 +142,19 @@ function selectTrip(id: string) {
 
 function backToList() {
   selectedVacationId.value = null;
+}
+
+async function deleteTrip() {
+  if (!selectedVacation.value) return;
+  const confirmed = await confirm({
+    title: 'vacation.deleteTitle',
+    message: 'vacation.deleteMessage',
+    variant: 'danger',
+  });
+  if (confirmed) {
+    await vacationStore.deleteVacation(selectedVacation.value.id);
+    selectedVacationId.value = null;
+  }
 }
 
 function startWizard() {
@@ -192,8 +235,14 @@ function handleIdeaUpdate(updatedIdea: VacationIdea) {
   vacationStore.updateVacation(selectedVacation.value.id, { ideas });
 }
 
-function handleIdeaDelete(ideaId: string) {
+async function handleIdeaDelete(ideaId: string) {
   if (!selectedVacation.value) return;
+  const confirmed = await confirm({
+    title: 'vacation.deleteSegmentTitle',
+    message: 'vacation.deleteSegmentMessage',
+    variant: 'danger',
+  });
+  if (!confirmed) return;
   const ideas = selectedVacation.value.ideas.filter((i) => i.id !== ideaId);
   vacationStore.updateVacation(selectedVacation.value.id, { ideas });
 }
@@ -261,7 +310,7 @@ function addQuickIdea() {
             style="background: linear-gradient(135deg, rgb(0 180 216 / 8%), rgb(255 217 61 / 6%))"
           >
             <span class="relative z-10 animate-bounce text-5xl" style="animation-duration: 3s">
-              {{ tripTypeEmoji(vacation.tripType) }}
+              {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
             </span>
           </div>
 
@@ -283,8 +332,9 @@ function addQuickIdea() {
                 v-if="vacationCountdown(vacation) !== null && vacationCountdown(vacation)! > 0"
                 class="font-outfit inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-3 py-1 text-[11px] font-bold text-white"
               >
-                {{ tripTypeEmoji(vacation.tripType) }} {{ vacationCountdown(vacation) }}
-                {{ t(tripCountdownKey(vacation.tripType) as any) }}!
+                {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
+                {{ vacationCountdown(vacation) }}
+                {{ t(tripCountdownKey(vacation.tripType, vacation.tripPurpose) as any) }}!
               </span>
               <span
                 v-else-if="
@@ -340,6 +390,17 @@ function addQuickIdea() {
                 {{ t('travel.needsBooking').toLowerCase() }}
               </span>
             </div>
+
+            <!-- Accommodation gap warning -->
+            <div v-if="computeAccommodationGaps(vacation).length > 0" class="mt-1.5">
+              <span
+                class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-[9px] font-semibold text-[var(--heritage-orange)]"
+              >
+                🏨 {{ computeAccommodationGaps(vacation).length }}
+                {{ computeAccommodationGaps(vacation).length === 1 ? 'night' : 'nights' }}
+                {{ t('travel.accommodationGap').toLowerCase() }}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -372,7 +433,7 @@ function addQuickIdea() {
               style="background: linear-gradient(135deg, rgb(0 180 216 / 4%), rgb(44 62 80 / 3%))"
             >
               <span class="relative z-10 text-4xl">
-                {{ tripTypeEmoji(vacation.tripType) }}
+                {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
               </span>
             </div>
             <div class="p-4">
@@ -422,6 +483,15 @@ function addQuickIdea() {
          EXPANDED VIEW — when a trip is selected
          ═══════════════════════════════════════════════════════════════════════ -->
     <template v-else-if="selectedVacation">
+      <!-- Back to all trips -->
+      <button
+        type="button"
+        class="font-outfit mb-2 inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+        @click="backToList"
+      >
+        ← {{ t('travel.allTrips') }}
+      </button>
+
       <!-- Hero banner -->
       <div
         class="relative overflow-hidden rounded-3xl shadow-[var(--card-shadow)]"
@@ -434,15 +504,8 @@ function addQuickIdea() {
         />
 
         <div class="relative z-10 px-6 py-5">
-          <!-- Row 1: nav -->
-          <div class="mb-3 flex items-center justify-between">
-            <button
-              type="button"
-              class="font-outfit text-xs font-semibold text-white/45 transition-colors hover:text-white"
-              @click="backToList"
-            >
-              ← {{ t('travel.allTrips') }}
-            </button>
+          <!-- Actions row -->
+          <div class="mb-3 flex items-center justify-end">
             <div class="flex gap-1.5">
               <button
                 type="button"
@@ -450,6 +513,14 @@ function addQuickIdea() {
                 @click="editInWizard(1)"
               >
                 ✏️ {{ t('travel.editTravelPlans') }}
+              </button>
+              <button
+                type="button"
+                class="font-outfit inline-flex items-center justify-center rounded-full border-[1.5px] border-white/10 bg-white/6 px-2.5 py-1.5 text-xs text-white/40 transition-all hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-300"
+                :title="t('vacation.deleteTitle')"
+                @click="deleteTrip"
+              >
+                🗑️
               </button>
             </div>
           </div>
@@ -460,7 +531,7 @@ function addQuickIdea() {
               class="shrink-0 text-[40px] drop-shadow-lg"
               style="animation: hero-float 4s ease-in-out infinite"
             >
-              {{ tripTypeEmoji(selectedVacation.tripType) }}
+              {{ tripTypeEmoji(selectedVacation.tripType, selectedVacation.tripPurpose) }}
             </span>
             <div class="min-w-0 flex-1">
               <h2 class="font-outfit text-xl font-extrabold text-white sm:text-[22px]">
@@ -483,8 +554,15 @@ function addQuickIdea() {
                   {{ vacationCountdown(selectedVacation) }}
                 </span>
                 <span class="font-outfit text-[11px] font-semibold text-white/70">
-                  {{ t(tripCountdownKey(selectedVacation.tripType) as any) }}!
-                  {{ tripTypeEmoji(selectedVacation.tripType) }}
+                  {{
+                    t(
+                      tripCountdownKey(
+                        selectedVacation.tripType,
+                        selectedVacation.tripPurpose
+                      ) as any
+                    )
+                  }}!
+                  {{ tripTypeEmoji(selectedVacation.tripType, selectedVacation.tripPurpose) }}
                 </span>
               </template>
               <template v-else>
@@ -560,31 +638,6 @@ function addQuickIdea() {
             </span>
           </div>
 
-          <!-- Accommodation gap warning -->
-          <button
-            v-if="accommodationGaps.length > 0"
-            class="mb-4 flex w-full cursor-pointer items-start gap-2 rounded-xl border border-dashed border-[rgba(241,93,34,0.2)] bg-[var(--tint-orange-8)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--tint-orange-15)] dark:bg-orange-900/10"
-            @click="openAddModal('accommodation')"
-          >
-            <span class="mt-0.5 text-sm">🏨</span>
-            <div class="flex-1">
-              <span class="font-outfit text-xs font-semibold text-[var(--heritage-orange)]">
-                {{ accommodationGaps.length }} {{ t('travel.accommodationGap') }}
-              </span>
-              <span class="block text-[10px] text-[var(--color-text-muted)]">
-                {{
-                  accommodationGaps
-                    .slice(0, 3)
-                    .map((d) => formatNookDate(d))
-                    .join(', ')
-                }}{{ accommodationGaps.length > 3 ? '...' : '' }}
-              </span>
-            </div>
-            <span class="font-outfit mt-0.5 text-[10px] font-semibold text-[#00B4D8]">
-              {{ t('travel.addSegment') }}
-            </span>
-          </button>
-
           <!-- Visual timeline -->
           <div class="relative space-y-2 pl-10">
             <!-- Vertical line -->
@@ -593,78 +646,117 @@ function addQuickIdea() {
               style="background: linear-gradient(180deg, #00b4d8, rgb(0 180 216 / 30%))"
             />
 
-            <template v-for="group in groupedByDate" :key="group.date">
-              <!-- Date node -->
-              <div class="relative flex items-center pt-3 pb-1">
-                <div
-                  class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-[#00B4D8] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
-                >
-                  📅
-                </div>
-                <span class="font-outfit text-[13px] font-bold text-gray-900 dark:text-gray-100">
-                  {{ group.label }}
-                </span>
-              </div>
-
-              <!-- Segment cards within this date -->
-              <div v-for="item in group.items" :key="item.id" class="relative mb-2">
-                <!-- Connector dot -->
-                <div
-                  class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[#00B4D8] opacity-25"
-                />
-                <div
-                  class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px] bg-[rgba(0,180,216,0.12)]"
-                />
-
-                <VacationSegmentCard
-                  :icon="item.icon"
-                  :title="item.title"
-                  :status="item.status"
-                  :key-value="item.keyValue"
-                  :collapsed="isCollapsed(item.id)"
-                  :read-only="false"
-                  @update:collapsed="setCollapsed(item.id, $event)"
-                  @edit="openEditModal(item)"
-                >
-                  <!-- Detail rows — click.stop on interactive elements to prevent edit -->
-                  <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" @click.stop>
-                    <template v-for="row in item.detailRows" :key="row.label">
-                      <span
-                        class="font-outfit self-center text-[10px] font-medium text-gray-400 dark:text-gray-500"
-                      >
-                        {{ row.label }}
-                      </span>
-                      <!-- Copyable value -->
-                      <button
-                        v-if="row.copyable"
-                        class="font-outfit inline-flex w-fit cursor-pointer items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
-                        @click="copy(row.value)"
-                      >
-                        {{ row.value }}
-                        <span class="text-[10px] opacity-30">📋</span>
-                      </button>
-                      <!-- Map link -->
-                      <a
-                        v-else-if="row.mapLink"
-                        :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="font-outfit inline-flex w-fit items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
-                      >
-                        {{ row.value }}
-                        <span class="text-[10px] opacity-40">📍</span>
-                      </a>
-                      <!-- Plain value -->
-                      <span
-                        v-else
-                        class="self-center text-xs text-[var(--color-text)] dark:text-gray-200"
-                      >
-                        {{ row.value }}
-                      </span>
-                    </template>
+            <template v-for="(entry, ei) in mergedTimeline" :key="ei">
+              <!-- ── Gap warning (inline at correct date) ── -->
+              <template v-if="entry.type === 'gap'">
+                <div class="relative flex items-center pt-3 pb-1">
+                  <div
+                    class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-dashed border-[var(--heritage-orange)] bg-white text-xs dark:bg-slate-800"
+                  >
+                    🏨
                   </div>
-                </VacationSegmentCard>
-              </div>
+                  <span class="font-outfit text-[13px] font-bold text-[var(--heritage-orange)]">
+                    {{ entry.label }}
+                  </span>
+                </div>
+                <div class="relative mb-2">
+                  <div
+                    class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[var(--heritage-orange)] opacity-25"
+                  />
+                  <div
+                    class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px] bg-[rgba(241,93,34,0.12)]"
+                  />
+                  <button
+                    class="flex w-full cursor-pointer items-center gap-2 rounded-2xl border border-dashed border-[rgba(241,93,34,0.2)] bg-[var(--tint-orange-8)] px-4 py-3 text-left transition-colors hover:bg-[var(--tint-orange-15)] dark:bg-orange-900/10"
+                    @click="openAddModal('accommodation')"
+                  >
+                    <div class="flex-1">
+                      <span class="font-outfit text-xs font-semibold text-[var(--heritage-orange)]">
+                        {{ t('travel.accommodationGap') }}
+                      </span>
+                    </div>
+                    <span class="font-outfit text-[10px] font-semibold text-[#00B4D8]">
+                      {{ t('travel.addSegment') }}
+                    </span>
+                  </button>
+                </div>
+              </template>
+
+              <!-- ── Date group with segment cards ── -->
+              <template v-else>
+                <!-- Date node -->
+                <div class="relative flex items-center pt-3 pb-1">
+                  <div
+                    class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-[#00B4D8] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
+                  >
+                    📅
+                  </div>
+                  <span class="font-outfit text-[13px] font-bold text-gray-900 dark:text-gray-100">
+                    {{ entry.data.label }}
+                  </span>
+                </div>
+
+                <!-- Segment cards within this date -->
+                <div v-for="item in entry.data.items" :key="item.id" class="relative mb-2">
+                  <!-- Connector dot -->
+                  <div
+                    class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[#00B4D8] opacity-25"
+                  />
+                  <div
+                    class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px] bg-[rgba(0,180,216,0.12)]"
+                  />
+
+                  <VacationSegmentCard
+                    :icon="item.icon"
+                    :title="item.title"
+                    :status="item.status"
+                    :key-value="item.keyValue"
+                    :collapsed="isCollapsed(item.id)"
+                    :read-only="false"
+                    show-edit
+                    @update:collapsed="setCollapsed(item.id, $event)"
+                    @edit="openEditModal(item)"
+                  >
+                    <!-- Detail rows — click.stop on interactive elements to prevent edit -->
+                    <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" @click.stop>
+                      <template v-for="row in item.detailRows" :key="row.label">
+                        <span
+                          class="font-outfit self-center text-[10px] font-medium text-gray-400 dark:text-gray-500"
+                        >
+                          {{ row.label }}
+                        </span>
+                        <!-- Copyable value -->
+                        <button
+                          v-if="row.copyable"
+                          class="font-outfit inline-flex w-fit cursor-pointer items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
+                          @click="copy(row.value)"
+                        >
+                          {{ row.value }}
+                          <span class="text-[10px] opacity-30">📋</span>
+                        </button>
+                        <!-- Map link -->
+                        <a
+                          v-else-if="row.mapLink"
+                          :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="font-outfit inline-flex w-fit items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
+                        >
+                          {{ row.value }}
+                          <span class="text-[10px] opacity-40">📍</span>
+                        </a>
+                        <!-- Plain value -->
+                        <span
+                          v-else
+                          class="self-center text-xs text-[var(--color-text)] dark:text-gray-200"
+                        >
+                          {{ row.value }}
+                        </span>
+                      </template>
+                    </div>
+                  </VacationSegmentCard>
+                </div>
+              </template>
             </template>
           </div>
 

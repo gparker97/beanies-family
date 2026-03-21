@@ -24,7 +24,7 @@ const vacationStore = useVacationStore();
 
 // Form fields
 const title = ref('');
-const status = ref<VacationSegmentStatus>('not_booked');
+const status = ref<VacationSegmentStatus>('pending');
 const name = ref('');
 const address = ref('');
 const checkInDate = ref('');
@@ -41,7 +41,7 @@ const { isEditing, isSubmitting } = useFormModal(
   {
     onEdit(acc) {
       title.value = acc.title ?? '';
-      status.value = acc.status ?? 'not_booked';
+      status.value = acc.status ?? 'pending';
       name.value = acc.name ?? '';
       address.value = acc.address ?? '';
       checkInDate.value = acc.checkInDate ?? '';
@@ -54,7 +54,7 @@ const { isEditing, isSubmitting } = useFormModal(
     },
     onNew() {
       title.value = '';
-      status.value = 'not_booked';
+      status.value = 'pending';
       name.value = '';
       address.value = '';
       checkInDate.value = '';
@@ -71,8 +71,6 @@ const { isEditing, isSubmitting } = useFormModal(
 const statusOptions = computed(() => [
   { value: 'booked', label: t('vacation.status.booked') },
   { value: 'pending', label: t('vacation.status.pending') },
-  { value: 'not_booked', label: t('vacation.status.not_booked') },
-  { value: 'researching', label: t('vacation.status.researching') },
 ]);
 
 const isHotelOrAirbnb = computed(

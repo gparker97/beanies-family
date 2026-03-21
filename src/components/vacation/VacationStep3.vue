@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { formatDateShort } from '@/utils/date';
+import { formatDateShort, extractDatePart } from '@/utils/date';
 import type {
   VacationAccommodation,
   VacationAccommodationType,
   VacationSegmentStatus,
+  VacationTravelSegment,
 } from '@/types/models';
 import { generateUUID } from '@/utils/id';
 import VacationSegmentCard from './VacationSegmentCard.vue';
@@ -14,6 +15,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 
 const props = defineProps<{
   accommodations: VacationAccommodation[];
+  travelSegments?: VacationTravelSegment[];
 }>();
 
 const emit = defineEmits<{
@@ -33,8 +35,6 @@ const accommodationTypes: { type: VacationAccommodationType; emoji: string; key:
 ];
 
 const statusOptions: { value: VacationSegmentStatus; key: string }[] = [
-  { value: 'not_booked', key: 'vacation.status.not_booked' },
-  { value: 'researching', key: 'vacation.status.researching' },
   { value: 'pending', key: 'vacation.status.pending' },
   { value: 'booked', key: 'vacation.status.booked' },
 ];
@@ -53,6 +53,17 @@ const nameFieldKey: Record<VacationAccommodationType, string> = {
   family_friends: 'vacation.field.hostName',
 };
 
+/** Derive check-in/out from outbound arrival and return departure dates */
+const flightDates = computed(() => {
+  const segs = props.travelSegments ?? [];
+  const outbound = segs.find((s) => s.type === 'flight_outbound');
+  const ret = segs.find((s) => s.type === 'flight_return');
+  return {
+    checkIn: outbound?.arrivalDate ? extractDatePart(outbound.arrivalDate) : undefined,
+    checkOut: ret?.departureDate ? extractDatePart(ret.departureDate) : undefined,
+  };
+});
+
 function hasType(type: VacationAccommodationType): boolean {
   return props.accommodations.some((a) => a.type === type);
 }
@@ -62,7 +73,9 @@ function addItem(type: VacationAccommodationType) {
     id: generateUUID(),
     type,
     title: t(`vacation.accommodation.${type}` as any),
-    status: 'not_booked',
+    status: 'pending',
+    checkInDate: flightDates.value.checkIn,
+    checkOutDate: flightDates.value.checkOut,
   };
   showAddPicker.value = false;
   emit('update:accommodations', [...props.accommodations, item]);
@@ -93,7 +106,9 @@ function togglePill(type: VacationAccommodationType) {
         id: generateUUID(),
         type,
         title: t(`vacation.accommodation.${type}` as any),
-        status: 'not_booked',
+        status: 'pending',
+        checkInDate: flightDates.value.checkIn,
+        checkOutDate: flightDates.value.checkOut,
       };
       emit('update:accommodations', [item]);
     } else {
@@ -110,9 +125,9 @@ function updateItem(index: number, field: keyof VacationAccommodation, value: st
 
 function updateStatus(index: number, value: string) {
   const current = props.accommodations[index]!;
-  // Single-select: clicking current status resets to 'not_booked'
+  // Single-select: clicking current status resets to 'pending'
   if (current.status === value) {
-    updateItem(index, 'status', 'not_booked');
+    updateItem(index, 'status', 'pending');
   } else {
     updateItem(index, 'status', value);
   }

@@ -1,12 +1,6 @@
 import { computed, type ComputedRef } from 'vue';
-import {
-  formatNookDate,
-  formatDateShort,
-  extractDatePart,
-  parseLocalDate,
-  addDays,
-  toDateInputValue,
-} from '@/utils/date';
+import { formatNookDate, formatDateShort, extractDatePart } from '@/utils/date';
+import { computeAccommodationGaps } from '@/utils/vacation';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 
 // ── Shared types ────────────────────────────────────────────────────────────
@@ -24,7 +18,7 @@ export interface TimelineItem {
   icon: string;
   title: string;
   keyValue: string;
-  status: 'booked' | 'pending' | 'not_booked' | 'researching';
+  status: 'booked' | 'pending';
   sortDate: string;
   /** Wizard step number for this kind: 2=travel, 3=accommodation, 4=transportation */
   stepNumber: number;
@@ -46,8 +40,9 @@ export const travelIcons: Record<string, string> = {
   flight_return: '🛬',
   flight_other: '✈️',
   cruise: '🚢',
-  train: '🚄',
+  train: '🚅',
   ferry: '⛴️',
+  car: '🚗',
 };
 
 export const accomIcons: Record<string, string> = {
@@ -61,7 +56,7 @@ export const transportIcons: Record<string, string> = {
   airport_shuttle: '🚐',
   rental_car: '🚗',
   taxi_rideshare: '🚕',
-  train: '🚄',
+  train: '🚅',
   bus: '🚌',
 };
 
@@ -174,62 +169,8 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
 export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undefined>) {
   const accommodationGaps = computed(() => {
     const v = vacation.value;
-    if (!v?.startDate || !v?.endDate) return [];
-    const start = parseLocalDate(extractDatePart(v.startDate));
-    const end = parseLocalDate(extractDatePart(v.endDate));
-    const coveredDates = new Set<string>();
-
-    // Accommodation check-in to check-out (exclusive of checkout day)
-    for (const acc of v.accommodations) {
-      if (acc.checkInDate && acc.checkOutDate) {
-        let d = parseLocalDate(extractDatePart(acc.checkInDate));
-        const out = parseLocalDate(extractDatePart(acc.checkOutDate));
-        while (d < out) {
-          coveredDates.add(toDateInputValue(d));
-          d = addDays(d, 1);
-        }
-      }
-    }
-
-    // Cruise ships include accommodation — cover embarkation→disembarkation dates
-    for (const seg of v.travelSegments) {
-      if (seg.type === 'cruise' && seg.embarkationDate && seg.disembarkationDate) {
-        let d = parseLocalDate(extractDatePart(seg.embarkationDate));
-        const out = parseLocalDate(extractDatePart(seg.disembarkationDate));
-        while (d < out) {
-          coveredDates.add(toDateInputValue(d));
-          d = addDays(d, 1);
-        }
-      }
-    }
-
-    // Overnight flights cover the departure night
-    for (const seg of v.travelSegments) {
-      if (seg.type?.startsWith('flight') && seg.departureDate && seg.arrivalDate) {
-        const dep = extractDatePart(seg.departureDate);
-        const arr = extractDatePart(seg.arrivalDate);
-        if (arr > dep) {
-          let d = parseLocalDate(dep);
-          const arrDate = parseLocalDate(arr);
-          while (d < arrDate) {
-            coveredDates.add(toDateInputValue(d));
-            d = addDays(d, 1);
-          }
-        }
-      }
-    }
-
-    // The last day of the trip (return travel day) doesn't need accommodation
-    const endStr = toDateInputValue(end);
-
-    const gaps: string[] = [];
-    let d = new Date(start);
-    while (d < end) {
-      const dateStr = toDateInputValue(d);
-      if (dateStr !== endStr && !coveredDates.has(dateStr)) gaps.push(dateStr);
-      d = addDays(d, 1);
-    }
-    return gaps;
+    if (!v) return [];
+    return computeAccommodationGaps(v);
   });
 
   const timelineItems = computed<TimelineItem[]>(() => {
@@ -370,10 +311,8 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     return items;
   });
 
-  const bookedItems = computed(() => timelineItems.value.filter((i) => i.status !== 'not_booked'));
-  const unbookedItems = computed(() =>
-    timelineItems.value.filter((i) => i.status === 'not_booked')
-  );
+  const bookedItems = computed(() => timelineItems.value.filter((i) => i.status === 'booked'));
+  const unbookedItems = computed(() => timelineItems.value.filter((i) => i.status === 'pending'));
 
   const groupedByDate = computed<DateGroup[]>(() => {
     const groups: DateGroup[] = [];

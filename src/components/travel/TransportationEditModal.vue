@@ -24,7 +24,7 @@ const vacationStore = useVacationStore();
 
 // Form fields
 const title = ref('');
-const status = ref<VacationSegmentStatus>('not_booked');
+const status = ref<VacationSegmentStatus>('pending');
 const bookingReference = ref('');
 const pickupDate = ref('');
 const pickupTime = ref('');
@@ -46,7 +46,7 @@ const { isEditing, isSubmitting } = useFormModal(
   {
     onEdit(trans) {
       title.value = trans.title ?? '';
-      status.value = trans.status ?? 'not_booked';
+      status.value = trans.status ?? 'pending';
       bookingReference.value = trans.bookingReference ?? '';
       pickupDate.value = trans.pickupDate ?? '';
       pickupTime.value = trans.pickupTime ?? '';
@@ -64,7 +64,7 @@ const { isEditing, isSubmitting } = useFormModal(
     },
     onNew() {
       title.value = '';
-      status.value = 'not_booked';
+      status.value = 'pending';
       bookingReference.value = '';
       pickupDate.value = '';
       pickupTime.value = '';
@@ -86,8 +86,6 @@ const { isEditing, isSubmitting } = useFormModal(
 const statusOptions = computed(() => [
   { value: 'booked', label: t('vacation.status.booked') },
   { value: 'pending', label: t('vacation.status.pending') },
-  { value: 'not_booked', label: t('vacation.status.not_booked') },
-  { value: 'researching', label: t('vacation.status.researching') },
 ]);
 
 const isTrainBus = computed(
