@@ -7,6 +7,7 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useVacationStore } from '@/stores/vacationStore';
+import { buildTransportationTitle } from '@/utils/vacation';
 import type { VacationTransportation, VacationSegmentStatus } from '@/types/models';
 
 interface Props {
@@ -96,6 +97,14 @@ const isShuttleOrTaxi = computed(
     props.transportation?.type === 'taxi_rideshare'
 );
 
+const autoTitle = computed(() =>
+  buildTransportationTitle({
+    type: props.transportation?.type,
+    agencyName: agencyName.value,
+    operator: operator.value,
+  })
+);
+
 async function handleSave() {
   if (!props.vacationId || props.transportationIndex < 0) return;
   isSubmitting.value = true;
@@ -105,7 +114,7 @@ async function handleSave() {
     const transportation = [...vacation.transportation];
     transportation[props.transportationIndex] = {
       ...transportation[props.transportationIndex]!,
-      title: title.value,
+      title: autoTitle.value,
       status: status.value,
       bookingReference: bookingReference.value,
       pickupDate: pickupDate.value,
@@ -151,10 +160,12 @@ async function handleSave() {
         />
       </FormFieldGroup>
 
-      <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')" required>
-        <BaseInput v-model="title" />
-      </FormFieldGroup>
+      <!-- Auto-generated title -->
+      <div
+        class="font-outfit rounded-xl bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm font-semibold text-gray-800 dark:bg-slate-700 dark:text-gray-200"
+      >
+        {{ autoTitle }}
+      </div>
 
       <!-- Bus fields -->
       <template v-if="isBus">

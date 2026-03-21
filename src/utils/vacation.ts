@@ -105,6 +105,86 @@ export function tripDurationDays(start: string, end: string): number {
   return Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
+// ── Auto-generated segment titles ────────────────────────────────────────────
+
+/** Extract 3-letter airport code from strings like "Singapore (SIN)" */
+function airportCode(airport?: string): string {
+  if (!airport) return '';
+  const m = airport.match(/\(([A-Z]{3})\)/);
+  return m ? m[1]! : (airport.split(' ')[0] ?? '');
+}
+
+/** Build a display title for a travel segment based on its type and fields */
+export function buildTravelSegmentTitle(seg: {
+  type?: string;
+  departureAirport?: string;
+  arrivalAirport?: string;
+  operator?: string;
+  route?: string;
+  departureStation?: string;
+  arrivalStation?: string;
+  cruiseLine?: string;
+  carType?: string;
+  carLabel?: string;
+  title?: string;
+  activityCategory?: string;
+}): string {
+  const t = seg.type;
+  if (t === 'flight_outbound' || t === 'flight_return' || t === 'flight_other') {
+    const label =
+      t === 'flight_outbound'
+        ? 'outbound flight'
+        : t === 'flight_return'
+          ? 'return flight'
+          : 'flight';
+    const from = airportCode(seg.departureAirport);
+    const to = airportCode(seg.arrivalAirport);
+    return from && to ? `${label} — ${from} to ${to}` : label;
+  }
+  if (t === 'cruise') return seg.cruiseLine ? `cruise — ${seg.cruiseLine}` : 'cruise';
+  if (t === 'train' || t === 'ferry') {
+    const label = t === 'train' ? 'train' : 'ferry';
+    const from = seg.departureStation;
+    const to = seg.arrivalStation;
+    return from && to ? `${label} — ${from} to ${to}` : label;
+  }
+  if (t === 'car') {
+    const label = seg.carLabel || (seg.carType ? seg.carType.replace(/_/g, ' ') : 'car');
+    return label;
+  }
+  if (t === 'activity') return seg.title || 'activity';
+  return seg.title || '';
+}
+
+/** Build a display title for an accommodation based on its type and name */
+export function buildAccommodationTitle(acc: { type?: string; name?: string }): string {
+  const typeLabels: Record<string, string> = {
+    hotel: 'hotel',
+    airbnb: 'airbnb',
+    campground: 'campground',
+    family_friends: 'friends/family',
+  };
+  const label = typeLabels[acc.type ?? ''] ?? 'stay';
+  return acc.name ? `${label} — ${acc.name}` : label;
+}
+
+/** Build a display title for a transportation item based on its type */
+export function buildTransportationTitle(trans: {
+  type?: string;
+  agencyName?: string;
+  operator?: string;
+}): string {
+  const typeLabels: Record<string, string> = {
+    airport_shuttle: 'airport shuttle',
+    rental_car: 'rental car',
+    taxi_rideshare: 'taxi / rideshare',
+    bus: 'bus',
+  };
+  const label = typeLabels[trans.type ?? ''] ?? 'transport';
+  const detail = trans.agencyName || trans.operator;
+  return detail ? `${label} — ${detail}` : label;
+}
+
 /**
  * Compute dates with no overnight accommodation between trip start and end.
  * Accounts for hotel check-in/out, cruise embarkation spans, and overnight flights.
