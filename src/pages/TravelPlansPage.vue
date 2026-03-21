@@ -778,6 +778,7 @@ function addQuickIdea() {
                     deletable
                     :hint="hintMap.get(item.id)?.message"
                     :hint-expanded="expandedHintId === item.id"
+                    @update:title="saveInlineField(item, 'title', $event)"
                     @update:collapsed="setCollapsed(item.id, $event)"
                     @edit="openEditModal(item)"
                     @delete="deleteTimelineItem(item)"
@@ -904,23 +905,22 @@ function addQuickIdea() {
             >
               🤔 {{ t('vacation.stillDeciding' as any) }}
             </div>
-            <button
+            <VacationSegmentCard
               v-for="item in undatedItems"
               :key="item.id"
-              class="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgba(184,134,11,0.18)] bg-[rgba(255,217,61,0.08)] px-3 py-2.5 text-left transition-colors hover:bg-[rgba(255,217,61,0.2)]"
-              @click="openEditModal(item)"
-            >
-              <span class="text-sm">{{ item.icon }}</span>
-              <div class="flex-1">
-                <span class="font-outfit text-xs font-semibold text-[#B8860B]">
-                  {{ item.title }}
-                </span>
-                <small class="block text-[10px] text-[rgba(184,134,11,0.55)]">
-                  {{ t('travel.needsBooking').toLowerCase() }}
-                </small>
-              </div>
-              <span class="text-xs text-[#B8860B] opacity-40">✏️</span>
-            </button>
+              :icon="item.icon"
+              :title="item.title"
+              :status="item.status"
+              :key-value="item.keyValue"
+              :collapsed="isCollapsed(item.id)"
+              :read-only="false"
+              show-edit
+              deletable
+              @update:title="saveInlineField(item, 'title', $event)"
+              @update:collapsed="setCollapsed(item.id, $event)"
+              @edit="openEditModal(item)"
+              @delete="deleteTimelineItem(item)"
+            />
           </div>
         </div>
 
