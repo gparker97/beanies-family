@@ -26,6 +26,7 @@ import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
 import VacationSidebarCard from '@/components/vacation/VacationSidebarCard.vue';
+import NookSectionCard from '@/components/nook/NookSectionCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
@@ -450,17 +451,11 @@ function handleActivitySwapped(newId: string) {
       </div>
     </div>
 
-    <!-- Upcoming vacations — prominent card above calendar (matches mockup slide 9) -->
-    <div
+    <!-- Upcoming vacations — prominent card above calendar -->
+    <NookSectionCard
       v-if="vacationStore.upcomingVacations.length > 0"
-      class="rounded-[20px] bg-white p-4 shadow-[0_4px_20px_rgba(44,62,80,0.04)] dark:bg-slate-800 dark:shadow-none"
-      style="background: linear-gradient(180deg, white, rgb(0 180 216 / 2%))"
+      :title="t('vacation.upcoming')"
     >
-      <h3
-        class="font-outfit mb-3 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.05em] text-[var(--color-text-muted)] uppercase opacity-50"
-      >
-        ✈️ {{ t('vacation.upcoming') }}
-      </h3>
       <div
         class="flex snap-x gap-3 overflow-x-auto pb-1 sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:pb-0"
       >
@@ -472,7 +467,7 @@ function handleActivitySwapped(newId: string) {
           @click="handleVacationClick(vacation.id)"
         />
       </div>
-    </div>
+    </NookSectionCard>
 
     <!-- View toggle (compact, directly above calendar) -->
     <ViewToggle :active-view="activeView" @update:active-view="activeView = $event" />

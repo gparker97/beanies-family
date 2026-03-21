@@ -7,6 +7,7 @@ import { toAssigneePayload } from '@/utils/assignees';
 import TodoViewEditModal from '@/components/todo/TodoViewEditModal.vue';
 import TodoItemRow from '@/components/todo/TodoItemRow.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
+import NookSectionCard from './NookSectionCard.vue';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -74,32 +75,30 @@ async function toggleComplete(todoId: string) {
 </script>
 
 <template>
-  <div
-    class="nook-todo-card nook-card-dark relative overflow-hidden rounded-[var(--sq)] border-l-4 border-[#9B59B6] p-6 shadow-[var(--card-shadow)]"
+  <NookSectionCard
+    class="nook-todo-card relative overflow-hidden"
+    :title="t('nook.familyTodo')"
+    border-color="#9B59B6"
   >
+    <template #header-right>
+      <div class="flex items-center gap-2">
+        <span
+          class="rounded-full bg-[rgba(155,89,182,0.12)] px-2 py-0.5 text-xs font-semibold text-[#9B59B6]"
+        >
+          {{ t('nook.openCount').replace('{count}', String(openCount)) }}
+        </span>
+        <router-link to="/todo" class="text-primary-500 text-xs font-medium hover:underline">
+          {{ t('nook.viewAll') }} &rarr;
+        </router-link>
+      </div>
+    </template>
+
     <!-- Watermark -->
     <div
       class="pointer-events-none absolute -top-[10px] -right-[10px] text-[4rem] opacity-[0.04]"
       style="transform: rotate(-15deg)"
     >
       📝
-    </div>
-
-    <!-- Header -->
-    <div class="mb-4 flex items-center justify-between">
-      <div class="flex items-center">
-        <span class="nook-section-label text-secondary-500 dark:text-gray-400">
-          ✅ {{ t('nook.familyTodo') }}
-        </span>
-        <span
-          class="ml-2 rounded-full bg-[rgba(155,89,182,0.12)] px-2 py-0.5 text-xs font-semibold text-[#9B59B6]"
-        >
-          {{ t('nook.openCount').replace('{count}', String(openCount)) }}
-        </span>
-      </div>
-      <router-link to="/todo" class="text-primary-500 text-xs font-medium hover:underline">
-        {{ t('nook.viewAll') }} &rarr;
-      </router-link>
     </div>
 
     <!-- Quick-add bar -->
@@ -210,7 +209,7 @@ async function toggleComplete(todoId: string) {
     >
       +{{ remainingCount }} {{ t('nook.moretasks') }} &rarr;
     </router-link>
-  </div>
+  </NookSectionCard>
 
   <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
 </template>
