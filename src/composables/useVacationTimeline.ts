@@ -285,7 +285,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
 
     for (let i = 0; i < v.travelSegments.length; i++) {
       const seg = v.travelSegments[i]!;
-      const date = seg.sortDate ?? seg.departureDate ?? seg.embarkationDate ?? '';
+      const date = seg.sortDate || seg.departureDate || seg.embarkationDate || '';
       items.push({
         id: seg.id,
         kind: 'travel',
@@ -305,7 +305,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
 
     for (let i = 0; i < v.accommodations.length; i++) {
       const acc = v.accommodations[i]!;
-      const date = acc.checkInDate ?? '';
+      const date = acc.checkInDate || '';
       const rows: DetailRow[] = [];
       if (acc.name) rows.push({ label: 'name', value: acc.name, field: 'name' });
       if (acc.address)
@@ -356,7 +356,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
 
     for (let i = 0; i < v.transportation.length; i++) {
       const trans = v.transportation[i]!;
-      const date = trans.pickupDate ?? trans.departureDate ?? '';
+      const date = trans.pickupDate || trans.departureDate || '';
       const rows: DetailRow[] = [];
       if (trans.agencyName)
         rows.push({ label: 'company', value: trans.agencyName, field: 'agencyName' });
