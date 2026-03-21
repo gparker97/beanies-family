@@ -15,6 +15,8 @@ interface Props {
   collapsed: boolean;
   readOnly?: boolean;
   deletable?: boolean;
+  /** Show the edit pencil button (for view/detail contexts, not inline editing wizards) */
+  showEdit?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -38,21 +40,9 @@ const statusConfig = computed(() => {
       text: 'text-[#B8860B]',
       key: 'vacation.status.pending',
     },
-    not_booked: {
-      bg: 'bg-[var(--tint-slate-5)]',
-      text: 'text-gray-500 dark:text-gray-400',
-      key: 'vacation.status.not_booked',
-    },
-    researching: {
-      bg: 'bg-[var(--vacation-teal-tint)]',
-      text: 'text-teal-700 dark:text-teal-400',
-      key: 'vacation.status.researching',
-    },
   };
-  return map[props.status];
+  return map[props.status] ?? map.pending;
 });
-
-const isNotBooked = computed(() => props.status === 'not_booked');
 
 function toggleCollapse() {
   emit('update:collapsed', !props.collapsed);
@@ -70,12 +60,7 @@ async function handleDelete() {
 
 <template>
   <div
-    class="group/card rounded-2xl border bg-white transition-shadow hover:shadow-md dark:bg-slate-800"
-    :class="
-      isNotBooked
-        ? 'border-dashed border-[var(--vacation-gold-tint)] bg-[var(--vacation-gold-tint)]'
-        : 'border-[var(--tint-slate-10)] dark:border-slate-700'
-    "
+    class="group/card rounded-2xl border border-[var(--tint-slate-10)] bg-white transition-shadow hover:shadow-md dark:border-slate-700 dark:bg-slate-800"
   >
     <!-- Header -->
     <div class="cursor-pointer px-4 py-3" @click="toggleCollapse">
@@ -119,7 +104,7 @@ async function handleDelete() {
 
         <!-- Edit button — always visible on mobile, hover-reveal on desktop -->
         <button
-          v-if="!readOnly"
+          v-if="showEdit"
           class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-300 transition-all hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] lg:opacity-0 lg:group-hover/card:opacity-100"
           title="Edit"
           @click.stop="$emit('edit')"

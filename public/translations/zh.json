@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-21",
-    "translationCount": 1805
+    "translationCount": 1821
   },
   "translations": {
     "app.name": {
@@ -9029,6 +9029,86 @@
     "travel.countdown.combo": {
       "translation": "天后截止",
       "hash": "kwinoc",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.travel.addCar": {
+      "translation": "汽车",
+      "hash": "1g38",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.arrivesNextDay": {
+      "translation": "次日入住",
+      "hash": "t7n9ot",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.embarkationTime": {
+      "translation": "出发时间",
+      "hash": "v8qwxz",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.carType": {
+      "translation": "汽车类型",
+      "hash": "3sssa",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.carLabel": {
+      "translation": "汽车名称",
+      "hash": "3x4kp",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.leavingTime": {
+      "translation": "出发时间",
+      "hash": "2ov8qv",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.carType.family_car": {
+      "translation": "家庭用车",
+      "hash": "ovne94",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.carType.rental_car": {
+      "translation": "租车",
+      "hash": "1f9ck8",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.carType.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.segment.car": {
+      "translation": "汽车",
+      "hash": "1g38",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.business": {
+      "translation": "距离您的行程还有天",
+      "hash": "ya20bd",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.purpose.vacation": {
+      "translation": "休假",
+      "hash": "qt7u2r",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.purpose.business": {
+      "translation": "商业学",
+      "hash": "hwb0o0",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.trainCompany": {
+      "translation": "火车公司",
+      "hash": "s7syqj",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.trainNumber": {
+      "translation": "列车编号",
+      "hash": "6yf6n",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.ideas.category.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
       "lastUpdated": "2026-03-21"
     }
   }

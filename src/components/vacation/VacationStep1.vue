@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
-import type { VacationTripType } from '@/types/models';
+import type { VacationTripType, VacationTripPurpose } from '@/types/models';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
@@ -8,17 +8,19 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 interface Props {
   name: string;
   tripType: VacationTripType | '';
+  tripPurpose: VacationTripPurpose;
   assigneeIds: string[];
   showErrors?: boolean;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   showErrors: false,
 });
 
 const emit = defineEmits<{
   'update:name': [value: string];
   'update:tripType': [value: VacationTripType];
+  'update:tripPurpose': [value: VacationTripPurpose];
   'update:assigneeIds': [value: string[]];
 }>();
 
@@ -91,6 +93,34 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
         </button>
       </div>
     </FormFieldGroup>
+
+    <!-- Trip purpose toggle — only shown for fly_and_stay -->
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="opacity-0 -translate-y-1"
+      leave-active-class="transition-all duration-150 ease-in"
+      leave-to-class="opacity-0 -translate-y-1"
+    >
+      <div v-if="props.tripType === 'fly_and_stay'" class="flex items-center gap-2">
+        <button
+          v-for="purpose in ['vacation', 'business'] as const"
+          :key="purpose"
+          type="button"
+          class="font-outfit inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all"
+          :class="
+            tripPurpose === purpose
+              ? purpose === 'business'
+                ? 'border-[var(--color-text)] bg-[var(--tint-slate-10)] text-[var(--color-text)] dark:border-gray-400 dark:bg-slate-700 dark:text-gray-200'
+                : 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-tint)] text-[var(--vacation-teal)]'
+              : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)]'
+          "
+          @click="emit('update:tripPurpose', purpose)"
+        >
+          {{ purpose === 'vacation' ? '🌴' : '💼' }}
+          {{ t(`travel.purpose.${purpose}`) }}
+        </button>
+      </div>
+    </Transition>
 
     <!-- Who's going -->
     <FormFieldGroup

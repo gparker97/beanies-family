@@ -37,6 +37,7 @@ const categories: { key: VacationIdeaCategory; emoji: string }[] = [
   { key: 'sightseeing', emoji: '📸' },
   { key: 'shopping', emoji: '🛍️' },
   { key: 'nightlife', emoji: '🎉' },
+  { key: 'other', emoji: '✨' },
 ];
 
 const durations = ['30min', '1hr', '2hrs', 'half_day', 'full_day'] as const;
@@ -49,7 +50,8 @@ const categoryEmoji = computed(() => {
 const costTag = computed(() => {
   if (props.idea.costType === 'free') return '🆓';
   if (props.idea.costType === 'paid' && props.idea.estimatedCost) {
-    return `💰 ~$${props.idea.estimatedCost}`;
+    const cur = props.idea.estimatedCostCurrency ?? 'USD';
+    return `💰 ~${cur} ${props.idea.estimatedCost}`;
   }
   return null;
 });
@@ -88,59 +90,69 @@ function patch(fields: Partial<VacationIdea>) {
         : 'border-[var(--tint-slate-5)] bg-white hover:shadow-sm dark:bg-slate-800'
     "
   >
-    <!-- Collapsed row -->
-    <div class="flex cursor-pointer items-center gap-2 p-3" @click="toggleExpanded">
-      <!-- Vote heart -->
-      <button
-        class="cursor-pointer border-none bg-white text-lg transition-transform hover:scale-110 dark:bg-slate-700"
-        @click.stop="$emit('vote')"
-      >
-        {{ hasVoted ? '❤️' : '🤍' }}
-      </button>
-      <span class="font-outfit text-xs font-bold text-[var(--vacation-teal)]">
-        {{ idea.votes.length }}
-      </span>
-
-      <!-- Title + description preview -->
-      <div class="min-w-0 flex-1">
-        <span class="font-outfit block truncate text-sm font-semibold dark:text-white">
-          {{ idea.title }}
-        </span>
-        <span v-if="idea.description" class="block truncate text-xs text-[var(--color-text-muted)]">
-          {{ idea.description }}
+    <!-- Card content — matching mockup layout -->
+    <div class="flex cursor-pointer gap-2.5 p-3" @click="toggleExpanded">
+      <!-- Vote column -->
+      <div class="flex shrink-0 flex-col items-center gap-0.5">
+        <button
+          class="cursor-pointer border-none bg-transparent text-base transition-transform hover:scale-110"
+          @click.stop="$emit('vote')"
+        >
+          {{ hasVoted ? '❤️' : '🤍' }}
+        </button>
+        <span class="font-outfit text-xs font-bold text-[var(--vacation-teal)]">
+          {{ idea.votes.length }}
         </span>
       </div>
 
-      <!-- Category tag -->
-      <span
-        v-if="idea.category"
-        class="shrink-0 rounded-full bg-[var(--vacation-teal-tint)] px-2 py-0.5 text-[10px] font-semibold text-[var(--vacation-teal)]"
-      >
-        {{ categoryEmoji }} {{ t(`vacation.ideas.category.${idea.category}`) }}
-      </span>
+      <!-- Content column -->
+      <div class="min-w-0 flex-1">
+        <!-- Title -->
+        <div class="font-outfit text-sm font-semibold text-gray-900 dark:text-white">
+          {{ idea.title }}
+        </div>
 
-      <!-- Cost tag -->
-      <span
-        v-if="costTag"
-        class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-        :class="
-          idea.costType === 'free'
-            ? 'bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
-            : 'bg-[var(--tint-orange-8)] text-[var(--heritage-orange)]'
-        "
-      >
-        {{ costTag }}
-      </span>
+        <!-- Description (2-line clamp) -->
+        <div
+          v-if="idea.description"
+          class="mt-0.5 line-clamp-2 text-[11px] text-[var(--color-text-muted)]"
+        >
+          {{ idea.description }}
+        </div>
 
-      <!-- Author dot -->
-      <span
-        v-if="author"
-        class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
-        :style="{ backgroundColor: author.color }"
-        :title="author.name"
-      >
-        {{ author.name.charAt(0).toUpperCase() }}
-      </span>
+        <!-- Meta tags: category + cost + author -->
+        <div class="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span
+            v-if="idea.category"
+            class="rounded-full bg-[var(--vacation-teal-tint)] px-2 py-0.5 text-[9px] font-semibold text-[var(--vacation-teal)]"
+          >
+            {{ categoryEmoji }} {{ t(`vacation.ideas.category.${idea.category}`) }}
+          </span>
+          <span
+            v-if="costTag"
+            class="rounded-full px-2 py-0.5 text-[9px] font-semibold"
+            :class="
+              idea.costType === 'free'
+                ? 'bg-[rgba(39,174,96,0.08)] text-[#27AE60]'
+                : 'bg-[var(--tint-orange-8)] text-[var(--heritage-orange)]'
+            "
+          >
+            {{ costTag }}
+          </span>
+          <span
+            v-if="author"
+            class="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-muted)]"
+          >
+            <span
+              class="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[7px] font-bold text-white"
+              :style="{ backgroundColor: author.color }"
+            >
+              {{ author.name.charAt(0).toUpperCase() }}
+            </span>
+            {{ author.name.toLowerCase() }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Expanded detail editor -->

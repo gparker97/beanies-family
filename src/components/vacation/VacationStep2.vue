@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
 import { addHourToTime } from '@/utils/date';
@@ -43,8 +43,9 @@ const segmentIcons: Record<VacationTravelType, string> = {
   flight_return: '🛬',
   flight_other: '✈️',
   cruise: '🚢',
-  train: '🚂',
+  train: '🚅',
   ferry: '⛴️',
+  car: '🚗',
 };
 
 const defaultTitles: Record<VacationTravelType, string> = {
@@ -54,19 +55,24 @@ const defaultTitles: Record<VacationTravelType, string> = {
   cruise: 'cruise',
   train: 'train',
   ferry: 'ferry',
+  car: 'car',
 };
 
 const statusOptions = computed(() => [
   { value: 'booked', label: t('vacation.status.booked') },
   { value: 'pending', label: t('vacation.status.pending') },
-  { value: 'not_booked', label: t('vacation.status.not_booked') },
-  { value: 'researching', label: t('vacation.status.researching') },
 ]);
 
 const airlineOptions = computed(() => buildAirlineOptions());
 const airportOptions = computed(() => buildAirportOptions());
 const cruiseLineOptions = computed(() => buildCruiseLineOptions());
 const cruisePortOptions = computed(() => buildCruisePortOptions());
+
+const carTypeOptions = computed(() => [
+  { value: 'family_car', label: t('vacation.carType.family_car') },
+  { value: 'rental_car', label: t('vacation.carType.rental_car') },
+  { value: 'other', label: t('vacation.carType.other') },
+]);
 
 const sortedSegments = computed(() =>
   [...props.segments]
@@ -83,12 +89,10 @@ function segmentIcon(type: VacationTravelType): string {
   return segmentIcons[type] || '✈️';
 }
 
-// buildKeyValue delegates to the shared composable function
 function buildKeyValue(seg: VacationTravelSegment): string {
   return buildTravelKeyValue(seg);
 }
 
-// Alias shared cruise ship builder (template calls it as a function with cruiseLine arg)
 const cruiseShipOptions = buildCruiseShipOptions;
 
 function isFlightType(type: VacationTravelType): boolean {
@@ -99,6 +103,20 @@ function isTrainOrFerry(type: VacationTravelType): boolean {
   return type === 'train' || type === 'ferry';
 }
 
+// Auto-select car for road_trip, cruise for cruise
+watch(
+  () => props.tripType,
+  (tripType) => {
+    if (props.segments.length > 0) return; // don't override existing segments
+    if (tripType === 'road_trip') {
+      addSegment('car');
+    } else if (tripType === 'cruise') {
+      addSegment('cruise');
+    }
+  },
+  { immediate: true }
+);
+
 function addSegment(type: VacationTravelType) {
   // When adding a flight, create both outbound and return as separate entries
   if (type === 'flight_outbound') {
@@ -108,13 +126,13 @@ function addSegment(type: VacationTravelType) {
       id: outId,
       type: 'flight_outbound',
       title: defaultTitles['flight_outbound'],
-      status: 'not_booked' as VacationSegmentStatus,
+      status: 'pending' as VacationSegmentStatus,
     };
     const ret: VacationTravelSegment = {
       id: retId,
       type: 'flight_return',
       title: defaultTitles['flight_return'],
-      status: 'not_booked' as VacationSegmentStatus,
+      status: 'pending' as VacationSegmentStatus,
     };
     collapsedMap.value[outId] = false;
     collapsedMap.value[retId] = false;
@@ -127,70 +145,74 @@ function addSegment(type: VacationTravelType) {
     id,
     type,
     title: defaultTitles[type],
-    status: 'not_booked' as VacationSegmentStatus,
+    status: 'pending' as VacationSegmentStatus,
   };
   collapsedMap.value[id] = false;
   emit('update:segments', [...props.segments, newSegment]);
 }
 
-function updateSegment(index: number, field: keyof VacationTravelSegment, value: string) {
+function updateSegment(index: number, field: keyof VacationTravelSegment, value: string | boolean) {
   const updated = [...props.segments];
   const current = updated[index]!;
   updated[index] = { ...current, [field]: value };
+
   // When departureDate or embarkationDate changes, also set sortDate
   if (field === 'departureDate' || field === 'embarkationDate') {
-    updated[index] = { ...updated[index]!, sortDate: value };
+    updated[index] = { ...updated[index]!, sortDate: String(value) };
   }
-  // Auto-populate arrival from departure when arrival is empty or was auto-set to old departure
-  if (field === 'departureDate') {
-    if (!current.arrivalDate || current.arrivalDate === current.departureDate) {
-      updated[index] = { ...updated[index]!, arrivalDate: value };
-    }
-  }
-  if (field === 'departureTime' && !current.arrivalTime) {
-    updated[index] = { ...updated[index]!, arrivalTime: addHourToTime(value) };
-  }
-  if (field === 'embarkationDate') {
-    if (!current.disembarkationDate || current.disembarkationDate === current.embarkationDate) {
-      updated[index] = { ...updated[index]!, disembarkationDate: value };
+
+  // Compute arrivalDate from departureDate + arrivesNextDay
+  if (field === 'departureDate' || field === 'arrivesNextDay') {
+    const seg = updated[index]!;
+    if (seg.departureDate) {
+      if (seg.arrivesNextDay) {
+        const d = new Date(seg.departureDate + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        updated[index] = { ...updated[index]!, arrivalDate: d.toISOString().slice(0, 10) };
+      } else {
+        updated[index] = { ...updated[index]!, arrivalDate: seg.departureDate };
+      }
     }
   }
 
-  // Auto-populate return flight from outbound flight data.
-  // Uses the PREVIOUS outbound value to detect if the return field was auto-set
-  // (if return field matches prev outbound value or is empty, it's safe to overwrite).
+  if (field === 'departureTime' && !current.arrivalTime) {
+    updated[index] = { ...updated[index]!, arrivalTime: addHourToTime(String(value)) };
+  }
+  if (field === 'embarkationDate') {
+    if (!current.disembarkationDate || current.disembarkationDate === current.embarkationDate) {
+      updated[index] = { ...updated[index]!, disembarkationDate: String(value) };
+    }
+  }
+
+  // Auto-populate return flight from outbound flight data
   if (current.type === 'flight_outbound') {
     const retIdx = updated.findIndex((s) => s.type === 'flight_return');
     if (retIdx >= 0) {
       const ret = updated[retIdx]!;
       const prevValue = current[field as keyof VacationTravelSegment] as string | undefined;
 
-      // Invert from/to: outbound arrival → return departure
       if (field === 'arrivalAirport') {
         const prev = prevValue ?? '';
         if (!ret.departureAirport || ret.departureAirport === prev) {
-          updated[retIdx] = { ...updated[retIdx]!, departureAirport: value };
+          updated[retIdx] = { ...updated[retIdx]!, departureAirport: String(value) };
         }
       }
-      // Invert from/to: outbound departure → return arrival
       if (field === 'departureAirport') {
         const prev = prevValue ?? '';
         if (!ret.arrivalAirport || ret.arrivalAirport === prev) {
-          updated[retIdx] = { ...updated[retIdx]!, arrivalAirport: value };
+          updated[retIdx] = { ...updated[retIdx]!, arrivalAirport: String(value) };
         }
       }
-      // Copy booking reference
       if (field === 'bookingReference') {
         const prev = prevValue ?? '';
         if (!ret.bookingReference || ret.bookingReference === prev) {
-          updated[retIdx] = { ...updated[retIdx]!, bookingReference: value };
+          updated[retIdx] = { ...updated[retIdx]!, bookingReference: String(value) };
         }
       }
-      // Copy airline
       if (field === 'airline') {
         const prev = prevValue ?? '';
         if (!ret.airline || ret.airline === prev) {
-          updated[retIdx] = { ...updated[retIdx]!, airline: value };
+          updated[retIdx] = { ...updated[retIdx]!, airline: String(value) };
         }
       }
     }
@@ -251,9 +273,10 @@ function removeSegment(index: number) {
         </FormFieldGroup>
       </div>
 
-      <!-- Flight fields (all flight types use the same standard fields) -->
+      <!-- ═══ Flight fields — compact layout ═══ -->
       <template v-if="isFlightType(seg.type)">
-        <div class="grid grid-cols-2 gap-3">
+        <!-- Row 1: Airline + Flight # -->
+        <div class="grid grid-cols-[1fr_auto] gap-3">
           <BaseCombobox
             :model-value="seg.airline ?? ''"
             :options="airlineOptions"
@@ -269,12 +292,13 @@ function removeSegment(index: number) {
           <FormFieldGroup :label="t('vacation.field.flightNumber')" required>
             <BaseInput
               :model-value="seg.flightNumber ?? ''"
-              :placeholder="t('vacation.field.flightNumber')"
-              class="vacation-teal-input"
+              :placeholder="'e.g. 1842'"
+              class="vacation-teal-input !w-24"
               @update:model-value="updateSegment(idx, 'flightNumber', String($event))"
             />
           </FormFieldGroup>
         </div>
+        <!-- Row 2: From → To airports -->
         <div class="grid grid-cols-2 gap-3">
           <BaseCombobox
             :model-value="seg.departureAirport ?? ''"
@@ -301,8 +325,9 @@ function removeSegment(index: number) {
             @update:model-value="updateSegment(idx, 'arrivalAirport', String($event))"
           />
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureDate')">
+        <!-- Row 3: Date + Dep time + Arr time (+1 day) -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
+          <FormFieldGroup :label="t('form.date')">
             <BaseInput
               type="date"
               :model-value="seg.departureDate ?? ''"
@@ -318,23 +343,32 @@ function removeSegment(index: number) {
               @update:model-value="updateSegment(idx, 'departureTime', String($event))"
             />
           </FormFieldGroup>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.arrivalDate')">
-            <BaseInput
-              type="date"
-              :model-value="seg.arrivalDate ?? ''"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'arrivalDate', String($event))"
-            />
-          </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.arrivalTime')">
-            <BaseInput
-              type="time"
-              :model-value="seg.arrivalTime ?? ''"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'arrivalTime', String($event))"
-            />
+            <div class="flex items-center gap-2">
+              <BaseInput
+                type="time"
+                :model-value="seg.arrivalTime ?? ''"
+                class="vacation-teal-input flex-1"
+                @update:model-value="updateSegment(idx, 'arrivalTime', String($event))"
+              />
+              <label class="flex shrink-0 items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  :checked="seg.arrivesNextDay ?? false"
+                  class="h-3.5 w-3.5 rounded border-gray-300 text-[var(--vacation-teal)] focus:ring-[var(--vacation-teal)]"
+                  @change="
+                    updateSegment(
+                      idx,
+                      'arrivesNextDay',
+                      ($event.target as HTMLInputElement).checked
+                    )
+                  "
+                />
+                <span class="font-outfit text-[10px] font-medium text-gray-500 dark:text-gray-400">
+                  +1 day
+                </span>
+              </label>
+            </div>
           </FormFieldGroup>
         </div>
         <FormFieldGroup :label="t('vacation.field.bookingReference')">
@@ -347,7 +381,7 @@ function removeSegment(index: number) {
         </FormFieldGroup>
       </template>
 
-      <!-- Cruise fields -->
+      <!-- ═══ Cruise fields ═══ -->
       <template v-else-if="seg.type === 'cruise'">
         <div class="grid grid-cols-2 gap-3">
           <BaseCombobox
@@ -394,13 +428,21 @@ function removeSegment(index: number) {
             />
           </FormFieldGroup>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <FormFieldGroup :label="t('vacation.field.embarkationDate')">
             <BaseInput
               type="date"
               :model-value="seg.embarkationDate ?? ''"
               class="vacation-teal-input"
               @update:model-value="updateSegment(idx, 'embarkationDate', String($event))"
+            />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.embarkationTime')">
+            <BaseInput
+              type="time"
+              :model-value="seg.embarkationTime ?? ''"
+              class="vacation-teal-input"
+              @update:model-value="updateSegment(idx, 'embarkationTime', String($event))"
             />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.disembarkationDate')">
@@ -422,21 +464,73 @@ function removeSegment(index: number) {
         </FormFieldGroup>
       </template>
 
-      <!-- Train/Ferry fields -->
+      <!-- ═══ Car fields ═══ -->
+      <template v-else-if="seg.type === 'car'">
+        <FormFieldGroup :label="t('vacation.field.carType')">
+          <TogglePillGroup
+            :model-value="seg.carType ?? ''"
+            :options="carTypeOptions"
+            clearable
+            @update:model-value="updateSegment(idx, 'carType', $event)"
+          />
+        </FormFieldGroup>
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.leavingTime')">
+            <BaseInput
+              type="time"
+              :model-value="seg.leavingTime ?? ''"
+              class="vacation-teal-input"
+              @update:model-value="updateSegment(idx, 'leavingTime', String($event))"
+            />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.carLabel')">
+            <BaseInput
+              :model-value="seg.carLabel ?? ''"
+              placeholder="e.g. Tesla Model Y"
+              class="vacation-teal-input"
+              @update:model-value="updateSegment(idx, 'carLabel', String($event))"
+            />
+          </FormFieldGroup>
+        </div>
+        <FormFieldGroup :label="t('vacation.field.departureDate')">
+          <BaseInput
+            type="date"
+            :model-value="seg.departureDate ?? ''"
+            class="vacation-teal-input"
+            @update:model-value="updateSegment(idx, 'departureDate', String($event))"
+          />
+        </FormFieldGroup>
+      </template>
+
+      <!-- ═══ Train/Ferry fields ═══ -->
       <template v-else-if="isTrainOrFerry(seg.type)">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.operator')">
+          <FormFieldGroup
+            :label="
+              seg.type === 'train' ? t('vacation.field.trainCompany') : t('vacation.field.operator')
+            "
+          >
             <BaseInput
               :model-value="seg.operator ?? ''"
-              :placeholder="t('vacation.field.operator')"
+              :placeholder="
+                seg.type === 'train'
+                  ? t('vacation.field.trainCompany')
+                  : t('vacation.field.operator')
+              "
               class="vacation-teal-input"
               @update:model-value="updateSegment(idx, 'operator', String($event))"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.route')">
+          <FormFieldGroup
+            :label="
+              seg.type === 'train' ? t('vacation.field.trainNumber') : t('vacation.field.route')
+            "
+          >
             <BaseInput
               :model-value="seg.route ?? ''"
-              :placeholder="t('vacation.field.route')"
+              :placeholder="
+                seg.type === 'train' ? t('vacation.field.trainNumber') : t('vacation.field.route')
+              "
               class="vacation-teal-input"
               @update:model-value="updateSegment(idx, 'route', String($event))"
             />
@@ -488,7 +582,7 @@ function removeSegment(index: number) {
         </FormFieldGroup>
       </template>
 
-      <!-- Notes -->
+      <!-- Notes (all types) -->
       <div class="mt-3">
         <FormFieldGroup :label="t('vacation.field.notes')">
           <textarea
@@ -522,9 +616,16 @@ function removeSegment(index: number) {
     <button
       type="button"
       class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+      @click="addSegment('car')"
+    >
+      + 🚗 {{ t('vacation.travel.addCar') }}
+    </button>
+    <button
+      type="button"
+      class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('train')"
     >
-      + 🚂 {{ t('vacation.segment.train') }}
+      + 🚅 {{ t('vacation.segment.train') }}
     </button>
     <button
       type="button"

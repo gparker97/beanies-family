@@ -3,7 +3,13 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { tripTypeEmoji, bookingProgress, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
+import {
+  tripTypeEmoji,
+  bookingProgress,
+  daysUntilTrip,
+  tripCountdownKey,
+  computeAccommodationGaps,
+} from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
 import NookSectionCard from './NookSectionCard.vue';
 
@@ -14,6 +20,9 @@ const { t } = useTranslation();
 const vacation = computed(() => vacationStore.upcomingVacations[0]);
 
 const progress = computed(() => (vacation.value ? bookingProgress(vacation.value) : null));
+const gapCount = computed(() =>
+  vacation.value ? computeAccommodationGaps(vacation.value).length : 0
+);
 const countdown = computed(() =>
   vacation.value?.startDate ? daysUntilTrip(vacation.value.startDate) : null
 );
@@ -42,7 +51,7 @@ function handleClick() {
   >
     <!-- Row 1: Trip name + emoji + date -->
     <div class="flex items-center gap-2.5">
-      <span class="text-xl">{{ tripTypeEmoji(vacation.tripType) }}</span>
+      <span class="text-xl">{{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}</span>
       <div class="min-w-0 flex-1">
         <div class="font-outfit text-sm font-bold text-gray-900 dark:text-gray-100">
           {{ vacation.name }}
@@ -64,6 +73,15 @@ function handleClick() {
       </span>
     </div>
 
+    <!-- Accommodation gap warning -->
+    <div v-if="gapCount > 0" class="mt-2">
+      <span
+        class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--tint-orange-8)] px-2.5 py-0.5 text-[9px] font-semibold text-[var(--heritage-orange)]"
+      >
+        🏨 {{ gapCount }} {{ gapCount === 1 ? 'night' : 'nights' }} unaccommodated
+      </span>
+    </div>
+
     <!-- Row 3: Countdown hero badge -->
     <div
       v-if="countdown !== null && countdown > 0"
@@ -73,8 +91,8 @@ function handleClick() {
         {{ countdown }}
       </span>
       <span class="font-outfit text-[11px] font-semibold text-white/80">
-        {{ t(tripCountdownKey(vacation.tripType) as any) }}!
-        {{ tripTypeEmoji(vacation.tripType) }}
+        {{ t(tripCountdownKey(vacation.tripType, vacation.tripPurpose) as any) }}!
+        {{ tripTypeEmoji(vacation.tripType, vacation.tripPurpose) }}
       </span>
     </div>
   </NookSectionCard>

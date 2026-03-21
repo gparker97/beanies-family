@@ -46,6 +46,7 @@ const showErrors = ref(false);
 // Form data
 const name = ref('');
 const tripType = ref<VacationTripType>('' as VacationTripType);
+const tripPurpose = ref<import('@/types/models').VacationTripPurpose>('vacation');
 const assigneeIds = ref<string[]>([]);
 const travelSegments = ref<VacationTravelSegment[]>([]);
 const accommodations = ref<VacationAccommodation[]>([]);
@@ -56,7 +57,9 @@ const ideas = ref<VacationIdea[]>([]);
 const celebrationOpen = ref(false);
 const savedVacation = ref<FamilyVacation | null>(null);
 
-const celebrationEmoji = computed(() => tripTypeEmoji(savedVacation.value?.tripType));
+const celebrationEmoji = computed(() =>
+  tripTypeEmoji(savedVacation.value?.tripType, savedVacation.value?.tripPurpose)
+);
 const celebrationDateRange = computed(() => {
   const v = savedVacation.value;
   if (!v?.startDate || !v?.endDate) return t('vacation.status.pending');
@@ -112,6 +115,7 @@ watch(
       // Edit mode — populate from existing
       name.value = props.vacation.name;
       tripType.value = props.vacation.tripType;
+      tripPurpose.value = props.vacation.tripPurpose ?? 'vacation';
       assigneeIds.value = [...props.vacation.assigneeIds];
       travelSegments.value = JSON.parse(JSON.stringify(props.vacation.travelSegments));
       accommodations.value = JSON.parse(JSON.stringify(props.vacation.accommodations));
@@ -122,6 +126,7 @@ watch(
       // New mode
       name.value = '';
       tripType.value = '' as VacationTripType;
+      tripPurpose.value = 'vacation';
       assigneeIds.value = props.defaultAssigneeIds ? [...props.defaultAssigneeIds] : [];
       travelSegments.value = [];
       accommodations.value = [];
@@ -164,6 +169,7 @@ async function handleSave() {
       saved = await vacationStore.updateVacation(props.vacation.id, {
         name: name.value.trim(),
         tripType: tripType.value,
+        tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
         assigneeIds: [...assigneeIds.value],
         travelSegments: [...travelSegments.value],
         accommodations: [...accommodations.value],
@@ -174,6 +180,7 @@ async function handleSave() {
       saved = await vacationStore.createVacation({
         name: name.value.trim(),
         tripType: tripType.value,
+        tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
         assigneeIds: [...assigneeIds.value],
         travelSegments: [...travelSegments.value],
         accommodations: [...accommodations.value],
@@ -223,17 +230,8 @@ const saveLabel = computed(() => {
     :save-label="saveLabel"
     :save-disabled="false"
     :is-submitting="isSubmitting"
-    :show-delete="isEditing"
     @close="emit('close')"
     @save="currentStep < 5 ? goNext() : handleSave()"
-    @delete="
-      async () => {
-        if (vacation) {
-          await vacationStore.deleteVacation(vacation.id);
-          emit('close');
-        }
-      }
-    "
   >
     <template #footer-start>
       <div class="flex items-center gap-2">
@@ -307,6 +305,7 @@ const saveLabel = computed(() => {
       v-if="currentStep === 1"
       v-model:name="name"
       v-model:trip-type="tripType"
+      v-model:trip-purpose="tripPurpose"
       v-model:assignee-ids="assigneeIds"
       :show-errors="showErrors"
     />
@@ -315,7 +314,11 @@ const saveLabel = computed(() => {
       v-model:segments="travelSegments"
       :trip-type="tripType"
     />
-    <VacationStep3 v-if="currentStep === 3" v-model:accommodations="accommodations" />
+    <VacationStep3
+      v-if="currentStep === 3"
+      v-model:accommodations="accommodations"
+      :travel-segments="travelSegments"
+    />
     <VacationStep4 v-if="currentStep === 4" v-model:transportation="transportation" />
     <VacationStep5
       v-if="currentStep === 5"
@@ -363,7 +366,7 @@ const saveLabel = computed(() => {
       <div v-if="celebrationCountdown" class="mb-4">
         <span class="cele-countdown">
           {{ celebrationEmoji }} {{ celebrationCountdown }}
-          {{ t(tripCountdownKey(savedVacation?.tripType) as any) }}
+          {{ t(tripCountdownKey(savedVacation?.tripType, savedVacation?.tripPurpose) as any) }}
         </span>
       </div>
 

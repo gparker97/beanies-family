@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { FamilyVacation } from '@/types/models';
-import { bookingProgress, daysUntilTrip, tripTypeEmoji, tripCountdownKey } from '@/utils/vacation';
+import {
+  bookingProgress,
+  daysUntilTrip,
+  tripTypeEmoji,
+  tripCountdownKey,
+  computeAccommodationGaps,
+} from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -12,7 +18,7 @@ defineEmits<{ click: [] }>();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 
-const emoji = computed(() => tripTypeEmoji(props.vacation.tripType));
+const emoji = computed(() => tripTypeEmoji(props.vacation.tripType, props.vacation.tripPurpose));
 const progress = computed(() => bookingProgress(props.vacation));
 const days = computed(() =>
   props.vacation.startDate ? daysUntilTrip(props.vacation.startDate) : null
@@ -28,6 +34,7 @@ const assignees = computed(() =>
     .filter(Boolean)
 );
 const unbookedCount = computed(() => progress.value.total - progress.value.booked);
+const gapCount = computed(() => computeAccommodationGaps(props.vacation).length);
 </script>
 
 <template>
@@ -63,7 +70,8 @@ const unbookedCount = computed(() => progress.value.total - progress.value.booke
         class="inline-flex items-center rounded-lg px-2.5 py-0.5 text-[10px] font-bold text-white"
         style="background: linear-gradient(135deg, var(--vacation-teal), #0096c7)"
       >
-        {{ emoji }} {{ days }} {{ t(tripCountdownKey(vacation.tripType) as any) }}!
+        {{ emoji }} {{ days }}
+        {{ t(tripCountdownKey(vacation.tripType, vacation.tripPurpose) as any) }}!
       </span>
       <span v-else />
       <div class="flex items-center">
@@ -92,12 +100,19 @@ const unbookedCount = computed(() => progress.value.total - progress.value.booke
       >
     </div>
 
-    <!-- Alert row -->
-    <div v-if="unbookedCount > 0" class="mt-2">
+    <!-- Alert rows -->
+    <div v-if="unbookedCount > 0 || gapCount > 0" class="mt-2 flex flex-wrap gap-1.5">
       <span
+        v-if="unbookedCount > 0"
         class="inline-flex items-center rounded-lg bg-[var(--vacation-gold-tint)] px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-300"
       >
         ⏳ {{ unbookedCount }} {{ unbookedCount === 1 ? 'item needs' : 'items need' }} booking
+      </span>
+      <span
+        v-if="gapCount > 0"
+        class="inline-flex items-center rounded-lg bg-[var(--tint-orange-8)] px-2 py-0.5 text-[10px] font-semibold text-[var(--heritage-orange)]"
+      >
+        🏨 {{ gapCount }} {{ gapCount === 1 ? 'night' : 'nights' }} unaccommodated
       </span>
     </div>
   </div>

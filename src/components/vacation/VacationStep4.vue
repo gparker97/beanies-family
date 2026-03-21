@@ -28,13 +28,11 @@ const transportTypes: { type: VacationTransportationType; emoji: string; key: st
   { type: 'airport_shuttle', emoji: '🚐', key: 'airport_shuttle' },
   { type: 'rental_car', emoji: '🚗', key: 'rental_car' },
   { type: 'taxi_rideshare', emoji: '🚕', key: 'taxi_rideshare' },
-  { type: 'train', emoji: '🚂', key: 'train' },
+  { type: 'train', emoji: '🚅', key: 'train' },
   { type: 'bus', emoji: '🚌', key: 'bus' },
 ];
 
 const statusOptions: { value: VacationSegmentStatus; key: string }[] = [
-  { value: 'not_booked', key: 'vacation.status.not_booked' },
-  { value: 'researching', key: 'vacation.status.researching' },
   { value: 'pending', key: 'vacation.status.pending' },
   { value: 'booked', key: 'vacation.status.booked' },
 ];
@@ -43,7 +41,7 @@ const emojiMap: Record<VacationTransportationType, string> = {
   airport_shuttle: '🚐',
   rental_car: '🚗',
   taxi_rideshare: '🚕',
-  train: '🚂',
+  train: '🚅',
   bus: '🚌',
 };
 
@@ -56,7 +54,7 @@ function addItem(type: VacationTransportationType) {
     id: generateUUID(),
     type,
     title: t(`vacation.transport.${type}` as any),
-    status: 'not_booked',
+    status: 'pending',
   };
   emit('update:transportation', [...props.transportation, item]);
 }
@@ -87,7 +85,7 @@ function updateItem(index: number, field: keyof VacationTransportation, value: s
 function updateStatus(index: number, value: string) {
   const current = props.transportation[index]!;
   if (current.status === value) {
-    updateItem(index, 'status', 'not_booked');
+    updateItem(index, 'status', 'pending');
   } else {
     updateItem(index, 'status', value);
   }
