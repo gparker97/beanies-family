@@ -2,17 +2,20 @@
 import { computed, ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
-import { formatDateShort, addHourToTime } from '@/utils/date';
+import { addHourToTime } from '@/utils/date';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
-import { AIRLINES } from '@/constants/airlines';
-import { AIRPORTS } from '@/constants/airports';
-import { CRUISE_LINES } from '@/constants/cruiseLines';
-import { CRUISE_SHIPS } from '@/constants/cruiseShips';
-import { CRUISE_PORTS } from '@/constants/cruisePorts';
+import {
+  buildAirlineOptions,
+  buildAirportOptions,
+  buildCruiseLineOptions,
+  buildCruiseShipOptions,
+  buildCruisePortOptions,
+} from '@/utils/vacation';
+import { buildTravelKeyValue } from '@/composables/useVacationTimeline';
 import type {
   VacationTravelSegment,
   VacationTravelType,
@@ -60,42 +63,10 @@ const statusOptions = computed(() => [
   { value: 'researching', label: t('vacation.status.researching') },
 ]);
 
-const airlineOptions = computed(() =>
-  AIRLINES.map((a) => ({
-    value: `${a.name} (${a.code})`,
-    label: `${a.name} (${a.code})`,
-  }))
-);
-
-const airportOptions = computed(() =>
-  AIRPORTS.map((a) => ({
-    value: `${a.city} (${a.code})`,
-    label: `${a.city} - ${a.name} (${a.code})`,
-  }))
-);
-
-const cruiseLineOptions = computed(() =>
-  CRUISE_LINES.map((c) => ({
-    value: c.name,
-    label: `${c.name} (${c.shortName})`,
-  }))
-);
-
-// Filter ships by selected cruise line when available
-function cruiseShipOptions(cruiseLine?: string) {
-  const ships = cruiseLine ? CRUISE_SHIPS.filter((s) => s.cruiseLine === cruiseLine) : CRUISE_SHIPS;
-  return ships.map((s) => ({
-    value: s.name,
-    label: cruiseLine ? s.name : `${s.name} — ${s.cruiseLine}`,
-  }));
-}
-
-const cruisePortOptions = computed(() =>
-  CRUISE_PORTS.map((p) => ({
-    value: `${p.city} — ${p.name}`,
-    label: `${p.city} — ${p.name}, ${p.country}`,
-  }))
-);
+const airlineOptions = computed(() => buildAirlineOptions());
+const airportOptions = computed(() => buildAirportOptions());
+const cruiseLineOptions = computed(() => buildCruiseLineOptions());
+const cruisePortOptions = computed(() => buildCruisePortOptions());
 
 const sortedSegments = computed(() =>
   [...props.segments]
@@ -112,38 +83,13 @@ function segmentIcon(type: VacationTravelType): string {
   return segmentIcons[type] || '✈️';
 }
 
+// buildKeyValue delegates to the shared composable function
 function buildKeyValue(seg: VacationTravelSegment): string {
-  const parts: string[] = [];
-  // Flight: show airline code + flight#, route, departure time
-  if (isFlightType(seg.type)) {
-    if (seg.airline) {
-      const codeMatch = seg.airline.match(/\(([A-Z0-9]{2})\)/);
-      const code = codeMatch ? codeMatch[1] : seg.airline.split(' ')[0];
-      parts.push(seg.flightNumber ? `${code} ${seg.flightNumber}` : code!);
-    }
-    if (seg.departureAirport && seg.arrivalAirport) {
-      const from = seg.departureAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.departureAirport;
-      const to = seg.arrivalAirport.match(/\(([A-Z]{3})\)/)?.[1] ?? seg.arrivalAirport;
-      parts.push(`${from}→${to}`);
-    }
-    if (seg.departureDate) parts.push(formatDateShort(seg.departureDate).toLowerCase());
-    if (seg.departureTime) parts.push(seg.departureTime);
-  }
-  // Cruise: line + ship, embarkation date
-  else if (seg.type === 'cruise') {
-    if (seg.cruiseLine) parts.push(seg.cruiseLine);
-    if (seg.shipName) parts.push(seg.shipName);
-    if (seg.embarkationDate) parts.push(formatDateShort(seg.embarkationDate).toLowerCase());
-  }
-  // Train/Ferry: operator, route, departure
-  else {
-    if (seg.operator) parts.push(seg.operator);
-    if (seg.route) parts.push(seg.route);
-    if (seg.departureDate) parts.push(formatDateShort(seg.departureDate).toLowerCase());
-    if (seg.departureTime) parts.push(seg.departureTime);
-  }
-  return parts.join(' · ');
+  return buildTravelKeyValue(seg);
 }
+
+// Alias shared cruise ship builder (template calls it as a function with cruiseLine arg)
+const cruiseShipOptions = buildCruiseShipOptions;
 
 function isFlightType(type: VacationTravelType): boolean {
   return type === 'flight_outbound' || type === 'flight_return' || type === 'flight_other';

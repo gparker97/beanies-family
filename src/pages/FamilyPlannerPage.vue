@@ -27,7 +27,6 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
 import VacationSidebarCard from '@/components/vacation/VacationSidebarCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
-import VacationViewModal from '@/components/vacation/VacationViewModal.vue';
 import CreatedConfirmModal from '@/components/ui/CreatedConfirmModal.vue';
 import type { ConfirmDetail } from '@/components/ui/CreatedConfirmModal.vue';
 import type {
@@ -58,7 +57,7 @@ const {
   handleScopedSave,
 } = useActivityScopeEdit();
 
-// Open activity view modal from query param (e.g. /planner?activity=abc)
+// Open activity view modal from query param (e.g. /activities?activity=abc)
 onMounted(() => {
   const activityId = route.query.activity as string | undefined;
   if (activityId) {
@@ -115,10 +114,6 @@ const vacationWizardDefaults = ref<{ assigneeIds: string[]; date: string }>({
 const editingVacation = ref<import('@/types/models').FamilyVacation | null>(null);
 const editVacationStep = ref<number | undefined>(undefined);
 
-// Vacation view modal state
-const showVacationView = ref(false);
-const viewingVacationId = ref<string | undefined>(undefined);
-
 function handleStartVacationWizard(defaults: { assigneeIds: string[]; date: string }) {
   showModal.value = false;
   vacationWizardDefaults.value = defaults;
@@ -128,15 +123,7 @@ function handleStartVacationWizard(defaults: { assigneeIds: string[]; date: stri
 }
 
 function handleVacationClick(id: string) {
-  viewingVacationId.value = id;
-  showVacationView.value = true;
-}
-
-function handleVacationEdit(vacation: import('@/types/models').FamilyVacation, step?: number) {
-  showVacationView.value = false;
-  editingVacation.value = vacation;
-  editVacationStep.value = step;
-  showVacationWizard.value = true;
+  router.push({ path: '/travel', query: { vacation: id } });
 }
 
 const headerSubtitle = computed(() => {
@@ -601,14 +588,6 @@ function handleActivitySwapped(newId: string) {
       "
     />
 
-    <!-- Vacation view modal -->
-    <VacationViewModal
-      :open="showVacationView"
-      :vacation-id="viewingVacationId"
-      @close="showVacationView = false"
-      @edit="handleVacationEdit"
-    />
-
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodo = null" />
 
     <ActivityViewEditModal
@@ -617,7 +596,6 @@ function handleActivitySwapped(newId: string) {
       @close="viewingActivity = null"
       @open-edit="handleViewOpenEdit"
       @activity-swapped="handleActivitySwapped"
-      @open-vacation="handleVacationClick"
     />
 
     <!-- Activity Created Confirmation -->

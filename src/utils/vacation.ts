@@ -1,4 +1,9 @@
 import { parseLocalDate, extractDatePart } from '@/utils/date';
+import { AIRLINES } from '@/constants/airlines';
+import { AIRPORTS } from '@/constants/airports';
+import { CRUISE_LINES } from '@/constants/cruiseLines';
+import { CRUISE_SHIPS } from '@/constants/cruiseShips';
+import { CRUISE_PORTS } from '@/constants/cruisePorts';
 import type {
   FamilyVacation,
   VacationTripType,
@@ -97,4 +102,47 @@ export function tripDurationDays(start: string, end: string): number {
   const startDate = parseLocalDate(extractDatePart(start));
   const endDate = parseLocalDate(extractDatePart(end));
   return Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+}
+
+// ── Combobox option builders (shared by VacationStep2 + edit modals) ────────
+
+export interface ComboOption {
+  value: string;
+  label: string;
+}
+
+export function buildAirlineOptions(): ComboOption[] {
+  return AIRLINES.map((a) => ({
+    value: `${a.name} (${a.code})`,
+    label: `${a.name} (${a.code})`,
+  }));
+}
+
+export function buildAirportOptions(): ComboOption[] {
+  return AIRPORTS.map((a) => ({
+    value: `${a.city} (${a.code})`,
+    label: `${a.city} - ${a.name} (${a.code})`,
+  }));
+}
+
+export function buildCruiseLineOptions(): ComboOption[] {
+  return CRUISE_LINES.map((c) => ({
+    value: c.name,
+    label: `${c.name} (${c.shortName})`,
+  }));
+}
+
+export function buildCruiseShipOptions(cruiseLine?: string): ComboOption[] {
+  const ships = cruiseLine ? CRUISE_SHIPS.filter((s) => s.cruiseLine === cruiseLine) : CRUISE_SHIPS;
+  return ships.map((s) => ({
+    value: s.name,
+    label: cruiseLine ? s.name : `${s.name} — ${s.cruiseLine}`,
+  }));
+}
+
+export function buildCruisePortOptions(): ComboOption[] {
+  return CRUISE_PORTS.map((p) => ({
+    value: `${p.city} — ${p.name}`,
+    label: `${p.city} — ${p.name}, ${p.country}`,
+  }));
 }

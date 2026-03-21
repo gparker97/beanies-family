@@ -31,9 +31,15 @@ export const NAV_ITEMS: NavItemDef[] = [
     section: 'treehouse',
   },
   {
-    labelKey: 'nav.planner',
-    path: '/planner',
+    labelKey: 'nav.activities',
+    path: '/activities',
     emoji: '\u{1F4C5}',
+    section: 'treehouse',
+  },
+  {
+    labelKey: 'nav.travel',
+    path: '/travel',
+    emoji: '\u2708\uFE0F',
     section: 'treehouse',
   },
   { labelKey: 'nav.todo', path: '/todo', emoji: '\u2705', section: 'treehouse' },
@@ -79,7 +85,8 @@ export interface MobileTabDef {
 export const MOBILE_TAB_ITEMS: MobileTabDef[] = [
   { labelKey: 'mobile.nook', path: '/nook', emoji: '\u{1F3E1}' },
   { labelKey: 'mobile.todo', path: '/todo', emoji: '\u2705' },
-  { labelKey: 'mobile.planner', path: '/planner', emoji: '\u{1F4C5}' },
+  { labelKey: 'mobile.activities', path: '/activities', emoji: '\u{1F4C5}' },
+  { labelKey: 'mobile.travel', path: '/travel', emoji: '\u2708\uFE0F' },
   { labelKey: 'mobile.piggyBank', path: '/dashboard', emoji: '\u{1F437}' },
   { labelKey: 'mobile.pod', path: '/family', emoji: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}' },
 ];

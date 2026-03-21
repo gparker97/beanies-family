@@ -841,7 +841,7 @@ function handleDelete() {
                 class="hover:text-primary-500 ml-auto text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
                 @click="
                   emit('close');
-                  router.push({ path: '/planner', query: { activity: activityId } });
+                  router.push({ path: '/activities', query: { activity: activityId } });
                 "
               >
                 {{ t('action.view') }} &rarr;

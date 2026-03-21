@@ -39,10 +39,10 @@ describe('MobileBottomNav', () => {
     mockRoute.path = '/nook';
   });
 
-  it('renders 5 navigation tabs', () => {
+  it('renders 6 navigation tabs', () => {
     const wrapper = mount(MobileBottomNav);
     const buttons = wrapper.findAll('button');
-    expect(buttons).toHaveLength(5);
+    expect(buttons).toHaveLength(6);
   });
 
   it('highlights active tab based on current route', () => {
@@ -75,7 +75,8 @@ describe('MobileBottomNav', () => {
     const wrapper = mount(MobileBottomNav);
     expect(wrapper.text()).toContain('mobile.nook');
     expect(wrapper.text()).toContain('mobile.todo');
-    expect(wrapper.text()).toContain('mobile.planner');
+    expect(wrapper.text()).toContain('mobile.activities');
+    expect(wrapper.text()).toContain('mobile.travel');
     expect(wrapper.text()).toContain('mobile.piggyBank');
     expect(wrapper.text()).toContain('mobile.pod');
   });
@@ -85,8 +86,8 @@ describe('MobileBottomNav', () => {
     const wrapper = mount(MobileBottomNav);
     const buttons = wrapper.findAll('button');
 
-    // Fourth tab (Piggy Bank → /dashboard) should be active for /dashboard/accounts
-    const piggyPill = buttons[3]!.find('div');
+    // Fifth tab (Piggy Bank → /dashboard) should be active for /dashboard/accounts
+    const piggyPill = buttons[4]!.find('div');
     expect(piggyPill.classes()).toContain('bg-[rgba(241,93,34,0.08)]');
   });
 });

@@ -89,10 +89,16 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.nook', requiresAuth: true },
   },
   {
-    path: '/planner',
-    name: 'Planner',
+    path: '/activities',
+    name: 'Activities',
     component: () => import('@/pages/FamilyPlannerPage.vue'),
-    meta: { titleKey: 'nav.planner', requiresAuth: true },
+    meta: { titleKey: 'nav.activities', requiresAuth: true },
+  },
+  {
+    path: '/travel',
+    name: 'Travel',
+    component: () => import('@/pages/TravelPlansPage.vue'),
+    meta: { titleKey: 'nav.travel', requiresAuth: true },
   },
   {
     path: '/todo',

@@ -48,7 +48,6 @@ const emit = defineEmits<{
   deleted: [id: string];
   'open-edit': [activity: FamilyActivity];
   'activity-swapped': [newId: string];
-  'open-vacation': [vacationId: string];
 }>();
 
 const { t, isBeanieMode } = useTranslation();
@@ -319,9 +318,9 @@ watch(
     effectiveTargetId.value = null;
     showReschedule.value = false;
 
-    // Vacation guard: redirect to vacation modal instead
+    // Vacation guard: redirect to travel page instead
     if (newActivity?.vacationId) {
-      emit('open-vacation', newActivity.vacationId);
+      router.push({ path: '/travel', query: { vacation: newActivity.vacationId } });
       emit('close');
     }
   }

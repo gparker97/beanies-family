@@ -240,7 +240,10 @@ function handleClick(item: ScheduleItem) {
             {{ t('nook.thisWeek') }}
           </span>
         </div>
-        <router-link to="/planner" class="text-primary-500 text-xs font-semibold hover:underline">
+        <router-link
+          to="/activities"
+          class="text-primary-500 text-xs font-semibold hover:underline"
+        >
           {{ t('nook.fullCalendar') }} &rarr;
         </router-link>
       </div>
@@ -280,7 +283,7 @@ function handleClick(item: ScheduleItem) {
         </div>
         <router-link
           v-if="hasMoreWeekItems"
-          to="/planner"
+          to="/activities"
           class="text-primary-500 font-outfit mt-1 block text-center text-xs font-semibold hover:underline"
         >
           +{{ hiddenWeekCount }} {{ t('nook.moreItems') }} &rarr;

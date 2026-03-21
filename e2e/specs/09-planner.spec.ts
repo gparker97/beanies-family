@@ -23,8 +23,8 @@ test.describe('Family Planner', () => {
     await bypassLoginIfNeeded(page);
 
     // Navigate to planner (defaults to week view)
-    await page.goto('/planner');
-    await page.waitForURL('/planner');
+    await page.goto('/activities');
+    await page.waitForURL('/activities');
   }
 
   /** Switch to month view by clicking the Month toggle button. */

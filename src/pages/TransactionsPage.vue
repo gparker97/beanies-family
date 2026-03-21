@@ -374,7 +374,7 @@ function showCreatedConfirmation(opts: {
 
 function handleViewActivity(activityId: string) {
   viewingTransaction.value = null;
-  router.push({ path: '/planner', query: { activity: activityId } });
+  router.push({ path: '/activities', query: { activity: activityId } });
 }
 
 function handleViewLoan(loanId: string) {
