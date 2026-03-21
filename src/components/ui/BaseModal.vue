@@ -111,6 +111,7 @@ onUnmounted(() => {
                 ? 'h-full max-h-full rounded-none'
                 : ['max-h-[calc(100vh-2rem)] rounded-3xl', sizeClasses[size]]
             "
+            @click.stop
           >
             <!-- Header -->
             <div

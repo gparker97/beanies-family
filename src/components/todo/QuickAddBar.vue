@@ -92,7 +92,7 @@ function handleKeydown(e: KeyboardEvent) {
           />
           <span
             v-if="!dueDate && !dateInputFocused"
-            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-3 text-sm font-semibold text-[var(--color-text)]"
+            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-2 text-sm font-semibold text-[var(--color-text)]"
           >
             {{ t('todo.selectDueDate') }}
           </span>
@@ -106,9 +106,9 @@ function handleKeydown(e: KeyboardEvent) {
     </div>
 
     <!-- Row 2: Date + Assignee on same line (mobile only) -->
-    <div class="flex items-center gap-2 sm:hidden">
+    <div class="grid grid-cols-2 gap-2 sm:hidden">
       <div
-        class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
+        class="flex items-center gap-1.5 rounded-2xl px-3 transition-colors"
         :class="dueDate ? 'bg-[var(--tint-orange-8)]' : ''"
         :style="!dueDate ? 'background: var(--tint-slate-5)' : undefined"
       >
@@ -126,13 +126,18 @@ function handleKeydown(e: KeyboardEvent) {
           />
           <span
             v-if="!dueDate && !dateInputFocused"
-            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-1 text-xs font-semibold text-[var(--color-text)]"
+            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-2 text-xs font-semibold text-[var(--color-text)]"
           >
             {{ t('todo.selectDueDate') }}
           </span>
         </div>
       </div>
-      <AssigneePickerButton v-model="assigneeIds" size="sm" />
+      <div class="flex items-center gap-1.5">
+        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] opacity-35">
+          {{ t('todo.who') }}
+        </span>
+        <AssigneePickerButton v-model="assigneeIds" size="sm" class="flex-1" />
+      </div>
     </div>
   </div>
 </template>
