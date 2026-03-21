@@ -909,11 +909,16 @@ onUnmounted(() => {
 
         <p class="reveal">
           So I did, and I fiddled with those fickle banking connectors that sync your transactions,
-          but always fail. Then they ask for your credentials 10 times in a row, and proceed to not
-          work anyway. They ask you to upload CSVs, then say they can't read them. Lots of my
-          important transactions were in cash or paid on cards. Some banks and cards don't provide
-          reliable APIs. When things did work (rarely) it was temporary and only tracked what you
-          <em>did</em> spend, not what you <em>planned</em> to spend.
+          but always fail. They ask for your online banking credentials 10 times in a row, and
+          proceed to not work anyway. Lots of my important transactions were in cash or paid on
+          cards. Some banks and cards don't provide reliable APIs. When things did work, it was
+          temporary and only tracked what you <em>did</em> spend, not what you <em>planned</em> to
+          spend.
+        </p>
+
+        <p class="reveal">
+          Well, at least I didn't divulge the secret key for all my bank accounts to some nameless
+          software corporation. Wait... nevermind.
         </p>
 
         <p class="reveal">
