@@ -158,12 +158,12 @@ function handleSave() {
       </FormFieldGroup>
 
       <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
+      <FormFieldGroup :label="t('vacation.field.title')" required>
         <BaseInput v-model="title" />
       </FormFieldGroup>
 
       <!-- Description -->
-      <FormFieldGroup :label="t('vacation.field.description')" :optional="true">
+      <FormFieldGroup :label="t('vacation.field.description')">
         <textarea
           v-model="description"
           :placeholder="t('vacation.ideas.descriptionPlaceholder')"
@@ -174,16 +174,16 @@ function handleSave() {
 
       <!-- Date + Location -->
       <div class="grid grid-cols-2 gap-3">
-        <FormFieldGroup :label="t('vacation.ideas.whichDay')" :optional="true">
+        <FormFieldGroup :label="t('vacation.ideas.whichDay')">
           <BaseInput v-model="suggestedDate" type="date" />
         </FormFieldGroup>
-        <FormFieldGroup :label="t('vacation.field.location')" :optional="true">
+        <FormFieldGroup :label="t('vacation.field.location')">
           <BaseInput v-model="location" placeholder="e.g. Downtown, Beach..." />
         </FormFieldGroup>
       </div>
 
       <!-- Link -->
-      <FormFieldGroup :label="t('vacation.field.link')" :optional="true">
+      <FormFieldGroup :label="t('vacation.field.link')">
         <div class="flex items-center gap-2">
           <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
           <a
@@ -228,7 +228,7 @@ function handleSave() {
             font-size="0.95rem"
           />
         </FormFieldGroup>
-        <FormFieldGroup :label="t('vacation.ideas.duration')" :optional="true">
+        <FormFieldGroup :label="t('vacation.ideas.duration')">
           <div class="flex flex-wrap gap-1.5">
             <button
               v-for="dur in durations"
@@ -249,7 +249,7 @@ function handleSave() {
       </div>
 
       <!-- Booking needed -->
-      <FormFieldGroup :label="t('vacation.ideas.bookingNeeded')" :optional="true">
+      <FormFieldGroup :label="t('vacation.ideas.bookingNeeded')">
         <div class="flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -279,7 +279,7 @@ function handleSave() {
       </FormFieldGroup>
 
       <!-- Notes -->
-      <FormFieldGroup :label="t('vacation.field.notes')" :optional="true">
+      <FormFieldGroup :label="t('vacation.field.notes')">
         <textarea
           v-model="notes"
           :placeholder="t('vacation.field.notesPlaceholder')"

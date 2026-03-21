@@ -91,11 +91,6 @@ const hintMap = computed(() =>
 );
 
 /** Which hint tooltip is currently expanded */
-const expandedHintId = ref<string | null>(null);
-
-function toggleHint(id: string) {
-  expandedHintId.value = expandedHintId.value === id ? null : id;
-}
 
 const mergedTimeline = computed<TimelineEntry[]>(() => {
   const entries: TimelineEntry[] = [];
@@ -372,7 +367,7 @@ function addQuickIdea() {
       <PageHeader icon="airplane" :title="t('travel.title')" :subtitle="t('travel.subtitle')">
         <button
           type="button"
-          class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
+          class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
           @click="startWizard"
         >
           {{ t('travel.planATrip') }} 🌴
@@ -556,7 +551,7 @@ function addQuickIdea() {
           </p>
           <button
             type="button"
-            class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
+            class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
             @click="startWizard"
           >
             {{ t('travel.planATrip') }} 🌴
@@ -602,7 +597,7 @@ function addQuickIdea() {
               </button>
               <button
                 type="button"
-                class="font-outfit inline-flex items-center justify-center rounded-full border-[1.5px] border-white/10 bg-white/6 px-2.5 py-1.5 text-xs text-white/40 transition-all hover:border-red-400/30 hover:bg-red-500/15 hover:text-red-300"
+                class="font-outfit inline-flex items-center justify-center rounded-full border-[1.5px] border-white/20 bg-white/10 px-2.5 py-1.5 text-xs text-white/60 transition-all hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-200"
                 :title="t('vacation.deleteTitle')"
                 @click="deleteTrip"
               >
@@ -802,12 +797,10 @@ function addQuickIdea() {
                     show-edit
                     deletable
                     :hint="hintMap.get(item.id)?.message"
-                    :hint-expanded="expandedHintId === item.id"
                     @update:title="saveInlineField(item, 'title', $event)"
                     @update:collapsed="setCollapsed(item.id, $event)"
                     @edit="openEditModal(item)"
                     @delete="deleteTimelineItem(item)"
-                    @toggle-hint="toggleHint(item.id)"
                   >
                     <!-- Detail rows — divided, compact, inline-editable with pencil -->
                     <div class="divide-y divide-gray-100 dark:divide-slate-700/40" @click.stop>
@@ -859,20 +852,19 @@ function addQuickIdea() {
                           </span>
                         </div>
 
-                        <!-- Map link (address — editable + map icon) -->
-                        <div v-else-if="row.mapLink" class="flex min-w-0 items-center gap-1.5">
-                          <span class="truncate text-sm text-gray-900 dark:text-gray-100">
+                        <!-- Map link (entire row clickable) -->
+                        <a
+                          v-else-if="row.mapLink"
+                          :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="flex min-w-0 items-center gap-1.5"
+                        >
+                          <span class="truncate text-sm text-[#00B4D8] hover:underline">
                             {{ row.value }}
                           </span>
-                          <a
-                            :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="shrink-0 text-xs opacity-40 hover:opacity-70"
-                          >
-                            📍
-                          </a>
-                        </div>
+                          <span class="shrink-0 text-xs opacity-40">📍</span>
+                        </a>
 
                         <!-- Clickable link -->
                         <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">

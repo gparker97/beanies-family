@@ -74,7 +74,6 @@ export const transportIcons: Record<string, string> = {
   airport_shuttle: '🚐',
   rental_car: '🚗',
   taxi_rideshare: '🚕',
-  train: '🚅',
   bus: '🚌',
 };
 
@@ -144,18 +143,21 @@ export function buildTravelKeyValue(seg: {
   return p.join(' · ');
 }
 
-/** Build detail rows for a travel segment — each field gets its own editable row */
+/**
+ * Build detail rows for a travel segment.
+ * Inline editing only for: dates, times, flight #, cabin #, car label, description, duration, notes.
+ * Dropdown/selection fields (airline, airports, cruise line/ship/port, car type): read-only.
+ * Location/address fields: mapLink (opens maps). Link fields: isLink (clickable URL).
+ */
 export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
   if (isF) {
-    if (seg.airline) rows.push({ label: 'airline', value: seg.airline, field: 'airline' });
+    if (seg.airline) rows.push({ label: 'airline', value: seg.airline });
     if (seg.flightNumber)
       rows.push({ label: 'flight #', value: seg.flightNumber, field: 'flightNumber' });
-    if (seg.departureAirport)
-      rows.push({ label: 'from', value: seg.departureAirport, field: 'departureAirport' });
-    if (seg.arrivalAirport)
-      rows.push({ label: 'to', value: seg.arrivalAirport, field: 'arrivalAirport' });
+    if (seg.departureAirport) rows.push({ label: 'from', value: seg.departureAirport });
+    if (seg.arrivalAirport) rows.push({ label: 'to', value: seg.arrivalAirport });
     if (seg.departureDate)
       rows.push({
         label: 'date',
@@ -172,17 +174,15 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
       });
     if (seg.arrivalTime)
       rows.push({
-        label: 'arrives',
+        label: seg.arrivesNextDay ? 'arrives (+1)' : 'arrives',
         value: seg.arrivalTime,
         field: 'arrivalTime',
         inputType: 'time',
       });
   } else if (seg.type === 'cruise') {
-    if (seg.cruiseLine)
-      rows.push({ label: 'cruise line', value: seg.cruiseLine, field: 'cruiseLine' });
-    if (seg.shipName) rows.push({ label: 'ship', value: seg.shipName, field: 'shipName' });
-    if (seg.departurePort)
-      rows.push({ label: 'port', value: seg.departurePort, field: 'departurePort' });
+    if (seg.cruiseLine) rows.push({ label: 'cruise line', value: seg.cruiseLine });
+    if (seg.shipName) rows.push({ label: 'ship', value: seg.shipName });
+    if (seg.departurePort) rows.push({ label: 'port', value: seg.departurePort });
     if (seg.cabinNumber)
       rows.push({ label: 'cabin', value: seg.cabinNumber, field: 'cabinNumber' });
     if (seg.embarkationDate)
@@ -207,7 +207,7 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
         inputType: 'date',
       });
   } else if (seg.type === 'car') {
-    if (seg.carType) rows.push({ label: 'car type', value: seg.carType, field: 'carType' });
+    if (seg.carType) rows.push({ label: 'car type', value: seg.carType.replace(/_/g, ' ') });
     if (seg.carLabel) rows.push({ label: 'car', value: seg.carLabel, field: 'carLabel' });
     if (seg.departureDate)
       rows.push({
@@ -242,12 +242,10 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
     if (seg.link) rows.push({ label: 'link', value: seg.link, isLink: true });
   } else {
     // Train / Ferry
-    if (seg.operator) rows.push({ label: 'operator', value: seg.operator, field: 'operator' });
-    if (seg.route) rows.push({ label: 'route', value: seg.route, field: 'route' });
-    if (seg.departureStation)
-      rows.push({ label: 'from', value: seg.departureStation, field: 'departureStation' });
-    if (seg.arrivalStation)
-      rows.push({ label: 'to', value: seg.arrivalStation, field: 'arrivalStation' });
+    if (seg.operator) rows.push({ label: 'operator', value: seg.operator });
+    if (seg.route) rows.push({ label: 'route', value: seg.route });
+    if (seg.departureStation) rows.push({ label: 'from', value: seg.departureStation });
+    if (seg.arrivalStation) rows.push({ label: 'to', value: seg.arrivalStation });
     if (seg.departureDate)
       rows.push({
         label: 'date',
@@ -307,9 +305,8 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       const acc = v.accommodations[i]!;
       const date = acc.checkInDate || '';
       const rows: DetailRow[] = [];
-      if (acc.name) rows.push({ label: 'name', value: acc.name, field: 'name' });
-      if (acc.address)
-        rows.push({ label: 'address', value: acc.address, field: 'address', mapLink: true });
+      if (acc.name) rows.push({ label: 'name', value: acc.name });
+      if (acc.address) rows.push({ label: 'address', value: acc.address, mapLink: true });
       if (acc.checkInDate)
         rows.push({
           label: 'check-in',
@@ -324,7 +321,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
           field: 'checkOutDate',
           inputType: 'date',
         });
-      if (acc.roomType) rows.push({ label: 'room', value: acc.roomType, field: 'roomType' });
+      if (acc.roomType) rows.push({ label: 'room', value: acc.roomType });
       if (acc.confirmationNumber)
         rows.push({ label: 'confirmation', value: acc.confirmationNumber, copyable: true });
       if (acc.contactPhone)
@@ -358,22 +355,13 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       const trans = v.transportation[i]!;
       const date = trans.pickupDate || trans.departureDate || '';
       const rows: DetailRow[] = [];
-      if (trans.agencyName)
-        rows.push({ label: 'company', value: trans.agencyName, field: 'agencyName' });
+      if (trans.agencyName) rows.push({ label: 'company', value: trans.agencyName });
       if (trans.agencyAddress)
-        rows.push({
-          label: 'address',
-          value: trans.agencyAddress,
-          field: 'agencyAddress',
-          mapLink: true,
-        });
-      if (trans.operator)
-        rows.push({ label: 'operator', value: trans.operator, field: 'operator' });
-      if (trans.route) rows.push({ label: 'route', value: trans.route, field: 'route' });
-      if (trans.departureStation)
-        rows.push({ label: 'from', value: trans.departureStation, field: 'departureStation' });
-      if (trans.arrivalStation)
-        rows.push({ label: 'to', value: trans.arrivalStation, field: 'arrivalStation' });
+        rows.push({ label: 'address', value: trans.agencyAddress, mapLink: true });
+      if (trans.operator) rows.push({ label: 'operator', value: trans.operator });
+      if (trans.route) rows.push({ label: 'route', value: trans.route });
+      if (trans.departureStation) rows.push({ label: 'from', value: trans.departureStation });
+      if (trans.arrivalStation) rows.push({ label: 'to', value: trans.arrivalStation });
       if (trans.pickupDate)
         rows.push({
           label: 'pickup date',
@@ -432,7 +420,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         } else if (trans.pickupDate) {
           kvParts.push(formatDateShort(trans.pickupDate).toLowerCase());
         }
-      } else if (trans.type === 'train' || trans.type === 'bus') {
+      } else if (trans.type === 'bus') {
         if (trans.departureDate) {
           const datePart = formatDateShort(trans.departureDate).toLowerCase();
           kvParts.push(trans.departureTime ? `${datePart} · ${trans.departureTime}` : datePart);
