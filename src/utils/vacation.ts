@@ -1,4 +1,4 @@
-import { parseLocalDate, extractDatePart } from '@/utils/date';
+import { parseLocalDate, extractDatePart, addDays, toDateInputValue } from '@/utils/date';
 import { AIRLINES } from '@/constants/airlines';
 import { AIRPORTS } from '@/constants/airports';
 import { CRUISE_LINES } from '@/constants/cruiseLines';
@@ -22,8 +22,9 @@ const TRIP_TYPE_EMOJIS: Record<VacationTripType, string> = {
   adventure: '🏔️',
 };
 
-/** Get the emoji for a vacation trip type, defaulting to ✈️ */
-export function tripTypeEmoji(tripType?: string): string {
+/** Get the emoji for a vacation trip type, defaulting to ✈️. Business fly_and_stay uses 💼. */
+export function tripTypeEmoji(tripType?: string, tripPurpose?: string): string {
+  if (tripType === 'fly_and_stay' && tripPurpose === 'business') return '💼';
   return TRIP_TYPE_EMOJIS[tripType as VacationTripType] ?? '✈️';
 }
 
@@ -105,13 +106,84 @@ export function tripDurationDays(start: string, end: string): number {
 }
 
 /**
+ * Compute dates with no overnight accommodation between trip start and end.
+ * Accounts for hotel check-in/out, cruise embarkation spans, and overnight flights.
+ * Returns an array of ISO date strings for uncovered nights.
+ */
+export function computeAccommodationGaps(v: FamilyVacation): string[] {
+  if (!v.startDate || !v.endDate) return [];
+  const start = parseLocalDate(extractDatePart(v.startDate));
+  const end = parseLocalDate(extractDatePart(v.endDate));
+  const coveredDates = new Set<string>();
+
+  // Accommodation check-in to check-out (exclusive of checkout day)
+  for (const acc of v.accommodations) {
+    if (acc.checkInDate && acc.checkOutDate) {
+      let d = parseLocalDate(extractDatePart(acc.checkInDate));
+      const out = parseLocalDate(extractDatePart(acc.checkOutDate));
+      while (d < out) {
+        coveredDates.add(toDateInputValue(d));
+        d = addDays(d, 1);
+      }
+    }
+  }
+
+  // Cruise ships include accommodation — cover embarkation→disembarkation dates
+  for (const seg of v.travelSegments) {
+    if (seg.type === 'cruise' && seg.embarkationDate && seg.disembarkationDate) {
+      let d = parseLocalDate(extractDatePart(seg.embarkationDate));
+      const out = parseLocalDate(extractDatePart(seg.disembarkationDate));
+      while (d < out) {
+        coveredDates.add(toDateInputValue(d));
+        d = addDays(d, 1);
+      }
+    }
+  }
+
+  // Overnight flights cover the departure night
+  for (const seg of v.travelSegments) {
+    if (seg.type?.startsWith('flight') && seg.departureDate && seg.arrivalDate) {
+      const dep = extractDatePart(seg.departureDate);
+      const arr = extractDatePart(seg.arrivalDate);
+      if (arr > dep) {
+        let d = parseLocalDate(dep);
+        const arrDate = parseLocalDate(arr);
+        while (d < arrDate) {
+          coveredDates.add(toDateInputValue(d));
+          d = addDays(d, 1);
+        }
+      }
+    }
+  }
+
+  // The last day of the trip (return travel day) doesn't need accommodation
+  const endStr = toDateInputValue(end);
+
+  const gaps: string[] = [];
+  let d = new Date(start);
+  while (d < end) {
+    const dateStr = toDateInputValue(d);
+    if (dateStr !== endStr && !coveredDates.has(dateStr)) gaps.push(dateStr);
+    d = addDays(d, 1);
+  }
+  return gaps;
+}
+
+/**
  * Translation key suffix for trip-type-appropriate countdown label.
  * Returns a key like 'travel.countdown.fly_and_stay' for use with t().
+ * Business trips get a muted, neutral label.
  */
-export function tripCountdownKey(tripType?: string): string {
+export function tripCountdownKey(tripType?: string, tripPurpose?: string): string {
+  if (tripPurpose === 'business') return 'travel.countdown.business';
   const valid = ['fly_and_stay', 'cruise', 'road_trip', 'camping', 'adventure', 'combo'];
   if (tripType && valid.includes(tripType)) return `travel.countdown.${tripType}`;
   return 'travel.countdown.fly_and_stay';
+}
+
+/** Whether this vacation is a business trip */
+export function isBusinessTrip(v?: { tripPurpose?: string }): boolean {
+  return v?.tripPurpose === 'business';
 }
 
 // ── Combobox option builders (shared by VacationStep2 + edit modals) ────────

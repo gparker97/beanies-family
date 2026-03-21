@@ -460,7 +460,7 @@ export type VacationTripType =
   | 'camping'
   | 'adventure';
 
-export type VacationSegmentStatus = 'booked' | 'pending' | 'not_booked' | 'researching';
+export type VacationSegmentStatus = 'booked' | 'pending';
 
 export type VacationIdeaCategory =
   | 'beach'
@@ -468,7 +468,8 @@ export type VacationIdeaCategory =
   | 'food'
   | 'sightseeing'
   | 'shopping'
-  | 'nightlife';
+  | 'nightlife'
+  | 'other';
 
 export type VacationTravelType =
   | 'flight_outbound'
@@ -476,7 +477,8 @@ export type VacationTravelType =
   | 'flight_other'
   | 'cruise'
   | 'train'
-  | 'ferry';
+  | 'ferry'
+  | 'car';
 
 export type VacationAccommodationType = 'hotel' | 'airbnb' | 'campground' | 'family_friends';
 
@@ -505,6 +507,7 @@ export interface VacationTravelSegment {
   departureTime?: string;
   arrivalDate?: ISODateString;
   arrivalTime?: string;
+  arrivesNextDay?: boolean;
 
   // Return flight fields (used in combined flight entry, split on save)
   returnAirline?: string;
@@ -523,6 +526,7 @@ export interface VacationTravelSegment {
   departurePort?: string;
   cabinNumber?: string;
   embarkationDate?: ISODateString;
+  embarkationTime?: string;
   disembarkationDate?: ISODateString;
 
   // Train/Ferry fields
@@ -530,6 +534,11 @@ export interface VacationTravelSegment {
   route?: string;
   departureStation?: string;
   arrivalStation?: string;
+
+  // Car fields
+  carType?: 'family_car' | 'rental_car' | 'other';
+  carLabel?: string;
+  leavingTime?: string;
 }
 
 export interface VacationAccommodation {
@@ -583,6 +592,7 @@ export interface VacationIdea {
   location?: string;
   suggestedDate?: ISODateString;
   estimatedCost?: number;
+  estimatedCostCurrency?: CurrencyCode;
   costType?: 'free' | 'paid';
   duration?: '30min' | '1hr' | '2hrs' | 'half_day' | 'full_day';
   needsBooking?: boolean;
@@ -592,11 +602,14 @@ export interface VacationIdea {
   createdAt: ISODateString;
 }
 
+export type VacationTripPurpose = 'vacation' | 'business';
+
 export interface FamilyVacation {
   id: UUID;
   activityId: UUID; // Linked FamilyActivity for calendar display
   name: string;
   tripType: VacationTripType;
+  tripPurpose?: VacationTripPurpose;
   assigneeIds: UUID[];
 
   travelSegments: VacationTravelSegment[];
