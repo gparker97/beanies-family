@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-19
-> **Updated by:** Claude (Nook "This Week" card grouped by day/date)
+> **Last updated:** 2026-03-21
+> **Updated by:** Claude (Dedicated Travel Plans Page)
 
 ## Current Phase
 
@@ -54,7 +54,37 @@
 - Multi-currency display with global display currency selector
 - Family Nook home screen (`/nook`) — greeting, status toast, family beans row, schedule cards (merged todos + planner activities with view-first modals, "This Week" card grouped by day/date matching planner sidebar pattern), inline todo widget with view/edit modals, milestones, piggy bank card, recent activity feed (view-first modals for todos + transactions). Overdue task detection with orange pill + ⏰ indicator. Task description preview (2-line clamp) on cards. `/` redirects to `/nook`
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
+- Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### Dedicated Travel Plans Page (2026-03-21)
+
+- **New `/travel` route**: Full dedicated page for vacation/trip planning with list + expanded views. Route `/planner` renamed to `/activities`
+- **Trip list view**: Card grid with countdown badges, member chips, progress bars, collapsible past trips section, empty state
+- **Expanded trip view**: Teal gradient hero banner, visual timeline with date nodes, ideas panel with quick-add
+- **Visual timeline**: Chronological date groups with segment cards, inline accommodation gap warnings at correct positions, connector dots and vertical line
+- **Inline editing**: Detail rows with auto-sizing inputs + pencil hint on hover, saves on blur via `saveInlineField()`. Copy badge restricted to booking ref only
+- **Segment edit modals**: `TravelSegmentEditModal`, `AccommodationEditModal`, `TransportationEditModal`, `IdeaEditModal` — all using BeanieFormModal
+- **Ideas system**: VacationIdeaCard with vote/title/description/meta layout matching mockup. IdeaEditModal with category pills, currency amount input, link field (auto-prepends https://), duration, booking needed. "Other" category added
+- **Helpful hints**: Overlap detection (accommodation/accommodation, accommodation/cruise, flight/cruise) with amber card tint + ⚠️ toggle indicator
+- **Trip-type countdown language**: "days until takeoff" (fly), "days until we set sail" (cruise), "days until we hit the road" (road trip), etc.
+- **Business trip support**: `tripPurpose` field on `fly_and_stay` trips — 💼 icon, muted countdown
+- **Flight UX**: Arrival date replaced with "+1 day" checkbox, compact 3-column layout (date/dep time/arr time)
+- **Cruise**: Embarkation time field added
+- **Car segment type**: New `car` travel type with car type toggle (family/rental/other), car name, leaving time. Auto-selected for road trips
+- **Train updates**: Icon → 🚅 bullet train, labels → "Train Company"/"Train Number"
+- **Status simplification**: `VacationSegmentStatus` reduced to `booked | pending`. Pending items show in timeline with gold dashed-border tint
+- **Accommodation pre-fill**: Hotel check-in/out auto-populated from outbound arrival / return departure dates
+- **Wizard steps 3 & 4 refactored**: Match Step 2 convention — `+ type` pills at bottom that always append (no toggle/replace). Single type per entry, immutable after creation
+- **"+ add a plan" button**: Bottom of timeline with animated type picker (Travel/Stay/Getting Around) → opens wizard at correct step
+- **Delete support**: Delete button on all timeline cards (including undated), delete trip from detail page hero, idea delete with confirmation
+- **NookSectionCard**: Shared card wrapper for consistent nook/activities section styling. NookVacationCard with blue gradient tint + countdown hero badge
+- **Accommodation gap warnings**: `computeAccommodationGaps()` extracted to shared utility. Shown on trip cards (list, sidebar, nook) + inline in timeline
+- **Onboarding fixes**: Google Drive modal de-emphasized "View in Drive" + auto-advances, loading spinners on Add Member/Finish, accounts displayed in list
+- **Todo mobile UX**: Skip auto-focus on quick-add bar for mobile/tablet (prevents keyboard popup)
+- **DRY**: `useVacationTimeline` composable, shared option builders in `vacation.ts`, `buildTravelKeyValue` shared function
+- **Files**: 6 new components, 1 new composable, ~25 modified files. VacationViewModal deleted (replaced by dedicated page)
+- Plan: `docs/plans/2026-03-21-dedicated-travel-plans-page.md`
 
 ### Nook Schedule Card Grouping (2026-03-19)
 
