@@ -289,7 +289,7 @@ async function handleSave() {
       </FormFieldGroup>
 
       <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
+      <FormFieldGroup :label="t('vacation.field.title')" required>
         <BaseInput v-model="title" />
       </FormFieldGroup>
 
@@ -433,7 +433,7 @@ async function handleSave() {
       <!-- ═══ Activity fields ═══ -->
       <template v-if="isActivity">
         <!-- Description -->
-        <FormFieldGroup :label="t('vacation.field.description')" :optional="true">
+        <FormFieldGroup :label="t('vacation.field.description')">
           <textarea
             v-model="description"
             rows="2"
@@ -449,13 +449,13 @@ async function handleSave() {
           <FormFieldGroup :label="t('vacation.field.startTime')">
             <BaseInput v-model="startTime" type="time" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.duration')" :optional="true">
+          <FormFieldGroup :label="t('vacation.field.duration')">
             <BaseInput v-model="activityDuration" placeholder="e.g. 2 hours" />
           </FormFieldGroup>
         </div>
 
         <!-- Location (own row, with maps link) -->
-        <FormFieldGroup :label="t('vacation.field.location')" :optional="true">
+        <FormFieldGroup :label="t('vacation.field.location')">
           <div class="relative">
             <BaseInput v-model="location" />
             <a
@@ -480,7 +480,7 @@ async function handleSave() {
               :placeholder="t('vacation.field.bookingReference')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.link')" :optional="true">
+          <FormFieldGroup :label="t('vacation.field.link')">
             <div class="flex items-center gap-2">
               <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
               <a

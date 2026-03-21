@@ -24,8 +24,7 @@ withDefaults(defineProps<Props>(), {
       "
     >
       {{ label }}
-      <span v-if="required" class="text-primary-500">*</span>
-      <span v-if="optional" class="opacity-50">(optional)</span>
+      <span v-if="required" class="text-primary-500 text-sm font-bold opacity-100">*</span>
     </label>
     <div :class="error ? 'ring-primary-500/40 rounded-2xl ring-2' : ''">
       <slot />
