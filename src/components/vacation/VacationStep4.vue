@@ -73,14 +73,21 @@ function togglePill(type: VacationTransportationType) {
       );
     }
   } else {
-    // Single-select: replace with the new type
     const item: VacationTransportation = {
       id: generateUUID(),
       type,
       title: t(`vacation.transport.${type}` as any),
       status: 'pending',
     };
-    emit('update:transportation', [item]);
+    // If existing items have data, append; otherwise replace (first-time single-select)
+    const hasData = props.transportation.some(
+      (tr) => tr.bookingReference || tr.pickupDate || tr.pickupTime || tr.returnDate
+    );
+    if (hasData) {
+      emit('update:transportation', [...props.transportation, item]);
+    } else {
+      emit('update:transportation', [item]);
+    }
   }
 }
 
