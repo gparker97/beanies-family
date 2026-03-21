@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-20",
-    "translationCount": 1773
+    "lastUpdated": "2026-03-21",
+    "translationCount": 1799
   },
   "translations": {
     "app.name": {
@@ -3086,11 +3086,6 @@
       "hash": "1g60t",
       "lastUpdated": "2026-03-03"
     },
-    "mobile.planner": {
-      "translation": "Planner",
-      "hash": "jd1l0y",
-      "lastUpdated": "2026-03-03"
-    },
     "mobile.piggyBank": {
       "translation": "小猪存钱罐",
       "hash": "37zgyk",
@@ -3144,11 +3139,6 @@
     "nav.nook": {
       "translation": "家庭控制面板",
       "hash": "7brcuw",
-      "lastUpdated": "2026-03-03"
-    },
-    "nav.planner": {
-      "translation": "家庭计划员",
-      "hash": "8vqdpm",
       "lastUpdated": "2026-03-03"
     },
     "nav.todo": {
@@ -8870,6 +8860,146 @@
       "translation": "这将从您的度假计划中删除此项目。",
       "hash": "xq1xuc",
       "lastUpdated": "2026-03-20"
+    },
+    "nav.activities": {
+      "translation": "家庭活动",
+      "hash": "gvy59l",
+      "lastUpdated": "2026-03-21"
+    },
+    "nav.travel": {
+      "translation": "旅行计划",
+      "hash": "is0mhw",
+      "lastUpdated": "2026-03-21"
+    },
+    "action.saveAndClose": {
+      "translation": "保存&关闭",
+      "hash": "58ycwr",
+      "lastUpdated": "2026-03-21"
+    },
+    "mobile.activities": {
+      "translation": "活动",
+      "hash": "46kgs3",
+      "lastUpdated": "2026-03-21"
+    },
+    "mobile.travel": {
+      "translation": "旅行",
+      "hash": "tguthi",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.title": {
+      "translation": "旅行计划",
+      "hash": "is0mhw",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.subtitle": {
+      "translation": "豆子接下来要去哪里？",
+      "hash": "iwpyv8",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.planATrip": {
+      "translation": "规划行程",
+      "hash": "lretcq",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.empty": {
+      "translation": "还没有计划行程，是时候开始梦想了！",
+      "hash": "rv6y0v",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.emptySubtitle": {
+      "translation": "一起规划您的下一次家庭冒险。",
+      "hash": "vw24e9",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.pastTrips": {
+      "translation": "过去的行程",
+      "hash": "reu89s",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.daysUntil": {
+      "translation": "起飞前天数",
+      "hash": "jy7otf",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.daysAgo": {
+      "translation": "天前",
+      "hash": "x9tl8g",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.completed": {
+      "translation": "已完成",
+      "hash": "9xualn",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.allTrips": {
+      "translation": "所有行程",
+      "hash": "1dbxwv",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.bookingProgress": {
+      "translation": "预订正在进行",
+      "hash": "xvjlg4",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.needsBooking": {
+      "translation": "需要预订",
+      "hash": "9gph0q",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.editDetails": {
+      "translation": "编辑详情",
+      "hash": "oumh4c",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.addSegment": {
+      "translation": "+ 添加",
+      "hash": "o8zrg",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.accommodationGap": {
+      "translation": "没有预订此晚的住宿",
+      "hash": "mita3s",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.ideas": {
+      "translation": "Bean Bucket List",
+      "hash": "5etkuc",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.ideasTeaser": {
+      "translation": "建议",
+      "hash": "15yzb0",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.quickAddIdea": {
+      "translation": "快速添加创意...",
+      "hash": "dgpi4j",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.timeline": {
+      "translation": "假期时间表",
+      "hash": "x9w9zz",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.editSegment": {
+      "translation": "编辑受众群",
+      "hash": "vqatr1",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.editAccommodation": {
+      "translation": "编辑住宿信息",
+      "hash": "1ekuv8",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.editTransportation": {
+      "translation": "编辑交通",
+      "hash": "2nyim6",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.editTravelPlans": {
+      "translation": "旅行计划",
+      "hash": "9iqcka",
+      "lastUpdated": "2026-03-21"
     }
   }
 }

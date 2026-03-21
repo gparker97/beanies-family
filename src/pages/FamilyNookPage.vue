@@ -6,6 +6,7 @@ import FamilyStatusToast from '@/components/nook/FamilyStatusToast.vue';
 import NookYourBeans from '@/components/nook/NookYourBeans.vue';
 import ScheduleCards from '@/components/nook/ScheduleCards.vue';
 import NookTodoWidget from '@/components/nook/NookTodoWidget.vue';
+import NookVacationCard from '@/components/nook/NookVacationCard.vue';
 import MilestonesCard from '@/components/nook/MilestonesCard.vue';
 import PiggyBankCard from '@/components/nook/PiggyBankCard.vue';
 import RecentActivityCard from '@/components/nook/RecentActivityCard.vue';
@@ -20,6 +21,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { confirm } from '@/composables/useConfirm';
 import { useSounds } from '@/composables/useSounds';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
@@ -38,6 +40,7 @@ const { canViewFinances } = usePermissions();
 const todoStore = useTodoStore();
 const activityStore = useActivityStore();
 const transactionsStore = useTransactionsStore();
+const vacationStore = useVacationStore();
 const { playWhoosh } = useSounds();
 
 // ── Todo modal (for ScheduleCards / RecentActivityCard clicks) ───────────────
@@ -164,6 +167,9 @@ async function handleTransactionDelete(id: string) {
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
     />
+
+    <!-- Upcoming vacation -->
+    <NookVacationCard v-if="vacationStore.upcomingVacations.length > 0" />
 
     <!-- Todo widget (full width) -->
     <NookTodoWidget />

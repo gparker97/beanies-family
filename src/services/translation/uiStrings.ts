@@ -150,7 +150,8 @@ const STRING_DEFS = {
   'nav.section.treehouse': { en: 'The Treehouse', beanie: 'family treehouse' },
   'nav.section.piggyBank': { en: 'The Piggy Bank', beanie: 'piggy bank' },
   'nav.nook': { en: 'Family Dashboard', beanie: 'family nook' },
-  'nav.planner': { en: 'Family Planner', beanie: 'our plans' },
+  'nav.activities': { en: 'Family Activities', beanie: 'our activities' },
+  'nav.travel': { en: 'Travel Plans', beanie: 'travel plans' },
   'nav.todo': { en: 'Family To-Do', beanie: 'to-do list' },
   'nav.overview': { en: 'Overview', beanie: 'finance corner' },
   'nav.budgets': { en: 'Budgets', beanie: 'budgets' },
@@ -2275,7 +2276,8 @@ const STRING_DEFS = {
   // Mobile navigation
   'mobile.nook': { en: 'Nook', beanie: 'nook' },
   'mobile.todo': { en: 'To-Do', beanie: 'to-do' },
-  'mobile.planner': { en: 'Planner', beanie: 'planner' },
+  'mobile.activities': { en: 'Activities', beanie: 'activities' },
+  'mobile.travel': { en: 'Travel', beanie: 'travel' },
   'mobile.piggyBank': { en: 'Piggy Bank', beanie: 'piggy bank' },
   'mobile.budget': { en: 'Budget', beanie: 'budget' },
   'mobile.pod': { en: 'Family', beanie: 'your pod' },
@@ -3572,6 +3574,42 @@ const STRING_DEFS = {
     en: 'This will remove this item from your vacation plan.',
     beanie: 'this will remove this item from your vacation plan.',
   },
+  // Travel Plans page
+  'travel.title': { en: 'Travel Plans', beanie: 'travel plans' },
+  'travel.subtitle': {
+    en: 'where are the beans headed next?',
+    beanie: 'where are the beans headed next?',
+  },
+  'travel.planATrip': { en: '+ Plan a Trip', beanie: '+ plan a trip' },
+  'travel.empty': {
+    en: 'No trips planned yet — time to start dreaming!',
+    beanie: 'no trips planned yet — time to start dreaming!',
+  },
+  'travel.emptySubtitle': {
+    en: 'Plan your next family adventure together.',
+    beanie: 'plan your next family adventure together.',
+  },
+  'travel.pastTrips': { en: 'Past Trips', beanie: 'past trips' },
+  'travel.daysUntil': { en: 'Days Until Takeoff', beanie: 'days until takeoff' },
+  'travel.daysAgo': { en: 'Days Ago', beanie: 'days ago' },
+  'travel.completed': { en: 'Completed', beanie: 'completed' },
+  'travel.allTrips': { en: 'All Trips', beanie: 'all trips' },
+  'travel.bookingProgress': { en: 'Booking Progress', beanie: 'booking progress' },
+  'travel.needsBooking': { en: 'Needs Booking', beanie: 'needs booking' },
+  'travel.editDetails': { en: 'Edit Details', beanie: 'edit details' },
+  'travel.editTravelPlans': { en: 'Edit Travel Plans', beanie: 'edit travel plans' },
+  'travel.addSegment': { en: '+ Add', beanie: '+ add' },
+  'travel.accommodationGap': {
+    en: 'No accommodation booked for this night',
+    beanie: 'no accommodation booked for this night',
+  },
+  'travel.ideas': { en: 'Bean Bucket List', beanie: 'bean bucket list' },
+  'travel.ideasTeaser': { en: 'Ideas', beanie: 'ideas' },
+  'travel.quickAddIdea': { en: 'Quick-add an idea...', beanie: 'quick-add an idea...' },
+  'travel.timeline': { en: 'Timeline', beanie: 'timeline' },
+  'travel.editSegment': { en: 'Edit Segment', beanie: 'edit segment' },
+  'travel.editAccommodation': { en: 'Edit Accommodation', beanie: 'edit accommodation' },
+  'travel.editTransportation': { en: 'Edit Transportation', beanie: 'edit transportation' },
 } satisfies Record<string, StringEntry>;
 
 /**
