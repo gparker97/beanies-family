@@ -4,6 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatNookDate } from '@/utils/date';
+import NookSectionCard from './NookSectionCard.vue';
 
 const emit = defineEmits<{
   'open-todo': [id: string];
@@ -67,21 +68,16 @@ const activityItems = computed<ActivityItem[]>(() => {
 </script>
 
 <template>
-  <div
-    class="nook-activity-card nook-card-dark rounded-[var(--sq)] border-l-4 border-[#27AE60] p-6 shadow-[var(--card-shadow)]"
+  <NookSectionCard
+    class="nook-activity-card"
+    :title="t('nook.recentActivity')"
+    border-color="#27AE60"
   >
-    <!-- Header -->
-    <div class="mb-4 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="text-base">{{ '⚡' }}</span>
-        <span class="nook-section-label text-secondary-500 dark:text-gray-400">
-          {{ t('nook.recentActivity') }}
-        </span>
-      </div>
+    <template #header-right>
       <router-link to="/transactions" class="text-primary-500 text-xs font-medium">
         {{ t('nook.seeAll') }} &rarr;
       </router-link>
-    </div>
+    </template>
 
     <!-- Items list -->
     <div v-if="activityItems.length > 0" class="space-y-0">
@@ -122,7 +118,7 @@ const activityItems = computed<ActivityItem[]>(() => {
     <div v-else class="py-8 text-center text-sm text-gray-500">
       {{ t('nook.noActivity') }}
     </div>
-  </div>
+  </NookSectionCard>
 </template>
 
 <style scoped>

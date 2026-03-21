@@ -5,6 +5,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { toDateInputValue, formatNookDate } from '@/utils/date';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import NookSectionCard from './NookSectionCard.vue';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
@@ -175,25 +176,18 @@ function handleClick(item: ScheduleItem) {
 <template>
   <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
     <!-- Left — Today's Schedule -->
-    <div
-      class="nook-schedule-today nook-card-dark border-sky-silk-300 rounded-[var(--sq)] border-l-4 p-6 shadow-[var(--card-shadow)]"
+    <NookSectionCard
+      class="nook-schedule-today"
+      :title="t('nook.todaySchedule')"
+      border-color="#AED6F1"
     >
-      <!-- Header -->
-      <div class="mb-4 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-base">📆</span>
-          <span
-            class="font-outfit text-secondary-500 text-sm font-semibold tracking-[0.06em] uppercase dark:text-gray-200"
-          >
-            {{ t('nook.todaySchedule') }}
-          </span>
-        </div>
+      <template #header-right>
         <span
           class="rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[#3A7BAD]"
         >
           {{ todayFormatted }}
         </span>
-      </div>
+      </template>
 
       <!-- Content -->
       <div v-if="todayItems.length > 0" class="flex flex-col gap-3">
@@ -224,29 +218,18 @@ function handleClick(item: ScheduleItem) {
       <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
         {{ t('nook.noEvents') }}
       </div>
-    </div>
+    </NookSectionCard>
 
     <!-- Right — This Week -->
-    <div
-      class="nook-schedule-week nook-card-dark border-primary-500 rounded-[var(--sq)] border-l-4 p-6 shadow-[var(--card-shadow)]"
-    >
-      <!-- Header -->
-      <div class="mb-4 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-base">🗓️</span>
-          <span
-            class="font-outfit text-secondary-500 text-sm font-semibold tracking-[0.06em] uppercase dark:text-gray-200"
-          >
-            {{ t('nook.thisWeek') }}
-          </span>
-        </div>
+    <NookSectionCard class="nook-schedule-week" :title="t('nook.thisWeek')" border-color="#F15D22">
+      <template #header-right>
         <router-link
           to="/activities"
           class="text-primary-500 text-xs font-semibold hover:underline"
         >
           {{ t('nook.fullCalendar') }} &rarr;
         </router-link>
-      </div>
+      </template>
 
       <!-- Content -->
       <div v-if="weekItems.length > 0" class="flex flex-col gap-4">
@@ -292,7 +275,7 @@ function handleClick(item: ScheduleItem) {
       <div v-else class="text-secondary-500/40 py-4 text-center text-sm dark:text-gray-500">
         {{ t('nook.comingSoon') }}
       </div>
-    </div>
+    </NookSectionCard>
   </div>
 </template>
 

@@ -5,6 +5,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { formatNookDate } from '@/utils/date';
 import type { GoalType } from '@/types/models';
+import NookSectionCard from './NookSectionCard.vue';
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
@@ -148,24 +149,19 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
 </script>
 
 <template>
-  <div
-    class="nook-milestones-card nook-card-dark border-terracotta-400 rounded-[var(--sq)] border-l-4 p-6 shadow-[var(--card-shadow)]"
+  <NookSectionCard
+    class="nook-milestones-card"
+    :title="t('nook.milestones')"
+    border-color="#E67E22"
   >
-    <!-- Header -->
-    <div class="mb-4 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <span class="text-base">{{ '🏆' }}</span>
-        <span class="nook-section-label text-secondary-500 dark:text-gray-400">
-          {{ t('nook.milestones') }}
-        </span>
-      </div>
+    <template #header-right>
       <span
         v-if="upcomingCount > 0"
         class="text-primary-500 rounded-full bg-[var(--tint-orange-8)] px-2 py-0.5 text-xs font-semibold"
       >
         {{ upcomingCount }} {{ t('nook.upcoming') }}
       </span>
-    </div>
+    </template>
 
     <!-- Items list -->
     <div v-if="milestones.length > 0" class="space-y-0">
@@ -207,7 +203,7 @@ const upcomingCount = computed(() => milestones.value.filter((m) => m.type !== '
     <div v-else class="text-secondary-500/40 py-6 text-center text-sm dark:text-gray-500">
       {{ '🏆' }} {{ t('nook.noMilestones') }}
     </div>
-  </div>
+  </NookSectionCard>
 </template>
 
 <style scoped>

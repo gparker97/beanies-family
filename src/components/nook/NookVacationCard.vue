@@ -5,6 +5,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { tripTypeEmoji, bookingProgress, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
+import NookSectionCard from './NookSectionCard.vue';
 
 const router = useRouter();
 const vacationStore = useVacationStore();
@@ -32,42 +33,59 @@ function handleClick() {
 </script>
 
 <template>
-  <button
+  <NookSectionCard
     v-if="vacation"
-    class="flex w-full cursor-pointer items-center gap-3 rounded-[var(--sq)] border-l-4 border-[#00B4D8] p-3.5 text-left transition-all hover:shadow-[0_4px_16px_rgba(0,180,216,0.08)]"
-    style="background: linear-gradient(135deg, rgb(0 180 216 / 4%), rgb(255 217 61 / 3%))"
+    class="nook-vacation-tint cursor-pointer"
+    :title="t('vacation.upcoming')"
+    border-color="#00B4D8"
     @click="handleClick"
   >
-    <!-- Emoji -->
-    <span class="text-2xl">{{ tripTypeEmoji(vacation.tripType) }}</span>
-
-    <!-- Content -->
-    <div class="min-w-0 flex-1">
-      <div class="font-outfit text-sm font-bold text-gray-900 dark:text-gray-100">
-        {{ vacation.name }}
-      </div>
-      <div class="font-outfit mt-0.5 text-xs text-gray-400">📅 {{ dateRange }}</div>
-
-      <!-- Progress bar -->
-      <div v-if="progress && progress.total > 0" class="mt-2 flex items-center gap-2">
-        <div class="h-1 flex-1 overflow-hidden rounded-full bg-[var(--tint-slate-5)]">
-          <div
-            class="h-full rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6]"
-            :style="{ width: progress.percent + '%' }"
-          />
+    <!-- Row 1: Trip name + emoji + date -->
+    <div class="flex items-center gap-2.5">
+      <span class="text-xl">{{ tripTypeEmoji(vacation.tripType) }}</span>
+      <div class="min-w-0 flex-1">
+        <div class="font-outfit text-sm font-bold text-gray-900 dark:text-gray-100">
+          {{ vacation.name }}
         </div>
-        <span class="font-outfit text-[10px] font-semibold whitespace-nowrap text-[#00B4D8]">
-          {{ progress.booked }}/{{ progress.total }}
-        </span>
+        <div class="font-outfit mt-0.5 text-xs text-gray-400">📅 {{ dateRange }}</div>
       </div>
     </div>
 
-    <!-- Countdown badge -->
-    <div v-if="countdown !== null && countdown > 0" class="shrink-0 text-right">
-      <div class="font-outfit text-lg font-extrabold text-[#00B4D8]">{{ countdown }}</div>
-      <div class="font-outfit text-[9px] font-semibold text-gray-400">
-        {{ vacation ? t(tripCountdownKey(vacation.tripType) as any) : '' }}
+    <!-- Row 2: Booking progress -->
+    <div v-if="progress && progress.total > 0" class="mt-3 flex items-center gap-2.5">
+      <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[rgba(0,180,216,0.1)]">
+        <div
+          class="h-full rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6]"
+          :style="{ width: progress.percent + '%' }"
+        />
       </div>
+      <span class="font-outfit text-[10px] font-semibold whitespace-nowrap text-[#00B4D8]">
+        {{ progress.booked }}/{{ progress.total }} booked
+      </span>
     </div>
-  </button>
+
+    <!-- Row 3: Countdown hero badge -->
+    <div
+      v-if="countdown !== null && countdown > 0"
+      class="mt-3 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-2 shadow-[0_4px_12px_rgba(0,180,216,0.2)]"
+    >
+      <span class="font-outfit text-lg leading-none font-extrabold text-white">
+        {{ countdown }}
+      </span>
+      <span class="font-outfit text-[11px] font-semibold text-white/80">
+        {{ t(tripCountdownKey(vacation.tripType) as any) }}!
+        {{ tripTypeEmoji(vacation.tripType) }}
+      </span>
+    </div>
+  </NookSectionCard>
 </template>
+
+<style scoped>
+.nook-vacation-tint {
+  background: linear-gradient(180deg, rgb(0 180 216 / 6%), rgb(0 180 216 / 14%)) !important;
+}
+
+:global(.dark) .nook-vacation-tint {
+  background: linear-gradient(180deg, rgb(0 180 216 / 8%), rgb(0 180 216 / 18%)) !important;
+}
+</style>
