@@ -17,7 +17,7 @@ import { useClipboard } from '@/composables/useClipboard';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import { formatDateShort, formatNookDate } from '@/utils/date';
-import { tripTypeEmoji, bookingProgress, daysUntilTrip } from '@/utils/vacation';
+import { tripTypeEmoji, bookingProgress, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
@@ -258,13 +258,7 @@ function addQuickIdea() {
           <!-- Hero gradient with floating emoji -->
           <div
             class="relative flex h-24 items-center justify-center overflow-hidden"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgb(0 180 216 / 8%),
-                rgb(255 217 61 / 6%)
-              );
-            "
+            style="background: linear-gradient(135deg, rgb(0 180 216 / 8%), rgb(255 217 61 / 6%))"
           >
             <span class="relative z-10 animate-bounce text-5xl" style="animation-duration: 3s">
               {{ tripTypeEmoji(vacation.tripType) }}
@@ -289,7 +283,8 @@ function addQuickIdea() {
                 v-if="vacationCountdown(vacation) !== null && vacationCountdown(vacation)! > 0"
                 class="font-outfit inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-3 py-1 text-[11px] font-bold text-white"
               >
-                ✈️ {{ vacationCountdown(vacation) }} {{ t('travel.daysUntil') }}!
+                {{ tripTypeEmoji(vacation.tripType) }} {{ vacationCountdown(vacation) }}
+                {{ t(tripCountdownKey(vacation.tripType) as any) }}!
               </span>
               <span
                 v-else-if="
@@ -374,13 +369,7 @@ function addQuickIdea() {
           >
             <div
               class="relative flex h-20 items-center justify-center overflow-hidden"
-              style="
-                background: linear-gradient(
-                  135deg,
-                  rgb(0 180 216 / 4%),
-                  rgb(44 62 80 / 3%)
-                );
-              "
+              style="background: linear-gradient(135deg, rgb(0 180 216 / 4%), rgb(44 62 80 / 3%))"
             >
               <span class="relative z-10 text-4xl">
                 {{ tripTypeEmoji(vacation.tripType) }}
@@ -494,7 +483,8 @@ function addQuickIdea() {
                   {{ vacationCountdown(selectedVacation) }}
                 </span>
                 <span class="font-outfit text-[11px] font-semibold text-white/70">
-                  {{ t('travel.daysUntil') }}! ✈️
+                  {{ t(tripCountdownKey(selectedVacation.tripType) as any) }}!
+                  {{ tripTypeEmoji(selectedVacation.tripType) }}
                 </span>
               </template>
               <template v-else>
@@ -550,13 +540,7 @@ function addQuickIdea() {
           <div
             v-if="selectedVacation.ideas.length > 0"
             class="mb-5 flex cursor-pointer items-center gap-3 rounded-2xl border-[1.5px] border-[rgba(255,217,61,0.12)] p-3 transition-all hover:shadow-[0_4px_14px_rgba(255,217,61,0.1)] lg:hidden"
-            style="
-              background: linear-gradient(
-                135deg,
-                rgb(255 217 61 / 8%),
-                rgb(0 180 216 / 6%)
-              );
-            "
+            style="background: linear-gradient(135deg, rgb(255 217 61 / 8%), rgb(0 180 216 / 6%))"
             @click="scrollToIdeas"
           >
             <span class="text-2xl">🌟</span>
@@ -715,16 +699,12 @@ function addQuickIdea() {
         <div
           ref="ideasPanelRef"
           class="mt-6 min-w-0 rounded-3xl border-t border-gray-100 p-5 lg:mt-0 lg:border-t-0 lg:border-l lg:border-gray-100 dark:border-slate-700"
-          style="
-            background: linear-gradient(180deg, rgb(255 217 61 / 3%), rgb(0 180 216 / 2%));
-          "
+          style="background: linear-gradient(180deg, rgb(255 217 61 / 3%), rgb(0 180 216 / 2%))"
         >
           <!-- Ideas header -->
           <div
             class="-mx-5 -mt-5 flex items-center gap-3 rounded-t-3xl border-b-[1.5px] border-[rgba(255,217,61,0.12)] px-4 py-3.5"
-            style="
-              background: linear-gradient(135deg, rgb(255 217 61 / 10%), rgb(0 180 216 / 6%));
-            "
+            style="background: linear-gradient(135deg, rgb(255 217 61 / 10%), rgb(0 180 216 / 6%))"
           >
             <div
               class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/70 text-[22px] shadow-[0_2px_8px_rgba(44,62,80,0.06)]"

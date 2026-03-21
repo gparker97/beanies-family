@@ -11,7 +11,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDateShort } from '@/utils/date';
-import { bookingProgress, tripTypeEmoji, daysUntilTrip } from '@/utils/vacation';
+import { bookingProgress, tripTypeEmoji, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
 import type {
   FamilyVacation,
   VacationTripType,
@@ -362,7 +362,8 @@ const saveLabel = computed(() => {
       <!-- Countdown pill -->
       <div v-if="celebrationCountdown" class="mb-4">
         <span class="cele-countdown">
-          ✈️ {{ celebrationCountdown }} {{ t('vacation.celebration.daysToTakeoff') }}
+          {{ celebrationEmoji }} {{ celebrationCountdown }}
+          {{ t(tripCountdownKey(savedVacation?.tripType) as any) }}
         </span>
       </div>
 
