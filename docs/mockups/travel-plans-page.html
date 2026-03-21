@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>beanies.family — travel plans page mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --deep-slate: #2C3E50;
+    --heritage-orange: #F15D22;
+    --sky-silk: #AED6F1;
+    --terracotta: #E67E22;
+    --cloud-white: #F8F9FA;
+    --green: #27AE60;
+    --purple: #9B59B6;
+    --tint-orange-8: rgba(241,93,34,0.08);
+    --tint-orange-15: rgba(241,93,34,0.15);
+    --tint-slate-5: rgba(44,62,80,0.05);
+    --tint-slate-10: rgba(44,62,80,0.1);
+    --vt: #00B4D8;
+    --vt-dark: #0077B6;
+    --vt-tint: rgba(0,180,216,0.08);
+    --vt-tint-15: rgba(0,180,216,0.15);
+    --vg: linear-gradient(135deg, #00B4D8, #0077B6);
+    --gold: #FFD93D;
+    --gold-tint: rgba(255,217,61,0.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,sans-serif;background:var(--cloud-white);color:var(--deep-slate);line-height:1.5}
+  h1,h2,h3,h4,h5,h6{font-family:'Outfit',sans-serif}
+
+  /* ═══ MOCKUP NAV ═══ */
+  .mnav{position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--deep-slate);padding:10px 20px;display:flex;align-items:center;gap:10px;overflow-x:auto;box-shadow:0 4px 20px rgba(0,0,0,0.15)}
+  .mnav-logo{font-family:'Outfit';font-weight:700;font-size:13px;color:var(--heritage-orange);white-space:nowrap;margin-right:6px}
+  .mnav button{font-family:'Outfit';font-size:10px;font-weight:600;padding:5px 11px;border-radius:18px;border:1.5px solid rgba(255,255,255,0.15);background:transparent;color:rgba(255,255,255,0.7);cursor:pointer;white-space:nowrap;transition:all 0.2s}
+  .mnav button:hover{border-color:var(--heritage-orange);color:white}
+  .mnav button.active{background:var(--heritage-orange);border-color:var(--heritage-orange);color:white}
+
+  .screen{display:none;padding:56px 0 0;min-height:100vh}
+  .screen.active{display:flex}
+
+  /* ═══ SIDEBAR (matching real app) ═══ */
+  /* Real sidebar is w-64 (256px) with p-4 */
+  .sidebar{width:256px;background:var(--deep-slate);min-height:100vh;padding:16px;flex-shrink:0;display:flex;flex-direction:column;gap:4px}
+  /* Real logo: 44x44 icon, gap-3, Outfit text-base font-bold, tagline italic text-[0.75rem] tracking-[0.06em] text-white/25 */
+  .sb-brand{display:flex;align-items:center;gap:12px;padding:4px 4px 16px;margin-bottom:16px}
+  .sb-brand-logo{width:44px;height:44px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden}
+  .sb-brand-logo img{width:100%;height:100%;object-fit:cover}
+  .sb-brand-name{font-family:'Outfit';font-size:16px;font-weight:700;line-height:1.1}
+  .sb-brand-name .white{color:white}
+  .sb-brand-name .orange{color:var(--heritage-orange)}
+  .sb-brand-sub{font-family:'Outfit';font-size:12px;font-weight:300;letter-spacing:0.06em;color:rgba(255,255,255,0.25);font-style:italic;margin-top:2px}
+
+  /* Real: section btn = Outfit text-sm font-bold tracking-wide uppercase, rounded-xl px-3 py-2, gap-2 */
+  .sb-section{margin-bottom:4px}
+  .sb-section-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;border-radius:12px;border:none;background:transparent;font-family:'Outfit';font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;transition:all 0.15s}
+  .sb-section-btn.treehouse{color:var(--heritage-orange)}
+  .sb-section-btn.piggy{color:#27AE60}
+  .sb-section-btn:hover{background:rgba(255,255,255,0.05)}
+  .sb-section-btn .emoji{font-size:16px}
+  .sb-section-btn .chev{margin-left:auto;font-size:10px;color:rgba(255,255,255,0.3);transition:transform 0.2s}
+  .sb-section-btn.open .chev{transform:rotate(180deg)}
+
+  /* Real: nav items = Outfit text-lg font-medium, rounded-2xl px-3.5 py-2.5, gap-3, border-l-4 */
+  .sb-items{padding:4px 0;display:flex;flex-direction:column;gap:2px}
+  .sb-item{display:flex;align-items:center;gap:12px;width:100%;padding:10px 14px;border-radius:16px;border:none;border-left:4px solid transparent;background:transparent;color:rgba(255,255,255,0.4);font-family:'Outfit';font-size:18px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:left}
+  .sb-item:hover{background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.7)}
+  .sb-item.active{border-left-color:var(--heritage-orange);background:linear-gradient(to right,rgba(241,93,34,0.2),rgba(230,126,34,0.1));color:white;font-weight:600;padding-left:12px}
+  .sb-item .emoji{font-size:18px;width:24px;text-align:center}
+
+  /* Real: mx-2 my-2 h-px bg-white/[0.08] */
+  .sb-divider{height:1px;background:rgba(255,255,255,0.08);margin:8px 8px}
+
+  /* ═══ MAIN CONTENT AREA ═══ */
+  .main{flex:1;min-width:0;overflow-y:auto;max-height:calc(100vh - 56px)}
+  .main-inner{max-width:1080px;margin:0 auto;padding:28px 32px 40px}
+
+  /* ═══ PAGE HEADER ═══ */
+  /* Real: subtitle text-sm, button rounded-2xl Outfit text-sm font-semibold */
+  .page-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px;flex-wrap:wrap}
+  .page-hdr h1{font-size:24px;font-weight:700;display:flex;align-items:center;gap:10px}
+  .page-hdr-sub{font-size:14px;color:rgba(44,62,80,0.4);margin-top:2px}
+  .btn-create{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:16px;background:var(--vg);color:white;font-family:'Outfit';font-size:14px;font-weight:600;border:none;cursor:pointer;box-shadow:0 4px 12px rgba(0,180,216,0.2);transition:all 0.2s}
+  .btn-create:hover{box-shadow:0 6px 16px rgba(0,180,216,0.3)}
+
+  /* ═══ TRIP CARDS GRID ═══ */
+  .trips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:32px}
+
+  /* Real cards: rounded-3xl (24px), shadow-[0_4px_20px_rgba(44,62,80,0.05)], hover shadow-[0_6px_24px_rgba(44,62,80,0.08)] */
+  .trip-card{background:white;border-radius:24px;border:1.5px solid rgba(44,62,80,0.06);overflow:hidden;cursor:pointer;transition:all 0.25s;position:relative;box-shadow:0 4px 20px rgba(44,62,80,0.05)}
+  .trip-card:hover{border-color:rgba(0,180,216,0.2);box-shadow:0 6px 24px rgba(0,180,216,0.08);transform:translateY(-2px)}
+  .trip-card-hero{height:100px;background:linear-gradient(135deg,rgba(0,180,216,0.08),rgba(255,217,61,0.06));display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .trip-card-hero::before{content:'';position:absolute;top:-20px;right:-20px;width:100px;height:100px;background:radial-gradient(circle,rgba(255,217,61,0.12),transparent 70%);border-radius:50%}
+  .trip-card-hero::after{content:'';position:absolute;bottom:-15px;left:-10px;width:80px;height:80px;background:radial-gradient(circle,rgba(0,180,216,0.08),transparent 70%);border-radius:50%}
+  .trip-card-emoji{font-size:48px;position:relative;z-index:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.1));animation:float 3s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+  .trip-card-body{padding:16px 18px 18px}
+  .trip-card-name{font-family:'Outfit';font-size:17px;font-weight:700;margin-bottom:2px;line-height:1.2}
+  .trip-card-dest{font-size:12px;color:var(--vt);font-weight:500;margin-bottom:10px;display:flex;align-items:center;gap:4px}
+  .trip-card-dates{font-family:'Outfit';font-size:12px;color:rgba(44,62,80,0.45);margin-bottom:10px;display:flex;align-items:center;gap:5px}
+  .trip-card-meta{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  /* Badges/pills: rounded-full */
+  .trip-countdown{display:inline-flex;align-items:center;gap:3px;padding:4px 12px;border-radius:9999px;background:var(--vg);color:white;font-family:'Outfit';font-size:11px;font-weight:700}
+  /* Member chips with names on trip cards */
+  .trip-members{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+  .trip-member{display:inline-flex;align-items:center;gap:4px;padding:3px 10px 3px 4px;border-radius:9999px;background:var(--tint-slate-5);font-family:'Outfit';font-size:11px;font-weight:500;color:var(--deep-slate)}
+  .trip-member .dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;flex-shrink:0}
+  .trip-progress{display:flex;align-items:center;gap:8px}
+  .trip-prog-bar{flex:1;height:5px;border-radius:3px;background:rgba(44,62,80,0.06);overflow:hidden}
+  .trip-prog-fill{height:100%;border-radius:3px;background:var(--vg)}
+  .trip-prog-lbl{font-family:'Outfit';font-size:10px;font-weight:600;color:var(--vt);white-space:nowrap}
+  .trip-pending{display:inline-flex;align-items:center;gap:3px;padding:3px 10px;border-radius:9999px;background:var(--gold-tint);font-family:'Outfit';font-size:9px;font-weight:600;color:#B8860B;margin-top:6px}
+
+  /* ═══ EMPTY STATE ═══ */
+  /* Real: rounded-3xl bg-white p-6, standard shadow. Using dashed border for travel accent */
+  .empty-state{text-align:center;padding:60px 24px;background:white;border-radius:24px;border:2px dashed rgba(0,180,216,0.15);box-shadow:0 4px 20px rgba(44,62,80,0.05)}
+  .empty-state-emoji{font-size:56px;margin-bottom:12px;display:block}
+  .empty-state h3{font-family:'Outfit';font-size:20px;font-weight:700;margin-bottom:6px}
+  .empty-state p{font-size:13px;color:rgba(44,62,80,0.45);margin-bottom:20px;max-width:360px;margin-left:auto;margin-right:auto}
+
+  /* ═══ EXPANDED TRIP VIEW ═══ */
+  /* rounded-3xl = 24px ✓, use standard shadow */
+  .trip-expanded{background:white;border-radius:24px;box-shadow:0 4px 20px rgba(44,62,80,0.05);overflow:hidden;margin-bottom:24px}
+
+  /* Hero banner — compact but impactful. Countdown is prominent. */
+  .trip-hero{background:var(--vg);padding:18px 24px 16px;position:relative;overflow:hidden}
+  .trip-hero::before{content:'';position:absolute;top:-40px;right:-30px;width:180px;height:180px;background:radial-gradient(circle,rgba(255,217,61,0.14),transparent 70%);border-radius:50%}
+
+  /* Row 1: back/actions bar — minimal, top-right utility */
+  .trip-hero-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;position:relative;z-index:1}
+  .trip-hero-back{border:none;background:transparent;color:rgba(255,255,255,0.45);font-family:'Outfit';font-size:12px;font-weight:600;cursor:pointer;padding:2px 0;transition:color 0.15s}
+  .trip-hero-back:hover{color:white}
+  .trip-hero-actions{display:flex;gap:5px}
+  .trip-hero-btn{padding:5px 12px;border-radius:9999px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);font-family:'Outfit';font-size:11px;font-weight:600;color:rgba(255,255,255,0.55);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:3px}
+  .trip-hero-btn:hover{background:rgba(255,255,255,0.15);color:white;border-color:rgba(255,255,255,0.25)}
+
+  /* Row 2: emoji + name/subtitle */
+  .trip-hero-main{display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+  .trip-hero-emoji{font-size:40px;flex-shrink:0;filter:drop-shadow(0 2px 10px rgba(0,0,0,0.15));animation:heroFloat 4s ease-in-out infinite}
+  @keyframes heroFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .trip-hero-info{flex:1;min-width:0}
+  .trip-hero h2{font-size:22px;font-weight:800;color:white;line-height:1.2}
+  .trip-hero-subtitle{font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px}
+
+  /* Row 3: countdown + members together — countdown is the anchor */
+  .trip-hero-bottom{display:flex;align-items:center;gap:10px;margin-top:12px;position:relative;z-index:1;flex-wrap:wrap}
+  .trip-hero-countdown{display:inline-flex;align-items:center;gap:5px;padding:6px 16px;border-radius:9999px;background:rgba(255,255,255,0.16);backdrop-filter:blur(6px);border:1.5px solid rgba(255,255,255,0.1);flex-shrink:0}
+  .trip-hero-countdown .num{font-family:'Outfit';font-size:20px;font-weight:800;color:var(--gold);line-height:1}
+  .trip-hero-countdown .label{font-family:'Outfit';font-size:11px;font-weight:600;color:rgba(255,255,255,0.7)}
+  .trip-hero-members{display:flex;flex-wrap:wrap;gap:5px}
+  .trip-hero-member{display:inline-flex;align-items:center;gap:4px;padding:3px 10px 3px 4px;border-radius:9999px;background:rgba(255,255,255,0.08);font-family:'Outfit';font-size:11px;font-weight:500;color:rgba(255,255,255,0.75)}
+  .trip-hero-member .dot{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;flex-shrink:0}
+
+  /* Trip body — two columns */
+  .trip-body{display:grid;grid-template-columns:1fr 340px;gap:0;min-height:500px}
+  .trip-timeline{padding:24px 28px;border-right:1px solid rgba(44,62,80,0.06)}
+  .trip-ideas-panel{padding:24px;background:linear-gradient(180deg,rgba(255,217,61,0.03),rgba(0,180,216,0.02))}
+
+  /* Progress bar */
+  .trip-prog-banner{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--tint-slate-5);border-radius:16px;margin-bottom:20px}
+  .trip-prog-banner .emoji{font-size:16px}
+  .trip-prog-banner .bar{flex:1;height:8px;border-radius:4px;background:rgba(44,62,80,0.06);overflow:hidden}
+  .trip-prog-banner .fill{height:100%;border-radius:4px;background:var(--vg)}
+  .trip-prog-banner .lbl{font-family:'Outfit';font-size:12px;font-weight:600;color:var(--vt);white-space:nowrap}
+
+  /* ═══ VISUAL TIMELINE ═══ */
+  .tl{position:relative;padding-left:40px}
+  /* Vertical line */
+  .tl::before{content:'';position:absolute;top:0;bottom:0;left:15px;width:2px;background:linear-gradient(180deg,var(--vt),rgba(0,180,216,0.3));border-radius:1px}
+
+  /* Date node — circle on the line with label beside it */
+  .tl-date{position:relative;display:flex;align-items:center;gap:0;padding:14px 0 8px;margin:0}
+  .tl-date-dot{position:absolute;left:-40px;width:32px;height:32px;border-radius:50%;background:white;border:2.5px solid var(--vt);display:flex;align-items:center;justify-content:center;font-size:12px;z-index:2;box-shadow:0 2px 8px rgba(0,180,216,0.12)}
+  .tl-date-label{font-family:'Outfit';font-size:13px;font-weight:700;color:var(--deep-slate);display:flex;align-items:center;gap:6px}
+  .tl-date-label small{font-family:'Inter';font-size:11px;font-weight:400;color:rgba(44,62,80,0.35)}
+
+  /* Sea/duration span — thicker colored segment */
+  .tl-sea{position:relative;padding:10px 0;margin:4px 0}
+  .tl-sea::before{content:'';position:absolute;top:0;bottom:0;left:-29px;width:10px;border-radius:5px;background:linear-gradient(180deg,var(--vt),var(--vt-dark));opacity:0.2}
+  .tl-sea-label{font-family:'Outfit';font-size:11px;font-weight:600;color:var(--vt);display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--vt-tint);border-radius:9999px;width:fit-content}
+
+  /* Gap section — dashed line segment */
+  .tl-gap-section{position:relative;padding:4px 0}
+  .tl-gap-section::before{content:'';position:absolute;top:0;bottom:0;left:-29px;width:2px;border-left:2px dashed rgba(184,134,11,0.25);margin-left:3px}
+  .tl-gap-date{position:relative;display:flex;align-items:center;padding:10px 0 6px}
+  .tl-gap-date-dot{position:absolute;left:-40px;width:32px;height:32px;border-radius:50%;background:var(--gold-tint);border:2.5px dashed rgba(184,134,11,0.3);display:flex;align-items:center;justify-content:center;font-size:12px;z-index:2}
+  .tl-gap-date-label{font-family:'Outfit';font-size:12px;font-weight:600;color:#B8860B;display:flex;align-items:center;gap:5px}
+
+  /* Small connector dot for cards within same date */
+  .tl-card-wrap{position:relative;margin-bottom:8px}
+  .tl-card-wrap::before{content:'';position:absolute;top:16px;left:-33px;width:8px;height:8px;border-radius:50%;background:var(--vt);opacity:0.25;z-index:2}
+  .tl-card-wrap::after{content:'';position:absolute;top:19px;left:-25px;width:18px;height:2px;background:rgba(0,180,216,0.12);z-index:1}
+
+  /* Timeline segment cards */
+  .tl-card{background:white;border-radius:16px;border:1.5px solid rgba(44,62,80,0.06);overflow:hidden;transition:all 0.15s}
+  .tl-card:hover{box-shadow:0 2px 12px rgba(44,62,80,0.04);border-color:rgba(44,62,80,0.1)}
+  .tl-card-hdr{display:flex;align-items:center;gap:8px;padding:10px 14px;cursor:pointer;user-select:none}
+  .tl-card-hdr .emoji{font-size:16px}
+  .tl-card-hdr .title{font-family:'Outfit';font-size:13px;font-weight:600;flex:1}
+  .tl-card-hdr .kv{font-family:'Inter';font-size:11px;color:rgba(44,62,80,0.4);white-space:nowrap}
+  .tl-card-hdr .kv strong{font-family:'Outfit';font-weight:600;color:var(--deep-slate)}
+  .tl-st{font-family:'Outfit';font-size:9px;font-weight:600;padding:2px 8px;border-radius:9999px;text-transform:uppercase}
+  .tl-st.ok{background:rgba(39,174,96,0.1);color:var(--green)}
+  .tl-st.nb{background:var(--tint-slate-5);color:rgba(44,62,80,0.35)}
+  .tl-st.pend{background:var(--gold-tint);color:#B8860B}
+  .tl-exp{font-size:11px;color:rgba(44,62,80,0.2);margin-left:4px}
+
+  .tl-card-body{padding:0 14px 12px;border-top:1px solid rgba(44,62,80,0.04);padding-top:10px}
+  .tl-row{display:flex;align-items:center;gap:8px;padding:4px 0}
+  .tl-row+.tl-row{border-top:1px solid rgba(44,62,80,0.03)}
+  .tl-lbl{font-family:'Outfit';font-size:10px;font-weight:500;color:rgba(44,62,80,0.35);min-width:72px;flex-shrink:0}
+  .tl-val{font-family:'Inter';font-size:12px;flex:1}
+  .tl-edit-input{font-family:'Inter';font-size:12px;color:var(--deep-slate);background:transparent;border:none;border-bottom:1.5px dashed rgba(0,180,216,0.18);outline:none;padding:2px 0;flex:1;transition:all 0.15s}
+  .tl-edit-input:focus{border-bottom-color:var(--vt);border-bottom-style:solid}
+  .tl-edit-input:hover{border-bottom-color:rgba(0,180,216,0.35)}
+  .tl-section-edit{display:inline-flex;align-items:center;gap:3px;padding:4px 12px;border-radius:9999px;background:var(--vt-tint);border:none;font-family:'Outfit';font-size:10px;font-weight:600;color:var(--vt);cursor:pointer;transition:all 0.15s;margin-top:6px}
+  .tl-section-edit:hover{background:var(--vt-tint-15)}
+
+  /* Copyable pill */
+  .cp{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:9999px;background:white;border:1.5px solid rgba(44,62,80,0.06);cursor:pointer;transition:all 0.2s;position:relative;font-family:'Outfit';font-size:12px;font-weight:600;color:var(--deep-slate)}
+  .cp:hover{border-color:var(--vt);background:var(--vt-tint)}
+  .cp:active{transform:scale(0.97)}
+  .cp .ci{font-size:9px;opacity:0.3}
+  .cp:hover .ci{opacity:0.7}
+  .cp-toast{position:absolute;top:-22px;left:50%;transform:translateX(-50%) translateY(4px);background:var(--deep-slate);color:white;font-size:9px;font-weight:600;padding:2px 7px;border-radius:5px;white-space:nowrap;opacity:0;pointer-events:none;transition:all 0.25s cubic-bezier(0.175,0.885,0.32,1.275)}
+  .cp.copied .cp-toast{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* Not-booked gap */
+  .tl-gap-wrap{position:relative;margin-bottom:8px}
+  .tl-gap-wrap::before{content:'';position:absolute;top:16px;left:-33px;width:8px;height:8px;border-radius:50%;background:#B8860B;opacity:0.2;z-index:2}
+  .tl-gap-wrap::after{content:'';position:absolute;top:19px;left:-25px;width:18px;height:2px;background:rgba(184,134,11,0.1);z-index:1}
+  .tl-gap{display:flex;align-items:center;gap:7px;padding:10px 14px;border-radius:16px;background:var(--gold-tint);border:1.5px dashed rgba(184,134,11,0.12)}
+  .tl-gap .emoji{font-size:14px}
+  .tl-gap span{font-family:'Outfit';font-size:11px;font-weight:600;color:#B8860B}
+  .tl-gap small{font-size:10px;color:rgba(184,134,11,0.5);display:block}
+
+  /* ═══ IDEAS PANEL ═══ */
+  /* Header banner — visually distinct from list items */
+  .ideas-hdr{display:flex;align-items:center;gap:12px;padding:14px 16px;margin:-24px -24px 0;background:linear-gradient(135deg,rgba(255,217,61,0.1),rgba(0,180,216,0.06));border-bottom:1.5px solid rgba(255,217,61,0.12)}
+  .ideas-hdr-icon{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,0.7);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;box-shadow:0 2px 8px rgba(44,62,80,0.06)}
+  .ideas-hdr-text h3{font-family:'Outfit';font-size:17px;font-weight:700;color:var(--deep-slate)}
+  .ideas-hdr-text .sub{font-size:11px;color:rgba(44,62,80,0.45);margin-top:1px}
+
+  /* List label — clearly signals editable list below */
+  .ideas-list-label{font-family:'Outfit';font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:rgba(44,62,80,0.3);margin:16px 0 8px;padding:0 2px}
+
+  /* Cards: rounded-2xl (16px) — clear card treatment with edit affordance */
+  .idea-card{background:white;border-radius:16px;border:1.5px solid rgba(44,62,80,0.06);padding:12px;margin-bottom:8px;transition:all 0.15s;cursor:pointer;box-shadow:0 2px 8px rgba(44,62,80,0.03);position:relative}
+  .idea-card:hover{border-color:rgba(0,180,216,0.15);box-shadow:0 4px 14px rgba(0,180,216,0.08);transform:translateY(-1px)}
+  .idea-edit{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:8px;background:var(--tint-slate-5);display:flex;align-items:center;justify-content:center;font-size:12px;opacity:0;transition:all 0.15s}
+  .idea-card:hover .idea-edit{opacity:1}
+  .idea-edit:hover{background:var(--vt-tint)}
+
+  /* Mobile ideas teaser — shown at bottom of timeline on narrow screens */
+  .ideas-teaser{display:none;align-items:center;gap:10px;padding:12px 16px;margin-bottom:20px;background:linear-gradient(135deg,rgba(255,217,61,0.08),rgba(0,180,216,0.06));border:1.5px solid rgba(255,217,61,0.12);border-radius:16px;cursor:pointer;transition:all 0.15s}
+  .ideas-teaser:hover{box-shadow:0 4px 14px rgba(255,217,61,0.1);border-color:rgba(255,217,61,0.2)}
+  .ideas-teaser-icon{font-size:24px;flex-shrink:0}
+  .ideas-teaser-text{flex:1;font-family:'Outfit';font-size:13px;font-weight:600;color:var(--deep-slate)}
+  .ideas-teaser-text small{display:block;font-family:'Inter';font-size:11px;font-weight:400;color:rgba(44,62,80,0.4);margin-top:1px}
+  .ideas-teaser-arrow{font-family:'Outfit';font-size:14px;color:rgba(44,62,80,0.25);flex-shrink:0}
+  .idea-top{display:flex;align-items:flex-start;gap:10px}
+  .idea-vote{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:28px}
+  .idea-vote button{background:none;border:none;cursor:pointer;font-size:14px;padding:0;transition:transform 0.15s}
+  .idea-vote button:hover{transform:scale(1.2)}
+  .idea-vote .cnt{font-family:'Outfit';font-size:13px;font-weight:700;color:var(--vt)}
+  .idea-content{flex:1;min-width:0}
+  .idea-title{font-family:'Outfit';font-size:13px;font-weight:600;margin-bottom:2px}
+  .idea-desc{font-size:11px;color:rgba(44,62,80,0.45);margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .idea-meta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .idea-tag{font-family:'Outfit';font-size:9px;font-weight:600;padding:2px 8px;border-radius:9999px;background:var(--vt-tint);color:var(--vt)}
+  .idea-author{font-size:10px;color:rgba(44,62,80,0.3);display:flex;align-items:center;gap:3px}
+  .idea-author-dot{width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:7px;color:white;font-weight:700}
+
+  .ideas-add{display:flex;gap:6px;margin-top:10px}
+  /* Inputs: rounded-xl (12px) */
+  .ideas-add input{flex:1;padding:10px 14px;border-radius:12px;border:1.5px solid rgba(44,62,80,0.08);background:white;font-family:'Inter';font-size:13px;color:var(--deep-slate);outline:none}
+  .ideas-add input:focus{border-color:var(--vt);box-shadow:0 0 0 3px var(--vt-tint)}
+  .ideas-add input::placeholder{color:rgba(44,62,80,0.25)}
+  .ideas-add button{width:40px;height:40px;border-radius:12px;background:var(--vg);border:none;color:white;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+  /* ═══ EDIT MODAL (BeanieFormModal convention) ═══ */
+  /* BeanieFormModal convention: icon 44x44 rounded-[14px], title text-lg font-bold,
+     body bg-[#F8F9FA] px-6 py-5 space-y-5, save rounded-[16px] py-3.5 text-sm font-bold,
+     delete 48x48 rounded-[14px], labels tracking-[0.1em] */
+  .edit-modal-backdrop{position:fixed;top:56px;left:0;right:0;bottom:0;background:rgba(44,62,80,0.35);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
+  .edit-modal{background:white;border-radius:24px;width:100%;max-width:520px;box-shadow:0 24px 80px rgba(44,62,80,0.18);overflow:hidden}
+  .edit-modal-hdr{display:flex;align-items:center;gap:14px;padding:18px 24px;border-bottom:1px solid rgba(44,62,80,0.06)}
+  .edit-modal-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .edit-modal-title{font-family:'Outfit';font-size:18px;font-weight:700}
+  .edit-modal-sub{font-size:11px;color:rgba(44,62,80,0.4);margin-top:1px}
+  .edit-modal-close{margin-left:auto;width:32px;height:32px;border-radius:10px;border:none;background:var(--tint-slate-5);color:rgba(44,62,80,0.4);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .edit-modal-body{padding:20px 24px;background:var(--cloud-white);max-height:60vh;overflow-y:auto}
+  .edit-modal-footer{padding:16px 24px;display:flex;align-items:center;gap:12px;border-top:1px solid rgba(44,62,80,0.06);background:white}
+  .efg{margin-bottom:20px}
+  .efg:last-child{margin-bottom:0}
+  .efl{font-family:'Outfit';font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:rgba(44,62,80,0.35);margin-bottom:8px;display:flex;align-items:center;gap:5px}
+  .efi{width:100%;padding:12px 16px;border-radius:12px;border:1.5px solid rgba(44,62,80,0.1);background:white;font-family:'Inter';font-size:14px;color:var(--deep-slate);outline:none;transition:all 0.15s}
+  .efi:focus{border-color:var(--vt);box-shadow:0 0 0 3px var(--vt-tint)}
+  .efi::placeholder{color:rgba(44,62,80,0.28)}
+  .efr{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .ebadge{font-size:9px;font-weight:600;padding:1px 6px;border-radius:6px;text-transform:uppercase}
+  .ebadge-r{background:var(--tint-orange-15);color:var(--heritage-orange)}
+  .esave{flex:1;padding:14px 24px;border-radius:16px;background:var(--vg);color:white;font-family:'Outfit';font-size:14px;font-weight:700;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(0,180,216,0.15);transition:all 0.2s}
+  .esave:hover{box-shadow:0 4px 16px rgba(0,180,216,0.25)}
+  .edelete{width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.08);border:none;font-size:20px;cursor:pointer;border-radius:14px;flex-shrink:0;transition:all 0.15s}
+  .edelete:hover{transform:scale(1.05)}
+  textarea.efi{resize:vertical;min-height:60px}
+
+  /* ═══ RESPONSIVE ═══ */
+  @media(max-width:1100px){
+    .trip-body{grid-template-columns:1fr}
+    .trip-ideas-panel{border-top:1px solid rgba(44,62,80,0.06)}
+    /* Show the ideas teaser at bottom of timeline when ideas panel stacks below */
+    .ideas-teaser{display:flex}
+  }
+  @media(max-width:768px){
+    .sidebar{display:none}
+    .trips-grid{grid-template-columns:1fr}
+    .main-inner{padding:20px 16px}
+    /* On mobile: countdown gets its own line for prominence */
+    .trip-hero-bottom{flex-direction:column;align-items:flex-start;gap:8px}
+    .trip-hero-countdown .num{font-size:18px}
+    .trip-hero-main{gap:10px}
+    .trip-hero-emoji{font-size:34px}
+    .trip-hero h2{font-size:19px}
+  }
+</style>
+</head>
+<body>
+
+<nav class="mnav">
+  <span class="mnav-logo">beanies.family</span>
+  <button class="active" onclick="showScreen('s1')">1. trip list</button>
+  <button onclick="showScreen('s2')">2. expanded trip</button>
+  <button onclick="showScreen('s3')">3. edit segment modal</button>
+  <button onclick="showScreen('s4')">4. empty state</button>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 1 — TRIP LIST (main travel plans page)
+     ══════════════════════════════════════════════════════════ -->
+<div id="s1" class="screen active">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-logo">🫘</div>
+      <div><div class="sb-brand-name"><span class="white">beanies</span><span class="orange">.family</span></div><div class="sb-brand-sub">every bean counts</div></div>
+    </div>
+
+    <div class="sb-section">
+      <button class="sb-section-btn open treehouse"><span class="emoji">🌳</span> treehouse <span class="chev">▾</span></button>
+      <div class="sb-items">
+        <button class="sb-item"><span class="emoji">🏡</span> nook</button>
+        <button class="sb-item"><span class="emoji">📅</span> our activities</button>
+        <button class="sb-item active"><span class="emoji">✈️</span> travel plans</button>
+        <button class="sb-item"><span class="emoji">✅</span> to-do</button>
+        <button class="sb-item"><span class="emoji">👨‍👩‍👧</span> family</button>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <button class="sb-section-btn piggy"><span class="emoji">🐷</span> piggy bank <span class="chev">▸</span></button>
+    </div>
+
+    <div class="sb-divider"></div>
+    <button class="sb-item"><span class="emoji">📚</span> help</button>
+    <button class="sb-item"><span class="emoji">⚙️</span> settings</button>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+    <div class="main-inner">
+      <div class="page-hdr">
+        <div>
+          <h1>✈️ travel plans</h1>
+          <div class="page-hdr-sub">where are the beans headed next?</div>
+        </div>
+        <button class="btn-create">+ plan a trip 🌴</button>
+      </div>
+
+      <!-- Trip cards grid -->
+      <div class="trips-grid">
+        <!-- Trip 1 — Caribbean Cruise -->
+        <div class="trip-card" onclick="showScreen('s2')">
+          <div class="trip-card-hero">
+            <span class="trip-card-emoji">🚢</span>
+          </div>
+          <div class="trip-card-body">
+            <div class="trip-card-name">caribbean cruise 2026</div>
+            <div class="trip-card-dest">📍 eastern caribbean</div>
+            <div class="trip-card-dates">📅 jul 10 – jul 18, 2026</div>
+            <div class="trip-card-meta">
+              <span class="trip-countdown">✈️ 113 days!</span>
+            </div>
+            <div class="trip-members">
+              <span class="trip-member"><span class="dot" style="background:#3498DB">G</span> greg</span>
+              <span class="trip-member"><span class="dot" style="background:#E74C8B">L</span> lisa</span>
+              <span class="trip-member"><span class="dot" style="background:#F39C12">E</span> emma</span>
+              <span class="trip-member"><span class="dot" style="background:#27AE60">J</span> jack</span>
+            </div>
+            <div class="trip-progress" style="margin-top:10px">
+              <div class="trip-prog-bar"><div class="trip-prog-fill" style="width:67%"></div></div>
+              <span class="trip-prog-lbl">4/6 booked</span>
+            </div>
+            <div class="trip-pending">⏳ 2 items need booking</div>
+          </div>
+        </div>
+
+        <!-- Trip 2 — Ski Trip -->
+        <div class="trip-card">
+          <div class="trip-card-hero" style="background:linear-gradient(135deg,rgba(167,139,250,0.08),rgba(124,58,237,0.06))">
+            <span class="trip-card-emoji">⛷️</span>
+          </div>
+          <div class="trip-card-body">
+            <div class="trip-card-name">ski trip — vermont</div>
+            <div class="trip-card-dest">📍 stowe, VT</div>
+            <div class="trip-card-dates">📅 dec 20 – dec 27, 2026</div>
+            <div class="trip-card-meta">
+              <span class="trip-countdown" style="background:linear-gradient(135deg,#A78BFA,#7C3AED)">⛷️ 275 days!</span>
+            </div>
+            <div class="trip-members">
+              <span class="trip-member"><span class="dot" style="background:#3498DB">G</span> greg</span>
+              <span class="trip-member"><span class="dot" style="background:#E74C8B">L</span> lisa</span>
+              <span class="trip-member"><span class="dot" style="background:#F39C12">E</span> emma</span>
+              <span class="trip-member"><span class="dot" style="background:#27AE60">J</span> jack</span>
+            </div>
+            <div class="trip-progress">
+              <div class="trip-prog-bar"><div class="trip-prog-fill" style="width:20%;background:linear-gradient(135deg,#A78BFA,#7C3AED)"></div></div>
+              <span class="trip-prog-lbl" style="color:#7C3AED">1/5 booked</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Past trips — collapsible section (matching completed todo convention) -->
+      <div style="margin-top:8px">
+        <button type="button" onclick="var s=document.getElementById('past-trips');s.style.display=s.style.display==='none'?'grid':'none';this.querySelector('.chv').textContent=s.style.display==='none'?'▸':'▾'" style="display:flex;align-items:center;gap:6px;font-family:'Outfit';font-size:13px;font-weight:600;color:rgba(44,62,80,0.4);background:none;border:none;cursor:pointer;padding:4px 0;transition:color 0.15s" onmouseenter="this.style.color='var(--deep-slate)'" onmouseleave="this.style.color='rgba(44,62,80,0.4)'">
+          <span class="chv" style="font-size:10px;opacity:0.5">▸</span>
+          past trips (1)
+        </button>
+        <div id="past-trips" style="display:none;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:10px">
+          <div class="trip-card" style="opacity:0.5">
+            <div class="trip-card-hero" style="background:linear-gradient(135deg,rgba(39,174,96,0.06),rgba(46,204,113,0.04));height:80px">
+              <span class="trip-card-emoji" style="animation:none;font-size:36px">🏕️</span>
+            </div>
+            <div class="trip-card-body">
+              <div class="trip-card-name">camping — blue ridge</div>
+              <div class="trip-card-dest">📍 shenandoah, VA</div>
+              <div class="trip-card-dates">📅 may 24 – may 27, 2025</div>
+              <div class="trip-card-meta">
+                <span style="font-family:'Outfit';font-size:11px;font-weight:600;color:rgba(44,62,80,0.35);padding:4px 10px;border-radius:8px;background:var(--tint-slate-5)">✓ completed</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 2 — EXPANDED TRIP (full page view)
+     ══════════════════════════════════════════════════════════ -->
+<div id="s2" class="screen">
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-logo">🫘</div>
+      <div><div class="sb-brand-name"><span class="white">beanies</span><span class="orange">.family</span></div><div class="sb-brand-sub">every bean counts</div></div>
+    </div>
+    <div class="sb-section">
+      <button class="sb-section-btn open treehouse"><span class="emoji">🌳</span> treehouse <span class="chev">▾</span></button>
+      <div class="sb-items">
+        <button class="sb-item"><span class="emoji">🏡</span> nook</button>
+        <button class="sb-item"><span class="emoji">📅</span> our activities</button>
+        <button class="sb-item active"><span class="emoji">✈️</span> travel plans</button>
+        <button class="sb-item"><span class="emoji">✅</span> to-do</button>
+        <button class="sb-item"><span class="emoji">👨‍👩‍👧</span> family</button>
+      </div>
+    </div>
+    <div class="sb-section">
+      <button class="sb-section-btn piggy"><span class="emoji">🐷</span> piggy bank <span class="chev">▸</span></button>
+    </div>
+    <div class="sb-divider"></div>
+    <button class="sb-item"><span class="emoji">📚</span> help</button>
+    <button class="sb-item"><span class="emoji">⚙️</span> settings</button>
+  </div>
+
+  <div class="main">
+    <div class="main-inner" style="max-width:1200px">
+      <div class="trip-expanded">
+        <!-- Hero banner — three compact rows -->
+        <div class="trip-hero">
+          <!-- Row 1: utility nav -->
+          <div class="trip-hero-nav">
+            <button class="trip-hero-back" onclick="showScreen('s1')">← all trips</button>
+            <div class="trip-hero-actions">
+              <button class="trip-hero-btn">✏️ edit</button>
+              <button class="trip-hero-btn">📤 share</button>
+            </div>
+          </div>
+          <!-- Row 2: emoji + name -->
+          <div class="trip-hero-main">
+            <span class="trip-hero-emoji">🚢</span>
+            <div class="trip-hero-info">
+              <h2>caribbean cruise 2026</h2>
+              <div class="trip-hero-subtitle">📍 eastern caribbean · jul 10 – 18, 2026</div>
+            </div>
+          </div>
+          <!-- Row 3: countdown (leading) + members — wraps on mobile -->
+          <div class="trip-hero-bottom">
+            <div class="trip-hero-countdown">
+              <span class="num">113</span>
+              <span class="label">days to go! ✈️</span>
+            </div>
+            <div class="trip-hero-members">
+              <span class="trip-hero-member"><span class="dot" style="background:#3498DB">G</span> greg</span>
+              <span class="trip-hero-member"><span class="dot" style="background:#E74C8B">L</span> lisa</span>
+              <span class="trip-hero-member"><span class="dot" style="background:#F39C12">E</span> emma</span>
+              <span class="trip-hero-member"><span class="dot" style="background:#27AE60">J</span> jack</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Two-column body: Timeline + Ideas -->
+        <div class="trip-body">
+          <!-- LEFT: Chronological timeline -->
+          <div class="trip-timeline">
+            <!-- Progress -->
+            <div class="trip-prog-banner">
+              <span class="emoji">📋</span>
+              <div class="bar"><div class="fill" style="width:67%"></div></div>
+              <span class="lbl">4 of 6 booked</span>
+            </div>
+
+            <!-- Ideas teaser — only visible on tablet/mobile when ideas panel stacks below -->
+            <div class="ideas-teaser" onclick="document.querySelector('.trip-ideas-panel').scrollIntoView({behavior:'smooth'})">
+              <span class="ideas-teaser-icon">🌟</span>
+              <div class="ideas-teaser-text">4 ideas on the bean bucket list!<small>the family has been brainstorming — tap to see & vote</small></div>
+              <span class="ideas-teaser-arrow">↓</span>
+            </div>
+
+            <div style="font-family:'Outfit';font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:6px">📅 trip timeline <span style="font-size:11px;font-weight:500;color:rgba(44,62,80,0.35)">— click any field to edit</span></div>
+
+            <!-- VISUAL TIMELINE -->
+            <div class="tl">
+
+              <!-- ● JUL 10 -->
+              <div class="tl-date">
+                <div class="tl-date-dot">📅</div>
+                <div class="tl-date-label">thu, jul 10 <small>· check in day</small></div>
+              </div>
+
+              <div class="tl-card-wrap">
+                <div class="tl-card">
+                  <div class="tl-card-hdr" onclick="togTL(this)">
+                    <span class="emoji">🏨</span>
+                    <span class="title">hotel check-in</span>
+                    <span class="kv"><strong>CVH-44892</strong> · condado vanderbilt</span>
+                    <span class="tl-st ok">✓</span>
+                    <span class="tl-exp">▾</span>
+                  </div>
+                  <div class="tl-card-body">
+                    <div class="tl-row"><span class="tl-lbl">hotel</span><input class="tl-edit-input" value="condado vanderbilt hotel" style="font-weight:500" /></div>
+                    <div class="tl-row"><span class="tl-lbl">room</span><input class="tl-edit-input" value="family suite — ocean view" /></div>
+                    <div class="tl-row"><span class="tl-lbl">address</span><span class="tl-val"><span class="cp" onclick="copyV(this,'1055 Ashford Ave, San Juan, PR')" style="font-weight:400;font-family:'Inter';font-size:11px">1055 ashford ave, san juan <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+                    <div class="tl-row"><span class="tl-lbl">confirmation</span><span class="tl-val"><span class="cp" onclick="copyV(this,'CVH-44892')">CVH-44892 <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+                    <div class="tl-row"><span class="tl-lbl">phone</span><span class="tl-val"><span class="cp" onclick="copyV(this,'+1 (787) 721-5500')" style="font-weight:400;font-family:'Inter';font-size:11px">+1 (787) 721-5500 <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+                    <div class="tl-row"><span class="tl-lbl">notes</span><input class="tl-edit-input" placeholder="add a note..." value="" style="color:rgba(44,62,80,0.3)" /></div>
+                    <button class="tl-section-edit" onclick="showScreen('s3')">✏️ edit details</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ⚠️ GAP: rental car for airport → hotel (inline warning) -->
+              <div class="tl-gap-wrap">
+                <div class="tl-gap" style="cursor:pointer" onclick="showScreen('s3')">
+                  <span class="emoji">🚗</span>
+                  <div style="flex:1"><span>rental car — still researching</span><small>how are the beans getting from airport to hotel?</small></div>
+                  <button style="padding:3px 10px;border-radius:9999px;background:var(--vt-tint);border:1.5px solid rgba(0,180,216,0.15);font-family:'Outfit';font-size:10px;font-weight:600;color:var(--vt);cursor:pointer;white-space:nowrap">+ add</button>
+                </div>
+              </div>
+
+              <!-- ● JUL 11 -->
+              <div class="tl-date">
+                <div class="tl-date-dot">✈️</div>
+                <div class="tl-date-label">fri, jul 11 <small>· travel day</small></div>
+              </div>
+
+              <div class="tl-card-wrap">
+                <div class="tl-card">
+                  <div class="tl-card-hdr" onclick="togTL(this)">
+                    <span class="emoji">🛫</span>
+                    <span class="title">outbound flight</span>
+                    <span class="kv"><strong>DL 1842</strong> · 8:30am · JFK → SJU</span>
+                    <span class="tl-st ok">✓</span>
+                    <span class="tl-exp">▾</span>
+                  </div>
+                  <div class="tl-card-body">
+                    <div class="tl-row"><span class="tl-lbl">airline</span><input class="tl-edit-input" value="delta airlines" /></div>
+                    <div class="tl-row"><span class="tl-lbl">flight</span><span class="tl-val"><span class="cp" onclick="copyV(this,'DL 1842')">DL 1842 <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+                    <div class="tl-row"><span class="tl-lbl">route</span><input class="tl-edit-input" value="JFK → SJU" style="font-weight:500" /></div>
+                    <div class="tl-row"><span class="tl-lbl">date / time</span><input class="tl-edit-input" value="jul 11, 2026 · 8:30am" style="font-weight:500" /></div>
+                    <div class="tl-row"><span class="tl-lbl">booking</span><span class="tl-val"><span class="cp" onclick="copyV(this,'GKXT4R')">GKXT4R <span class="ci">📋</span><span class="cp-toast">copied!</span></span></span></div>
+                    <div class="tl-row"><span class="tl-lbl">notes</span><input class="tl-edit-input" value="terminal 4 — check-in by 6:30am" /></div>
+                    <button class="tl-section-edit" onclick="showScreen('s3')">✏️ edit details</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tl-card-wrap">
+                <div class="tl-card">
+                  <div class="tl-card-hdr">
+                    <span class="emoji">🚐</span>
+                    <span class="title">airport → hotel shuttle</span>
+                    <span class="kv"><strong>ISPR-7782</strong></span>
+                    <span class="tl-st ok">✓</span>
+                    <span class="tl-exp">▸</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tl-card-wrap">
+                <div class="tl-card">
+                  <div class="tl-card-hdr">
+                    <span class="emoji">🏨</span>
+                    <span class="title">hotel check-out</span>
+                    <span class="kv">condado vanderbilt</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tl-card-wrap">
+                <div class="tl-card">
+                  <div class="tl-card-hdr">
+                    <span class="emoji">🚢</span>
+                    <span class="title">cruise embarkation</span>
+                    <span class="kv"><strong>D-428</strong> · royal caribbean</span>
+                    <span class="tl-st ok">✓</span>
+                    <span class="tl-exp">▸</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 🚢 AT SEA — thicker line segment -->
+              <div class="tl-sea">
+                <div class="tl-sea-label">🚢 jul 11 – jul 18 · at sea</div>
+              </div>
+
+              <!-- ● JUL 18 -->
+              <div class="tl-date">
+                <div class="tl-date-dot">🚢</div>
+                <div class="tl-date-label">sat, jul 18 <small>· disembarkation</small></div>
+              </div>
+
+              <div class="tl-card-wrap">
+                <div class="tl-card">
+                  <div class="tl-card-hdr">
+                    <span class="emoji">🚢</span>
+                    <span class="title">cruise disembarkation</span>
+                    <span class="kv">san juan, PR</span>
+                    <span class="tl-st ok">✓</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ⚠️ GAP: no hotel for tonight — right after disembarkation -->
+              <div class="tl-gap-wrap">
+                <div class="tl-gap" style="cursor:pointer" onclick="showScreen('s3')">
+                  <span class="emoji">🏨</span>
+                  <div style="flex:1"><span>no hotel booked for tonight</span><small>the beans need a place to sleep on jul 18!</small></div>
+                  <button style="padding:3px 10px;border-radius:9999px;background:var(--vt-tint);border:1.5px solid rgba(0,180,216,0.15);font-family:'Outfit';font-size:10px;font-weight:600;color:var(--vt);cursor:pointer;white-space:nowrap">+ add</button>
+                </div>
+              </div>
+
+              <!-- ● JUL 19 (or TBD) — return journey gap -->
+              <div class="tl-gap-section">
+                <div class="tl-gap-date">
+                  <div class="tl-gap-date-dot">❓</div>
+                  <div class="tl-gap-date-label">return date TBD</div>
+                </div>
+
+                <div class="tl-gap-wrap">
+                  <div class="tl-gap" style="cursor:pointer" onclick="showScreen('s3')">
+                    <span class="emoji">🛬</span>
+                    <div style="flex:1"><span>return flight — not booked yet</span><small>no way home booked — the beans are stranded! 😱</small></div>
+                    <button style="padding:3px 10px;border-radius:9999px;background:var(--vt-tint);border:1.5px solid rgba(0,180,216,0.15);font-family:'Outfit';font-size:10px;font-weight:600;color:var(--vt);cursor:pointer;white-space:nowrap">+ add</button>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- end .tl -->
+          </div>
+
+          <!-- RIGHT: Ideas panel -->
+          <div class="trip-ideas-panel">
+            <!-- Strong header banner — visually distinct from the list items -->
+            <div class="ideas-hdr">
+              <div class="ideas-hdr-icon">🌟</div>
+              <div class="ideas-hdr-text">
+                <h3>bean bucket list</h3>
+                <div class="sub">everyone can add & vote! tap an idea to edit.</div>
+              </div>
+            </div>
+
+            <!-- List label -->
+            <div class="ideas-list-label">4 ideas · sorted by votes</div>
+
+            <div class="idea-card">
+              <span class="idea-edit">✏️</span>
+              <div class="idea-top">
+                <div class="idea-vote"><button>❤️</button><span class="cnt">4</span></div>
+                <div class="idea-content">
+                  <div class="idea-title">snorkel at trunk bay 🐠</div>
+                  <div class="idea-desc">the underwater snorkeling trail in st. john — perfect for kids! clear water and loads of fish.</div>
+                  <div class="idea-meta">
+                    <span class="idea-tag">🏖️ beach</span>
+                    <span class="idea-tag" style="background:rgba(39,174,96,0.08);color:var(--green)">🆓 free</span>
+                    <span class="idea-author"><span class="idea-author-dot" style="background:#3498DB">G</span> greg</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="idea-card">
+              <span class="idea-edit">✏️</span>
+              <div class="idea-top">
+                <div class="idea-vote"><button>❤️</button><span class="cnt">3</span></div>
+                <div class="idea-content">
+                  <div class="idea-title">pirate ship excursion ☠️</div>
+                  <div class="idea-desc">kids dress up as pirates, sword fighting, and treasure hunt on the ship!</div>
+                  <div class="idea-meta">
+                    <span class="idea-tag">🎭 activity</span>
+                    <span class="idea-tag" style="background:var(--tint-orange-8);color:var(--heritage-orange)">💰 ~$120</span>
+                    <span class="idea-author"><span class="idea-author-dot" style="background:#F39C12">E</span> emma</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="idea-card">
+              <span class="idea-edit">✏️</span>
+              <div class="idea-top">
+                <div class="idea-vote"><button>🤍</button><span class="cnt">2</span></div>
+                <div class="idea-content">
+                  <div class="idea-title">magens bay beach day 🌴</div>
+                  <div class="idea-desc">one of the best beaches in the world! calm water for the little beans.</div>
+                  <div class="idea-meta">
+                    <span class="idea-tag">🏖️ beach</span>
+                    <span class="idea-author"><span class="idea-author-dot" style="background:#E74C8B">L</span> lisa</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="idea-card">
+              <span class="idea-edit">✏️</span>
+              <div class="idea-top">
+                <div class="idea-vote"><button>🤍</button><span class="cnt">1</span></div>
+                <div class="idea-content">
+                  <div class="idea-title">find the best ice cream 🍦</div>
+                  <div class="idea-desc">try a different ice cream shop at every port. vote for the winner!</div>
+                  <div class="idea-meta">
+                    <span class="idea-tag">🍽️ food</span>
+                    <span class="idea-author"><span class="idea-author-dot" style="background:#27AE60">J</span> jack</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="ideas-add">
+              <input placeholder="add an idea... 🤩" />
+              <button>+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 3 — EDIT SEGMENT MODAL (BeanieFormModal convention)
+     Shows a flight edit as example. Same pattern for hotel, cruise, etc.
+     ══════════════════════════════════════════════════════════ -->
+<div id="s3" class="screen" style="position:relative">
+  <!-- Reuse sidebar + main from screen 2 as background context -->
+  <div class="sidebar" style="opacity:0.3;pointer-events:none">
+    <div class="sb-brand"><div class="sb-brand-logo">🫘</div><div><div class="sb-brand-name">beanies.family</div></div></div>
+  </div>
+  <div class="main" style="opacity:0.15;pointer-events:none;filter:blur(2px)">
+    <div class="main-inner" style="max-width:1200px"><div class="trip-expanded"><div class="trip-hero" style="padding:20px 24px"><div class="trip-hero-top"><span class="trip-hero-emoji" style="font-size:32px">🚢</span><div class="trip-hero-info"><h2 style="font-size:18px">caribbean cruise 2026</h2></div></div></div></div></div>
+  </div>
+
+  <!-- Modal overlay -->
+  <div class="edit-modal-backdrop">
+    <div class="edit-modal">
+      <div class="edit-modal-hdr">
+        <div class="edit-modal-icon" style="background:rgba(59,130,246,0.08)">🛫</div>
+        <div>
+          <div class="edit-modal-title">edit outbound flight</div>
+          <div class="edit-modal-sub">caribbean cruise 2026</div>
+        </div>
+        <button class="edit-modal-close" onclick="showScreen('s2')">✕</button>
+      </div>
+      <div class="edit-modal-body">
+        <div class="efr" style="margin-bottom:16px">
+          <div class="efg">
+            <div class="efl">airline <span style="color:var(--heritage-orange)">*</span></div>
+            <input class="efi" value="delta airlines" />
+          </div>
+          <div class="efg">
+            <div class="efl">flight number <span style="color:var(--heritage-orange)">*</span></div>
+            <input class="efi" value="DL 1842" />
+          </div>
+        </div>
+
+        <div class="efr" style="margin-bottom:16px">
+          <div class="efg">
+            <div class="efl">from <span style="color:var(--heritage-orange)">*</span></div>
+            <input class="efi" value="JFK — new york" />
+          </div>
+          <div class="efg">
+            <div class="efl">to <span style="color:var(--heritage-orange)">*</span></div>
+            <input class="efi" value="SJU — san juan" />
+          </div>
+        </div>
+
+        <div class="efr" style="margin-bottom:16px">
+          <div class="efg">
+            <div class="efl">date <span style="color:var(--heritage-orange)">*</span></div>
+            <input class="efi" type="date" value="2026-07-11" />
+          </div>
+          <div class="efg">
+            <div class="efl">departure time</div>
+            <input class="efi" type="time" value="08:30" />
+          </div>
+        </div>
+
+        <div class="efg">
+          <div class="efl">booking reference</div>
+          <input class="efi" value="GKXT4R" placeholder="e.g. ABCDEF" />
+        </div>
+
+        <div class="efg">
+          <div class="efl">notes</div>
+          <textarea class="efi" rows="2" placeholder="any extra details...">terminal 4 — check-in by 6:30am</textarea>
+        </div>
+
+        <!-- Booking status -->
+        <div class="efg">
+          <div class="efl">booking status</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:12px;border:2px solid var(--green);background:rgba(39,174,96,0.06);font-family:'Outfit';font-size:12px;font-weight:600;color:var(--green);cursor:pointer">✓ booked</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:12px;border:2px solid transparent;background:var(--tint-slate-5);font-family:'Outfit';font-size:12px;font-weight:500;color:rgba(44,62,80,0.45);cursor:pointer">🔍 researching</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:12px;border:2px solid transparent;background:var(--tint-slate-5);font-family:'Outfit';font-size:12px;font-weight:500;color:rgba(44,62,80,0.45);cursor:pointer">⏳ not booked</span>
+          </div>
+        </div>
+      </div>
+      <div class="edit-modal-footer">
+        <button class="edelete" title="delete">🗑️</button>
+        <button class="esave">save flight</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     SCREEN 4 — EMPTY STATE
+     ══════════════════════════════════════════════════════════ -->
+<div id="s4" class="screen">
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div class="sb-brand-logo">🫘</div>
+      <div><div class="sb-brand-name"><span class="white">beanies</span><span class="orange">.family</span></div><div class="sb-brand-sub">every bean counts</div></div>
+    </div>
+    <div class="sb-section">
+      <button class="sb-section-btn open treehouse"><span class="emoji">🌳</span> treehouse <span class="chev">▾</span></button>
+      <div class="sb-items">
+        <button class="sb-item"><span class="emoji">🏡</span> nook</button>
+        <button class="sb-item"><span class="emoji">📅</span> our activities</button>
+        <button class="sb-item active"><span class="emoji">✈️</span> travel plans</button>
+        <button class="sb-item"><span class="emoji">✅</span> to-do</button>
+        <button class="sb-item"><span class="emoji">👨‍👩‍👧</span> family</button>
+      </div>
+    </div>
+    <div class="sb-section">
+      <button class="sb-section-btn piggy"><span class="emoji">🐷</span> piggy bank <span class="chev">▸</span></button>
+    </div>
+    <div class="sb-divider"></div>
+    <button class="sb-item"><span class="emoji">📚</span> help</button>
+    <button class="sb-item"><span class="emoji">⚙️</span> settings</button>
+  </div>
+
+  <div class="main">
+    <div class="main-inner">
+      <div class="page-hdr">
+        <div>
+          <h1>✈️ travel plans</h1>
+          <div class="page-hdr-sub">where are the beans headed next?</div>
+        </div>
+        <button class="btn-create">+ plan a trip 🌴</button>
+      </div>
+
+      <div class="empty-state">
+        <span class="empty-state-emoji">🌍</span>
+        <h3>no trips planned yet!</h3>
+        <p>the beans haven't planned any adventures. start by adding your first family trip — flights, hotels, ideas, and more!</p>
+        <button class="btn-create">+ plan your first trip ✈️</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showScreen(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.mnav button').forEach(b=>b.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+  function togTL(hdr){
+    var body=hdr.nextElementSibling;
+    if(body&&body.classList.contains('tl-card-body')){
+      body.style.display=body.style.display==='none'?'block':'none';
+      hdr.querySelector('.tl-exp').textContent=body.style.display==='none'?'▸':'▾';
+    }
+  }
+  function copyV(el,text){
+    if(navigator.clipboard)navigator.clipboard.writeText(text);
+    el.classList.add('copied');setTimeout(()=>el.classList.remove('copied'),1200);
+  }
+</script>
+</body>
+</html>

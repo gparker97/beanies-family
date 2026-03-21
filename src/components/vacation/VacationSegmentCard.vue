@@ -22,6 +22,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   'update:title': [value: string];
   'update:collapsed': [value: boolean];
+  edit: [];
   delete: [];
 }>();
 
@@ -69,7 +70,7 @@ async function handleDelete() {
 
 <template>
   <div
-    class="rounded-2xl border bg-white transition-shadow hover:shadow-md dark:bg-slate-800"
+    class="group/card rounded-2xl border bg-white transition-shadow hover:shadow-md dark:bg-slate-800"
     :class="
       isNotBooked
         ? 'border-dashed border-[var(--vacation-gold-tint)] bg-[var(--vacation-gold-tint)]'
@@ -88,10 +89,12 @@ async function handleDelete() {
           {{ t(statusConfig.key as any) }}
         </span>
 
-        <div v-if="!readOnly" class="group/title relative min-w-0 flex-1" @click.stop>
+        <!-- Editable title — auto-width, not full row -->
+        <div v-if="!readOnly" class="group/title relative min-w-0 shrink" @click.stop>
           <input
             :value="title"
-            class="font-outfit w-full border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
+            class="font-outfit w-auto max-w-[180px] min-w-[60px] border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
+            :size="Math.max(title.length, 6)"
             @input="emit('update:title', ($event.target as HTMLInputElement).value)"
           />
           <span
@@ -102,7 +105,7 @@ async function handleDelete() {
         </div>
         <span
           v-else
-          class="font-outfit min-w-0 flex-1 text-sm font-semibold text-slate-900 dark:text-gray-100"
+          class="font-outfit min-w-0 shrink text-sm font-semibold text-slate-900 dark:text-gray-100"
         >
           {{ title }}
         </span>
@@ -111,6 +114,30 @@ async function handleDelete() {
           {{ subtitle }}
         </span>
 
+        <!-- Spacer to push actions to right -->
+        <div class="flex-1" />
+
+        <!-- Edit button — always visible on mobile, hover-reveal on desktop -->
+        <button
+          v-if="!readOnly"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-300 transition-all hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] lg:opacity-0 lg:group-hover/card:opacity-100"
+          title="Edit"
+          @click.stop="$emit('edit')"
+        >
+          ✏️
+        </button>
+
+        <!-- Delete button — always visible on mobile, hover-reveal on desktop -->
+        <button
+          v-if="deletable && !readOnly"
+          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-300 transition-all hover:bg-red-50 hover:text-red-500 lg:opacity-0 lg:group-hover/card:opacity-100 dark:hover:bg-red-900/20"
+          title="Delete"
+          @click.stop="handleDelete"
+        >
+          🗑️
+        </button>
+
+        <!-- Chevron -->
         <button
           class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-base text-gray-400 transition-colors hover:bg-slate-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
           @click.stop="toggleCollapse"
@@ -128,22 +155,14 @@ async function handleDelete() {
       </div>
     </div>
 
-    <!-- Collapsible body -->
+    <!-- Collapsible body — clicking whitespace opens edit modal -->
     <div
       class="overflow-hidden transition-all duration-300"
       :class="collapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'"
     >
-      <div class="px-4 pb-4">
+      <div class="px-4 pb-4" @click="$emit('edit')">
+        <!-- Slot content: click.stop on interactive elements prevents edit -->
         <slot />
-
-        <!-- Delete button at the bottom of the expanded body -->
-        <button
-          v-if="deletable && !readOnly"
-          class="mt-3 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300"
-          @click.stop="handleDelete"
-        >
-          🗑️ {{ t('vacation.deleteSegmentTitle' as any) }}
-        </button>
       </div>
     </div>
   </div>

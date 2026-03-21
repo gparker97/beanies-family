@@ -1,0 +1,246 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
+import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import { useTranslation } from '@/composables/useTranslation';
+import { useFormModal } from '@/composables/useFormModal';
+import { useVacationStore } from '@/stores/vacationStore';
+import type { VacationTransportation, VacationSegmentStatus } from '@/types/models';
+
+interface Props {
+  open: boolean;
+  transportation?: VacationTransportation;
+  vacationId: string;
+  transportationIndex: number;
+}
+
+const props = defineProps<Props>();
+const emit = defineEmits<{ close: [] }>();
+
+const { t } = useTranslation();
+const vacationStore = useVacationStore();
+
+// Form fields
+const title = ref('');
+const status = ref<VacationSegmentStatus>('not_booked');
+const bookingReference = ref('');
+const pickupDate = ref('');
+const pickupTime = ref('');
+const returnDate = ref('');
+const returnTime = ref('');
+const agencyName = ref('');
+const agencyAddress = ref('');
+const operator = ref('');
+const route = ref('');
+const departureStation = ref('');
+const arrivalStation = ref('');
+const departureDate = ref('');
+const departureTime = ref('');
+const notes = ref('');
+
+const { isEditing, isSubmitting } = useFormModal(
+  () => props.transportation,
+  () => props.open,
+  {
+    onEdit(trans) {
+      title.value = trans.title ?? '';
+      status.value = trans.status ?? 'not_booked';
+      bookingReference.value = trans.bookingReference ?? '';
+      pickupDate.value = trans.pickupDate ?? '';
+      pickupTime.value = trans.pickupTime ?? '';
+      returnDate.value = trans.returnDate ?? '';
+      returnTime.value = trans.returnTime ?? '';
+      agencyName.value = trans.agencyName ?? '';
+      agencyAddress.value = trans.agencyAddress ?? '';
+      operator.value = trans.operator ?? '';
+      route.value = trans.route ?? '';
+      departureStation.value = trans.departureStation ?? '';
+      arrivalStation.value = trans.arrivalStation ?? '';
+      departureDate.value = trans.departureDate ?? '';
+      departureTime.value = trans.departureTime ?? '';
+      notes.value = trans.notes ?? '';
+    },
+    onNew() {
+      title.value = '';
+      status.value = 'not_booked';
+      bookingReference.value = '';
+      pickupDate.value = '';
+      pickupTime.value = '';
+      returnDate.value = '';
+      returnTime.value = '';
+      agencyName.value = '';
+      agencyAddress.value = '';
+      operator.value = '';
+      route.value = '';
+      departureStation.value = '';
+      arrivalStation.value = '';
+      departureDate.value = '';
+      departureTime.value = '';
+      notes.value = '';
+    },
+  }
+);
+
+const statusOptions = computed(() => [
+  { value: 'booked', label: t('vacation.status.booked') },
+  { value: 'pending', label: t('vacation.status.pending') },
+  { value: 'not_booked', label: t('vacation.status.not_booked') },
+  { value: 'researching', label: t('vacation.status.researching') },
+]);
+
+const isTrainBus = computed(
+  () => props.transportation?.type === 'train' || props.transportation?.type === 'bus'
+);
+const isRentalCar = computed(() => props.transportation?.type === 'rental_car');
+const isShuttleOrTaxi = computed(
+  () =>
+    props.transportation?.type === 'airport_shuttle' ||
+    props.transportation?.type === 'taxi_rideshare'
+);
+
+async function handleSave() {
+  if (!props.vacationId || props.transportationIndex < 0) return;
+  isSubmitting.value = true;
+  try {
+    const vacation = vacationStore.getVacationById(props.vacationId);
+    if (!vacation) return;
+    const transportation = [...vacation.transportation];
+    transportation[props.transportationIndex] = {
+      ...transportation[props.transportationIndex]!,
+      title: title.value,
+      status: status.value,
+      bookingReference: bookingReference.value,
+      pickupDate: pickupDate.value,
+      pickupTime: pickupTime.value,
+      returnDate: returnDate.value,
+      returnTime: returnTime.value,
+      agencyName: agencyName.value,
+      agencyAddress: agencyAddress.value,
+      operator: operator.value,
+      route: route.value,
+      departureStation: departureStation.value,
+      arrivalStation: arrivalStation.value,
+      departureDate: departureDate.value,
+      departureTime: departureTime.value,
+      notes: notes.value,
+    };
+    await vacationStore.updateVacation(props.vacationId, { transportation });
+    emit('close');
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+</script>
+
+<template>
+  <BeanieFormModal
+    :open="open"
+    :title="isEditing ? t('travel.editTransportation') : t('travel.editTransportation')"
+    icon="🚗"
+    icon-bg="bg-[rgba(0,180,216,0.1)]"
+    save-gradient="teal"
+    :is-submitting="isSubmitting"
+    @close="$emit('close')"
+    @save="handleSave"
+  >
+    <div class="space-y-5">
+      <!-- Title -->
+      <FormFieldGroup :label="t('vacation.field.title')">
+        <BaseInput v-model="title" />
+      </FormFieldGroup>
+
+      <!-- Status -->
+      <FormFieldGroup :label="t('vacation.field.status')">
+        <TogglePillGroup
+          :model-value="status"
+          :options="statusOptions"
+          @update:model-value="status = $event as VacationSegmentStatus"
+        />
+      </FormFieldGroup>
+
+      <!-- Train/Bus fields -->
+      <template v-if="isTrainBus">
+        <FormFieldGroup :label="t('vacation.field.operator')">
+          <BaseInput v-model="operator" :placeholder="t('vacation.field.operator')" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.field.route')">
+          <BaseInput v-model="route" :placeholder="t('vacation.field.route')" />
+        </FormFieldGroup>
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.departureAirport')">
+            <BaseInput v-model="departureStation" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.arrivalAirport')">
+            <BaseInput v-model="arrivalStation" />
+          </FormFieldGroup>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.departureDate')">
+            <BaseInput v-model="departureDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.departureTime')">
+            <BaseInput v-model="departureTime" type="time" />
+          </FormFieldGroup>
+        </div>
+      </template>
+
+      <!-- Rental car fields -->
+      <template v-if="isRentalCar">
+        <FormFieldGroup :label="t('vacation.field.agencyName')">
+          <BaseInput v-model="agencyName" :placeholder="t('vacation.field.agencyName')" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.field.agencyAddress')">
+          <BaseInput v-model="agencyAddress" :placeholder="t('vacation.field.agencyAddress')" />
+        </FormFieldGroup>
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.pickupDate')">
+            <BaseInput v-model="pickupDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.pickupTime')">
+            <BaseInput v-model="pickupTime" type="time" />
+          </FormFieldGroup>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.returnDate')">
+            <BaseInput v-model="returnDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.returnTime')">
+            <BaseInput v-model="returnTime" type="time" />
+          </FormFieldGroup>
+        </div>
+      </template>
+
+      <!-- Shuttle / Taxi fields -->
+      <template v-if="isShuttleOrTaxi">
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.pickupDate')">
+            <BaseInput v-model="pickupDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.pickupTime')">
+            <BaseInput v-model="pickupTime" type="time" />
+          </FormFieldGroup>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <FormFieldGroup :label="t('vacation.field.returnDate')">
+            <BaseInput v-model="returnDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.returnTime')">
+            <BaseInput v-model="returnTime" type="time" />
+          </FormFieldGroup>
+        </div>
+      </template>
+
+      <!-- Common: Booking reference -->
+      <FormFieldGroup :label="t('vacation.field.bookingReference')">
+        <BaseInput v-model="bookingReference" :placeholder="t('vacation.field.bookingReference')" />
+      </FormFieldGroup>
+
+      <!-- Notes -->
+      <FormFieldGroup :label="t('vacation.field.notes')">
+        <BaseInput v-model="notes" :placeholder="t('vacation.field.notesPlaceholder')" />
+      </FormFieldGroup>
+    </div>
+  </BeanieFormModal>
+</template>

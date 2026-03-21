@@ -73,8 +73,8 @@ test.describe('Loan & Activity Linking', () => {
     amount: number,
     accountName: string
   ) {
-    await page.goto('/planner');
-    await page.waitForURL('/planner');
+    await page.goto('/activities');
+    await page.waitForURL('/activities');
 
     // Open add activity modal
     await page.getByRole('button', { name: /\+ add activity/i }).click();
@@ -232,8 +232,8 @@ test.describe('Loan & Activity Linking', () => {
     await createCheckingAccount(page, 'Integrity Checking');
 
     // Navigate to planner and create a one-off activity WITHOUT cost first
-    await page.goto('/planner');
-    await page.waitForURL('/planner');
+    await page.goto('/activities');
+    await page.waitForURL('/activities');
 
     await page.getByRole('button', { name: /\+ add activity/i }).click();
     await expect(page.getByText(/new activity/i)).toBeVisible();
