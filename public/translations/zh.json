@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-21",
-    "translationCount": 1834
+    "translationCount": 1836
   },
   "translations": {
     "app.name": {
@@ -9174,6 +9174,16 @@
     "vacation.field.link": {
       "translation": "链接",
       "hash": "1erkq",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.ideas.planned": {
+      "translation": "状态",
+      "hash": "twsvse",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.ideas.plannedSection": {
+      "translation": "计划",
+      "hash": "jd1l0k",
       "lastUpdated": "2026-03-21"
     }
   }

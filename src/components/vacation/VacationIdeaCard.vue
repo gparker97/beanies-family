@@ -139,6 +139,12 @@ function patch(fields: Partial<VacationIdea>) {
           >
             {{ costTag }}
           </span>
+          <span
+            v-if="idea.isPlanned"
+            class="rounded-full bg-[rgba(39,174,96,0.08)] px-2 py-0.5 text-[9px] font-semibold text-[#27AE60]"
+          >
+            ✓ planned
+          </span>
           <a
             v-if="idea.link"
             :href="idea.link"

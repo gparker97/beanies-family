@@ -495,7 +495,6 @@ export type VacationTransportationType =
   | 'airport_shuttle'
   | 'rental_car'
   | 'taxi_rideshare'
-  | 'train'
   | 'bus';
 
 export interface VacationTravelSegment {
@@ -613,6 +612,7 @@ export interface VacationIdea {
   costType?: 'free' | 'paid';
   duration?: '30min' | '1hr' | '2hrs' | 'half_day' | 'full_day';
   needsBooking?: boolean;
+  isPlanned?: boolean;
   link?: string;
   notes?: string;
   votes: VacationIdeaVote[];

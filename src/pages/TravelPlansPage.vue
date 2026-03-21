@@ -85,6 +85,12 @@ type TimelineEntry =
   | { type: 'group'; data: (typeof groupedByDate)['value'][number] }
   | { type: 'gap'; date: string; label: string };
 
+/** Split ideas into unplanned and planned */
+const unplannedIdeas = computed(
+  () => selectedVacation.value?.ideas.filter((i) => !i.isPlanned) ?? []
+);
+const plannedIdeas = computed(() => selectedVacation.value?.ideas.filter((i) => i.isPlanned) ?? []);
+
 /** Hints keyed by item ID — used to tint affected segment cards */
 const hintMap = computed(() =>
   selectedVacation.value ? computeTimelineHints(selectedVacation.value) : new Map()
@@ -986,17 +992,16 @@ function addQuickIdea() {
             </div>
           </div>
 
-          <!-- List label -->
+          <!-- Ideas section -->
           <div
             class="font-outfit mt-4 mb-2 text-[10px] font-semibold tracking-[0.08em] text-gray-300 uppercase"
           >
             ideas & wishes
           </div>
 
-          <!-- Idea cards — click to open edit modal -->
           <div class="space-y-2">
             <VacationIdeaCard
-              v-for="idea in selectedVacation.ideas"
+              v-for="idea in unplannedIdeas"
               :key="idea.id"
               :idea="idea"
               :current-member-id="familyStore.currentMemberId ?? ''"
@@ -1009,11 +1014,32 @@ function addQuickIdea() {
 
           <!-- Empty ideas -->
           <div
-            v-if="selectedVacation.ideas.length === 0"
+            v-if="unplannedIdeas.length === 0 && plannedIdeas.length === 0"
             class="py-6 text-center text-sm text-gray-400"
           >
             {{ t('vacation.ideas.empty') }}
           </div>
+
+          <!-- Planned section -->
+          <template v-if="plannedIdeas.length > 0">
+            <div
+              class="font-outfit mt-5 mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.08em] text-green-600 uppercase dark:text-green-400"
+            >
+              ✓ {{ t('vacation.ideas.plannedSection') }}
+            </div>
+            <div class="space-y-2">
+              <VacationIdeaCard
+                v-for="idea in plannedIdeas"
+                :key="idea.id"
+                :idea="idea"
+                :current-member-id="familyStore.currentMemberId ?? ''"
+                :expanded="false"
+                @vote="handleVote(idea.id)"
+                @update:expanded="openIdeaEdit(idea.id)"
+                @delete="handleIdeaDelete(idea.id)"
+              />
+            </div>
+          </template>
 
           <!-- Quick-add input -->
           <div class="mt-3 flex gap-1.5">
