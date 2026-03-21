@@ -77,7 +77,7 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
 
 <template>
   <div
-    class="relative overflow-hidden rounded-[var(--sq)] p-6"
+    class="relative overflow-hidden rounded-[20px] p-5"
     :style="{ background: 'linear-gradient(135deg, #2C3E50, #3D5368)' }"
   >
     <!-- Radial glow -->
@@ -87,9 +87,8 @@ const isPositiveChange = computed(() => monthlyChange.value >= 0);
     />
 
     <!-- Header -->
-    <div class="mb-4 flex items-center gap-2.5">
-      <span class="text-xl">{{ '🐷' }}</span>
-      <span class="font-outfit text-xs font-bold tracking-[0.08em] text-white/50 uppercase">
+    <div class="mb-4">
+      <span class="font-outfit text-xs font-bold tracking-[0.05em] text-white/60 uppercase">
         {{ t('nook.piggyBank') }}
       </span>
     </div>
