@@ -95,25 +95,16 @@ function togglePill(type: VacationAccommodationType) {
       );
     }
   } else {
-    // Single-select: replace current type (if empty) or just add the new type
-    const currentItems = props.accommodations;
-    const allEmpty = currentItems.every(
-      (a) => !a.name && !a.address && !a.checkInDate && !a.checkOutDate && !a.confirmationNumber
-    );
-    if (allEmpty) {
-      // Replace all empty items with the new type
-      const item: VacationAccommodation = {
-        id: generateUUID(),
-        type,
-        title: t(`vacation.accommodation.${type}` as any),
-        status: 'pending',
-        checkInDate: flightDates.value.checkIn,
-        checkOutDate: flightDates.value.checkOut,
-      };
-      emit('update:accommodations', [item]);
-    } else {
-      addItem(type);
-    }
+    // Single-select: replace with the new type
+    const item: VacationAccommodation = {
+      id: generateUUID(),
+      type,
+      title: t(`vacation.accommodation.${type}` as any),
+      status: 'pending',
+      checkInDate: flightDates.value.checkIn,
+      checkOutDate: flightDates.value.checkOut,
+    };
+    emit('update:accommodations', [item]);
   }
 }
 
@@ -152,16 +143,8 @@ function buildAccomKeyValue(item: VacationAccommodation): string {
   return parts.join(' · ');
 }
 
-function showsRoomType(type: VacationAccommodationType): boolean {
-  return type === 'hotel' || type === 'airbnb';
-}
-
 function showsConfirmationNumber(type: VacationAccommodationType): boolean {
   return type !== 'family_friends';
-}
-
-function showsBreakfast(type: VacationAccommodationType): boolean {
-  return type === 'hotel';
 }
 </script>
 
@@ -297,33 +280,6 @@ function showsBreakfast(type: VacationAccommodationType): boolean {
             @update:model-value="updateItem(index, 'confirmationNumber', String($event))"
           />
         </FormFieldGroup>
-
-        <FormFieldGroup v-if="showsRoomType(item.type)" :label="t('vacation.field.roomType')">
-          <BaseInput
-            :model-value="item.roomType ?? ''"
-            class="vacation-teal-input"
-            @update:model-value="updateItem(index, 'roomType', String($event))"
-          />
-        </FormFieldGroup>
-
-        <!-- Breakfast Included (hotel only) -->
-        <div v-if="showsBreakfast(item.type)" class="flex items-center gap-2">
-          <input
-            :id="`breakfast-${item.id}`"
-            type="checkbox"
-            :checked="item.breakfastIncluded ?? false"
-            class="h-4 w-4 rounded border-gray-300 text-[var(--vacation-teal)] focus:ring-[var(--vacation-teal)]"
-            @change="
-              updateItem(index, 'breakfastIncluded', ($event.target as HTMLInputElement).checked)
-            "
-          />
-          <label
-            :for="`breakfast-${item.id}`"
-            class="text-sm font-medium text-[var(--color-text)] dark:text-gray-200"
-          >
-            {{ t('vacation.field.breakfastIncluded') }}
-          </label>
-        </div>
 
         <FormFieldGroup :label="t('vacation.field.contactPhone')">
           <BaseInput

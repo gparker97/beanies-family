@@ -73,11 +73,6 @@ const statusOptions = computed(() => [
   { value: 'pending', label: t('vacation.status.pending') },
 ]);
 
-const isHotelOrAirbnb = computed(
-  () => props.accommodation?.type === 'hotel' || props.accommodation?.type === 'airbnb'
-);
-const isHotel = computed(() => props.accommodation?.type === 'hotel');
-
 const nameFieldLabel = computed(() => {
   const type = props.accommodation?.type;
   if (type === 'hotel') return t('vacation.field.hotelName');
@@ -169,23 +164,6 @@ async function handleSave() {
           :placeholder="t('vacation.field.confirmationNumber')"
         />
       </FormFieldGroup>
-
-      <!-- Room type (hotel/airbnb only) -->
-      <FormFieldGroup v-if="isHotelOrAirbnb" :label="t('vacation.field.roomType')">
-        <BaseInput v-model="roomType" :placeholder="t('vacation.field.roomType')" />
-      </FormFieldGroup>
-
-      <!-- Breakfast included (hotel only) -->
-      <label v-if="isHotel" class="flex items-center gap-3">
-        <input
-          v-model="breakfastIncluded"
-          type="checkbox"
-          class="h-4 w-4 rounded border-gray-300 text-[#00B4D8] focus:ring-[#00B4D8]"
-        />
-        <span class="font-outfit text-sm font-medium text-gray-700 dark:text-gray-300">
-          {{ t('vacation.field.breakfastIncluded') }}
-        </span>
-      </label>
 
       <!-- Contact phone -->
       <FormFieldGroup :label="t('vacation.field.contactPhone')">

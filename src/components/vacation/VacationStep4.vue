@@ -61,6 +61,7 @@ function addItem(type: VacationTransportationType) {
 
 function togglePill(type: VacationTransportationType) {
   if (hasType(type)) {
+    // Deselect: remove only if all items of this type are empty
     const items = props.transportation.filter((tr) => tr.type === type);
     const allEmpty = items.every(
       (tr) => !tr.bookingReference && !tr.pickupDate && !tr.pickupTime && !tr.returnDate
@@ -72,7 +73,14 @@ function togglePill(type: VacationTransportationType) {
       );
     }
   } else {
-    addItem(type);
+    // Single-select: replace with the new type
+    const item: VacationTransportation = {
+      id: generateUUID(),
+      type,
+      title: t(`vacation.transport.${type}` as any),
+      status: 'pending',
+    };
+    emit('update:transportation', [item]);
   }
 }
 
