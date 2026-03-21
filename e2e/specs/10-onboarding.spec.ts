@@ -67,8 +67,8 @@ test.describe('Onboarding Wizard', () => {
     await page.getByTestId('combobox-dropdown').locator('button').first().click();
     await page.getByTestId('onboarding-add-account').click();
 
-    // Should show confirmation
-    await expect(page.getByText(/added/i)).toBeVisible({ timeout: 5000 });
+    // Should show the added account list with "Add Another" button
+    await expect(page.getByText(/add another/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('step 2 to step 3 navigation via Next button', async ({ page }) => {
