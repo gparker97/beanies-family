@@ -78,7 +78,7 @@ const selectedVacation = computed(() =>
   selectedVacationId.value ? vacationStore.getVacationById(selectedVacationId.value) : undefined
 );
 
-const { groupedByDate, accommodationGaps, unbookedItems } = useVacationTimeline(selectedVacation);
+const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(selectedVacation);
 
 /** Merged timeline: interleave date groups with gap warnings at correct positions */
 type TimelineEntry =
@@ -898,14 +898,14 @@ function addQuickIdea() {
           </div>
 
           <!-- Unbooked items -->
-          <div v-if="unbookedItems.length > 0" class="mt-4 space-y-2">
+          <div v-if="undatedItems.length > 0" class="mt-4 space-y-2">
             <div
               class="font-outfit text-[10px] font-semibold tracking-wide text-[#B8860B] uppercase"
             >
               🤔 {{ t('vacation.stillDeciding' as any) }}
             </div>
             <button
-              v-for="item in unbookedItems"
+              v-for="item in undatedItems"
               :key="item.id"
               class="flex w-full cursor-pointer items-center gap-2 rounded-xl border border-dashed border-[rgba(184,134,11,0.18)] bg-[rgba(255,217,61,0.08)] px-3 py-2.5 text-left transition-colors hover:bg-[rgba(255,217,61,0.2)]"
               @click="openEditModal(item)"

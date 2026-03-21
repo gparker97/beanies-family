@@ -65,11 +65,13 @@ async function handleDelete() {
 
 <template>
   <div
-    class="group/card rounded-2xl border bg-white transition-shadow hover:shadow-md dark:bg-slate-800"
+    class="group/card rounded-2xl border transition-shadow hover:shadow-md"
     :class="
       hint
         ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-900/5'
-        : 'border-[var(--tint-slate-10)] dark:border-slate-700'
+        : status === 'pending'
+          ? 'border-dashed border-[rgba(184,134,11,0.18)] bg-[rgba(255,217,61,0.06)] dark:border-[rgba(184,134,11,0.25)] dark:bg-[rgba(255,217,61,0.03)]'
+          : 'border-[var(--tint-slate-10)] bg-white dark:border-slate-700 dark:bg-slate-800'
     "
   >
     <!-- Hint tooltip (expanded) -->

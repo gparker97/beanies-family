@@ -428,12 +428,14 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     return items;
   });
 
-  const bookedItems = computed(() => timelineItems.value.filter((i) => i.status === 'booked'));
-  const unbookedItems = computed(() => timelineItems.value.filter((i) => i.status === 'pending'));
+  /** Items with no date set — shown in a separate "no date" section */
+  const undatedItems = computed(() =>
+    timelineItems.value.filter((i) => i.sortDate === '9999-12-31')
+  );
 
   const groupedByDate = computed<DateGroup[]>(() => {
     const groups: DateGroup[] = [];
-    for (const item of bookedItems.value) {
+    for (const item of timelineItems.value.filter((i) => i.sortDate !== '9999-12-31')) {
       const existing = groups.find((g) => g.date === item.sortDate);
       if (existing) {
         existing.items.push(item);
@@ -448,5 +450,5 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
     return groups;
   });
 
-  return { timelineItems, groupedByDate, accommodationGaps, bookedItems, unbookedItems };
+  return { timelineItems, groupedByDate, accommodationGaps, undatedItems };
 }
