@@ -3423,7 +3423,7 @@ const STRING_DEFS = {
   'vacation.addAnotherTransport': { en: 'Add Another Transport', beanie: 'add another transport' },
 
   // Step 5 - Ideas
-  'vacation.step5.title': { en: 'Bean Bucket List!', beanie: 'bean bucket list!' },
+  'vacation.step5.title': { en: 'Trip ideas!', beanie: 'beanie trip ideas!' },
   'vacation.step5.subtitle': {
     en: 'What do the beans want to see and do?',
     beanie: 'what do the beans want to see and do?',
