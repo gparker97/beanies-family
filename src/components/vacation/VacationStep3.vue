@@ -25,7 +25,6 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 
 const collapsedMap = ref<Record<string, boolean>>({});
-const showAddPicker = ref(false);
 
 const accommodationTypes: { type: VacationAccommodationType; emoji: string; key: string }[] = [
   { type: 'hotel', emoji: '🏨', key: 'hotel' },
@@ -64,10 +63,6 @@ const flightDates = computed(() => {
   };
 });
 
-function hasType(type: VacationAccommodationType): boolean {
-  return props.accommodations.some((a) => a.type === type);
-}
-
 function addItem(type: VacationAccommodationType) {
   const item: VacationAccommodation = {
     id: generateUUID(),
@@ -77,42 +72,8 @@ function addItem(type: VacationAccommodationType) {
     checkInDate: flightDates.value.checkIn,
     checkOutDate: flightDates.value.checkOut,
   };
-  showAddPicker.value = false;
+  collapsedMap.value[item.id] = false;
   emit('update:accommodations', [...props.accommodations, item]);
-}
-
-function togglePill(type: VacationAccommodationType) {
-  if (hasType(type)) {
-    // Deselect: remove only if all items of this type are empty
-    const items = props.accommodations.filter((a) => a.type === type);
-    const allEmpty = items.every(
-      (a) => !a.name && !a.address && !a.checkInDate && !a.checkOutDate && !a.confirmationNumber
-    );
-    if (allEmpty) {
-      emit(
-        'update:accommodations',
-        props.accommodations.filter((a) => a.type !== type)
-      );
-    }
-  } else {
-    const item: VacationAccommodation = {
-      id: generateUUID(),
-      type,
-      title: t(`vacation.accommodation.${type}` as any),
-      status: 'pending',
-      checkInDate: flightDates.value.checkIn,
-      checkOutDate: flightDates.value.checkOut,
-    };
-    // If existing items have data, append; otherwise replace (first-time single-select)
-    const hasData = props.accommodations.some(
-      (a) => a.name || a.address || a.checkInDate || a.checkOutDate || a.confirmationNumber
-    );
-    if (hasData) {
-      emit('update:accommodations', [...props.accommodations, item]);
-    } else {
-      emit('update:accommodations', [item]);
-    }
-  }
 }
 
 function updateItem(index: number, field: keyof VacationAccommodation, value: string | boolean) {
@@ -167,34 +128,7 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
     </p>
   </div>
 
-  <div class="space-y-4">
-    <!-- Add-on pills -->
-    <div class="flex flex-wrap justify-center gap-2">
-      <button
-        v-for="at in accommodationTypes"
-        :key="at.type"
-        type="button"
-        class="inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-sm transition-all"
-        :class="
-          hasType(at.type)
-            ? 'border-[var(--vacation-teal)] bg-[var(--vacation-teal-tint)] dark:bg-[var(--vacation-teal-15)]'
-            : 'border-[var(--tint-slate-10)] bg-white hover:border-[var(--vacation-teal-15)] dark:border-slate-700 dark:bg-slate-800'
-        "
-        @click="togglePill(at.type)"
-      >
-        <span
-          v-if="hasType(at.type)"
-          class="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--vacation-teal)] text-[10px] text-white"
-        >
-          ✓
-        </span>
-        <span>{{ at.emoji }}</span>
-        <span class="font-outfit font-semibold text-[var(--color-text)] dark:text-gray-100">
-          {{ t(`vacation.accommodation.${at.key}` as any) }}
-        </span>
-      </button>
-    </div>
-
+  <div class="space-y-3">
     <!-- Segment cards -->
     <VacationSegmentCard
       v-for="(item, index) in accommodations"
@@ -307,30 +241,17 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
       </div>
     </VacationSegmentCard>
 
-    <!-- Add Another Stay button with mini picker -->
-    <div v-if="accommodations.length > 0">
+    <!-- Add accommodation pills -->
+    <div class="mt-4 flex flex-wrap gap-2">
       <button
+        v-for="at in accommodationTypes"
+        :key="at.type"
         type="button"
-        class="w-full rounded-xl border border-dashed border-[var(--vacation-teal-15)] py-2.5 text-sm font-semibold text-[var(--vacation-teal)] transition-colors hover:bg-[var(--vacation-teal-tint)] dark:hover:bg-[var(--vacation-teal-15)]"
-        @click="showAddPicker = !showAddPicker"
+        class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
+        @click="addItem(at.type)"
       >
-        + {{ t('vacation.addAnotherStay') }}
+        + {{ at.emoji }} {{ t(`vacation.accommodation.${at.key}` as any) }}
       </button>
-      <!-- Mini type picker -->
-      <div v-if="showAddPicker" class="mt-2 flex flex-wrap justify-center gap-2">
-        <button
-          v-for="at in accommodationTypes"
-          :key="at.type"
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-xl border border-[var(--tint-slate-10)] bg-white px-3 py-1.5 text-sm transition-all hover:border-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-tint)] dark:border-slate-700 dark:bg-slate-800 dark:hover:border-[var(--vacation-teal)]"
-          @click="addItem(at.type)"
-        >
-          <span>{{ at.emoji }}</span>
-          <span class="font-outfit font-semibold text-[var(--color-text)] dark:text-gray-100">
-            {{ t(`vacation.accommodation.${at.key}` as any) }}
-          </span>
-        </button>
-      </div>
     </div>
   </div>
 </template>
