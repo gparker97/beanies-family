@@ -141,17 +141,16 @@ async function handleDelete() {
       </div>
     </div>
 
-    <!-- Collapsible body — clicking whitespace opens edit modal -->
+    <!-- Collapsible body -->
     <div
       class="overflow-hidden transition-all duration-300"
       :class="collapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'"
     >
-      <div class="px-4 pb-4" @click="$emit('edit')">
+      <div class="px-4 pb-2">
         <!-- Hint banner (shown when expanded, for hints or pending items) -->
         <div
           v-if="hint || status === 'pending'"
           class="mb-3 flex items-start gap-2 rounded-xl border border-amber-200/40 bg-amber-50/60 px-3 py-2 dark:border-amber-500/10 dark:bg-amber-900/10"
-          @click.stop
         >
           <span class="mt-0.5 text-sm">⚠️</span>
           <span class="text-xs text-amber-800 dark:text-amber-300">
@@ -162,31 +161,32 @@ async function handleDelete() {
           </span>
         </div>
 
-        <!-- Slot content: click.stop on interactive elements prevents edit -->
+        <!-- Slot content -->
         <slot />
-
-        <!-- Edit / Delete actions (shown only when expanded) -->
-        <div
-          v-if="showEdit || (deletable && !readOnly)"
-          class="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-slate-700/40"
-          @click.stop
-        >
-          <button
-            v-if="showEdit"
-            class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[rgba(0,180,216,0.08)] px-3 py-1.5 text-xs font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
-            @click="$emit('edit')"
-          >
-            ✏️ {{ t('action.edit') }}
-          </button>
-          <button
-            v-if="deletable && !readOnly"
-            class="font-outfit inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
-            @click="handleDelete"
-          >
-            🗑️ {{ t('common.delete') }}
-          </button>
-        </div>
       </div>
+    </div>
+
+    <!-- Edit / Delete actions — outside overflow container to avoid click issues -->
+    <div
+      v-if="!collapsed && (showEdit || (deletable && !readOnly))"
+      class="flex items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-slate-700/40"
+    >
+      <button
+        v-if="showEdit"
+        type="button"
+        class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[rgba(0,180,216,0.08)] px-3 py-1.5 text-xs font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+        @click="$emit('edit')"
+      >
+        ✏️ {{ t('action.edit') }}
+      </button>
+      <button
+        v-if="deletable && !readOnly"
+        type="button"
+        class="font-outfit inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+        @click="handleDelete"
+      >
+        🗑️ {{ t('common.delete') }}
+      </button>
     </div>
   </div>
 </template>

@@ -81,6 +81,7 @@ const calendarDays = computed(() => {
     isToday: boolean;
     weekRow: number;
     activities: Array<{ category: ActivityCategory; color?: string }>;
+    vacations: Array<{ id: string; name: string; emoji: string; isStart: boolean }>;
   }> = [];
 
   // Get activity occurrences for this month
@@ -99,6 +100,31 @@ const calendarDays = computed(() => {
       .push({ category: occ.activity.category, color: occ.activity.color });
   }
 
+  // Build a map of date -> vacations covering that date
+  const dateVacations = new Map<
+    string,
+    Array<{ id: string; name: string; emoji: string; isStart: boolean }>
+  >();
+  for (const v of vacationStore.vacations) {
+    if (!v.startDate || !v.endDate) continue;
+    const vStart = extractDatePart(v.startDate);
+    const vEnd = extractDatePart(v.endDate);
+    const emoji = tripTypeEmoji(v.tripType, v.tripPurpose);
+    // Walk each day of the vacation
+    const startD = new Date(vStart + 'T00:00:00');
+    const endD = new Date(vEnd + 'T00:00:00');
+    for (let d = new Date(startD); d <= endD; d.setDate(d.getDate() + 1)) {
+      const dateStr = formatDate(d);
+      if (!dateVacations.has(dateStr)) dateVacations.set(dateStr, []);
+      dateVacations.get(dateStr)!.push({
+        id: v.id,
+        name: v.name,
+        emoji,
+        isStart: dateStr === vStart,
+      });
+    }
+  }
+
   // Previous month padding
   const prevMonth = new Date(year, month, 0);
   for (let i = startOffset - 1; i >= 0; i--) {
@@ -111,6 +137,7 @@ const calendarDays = computed(() => {
       isToday: false,
       weekRow: days.length < 7 ? 0 : Math.floor(days.length / 7),
       activities: dateActivities.get(dateStr) ?? [],
+      vacations: dateVacations.get(dateStr) ?? [],
     });
   }
 
@@ -124,6 +151,7 @@ const calendarDays = computed(() => {
       isToday: dateStr === todayStr.value,
       weekRow: Math.floor(days.length / 7),
       activities: dateActivities.get(dateStr) ?? [],
+      vacations: dateVacations.get(dateStr) ?? [],
     });
   }
 
@@ -139,6 +167,7 @@ const calendarDays = computed(() => {
         isToday: false,
         weekRow: Math.floor(days.length / 7),
         activities: dateActivities.get(dateStr) ?? [],
+        vacations: dateVacations.get(dateStr) ?? [],
       });
     }
   }
@@ -163,60 +192,6 @@ const vacationDateSet = computed(() => {
 });
 
 // Vacation span bars for each week row
-const vacationSpans = computed(() => {
-  const spans: Array<{
-    vacationId: string;
-    name: string;
-    emoji: string;
-    startCol: number;
-    endCol: number;
-    weekIndex: number;
-  }> = [];
-
-  const days = calendarDays.value;
-  const weeksCount = Math.ceil(days.length / 7);
-
-  for (const v of vacationStore.vacations) {
-    if (!v.startDate || !v.endDate) continue;
-    const vStart = extractDatePart(v.startDate);
-    const vEnd = extractDatePart(v.endDate);
-
-    for (let w = 0; w < weeksCount; w++) {
-      let startCol = -1;
-      let endCol = -1;
-      for (let d = 0; d < 7; d++) {
-        const cell = days[w * 7 + d];
-        if (!cell) continue;
-        if (cell.date >= vStart && cell.date <= vEnd) {
-          if (startCol < 0) startCol = d;
-          endCol = d;
-        }
-      }
-      if (startCol >= 0) {
-        spans.push({
-          vacationId: v.id,
-          name: v.name,
-          emoji: tripTypeEmoji(v.tripType),
-          startCol,
-          endCol,
-          weekIndex: w,
-        });
-      }
-    }
-  }
-  return spans;
-});
-
-// Group vacation spans by week row for template rendering
-const vacationSpansByWeek = computed(() => {
-  const map = new Map<number, typeof vacationSpans.value>();
-  for (const span of vacationSpans.value) {
-    if (!map.has(span.weekIndex)) map.set(span.weekIndex, []);
-    map.get(span.weekIndex)!.push(span);
-  }
-  return map;
-});
-
 const activityCount = computed(() => {
   return activityStore.monthActivities(currentYear.value, currentMonth.value).length;
 });
@@ -265,8 +240,8 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
       </div>
     </div>
 
-    <!-- Calendar grid with vacation overlays -->
-    <div class="relative">
+    <!-- Calendar grid -->
+    <div>
       <div class="grid grid-cols-7 gap-0">
         <button
           v-for="(cell, idx) in calendarDays"
@@ -313,31 +288,28 @@ defineExpose({ monthLabel, activityCount, currentYear, currentMonth });
               +{{ cell.activities.length - 4 }}
             </span>
           </div>
+
+          <!-- Spacer pushes vacation bars to bottom of cell (aligned across columns) -->
+          <div class="flex-1" />
+
+          <!-- Vacation indicators (anchored to bottom of cell) -->
+          <div
+            v-for="vac in cell.vacations"
+            :key="vac.id"
+            class="mt-0.5 w-full cursor-pointer overflow-hidden rounded-sm px-0.5"
+            style="background: rgb(0 180 216 / 12%)"
+            @click.stop="emit('vacation-click', vac.id)"
+          >
+            <span
+              v-if="vac.isStart"
+              class="font-outfit block truncate text-[8px] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
+            >
+              {{ vac.emoji }} {{ vac.name }}
+            </span>
+            <span v-else class="block h-[10px]" />
+          </div>
         </button>
       </div>
-
-      <!-- Vacation span bars overlaid per week row -->
-      <template v-for="[weekIdx, spans] in vacationSpansByWeek" :key="'vw-' + weekIdx">
-        <div
-          v-for="span in spans"
-          :key="'vs-' + span.vacationId + '-' + weekIdx"
-          class="pointer-events-auto absolute flex h-5 cursor-pointer items-center rounded-lg px-2 opacity-80 transition-opacity hover:opacity-100"
-          style="background: linear-gradient(to right, var(--vacation-teal), #0077b6); opacity: 0.2"
-          :style="{
-            left: `${(span.startCol / 7) * 100}%`,
-            width: `${((span.endCol - span.startCol + 1) / 7) * 100}%`,
-            bottom: `calc(100% - ${(weekIdx + 1) * 60}px + 2px)`,
-          }"
-          @click.stop="emit('vacation-click', span.vacationId)"
-        >
-          <span
-            class="font-outfit truncate text-[10px] font-semibold text-white"
-            style="text-shadow: 0 1px 2px rgb(0 0 0 / 30%)"
-          >
-            {{ span.emoji }} {{ span.name }}
-          </span>
-        </div>
-      </template>
     </div>
   </div>
 </template>

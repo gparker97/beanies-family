@@ -159,9 +159,9 @@ async function toggleComplete(todoId: string) {
         </div>
       </div>
       <!-- Row 2: Date + Assignee on same line (mobile only) -->
-      <div class="flex items-center gap-2 sm:hidden">
+      <div class="grid grid-cols-2 gap-2 sm:hidden">
         <div
-          class="flex min-w-0 flex-1 items-center gap-1.5 rounded-2xl px-3 transition-colors"
+          class="flex items-center gap-1.5 rounded-2xl px-3 transition-colors"
           :class="newTaskDate ? 'bg-[var(--tint-orange-8)]' : ''"
           :style="!newTaskDate ? 'background: var(--tint-slate-5)' : undefined"
         >
@@ -179,13 +179,18 @@ async function toggleComplete(todoId: string) {
             />
             <span
               v-if="!newTaskDate && !dateInputFocused"
-              class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-1 text-xs font-semibold text-[var(--color-text)]"
+              class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-2 text-xs font-semibold text-[var(--color-text)]"
             >
               {{ t('todo.selectDueDate') }}
             </span>
           </div>
         </div>
-        <AssigneePickerButton v-model="newTaskAssignees" size="sm" />
+        <div class="flex items-center gap-1.5">
+          <span class="font-outfit text-xs font-semibold text-[var(--color-text)] opacity-35">
+            {{ t('todo.who') }}
+          </span>
+          <AssigneePickerButton v-model="newTaskAssignees" size="sm" class="flex-1" />
+        </div>
       </div>
     </div>
 

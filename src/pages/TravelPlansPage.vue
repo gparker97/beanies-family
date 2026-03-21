@@ -255,12 +255,6 @@ function openEditModal(item: TimelineItem) {
 
 async function deleteTimelineItem(item: TimelineItem) {
   if (!selectedVacation.value) return;
-  const confirmed = await confirm({
-    title: 'vacation.deleteSegmentTitle',
-    message: 'vacation.deleteSegmentMessage',
-    variant: 'danger',
-  });
-  if (!confirmed) return;
   const id = selectedVacation.value.id;
   if (item.kind === 'travel') {
     const travelSegments = selectedVacation.value.travelSegments.filter(
@@ -809,7 +803,7 @@ function addQuickIdea() {
                     @delete="deleteTimelineItem(item)"
                   >
                     <!-- Detail rows — divided, compact, inline-editable with pencil -->
-                    <div class="divide-y divide-gray-100 dark:divide-slate-700/40" @click.stop>
+                    <div class="divide-y divide-gray-100 dark:divide-slate-700/40">
                       <div
                         v-for="row in item.detailRows"
                         :key="row.label"

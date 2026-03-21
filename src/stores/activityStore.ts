@@ -161,8 +161,6 @@ export const useActivityStore = defineStore('activities', () => {
 
     // Look ahead 90 days
     for (const a of filteredActivities.value) {
-      // Skip vacation-linked activities — they display as vacation bars/cards
-      if (a.vacationId) continue;
       for (let i = 0; i < 3; i++) {
         const y = today.getFullYear();
         const m = today.getMonth() + i;
