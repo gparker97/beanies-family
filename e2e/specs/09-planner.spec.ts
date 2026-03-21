@@ -53,7 +53,7 @@ test.describe('Family Planner', () => {
     await setupPlanner(page);
 
     // Page header — title comes from AppHeader (lowercase, no emoji)
-    await expect(page.getByRole('heading', { name: /family planner/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /family activities/i })).toBeVisible();
 
     // Calendar navigation
     await expect(page.getByRole('button', { name: /today/i })).toBeVisible();
