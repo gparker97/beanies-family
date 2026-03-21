@@ -596,6 +596,7 @@ export interface VacationIdea {
   costType?: 'free' | 'paid';
   duration?: '30min' | '1hr' | '2hrs' | 'half_day' | 'full_day';
   needsBooking?: boolean;
+  link?: string;
   notes?: string;
   votes: VacationIdeaVote[];
   createdBy: UUID;
