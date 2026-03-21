@@ -3558,6 +3558,23 @@ const STRING_DEFS = {
   'vacation.segment.cruise': { en: 'Cruise', beanie: 'cruise' },
   'vacation.segment.train': { en: 'Train', beanie: 'train' },
   'vacation.segment.ferry': { en: 'Ferry', beanie: 'ferry' },
+  'vacation.segment.activity': { en: 'Activity', beanie: 'activity' },
+  'vacation.travel.addActivity': { en: 'Activity', beanie: 'activity' },
+  'vacation.activityCategory.show_musical': { en: 'Show / Musical', beanie: 'show / musical' },
+  'vacation.activityCategory.theme_park': { en: 'Theme Park', beanie: 'theme park' },
+  'vacation.activityCategory.sporting_event': {
+    en: 'Sporting Event',
+    beanie: 'sporting event',
+  },
+  'vacation.activityCategory.concert': { en: 'Concert', beanie: 'concert' },
+  'vacation.activityCategory.excursion': { en: 'Excursion / Tour', beanie: 'excursion / tour' },
+  'vacation.activityCategory.other': { en: 'Other', beanie: 'other' },
+  'vacation.field.activityCategory': {
+    en: 'Activity Type',
+    beanie: 'activity type',
+  },
+  'vacation.field.startTime': { en: 'Start Time', beanie: 'start time' },
+  'vacation.field.duration': { en: 'Duration', beanie: 'duration' },
 
   // Ideas empty state
   'vacation.ideas.empty': {

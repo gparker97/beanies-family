@@ -478,7 +478,16 @@ export type VacationTravelType =
   | 'cruise'
   | 'train'
   | 'ferry'
-  | 'car';
+  | 'car'
+  | 'activity';
+
+export type VacationActivityCategory =
+  | 'show_musical'
+  | 'theme_park'
+  | 'sporting_event'
+  | 'concert'
+  | 'excursion'
+  | 'other';
 
 export type VacationAccommodationType = 'hotel' | 'airbnb' | 'campground' | 'family_friends';
 
@@ -539,6 +548,14 @@ export interface VacationTravelSegment {
   carType?: 'family_car' | 'rental_car' | 'other';
   carLabel?: string;
   leavingTime?: string;
+
+  // Activity fields
+  activityCategory?: VacationActivityCategory;
+  description?: string;
+  location?: string;
+  link?: string;
+  startTime?: string;
+  duration?: string;
 }
 
 export interface VacationAccommodation {

@@ -191,6 +191,23 @@ function addSegmentViaWizard(step: number) {
   editInWizard(step);
 }
 
+async function addActivitySegment() {
+  if (!selectedVacation.value) return;
+  showAddMenu.value = false;
+  const id = selectedVacation.value.id;
+  const newSeg = {
+    id: crypto.randomUUID(),
+    type: 'activity' as const,
+    title: 'activity',
+    status: 'pending' as const,
+  };
+  const travelSegments = [...selectedVacation.value.travelSegments, newSeg];
+  await vacationStore.updateVacation(id, { travelSegments });
+  // Open the edit modal for the new segment
+  editingItemIndex.value = travelSegments.length - 1;
+  editModalType.value = 'travel';
+}
+
 // ── Collapsible cards ────────────────────────────────────────────────────────
 
 function isCollapsed(id: string): boolean {
@@ -857,6 +874,21 @@ function addQuickIdea() {
                           </a>
                         </div>
 
+                        <!-- Clickable link -->
+                        <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">
+                          <a
+                            :href="
+                              row.value.startsWith('http') ? row.value : `https://${row.value}`
+                            "
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="truncate text-sm text-[#00B4D8] hover:underline"
+                          >
+                            {{ row.value.replace(/^https?:\/\//, '') }}
+                          </a>
+                          <span class="shrink-0 text-xs opacity-40">🔗</span>
+                        </div>
+
                         <!-- Plain read-only value -->
                         <span v-else class="text-sm text-gray-900 dark:text-gray-100">
                           {{ row.value }}
@@ -901,6 +933,12 @@ function addQuickIdea() {
                   @click="addSegmentViaWizard(4)"
                 >
                   🚗 {{ t('vacation.step.gettingAround') }}
+                </button>
+                <button
+                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  @click="addActivitySegment"
+                >
+                  🎭 {{ t('vacation.segment.activity') }}
                 </button>
               </div>
             </Transition>
