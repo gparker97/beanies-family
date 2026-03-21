@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { FamilyVacation } from '@/types/models';
-import { bookingProgress, daysUntilTrip } from '@/utils/vacation';
+import { bookingProgress, daysUntilTrip, tripTypeEmoji, tripCountdownKey } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -12,16 +12,7 @@ defineEmits<{ click: [] }>();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 
-const tripEmojis: Record<string, string> = {
-  fly_and_stay: '✈️',
-  cruise: '🚢',
-  road_trip: '🚗',
-  combo: '🎒',
-  camping: '🏕️',
-  adventure: '🏔️',
-};
-
-const emoji = computed(() => tripEmojis[props.vacation.tripType] ?? '✈️');
+const emoji = computed(() => tripTypeEmoji(props.vacation.tripType));
 const progress = computed(() => bookingProgress(props.vacation));
 const days = computed(() =>
   props.vacation.startDate ? daysUntilTrip(props.vacation.startDate) : null
@@ -72,7 +63,7 @@ const unbookedCount = computed(() => progress.value.total - progress.value.booke
         class="inline-flex items-center rounded-lg px-2.5 py-0.5 text-[10px] font-bold text-white"
         style="background: linear-gradient(135deg, var(--vacation-teal), #0096c7)"
       >
-        ✈️ {{ days }} {{ t('vacation.daysAway').toLowerCase() }}!
+        {{ emoji }} {{ days }} {{ t(tripCountdownKey(vacation.tripType) as any) }}!
       </span>
       <span v-else />
       <div class="flex items-center">

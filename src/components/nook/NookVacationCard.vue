@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { tripTypeEmoji, bookingProgress, daysUntilTrip } from '@/utils/vacation';
+import { tripTypeEmoji, bookingProgress, daysUntilTrip, tripCountdownKey } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
 
 const router = useRouter();
@@ -66,7 +66,7 @@ function handleClick() {
     <div v-if="countdown !== null && countdown > 0" class="shrink-0 text-right">
       <div class="font-outfit text-lg font-extrabold text-[#00B4D8]">{{ countdown }}</div>
       <div class="font-outfit text-[9px] font-semibold text-gray-400">
-        {{ t('travel.daysUntil') }}
+        {{ vacation ? t(tripCountdownKey(vacation.tripType) as any) : '' }}
       </div>
     </div>
   </button>

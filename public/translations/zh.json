@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-21",
-    "translationCount": 1799
+    "translationCount": 1805
   },
   "translations": {
     "app.name": {
@@ -8999,6 +8999,36 @@
     "travel.editTravelPlans": {
       "translation": "旅行计划",
       "hash": "9iqcka",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.fly_and_stay": {
+      "translation": "距离起飞还有天",
+      "hash": "k4a4w3",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.cruise": {
+      "translation": "离我们起航还有几天",
+      "hash": "4lxe8a",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.road_trip": {
+      "translation": "距离上路还有几天",
+      "hash": "hil2zh",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.camping": {
+      "translation": "天，直到我们粗糙它",
+      "hash": "r5yhjb",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.adventure": {
+      "translation": "距离探险之旅还有几天",
+      "hash": "inj4h6",
+      "lastUpdated": "2026-03-21"
+    },
+    "travel.countdown.combo": {
+      "translation": "天后截止",
+      "hash": "kwinoc",
       "lastUpdated": "2026-03-21"
     }
   }

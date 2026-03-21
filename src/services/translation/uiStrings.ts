@@ -3599,6 +3599,18 @@ const STRING_DEFS = {
   'travel.editDetails': { en: 'Edit Details', beanie: 'edit details' },
   'travel.editTravelPlans': { en: 'Edit Travel Plans', beanie: 'edit travel plans' },
   'travel.addSegment': { en: '+ Add', beanie: '+ add' },
+  'travel.countdown.fly_and_stay': { en: 'days until takeoff', beanie: 'days until takeoff' },
+  'travel.countdown.cruise': { en: 'days until we set sail', beanie: 'days until we set sail' },
+  'travel.countdown.road_trip': {
+    en: 'days until we hit the road',
+    beanie: 'days until we hit the road',
+  },
+  'travel.countdown.camping': { en: 'days until we rough it', beanie: 'days until we rough it' },
+  'travel.countdown.adventure': {
+    en: 'days until the adventure',
+    beanie: 'days until the adventure',
+  },
+  'travel.countdown.combo': { en: 'days to go', beanie: 'days to go' },
   'travel.accommodationGap': {
     en: 'No accommodation booked for this night',
     beanie: 'no accommodation booked for this night',

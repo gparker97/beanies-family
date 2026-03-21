@@ -104,6 +104,16 @@ export function tripDurationDays(start: string, end: string): number {
   return Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 }
 
+/**
+ * Translation key suffix for trip-type-appropriate countdown label.
+ * Returns a key like 'travel.countdown.fly_and_stay' for use with t().
+ */
+export function tripCountdownKey(tripType?: string): string {
+  const valid = ['fly_and_stay', 'cruise', 'road_trip', 'camping', 'adventure', 'combo'];
+  if (tripType && valid.includes(tripType)) return `travel.countdown.${tripType}`;
+  return 'travel.countdown.fly_and_stay';
+}
+
 // ── Combobox option builders (shared by VacationStep2 + edit modals) ────────
 
 export interface ComboOption {
