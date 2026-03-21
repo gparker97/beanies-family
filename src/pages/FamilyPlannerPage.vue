@@ -23,7 +23,6 @@ import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
-import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
 import VacationSidebarCard from '@/components/vacation/VacationSidebarCard.vue';
 import NookSectionCard from '@/components/nook/NookSectionCard.vue';
@@ -39,7 +38,6 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
-const { isMobile } = useBreakpoint();
 const route = useRoute();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
@@ -85,7 +83,7 @@ const activeMemberNames = computed(() =>
     .map((m) => m.name)
 );
 
-const activeView = ref(isMobile.value ? 'month' : 'week');
+const activeView = ref('month');
 const showInactive = ref(false);
 const showMemberFilterMobile = ref(false);
 const showModal = ref(false);
