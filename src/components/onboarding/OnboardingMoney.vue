@@ -46,6 +46,9 @@ const accountCurrency = ref<string>(settingsStore.baseCurrency);
 const accountAdded = ref(false);
 const addedAccountName = ref('');
 const addedAccountId = ref('');
+const addedAccounts = ref<
+  { id: string; name: string; type: string; balance: number; currency: string }[]
+>([]);
 
 const { options: institutionOptions } = useInstitutionOptions();
 
@@ -78,6 +81,13 @@ async function handleAddAccount() {
   });
 
   if (account) {
+    addedAccounts.value.push({
+      id: account.id,
+      name,
+      type: accountType.value,
+      balance: accountBalance.value || 0,
+      currency: accountCurrency.value,
+    });
     addedAccountName.value = name;
     addedAccountId.value = account.id;
     accountAdded.value = true;
@@ -315,17 +325,27 @@ function formatCurrency(val: number): string {
         </div>
       </template>
 
-      <!-- Confirmation row -->
-      <div v-else class="mt-2.5 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-xs" style="color: #27ae60">✓</span>
-          <span class="font-heading text-xs font-semibold" style="color: #27ae60">
-            {{ addedAccountName }} {{ t('onboarding.added') }}
-          </span>
+      <!-- Added accounts list + add another -->
+      <div v-else>
+        <div v-if="addedAccounts.length > 0" class="ob-added-list">
+          <div v-for="acc in addedAccounts" :key="acc.id" class="ob-added-row">
+            <span class="text-base">🏦</span>
+            <div class="min-w-0 flex-1">
+              <div class="font-heading truncate text-xs font-bold">{{ acc.name }}</div>
+              <div class="truncate text-xs opacity-45">
+                {{ acc.currency }}
+                {{ acc.balance.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+              </div>
+            </div>
+            <span class="ob-added-category">{{ acc.type }}</span>
+            <span class="text-xs font-bold" style="color: #27ae60">✓</span>
+          </div>
         </div>
-        <button class="ob-add-pill" @click="handleAddAnotherAccount">
-          {{ t('onboarding.addAnother') }}
-        </button>
+        <div class="mt-2 flex justify-end">
+          <button class="ob-add-pill" @click="handleAddAnotherAccount">
+            {{ t('onboarding.addAnother') }}
+          </button>
+        </div>
       </div>
     </div>
 
