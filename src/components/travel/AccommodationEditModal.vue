@@ -133,7 +133,7 @@ async function handleSave() {
       </FormFieldGroup>
 
       <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
+      <FormFieldGroup :label="t('vacation.field.title')" required>
         <BaseInput v-model="title" />
       </FormFieldGroup>
 

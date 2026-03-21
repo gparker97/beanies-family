@@ -88,9 +88,7 @@ const statusOptions = computed(() => [
   { value: 'pending', label: t('vacation.status.pending') },
 ]);
 
-const isTrainBus = computed(
-  () => props.transportation?.type === 'train' || props.transportation?.type === 'bus'
-);
+const isBus = computed(() => props.transportation?.type === 'bus');
 const isRentalCar = computed(() => props.transportation?.type === 'rental_car');
 const isShuttleOrTaxi = computed(
   () =>
@@ -154,24 +152,18 @@ async function handleSave() {
       </FormFieldGroup>
 
       <!-- Title -->
-      <FormFieldGroup :label="t('vacation.field.title')">
+      <FormFieldGroup :label="t('vacation.field.title')" required>
         <BaseInput v-model="title" />
       </FormFieldGroup>
 
-      <!-- Train/Bus fields -->
-      <template v-if="isTrainBus">
-        <FormFieldGroup :label="t('vacation.field.operator')">
-          <BaseInput v-model="operator" :placeholder="t('vacation.field.operator')" />
-        </FormFieldGroup>
-        <FormFieldGroup :label="t('vacation.field.route')">
-          <BaseInput v-model="route" :placeholder="t('vacation.field.route')" />
-        </FormFieldGroup>
+      <!-- Bus fields -->
+      <template v-if="isBus">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureAirport')">
-            <BaseInput v-model="departureStation" />
+          <FormFieldGroup :label="t('vacation.field.operator')">
+            <BaseInput v-model="operator" :placeholder="t('vacation.field.operator')" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalAirport')">
-            <BaseInput v-model="arrivalStation" />
+          <FormFieldGroup :label="t('vacation.field.route')">
+            <BaseInput v-model="route" :placeholder="t('vacation.field.route')" />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">

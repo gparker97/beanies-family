@@ -17,10 +17,8 @@ interface Props {
   deletable?: boolean;
   /** Show the edit pencil button (for view/detail contexts, not inline editing wizards) */
   showEdit?: boolean;
-  /** Helpful hint message (overlap warning) — shown on click of indicator */
+  /** Helpful hint message (overlap warning) — shown when expanded */
   hint?: string;
-  /** Whether the hint tooltip is currently visible */
-  hintExpanded?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -28,7 +26,6 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   'update:title': [value: string];
   'update:collapsed': [value: boolean];
-  'toggle-hint': [];
   edit: [];
   delete: [];
 }>();
@@ -67,29 +64,11 @@ async function handleDelete() {
   <div
     class="group/card rounded-2xl border transition-shadow hover:shadow-md"
     :class="
-      hint
+      hint || status === 'pending'
         ? 'border-amber-300/50 bg-amber-50/30 dark:border-amber-500/20 dark:bg-amber-900/5'
-        : status === 'pending'
-          ? 'border-dashed border-[rgba(184,134,11,0.18)] bg-[rgba(255,217,61,0.06)] dark:border-[rgba(184,134,11,0.25)] dark:bg-[rgba(255,217,61,0.03)]'
-          : 'border-[var(--tint-slate-10)] bg-white dark:border-slate-700 dark:bg-slate-800'
+        : 'border-[var(--tint-slate-10)] bg-white dark:border-slate-700 dark:bg-slate-800'
     "
   >
-    <!-- Hint tooltip (expanded) -->
-    <Transition
-      enter-active-class="transition-all duration-150 ease-out"
-      enter-from-class="opacity-0 -translate-y-1"
-      leave-active-class="transition-all duration-100 ease-in"
-      leave-to-class="opacity-0 -translate-y-1"
-    >
-      <div
-        v-if="hint && hintExpanded"
-        class="flex items-start gap-2 border-b border-amber-200/40 bg-amber-50/60 px-4 py-2.5 dark:border-amber-500/10 dark:bg-amber-900/10"
-      >
-        <span class="mt-0.5 text-xs">⚠️</span>
-        <span class="text-[11px] text-amber-800 dark:text-amber-300">{{ hint }}</span>
-      </div>
-    </Transition>
-
     <!-- Header -->
     <div class="cursor-pointer px-4 py-3" @click="toggleCollapse">
       <div class="flex items-center gap-2">
@@ -102,8 +81,12 @@ async function handleDelete() {
           {{ t(statusConfig.key as any) }}
         </span>
 
-        <!-- Editable title — auto-width, not full row -->
-        <div v-if="!readOnly" class="group/title relative min-w-0 shrink" @click.stop>
+        <!-- Editable title — desktop only (hidden on mobile to avoid blocking edit icon) -->
+        <div
+          v-if="!readOnly"
+          class="group/title relative hidden min-w-0 shrink lg:block"
+          @click.stop
+        >
           <input
             :value="title"
             class="font-outfit w-auto max-w-[180px] min-w-[60px] border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
@@ -116,9 +99,10 @@ async function handleDelete() {
             ✏️
           </span>
         </div>
+        <!-- Plain title (mobile + read-only) -->
         <span
-          v-else
-          class="font-outfit min-w-0 shrink text-sm font-semibold text-slate-900 dark:text-gray-100"
+          class="font-outfit min-w-0 shrink truncate text-sm font-semibold text-slate-900 dark:text-gray-100"
+          :class="readOnly ? '' : 'lg:hidden'"
         >
           {{ title }}
         </span>
@@ -130,40 +114,14 @@ async function handleDelete() {
         <!-- Spacer to push actions to right -->
         <div class="flex-1" />
 
-        <!-- Hint indicator — always visible when hint exists -->
-        <button
-          v-if="hint"
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm transition-all"
-          :class="
-            hintExpanded
-              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400'
-              : 'text-amber-400 hover:bg-amber-50 hover:text-amber-500 dark:text-amber-500 dark:hover:bg-amber-900/20'
-          "
+        <!-- Hint indicator — static icon signaling a hint exists -->
+        <span
+          v-if="hint || status === 'pending'"
+          class="shrink-0 text-sm text-amber-400"
           title="Scheduling hint"
-          @click.stop="$emit('toggle-hint')"
         >
           ⚠️
-        </button>
-
-        <!-- Edit button — always visible on mobile, hover-reveal on desktop -->
-        <button
-          v-if="showEdit"
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-300 transition-all hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] lg:opacity-0 lg:group-hover/card:opacity-100"
-          title="Edit"
-          @click.stop="$emit('edit')"
-        >
-          ✏️
-        </button>
-
-        <!-- Delete button — always visible on mobile, hover-reveal on desktop -->
-        <button
-          v-if="deletable && !readOnly"
-          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-300 transition-all hover:bg-red-50 hover:text-red-500 lg:opacity-0 lg:group-hover/card:opacity-100 dark:hover:bg-red-900/20"
-          title="Delete"
-          @click.stop="handleDelete"
-        >
-          🗑️
-        </button>
+        </span>
 
         <!-- Chevron -->
         <button
@@ -189,8 +147,45 @@ async function handleDelete() {
       :class="collapsed ? 'max-h-0 opacity-0' : 'max-h-[1200px] opacity-100'"
     >
       <div class="px-4 pb-4" @click="$emit('edit')">
+        <!-- Hint banner (shown when expanded, for hints or pending items) -->
+        <div
+          v-if="hint || status === 'pending'"
+          class="mb-3 flex items-start gap-2 rounded-xl border border-amber-200/40 bg-amber-50/60 px-3 py-2 dark:border-amber-500/10 dark:bg-amber-900/10"
+          @click.stop
+        >
+          <span class="mt-0.5 text-sm">⚠️</span>
+          <span class="text-xs text-amber-800 dark:text-amber-300">
+            <template v-if="hint">{{ hint }}</template>
+            <template v-else
+              >{{ t('vacation.status.pending') }} — {{ t('travel.needsBooking') }}</template
+            >
+          </span>
+        </div>
+
         <!-- Slot content: click.stop on interactive elements prevents edit -->
         <slot />
+
+        <!-- Edit / Delete actions (shown only when expanded) -->
+        <div
+          v-if="showEdit || (deletable && !readOnly)"
+          class="mt-3 flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-slate-700/40"
+          @click.stop
+        >
+          <button
+            v-if="showEdit"
+            class="font-outfit inline-flex items-center gap-1 rounded-lg bg-[rgba(0,180,216,0.08)] px-3 py-1.5 text-xs font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+            @click="$emit('edit')"
+          >
+            ✏️ {{ t('action.edit') }}
+          </button>
+          <button
+            v-if="deletable && !readOnly"
+            class="font-outfit inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold text-red-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+            @click="handleDelete"
+          >
+            🗑️ {{ t('common.delete') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
