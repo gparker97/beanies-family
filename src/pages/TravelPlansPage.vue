@@ -43,6 +43,9 @@ const showVacationWizard = ref(false);
 const editingVacation = ref<FamilyVacation | null>(null);
 const editVacationStep = ref<number | undefined>(undefined);
 
+// Add menu state (timeline bottom)
+const showAddMenu = ref(false);
+
 // Edit modal state
 const editModalType = ref<'travel' | 'accommodation' | 'transportation' | null>(null);
 const editingItemIndex = ref(-1);
@@ -183,6 +186,11 @@ function editInWizard(step: number) {
   }
 }
 
+function addSegmentViaWizard(step: number) {
+  showAddMenu.value = false;
+  editInWizard(step);
+}
+
 // ── Collapsible cards ────────────────────────────────────────────────────────
 
 function isCollapsed(id: string): boolean {
@@ -195,6 +203,25 @@ function setCollapsed(id: string, val: boolean) {
 
 // ── Edit modals ──────────────────────────────────────────────────────────────
 
+/** Inline-edit a single field on a timeline item and save immediately */
+function saveInlineField(item: TimelineItem, field: string, value: string) {
+  if (!selectedVacation.value) return;
+  const id = selectedVacation.value.id;
+  if (item.kind === 'travel') {
+    const travelSegments = [...selectedVacation.value.travelSegments];
+    travelSegments[item.arrayIndex] = { ...travelSegments[item.arrayIndex]!, [field]: value };
+    vacationStore.updateVacation(id, { travelSegments });
+  } else if (item.kind === 'accommodation') {
+    const accommodations = [...selectedVacation.value.accommodations];
+    accommodations[item.arrayIndex] = { ...accommodations[item.arrayIndex]!, [field]: value };
+    vacationStore.updateVacation(id, { accommodations });
+  } else if (item.kind === 'transportation') {
+    const transportation = [...selectedVacation.value.transportation];
+    transportation[item.arrayIndex] = { ...transportation[item.arrayIndex]!, [field]: value };
+    vacationStore.updateVacation(id, { transportation });
+  }
+}
+
 function openEditModal(item: TimelineItem) {
   editingItemIndex.value = item.arrayIndex;
   editModalType.value = item.kind;
@@ -203,6 +230,33 @@ function openEditModal(item: TimelineItem) {
 function openAddModal(kind: 'travel' | 'accommodation' | 'transportation') {
   editingItemIndex.value = -1;
   editModalType.value = kind;
+}
+
+async function deleteTimelineItem(item: TimelineItem) {
+  if (!selectedVacation.value) return;
+  const confirmed = await confirm({
+    title: 'vacation.deleteSegmentTitle',
+    message: 'vacation.deleteSegmentMessage',
+    variant: 'danger',
+  });
+  if (!confirmed) return;
+  const id = selectedVacation.value.id;
+  if (item.kind === 'travel') {
+    const travelSegments = selectedVacation.value.travelSegments.filter(
+      (_, i) => i !== item.arrayIndex
+    );
+    await vacationStore.updateVacation(id, { travelSegments });
+  } else if (item.kind === 'accommodation') {
+    const accommodations = selectedVacation.value.accommodations.filter(
+      (_, i) => i !== item.arrayIndex
+    );
+    await vacationStore.updateVacation(id, { accommodations });
+  } else if (item.kind === 'transportation') {
+    const transportation = selectedVacation.value.transportation.filter(
+      (_, i) => i !== item.arrayIndex
+    );
+    await vacationStore.updateVacation(id, { transportation });
+  }
 }
 
 function closeEditModal() {
@@ -726,53 +780,126 @@ function addQuickIdea() {
                     :collapsed="isCollapsed(item.id)"
                     :read-only="false"
                     show-edit
+                    deletable
                     :hint="hintMap.get(item.id)?.message"
                     :hint-expanded="expandedHintId === item.id"
                     @update:collapsed="setCollapsed(item.id, $event)"
                     @edit="openEditModal(item)"
+                    @delete="deleteTimelineItem(item)"
                     @toggle-hint="toggleHint(item.id)"
                   >
-                    <!-- Detail rows — click.stop on interactive elements to prevent edit -->
-                    <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1" @click.stop>
-                      <template v-for="row in item.detailRows" :key="row.label">
+                    <!-- Detail rows — divided, compact, inline-editable with pencil -->
+                    <div class="divide-y divide-gray-100 dark:divide-slate-700/40" @click.stop>
+                      <div
+                        v-for="row in item.detailRows"
+                        :key="row.label"
+                        class="flex items-center gap-3 py-1 first:pt-0 last:pb-0"
+                      >
+                        <!-- Label -->
                         <span
-                          class="font-outfit self-center text-[10px] font-medium text-gray-400 dark:text-gray-500"
+                          class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
                         >
                           {{ row.label }}
                         </span>
-                        <!-- Copyable value -->
+
+                        <!-- Copyable value (booking ref only) -->
                         <button
                           v-if="row.copyable"
-                          class="font-outfit inline-flex w-fit cursor-pointer items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
+                          class="font-outfit inline-flex items-center gap-1.5 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2.5 py-0.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
                           @click="copy(row.value)"
                         >
                           {{ row.value }}
-                          <span class="text-[10px] opacity-30">📋</span>
+                          <span class="text-xs opacity-30">📋</span>
                         </button>
-                        <!-- Map link -->
-                        <a
-                          v-else-if="row.mapLink"
-                          :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="font-outfit inline-flex w-fit items-center gap-1 self-center rounded-lg border border-[var(--tint-slate-10)] bg-white px-2 py-0.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
-                        >
-                          {{ row.value }}
-                          <span class="text-[10px] opacity-40">📍</span>
-                        </a>
-                        <!-- Plain value -->
-                        <span
-                          v-else
-                          class="self-center text-xs text-[var(--color-text)] dark:text-gray-200"
-                        >
+
+                        <!-- Inline-editable field with pencil hint -->
+                        <div v-else-if="row.field" class="group/field relative min-w-0 shrink">
+                          <input
+                            :type="row.inputType ?? 'text'"
+                            :value="row.value"
+                            :size="
+                              row.inputType === 'date' || row.inputType === 'time'
+                                ? undefined
+                                : Math.max(String(row.value).length, 8)
+                            "
+                            class="font-outfit w-auto border-0 border-b border-dashed border-transparent bg-transparent pr-5 text-sm font-medium text-gray-900 transition-colors outline-none hover:border-gray-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
+                            @change="
+                              saveInlineField(
+                                item,
+                                row.field!,
+                                ($event.target as HTMLInputElement).value
+                              )
+                            "
+                          />
+                          <span
+                            class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
+                          >
+                            ✏️
+                          </span>
+                        </div>
+
+                        <!-- Map link (address — editable + map icon) -->
+                        <div v-else-if="row.mapLink" class="flex min-w-0 items-center gap-1.5">
+                          <span class="truncate text-sm text-gray-900 dark:text-gray-100">
+                            {{ row.value }}
+                          </span>
+                          <a
+                            :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="shrink-0 text-xs opacity-40 hover:opacity-70"
+                          >
+                            📍
+                          </a>
+                        </div>
+
+                        <!-- Plain read-only value -->
+                        <span v-else class="text-sm text-gray-900 dark:text-gray-100">
                           {{ row.value }}
                         </span>
-                      </template>
+                      </div>
                     </div>
                   </VacationSegmentCard>
                 </div>
               </template>
             </template>
+          </div>
+
+          <!-- Add segment to timeline -->
+          <div class="mt-4 flex items-center gap-2 pl-10">
+            <button
+              class="font-outfit inline-flex items-center gap-1 rounded-full border-[1.5px] border-[#00B4D8]/30 bg-[rgba(0,180,216,0.06)] px-4 py-2 text-xs font-semibold text-[#00B4D8] shadow-sm transition-all hover:border-[#00B4D8]/50 hover:bg-[rgba(0,180,216,0.12)]"
+              @click="showAddMenu = !showAddMenu"
+            >
+              {{ showAddMenu ? '✕ close' : '+ add a plan' }}
+            </button>
+            <Transition
+              enter-active-class="transition-all duration-150 ease-out"
+              enter-from-class="opacity-0 -translate-x-2"
+              leave-active-class="transition-all duration-100 ease-in"
+              leave-to-class="opacity-0 -translate-x-2"
+            >
+              <div v-if="showAddMenu" class="flex flex-wrap gap-1.5">
+                <button
+                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  @click="addSegmentViaWizard(2)"
+                >
+                  ✈️ {{ t('vacation.step.travel') }}
+                </button>
+                <button
+                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  @click="addSegmentViaWizard(3)"
+                >
+                  🏨 {{ t('vacation.step.stay') }}
+                </button>
+                <button
+                  class="rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8] dark:bg-slate-700 dark:text-gray-300"
+                  @click="addSegmentViaWizard(4)"
+                >
+                  🚗 {{ t('vacation.step.gettingAround') }}
+                </button>
+              </div>
+            </Transition>
           </div>
 
           <!-- Unbooked items -->

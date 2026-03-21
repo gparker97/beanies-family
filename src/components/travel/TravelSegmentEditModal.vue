@@ -411,14 +411,14 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureAirport')">
+          <FormFieldGroup :label="t('vacation.field.departureStation')">
             <BaseInput
               v-model="departureStation"
-              :placeholder="t('vacation.field.departureAirport')"
+              :placeholder="t('vacation.field.departureStation')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalAirport')">
-            <BaseInput v-model="arrivalStation" :placeholder="t('vacation.field.arrivalAirport')" />
+          <FormFieldGroup :label="t('vacation.field.arrivalStation')">
+            <BaseInput v-model="arrivalStation" :placeholder="t('vacation.field.arrivalStation')" />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
