@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-21",
-    "translationCount": 1822
+    "translationCount": 1834
   },
   "translations": {
     "app.name": {
@@ -8417,9 +8417,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.step5.title": {
-      "translation": "Bean Bucket List ！",
-      "hash": "pp8u71",
-      "lastUpdated": "2026-03-20"
+      "translation": "旅程创意！",
+      "hash": "gn1tog",
+      "lastUpdated": "2026-03-21"
     },
     "vacation.step5.subtitle": {
       "translation": "豆子想看什么和做什么？",
@@ -8657,9 +8657,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.bucketList": {
-      "translation": "Bean Bucket List",
-      "hash": "5etkuc",
-      "lastUpdated": "2026-03-20"
+      "translation": "旅程创意！",
+      "hash": "1hlx28",
+      "lastUpdated": "2026-03-21"
     },
     "vacation.editAll": {
       "translation": "编辑套餐",
@@ -8817,9 +8817,9 @@
       "lastUpdated": "2026-03-20"
     },
     "vacation.field.location": {
-      "translation": "港口/地点",
-      "hash": "br683p",
-      "lastUpdated": "2026-03-20"
+      "translation": "位置",
+      "hash": "wibidx",
+      "lastUpdated": "2026-03-21"
     },
     "vacation.field.notes": {
       "translation": "注意",
@@ -8962,8 +8962,8 @@
       "lastUpdated": "2026-03-21"
     },
     "travel.ideas": {
-      "translation": "Bean Bucket List",
-      "hash": "5etkuc",
+      "translation": "旅程创意！",
+      "hash": "1hlx28",
       "lastUpdated": "2026-03-21"
     },
     "travel.ideasTeaser": {
@@ -9114,6 +9114,66 @@
     "travel.hint": {
       "translation": "有用的提示",
       "hash": "8y3eff",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.segment.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.travel.addActivity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.activityCategory.show_musical": {
+      "translation": "表演/音乐剧",
+      "hash": "9dhpks",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.activityCategory.theme_park": {
+      "translation": "游乐园",
+      "hash": "tyj65b",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.activityCategory.sporting_event": {
+      "translation": "体育赛事",
+      "hash": "913mzc",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.activityCategory.concert": {
+      "translation": "我喜欢你的陪伴",
+      "hash": "rrt08q",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.activityCategory.excursion": {
+      "translation": "岸上观光/游览",
+      "hash": "pruiah",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.activityCategory.other": {
+      "translation": "其他地区",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.activityCategory": {
+      "translation": "Activity Type",
+      "hash": "4wetsl",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.startTime": {
+      "translation": "开始时间",
+      "hash": "5z1fkb",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.duration": {
+      "translation": "课时",
+      "hash": "vvi6vg",
+      "lastUpdated": "2026-03-21"
+    },
+    "vacation.field.link": {
+      "translation": "链接",
+      "hash": "1erkq",
       "lastUpdated": "2026-03-21"
     }
   }
