@@ -95,7 +95,6 @@ function togglePill(type: VacationAccommodationType) {
       );
     }
   } else {
-    // Single-select: replace with the new type
     const item: VacationAccommodation = {
       id: generateUUID(),
       type,
@@ -104,7 +103,15 @@ function togglePill(type: VacationAccommodationType) {
       checkInDate: flightDates.value.checkIn,
       checkOutDate: flightDates.value.checkOut,
     };
-    emit('update:accommodations', [item]);
+    // If existing items have data, append; otherwise replace (first-time single-select)
+    const hasData = props.accommodations.some(
+      (a) => a.name || a.address || a.checkInDate || a.checkOutDate || a.confirmationNumber
+    );
+    if (hasData) {
+      emit('update:accommodations', [...props.accommodations, item]);
+    } else {
+      emit('update:accommodations', [item]);
+    }
   }
 }
 

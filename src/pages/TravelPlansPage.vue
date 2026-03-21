@@ -227,11 +227,6 @@ function openEditModal(item: TimelineItem) {
   editModalType.value = item.kind;
 }
 
-function openAddModal(kind: 'travel' | 'accommodation' | 'transportation') {
-  editingItemIndex.value = -1;
-  editModalType.value = kind;
-}
-
 async function deleteTimelineItem(item: TimelineItem) {
   if (!selectedVacation.value) return;
   const confirmed = await confirm({
@@ -734,7 +729,7 @@ function addQuickIdea() {
                   />
                   <button
                     class="flex w-full cursor-pointer items-center gap-2 rounded-2xl border border-dashed border-[rgba(241,93,34,0.2)] bg-[var(--tint-orange-8)] px-4 py-3 text-left transition-colors hover:bg-[var(--tint-orange-15)] dark:bg-orange-900/10"
-                    @click="openAddModal('accommodation')"
+                    @click="addSegmentViaWizard(3)"
                   >
                     <div class="flex-1">
                       <span class="font-outfit text-xs font-semibold text-[var(--heritage-orange)]">
