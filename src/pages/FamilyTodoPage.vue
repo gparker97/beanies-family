@@ -15,6 +15,7 @@ import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
 import type { TodoSort } from '@/components/todo/FilterBar.vue';
 import type { TodoItem } from '@/types/models';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const route = useRoute();
 const { t } = useTranslation();
@@ -30,6 +31,8 @@ const currentMemberId = computed(() => authStore.currentUser?.memberId ?? '');
 const sortBy = ref<TodoSort>('newest');
 const memberFilter = ref('all');
 const showCompletedSection = ref(false);
+
+const { isDesktop } = useBreakpoint();
 
 // Ref to QuickAddBar for auto-focus
 const quickAddBar = ref<InstanceType<typeof QuickAddBar> | null>(null);
@@ -124,9 +127,11 @@ onMounted(async () => {
     if (todo) openModal(todo);
   }
 
-  // Auto-focus the quick add bar
-  await nextTick();
-  quickAddBar.value?.focus();
+  // Auto-focus the quick add bar (skip on mobile/tablet to avoid keyboard popup)
+  if (isDesktop.value) {
+    await nextTick();
+    quickAddBar.value?.focus();
+  }
 });
 
 async function handleDelete(id: string) {
