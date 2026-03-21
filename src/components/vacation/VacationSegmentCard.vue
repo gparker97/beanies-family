@@ -81,28 +81,9 @@ async function handleDelete() {
           {{ t(statusConfig.key as any) }}
         </span>
 
-        <!-- Editable title — desktop only (hidden on mobile to avoid blocking edit icon) -->
-        <div
-          v-if="!readOnly"
-          class="group/title relative hidden min-w-0 shrink lg:block"
-          @click.stop
-        >
-          <input
-            :value="title"
-            class="font-outfit w-auto max-w-[180px] min-w-[60px] border-0 border-b border-dashed border-transparent bg-transparent text-sm font-semibold text-slate-900 transition-colors outline-none hover:border-slate-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
-            :size="Math.max(title.length, 6)"
-            @change="emit('update:title', ($event.target as HTMLInputElement).value)"
-          />
-          <span
-            class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/title:opacity-100 dark:text-slate-500"
-          >
-            ✏️
-          </span>
-        </div>
-        <!-- Plain title (mobile + read-only) -->
+        <!-- Title (read-only display) -->
         <span
           class="font-outfit min-w-0 shrink truncate text-sm font-semibold text-slate-900 dark:text-gray-100"
-          :class="readOnly ? '' : 'lg:hidden'"
         >
           {{ title }}
         </span>
