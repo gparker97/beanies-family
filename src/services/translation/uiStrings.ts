@@ -3507,7 +3507,7 @@ const STRING_DEFS = {
     en: 'Sorted by date \u2014 tap to copy \u2014 click fields to edit inline',
     beanie: 'sorted by date \u2014 tap to copy \u2014 click fields to edit inline',
   },
-  'vacation.bucketList': { en: 'Bean Bucket List', beanie: 'bean bucket list' },
+  'vacation.bucketList': { en: 'Trip Ideas!', beanie: 'breanie trip ideas!' },
   'vacation.editAll': { en: 'Edit Plans', beanie: 'edit plans' },
   'vacation.nightsNoAccommodation': {
     en: 'night(s) without accommodation',
@@ -3633,7 +3633,7 @@ const STRING_DEFS = {
     beanie: 'no accommodation booked for this night',
   },
   'travel.hint': { en: 'Helpful Hint', beanie: 'helpful hint' },
-  'travel.ideas': { en: 'Bean Bucket List', beanie: 'bean bucket list' },
+  'travel.ideas': { en: 'Trip Ideas!', beanie: 'beanie trip ideas!' },
   'travel.ideasTeaser': { en: 'Ideas', beanie: 'ideas' },
   'travel.quickAddIdea': { en: 'Quick-add an idea...', beanie: 'quick-add an idea...' },
   'travel.timeline': { en: 'Timeline', beanie: 'timeline' },

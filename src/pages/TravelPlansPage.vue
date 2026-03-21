@@ -203,13 +203,21 @@ function setCollapsed(id: string, val: boolean) {
 
 // ── Edit modals ──────────────────────────────────────────────────────────────
 
+/** Date fields that should also update sortDate on travel segments */
+const TRAVEL_DATE_FIELDS = new Set(['departureDate', 'embarkationDate']);
+
 /** Inline-edit a single field on a timeline item and save immediately */
 function saveInlineField(item: TimelineItem, field: string, value: string) {
   if (!selectedVacation.value) return;
   const id = selectedVacation.value.id;
   if (item.kind === 'travel') {
     const travelSegments = [...selectedVacation.value.travelSegments];
-    travelSegments[item.arrayIndex] = { ...travelSegments[item.arrayIndex]!, [field]: value };
+    const updated = { ...travelSegments[item.arrayIndex]!, [field]: value };
+    // Keep sortDate in sync when a primary date field changes
+    if (TRAVEL_DATE_FIELDS.has(field)) {
+      updated.sortDate = value;
+    }
+    travelSegments[item.arrayIndex] = updated;
     vacationStore.updateVacation(id, { travelSegments });
   } else if (item.kind === 'accommodation') {
     const accommodations = [...selectedVacation.value.accommodations];
