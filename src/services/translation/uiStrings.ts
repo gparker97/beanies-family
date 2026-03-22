@@ -488,6 +488,19 @@ const STRING_DEFS = {
 
   // Goal Link (transaction-to-goal allocation)
   'goalLink.title': { en: 'Link to Goal', beanie: 'link to goal' },
+  'goalLink.hintIntro': {
+    en: 'When linked, each incoming payment automatically contributes towards this goal. Choose how much:',
+    beanie:
+      'when linked, each incoming payment automatically goes towards this goal. choose how much:',
+  },
+  'goalLink.hintPercentage': {
+    en: 'Percentage — a share of every payment (e.g. 20% of each payday)',
+    beanie: 'percentage — a share of every payment (e.g. 20% of each payday)',
+  },
+  'goalLink.hintFixed': {
+    en: 'Fixed amount — the same amount from every payment, up to the remaining goal balance',
+    beanie: 'fixed amount — the same amount from every payment, up to the remaining goal balance',
+  },
   'goalLink.selectGoal': { en: 'Select Goal', beanie: 'pick a goal' },
   'goalLink.allocMode': { en: 'Contribution', beanie: 'contribution' },
   'goalLink.percentage': { en: 'Percentage', beanie: 'percentage' },
@@ -500,6 +513,20 @@ const STRING_DEFS = {
 
   // Transaction — Link Payment
   'txLink.linkPayment': { en: 'Link Payment', beanie: 'link payment' },
+  'txLink.hintLinkPaymentIntro': {
+    en: 'Link this outgoing payment to an activity or loan:',
+    beanie: 'link this outgoing payment to an activity or loan:',
+  },
+  'txLink.hintLinkPaymentActivity': {
+    en: 'Activity — tracks the cost against a family activity (e.g. swim class, music lesson). The payment appears on the activity timeline.',
+    beanie:
+      'activity — tracks the cost against a family activity. the payment shows on the activity timeline.',
+  },
+  'txLink.hintLinkPaymentLoan': {
+    en: 'Loan — each payment is automatically split into interest and principal using standard amortization, reducing the outstanding loan balance over time.',
+    beanie:
+      'loan — each payment is split into interest and principal, reducing the loan balance over time.',
+  },
   'txLink.activity': { en: 'Activity', beanie: 'activity' },
   'txLink.loan': { en: 'Loan', beanie: 'loan' },
   'txLink.selectLoan': { en: 'Select a Loan', beanie: 'pick a loan' },
