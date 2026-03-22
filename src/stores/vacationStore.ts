@@ -139,8 +139,11 @@ export const useVacationStore = defineStore('vacations', () => {
       const vacation = vacations.value.find((v) => v.id === id);
       if (!vacation) return false;
 
-      // Delete the linked activity first
+      // Delete the linked activity first (repo + in-memory store)
       await activityRepo.deleteActivity(vacation.activityId);
+      const { useActivityStore } = await import('@/stores/activityStore');
+      const activityStore = useActivityStore();
+      activityStore.removeFromMemory(vacation.activityId);
 
       // Delete the vacation
       const success = await vacationRepo.deleteVacation(id);
