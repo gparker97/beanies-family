@@ -16,7 +16,7 @@ withDefaults(defineProps<Props>(), {
 <template>
   <div class="space-y-2">
     <label
-      class="font-outfit text-xs font-semibold tracking-[0.1em] uppercase"
+      class="font-outfit text-xs font-semibold tracking-[0.1em] whitespace-nowrap uppercase"
       :class="
         error
           ? 'text-primary-500 opacity-100'
