@@ -507,6 +507,8 @@ function handleDelete() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
+    size="wide"
     :open="open"
     :title="modalTitle"
     :icon="isEditingRecurring ? '🔄' : direction === 'in' ? '💚' : '🧡'"

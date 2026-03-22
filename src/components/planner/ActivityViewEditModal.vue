@@ -582,6 +582,7 @@ async function confirmReschedule() {
 <template>
   <BeanieFormModal
     v-if="activity"
+    variant="drawer"
     :open="true"
     :title="t('planner.viewActivity')"
     :icon="activity.icon || '📋'"

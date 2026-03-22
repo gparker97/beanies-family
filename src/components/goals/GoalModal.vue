@@ -168,6 +168,8 @@ function handleDelete() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
+    size="narrow"
     :open="open"
     :title="modalTitle"
     :icon="goalEmoji || '🎯'"

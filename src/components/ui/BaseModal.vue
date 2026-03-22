@@ -2,6 +2,7 @@
 import { computed, watch, onMounted, onUnmounted } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { lockBodyScroll, unlockBodyScroll } from '@/utils/overlayStack';
 
 interface Props {
   open: boolean;
@@ -57,9 +58,9 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      lockBodyScroll();
     } else {
-      document.body.style.overflow = '';
+      unlockBodyScroll();
     }
   }
 );
@@ -70,7 +71,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
-  document.body.style.overflow = '';
+  if (props.open) unlockBodyScroll();
 });
 </script>
 

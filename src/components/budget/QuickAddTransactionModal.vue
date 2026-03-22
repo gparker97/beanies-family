@@ -92,6 +92,7 @@ function handleSave() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
     :open="open"
     :title="t('budget.quickAdd.title')"
     icon="⚡"

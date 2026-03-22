@@ -269,6 +269,7 @@ async function handleDelete() {
 <template>
   <BeanieFormModal
     v-if="todo"
+    variant="drawer"
     :open="true"
     :title="t('todo.viewTask')"
     icon="✅"

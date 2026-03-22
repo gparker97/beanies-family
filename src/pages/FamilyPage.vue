@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import { BaseButton, BaseInput, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -260,6 +260,9 @@ async function handleMemberSave(
     const memberName = data.name;
     await familyStore.createMember(data);
     showAddModal.value = false;
+
+    // Wait for drawer close transition before opening invite modal
+    await nextTick();
 
     // Show success toast and auto-open invite modal
     showToast('success', t('family.memberAdded'), memberName);

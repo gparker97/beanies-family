@@ -268,6 +268,7 @@ async function handleDelete() {
 <template>
   <BeanieFormModal
     v-if="transaction"
+    variant="drawer"
     :open="true"
     :title="t('transactions.viewTransaction')"
     :icon="categoryEmoji || '💰'"

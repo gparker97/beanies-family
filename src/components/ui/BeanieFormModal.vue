@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import BaseModal from './BaseModal.vue';
+import BaseSidePanel from './BaseSidePanel.vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 interface Props {
@@ -13,8 +15,10 @@ interface Props {
   saveDisabled?: boolean;
   isSubmitting?: boolean;
   showDelete?: boolean;
-  /** When true, uses the #custom-header slot edge-to-edge (no padding/border) */
+  /** When true, uses the #custom-header slot edge-to-edge (no padding/border). Modal only. */
   customHeader?: boolean;
+  /** Render as a centered modal or a right-side drawer. */
+  variant?: 'modal' | 'drawer';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -27,6 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
   isSubmitting: false,
   showDelete: false,
   customHeader: false,
+  variant: 'modal',
 });
 
 const emit = defineEmits<{
@@ -37,20 +42,45 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
-const modalSize = props.size === 'narrow' ? 'lg' : props.size === 'wide' ? '2xl' : 'xl';
+const containerComponent = computed(() => (props.variant === 'drawer' ? BaseSidePanel : BaseModal));
+
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+type DrawerSize = 'narrow' | 'medium' | 'wide' | 'full';
+
+const modalSizeMap: Record<string, ModalSize> = {
+  narrow: 'lg',
+  default: 'xl',
+  wide: '2xl',
+};
+
+const drawerSizeMap: Record<string, DrawerSize> = {
+  narrow: 'narrow',
+  default: 'medium',
+  wide: 'wide',
+};
+
+const containerProps = computed(() => {
+  if (props.variant === 'drawer') {
+    return {
+      open: props.open,
+      size: drawerSizeMap[props.size] ?? ('medium' as DrawerSize),
+      closable: !props.isSubmitting,
+    };
+  }
+  return {
+    open: props.open,
+    size: modalSizeMap[props.size] ?? ('xl' as ModalSize),
+    closable: !props.isSubmitting,
+    fullscreenMobile: true,
+    customHeader: props.customHeader,
+  };
+});
 </script>
 
 <template>
-  <BaseModal
-    :open="open"
-    :size="modalSize"
-    :closable="!isSubmitting"
-    :custom-header="customHeader"
-    fullscreen-mobile
-    @close="emit('close')"
-  >
+  <component :is="containerComponent" v-bind="containerProps" @close="emit('close')">
     <template #header>
-      <slot v-if="customHeader" name="custom-header" />
+      <slot v-if="customHeader && variant === 'modal'" name="custom-header" />
       <div v-else class="flex w-full items-center gap-3">
         <!-- Icon box -->
         <div
@@ -132,5 +162,5 @@ const modalSize = props.size === 'narrow' ? 'lg' : props.size === 'wide' ? '2xl'
         </button>
       </div>
     </template>
-  </BaseModal>
+  </component>
 </template>
