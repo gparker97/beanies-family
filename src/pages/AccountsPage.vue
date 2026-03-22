@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
-import { BaseButton } from '@/components/ui';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -358,10 +357,13 @@ async function deleteAccount(id: string) {
       <p class="text-sm text-gray-500 dark:text-gray-400">
         {{ subtitleText }}
       </p>
-      <BaseButton @click="openAddWithDefaults()">
-        <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
+      <button
+        type="button"
+        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+        @click="openAddWithDefaults()"
+      >
         {{ t('accounts.addAccount') }}
-      </BaseButton>
+      </button>
     </div>
 
     <!-- Hero Section: 2:1 layout -->
@@ -448,10 +450,13 @@ async function deleteAccount(id: string) {
         {{ t('accounts.noAccounts') }}
       </h3>
       <p class="mt-1 mb-4 text-gray-500 dark:text-gray-400">{{ t('accounts.getStarted') }}</p>
-      <BaseButton @click="openAddWithDefaults()">
-        <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
+      <button
+        type="button"
+        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+        @click="openAddWithDefaults()"
+      >
         {{ t('accounts.addAccount') }}
-      </BaseButton>
+      </button>
     </div>
 
     <!-- Unified Sections Loop -->
