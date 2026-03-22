@@ -3653,8 +3653,12 @@ const STRING_DEFS = {
     beanie: 'no accommodation booked for this night',
   },
   'travel.hint': { en: 'Helpful Hint', beanie: 'helpful hint' },
-  'travel.ideas': { en: 'Trip Ideas!', beanie: 'beanie trip ideas!' },
+  'travel.ideas': { en: 'Trip Ideas', beanie: 'beanie trip ideas' },
   'travel.ideasTeaser': { en: 'Ideas', beanie: 'ideas' },
+  'travel.ideasTeaserHint': {
+    en: 'View All Your Trip Ideas',
+    beanie: 'view all your beanie trip ideas',
+  },
   'travel.quickAddIdea': { en: 'Quick-add an idea...', beanie: 'quick-add an idea...' },
   'travel.timeline': { en: 'Timeline', beanie: 'timeline' },
   'travel.editSegment': { en: 'Edit Segment', beanie: 'edit segment' },

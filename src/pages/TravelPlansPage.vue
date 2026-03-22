@@ -706,7 +706,7 @@ function addQuickIdea() {
             <div class="font-outfit flex-1 text-sm font-semibold text-gray-900 dark:text-gray-100">
               {{ selectedVacation.ideas.length }} {{ t('travel.ideasTeaser').toLowerCase() }}
               <span class="mt-0.5 block text-[11px] font-normal text-gray-400">
-                {{ t('travel.ideas') }}
+                {{ t('travel.ideasTeaserHint') }}
               </span>
             </div>
             <span class="text-sm text-gray-300">↓</span>
