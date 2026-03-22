@@ -877,7 +877,18 @@ function handleDelete() {
 
         <!-- Editable link selector (new items or unlinked items) -->
         <template v-else>
-          <FormFieldGroup :label="t('txLink.linkPayment')" optional>
+          <div>
+            <div class="mb-2 flex items-center gap-1.5">
+              <label
+                class="font-outfit text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+              >
+                {{ t('txLink.linkPayment') }}
+              </label>
+              <InfoHintBadge
+                :text="t('txLink.hintLinkPaymentIntro')"
+                :items="[t('txLink.hintLinkPaymentActivity'), t('txLink.hintLinkPaymentLoan')]"
+              />
+            </div>
             <TogglePillGroup
               v-model="linkType"
               :options="[
@@ -886,7 +897,7 @@ function handleDelete() {
               ]"
               clearable
             />
-          </FormFieldGroup>
+          </div>
 
           <FormFieldGroup v-if="linkType === 'activity'" :label="t('txLink.activity')">
             <ActivityLinkDropdown v-model="activityId" />
@@ -914,7 +925,18 @@ function handleDelete() {
     <!-- 8b. Goal link (income only, after date/schedule section) -->
     <ConditionalSection :show="direction === 'in' && goalItems.length > 0">
       <div class="space-y-3">
-        <FormFieldGroup :label="t('goalLink.title')" optional>
+        <div>
+          <div class="mb-2 flex items-center gap-1.5">
+            <label
+              class="font-outfit text-xs font-semibold tracking-[0.1em] whitespace-nowrap text-[var(--color-text)] uppercase opacity-35 dark:text-gray-300"
+            >
+              {{ t('goalLink.title') }}
+            </label>
+            <InfoHintBadge
+              :text="t('goalLink.hintIntro')"
+              :items="[t('goalLink.hintPercentage'), t('goalLink.hintFixed')]"
+            />
+          </div>
           <EntityLinkDropdown
             v-model="goalId"
             :items="goalItems"
@@ -922,7 +944,7 @@ function handleDelete() {
             :empty-text="t('goalLink.noGoals')"
             default-icon="🎯"
           />
-        </FormFieldGroup>
+        </div>
         <ConditionalSection :show="!!goalId">
           <div class="space-y-3">
             <FormFieldGroup :label="t('goalLink.allocMode')">
