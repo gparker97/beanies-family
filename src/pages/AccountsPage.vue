@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
@@ -46,14 +46,22 @@ const groupBy = ref<'member' | 'category'>(
 );
 const addModalDefaults = ref<{ memberId?: string; type?: AccountType } | undefined>();
 
-// Open edit modal from query param (e.g. navigated from Dashboard)
-onMounted(() => {
+// Open edit modal from query param (e.g. navigated from Dashboard or global search)
+function handleAccountQueryParam() {
   const viewId = route.query.view as string | undefined;
   if (viewId) {
     const account = accountsStore.accounts.find((a) => a.id === viewId);
     if (account) openEditModal(account);
+    router.replace({ query: { ...route.query, view: undefined } });
   }
-});
+}
+watch(
+  () => route.query.view,
+  (val) => {
+    if (val) handleAccountQueryParam();
+  }
+);
+onMounted(handleAccountQueryParam);
 
 const groupByOptions = computed(() => [
   { value: 'member', label: t('accounts.groupByMember') },
