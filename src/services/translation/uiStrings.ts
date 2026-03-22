@@ -3348,6 +3348,7 @@ const STRING_DEFS = {
   'vacation.travel.flights': { en: 'Flights', beanie: 'flights' },
   'vacation.travel.outbound': { en: 'Outbound', beanie: 'outbound' },
   'vacation.travel.return': { en: 'Return', beanie: 'return' },
+  'vacation.travel.oneWay': { en: 'One-way', beanie: 'one-way' },
 
   // Travel fields
   'vacation.field.airline': { en: 'Airline', beanie: 'airline' },

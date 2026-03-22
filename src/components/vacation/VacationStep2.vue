@@ -37,6 +37,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 
 const collapsedMap = ref<Record<string, boolean>>({});
+const showFlightTypeChoice = ref(false);
 
 const segmentIcons: Record<VacationTravelType, string> = {
   flight_outbound: '✈️',
@@ -50,14 +51,14 @@ const segmentIcons: Record<VacationTravelType, string> = {
 };
 
 const defaultTitles: Record<VacationTravelType, string> = {
-  flight_outbound: 'outbound flight',
-  flight_return: 'return flight',
+  flight_outbound: 'flight',
+  flight_return: 'flight',
   flight_other: 'flight',
   cruise: 'cruise',
   train: 'train',
   ferry: 'ferry',
   car: 'car',
-  activity: 'activity',
+  activity: '',
 };
 
 const statusOptions = computed(() => [
@@ -122,25 +123,9 @@ watch(
 );
 
 function addSegment(type: VacationTravelType) {
-  // When adding a flight, create both outbound and return as separate entries
+  // For flights, show the one-way/return choice first
   if (type === 'flight_outbound') {
-    const outId = generateUUID();
-    const retId = generateUUID();
-    const outbound: VacationTravelSegment = {
-      id: outId,
-      type: 'flight_outbound',
-      title: defaultTitles['flight_outbound'],
-      status: 'pending' as VacationSegmentStatus,
-    };
-    const ret: VacationTravelSegment = {
-      id: retId,
-      type: 'flight_return',
-      title: defaultTitles['flight_return'],
-      status: 'pending' as VacationSegmentStatus,
-    };
-    collapsedMap.value[outId] = false;
-    collapsedMap.value[retId] = false;
-    emit('update:segments', [...props.segments, outbound, ret]);
+    showFlightTypeChoice.value = true;
     return;
   }
 
@@ -153,6 +138,32 @@ function addSegment(type: VacationTravelType) {
   };
   collapsedMap.value[id] = false;
   emit('update:segments', [...props.segments, newSegment]);
+}
+
+function addFlightSegments(returnFlight: boolean) {
+  showFlightTypeChoice.value = false;
+  const outId = generateUUID();
+  const outbound: VacationTravelSegment = {
+    id: outId,
+    type: 'flight_outbound',
+    title: defaultTitles['flight_outbound'],
+    status: 'pending' as VacationSegmentStatus,
+  };
+  collapsedMap.value[outId] = false;
+
+  if (returnFlight) {
+    const retId = generateUUID();
+    const ret: VacationTravelSegment = {
+      id: retId,
+      type: 'flight_return',
+      title: defaultTitles['flight_return'],
+      status: 'pending' as VacationSegmentStatus,
+    };
+    collapsedMap.value[retId] = false;
+    emit('update:segments', [...props.segments, outbound, ret]);
+  } else {
+    emit('update:segments', [...props.segments, outbound]);
+  }
 }
 
 function updateSegment(index: number, field: keyof VacationTravelSegment, value: string | boolean) {
@@ -189,8 +200,27 @@ function updateSegment(index: number, field: keyof VacationTravelSegment, value:
   }
 
   // Auto-populate return flight from outbound flight data
+  // Find the nearest return flight AFTER this outbound (they're created as adjacent pairs)
   if (current.type === 'flight_outbound') {
-    const retIdx = updated.findIndex((s) => s.type === 'flight_return');
+    let retIdx = -1;
+    for (let i = index + 1; i < updated.length; i++) {
+      if (updated[i]!.type === 'flight_return') {
+        retIdx = i;
+        break;
+      }
+      // Stop if we hit another outbound — the return for this outbound isn't after it
+      if (updated[i]!.type === 'flight_outbound') break;
+    }
+    // Fallback: search before this outbound if no return found after
+    if (retIdx < 0) {
+      for (let i = index - 1; i >= 0; i--) {
+        if (updated[i]!.type === 'flight_return') {
+          retIdx = i;
+          break;
+        }
+        if (updated[i]!.type === 'flight_outbound') break;
+      }
+    }
     if (retIdx >= 0) {
       const ret = updated[retIdx]!;
       const prevValue = current[field as keyof VacationTravelSegment] as string | undefined;
@@ -603,7 +633,36 @@ function removeSegment(index: number) {
 
   <!-- Add segment pills -->
   <div class="mt-4 flex flex-wrap gap-2">
+    <template v-if="showFlightTypeChoice">
+      <div
+        class="flex items-center gap-1.5 rounded-xl border border-teal-300 bg-teal-50/60 px-2 py-1 dark:border-teal-600 dark:bg-teal-900/20"
+      >
+        <span class="text-xs text-teal-600 dark:text-teal-400">✈️</span>
+        <button
+          type="button"
+          class="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm transition-colors hover:bg-teal-100 dark:bg-slate-700 dark:text-teal-300 dark:hover:bg-slate-600"
+          @click="addFlightSegments(false)"
+        >
+          {{ t('vacation.travel.oneWay') }}
+        </button>
+        <button
+          type="button"
+          class="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-teal-700 shadow-sm transition-colors hover:bg-teal-100 dark:bg-slate-700 dark:text-teal-300 dark:hover:bg-slate-600"
+          @click="addFlightSegments(true)"
+        >
+          {{ t('vacation.travel.return') }}
+        </button>
+        <button
+          type="button"
+          class="ml-0.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          @click="showFlightTypeChoice = false"
+        >
+          ✕
+        </button>
+      </div>
+    </template>
     <button
+      v-else
       type="button"
       class="rounded-xl border border-dashed border-[var(--tint-slate-10)] px-3 py-1.5 text-xs font-semibold text-teal-600 transition-colors hover:border-teal-400 dark:border-slate-600 dark:text-teal-400 dark:hover:border-teal-500"
       @click="addSegment('flight_outbound')"

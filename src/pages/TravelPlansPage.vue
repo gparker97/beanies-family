@@ -199,7 +199,7 @@ async function addActivitySegment() {
   const newSeg = {
     id: crypto.randomUUID(),
     type: 'activity' as const,
-    title: 'activity',
+    title: '',
     status: 'pending' as const,
   };
   const travelSegments = [...selectedVacation.value.travelSegments, newSeg];

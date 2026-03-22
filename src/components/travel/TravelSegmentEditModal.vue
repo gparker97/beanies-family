@@ -197,6 +197,53 @@ const effectiveTitle = computed(() =>
   props.segment?.type === 'activity' ? title.value : autoTitle.value
 );
 
+/** Fields missing for "booked" status — empty set means all good */
+const bookedErrors = computed<Set<string>>(() => {
+  if (status.value !== 'booked') return new Set();
+  const missing = new Set<string>();
+  if (isFlight.value) {
+    if (!airline.value) missing.add('airline');
+    if (!flightNumber.value) missing.add('flightNumber');
+    if (!departureDate.value) missing.add('departureDate');
+    if (!departureTime.value) missing.add('departureTime');
+    if (!arrivalTime.value) missing.add('arrivalTime');
+  } else if (isCruise.value) {
+    if (!cruiseLine.value) missing.add('cruiseLine');
+    if (!shipName.value) missing.add('shipName');
+    if (!departurePort.value) missing.add('departurePort');
+    if (!embarkationDate.value) missing.add('embarkationDate');
+    if (!embarkationTime.value) missing.add('embarkationTime');
+    if (!disembarkationDate.value) missing.add('disembarkationDate');
+    if (!bookingReference.value) missing.add('bookingReference');
+  } else if (isTrainFerry.value) {
+    if (!departureStation.value) missing.add('departureStation');
+    if (!arrivalStation.value) missing.add('arrivalStation');
+    if (!operator.value) missing.add('operator');
+    if (!route.value) missing.add('route');
+    if (!departureDate.value) missing.add('departureDate');
+    if (!departureTime.value) missing.add('departureTime');
+    if (!bookingReference.value) missing.add('bookingReference');
+  } else if (isCar.value) {
+    if (!carType.value) missing.add('carType');
+    if (!departureDate.value) missing.add('departureDate');
+  } else if (isActivity.value) {
+    if (!departureDate.value) missing.add('departureDate');
+  }
+  return missing;
+});
+
+/** Required fields must be filled before saving */
+const canSave = computed(() => {
+  // Base requirements per type
+  if (isFlight.value && !(departureAirport.value && arrivalAirport.value)) return false;
+  if (isCruise.value && !cruiseLine.value) return false;
+  if (isTrainFerry.value && !(departureStation.value && arrivalStation.value)) return false;
+  if (isActivity.value && !title.value.trim()) return false;
+  // Booked status requires additional fields
+  if (bookedErrors.value.size > 0) return false;
+  return true;
+});
+
 function handleDepartureTimeChange(val: string | number) {
   const v = String(val);
   departureTime.value = v;
@@ -217,7 +264,7 @@ const computedArrivalDate = computed(() => {
 });
 
 async function handleSave() {
-  if (!props.vacationId || props.segmentIndex < 0) return;
+  if (!canSave.value || !props.vacationId || props.segmentIndex < 0) return;
   isSubmitting.value = true;
   try {
     const vacation = vacationStore.getVacationById(props.vacationId);
@@ -263,6 +310,55 @@ async function handleSave() {
       duration: activityDuration.value || undefined,
       sortDate,
     };
+    // Auto-populate return flight from outbound flight data
+    // Find the nearest return flight after this outbound (they're created as adjacent pairs)
+    const currentSeg = segments[props.segmentIndex]!;
+    if (currentSeg.type === 'flight_outbound') {
+      let retIdx = -1;
+      for (let i = props.segmentIndex + 1; i < segments.length; i++) {
+        if (segments[i]!.type === 'flight_return') {
+          retIdx = i;
+          break;
+        }
+        if (segments[i]!.type === 'flight_outbound') break;
+      }
+      if (retIdx < 0) {
+        for (let i = props.segmentIndex - 1; i >= 0; i--) {
+          if (segments[i]!.type === 'flight_return') {
+            retIdx = i;
+            break;
+          }
+          if (segments[i]!.type === 'flight_outbound') break;
+        }
+      }
+      if (retIdx >= 0) {
+        const ret = segments[retIdx]!;
+        const prev = vacation.travelSegments[props.segmentIndex]!;
+        if (!ret.departureAirport || ret.departureAirport === (prev.arrivalAirport ?? '')) {
+          segments[retIdx] = { ...segments[retIdx]!, departureAirport: arrivalAirport.value };
+        }
+        if (!ret.arrivalAirport || ret.arrivalAirport === (prev.departureAirport ?? '')) {
+          segments[retIdx] = { ...segments[retIdx]!, arrivalAirport: departureAirport.value };
+        }
+        if (!ret.airline || ret.airline === (prev.airline ?? '')) {
+          segments[retIdx] = { ...segments[retIdx]!, airline: airline.value };
+        }
+        if (!ret.bookingReference || ret.bookingReference === (prev.bookingReference ?? '')) {
+          segments[retIdx] = { ...segments[retIdx]!, bookingReference: bookingReference.value };
+        }
+        // Regenerate return flight title with updated airports
+        const retSeg = segments[retIdx]!;
+        segments[retIdx] = {
+          ...retSeg,
+          title: buildTravelSegmentTitle({
+            type: retSeg.type,
+            departureAirport: retSeg.departureAirport,
+            arrivalAirport: retSeg.arrivalAirport,
+          }),
+        };
+      }
+    }
+
     await vacationStore.updateVacation(props.vacationId, { travelSegments: segments });
     emit('close');
   } finally {
@@ -279,6 +375,7 @@ async function handleSave() {
     icon="✈️"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
+    :save-disabled="!canSave"
     :is-submitting="isSubmitting"
     @close="$emit('close')"
     @save="handleSave"
@@ -327,26 +424,29 @@ async function handleSave() {
       <!-- ═══ Flight fields — compact layout ═══ -->
       <template v-if="isFlight">
         <div class="grid grid-cols-[1fr_auto] gap-3">
-          <FormFieldGroup :label="t('vacation.field.airline')">
+          <FormFieldGroup :label="t('vacation.field.airline')" :error="bookedErrors.has('airline')">
             <BaseCombobox
               v-model="airline"
               :options="airlineOpts"
               :placeholder="t('vacation.field.airline')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.flightNumber')">
+          <FormFieldGroup
+            :label="t('vacation.field.flightNumber')"
+            :error="bookedErrors.has('flightNumber')"
+          >
             <BaseInput v-model="flightNumber" placeholder="e.g. 1842" class="!w-24" />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureAirport')">
+          <FormFieldGroup :label="t('vacation.field.departureAirport')" required>
             <BaseCombobox
               v-model="departureAirport"
               :options="airportOpts"
               :placeholder="t('vacation.field.departureAirport')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalAirport')">
+          <FormFieldGroup :label="t('vacation.field.arrivalAirport')" required>
             <BaseCombobox
               v-model="arrivalAirport"
               :options="airportOpts"
@@ -355,17 +455,23 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
-          <FormFieldGroup :label="t('form.date')">
+          <FormFieldGroup :label="t('form.date')" :error="bookedErrors.has('departureDate')">
             <BaseInput v-model="departureDate" type="date" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.departureTime')">
+          <FormFieldGroup
+            :label="t('vacation.field.departureTime')"
+            :error="bookedErrors.has('departureTime')"
+          >
             <BaseInput
               v-model="departureTime"
               type="time"
               @update:model-value="handleDepartureTimeChange"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalTime')">
+          <FormFieldGroup
+            :label="t('vacation.field.arrivalTime')"
+            :error="bookedErrors.has('arrivalTime')"
+          >
             <div class="flex items-center gap-2">
               <BaseInput v-model="arrivalTime" type="time" class="flex-1" />
               <label class="flex shrink-0 items-center gap-1.5">
@@ -392,14 +498,21 @@ async function handleSave() {
       <!-- ═══ Cruise fields ═══ -->
       <template v-if="isCruise">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.cruiseLine')">
+          <FormFieldGroup
+            :label="t('vacation.field.cruiseLine')"
+            required
+            :error="bookedErrors.has('cruiseLine')"
+          >
             <BaseCombobox
               v-model="cruiseLine"
               :options="cruiseLineOpts"
               :placeholder="t('vacation.field.cruiseLine')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.shipName')">
+          <FormFieldGroup
+            :label="t('vacation.field.shipName')"
+            :error="bookedErrors.has('shipName')"
+          >
             <BaseCombobox
               v-model="shipName"
               :options="buildCruiseShipOptions(cruiseLine)"
@@ -408,7 +521,10 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departurePort')">
+          <FormFieldGroup
+            :label="t('vacation.field.departurePort')"
+            :error="bookedErrors.has('departurePort')"
+          >
             <BaseCombobox
               v-model="departurePort"
               :options="cruisePortOpts"
@@ -420,17 +536,29 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <FormFieldGroup :label="t('vacation.field.embarkationDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.embarkationDate')"
+            :error="bookedErrors.has('embarkationDate')"
+          >
             <BaseInput v-model="embarkationDate" type="date" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.embarkationTime')">
+          <FormFieldGroup
+            :label="t('vacation.field.embarkationTime')"
+            :error="bookedErrors.has('embarkationTime')"
+          >
             <BaseInput v-model="embarkationTime" type="time" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.disembarkationDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.disembarkationDate')"
+            :error="bookedErrors.has('disembarkationDate')"
+          >
             <BaseInput v-model="disembarkationDate" type="date" />
           </FormFieldGroup>
         </div>
-        <FormFieldGroup :label="t('vacation.field.bookingReference')">
+        <FormFieldGroup
+          :label="t('vacation.field.bookingReference')"
+          :error="bookedErrors.has('bookingReference')"
+        >
           <BaseInput
             v-model="bookingReference"
             :placeholder="t('vacation.field.bookingReference')"
@@ -440,7 +568,7 @@ async function handleSave() {
 
       <!-- ═══ Car fields ═══ -->
       <template v-if="isCar">
-        <FormFieldGroup :label="t('vacation.field.carType')">
+        <FormFieldGroup :label="t('vacation.field.carType')" :error="bookedErrors.has('carType')">
           <TogglePillGroup
             :model-value="carType"
             :options="carTypeOptions"
@@ -456,7 +584,10 @@ async function handleSave() {
             <BaseInput v-model="carLabel" placeholder="e.g. Tesla Model Y" />
           </FormFieldGroup>
         </div>
-        <FormFieldGroup :label="t('vacation.field.departureDate')">
+        <FormFieldGroup
+          :label="t('vacation.field.departureDate')"
+          :error="bookedErrors.has('departureDate')"
+        >
           <BaseInput v-model="departureDate" type="date" />
         </FormFieldGroup>
       </template>
@@ -474,7 +605,7 @@ async function handleSave() {
 
         <!-- Date + Time + Duration -->
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <FormFieldGroup :label="t('form.date')">
+          <FormFieldGroup :label="t('form.date')" :error="bookedErrors.has('departureDate')">
             <BaseInput v-model="departureDate" type="date" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.startTime')">
@@ -538,6 +669,7 @@ async function handleSave() {
                 ? t('vacation.field.trainCompany')
                 : t('vacation.field.operator')
             "
+            :error="bookedErrors.has('operator')"
           >
             <BaseInput
               v-model="operator"
@@ -554,6 +686,7 @@ async function handleSave() {
                 ? t('vacation.field.trainNumber')
                 : t('vacation.field.route')
             "
+            :error="bookedErrors.has('route')"
           >
             <BaseInput
               v-model="route"
@@ -566,25 +699,42 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureStation')">
+          <FormFieldGroup
+            :label="t('vacation.field.departureStation')"
+            required
+            :error="bookedErrors.has('departureStation')"
+          >
             <BaseInput
               v-model="departureStation"
               :placeholder="t('vacation.field.departureStation')"
             />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.arrivalStation')">
+          <FormFieldGroup
+            :label="t('vacation.field.arrivalStation')"
+            required
+            :error="bookedErrors.has('arrivalStation')"
+          >
             <BaseInput v-model="arrivalStation" :placeholder="t('vacation.field.arrivalStation')" />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.departureDate')"
+            :error="bookedErrors.has('departureDate')"
+          >
             <BaseInput v-model="departureDate" type="date" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.departureTime')">
+          <FormFieldGroup
+            :label="t('vacation.field.departureTime')"
+            :error="bookedErrors.has('departureTime')"
+          >
             <BaseInput v-model="departureTime" type="time" />
           </FormFieldGroup>
         </div>
-        <FormFieldGroup :label="t('vacation.field.bookingReference')">
+        <FormFieldGroup
+          :label="t('vacation.field.bookingReference')"
+          :error="bookedErrors.has('bookingReference')"
+        >
           <BaseInput
             v-model="bookingReference"
             :placeholder="t('vacation.field.bookingReference')"

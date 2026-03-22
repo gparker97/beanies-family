@@ -87,8 +87,27 @@ const autoTitle = computed(() =>
   buildAccommodationTitle({ type: props.accommodation?.type, name: name.value })
 );
 
+const isFamilyFriends = computed(() => props.accommodation?.type === 'family_friends');
+
+/** Fields missing for "booked" status */
+const bookedErrors = computed<Set<string>>(() => {
+  if (status.value !== 'booked') return new Set();
+  const missing = new Set<string>();
+  if (!checkInDate.value) missing.add('checkInDate');
+  if (!checkOutDate.value) missing.add('checkOutDate');
+  if (!address.value) missing.add('address');
+  if (!isFamilyFriends.value && !confirmationNumber.value) missing.add('confirmationNumber');
+  return missing;
+});
+
+const canSave = computed(() => {
+  if (!name.value.trim()) return false;
+  if (bookedErrors.value.size > 0) return false;
+  return true;
+});
+
 async function handleSave() {
-  if (!props.vacationId || props.accommodationIndex < 0) return;
+  if (!canSave.value || !props.vacationId || props.accommodationIndex < 0) return;
   isSubmitting.value = true;
   try {
     const vacation = vacationStore.getVacationById(props.vacationId);
@@ -124,6 +143,7 @@ async function handleSave() {
     icon="🏨"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
+    :save-disabled="!canSave"
     :is-submitting="isSubmitting"
     @close="$emit('close')"
     @save="handleSave"
@@ -146,27 +166,37 @@ async function handleSave() {
       </div>
 
       <!-- Name (type-specific label) -->
-      <FormFieldGroup :label="nameFieldLabel">
+      <FormFieldGroup :label="nameFieldLabel" required>
         <BaseInput v-model="name" :placeholder="nameFieldLabel" />
       </FormFieldGroup>
 
       <!-- Address -->
-      <FormFieldGroup :label="t('vacation.field.address')">
+      <FormFieldGroup :label="t('vacation.field.address')" :error="bookedErrors.has('address')">
         <BaseInput v-model="address" :placeholder="t('vacation.field.address')" />
       </FormFieldGroup>
 
       <!-- Check-in / Check-out dates -->
       <div class="grid grid-cols-2 gap-3">
-        <FormFieldGroup :label="t('vacation.field.checkIn')">
+        <FormFieldGroup
+          :label="t('vacation.field.checkIn')"
+          :error="bookedErrors.has('checkInDate')"
+        >
           <BaseInput v-model="checkInDate" type="date" />
         </FormFieldGroup>
-        <FormFieldGroup :label="t('vacation.field.checkOut')">
+        <FormFieldGroup
+          :label="t('vacation.field.checkOut')"
+          :error="bookedErrors.has('checkOutDate')"
+        >
           <BaseInput v-model="checkOutDate" type="date" />
         </FormFieldGroup>
       </div>
 
-      <!-- Confirmation number -->
-      <FormFieldGroup :label="t('vacation.field.confirmationNumber')">
+      <!-- Confirmation number (not applicable for friends/family) -->
+      <FormFieldGroup
+        v-if="!isFamilyFriends"
+        :label="t('vacation.field.confirmationNumber')"
+        :error="bookedErrors.has('confirmationNumber')"
+      >
         <BaseInput
           v-model="confirmationNumber"
           :placeholder="t('vacation.field.confirmationNumber')"
