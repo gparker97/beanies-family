@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '@/components/common/PageHeader.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -64,13 +64,20 @@ function scrollToIdeas() {
 
 // ── Query param: auto-select vacation from ?vacation=ID ──────────────────────
 
-onMounted(() => {
+function handleVacationQueryParam() {
   const vacationId = route.query.vacation as string | undefined;
   if (vacationId) {
     selectedVacationId.value = vacationId;
     router.replace({ query: {} });
   }
-});
+}
+watch(
+  () => route.query.vacation,
+  (val) => {
+    if (val) handleVacationQueryParam();
+  }
+);
+onMounted(handleVacationQueryParam);
 
 // ── Computed ─────────────────────────────────────────────────────────────────
 

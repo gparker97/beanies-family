@@ -34,6 +34,18 @@ const STRING_DEFS = {
   'app.tagline': { en: 'every bean counts' },
   'app.version': { en: 'v1.0.0 - MVP' },
 
+  // Global search
+  'search.placeholder': { en: 'Search everything...', beanie: 'search your beans...' },
+  'search.noResults': { en: 'No results found', beanie: 'no beans found' },
+  'search.activities': { en: 'Activities', beanie: 'activities' },
+  'search.vacations': { en: 'Travel Plans', beanie: 'beanie trips' },
+  'search.todos': { en: 'To-dos', beanie: 'to-dos' },
+  'search.accounts': { en: 'Accounts', beanie: 'accounts' },
+  'search.transactions': { en: 'Transactions', beanie: 'transactions' },
+  'search.goals': { en: 'Goals', beanie: 'goals' },
+  'search.assets': { en: 'Assets', beanie: 'assets' },
+  'search.members': { en: 'Family Members', beanie: 'beanies' },
+
   // Common labels
   'common.totalAssets': { en: 'Total Assets', beanie: 'total assets' },
   'common.totalLiabilities': { en: 'Total Liabilities', beanie: 'total liabilities' },

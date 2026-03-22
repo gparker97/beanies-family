@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ViewToggle from '@/components/planner/ViewToggle.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
@@ -57,14 +57,20 @@ const {
 } = useActivityScopeEdit();
 
 // Open activity view modal from query param (e.g. /activities?activity=abc)
-onMounted(() => {
+function handleActivityQueryParam() {
   const activityId = route.query.activity as string | undefined;
   if (activityId) {
     openViewModal(activityId);
-    // Clean up query param so refreshing doesn't re-open
     router.replace({ query: {} });
   }
-});
+}
+onMounted(handleActivityQueryParam);
+watch(
+  () => route.query.activity,
+  (val) => {
+    if (val) handleActivityQueryParam();
+  }
+);
 
 function toggleAllMembers() {
   if (!memberFilterStore.isAllSelected) memberFilterStore.selectAll();
