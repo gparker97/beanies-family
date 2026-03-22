@@ -109,6 +109,12 @@ onMounted(() => {
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
   nextTick(() => initRevealObserver());
+
+  // Open contact modal if navigated with #contact hash (e.g. from blog footer)
+  if (window.location.hash === '#contact') {
+    openContact();
+    history.replaceState(null, '', window.location.pathname);
+  }
 });
 
 onUnmounted(() => {
@@ -137,8 +143,9 @@ onUnmounted(() => {
         <div class="fnav__links">
           <a href="#story" @click.prevent="scrollTo('story')">my story</a>
           <a href="#security" @click.prevent="scrollTo('security')">security</a>
+          <a href="/beanstalk">blog</a>
         </div>
-        <button class="fnav__cta" @click="goToWelcome">try it free</button>
+        <button class="fnav__cta" @click="goToWelcome">create your bean pod</button>
       </div>
     </nav>
 
@@ -1155,7 +1162,7 @@ onUnmounted(() => {
           style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center"
           class="reveal"
         >
-          <button class="btn-primary" @click="goToWelcome">let's go &#x1FAD8;</button>
+          <button class="btn-primary" @click="goToWelcome">create your bean pod &#x1FAD8;</button>
           <a
             href="https://github.com/gparker97/beanies-family"
             target="_blank"
@@ -1170,13 +1177,12 @@ onUnmounted(() => {
 
     <!-- FOOTER -->
     <footer class="footer">
-      <p class="footer__brand">
-        &#x1FAD8; beanies<span class="footer__brand-orange">.family</span>
-      </p>
+      <p class="footer__brand">beanies<span class="footer__brand-orange">.family</span></p>
       <div class="footer__links">
         <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener"
           >GitHub</a
         >
+        <router-link to="/beanstalk">blog</router-link>
         <router-link to="/help">help</router-link>
         <router-link to="/welcome">sign in</router-link>
       </div>
@@ -2956,10 +2962,11 @@ onUnmounted(() => {
 .footer__tag {
   color: var(--heritage-orange);
   font-family: Outfit, sans-serif;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-top: 4px;
-  opacity: 0.4;
+  letter-spacing: 0.05em;
+  margin-top: 8px;
+  opacity: 0.5;
 }
 
 .footer__contact-btn {
