@@ -22,7 +22,7 @@ test.describe('Family Planner', () => {
     await page.goto('/');
     await bypassLoginIfNeeded(page);
 
-    // Navigate to planner (defaults to week view)
+    // Navigate to planner (defaults to month view)
     await page.goto('/activities');
     await page.waitForURL('/activities');
   }

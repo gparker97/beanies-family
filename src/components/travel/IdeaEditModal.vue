@@ -130,6 +130,7 @@ function handleSave() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
     :open="open"
     :title="isEditing ? (idea?.title ?? '') : ''"
     icon="🌟"

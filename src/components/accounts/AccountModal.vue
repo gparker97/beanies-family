@@ -198,6 +198,7 @@ function handleDelete() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
     :open="open"
     :title="modalTitle"
     :icon="modalIcon"

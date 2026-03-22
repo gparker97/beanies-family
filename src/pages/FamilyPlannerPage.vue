@@ -137,6 +137,7 @@ const headerSubtitle = computed(() => {
 });
 
 function openAddModal(date?: string, time?: string) {
+  sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
   selectedDate.value = date;

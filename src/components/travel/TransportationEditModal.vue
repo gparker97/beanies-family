@@ -141,6 +141,7 @@ async function handleSave() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
     :open="open"
     :title="isEditing ? t('travel.editTransportation') : t('travel.editTransportation')"
     icon="🚗"
