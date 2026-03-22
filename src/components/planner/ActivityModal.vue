@@ -356,6 +356,8 @@ function handleSave() {
 
 <template>
   <BeanieFormModal
+    variant="drawer"
+    size="wide"
     :open="open"
     :title="modalTitle"
     :icon="icon || '📋'"

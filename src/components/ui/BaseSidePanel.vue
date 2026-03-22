@@ -1,23 +1,37 @@
 <script setup lang="ts">
 import { watch, onMounted, onUnmounted } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { lockBodyScroll, unlockBodyScroll } from '@/utils/overlayStack';
 
 interface Props {
   open: boolean;
   title?: string;
   side?: 'left' | 'right';
+  size?: 'narrow' | 'medium' | 'wide' | 'full';
+  closable?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   side: 'right',
+  size: 'narrow',
+  closable: true,
 });
+
+const sizeClasses: Record<string, string> = {
+  narrow: 'max-w-md',
+  medium: 'max-w-lg',
+  wide: 'max-w-xl',
+  full: 'max-w-2xl',
+};
 
 const emit = defineEmits<{
   close: [];
 }>();
 
 function close() {
-  emit('close');
+  if (props.closable) {
+    emit('close');
+  }
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -30,9 +44,9 @@ watch(
   () => props.open,
   (isOpen) => {
     if (isOpen) {
-      document.body.style.overflow = 'hidden';
+      lockBodyScroll();
     } else {
-      document.body.style.overflow = '';
+      unlockBodyScroll();
     }
   }
 );
@@ -43,7 +57,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown);
-  document.body.style.overflow = '';
+  if (props.open) unlockBodyScroll();
 });
 </script>
 
@@ -51,6 +65,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <!-- Backdrop fade -->
     <Transition
+      appear
       enter-active-class="transition-opacity duration-200"
       enter-from-class="opacity-0"
       enter-to-class="opacity-100"
@@ -63,6 +78,7 @@ onUnmounted(() => {
 
     <!-- Panel slide -->
     <Transition
+      appear
       enter-active-class="transition-transform duration-300 ease-out"
       :enter-from-class="side === 'right' ? 'translate-x-full' : '-translate-x-full'"
       enter-to-class="translate-x-0"
@@ -72,8 +88,10 @@ onUnmounted(() => {
     >
       <div
         v-if="open"
-        class="fixed inset-y-0 z-40 flex w-full max-w-md flex-col overflow-y-auto bg-white shadow-xl dark:bg-slate-800"
-        :class="side === 'right' ? 'right-0' : 'left-0'"
+        role="dialog"
+        aria-modal="true"
+        class="fixed inset-y-0 z-40 flex w-full flex-col overflow-y-auto bg-white shadow-xl dark:bg-slate-800"
+        :class="[sizeClasses[size], side === 'right' ? 'right-0' : 'left-0']"
       >
         <!-- Header -->
         <div
@@ -89,6 +107,8 @@ onUnmounted(() => {
           <button
             type="button"
             class="rounded-xl p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-700 dark:hover:text-gray-300"
+            :disabled="!closable"
+            :class="{ 'cursor-not-allowed opacity-50': !closable }"
             @click="close"
           >
             <BeanieIcon name="close" size="md" />
