@@ -21,7 +21,7 @@ const sizeClasses: Record<string, string> = {
   narrow: 'max-w-md',
   medium: 'max-w-lg',
   wide: 'max-w-xl',
-  full: 'max-w-2xl',
+  full: 'max-w-3xl',
 };
 
 const emit = defineEmits<{

@@ -9,7 +9,7 @@ interface Props {
   title: string;
   icon?: string;
   iconBg?: string;
-  size?: 'default' | 'narrow' | 'wide';
+  size?: 'default' | 'narrow' | 'wide' | 'full';
   saveLabel?: string;
   saveGradient?: 'orange' | 'purple' | 'teal';
   saveDisabled?: boolean;
@@ -57,6 +57,7 @@ const drawerSizeMap: Record<string, DrawerSize> = {
   narrow: 'narrow',
   default: 'medium',
   wide: 'wide',
+  full: 'full',
 };
 
 const containerProps = computed(() => {

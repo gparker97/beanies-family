@@ -333,6 +333,11 @@ export const useActivityStore = defineStore('activities', () => {
     });
   }
 
+  /** Remove an activity from the in-memory array (used when another store deletes from the repo directly). */
+  function removeFromMemory(id: string) {
+    activities.value = activities.value.filter((a) => a.id !== id);
+  }
+
   function resetState() {
     activities.value = [];
     isLoading.value = false;
@@ -373,6 +378,7 @@ export const useActivityStore = defineStore('activities', () => {
     deleteActivity,
     splitActivity,
     materializeOverride,
+    removeFromMemory,
     resetState,
   };
 });

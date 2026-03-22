@@ -597,7 +597,7 @@ function addQuickIdea() {
               </button>
               <button
                 type="button"
-                class="font-outfit inline-flex items-center justify-center rounded-full border-[1.5px] border-white/20 bg-white/10 px-2.5 py-1.5 text-xs text-white/60 transition-all hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-200"
+                class="font-outfit inline-flex items-center justify-center rounded-full border-[1.5px] border-white/30 bg-white/15 px-2.5 py-1.5 text-xs text-white transition-all hover:border-red-400/40 hover:bg-red-500/20 hover:text-red-200"
                 :title="t('vacation.deleteTitle')"
                 @click="deleteTrip"
               >
