@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import BudgetSettingsModal from '@/components/budget/BudgetSettingsModal.vue';
 import QuickAddTransactionModal from '@/components/budget/QuickAddTransactionModal.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ShowFiguresPrompt from '@/components/ui/ShowFiguresPrompt.vue';
@@ -160,10 +159,13 @@ async function handleQuickAdd(data: CreateTransactionInput) {
       <p class="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
         {{ t('budget.empty.description') }}
       </p>
-      <BaseButton class="mt-6" @click="showSettingsModal = true">
-        <BeanieIcon name="plus" size="md" class="mr-1.5 -ml-1" />
+      <button
+        type="button"
+        class="font-outfit from-primary-500 to-terracotta-400 mt-6 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+        @click="showSettingsModal = true"
+      >
         {{ t('budget.addBudget') }}
-      </BaseButton>
+      </button>
     </div>
 
     <!-- ── Active Budget View ──────────────────────────────────────────── -->
