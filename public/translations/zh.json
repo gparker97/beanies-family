@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-21",
-    "translationCount": 1836
+    "lastUpdated": "2026-03-22",
+    "translationCount": 1837
   },
   "translations": {
     "app.name": {
@@ -397,9 +397,9 @@
       "lastUpdated": "2026-02-10"
     },
     "accounts.addAccount": {
-      "translation": "添加账户",
-      "hash": "he46su",
-      "lastUpdated": "2026-03-03"
+      "translation": "+添加账户",
+      "hash": "j46oe1",
+      "lastUpdated": "2026-03-22"
     },
     "accounts.editAccount": {
       "translation": "编辑账户",
@@ -493,8 +493,8 @@
     },
     "transactions.addTransaction": {
       "translation": "添加交易",
-      "hash": "4dkmu7",
-      "lastUpdated": "2026-03-03"
+      "hash": "dq17x2",
+      "lastUpdated": "2026-03-22"
     },
     "transactions.editTransaction": {
       "translation": "编辑交易",
@@ -577,9 +577,9 @@
       "lastUpdated": "2026-02-10"
     },
     "assets.addAsset": {
-      "translation": "添加文件",
-      "hash": "88awdt",
-      "lastUpdated": "2026-03-03"
+      "translation": "+ 增加资产",
+      "hash": "o2fupw",
+      "lastUpdated": "2026-03-22"
     },
     "assets.editAsset": {
       "translation": "编辑资产",
@@ -733,8 +733,8 @@
     },
     "goals.addGoal": {
       "translation": "添加目标",
-      "hash": "kcq4cu",
-      "lastUpdated": "2026-03-03"
+      "hash": "jujhzb",
+      "lastUpdated": "2026-03-22"
     },
     "goals.editGoal": {
       "translation": "编辑目标",
@@ -4722,9 +4722,9 @@
       "lastUpdated": "2026-03-01"
     },
     "budget.addBudget": {
-      "translation": "设置预算",
-      "hash": "8s1rm4",
-      "lastUpdated": "2026-03-03"
+      "translation": "+设置预算",
+      "hash": "vyw0yf",
+      "lastUpdated": "2026-03-22"
     },
     "budget.editBudget": {
       "translation": "编辑预算",
@@ -9185,6 +9185,11 @@
       "translation": "计划",
       "hash": "jd1l0k",
       "lastUpdated": "2026-03-21"
+    },
+    "todo.who": {
+      "translation": "对象",
+      "hash": "1v32",
+      "lastUpdated": "2026-03-22"
     }
   }
 }
