@@ -133,7 +133,15 @@ async function handleGoogleReconnected() {
 const showLayout = computed(() => {
   // Don't show sidebar/header unless signed in and on an app page
   if (!authStore.isAuthenticated) return false;
-  const noLayoutPages = ['NotFound', 'Welcome', 'Login', 'JoinFamily', 'Home'];
+  const noLayoutPages = [
+    'NotFound',
+    'Welcome',
+    'Login',
+    'JoinFamily',
+    'Home',
+    'BeanstalkBlog',
+    'BeanstalkPost',
+  ];
   return !noLayoutPages.includes(route.name as string);
 });
 
@@ -341,6 +349,17 @@ onMounted(async () => {
     await router.isReady();
     initBreadcrumbs.push(`route: ${String(route.name ?? route.path)}`);
 
+    // Fast path: skip heavy initialization for public-only pages
+    const publicOnlyPages = [
+      'Home',
+      'BeanstalkBlog',
+      'BeanstalkPost',
+      'HelpCenter',
+      'HelpCategory',
+      'HelpArticle',
+    ];
+    const isPublicPage = publicOnlyPages.includes(route.name as string);
+
     // Step 1: Load global settings (theme, language) — works before any family is active
     await settingsStore.loadGlobalSettings();
     initBreadcrumbs.push('settings: global settings loaded');
@@ -362,6 +381,12 @@ onMounted(async () => {
     // Load translations if language is not English (non-blocking)
     if (settingsStore.language !== 'en') {
       translationStore.loadTranslations(settingsStore.language).catch(console.error);
+    }
+
+    // Public pages: skip auth, IndexedDB, and data loading entirely
+    if (isPublicPage) {
+      initBreadcrumbs.push('public: skipping auth and data init for public page');
+      return;
     }
 
     // Request persistent storage so the browser won't evict IndexedDB
