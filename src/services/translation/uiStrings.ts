@@ -35,6 +35,30 @@ const STRING_DEFS = {
   'app.version': { en: 'v1.0.0 - MVP' },
 
   // Global search
+  // Blog
+  'blog.title': { en: 'Beanstalk Blog', beanie: 'beanstalk blog' },
+  'blog.tagline': {
+    en: 'The latest beanie news and updates',
+    beanie: 'the latest beanie news and updates',
+  },
+  'blog.featured': { en: 'Featured', beanie: 'featured' },
+  'blog.backToAll': { en: 'All Posts', beanie: 'all posts' },
+  'blog.newer': { en: 'Newer', beanie: 'newer' },
+  'blog.older': { en: 'Older', beanie: 'older' },
+  'blog.empty': {
+    en: 'No posts yet — the beanstalk is still growing!',
+    beanie: 'no posts yet — the beanstalk is still growing!',
+  },
+  'blog.noPostsInCategory': {
+    en: 'No posts in this category yet',
+    beanie: 'no posts in this category yet',
+  },
+  'blog.postNotFound': {
+    en: 'This post seems to have wandered off...',
+    beanie: 'this post seems to have wandered off...',
+  },
+
+  // Global search
   'search.placeholder': { en: 'Search everything...', beanie: 'search your beans...' },
   'search.noResults': { en: 'No results found', beanie: 'no beans found' },
   'search.activities': { en: 'Activities', beanie: 'activities' },
@@ -1033,7 +1057,7 @@ const STRING_DEFS = {
   'dashboard.upcoming': { en: 'Upcoming', beanie: 'coming up' },
   'dashboard.noRecurringItems': { en: 'No recurring items yet', beanie: 'no recurring beans yet' },
   'dashboard.roleParent': { en: 'Parent', beanie: 'big bean' },
-  'dashboard.roleLittleBean': { en: 'Little Bean', beanie: 'little bean' },
+  'dashboard.roleLittleBean': { en: 'Little Beanie', beanie: 'little beanie' },
   'dashboard.chartHidden': { en: 'Chart hidden', beanie: 'chart hidden' },
   'dashboard.noDataYet': { en: 'No data yet', beanie: 'no beans to chart yet' },
   'dashboard.comingUp': { en: 'Coming Up', beanie: 'coming up' },
@@ -2926,8 +2950,8 @@ const STRING_DEFS = {
   'homepage.viewOnGithub': { en: 'View on GitHub', beanie: 'view on github' },
   'homepage.signIn': { en: 'Sign In / Join', beanie: 'sign in / join' },
   'homepage.learnMore': {
-    en: 'Learn more about beanies.family',
-    beanie: 'learn more about beanies.family',
+    en: 'Back to Homepage',
+    beanie: 'back to homepage',
   },
 
   // Invite gate
@@ -3296,6 +3320,7 @@ const STRING_DEFS = {
   },
 
   // Navigation
+  'nav.beanstalk': { en: 'Beanstalk Blog', beanie: 'beanstalk blog' },
   'nav.help': { en: 'Help', beanie: 'help' },
 
   // ── Vacation Planner ──────────────────────────────────────────────────────

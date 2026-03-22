@@ -149,6 +149,18 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'help.title', requiresAuth: false },
   },
   {
+    path: '/beanstalk',
+    name: 'BeanstalkBlog',
+    component: () => import('@/pages/BeanstalkBlogPage.vue'),
+    meta: { titleKey: 'nav.beanstalk', requiresAuth: false },
+  },
+  {
+    path: '/beanstalk/:slug',
+    name: 'BeanstalkPost',
+    component: () => import('@/pages/BeanstalkPostPage.vue'),
+    meta: { titleKey: 'nav.beanstalk', requiresAuth: false },
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),

@@ -103,9 +103,18 @@ const emit = defineEmits<{
 
     <div class="mt-6 text-center">
       <button
-        class="text-xs text-gray-400 transition-colors hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+        class="font-outfit inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 shadow-sm transition-all hover:border-[var(--heritage-orange)] hover:text-[var(--heritage-orange)] hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:text-gray-400 dark:hover:border-[var(--heritage-orange)] dark:hover:text-[var(--heritage-orange)]"
         @click="router.push('/home')"
       >
+        <svg
+          class="h-3.5 w-3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
         {{ t('homepage.learnMore') }}
       </button>
     </div>
