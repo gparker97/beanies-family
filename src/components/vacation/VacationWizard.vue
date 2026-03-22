@@ -7,6 +7,7 @@ import VacationStep2 from './VacationStep2.vue';
 import VacationStep3 from './VacationStep3.vue';
 import VacationStep4 from './VacationStep4.vue';
 import VacationStep5 from './VacationStep5.vue';
+import IdeaEditModal from '@/components/travel/IdeaEditModal.vue';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -52,6 +53,27 @@ const travelSegments = ref<VacationTravelSegment[]>([]);
 const accommodations = ref<VacationAccommodation[]>([]);
 const transportation = ref<VacationTransportation[]>([]);
 const ideas = ref<VacationIdea[]>([]);
+
+// Idea edit drawer
+const editingIdeaId = ref<string | null>(null);
+const editingIdea = computed(() =>
+  editingIdeaId.value ? ideas.value.find((i) => i.id === editingIdeaId.value) : undefined
+);
+
+function openIdeaDrawer(idea: VacationIdea) {
+  editingIdeaId.value = idea.id;
+}
+
+function handleIdeaSave(updated: VacationIdea) {
+  ideas.value = ideas.value.map((i) => (i.id === updated.id ? updated : i));
+  editingIdeaId.value = null;
+}
+
+function handleIdeaDelete() {
+  if (!editingIdeaId.value) return;
+  ideas.value = ideas.value.filter((i) => i.id !== editingIdeaId.value);
+  editingIdeaId.value = null;
+}
 
 // Celebration modal
 const celebrationOpen = ref(false);
@@ -226,7 +248,7 @@ const saveLabel = computed(() => {
     :title="modalTitle"
     icon="✈️"
     icon-bg="var(--vacation-teal-tint)"
-    size="wide"
+    size="full"
     save-gradient="teal"
     :save-label="saveLabel"
     :save-disabled="false"
@@ -325,8 +347,18 @@ const saveLabel = computed(() => {
       v-if="currentStep === 5"
       v-model:ideas="ideas"
       :current-member-id="currentMemberId"
+      @edit-idea="openIdeaDrawer"
     />
   </BeanieFormModal>
+
+  <!-- Idea edit drawer (from wizard) -->
+  <IdeaEditModal
+    :open="editingIdeaId !== null"
+    :idea="editingIdea"
+    @close="editingIdeaId = null"
+    @save="handleIdeaSave"
+    @delete="handleIdeaDelete"
+  />
 
   <!-- Celebration modal -->
   <BaseModal :open="celebrationOpen" size="md" layer="overlay" :closable="false">
