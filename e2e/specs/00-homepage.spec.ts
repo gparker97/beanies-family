@@ -62,12 +62,12 @@ test.describe('Homepage', () => {
     await page.getByTestId('homepage-get-started').click();
     await expect(page).toHaveURL('/welcome');
 
-    // Should see "Learn more about beanies.family" link
-    const learnMoreLink = page.getByText('Learn more about beanies.family');
-    await expect(learnMoreLink).toBeVisible();
+    // Should see "Back to Homepage" button
+    const backLink = page.getByText('Back to Homepage');
+    await expect(backLink).toBeVisible();
 
     // Click it to go back to homepage
-    await learnMoreLink.click();
+    await backLink.click();
     await expect(page).toHaveURL('/home');
   });
 });
