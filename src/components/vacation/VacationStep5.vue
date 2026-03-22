@@ -16,12 +16,12 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   'update:ideas': [value: VacationIdea[]];
+  editIdea: [idea: VacationIdea];
 }>();
 
 const { t } = useTranslation();
 
 const newIdeaText = ref('');
-const expandedIds = ref<Set<string>>(new Set());
 
 const sortedIdeas = computed(() =>
   [...props.ideas].sort((a, b) => {
@@ -66,28 +66,11 @@ function handleVote(index: number) {
   emit('update:ideas', updated);
 }
 
-function handleUpdateIdea(index: number, updated: VacationIdea) {
-  const ideas = [...props.ideas];
-  ideas[index] = updated;
-  emit('update:ideas', ideas);
-}
-
 function handleDeleteIdea(index: number) {
   emit(
     'update:ideas',
     props.ideas.filter((_, i) => i !== index)
   );
-}
-
-function isExpanded(id: string) {
-  return expandedIds.value.has(id);
-}
-
-function setExpanded(id: string, value: boolean) {
-  const next = new Set(expandedIds.value);
-  if (value) next.add(id);
-  else next.delete(id);
-  expandedIds.value = next;
 }
 </script>
 
@@ -122,17 +105,20 @@ function setExpanded(id: string, value: boolean) {
 
   <!-- Ideas list -->
   <div v-if="sortedIdeas.length" class="space-y-2">
-    <VacationIdeaCard
+    <div
       v-for="idea in sortedIdeas"
       :key="idea.id"
-      :idea="idea"
-      :current-member-id="currentMemberId"
-      :expanded="isExpanded(idea.id)"
-      @update:expanded="setExpanded(idea.id, $event)"
-      @vote="handleVote(ideas.indexOf(idea))"
-      @update:idea="handleUpdateIdea(ideas.indexOf(idea), $event)"
-      @delete="handleDeleteIdea(ideas.indexOf(idea))"
-    />
+      class="cursor-pointer"
+      @click="$emit('editIdea', idea)"
+    >
+      <VacationIdeaCard
+        :idea="idea"
+        :current-member-id="currentMemberId"
+        read-only
+        @vote="handleVote(ideas.indexOf(idea))"
+        @delete="handleDeleteIdea(ideas.indexOf(idea))"
+      />
+    </div>
   </div>
 
   <!-- Empty state -->
