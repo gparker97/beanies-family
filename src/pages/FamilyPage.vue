@@ -363,7 +363,8 @@ function cancelEditFamilyName() {
         <!-- Action buttons — stacked right on desktop -->
         <div v-if="canManagePod" class="flex flex-shrink-0 flex-col items-end gap-2">
           <button
-            class="font-outfit from-primary-500 to-terracotta-400 hover:from-primary-600 hover:to-terracotta-500 rounded-full bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all"
+            type="button"
+            class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
             @click="openAddModal"
           >
             {{ t('family.hub.addBean') }}

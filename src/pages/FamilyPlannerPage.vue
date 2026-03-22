@@ -341,26 +341,14 @@ function handleActivitySwapped(newId: string) {
 
 <template>
   <div class="space-y-6">
-    <!-- Header row: subtitle + filters + add button -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <!-- Header row: subtitle + mobile filter + add button -->
+    <div class="flex items-center justify-between gap-2">
       <p class="text-secondary-500/40 hidden text-sm sm:block dark:text-gray-500">
         {{ headerSubtitle }}
       </p>
-      <div class="flex items-center gap-2">
-        <!-- Compact member filter (mobile: dropdown, desktop: inline chips) -->
-        <div class="hidden sm:flex">
-          <MemberChipFilter
-            :is-all-active="memberFilterStore.isAllSelected"
-            :is-member-active="
-              (id: string) =>
-                memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
-            "
-            @select-all="toggleAllMembers"
-            @select-member="toggleMember"
-          />
-        </div>
-        <!-- Mobile: compact member filter button -->
-        <div class="relative sm:hidden">
+      <!-- Mobile: compact member filter button -->
+      <div class="flex items-center gap-2 sm:hidden">
+        <div class="relative">
           <button
             type="button"
             class="font-outfit inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm font-medium transition-all"
@@ -439,15 +427,27 @@ function handleActivitySwapped(newId: string) {
             </div>
           </Transition>
         </div>
-        <button
-          v-if="canEditActivities"
-          type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
-          @click="openAddModal()"
-        >
-          {{ t('planner.addActivity') }}
-        </button>
       </div>
+      <button
+        v-if="canEditActivities"
+        type="button"
+        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+        @click="openAddModal()"
+      >
+        {{ t('planner.addActivity') }}
+      </button>
+    </div>
+
+    <!-- Desktop member filter (below header) -->
+    <div class="hidden sm:flex">
+      <MemberChipFilter
+        :is-all-active="memberFilterStore.isAllSelected"
+        :is-member-active="
+          (id: string) => memberFilterStore.isMemberSelected(id) && !memberFilterStore.isAllSelected
+        "
+        @select-all="toggleAllMembers"
+        @select-member="toggleMember"
+      />
     </div>
 
     <!-- Upcoming vacations — prominent card above calendar -->

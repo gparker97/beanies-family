@@ -690,12 +690,19 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
 <template>
   <div class="space-y-5">
     <!-- Header -->
-    <div>
+    <div class="flex items-center justify-between">
       <p class="text-sm text-[var(--color-text)] opacity-40">{{ subtitle }}</p>
+      <button
+        type="button"
+        class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+        @click="openAddModal"
+      >
+        {{ t('transactions.addTransaction') }}
+      </button>
     </div>
 
-    <!-- Secondary toolbar: filters + search + month + add -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
+    <!-- Secondary toolbar: filters + search + month -->
+    <div class="flex flex-wrap items-center gap-3">
       <div class="flex flex-wrap items-center gap-2.5">
         <!-- Filter pills -->
         <TogglePillGroup
@@ -728,14 +735,6 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         <!-- Month navigator -->
         <MonthNavigator v-model="selectedMonth" />
       </div>
-
-      <!-- Add button (gradient pill) -->
-      <button
-        class="font-outfit cursor-pointer rounded-full bg-gradient-to-r from-[#F15D22] to-[#E67E22] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_16px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_20px_rgba(241,93,34,0.3)]"
-        @click="openAddModal"
-      >
-        + {{ t('transactions.addTransaction') }}
-      </button>
     </div>
 
     <!-- Summary cards (3 across) -->
