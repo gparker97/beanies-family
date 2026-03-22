@@ -131,26 +131,28 @@ export function buildTravelSegmentTitle(seg: {
 }): string {
   const t = seg.type;
   if (t === 'flight_outbound' || t === 'flight_return' || t === 'flight_other') {
-    const label =
-      t === 'flight_outbound'
-        ? 'outbound flight'
-        : t === 'flight_return'
-          ? 'return flight'
-          : 'flight';
     const from = airportCode(seg.departureAirport);
     const to = airportCode(seg.arrivalAirport);
-    return from && to ? `${label} — ${from} to ${to}` : label;
+    if (from && to) return `${from} → ${to}`;
+    if (from) return from;
+    if (to) return to;
+    return t === 'flight_outbound'
+      ? 'outbound flight'
+      : t === 'flight_return'
+        ? 'return flight'
+        : 'flight';
   }
-  if (t === 'cruise') return seg.cruiseLine ? `cruise — ${seg.cruiseLine}` : 'cruise';
+  if (t === 'cruise') return seg.cruiseLine || 'cruise';
   if (t === 'train' || t === 'ferry') {
-    const label = t === 'train' ? 'train' : 'ferry';
     const from = seg.departureStation;
     const to = seg.arrivalStation;
-    return from && to ? `${label} — ${from} to ${to}` : label;
+    if (from && to) return `${from} → ${to}`;
+    if (from) return from;
+    if (to) return to;
+    return t === 'train' ? 'train' : 'ferry';
   }
   if (t === 'car') {
-    const label = seg.carLabel || (seg.carType ? seg.carType.replace(/_/g, ' ') : 'car');
-    return label;
+    return seg.carLabel || (seg.carType ? seg.carType.replace(/_/g, ' ') : 'car');
   }
   if (t === 'activity') return seg.title || 'activity';
   return seg.title || '';
@@ -158,14 +160,14 @@ export function buildTravelSegmentTitle(seg: {
 
 /** Build a display title for an accommodation based on its type and name */
 export function buildAccommodationTitle(acc: { type?: string; name?: string }): string {
+  if (acc.name) return acc.name;
   const typeLabels: Record<string, string> = {
     hotel: 'hotel',
     airbnb: 'airbnb',
     campground: 'campground',
-    family_friends: 'friends/family',
+    family_friends: 'stay',
   };
-  const label = typeLabels[acc.type ?? ''] ?? 'stay';
-  return acc.name ? `${label} — ${acc.name}` : label;
+  return typeLabels[acc.type ?? ''] ?? 'stay';
 }
 
 /** Build a display title for a transportation item based on its type */
