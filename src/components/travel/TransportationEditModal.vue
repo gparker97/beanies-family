@@ -105,8 +105,34 @@ const autoTitle = computed(() =>
   })
 );
 
+/** Fields missing for "booked" status */
+const bookedErrors = computed<Set<string>>(() => {
+  if (status.value !== 'booked') return new Set();
+  const missing = new Set<string>();
+  if (isRentalCar.value) {
+    if (!agencyName.value) missing.add('agencyName');
+    if (!pickupDate.value) missing.add('pickupDate');
+    if (!returnDate.value) missing.add('returnDate');
+    if (!bookingReference.value) missing.add('bookingReference');
+  } else if (isBus.value) {
+    if (!departureDate.value) missing.add('departureDate');
+    if (!departureTime.value) missing.add('departureTime');
+    if (!bookingReference.value) missing.add('bookingReference');
+  } else if (isShuttleOrTaxi.value) {
+    if (!pickupDate.value) missing.add('pickupDate');
+    if (!pickupTime.value) missing.add('pickupTime');
+    if (!bookingReference.value) missing.add('bookingReference');
+  }
+  return missing;
+});
+
+const canSave = computed(() => {
+  if (bookedErrors.value.size > 0) return false;
+  return true;
+});
+
 async function handleSave() {
-  if (!props.vacationId || props.transportationIndex < 0) return;
+  if (!canSave.value || !props.vacationId || props.transportationIndex < 0) return;
   isSubmitting.value = true;
   try {
     const vacation = vacationStore.getVacationById(props.vacationId);
@@ -147,6 +173,7 @@ async function handleSave() {
     icon="🚗"
     icon-bg="bg-[rgba(0,180,216,0.1)]"
     save-gradient="teal"
+    :save-disabled="!canSave"
     :is-submitting="isSubmitting"
     @close="$emit('close')"
     @save="handleSave"
@@ -179,10 +206,16 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.departureDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.departureDate')"
+            :error="bookedErrors.has('departureDate')"
+          >
             <BaseInput v-model="departureDate" type="date" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.departureTime')">
+          <FormFieldGroup
+            :label="t('vacation.field.departureTime')"
+            :error="bookedErrors.has('departureTime')"
+          >
             <BaseInput v-model="departureTime" type="time" />
           </FormFieldGroup>
         </div>
@@ -190,14 +223,20 @@ async function handleSave() {
 
       <!-- Rental car fields -->
       <template v-if="isRentalCar">
-        <FormFieldGroup :label="t('vacation.field.agencyName')">
+        <FormFieldGroup
+          :label="t('vacation.field.agencyName')"
+          :error="bookedErrors.has('agencyName')"
+        >
           <BaseInput v-model="agencyName" :placeholder="t('vacation.field.agencyName')" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.agencyAddress')">
           <BaseInput v-model="agencyAddress" :placeholder="t('vacation.field.agencyAddress')" />
         </FormFieldGroup>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.pickupDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.pickupDate')"
+            :error="bookedErrors.has('pickupDate')"
+          >
             <BaseInput v-model="pickupDate" type="date" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.pickupTime')">
@@ -205,7 +244,10 @@ async function handleSave() {
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.returnDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.returnDate')"
+            :error="bookedErrors.has('returnDate')"
+          >
             <BaseInput v-model="returnDate" type="date" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.returnTime')">
@@ -217,10 +259,16 @@ async function handleSave() {
       <!-- Shuttle / Taxi fields -->
       <template v-if="isShuttleOrTaxi">
         <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.pickupDate')">
+          <FormFieldGroup
+            :label="t('vacation.field.pickupDate')"
+            :error="bookedErrors.has('pickupDate')"
+          >
             <BaseInput v-model="pickupDate" type="date" />
           </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.pickupTime')">
+          <FormFieldGroup
+            :label="t('vacation.field.pickupTime')"
+            :error="bookedErrors.has('pickupTime')"
+          >
             <BaseInput v-model="pickupTime" type="time" />
           </FormFieldGroup>
         </div>
@@ -235,7 +283,10 @@ async function handleSave() {
       </template>
 
       <!-- Common: Booking reference -->
-      <FormFieldGroup :label="t('vacation.field.bookingReference')">
+      <FormFieldGroup
+        :label="t('vacation.field.bookingReference')"
+        :error="bookedErrors.has('bookingReference')"
+      >
         <BaseInput v-model="bookingReference" :placeholder="t('vacation.field.bookingReference')" />
       </FormFieldGroup>
 
