@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useCountUp } from '@/composables/useCountUp';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 
@@ -35,12 +36,32 @@ const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const { formatInDisplayCurrency } = useCurrencyDisplay();
 
+const route = useRoute();
+const router = useRouter();
+
 const progressMounted = ref(false);
 onMounted(() => {
   nextTick(() => {
     progressMounted.value = true;
   });
+  handleGoalQueryParam();
 });
+
+// Open goal from query param (e.g. from global search)
+function handleGoalQueryParam() {
+  const viewId = route.query.view as string | undefined;
+  if (viewId) {
+    const goal = goalsStore.goals.find((g) => g.id === viewId);
+    if (goal) openEditModal(goal);
+    router.replace({ query: {} });
+  }
+}
+watch(
+  () => route.query.view,
+  (val) => {
+    if (val) handleGoalQueryParam();
+  }
+);
 
 const goalsStore = useGoalsStore();
 const familyStore = useFamilyStore();

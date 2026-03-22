@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { BaseButton, BaseInput, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
@@ -32,6 +32,7 @@ import type {
 } from '@/types/models';
 
 const route = useRoute();
+const router = useRouter();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
@@ -239,16 +240,25 @@ function closeEditModal() {
   editingMember.value = null;
 }
 
-// Open modals from query params (e.g. navigated from Family Nook)
-onMounted(() => {
+// Open modals from query params (e.g. navigated from Family Nook or global search)
+function handleFamilyQueryParam() {
   if (route.query.add === 'true') {
     openAddModal();
+    router.replace({ query: {} });
   } else if (route.query.edit) {
     const memberId = route.query.edit as string;
     const member = familyStore.members.find((m) => m.id === memberId);
     if (member) openEditModal(member);
+    router.replace({ query: {} });
   }
-});
+}
+watch(
+  () => route.query.edit,
+  (val) => {
+    if (val) handleFamilyQueryParam();
+  }
+);
+onMounted(handleFamilyQueryParam);
 
 async function handleMemberSave(
   data: CreateFamilyMemberInput | { id: string; data: UpdateFamilyMemberInput }

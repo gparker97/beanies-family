@@ -7,6 +7,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import GlobalSearch from '@/components/common/GlobalSearch.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
@@ -74,6 +75,7 @@ const pageTitle = computed(() => {
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
 const currentMember = computed(() => familyStore.currentMember);
+const showSearch = ref(false);
 const showLanguageDropdown = ref(false);
 const showProfileDropdown = ref(false);
 const showCurrencyDropdown = ref(false);
@@ -206,7 +208,7 @@ async function confirmSignOutAndClearData() {
         </h1>
       </div>
 
-      <!-- Right: Privacy toggle + Profile avatar -->
+      <!-- Right: Privacy toggle + Search + Profile avatar -->
       <div class="flex items-center gap-2">
         <!-- Privacy mode toggle -->
         <button
@@ -238,6 +240,25 @@ async function confirmSignOutAndClearData() {
             v-if="isUnlocked"
             class="absolute right-0.5 bottom-0.5 h-2 w-2 rounded-full bg-[#27AE60]"
           />
+        </button>
+
+        <!-- Search -->
+        <button
+          type="button"
+          class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors dark:bg-slate-800 dark:shadow-none"
+          :aria-label="t('search.placeholder')"
+          @click="showSearch = true"
+        >
+          <svg
+            class="h-[18px] w-[18px] text-gray-400 dark:text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
         </button>
 
         <!-- Profile avatar dropdown -->
@@ -566,6 +587,25 @@ async function confirmSignOutAndClearData() {
           />
         </button>
 
+        <!-- Search -->
+        <button
+          type="button"
+          class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[14px] bg-white shadow-[0_2px_8px_rgba(44,62,80,0.06)] transition-colors hover:bg-gray-50 dark:bg-slate-800 dark:shadow-none dark:hover:bg-slate-700"
+          :aria-label="t('search.placeholder')"
+          @click="showSearch = true"
+        >
+          <svg
+            class="h-[18px] w-[18px] text-gray-400 dark:text-gray-500"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+
         <!-- Profile dropdown (avatar + chevron) -->
         <div class="relative">
           <button
@@ -786,5 +826,8 @@ async function confirmSignOutAndClearData() {
         </template>
       </BaseModal>
     </Teleport>
+
+    <!-- Global search overlay -->
+    <GlobalSearch :open="showSearch" @close="showSearch = false" />
   </header>
 </template>

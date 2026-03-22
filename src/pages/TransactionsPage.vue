@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
@@ -91,8 +91,8 @@ const createdConfirm = ref<{
   details: ConfirmDetail[];
 }>({ open: false, title: '', message: '', details: [] });
 
-// Open view modal from query param (e.g. navigated from Dashboard)
-onMounted(() => {
+// Open view modal from query param (e.g. navigated from Dashboard or global search)
+function handleTransactionQueryParam() {
   const viewId = route.query.view as string | undefined;
   if (viewId) {
     const tx = transactionsStore.transactions.find((t) => t.id === viewId);
@@ -103,10 +103,18 @@ onMounted(() => {
     const ri = recurringStore.getRecurringItemById(riId);
     if (ri) openEditRecurringModal(ri);
   }
-  // Clean up query params so refresh doesn't re-open
   if (viewId || riId) {
     router.replace({ query: {} });
   }
+}
+watch(
+  () => route.query.view,
+  (val) => {
+    if (val) handleTransactionQueryParam();
+  }
+);
+onMounted(() => {
+  handleTransactionQueryParam();
 });
 
 // ── Computeds ─────────────────────────────────────────────────────────────

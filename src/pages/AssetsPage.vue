@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
@@ -46,14 +46,22 @@ const showEditModal = ref(false);
 const editingAsset = ref<Asset | null>(null);
 const addModalDefaults = ref<{ memberId?: string; type?: AssetType } | undefined>();
 
-// Open edit modal from query param (e.g. navigated from Dashboard)
-onMounted(() => {
+// Open edit modal from query param (e.g. navigated from Dashboard or global search)
+function handleAssetQueryParam() {
   const viewId = route.query.view as string | undefined;
   if (viewId) {
     const asset = assetsStore.assets.find((a) => a.id === viewId);
     if (asset) openEditModal(asset);
+    router.replace({ query: {} });
   }
-});
+}
+watch(
+  () => route.query.view,
+  (val) => {
+    if (val) handleAssetQueryParam();
+  }
+);
+onMounted(handleAssetQueryParam);
 
 // Asset type options
 const assetTypes = computed(() => [

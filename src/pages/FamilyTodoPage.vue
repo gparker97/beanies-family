@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -18,6 +18,7 @@ import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
@@ -119,13 +120,23 @@ function openModal(todo: { id: string }) {
   selectedTodoId.value = todo.id;
 }
 
-// Open view modal from query param (e.g. navigated from Family Nook)
-onMounted(async () => {
+// Open view modal from query param (e.g. navigated from Family Nook or global search)
+function handleTodoQueryParam() {
   const viewId = route.query.view as string | undefined;
   if (viewId) {
     const todo = todoStore.todos.find((t) => t.id === viewId);
     if (todo) openModal(todo);
+    router.replace({ query: {} });
   }
+}
+watch(
+  () => route.query.view,
+  (val) => {
+    if (val) handleTodoQueryParam();
+  }
+);
+onMounted(async () => {
+  handleTodoQueryParam();
 
   // Auto-focus the quick add bar (skip on mobile/tablet to avoid keyboard popup)
   if (isDesktop.value) {
