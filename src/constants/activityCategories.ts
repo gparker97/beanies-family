@@ -101,10 +101,17 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
     group: 'School',
   },
   {
+    id: 'field_trip',
+    name: 'Field Trip',
+    emoji: '🚌',
+    color: '#2563EB',
+    group: 'School',
+  },
+  {
     id: 'school_recital',
     name: 'School Recital / Presentation',
     emoji: '🎭',
-    color: '#2563EB',
+    color: '#1E40AF',
     group: 'School',
   },
   {
