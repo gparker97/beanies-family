@@ -33,6 +33,9 @@ dist-ssr
 .claude/*
 !.claude/skills/
 
+# MCP server config (contains API tokens)
+.mcp.json
+
 # Playwright
 playwright-report
 test-results
