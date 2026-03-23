@@ -264,6 +264,18 @@ export function toDateInputValue(date: Date): string {
 }
 
 /**
+ * Detect if an HH:mm departure time is late-night (21:00–23:59) or early-morning (00:00–02:59).
+ * Returns 'early-morning', 'late-night', or null.
+ */
+export function detectNightFlight(time?: string): 'early-morning' | 'late-night' | null {
+  if (!time) return null;
+  const hour = parseInt(time.split(':')[0] ?? '12', 10);
+  if (hour < 3) return 'early-morning';
+  if (hour >= 21) return 'late-night';
+  return null;
+}
+
+/**
  * Format an HH:mm time string to 12-hour format (e.g. "4pm", "3:30pm").
  * Omits minutes when they are :00 for a cleaner display.
  */
