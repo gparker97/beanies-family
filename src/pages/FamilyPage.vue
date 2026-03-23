@@ -129,6 +129,7 @@ const isGeneratingInvite = ref(false);
 const inviteLinkError = ref<string | null>(null);
 const inviteLink = ref('');
 const inviteQrUrl = ref('');
+const cachedInviteExpiry = ref<string | null>(null);
 const shareEmail = ref('');
 const isSharing = ref(false);
 const shareResult = ref<'success' | 'error' | null>(null);
@@ -150,6 +151,7 @@ async function generateInviteLink(): Promise<string> {
   const fk = syncStore.familyKey;
   if (!fk) {
     // No family key — fall back to base URL (V3 or unconfigured)
+    cachedInviteExpiry.value = null;
     return buildBaseJoinUrl();
   }
 
@@ -163,6 +165,9 @@ async function generateInviteLink(): Promise<string> {
   // Store the invite package in the V4 envelope
   await syncStore.addInvitePackage(tokenHash, pkg);
 
+  // Cache the expiry so we can reuse this link until it expires
+  cachedInviteExpiry.value = pkg.expiresAt;
+
   // Build full URL with token + provider info
   const base = buildBaseJoinUrl();
   return `${base}&t=${encodeURIComponent(token)}`;
@@ -170,15 +175,27 @@ async function generateInviteLink(): Promise<string> {
 
 async function openInviteModal() {
   inviteLinkError.value = null;
-  inviteQrUrl.value = '';
   showInviteModal.value = true;
 
+  // Reuse cached invite link if it hasn't expired
+  const { isInviteExpired } = await import('@/services/crypto/inviteService');
+  if (
+    inviteLink.value &&
+    inviteQrUrl.value &&
+    cachedInviteExpiry.value &&
+    !isInviteExpired(cachedInviteExpiry.value)
+  ) {
+    return;
+  }
+
   // Generate a fresh invite link with crypto token + QR code
+  inviteQrUrl.value = '';
   isGeneratingInvite.value = true;
   try {
     inviteLink.value = await generateInviteLink();
     inviteQrUrl.value = await generateInviteQR(inviteLink.value);
   } catch (e) {
+    cachedInviteExpiry.value = null;
     inviteLinkError.value = (e as Error).message;
     inviteLink.value = buildBaseJoinUrl();
   } finally {
@@ -190,8 +207,12 @@ async function openInviteModal() {
 const showShareModal = ref(false);
 
 async function openShareModal() {
-  // Generate a fresh invite link if we don't have one yet
-  if (!inviteLink.value) {
+  // Generate invite link if we don't have a valid cached one
+  const { isInviteExpired } = await import('@/services/crypto/inviteService');
+  const hasCachedLink =
+    inviteLink.value && cachedInviteExpiry.value && !isInviteExpired(cachedInviteExpiry.value);
+
+  if (!hasCachedLink) {
     try {
       inviteLink.value = await generateInviteLink();
     } catch {
