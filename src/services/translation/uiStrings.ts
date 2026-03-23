@@ -1971,6 +1971,28 @@ const STRING_DEFS = {
     beanie: "couldn't share the pod. try sharing from google drive",
   },
 
+  // Share invite modal
+  'share.title': { en: 'Share Invite Link', beanie: 'share the magic link' },
+  'share.subtitle': {
+    en: 'Choose how to send the invite',
+    beanie: 'pick a way to send the magic link',
+  },
+  'share.copyLink': { en: 'Copy Link', beanie: 'copy link' },
+  'share.orShareVia': { en: 'or share via', beanie: 'or share via' },
+  'share.messageBody': {
+    en: "Hi! {member} has invited you to join the {family} family!\nClick here to join your family's bean pod: {link}",
+    beanie:
+      "hi! {member} has invited you to join the {family} pod!\nclick here to join your family's bean pod: {link}",
+  },
+  'share.emailSubject': {
+    en: "You're invited to join {family} on beanies.family!",
+    beanie: "you're invited to join {family} on beanies.family!",
+  },
+  'share.wechatHint': {
+    en: 'Link copied! Open WeChat and paste it in a chat to share with your contact.',
+    beanie: 'link copied! open wechat and paste it in a chat to share with your beanie.',
+  },
+
   // PWA / Offline / Install
   'pwa.offlineBanner': {
     en: "You're offline — changes are saved locally",

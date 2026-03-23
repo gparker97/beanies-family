@@ -6,7 +6,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
 import FamilyMemberCard from '@/components/family/FamilyMemberCard.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
-import { useClipboard } from '@/composables/useClipboard';
+import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
@@ -114,6 +114,11 @@ const upcomingThisWeek = computed(() => {
   return activityStore.upcomingActivities.filter((e) => e.date >= today && e.date <= weekFromNow);
 });
 
+/** True when there are non-owner members who could receive an invite link. */
+const hasInvitableMembers = computed(
+  () => familyStore.members.filter((m) => m.role !== 'owner').length > 0
+);
+
 const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingMember = ref<FamilyMember | null>(null);
@@ -181,11 +186,10 @@ async function openInviteModal() {
   }
 }
 
-// Per-member invite copy feedback
-const copiedMemberId = ref<string | null>(null);
-const { copy: copyMemberLink } = useClipboard();
+// Share invite modal (per-member share button on card)
+const showShareModal = ref(false);
 
-async function copyMemberInviteLink(memberId: string) {
+async function openShareModal() {
   // Generate a fresh invite link if we don't have one yet
   if (!inviteLink.value) {
     try {
@@ -195,15 +199,7 @@ async function copyMemberInviteLink(memberId: string) {
       return;
     }
   }
-  const ok = await copyMemberLink(inviteLink.value);
-  if (ok) {
-    copiedMemberId.value = memberId;
-    setTimeout(() => {
-      copiedMemberId.value = null;
-    }, 2000);
-  } else {
-    openInviteModal();
-  }
+  showShareModal.value = true;
 }
 
 async function handleShareWithEmail() {
@@ -380,7 +376,7 @@ function cancelEditFamilyName() {
             {{ t('family.hub.addBean') }}
           </button>
           <button
-            v-if="familyContextStore.activeFamilyId"
+            v-if="familyContextStore.activeFamilyId && hasInvitableMembers"
             class="hidden items-center gap-2 rounded-full border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-4 py-2 shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md sm:flex dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20"
             @click="openInviteModal"
           >
@@ -394,7 +390,7 @@ function cancelEditFamilyName() {
 
       <!-- Invite button — full-width on mobile only -->
       <button
-        v-if="canManagePod && familyContextStore.activeFamilyId"
+        v-if="canManagePod && familyContextStore.activeFamilyId && hasInvitableMembers"
         class="mt-4 flex w-full items-center gap-3 rounded-2xl border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-4 py-3 text-left shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md sm:hidden dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20"
         @click="openInviteModal"
       >
@@ -427,11 +423,10 @@ function cancelEditFamilyName() {
           :member="member"
           :highlights="memberHighlights.get(member.id) ?? []"
           :can-manage="canManagePod"
-          :copied-feedback="copiedMemberId === member.id"
           :class="syncHighlightClass(member.id)"
           @edit="openEditModal(member)"
           @delete="deleteMember(member.id)"
-          @copy-invite="copyMemberInviteLink(member.id)"
+          @share-invite="openShareModal"
           @role-change="handleRoleChange(member.id, $event)"
         />
       </div>
@@ -657,11 +652,18 @@ function cancelEditFamilyName() {
             </h3>
           </div>
           <div class="ml-8">
-            <InviteLinkCard
-              :link="inviteLink"
-              :qr-url="inviteQrUrl"
-              :loading="isGeneratingInvite"
-            />
+            <InviteLinkCard :link="inviteLink" :qr-url="inviteQrUrl" :loading="isGeneratingInvite">
+              <template #actions>
+                <button
+                  v-if="inviteLink && !isGeneratingInvite"
+                  class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-5 py-3 text-sm font-semibold text-[var(--color-secondary-500)] shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20 dark:text-gray-200"
+                  @click="showShareModal = true"
+                >
+                  <span class="text-base">💌</span>
+                  {{ t('share.title') }}
+                </button>
+              </template>
+            </InviteLinkCard>
           </div>
         </div>
 
@@ -693,5 +695,14 @@ function cancelEditFamilyName() {
         </div>
       </template>
     </BaseModal>
+
+    <!-- Share Invite Link Modal -->
+    <ShareInviteModal
+      :open="showShareModal"
+      :link="inviteLink"
+      :family-name="familyContextStore.activeFamilyName || t('family.title')"
+      :member-name="familyStore.currentMember?.name || t('family.title')"
+      @close="showShareModal = false"
+    />
   </div>
 </template>

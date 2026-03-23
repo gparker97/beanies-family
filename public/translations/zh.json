@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-03-23",
-    "translationCount": 1865
+    "translationCount": 1885
   },
   "translations": {
     "app.name": {
@@ -1107,14 +1107,14 @@
       "lastUpdated": "2026-03-03"
     },
     "settings.exportData": {
-      "translation": "导出数据",
-      "hash": "81o38q",
-      "lastUpdated": "2026-03-03"
+      "translation": "导出加密备份",
+      "hash": "n3k4h6",
+      "lastUpdated": "2026-03-23"
     },
     "settings.exportDataDescription": {
-      "translation": "将您的所有数据下载为JSON文件",
-      "hash": "oq5xnr",
-      "lastUpdated": "2026-02-10"
+      "translation": "将您的数据下载为加密的.beanpod文件（受密码保护）",
+      "hash": "rn20j6",
+      "lastUpdated": "2026-03-23"
     },
     "settings.clearAllData": {
       "translation": "清除所有数据",
@@ -2214,21 +2214,6 @@
     "settings.security": {
       "translation": "安全",
       "hash": "grkjmo",
-      "lastUpdated": "2026-03-03"
-    },
-    "settings.exportTranslationCache": {
-      "translation": "导出翻译缓存",
-      "hash": "ib0pfr",
-      "lastUpdated": "2026-03-03"
-    },
-    "settings.exportTranslationCacheDescription": {
-      "translation": "将缓存的翻译下载为JSON文件以提交到存储库",
-      "hash": "yg2btz",
-      "lastUpdated": "2026-02-24"
-    },
-    "settings.exportTranslations": {
-      "translation": "导出翻译",
-      "hash": "sitb1u",
       "lastUpdated": "2026-03-03"
     },
     "password.enterPassword": {
@@ -5457,14 +5442,14 @@
       "lastUpdated": "2026-03-04"
     },
     "settings.exportAsJson": {
-      "translation": "导出为JSON",
-      "hash": "qq1kga",
-      "lastUpdated": "2026-03-04"
+      "translation": "导出可读数据",
+      "hash": "uidl72",
+      "lastUpdated": "2026-03-23"
     },
     "settings.exportAsJsonDesc": {
-      "translation": "将您的所有数据下载为人类可读的JSON文件",
-      "hash": "fopzgx",
-      "lastUpdated": "2026-03-04"
+      "translation": "将您的所有数据下载为纯文本JSON文件（未加密）",
+      "hash": "js3ecr",
+      "lastUpdated": "2026-03-23"
     },
     "loginV6.unlockTitleWithFamily": {
       "translation": "登录{familyName}",
@@ -7402,9 +7387,9 @@
       "lastUpdated": "2026-03-14"
     },
     "planner.rescheduleHint": {
-      "translation": "将此事件移至其他日期或时间",
-      "hash": "3xv28p",
-      "lastUpdated": "2026-03-14"
+      "translation": "移至其他日期或时间",
+      "hash": "kegsfo",
+      "lastUpdated": "2026-03-23"
     },
     "planner.rescheduleTo": {
       "translation": "红线",
@@ -9329,6 +9314,121 @@
     "travel.ideasTeaserHint": {
       "translation": "查看所有旅程创意",
       "hash": "jdq8rw",
+      "lastUpdated": "2026-03-23"
+    },
+    "modal.time": {
+      "translation": "时间",
+      "hash": "1jvfx",
+      "lastUpdated": "2026-03-23"
+    },
+    "action.expandAll": {
+      "translation": "全部",
+      "hash": "t5upd1",
+      "lastUpdated": "2026-03-23"
+    },
+    "action.collapseAll": {
+      "translation": "全部折叠",
+      "hash": "xosbse",
+      "lastUpdated": "2026-03-23"
+    },
+    "txLink.quickLinkPrompt": {
+      "translation": "链接到贷款或活动？",
+      "hash": "1l590l",
+      "lastUpdated": "2026-03-23"
+    },
+    "password.incorrect": {
+      "translation": "密码不正确。 请再试一次 。",
+      "hash": "49fjvj",
+      "lastUpdated": "2026-03-23"
+    },
+    "loginV6.addAnotherBeanie": {
+      "translation": "要添加其他家庭成员吗？",
+      "hash": "hp3oth",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.title": {
+      "translation": "分享邀请链接",
+      "hash": "z4qv5c",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.subtitle": {
+      "translation": "选择发送邀请的方式",
+      "hash": "4c200s",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.copyLink": {
+      "translation": "复制链接",
+      "hash": "dywuuz",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.orShareVia": {
+      "translation": "分享渠道",
+      "hash": "dou8c0",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.emailSubject": {
+      "translation": "您受邀加入beanies.family上的{family} ！",
+      "hash": "lr70ik",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamily": {
+      "translation": "删除家庭数据和所有数据(& A)",
+      "hash": "85spfu",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyDesc": {
+      "translation": "从所有系统中永久删除此系列和所有数据。此操作无法撤消。",
+      "hash": "3d8jdb",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyWarning": {
+      "translation": "这将永久删除所有家庭数据，包括成员、账号、交易、活动和设置。数据将从此设备、云存储和所有连接的系统中删除。此操作无法撤消。",
+      "hash": "s4m68k",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyExport": {
+      "translation": "删除前将所有数据下载为可读文件",
+      "hash": "monedj",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyDriveDelete": {
+      "translation": "同时从Google云端硬盘中删除加密的.beanpod文件",
+      "hash": "hlclk7",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyTypeConfirm": {
+      "translation": "键入“删除”以确认",
+      "hash": "o4d1b4",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyAuthDesc": {
+      "translation": "输入您的密码以确认删除",
+      "hash": "89fc7n",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyFarewellTitle": {
+      "translation": "再见讯息",
+      "hash": "uyci5t",
+      "lastUpdated": "2026-03-23"
+    },
+    "settings.deleteFamilyFarewellMsg": {
+      "translation": "您的家庭数据已从所有系统中删除。我们很遗憾看到你离开--每一颗豆子都很重要。",
+      "hash": "6dmwm",
+      "lastUpdated": "2026-03-23"
+    },
+    "planner.rescheduleEditHint": {
+      "translation": "要更改定期计划，请使用下面的“编辑”",
+      "hash": "f24a5g",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.messageBody": {
+      "translation": "您好！ {member}邀请您加入{family}家庭！\\ n点击此处加入您家庭的豆豆荚： {link}",
+      "hash": "yyazky",
+      "lastUpdated": "2026-03-23"
+    },
+    "share.wechatHint": {
+      "translation": "链接已复制！打开微信并粘贴到聊天中，与您的联系人分享。",
+      "hash": "24yc0p",
       "lastUpdated": "2026-03-23"
     }
   }

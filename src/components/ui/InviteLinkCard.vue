@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { BaseButton } from '@/components/ui';
-import { useClipboard } from '@/composables/useClipboard';
 import { useTranslation } from '@/composables/useTranslation';
 
 defineProps<{
@@ -9,17 +7,7 @@ defineProps<{
   loading?: boolean;
 }>();
 
-const emit = defineEmits<{
-  copy: [];
-}>();
-
 const { t } = useTranslation();
-const { copied, copy } = useClipboard();
-
-async function handleCopy(text: string) {
-  await copy(text);
-  emit('copy');
-}
 </script>
 
 <template>
@@ -56,18 +44,8 @@ async function handleCopy(text: string) {
       {{ t('family.scanOrShare') }}
     </p>
 
-    <!-- Link + copy button -->
-    <div class="flex items-center gap-2">
-      <code
-        class="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 font-mono text-xs text-gray-900 select-all dark:border-slate-600 dark:bg-slate-800 dark:text-gray-100"
-        data-testid="invite-link-code"
-      >
-        {{ link }}
-      </code>
-      <BaseButton variant="secondary" @click="handleCopy(link)">
-        {{ copied ? t('login.copied') : t('login.copyLink') }}
-      </BaseButton>
-    </div>
+    <!-- Action slot (share button) -->
+    <slot name="actions" />
 
     <!-- Expiry note -->
     <p class="text-center text-xs text-gray-400 dark:text-gray-500">

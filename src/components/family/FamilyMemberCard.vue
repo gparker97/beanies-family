@@ -12,13 +12,12 @@ const props = defineProps<{
   member: FamilyMember;
   highlights: MemberHighlight[];
   canManage: boolean;
-  copiedFeedback: boolean;
 }>();
 
 const emit = defineEmits<{
   edit: [];
   delete: [];
-  'copy-invite': [];
+  'share-invite': [];
   'role-change': [role: 'admin' | 'member'];
 }>();
 
@@ -73,9 +72,9 @@ function avatarVariant() {
               v-if="member.requiresPassword && canManage"
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
               :title="t('family.copyInviteLinkHint')"
-              @click.stop="emit('copy-invite')"
+              @click.stop="emit('share-invite')"
             >
-              <BeanieIcon name="copy" size="md" />
+              <BeanieIcon name="share" size="md" />
             </button>
             <button
               v-if="member.role !== 'owner' && canManage"
@@ -112,14 +111,6 @@ function avatarVariant() {
             </span>
           </template>
         </div>
-
-        <!-- Copied feedback -->
-        <p
-          v-if="copiedFeedback"
-          class="mt-1 text-xs font-medium text-green-600 dark:text-green-400"
-        >
-          {{ t('family.linkCopied') }}
-        </p>
 
         <!-- Highlight sub-cards (2 upcoming items) -->
         <div class="mt-3 grid grid-cols-2 gap-2">
