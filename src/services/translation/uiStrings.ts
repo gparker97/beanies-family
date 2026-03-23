@@ -218,6 +218,8 @@ const STRING_DEFS = {
   'action.pause': { en: 'Pause', beanie: 'pause' },
   'action.resume': { en: 'Resume', beanie: 'resume' },
   'action.markCompleted': { en: 'Mark Complete', beanie: 'mark complete' },
+  'action.expandAll': { en: 'Expand All', beanie: 'expand all' },
+  'action.collapseAll': { en: 'Collapse All', beanie: 'collapse all' },
   'action.export': { en: 'Export', beanie: 'export' },
   'action.import': { en: 'Import', beanie: 'import' },
 
