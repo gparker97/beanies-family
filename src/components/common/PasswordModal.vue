@@ -10,6 +10,7 @@ interface Props {
   confirmLabel?: string;
   requireConfirmation?: boolean;
   closable?: boolean;
+  externalError?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
   confirmLabel: undefined,
   requireConfirmation: false,
   closable: true,
+  externalError: null,
 });
 
 const emit = defineEmits<{
@@ -151,8 +153,8 @@ function resetForm() {
         </p>
       </div>
 
-      <div v-if="error" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
-        <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+      <div v-if="error || externalError" class="rounded-lg bg-red-50 p-3 dark:bg-red-900/20">
+        <p class="text-sm text-red-600 dark:text-red-400">{{ error || externalError }}</p>
       </div>
 
       <div class="flex justify-end gap-3 pt-4">

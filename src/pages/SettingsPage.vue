@@ -5,7 +5,7 @@ import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings.vue
 import PasskeySettings from '@/components/settings/PasskeySettings.vue';
 import ProfileHeader from '@/components/settings/ProfileHeader.vue';
 import SettingsCard from '@/components/settings/SettingsCard.vue';
-import { BaseSelect, BaseButton } from '@/components/ui';
+import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
 import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -14,6 +14,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
+import { alert as showAlert } from '@/composables/useConfirm';
 import { useGoogleReconnect } from '@/composables/useGoogleReconnect';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
@@ -21,9 +22,21 @@ import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import { getDoc } from '@/services/automerge/docService';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
-import { downloadAsFile } from '@/services/sync/fileSync';
+import { downloadAsFile, tryUnwrapFamilyKey } from '@/services/sync/fileSync';
+import { getProviderConfig } from '@/services/sync/fileHandleStore';
+import { deleteFile } from '@/services/google/driveService';
+import { getValidToken } from '@/services/google/googleAuth';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useFamilyStore } from '@/stores/familyStore';
+import { useAccountsStore } from '@/stores/accountsStore';
+import { useTransactionsStore } from '@/stores/transactionsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
+import { useGoalsStore } from '@/stores/goalsStore';
+import { useRecurringStore } from '@/stores/recurringStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
+import { useTodoStore } from '@/stores/todoStore';
+import { useActivityStore } from '@/stores/activityStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -53,6 +66,15 @@ const importSuccess = ref(false);
 const showDecryptFileModal = ref(false);
 const encryptionError = ref<string | null>(null);
 const isProcessingEncryption = ref(false);
+
+// ── Delete Family state ────────────────────────────────────────────────────
+const showDeleteFamilyConfirm = ref(false);
+const showDeleteFamilyPassword = ref(false);
+const deleteConfirmText = ref('');
+const wantExport = ref(false);
+const wantDeleteDrive = ref(false);
+const isDeleting = ref(false);
+const deletePasswordError = ref<string | null>(null);
 
 // ── Currency ─────────────────────────────────────────────────────────────────
 const { currencyOptions } = useCurrencyOptions();
@@ -233,10 +255,6 @@ async function handleManualImport() {
   }
 }
 
-async function handleExportTranslations() {
-  await translationStore.exportCacheToFile();
-}
-
 function handleExportAsJson() {
   const doc = getDoc();
   const collections = [
@@ -249,6 +267,7 @@ function handleExportAsJson() {
     'recurringItems',
     'todos',
     'activities',
+    'vacations',
   ] as const;
 
   const data: Record<string, unknown> = {};
@@ -271,6 +290,96 @@ async function handleClearData() {
   }
   showClearConfirm.value = false;
   window.location.reload();
+}
+
+function resetDeleteFamilyState() {
+  deleteConfirmText.value = '';
+  wantExport.value = false;
+  wantDeleteDrive.value = false;
+  isDeleting.value = false;
+  deletePasswordError.value = null;
+}
+
+function handleDeleteFamilyConfirmClose() {
+  showDeleteFamilyConfirm.value = false;
+  resetDeleteFamilyState();
+}
+
+function handleDeleteFamilyClick() {
+  showDeleteFamilyConfirm.value = false;
+  showDeleteFamilyPassword.value = true;
+}
+
+async function handleDeleteFamilyPasswordConfirm(password: string) {
+  const familyContextStore = useFamilyContextStore();
+  const familyId = familyContextStore.activeFamilyId;
+  if (!familyId) return;
+
+  // Verify password against the envelope
+  const envelope = syncStore.envelope;
+  if (envelope) {
+    try {
+      await tryUnwrapFamilyKey(envelope, password);
+    } catch {
+      deletePasswordError.value = t('password.incorrect');
+      return;
+    }
+  }
+
+  deletePasswordError.value = null;
+  showDeleteFamilyPassword.value = false;
+  isDeleting.value = true;
+
+  try {
+    // 1. Export if requested
+    if (wantExport.value) {
+      handleExportAsJson();
+    }
+
+    // 2. Delete Drive file if requested
+    if (wantDeleteDrive.value) {
+      try {
+        const config = await getProviderConfig(familyId);
+        if (config?.type === 'google_drive' && config.driveFileId) {
+          const token = await getValidToken();
+          await deleteFile(token, config.driveFileId);
+        }
+      } catch (e) {
+        console.warn('[deleteFamily] Drive file deletion failed, continuing:', e);
+      }
+    }
+
+    // 3. Delete local family (IndexedDB, passkeys, file handles, registry, etc.)
+    await familyContextStore.deleteLocalFamily(familyId);
+
+    // 4. Auth teardown
+    await authStore.signOutAndClearData();
+
+    // 5. Reset all Pinia stores
+    useSyncStore().resetState();
+    useFamilyStore().resetState();
+    useAccountsStore().resetState();
+    useTransactionsStore().resetState();
+    useAssetsStore().resetState();
+    useGoalsStore().resetState();
+    useRecurringStore().resetState();
+    useSettingsStore().resetState();
+    useMemberFilterStore().resetState();
+    useTodoStore().resetState();
+    useActivityStore().resetState();
+
+    // 6. Farewell
+    await showAlert({
+      title: 'settings.deleteFamilyFarewellTitle',
+      message: 'settings.deleteFamilyFarewellMsg',
+    });
+
+    // 7. Redirect
+    router.replace('/welcome');
+  } catch (e) {
+    console.error('[deleteFamily] Deletion failed:', e);
+    isDeleting.value = false;
+  }
 }
 </script>
 
@@ -1052,26 +1161,6 @@ async function handleClearData() {
           {{ t('action.export') }}
         </BaseButton>
       </div>
-      <div
-        class="flex items-center justify-between border-b border-gray-200 py-3 dark:border-slate-700"
-      >
-        <div>
-          <p class="font-medium text-gray-900 dark:text-gray-100">
-            {{ t('settings.exportTranslationCache') }}
-          </p>
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            {{ t('settings.exportTranslationCacheDescription') }}
-          </p>
-        </div>
-        <BaseButton
-          variant="ghost"
-          size="sm"
-          :disabled="settingsStore.language === 'en'"
-          @click="handleExportTranslations"
-        >
-          {{ t('settings.exportTranslations') }}
-        </BaseButton>
-      </div>
       <div class="flex items-center justify-between py-3">
         <div>
           <p class="font-medium text-gray-900 dark:text-gray-100">
@@ -1099,7 +1188,101 @@ async function handleClearData() {
           </BaseButton>
         </div>
       </div>
+
+      <!-- ── Danger Zone: Delete Family ──────────────────────────────── -->
+      <div class="mt-6 rounded-lg border-2 border-[#F15D22]/40 p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-medium text-gray-900 dark:text-gray-100">
+              {{ t('settings.deleteFamily') }}
+            </p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+              {{ t('settings.deleteFamilyDesc') }}
+            </p>
+          </div>
+          <BaseButton variant="danger" size="sm" @click="showDeleteFamilyConfirm = true">
+            {{ t('settings.deleteFamily') }}
+          </BaseButton>
+        </div>
+      </div>
     </BeanieFormModal>
+
+    <!-- ── Delete Family Confirmation Drawer ───────────────────────────── -->
+    <BeanieFormModal
+      variant="drawer"
+      :open="showDeleteFamilyConfirm"
+      :title="t('settings.deleteFamily')"
+      icon="⚠️"
+      icon-bg="var(--color-heritage-orange)"
+      :save-label="t('action.close')"
+      @close="handleDeleteFamilyConfirmClose"
+      @save="handleDeleteFamilyConfirmClose"
+    >
+      <div class="space-y-4">
+        <div class="rounded-lg bg-[#F15D22]/10 p-4">
+          <p class="text-sm text-gray-800 dark:text-gray-200">
+            {{ t('settings.deleteFamilyWarning') }}
+          </p>
+        </div>
+
+        <label class="flex cursor-pointer items-start gap-3">
+          <input
+            v-model="wantExport"
+            type="checkbox"
+            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
+          />
+          <span class="text-sm text-gray-700 dark:text-gray-300">
+            {{ t('settings.deleteFamilyExport') }}
+          </span>
+        </label>
+
+        <label
+          v-if="syncStore.isGoogleDriveConnected"
+          class="flex cursor-pointer items-start gap-3"
+        >
+          <input
+            v-model="wantDeleteDrive"
+            type="checkbox"
+            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
+          />
+          <span class="text-sm text-gray-700 dark:text-gray-300">
+            {{ t('settings.deleteFamilyDriveDelete') }}
+          </span>
+        </label>
+
+        <div>
+          <BaseInput
+            v-model="deleteConfirmText"
+            :label="t('settings.deleteFamilyTypeConfirm')"
+            placeholder="delete"
+            autocomplete="off"
+          />
+        </div>
+
+        <BaseButton
+          variant="danger"
+          class="w-full"
+          :disabled="deleteConfirmText.toLowerCase() !== 'delete' || isDeleting"
+          @click="handleDeleteFamilyClick"
+        >
+          {{ t('settings.deleteFamily') }}
+        </BaseButton>
+      </div>
+    </BeanieFormModal>
+
+    <!-- ── Delete Family Password Gate ─────────────────────────────────── -->
+    <PasswordModal
+      :open="showDeleteFamilyPassword"
+      :title="t('settings.deleteFamily')"
+      :description="t('settings.deleteFamilyAuthDesc')"
+      :confirm-label="t('settings.deleteFamily')"
+      :external-error="deletePasswordError"
+      @close="
+        showDeleteFamilyPassword = false;
+        deletePasswordError = null;
+      "
+      @confirm="handleDeleteFamilyPasswordConfirm"
+    />
 
     <!-- ── Decrypt File Password Modal ─────────────────────────────────── -->
     <PasswordModal
