@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-22",
-    "translationCount": 1837
+    "lastUpdated": "2026-03-23",
+    "translationCount": 1865
   },
   "translations": {
     "app.name": {
@@ -247,9 +247,9 @@
       "lastUpdated": "2026-03-03"
     },
     "action.markCompleted": {
-      "translation": "标记为已完成",
-      "hash": "1qdmmo",
-      "lastUpdated": "2026-03-03"
+      "translation": "标记完成",
+      "hash": "xk0c30",
+      "lastUpdated": "2026-03-23"
     },
     "action.export": {
       "translation": "导出",
@@ -1792,9 +1792,9 @@
       "lastUpdated": "2026-03-03"
     },
     "dashboard.roleLittleBean": {
-      "translation": "Little Bean",
-      "hash": "ourpt2",
-      "lastUpdated": "2026-03-03"
+      "translation": "小豆豆",
+      "hash": "j01ebu",
+      "lastUpdated": "2026-03-23"
     },
     "dashboard.chartHidden": {
       "translation": "图表已隐藏",
@@ -5857,9 +5857,9 @@
       "lastUpdated": "2026-03-07"
     },
     "homepage.learnMore": {
-      "translation": "了解更多关于beanies.family的信息",
-      "hash": "xsytxv",
-      "lastUpdated": "2026-03-07"
+      "translation": "返回首页",
+      "hash": "1s9enu",
+      "lastUpdated": "2026-03-23"
     },
     "inviteGate.title": {
       "translation": "仅邀请",
@@ -8962,9 +8962,9 @@
       "lastUpdated": "2026-03-21"
     },
     "travel.ideas": {
-      "translation": "旅程创意！",
-      "hash": "1hlx28",
-      "lastUpdated": "2026-03-21"
+      "translation": "行程创意",
+      "hash": "bi6081",
+      "lastUpdated": "2026-03-23"
     },
     "travel.ideasTeaser": {
       "translation": "建议",
@@ -9190,6 +9190,146 @@
       "translation": "对象",
       "hash": "1v32",
       "lastUpdated": "2026-03-22"
+    },
+    "blog.title": {
+      "translation": "Beanstalk博客",
+      "hash": "wcxaq5",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.tagline": {
+      "translation": "最新的豆豆新闻和更新",
+      "hash": "763j36",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.featured": {
+      "translation": "編輯推薦",
+      "hash": "3qkaeq",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.backToAll": {
+      "translation": "所有内容",
+      "hash": "1b3238",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.newer": {
+      "translation": "從不",
+      "hash": "18qyp9",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.older": {
+      "translation": "較舊",
+      "hash": "19eu44",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.empty": {
+      "translation": "还没有帖子—豆茎仍在增长！",
+      "hash": "8ieufk",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.noPostsInCategory": {
+      "translation": "抱歉。此类别中尚无帖子",
+      "hash": "yxanx5",
+      "lastUpdated": "2026-03-23"
+    },
+    "blog.postNotFound": {
+      "translation": "这篇文章好像走丢了……",
+      "hash": "y3afut",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.placeholder": {
+      "translation": "搜索所有",
+      "hash": "aqqr9f",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.noResults": {
+      "translation": "未找到结果",
+      "hash": "myz3kp",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.activities": {
+      "translation": "活动",
+      "hash": "46kgs3",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.vacations": {
+      "translation": "旅行计划",
+      "hash": "is0mhw",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.todos": {
+      "translation": "待办",
+      "hash": "tjfroq",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.accounts": {
+      "translation": "账户",
+      "hash": "y9wwze",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.transactions": {
+      "translation": "交易",
+      "hash": "z19kl1",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.goals": {
+      "translation": "目标",
+      "hash": "152c9s",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.assets": {
+      "translation": "资产",
+      "hash": "wl9d43",
+      "lastUpdated": "2026-03-23"
+    },
+    "search.members": {
+      "translation": "家庭成员",
+      "hash": "ez95r1",
+      "lastUpdated": "2026-03-23"
+    },
+    "goalLink.hintIntro": {
+      "translation": "关联后，每笔收到的付款都会自动为实现这一目标做出贡献。选择金额：",
+      "hash": "vfye08",
+      "lastUpdated": "2026-03-23"
+    },
+    "goalLink.hintPercentage": {
+      "translation": "百分比—每笔付款的份额（例如每个发薪日的20% ）",
+      "hash": "rqu2nc",
+      "lastUpdated": "2026-03-23"
+    },
+    "goalLink.hintFixed": {
+      "translation": "固定金额—每笔付款的金额相同，直至剩余目标余额",
+      "hash": "jk5z10",
+      "lastUpdated": "2026-03-23"
+    },
+    "txLink.hintLinkPaymentIntro": {
+      "translation": "将此转出付款关联到活动或贷款：",
+      "hash": "48vdoe",
+      "lastUpdated": "2026-03-23"
+    },
+    "txLink.hintLinkPaymentActivity": {
+      "translation": "活动—跟踪家庭活动的成本（例如游泳课、音乐课）。付款将显示在活动时间表上。",
+      "hash": "bex3o1",
+      "lastUpdated": "2026-03-23"
+    },
+    "txLink.hintLinkPaymentLoan": {
+      "translation": "贷款—每笔付款使用标准摊销自动分为利息和本金，随着时间的推移减少未偿贷款余额。",
+      "hash": "se88t8",
+      "lastUpdated": "2026-03-23"
+    },
+    "nav.beanstalk": {
+      "translation": "Beanstalk博客",
+      "hash": "wcxaq5",
+      "lastUpdated": "2026-03-23"
+    },
+    "vacation.travel.oneWay": {
+      "translation": "单程票",
+      "hash": "5nseeg",
+      "lastUpdated": "2026-03-23"
+    },
+    "travel.ideasTeaserHint": {
+      "translation": "查看所有旅程创意",
+      "hash": "jdq8rw",
+      "lastUpdated": "2026-03-23"
     }
   }
 }
