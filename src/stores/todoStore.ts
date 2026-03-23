@@ -112,7 +112,15 @@ export const useTodoStore = defineStore('todos', () => {
         completedAt: now,
       });
       if (result) {
-        celebrate('goal-reached');
+        celebrate('goal-reached', {
+          onUndo: () => {
+            updateTodo(id, {
+              completed: false,
+              completedBy: undefined,
+              completedAt: undefined,
+            });
+          },
+        });
       }
       return result;
     }
