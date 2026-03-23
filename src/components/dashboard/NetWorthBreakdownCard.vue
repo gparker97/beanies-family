@@ -182,10 +182,33 @@ function formatPercent(pct: number): string {
 
 // ── Expandable detail ───────────────────────────────────────────────────────
 
-const expandedCategory = ref<string | null>(null);
+const expandedCategories = ref<Set<string>>(new Set());
 
 function toggleCategory(key: string) {
-  expandedCategory.value = expandedCategory.value === key ? null : key;
+  const next = new Set(expandedCategories.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedCategories.value = next;
+}
+
+const allCategoryKeys = computed(() => {
+  const keys = categories.value.map((c) => c.key);
+  if (liabilities.value > 0) keys.push('liabilities');
+  return keys;
+});
+
+const allExpanded = computed(
+  () =>
+    allCategoryKeys.value.length > 0 &&
+    allCategoryKeys.value.every((k) => expandedCategories.value.has(k))
+);
+
+function toggleAll() {
+  if (allExpanded.value) {
+    expandedCategories.value = new Set();
+  } else {
+    expandedCategories.value = new Set(allCategoryKeys.value);
+  }
 }
 
 interface DetailItem {
@@ -266,20 +289,37 @@ function getRouteForCategory(key: string): string {
         {{ t('dashboard.netWorthBreakdown') }}
       </div>
       <InfoHintBadge :text="t('hints.netWorthBreakdown')" />
+      <button
+        type="button"
+        class="ml-auto flex h-6 w-6 items-center justify-center rounded-full transition-all duration-200 hover:bg-[var(--tint-slate-8)]"
+        :title="allExpanded ? t('action.collapseAll') : t('action.expandAll')"
+        @click="toggleAll"
+      >
+        <svg
+          class="h-3.5 w-3.5 text-[var(--color-text-muted)] transition-transform duration-300"
+          :class="allExpanded ? 'rotate-180' : ''"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          viewBox="0 0 24 24"
+        >
+          <path d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
     </div>
 
     <!-- Category tile grid: 2 cols mobile, 3 cols tablet, 5 cols desktop -->
-    <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+    <div class="grid grid-cols-2 items-start gap-3 md:grid-cols-3 xl:grid-cols-5">
       <div
         v-for="cat in categories"
         :key="cat.key"
         class="cursor-pointer overflow-hidden rounded-[var(--sq)] bg-white shadow-[var(--card-shadow)] transition-[transform,box-shadow,ring] duration-200 dark:bg-slate-800"
         :class="
-          expandedCategory === cat.key
+          expandedCategories.has(cat.key)
             ? 'shadow-[var(--card-hover-shadow)] ring-2'
             : 'hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]'
         "
-        :style="expandedCategory === cat.key ? { '--tw-ring-color': cat.color + '40' } : {}"
+        :style="expandedCategories.has(cat.key) ? { '--tw-ring-color': cat.color + '40' } : {}"
         @click="toggleCategory(cat.key)"
       >
         <!-- Color accent bar -->
@@ -316,7 +356,7 @@ function getRouteForCategory(key: string): string {
         <!-- Inline expanded detail -->
         <div
           class="grid transition-[grid-template-rows] duration-300"
-          :class="expandedCategory === cat.key ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+          :class="expandedCategories.has(cat.key) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
           style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
           @click.stop
         >
@@ -370,7 +410,7 @@ function getRouteForCategory(key: string): string {
       v-if="liabilities > 0"
       class="mt-3 cursor-pointer overflow-hidden rounded-[var(--sq)] border border-red-200/60 bg-red-50/50 transition-[transform,box-shadow,ring] duration-200 dark:border-red-900/30 dark:bg-red-950/20"
       :class="
-        expandedCategory === 'liabilities'
+        expandedCategories.has('liabilities')
           ? 'shadow-[var(--card-shadow)] ring-2 ring-red-400/40'
           : 'hover:-translate-y-0.5 hover:shadow-[var(--card-shadow)]'
       "
@@ -395,7 +435,7 @@ function getRouteForCategory(key: string): string {
       <!-- Inline expanded detail for liabilities -->
       <div
         class="grid transition-[grid-template-rows] duration-300"
-        :class="expandedCategory === 'liabilities' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+        :class="expandedCategories.has('liabilities') ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
         style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
         @click.stop
       >
