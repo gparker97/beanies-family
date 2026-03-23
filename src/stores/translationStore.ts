@@ -196,48 +196,6 @@ export const useTranslationStore = defineStore('translation', () => {
     currentLanguage.value = language;
   }
 
-  /**
-   * Export current IndexedDB cache to a translation file.
-   * This allows developers to save new translations to JSON files.
-   */
-  async function exportCacheToFile(): Promise<void> {
-    if (currentLanguage.value === 'en') {
-      console.warn('Cannot export cache for English (source language)');
-      return;
-    }
-
-    const language = currentLanguage.value;
-    const allKeys = getAllKeys();
-
-    // Get all cached translations for this language
-    const cached = await translationCache.getTranslationsForLanguageByKeys(language, allKeys);
-
-    // Load existing file or create new
-    let file = await translationFiles.loadTranslationFile(language);
-    if (!file) {
-      const languageNames: Record<LanguageCode, string> = {
-        en: 'English',
-        zh: '中文 (简体)',
-      };
-      file = translationFiles.createEmptyTranslationFile(
-        language,
-        languageNames[language] || language
-      );
-    }
-
-    // Update file with cached translations
-    const updates = cached.map((entry) => ({
-      key: entry.key,
-      translation: entry.translation,
-      hash: entry.hash,
-    }));
-
-    const updatedFile = translationFiles.updateTranslationFile(file, updates);
-
-    // Download as JSON
-    translationFiles.downloadTranslationFile(updatedFile, `${language}.json`);
-  }
-
   return {
     // State
     currentLanguage,
@@ -254,6 +212,5 @@ export const useTranslationStore = defineStore('translation', () => {
     setBeanieMode,
     clearCache,
     setLanguageSync,
-    exportCacheToFile,
   };
 });

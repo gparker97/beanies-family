@@ -849,10 +849,10 @@ const STRING_DEFS = {
     beanie: 'coming soon — your very own bean advisor!',
   },
   'settings.dataManagement': { en: 'Data Management', beanie: 'data management' },
-  'settings.exportData': { en: 'Export Data', beanie: 'pack up your beans' },
+  'settings.exportData': { en: 'Export Encrypted Backup', beanie: 'export encrypted backup' },
   'settings.exportDataDescription': {
-    en: 'Download all your data as a JSON file',
-    beanie: 'download all your beanies as a file',
+    en: 'Download your data as an encrypted .beanpod file (password-protected)',
+    beanie: 'download your beans as an encrypted .beanpod file (password-protected)',
   },
   'settings.clearAllData': { en: 'Clear All Data', beanie: 'clear all data' },
   'settings.clearAllDataDescription': {
@@ -1349,10 +1349,10 @@ const STRING_DEFS = {
     en: 'Your data is protected with AES-256 encryption',
     beanie: 'your beans are locked with aes-256 encryption',
   },
-  'settings.exportAsJson': { en: 'Export as JSON', beanie: 'export as json' },
+  'settings.exportAsJson': { en: 'Export Readable Data', beanie: 'export readable data' },
   'settings.exportAsJsonDesc': {
-    en: 'Download all your data as a human-readable JSON file',
-    beanie: 'download all your beans as a readable json file',
+    en: 'Download all your data as a plain-text JSON file (not encrypted)',
+    beanie: 'download all your beans as a plain-text json file (not encrypted)',
   },
   'settings.noAutoSyncWarning': {
     en: "Your browser doesn't support automatic file saving. Use manual export/import instead. For automatic saving, use Chrome or Edge.",
@@ -1370,16 +1370,6 @@ const STRING_DEFS = {
     beanie: 'load data from a json file',
   },
   'settings.security': { en: 'Security', beanie: 'security' },
-  'settings.exportTranslationCache': {
-    en: 'Export Translation Cache',
-    beanie: 'export translation cache',
-  },
-  'settings.exportTranslationCacheDescription': {
-    en: 'Download cached translations as a JSON file to commit to the repository',
-    beanie: 'download cached translations as a json file to commit to the repository',
-  },
-  'settings.exportTranslations': { en: 'Export Translations', beanie: 'export translations' },
-
   // Password modal
   'password.enterPassword': { en: 'Enter Password', beanie: 'enter password' },
   'password.enterPasswordDescription': {
@@ -1394,6 +1384,10 @@ const STRING_DEFS = {
   'password.confirmPasswordPlaceholder': { en: 'Confirm password', beanie: 'confirm password' },
   'password.required': { en: 'Password is required', beanie: 'password is required' },
   'password.mismatch': { en: 'Passwords do not match', beanie: 'passwords do not match' },
+  'password.incorrect': {
+    en: 'Incorrect password. Please try again.',
+    beanie: 'wrong password. try again.',
+  },
   'password.decryptionError': { en: 'Decryption Error', beanie: 'decryption error' },
   'password.setAndContinue': { en: 'Set Password & Continue', beanie: 'set password & continue' },
   'password.strongPasswordDescription': {
@@ -2002,6 +1996,39 @@ const STRING_DEFS = {
   },
   'settings.installAppButton': { en: 'Install beanies.family', beanie: 'install beanies.family' },
   'settings.appInstalled': { en: 'App is installed', beanie: 'your beanies are installed!' },
+
+  'settings.deleteFamily': { en: 'Delete Family & All Data', beanie: 'delete family & all data' },
+  'settings.deleteFamilyDesc': {
+    en: 'Permanently remove this family and all data from all systems. This cannot be undone.',
+    beanie: 'permanently remove this family and all beans from everywhere. this cannot be undone.',
+  },
+  'settings.deleteFamilyWarning': {
+    en: 'This will permanently delete all family data including members, accounts, transactions, activities, and settings. Data will be removed from this device, cloud storage, and all connected systems. This action cannot be undone.',
+    beanie:
+      'this will permanently delete all family beans including members, accounts, transactions, activities, and settings. beans will be removed from this device, cloud storage, and all connected systems. this cannot be undone.',
+  },
+  'settings.deleteFamilyExport': {
+    en: 'Download all data as a readable file before deleting',
+    beanie: 'download all beans as a readable file before deleting',
+  },
+  'settings.deleteFamilyDriveDelete': {
+    en: 'Also delete the encrypted .beanpod file from Google Drive',
+    beanie: 'also delete the encrypted .beanpod file from google drive',
+  },
+  'settings.deleteFamilyTypeConfirm': {
+    en: 'Type "delete" to confirm',
+    beanie: 'type "delete" to confirm',
+  },
+  'settings.deleteFamilyAuthDesc': {
+    en: 'Enter your password to confirm deletion',
+    beanie: 'enter your password to confirm deletion',
+  },
+  'settings.deleteFamilyFarewellTitle': { en: 'Goodbye', beanie: 'goodbye' },
+  'settings.deleteFamilyFarewellMsg': {
+    en: "Your family data has been deleted from all systems. We're sorry to see you go — every bean counts.",
+    beanie:
+      "your family beans have been deleted from everywhere. we're sorry to see you go — every bean counts.",
+  },
 
   // Family To-Do
   'todo.title': { en: 'To-Do List', beanie: 'our to-do list' },
