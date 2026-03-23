@@ -18,6 +18,7 @@ interface Celebration {
   type: CelebrationType;
   message: string;
   asset: string;
+  onUndo?: () => void;
 }
 
 let nextId = 0;
@@ -62,7 +63,7 @@ const configs: Record<
   },
 };
 
-export function celebrate(trigger: CelebrationTrigger): void {
+export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () => void }): void {
   const config = configs[trigger];
   if (!config) return;
 
@@ -75,6 +76,7 @@ export function celebrate(trigger: CelebrationTrigger): void {
     type: config.type,
     message,
     asset: config.asset,
+    onUndo: options?.onUndo,
   };
 
   if (config.type === 'toast') {
