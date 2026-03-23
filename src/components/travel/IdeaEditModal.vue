@@ -8,6 +8,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { fetchLinkPreview, extractDomain, type LinkPreview } from '@/utils/linkPreview';
 import type { VacationIdea, VacationIdeaCategory, CurrencyCode } from '@/types/models';
 
 interface Props {
@@ -39,6 +40,8 @@ const duration = ref<string>('');
 const needsBooking = ref<boolean | undefined>(undefined);
 const isPlanned = ref(false);
 const link = ref('');
+const linkPreview = ref<LinkPreview | null>(null);
+const linkPreviewLoading = ref(false);
 const notes = ref('');
 
 const { isEditing } = useFormModal(
@@ -59,6 +62,7 @@ const { isEditing } = useFormModal(
       needsBooking.value = idea.needsBooking;
       isPlanned.value = idea.isPlanned ?? false;
       link.value = idea.link ?? '';
+      linkPreview.value = idea.linkPreview ?? null;
       notes.value = idea.notes ?? '';
     },
     onNew() {
@@ -74,6 +78,7 @@ const { isEditing } = useFormModal(
       needsBooking.value = undefined;
       isPlanned.value = false;
       link.value = '';
+      linkPreview.value = null;
       notes.value = '';
     },
   }
@@ -97,6 +102,30 @@ const voters = computed(() => {
     .map((v) => familyStore.members.find((m) => m.id === v.memberId))
     .filter(Boolean);
 });
+
+// Track the last URL we fetched a preview for to avoid duplicate requests
+let lastFetchedUrl = '';
+
+// On blur: normalize the link (add https:// if missing) then fetch preview
+async function handleLinkBlur() {
+  const trimmed = link.value.trim();
+  if (!trimmed) {
+    linkPreview.value = null;
+    lastFetchedUrl = '';
+    return;
+  }
+  // Auto-format the link with https:// if missing
+  link.value = normalizeLink(trimmed);
+
+  const url = link.value;
+  // Skip if we already fetched this exact URL
+  if (url === lastFetchedUrl && linkPreview.value) return;
+
+  lastFetchedUrl = url;
+  linkPreviewLoading.value = true;
+  linkPreview.value = await fetchLinkPreview(url);
+  linkPreviewLoading.value = false;
+}
 
 function normalizeLink(url: string): string {
   const trimmed = url.trim();
@@ -123,6 +152,7 @@ function handleSave() {
     needsBooking: needsBooking.value,
     isPlanned: isPlanned.value || undefined,
     link: normalizedLink.value || undefined,
+    linkPreview: linkPreview.value ?? undefined,
     notes: notes.value || undefined,
   });
 }
@@ -191,7 +221,13 @@ function handleSave() {
       <!-- Link -->
       <FormFieldGroup :label="t('vacation.field.link')">
         <div class="flex items-center gap-2">
-          <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+          <BaseInput
+            v-model="link"
+            type="url"
+            placeholder="https://..."
+            class="flex-1"
+            @blur="handleLinkBlur"
+          />
           <a
             v-if="normalizedLink"
             :href="normalizedLink"
@@ -203,6 +239,51 @@ function handleSave() {
             🔗
           </a>
         </div>
+        <!-- Link preview card -->
+        <div v-if="linkPreviewLoading" class="mt-2 flex items-center gap-2 text-xs text-gray-400">
+          <span class="animate-pulse">counting beans...</span>
+        </div>
+        <a
+          v-else-if="linkPreview && normalizedLink"
+          :href="normalizedLink"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-2 flex overflow-hidden rounded-xl border border-gray-200/80 bg-white transition-all hover:border-[rgba(0,180,216,0.3)] hover:shadow-sm dark:border-slate-700 dark:bg-slate-800"
+        >
+          <img
+            v-if="linkPreview.image"
+            :src="linkPreview.image"
+            alt=""
+            class="h-20 w-20 shrink-0 object-cover"
+            @error="($event.target as HTMLImageElement).style.display = 'none'"
+          />
+          <div class="min-w-0 flex-1 px-3 py-2">
+            <div
+              v-if="linkPreview.siteName"
+              class="font-outfit mb-0.5 truncate text-[10px] font-semibold tracking-wide text-[#00B4D8] uppercase"
+            >
+              {{ linkPreview.siteName }}
+            </div>
+            <div
+              v-else-if="normalizedLink"
+              class="font-outfit mb-0.5 truncate text-[10px] font-semibold tracking-wide text-gray-400 uppercase"
+            >
+              {{ extractDomain(normalizedLink) }}
+            </div>
+            <div
+              v-if="linkPreview.title"
+              class="font-outfit truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
+            >
+              {{ linkPreview.title }}
+            </div>
+            <div
+              v-if="linkPreview.description"
+              class="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500"
+            >
+              {{ linkPreview.description }}
+            </div>
+          </div>
+        </a>
       </FormFieldGroup>
 
       <!-- Cost toggle + Duration (side by side) -->

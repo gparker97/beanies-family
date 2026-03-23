@@ -614,6 +614,12 @@ export interface VacationIdea {
   needsBooking?: boolean;
   isPlanned?: boolean;
   link?: string;
+  linkPreview?: {
+    title?: string;
+    description?: string;
+    image?: string;
+    siteName?: string;
+  };
   notes?: string;
   votes: VacationIdeaVote[];
   createdBy: UUID;
