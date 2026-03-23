@@ -13,22 +13,33 @@ defineProps<{
 const show = ref(false);
 const el = ref<HTMLElement>();
 const btn = ref<HTMLElement>();
+const popover = ref<HTMLElement>();
 const popoverStyle = ref<Record<string, string>>({});
 
 function positionPopover() {
-  if (!btn.value) return;
+  if (!btn.value || !popover.value) return;
   const rect = btn.value.getBoundingClientRect();
+  const popoverRect = popover.value.getBoundingClientRect();
   const popoverWidth = 288; // w-72 = 18rem = 288px
-  // Default: align right edge to button right edge
+  const popoverHeight = popoverRect.height;
+  const gap = 8;
+
+  // Horizontal: align right edge to button right edge
   let left = rect.right - popoverWidth;
-  // If it would go off-screen left, flip to left-aligned
-  if (left < 8) left = rect.left;
-  // If it would go off-screen right, clamp
-  if (left + popoverWidth > window.innerWidth - 8) left = window.innerWidth - popoverWidth - 8;
+  if (left < gap) left = rect.left;
+  if (left + popoverWidth > window.innerWidth - gap) left = window.innerWidth - popoverWidth - gap;
+
+  // Vertical: default below, flip above if it would overflow the viewport
+  let top = rect.bottom + gap;
+  if (top + popoverHeight > window.innerHeight - gap) {
+    top = rect.top - gap - popoverHeight;
+    // If flipping above also overflows, pin to bottom with margin
+    if (top < gap) top = window.innerHeight - popoverHeight - gap;
+  }
 
   popoverStyle.value = {
     position: 'fixed',
-    top: `${rect.bottom + 8}px`,
+    top: `${top}px`,
     left: `${left}px`,
   };
 }
@@ -36,6 +47,8 @@ function positionPopover() {
 async function toggle() {
   show.value = !show.value;
   if (show.value) {
+    // Render off-screen first so we can measure, then reposition
+    popoverStyle.value = { position: 'fixed', top: '-9999px', left: '-9999px' };
     await nextTick();
     positionPopover();
   }
@@ -66,6 +79,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick));
     <Teleport to="body">
       <div
         v-if="show"
+        ref="popover"
         style="font-family: var(--font-inter)"
         class="z-[200] w-72 max-w-[calc(100vw-2rem)] rounded-xl p-3 text-xs leading-relaxed font-normal tracking-normal normal-case shadow-lg"
         :class="
