@@ -1745,6 +1745,7 @@ const STRING_DEFS = {
     beanie: 'more beans can join later!',
   },
   'loginV6.addMember': { en: 'Add Member', beanie: 'add beanie' },
+  'loginV6.addAnotherBeanie': { en: 'Add another family member?', beanie: 'add another beanie?' },
   'loginV6.finish': { en: 'Finish', beanie: 'finish' },
   'loginV6.skip': { en: 'Skip for now', beanie: 'skip for now' },
   'loginV6.joinButton': { en: "Join My Family's Pod", beanie: 'join your pod!' },

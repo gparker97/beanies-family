@@ -61,6 +61,7 @@ const newMemberRole = ref<'parent' | 'child'>('parent');
 const dobMonth = ref('');
 const dobDay = ref('');
 const dobYear = ref('');
+const showMemberForm = ref(true); // Pre-opened for first member
 
 const MONTH_KEYS = [
   'month.january',
@@ -272,6 +273,7 @@ async function handleAddMember() {
     dobMonth.value = '';
     dobDay.value = '';
     dobYear.value = '';
+    showMemberForm.value = false; // Collapse after adding — user must explicitly add another
   } else {
     formError.value = t('loginV6.addMemberFailed');
   }
@@ -281,6 +283,17 @@ async function handleAddMember() {
 async function handleRemoveMember(memberId: string) {
   await familyStore.deleteMember(memberId);
   addedMembers.value = addedMembers.value.filter((m) => m.id !== memberId);
+  // If all members removed, re-show the form
+  if (addedMembers.value.length === 0) showMemberForm.value = true;
+}
+
+function openAddMemberForm(role: 'parent' | 'child') {
+  newMemberRole.value = role;
+  newMemberName.value = '';
+  dobMonth.value = '';
+  dobDay.value = '';
+  dobYear.value = '';
+  showMemberForm.value = true;
 }
 
 const memberColors = ['#ef4444', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'];
@@ -812,13 +825,37 @@ function handleBack() {
         </div>
       </div>
 
+      <!-- Add another beanie prompt (shown after first member added, form collapsed) -->
+      <div
+        v-if="!showMemberForm && addedMembers.length > 0"
+        class="rounded-2xl border-2 border-dashed border-gray-200 p-4 text-center dark:border-slate-600"
+      >
+        <p class="font-outfit mb-3 text-sm font-semibold text-gray-500 dark:text-gray-400">
+          {{ t('loginV6.addAnotherBeanie') }}
+        </p>
+        <div class="flex justify-center gap-2">
+          <button
+            type="button"
+            class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
+            @click="openAddMemberForm('parent')"
+          >
+            🫘 {{ t('loginV6.parentBean') }}
+          </button>
+          <button
+            type="button"
+            class="font-outfit flex items-center gap-1.5 rounded-full border-2 border-transparent bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-[var(--color-secondary-500)] hover:bg-gray-50 dark:bg-slate-700 dark:text-gray-300 dark:hover:border-slate-400 dark:hover:bg-slate-600"
+            @click="openAddMemberForm('child')"
+          >
+            🌱 {{ t('loginV6.littleBean') }}
+          </button>
+        </div>
+      </div>
+
       <!-- Add member form -->
-      <div class="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-slate-600">
-        <BaseInput
-          v-model="newMemberName"
-          :label="'👤 ' + t('form.name')"
-          :placeholder="t('family.enterName')"
-        />
+      <div
+        v-if="showMemberForm"
+        class="space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-slate-600"
+      >
         <!-- Role toggle -->
         <div class="flex items-center gap-3">
           <span
@@ -853,6 +890,12 @@ function handleBack() {
           </div>
         </div>
 
+        <BaseInput
+          v-model="newMemberName"
+          :label="'👤 ' + t('form.name')"
+          :placeholder="t('family.enterName')"
+        />
+
         <!-- Birthday (month & day required, year optional) -->
         <div>
           <span
@@ -874,15 +917,25 @@ function handleBack() {
           </div>
         </div>
 
-        <BaseButton
-          class="w-full"
-          variant="secondary"
-          :disabled="!newMemberName || !dobMonth || !dobDay || isAddingMember"
-          :loading="isAddingMember"
-          @click="handleAddMember"
-        >
-          🫘 {{ t('loginV6.addMember') }}
-        </BaseButton>
+        <div class="flex gap-2">
+          <BaseButton
+            v-if="addedMembers.length > 0"
+            class="flex-1"
+            variant="outline"
+            @click="showMemberForm = false"
+          >
+            {{ t('action.cancel') }}
+          </BaseButton>
+          <BaseButton
+            class="flex-1"
+            variant="secondary"
+            :disabled="!newMemberName || !dobMonth || !dobDay || isAddingMember"
+            :loading="isAddingMember"
+            @click="handleAddMember"
+          >
+            🫘 {{ t('loginV6.addMember') }}
+          </BaseButton>
+        </div>
       </div>
 
       <BaseButton
