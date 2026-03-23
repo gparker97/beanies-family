@@ -419,12 +419,7 @@ function handleSave() {
         </div>
       </div>
 
-      <!-- 1. Who? -->
-      <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
-        <FamilyChipPicker v-model="assigneeIds" mode="multi" />
-      </FormFieldGroup>
-
-      <!-- 1b. Schedule mode tab bar (recurring / one-time) -->
+      <!-- 1. Schedule mode tab bar (recurring / one-time) -->
       <div class="rounded-2xl bg-[var(--tint-slate-5)] p-1.5 dark:bg-slate-700/50">
         <div class="grid grid-cols-2 gap-1.5">
           <button
@@ -480,6 +475,11 @@ function handleSave() {
           </button>
         </div>
       </div>
+
+      <!-- 2. Who? -->
+      <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
+        <FamilyChipPicker v-model="assigneeIds" mode="multi" />
+      </FormFieldGroup>
 
       <!-- 2. Category picker (grouped) -->
       <FormFieldGroup :label="t('modal.selectCategory')">

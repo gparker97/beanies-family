@@ -83,6 +83,7 @@ const draftNotes = ref('');
 // Reschedule state
 const showReschedule = ref(false);
 const rescheduleDate = ref('');
+const rescheduleEndDate = ref('');
 const rescheduleStartTime = ref('');
 const rescheduleEndTime = ref('');
 
@@ -533,14 +534,23 @@ async function handleDelete() {
 
 // ── Reschedule ──────────────────────────────────────────────────────────────
 
-const canReschedule = computed(() => isRecurring.value && !!props.occurrenceDate);
+const canReschedule = computed(() => !!activity.value);
 
 function toggleReschedule() {
   showReschedule.value = !showReschedule.value;
   if (showReschedule.value && activity.value) {
     rescheduleDate.value = props.occurrenceDate ?? activity.value.date?.split('T')[0] ?? '';
+    rescheduleEndDate.value = activity.value.endDate?.split('T')[0] ?? '';
     rescheduleStartTime.value = activity.value.startTime ?? '';
     rescheduleEndTime.value = activity.value.endTime ?? '';
+  }
+}
+
+function handleRescheduleEndDate(value: string) {
+  if (value && rescheduleDate.value && value < rescheduleDate.value) {
+    rescheduleEndDate.value = rescheduleDate.value;
+  } else {
+    rescheduleEndDate.value = value;
   }
 }
 
@@ -558,22 +568,44 @@ function handleRescheduleEndTime(value: string) {
 }
 
 async function confirmReschedule() {
-  if (!activity.value || !props.occurrenceDate || !rescheduleDate.value) return;
+  if (!activity.value || !rescheduleDate.value) return;
 
-  const overrides: Record<string, string | null> = { date: rescheduleDate.value };
-  if (rescheduleStartTime.value !== (activity.value.startTime ?? ''))
-    overrides.startTime = rescheduleStartTime.value || null;
-  if (rescheduleEndTime.value !== (activity.value.endTime ?? ''))
-    overrides.endTime = rescheduleEndTime.value || null;
+  if (isRecurring.value && props.occurrenceDate) {
+    // Recurring: materialize an override for this occurrence
+    const overrides: Record<string, string | null> = { date: rescheduleDate.value };
+    if (viewIsAllDay.value) {
+      overrides.endDate = rescheduleEndDate.value || null;
+    } else {
+      if (rescheduleStartTime.value !== (activity.value.startTime ?? ''))
+        overrides.startTime = rescheduleStartTime.value || null;
+      if (rescheduleEndTime.value !== (activity.value.endTime ?? ''))
+        overrides.endTime = rescheduleEndTime.value || null;
+    }
 
-  const override = await activityStore.materializeOverride(
-    activity.value.id,
-    props.occurrenceDate,
-    overrides
-  );
-  if (override) {
+    const override = await activityStore.materializeOverride(
+      activity.value.id,
+      props.occurrenceDate,
+      overrides
+    );
+    if (override) {
+      showReschedule.value = false;
+      emit('activity-swapped', override.id);
+      emit('close');
+    }
+  } else {
+    // One-time: directly update the activity
+    const update: Record<string, string | null> = { date: rescheduleDate.value };
+    if (viewIsAllDay.value) {
+      update.endDate = rescheduleEndDate.value || null;
+    } else {
+      if (rescheduleStartTime.value !== (activity.value.startTime ?? ''))
+        update.startTime = rescheduleStartTime.value || null;
+      if (rescheduleEndTime.value !== (activity.value.endTime ?? ''))
+        update.endTime = rescheduleEndTime.value || null;
+    }
+
+    await activityStore.updateActivity(activity.value.id, update);
     showReschedule.value = false;
-    emit('activity-swapped', override.id);
     emit('close');
   }
 }
@@ -589,7 +621,8 @@ async function confirmReschedule() {
     :icon-bg="activityColor + '20'"
     :save-label="t('action.close')"
     save-gradient="orange"
-    :show-delete="true"
+    :save-disabled="showReschedule"
+    :show-delete="!showReschedule"
     @close="handleClose"
     @save="handleDone"
     @delete="handleDelete"
@@ -658,36 +691,77 @@ async function confirmReschedule() {
         </span>
       </div>
 
-      <!-- Schedule summary box (recurring only) -->
-      <div
-        v-if="isRecurring"
-        class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
-      >
+      <!-- Schedule summary box -->
+      <div class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700">
         <div class="space-y-1.5">
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-              {{ t('planner.field.recurrence') }}
-            </span>
-            <span
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-            >
-              {{ scheduleSummary }}
-            </span>
-          </div>
-          <div v-if="endDateFormatted" class="flex items-center gap-2">
-            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-              {{ t('planner.field.endDate') }}
-            </span>
-            <span
-              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-            >
-              {{ endDateFormatted }}
-            </span>
-          </div>
+          <!-- Recurring: show recurrence pattern -->
+          <template v-if="isRecurring">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.recurrence') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ scheduleSummary }}
+              </span>
+            </div>
+            <div v-if="endDateFormatted" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.endDate') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ endDateFormatted }}
+              </span>
+            </div>
+          </template>
+          <!-- One-time: show date + time -->
+          <template v-else>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.date') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ viewFormattedDate }}
+              </span>
+            </div>
+            <div v-if="viewFormattedEndDate" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.endDate') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ viewFormattedEndDate }}
+              </span>
+            </div>
+            <div v-if="viewIsAllDay" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('modal.time') }}
+              </span>
+              <span class="font-outfit text-primary-500 text-sm font-semibold">
+                ☀️ {{ t('planner.allDay') }}
+              </span>
+            </div>
+            <div v-else-if="activity.startTime" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('modal.time') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ activity.startTime }}{{ activity.endTime ? ` – ${activity.endTime}` : '' }}
+              </span>
+            </div>
+          </template>
         </div>
       </div>
 
-      <!-- Reschedule action (recurring occurrences only) -->
+      <!-- Reschedule action -->
       <div v-if="canReschedule">
         <button
           type="button"
@@ -711,22 +785,34 @@ async function confirmReschedule() {
             {{ t('planner.rescheduleHint') }}
           </p>
 
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-2 gap-3" :class="{ 'grid-cols-3': !viewIsAllDay }">
             <FormFieldGroup :label="t('planner.rescheduleTo')">
               <BaseInput v-model="rescheduleDate" type="date" />
             </FormFieldGroup>
-            <FormFieldGroup :label="t('modal.startTime')">
-              <TimePresetPicker
-                :model-value="rescheduleStartTime"
-                @update:model-value="handleRescheduleStartTime"
-              />
-            </FormFieldGroup>
-            <FormFieldGroup :label="t('modal.endTime')">
-              <TimePresetPicker
-                :model-value="rescheduleEndTime"
-                @update:model-value="handleRescheduleEndTime"
-              />
-            </FormFieldGroup>
+            <template v-if="viewIsAllDay">
+              <FormFieldGroup :label="t('planner.field.endDate')">
+                <BaseInput
+                  :model-value="rescheduleEndDate"
+                  type="date"
+                  :min="rescheduleDate"
+                  @update:model-value="handleRescheduleEndDate($event as string)"
+                />
+              </FormFieldGroup>
+            </template>
+            <template v-else>
+              <FormFieldGroup :label="t('modal.startTime')">
+                <TimePresetPicker
+                  :model-value="rescheduleStartTime"
+                  @update:model-value="handleRescheduleStartTime"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('modal.endTime')">
+                <TimePresetPicker
+                  :model-value="rescheduleEndTime"
+                  @update:model-value="handleRescheduleEndTime"
+                />
+              </FormFieldGroup>
+            </template>
           </div>
 
           <div class="flex gap-2">
@@ -748,160 +834,65 @@ async function confirmReschedule() {
             </button>
           </div>
         </div>
+
+        <!-- Hint: use Edit for recurring schedule changes -->
+        <p
+          v-if="isRecurring && !showReschedule"
+          class="mt-2 text-center text-xs text-[var(--color-text-muted)] opacity-50"
+        >
+          {{ t('planner.rescheduleEditHint') }}
+        </p>
       </div>
 
-      <!-- Assignee — inline editable -->
-      <FormFieldGroup :label="t('planner.field.assignee')">
-        <InlineEditField
-          :editing="editingField === 'assignee'"
-          tint-color="orange"
-          @start-edit="startEdit('assignee')"
-        >
-          <template #view>
-            <div v-if="viewAssigneeIds.length" class="flex flex-wrap gap-1">
-              <MemberChip v-for="mid in viewAssigneeIds" :key="mid" :member-id="mid" size="md" />
-            </div>
-            <span v-else class="text-sm text-[var(--color-text-muted)]">
-              {{ t('todo.unassigned') }}
-            </span>
-          </template>
-          <template #edit>
-            <FamilyChipPicker
-              :model-value="draftAssigneeIds"
-              mode="multi"
-              compact
-              @update:model-value="handleAssigneeChange"
-            />
-            <div class="mt-1.5 flex gap-1.5">
-              <button
-                class="rounded-lg bg-[var(--color-primary-500)] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-600)]"
-                :disabled="draftAssigneeIds.length === 0"
-                :class="{ 'cursor-not-allowed opacity-40': draftAssigneeIds.length === 0 }"
-                @click="saveField('assignee')"
-              >
-                ✓
-              </button>
-              <button
-                class="rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-                @click="cancelEdit"
-              >
-                ✕
-              </button>
-            </div>
-          </template>
-        </InlineEditField>
-      </FormFieldGroup>
-
-      <!-- Date & Times — combined row -->
-      <div :class="!isRecurring ? 'grid grid-cols-3 gap-4' : 'grid grid-cols-2 gap-4'">
-        <!-- Date (only for one-off activities) -->
-        <!-- Start date (non-recurring only) -->
-        <FormFieldGroup
-          v-if="!isRecurring"
-          :label="viewIsAllDay ? t('planner.field.date') : t('planner.field.dateOnly')"
-        >
+      <!-- Everything below reschedule dims when rescheduling -->
+      <div
+        class="space-y-4 transition-all duration-300"
+        :class="showReschedule ? 'pointer-events-none opacity-25 select-none' : 'opacity-100'"
+      >
+        <!-- Assignee — inline editable -->
+        <FormFieldGroup :label="t('planner.field.assignee')">
           <InlineEditField
-            :editing="editingField === 'date'"
+            :editing="editingField === 'assignee'"
             tint-color="orange"
-            @start-edit="startEdit('date')"
+            @start-edit="startEdit('assignee')"
           >
             <template #view>
-              <span
-                v-if="viewFormattedDate"
-                class="font-outfit text-sm font-semibold text-[var(--color-text)]"
-              >
-                {{ viewFormattedDate }}
-              </span>
-              <span v-else class="text-sm text-[var(--color-text-muted)]">&mdash;</span>
-            </template>
-            <template #edit>
-              <div class="flex items-center gap-2">
-                <div class="flex-1">
-                  <BaseInput
-                    v-model="draftDate"
-                    type="date"
-                    class="rounded-[14px] ring-2 ring-orange-500/30"
-                    @keydown="handleInputKeydown('date')($event)"
-                  />
-                </div>
-                <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  @click.stop="saveField('date')"
-                >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
+              <div v-if="viewAssigneeIds.length" class="flex flex-wrap gap-1">
+                <MemberChip v-for="mid in viewAssigneeIds" :key="mid" :member-id="mid" size="md" />
               </div>
-            </template>
-          </InlineEditField>
-        </FormFieldGroup>
-
-        <!-- End date (all-day non-recurring only) -->
-        <FormFieldGroup v-if="!isRecurring && viewIsAllDay" :label="t('planner.field.endDate')">
-          <InlineEditField
-            :editing="editingField === 'endDate'"
-            tint-color="orange"
-            @start-edit="startEdit('endDate')"
-          >
-            <template #view>
-              <span
-                v-if="viewFormattedEndDate"
-                class="font-outfit text-sm font-semibold text-[var(--color-text)]"
-              >
-                {{ viewFormattedEndDate }}
-              </span>
               <span v-else class="text-sm text-[var(--color-text-muted)]">
-                {{ t('planner.field.dateOnly') }}
+                {{ t('todo.unassigned') }}
               </span>
             </template>
             <template #edit>
-              <div class="flex items-center gap-2">
-                <div class="flex-1">
-                  <BaseInput
-                    v-model="draftEndDate"
-                    type="date"
-                    :min="activity.date"
-                    class="rounded-[14px] ring-2 ring-orange-500/30"
-                    @keydown="handleInputKeydown('endDate')($event)"
-                  />
-                </div>
+              <FamilyChipPicker
+                :model-value="draftAssigneeIds"
+                mode="multi"
+                compact
+                @update:model-value="handleAssigneeChange"
+              />
+              <div class="mt-1.5 flex gap-1.5">
                 <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  @click.stop="saveField('endDate')"
+                  class="rounded-lg bg-[var(--color-primary-500)] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-600)]"
+                  :disabled="draftAssigneeIds.length === 0"
+                  :class="{ 'cursor-not-allowed opacity-40': draftAssigneeIds.length === 0 }"
+                  @click="saveField('assignee')"
                 >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
+                  ✓
+                </button>
+                <button
+                  class="rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                  @click="cancelEdit"
+                >
+                  ✕
                 </button>
               </div>
             </template>
           </InlineEditField>
         </FormFieldGroup>
 
-        <!-- All-day badge (shown instead of time fields) -->
-        <FormFieldGroup v-if="viewIsAllDay" :label="t('planner.allDay')">
-          <span
-            class="font-outfit text-primary-500 inline-flex items-center gap-1.5 rounded-full bg-[var(--tint-orange-8)] px-3 py-1.5 text-xs font-semibold"
-          >
-            ☀️ {{ t('planner.allDay') }}
-          </span>
-        </FormFieldGroup>
-
-        <!-- Start / End time (hidden for all-day activities) -->
-        <template v-if="!viewIsAllDay">
+        <!-- Start / End time — inline editable (recurring only, not all-day) -->
+        <div v-if="isRecurring && !viewIsAllDay" class="grid grid-cols-2 gap-4">
           <FormFieldGroup :label="t('modal.startTime')">
             <InlineEditField
               :editing="editingField === 'startTime'"
@@ -953,369 +944,378 @@ async function confirmReschedule() {
               </template>
             </InlineEditField>
           </FormFieldGroup>
-        </template>
-      </div>
+        </div>
 
-      <!-- Location — only shown when populated -->
-      <FormFieldGroup v-if="activity.location" :label="t('planner.field.location')">
-        <InlineEditField
-          :editing="editingField === 'location'"
-          tint-color="orange"
-          @start-edit="startEdit('location')"
-        >
-          <template #view>
-            <div class="flex items-center gap-1.5">
-              <a
-                :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#F15D22] transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                :title="t('planner.openInMaps')"
-                @click.stop
-              >
-                <svg
-                  class="h-3.5 w-3.5"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
+        <!-- Location — only shown when populated -->
+        <FormFieldGroup v-if="activity.location" :label="t('planner.field.location')">
+          <InlineEditField
+            :editing="editingField === 'location'"
+            tint-color="orange"
+            @start-edit="startEdit('location')"
+          >
+            <template #view>
+              <div class="flex items-center gap-1.5">
+                <a
+                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#F15D22] transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  :title="t('planner.openInMaps')"
+                  @click.stop
                 >
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-              </a>
-              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-                {{ activity.location }}
-              </span>
-            </div>
-          </template>
-          <template #edit>
-            <div class="flex items-center gap-2">
-              <div class="flex-1">
-                <BaseInput
-                  v-model="draftLocation"
-                  type="text"
-                  :placeholder="t('planner.field.location')"
-                  class="rounded-[14px] ring-2 ring-orange-500/30"
-                  @keydown="handleInputKeydown('location')($event)"
+                  <svg
+                    class="h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                </a>
+                <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                  {{ activity.location }}
+                </span>
+              </div>
+            </template>
+            <template #edit>
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <BaseInput
+                    v-model="draftLocation"
+                    type="text"
+                    :placeholder="t('planner.field.location')"
+                    class="rounded-[14px] ring-2 ring-orange-500/30"
+                    @keydown="handleInputKeydown('location')($event)"
+                  />
+                </div>
+                <button
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                  @click.stop="saveField('location')"
+                >
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M5 13l4 4L19 7" />
+                  </svg>
+                </button>
+              </div>
+            </template>
+          </InlineEditField>
+        </FormFieldGroup>
+
+        <!-- Drop-off / Pick-up — inline editable -->
+        <div
+          v-if="activity.dropoffMemberId || activity.pickupMemberId"
+          class="grid grid-cols-2 gap-x-4"
+        >
+          <div v-if="activity.dropoffMemberId">
+            <FormFieldGroup :label="'🚗 ' + t('planner.field.dropoff')">
+              <InlineEditField
+                :editing="editingField === 'dropoff'"
+                tint-color="orange"
+                @start-edit="startEdit('dropoff')"
+              >
+                <template #view>
+                  <span
+                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                  >
+                    {{ getMemberName(activity.dropoffMemberId) }}
+                  </span>
+                </template>
+                <template #edit>
+                  <FamilyChipPicker
+                    :model-value="draftDropoffMemberId"
+                    mode="single"
+                    compact
+                    @update:model-value="handleDropoffChange"
+                  />
+                  <button
+                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                    @click="cancelEdit"
+                  >
+                    ✕
+                  </button>
+                </template>
+              </InlineEditField>
+            </FormFieldGroup>
+          </div>
+          <div v-if="activity.pickupMemberId">
+            <FormFieldGroup :label="'🚗 ' + t('planner.field.pickup')">
+              <InlineEditField
+                :editing="editingField === 'pickup'"
+                tint-color="orange"
+                @start-edit="startEdit('pickup')"
+              >
+                <template #view>
+                  <span
+                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                  >
+                    {{ getMemberName(activity.pickupMemberId) }}
+                  </span>
+                </template>
+                <template #edit>
+                  <FamilyChipPicker
+                    :model-value="draftPickupMemberId"
+                    mode="single"
+                    compact
+                    @update:model-value="handlePickupChange"
+                  />
+                  <button
+                    class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
+                    @click="cancelEdit"
+                  >
+                    ✕
+                  </button>
+                </template>
+              </InlineEditField>
+            </FormFieldGroup>
+          </div>
+        </div>
+
+        <!-- Instructor — only shown when populated -->
+        <div
+          v-if="activity.instructorName || activity.instructorContact"
+          class="grid grid-cols-2 gap-4"
+        >
+          <FormFieldGroup v-if="activity.instructorName" :label="t('planner.field.instructor')">
+            <InlineEditField
+              :editing="editingField === 'instructorName'"
+              tint-color="orange"
+              @start-edit="startEdit('instructorName')"
+            >
+              <template #view>
+                <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                  {{ activity.instructorName }}
+                </span>
+              </template>
+              <template #edit>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1">
+                    <BaseInput
+                      ref="instructorNameRef"
+                      v-model="draftInstructorName"
+                      type="text"
+                      :placeholder="t('planner.field.instructor')"
+                      class="rounded-[14px] ring-2 ring-orange-500/30"
+                      @keydown="handleInputKeydown('instructorName')($event)"
+                    />
+                  </div>
+                  <button
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                    @click.stop="saveField('instructorName')"
+                  >
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
+              </template>
+            </InlineEditField>
+          </FormFieldGroup>
+          <FormFieldGroup
+            v-if="activity.instructorContact"
+            :label="t('planner.field.instructorContact')"
+          >
+            <InlineEditField
+              :editing="editingField === 'instructorContact'"
+              tint-color="orange"
+              @start-edit="startEdit('instructorContact')"
+            >
+              <template #view>
+                <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
+                  {{ activity.instructorContact }}
+                </span>
+              </template>
+              <template #edit>
+                <div class="flex items-center gap-2">
+                  <div class="flex-1">
+                    <BaseInput
+                      ref="instructorContactRef"
+                      v-model="draftInstructorContact"
+                      type="text"
+                      :placeholder="t('planner.field.instructorContact')"
+                      class="rounded-[14px] ring-2 ring-orange-500/30"
+                      @keydown="handleInputKeydown('instructorContact')($event)"
+                    />
+                  </div>
+                  <button
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                    @click.stop="saveField('instructorContact')"
+                  >
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
+              </template>
+            </InlineEditField>
+          </FormFieldGroup>
+        </div>
+
+        <!-- Cost — read-only -->
+        <FormFieldGroup v-if="feeLabel" :label="t('planner.cost')">
+          <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
+            {{ feeLabel }}
+          </span>
+        </FormFieldGroup>
+
+        <!-- Notes — only shown when populated -->
+        <FormFieldGroup v-if="activity.notes" :label="t('planner.field.notes')">
+          <InlineEditField
+            :editing="editingField === 'notes'"
+            tint-color="orange"
+            align-items="start"
+            @start-edit="startEdit('notes')"
+          >
+            <template #view>
+              <p
+                class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
+              >
+                {{ activity.notes }}
+              </p>
+            </template>
+            <template #edit>
+              <div class="space-y-2">
+                <textarea
+                  ref="notesRef"
+                  v-model="draftNotes"
+                  rows="3"
+                  class="w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] ring-2 ring-orange-500/30 transition-all focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
+                  :placeholder="t('planner.field.notes')"
+                  @keydown="handleNotesKeydown"
                 />
+                <div class="flex items-center justify-between">
+                  <span class="text-xs text-[var(--color-text-muted)]">
+                    Ctrl+Enter {{ t('modal.toSave') }}
+                  </span>
+                  <button
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
+                    @click.stop="saveField('notes')"
+                  >
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </template>
+          </InlineEditField>
+        </FormFieldGroup>
+
+        <!-- Linked Recurring Payment -->
+        <FormFieldGroup v-if="linkedRecurringItem" :label="t('txLink.monthlyTransaction')">
+          <div class="space-y-1">
+            <div
+              class="flex items-center justify-between rounded-xl bg-[var(--tint-orange-8)] px-3 py-2"
+            >
+              <div class="text-sm text-[var(--color-text)]">
+                <span class="font-outfit font-bold"
+                  >{{ linkedRecurringItem.currency }}
+                  {{
+                    linkedRecurringItem.amount.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                    })
+                  }}/{{ linkedRecurringItem.frequency === 'yearly' ? 'yr' : 'mo' }}</span
+                >
+                <span v-if="linkedPayFromAccount" class="text-[var(--color-text-muted)]">
+                  &middot; from {{ linkedPayFromAccount.name }}
+                </span>
               </div>
               <button
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                @click.stop="saveField('location')"
+                type="button"
+                class="hover:text-primary-500 text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
+                @click="
+                  emit('close');
+                  router.push({
+                    path: '/transactions',
+                    query: { recurringItem: linkedRecurringItem.id },
+                  });
+                "
               >
-                <svg
-                  class="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
+                {{ t('action.view') }} &rarr;
               </button>
             </div>
-          </template>
-        </InlineEditField>
-      </FormFieldGroup>
-
-      <!-- Drop-off / Pick-up — inline editable -->
-      <div
-        v-if="activity.dropoffMemberId || activity.pickupMemberId"
-        class="grid grid-cols-2 gap-x-4"
-      >
-        <div v-if="activity.dropoffMemberId">
-          <FormFieldGroup :label="'🚗 ' + t('planner.field.dropoff')">
-            <InlineEditField
-              :editing="editingField === 'dropoff'"
-              tint-color="orange"
-              @start-edit="startEdit('dropoff')"
-            >
-              <template #view>
-                <span
-                  class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-                >
-                  {{ getMemberName(activity.dropoffMemberId) }}
-                </span>
-              </template>
-              <template #edit>
-                <FamilyChipPicker
-                  :model-value="draftDropoffMemberId"
-                  mode="single"
-                  compact
-                  @update:model-value="handleDropoffChange"
-                />
-                <button
-                  class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-                  @click="cancelEdit"
-                >
-                  ✕
-                </button>
-              </template>
-            </InlineEditField>
-          </FormFieldGroup>
-        </div>
-        <div v-if="activity.pickupMemberId">
-          <FormFieldGroup :label="'🚗 ' + t('planner.field.pickup')">
-            <InlineEditField
-              :editing="editingField === 'pickup'"
-              tint-color="orange"
-              @start-edit="startEdit('pickup')"
-            >
-              <template #view>
-                <span
-                  class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-                >
-                  {{ getMemberName(activity.pickupMemberId) }}
-                </span>
-              </template>
-              <template #edit>
-                <FamilyChipPicker
-                  :model-value="draftPickupMemberId"
-                  mode="single"
-                  compact
-                  @update:model-value="handlePickupChange"
-                />
-                <button
-                  class="mt-1.5 rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-300 dark:hover:bg-gray-500"
-                  @click="cancelEdit"
-                >
-                  ✕
-                </button>
-              </template>
-            </InlineEditField>
-          </FormFieldGroup>
-        </div>
-      </div>
-
-      <!-- Instructor — only shown when populated -->
-      <div
-        v-if="activity.instructorName || activity.instructorContact"
-        class="grid grid-cols-2 gap-4"
-      >
-        <FormFieldGroup v-if="activity.instructorName" :label="t('planner.field.instructor')">
-          <InlineEditField
-            :editing="editingField === 'instructorName'"
-            tint-color="orange"
-            @start-edit="startEdit('instructorName')"
-          >
-            <template #view>
-              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-                {{ activity.instructorName }}
-              </span>
-            </template>
-            <template #edit>
-              <div class="flex items-center gap-2">
-                <div class="flex-1">
-                  <BaseInput
-                    ref="instructorNameRef"
-                    v-model="draftInstructorName"
-                    type="text"
-                    :placeholder="t('planner.field.instructor')"
-                    class="rounded-[14px] ring-2 ring-orange-500/30"
-                    @keydown="handleInputKeydown('instructorName')($event)"
-                  />
-                </div>
-                <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  @click.stop="saveField('instructorName')"
-                >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              </div>
-            </template>
-          </InlineEditField>
+          </div>
         </FormFieldGroup>
-        <FormFieldGroup
-          v-if="activity.instructorContact"
-          :label="t('planner.field.instructorContact')"
-        >
-          <InlineEditField
-            :editing="editingField === 'instructorContact'"
-            tint-color="orange"
-            @start-edit="startEdit('instructorContact')"
-          >
-            <template #view>
-              <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-                {{ activity.instructorContact }}
-              </span>
-            </template>
-            <template #edit>
-              <div class="flex items-center gap-2">
-                <div class="flex-1">
-                  <BaseInput
-                    ref="instructorContactRef"
-                    v-model="draftInstructorContact"
-                    type="text"
-                    :placeholder="t('planner.field.instructorContact')"
-                    class="rounded-[14px] ring-2 ring-orange-500/30"
-                    @keydown="handleInputKeydown('instructorContact')($event)"
-                  />
-                </div>
-                <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  @click.stop="saveField('instructorContact')"
-                >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              </div>
-            </template>
-          </InlineEditField>
-        </FormFieldGroup>
-      </div>
 
-      <!-- Cost — read-only -->
-      <FormFieldGroup v-if="feeLabel" :label="t('planner.cost')">
-        <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
-          {{ feeLabel }}
-        </span>
-      </FormFieldGroup>
-
-      <!-- Notes — only shown when populated -->
-      <FormFieldGroup v-if="activity.notes" :label="t('planner.field.notes')">
-        <InlineEditField
-          :editing="editingField === 'notes'"
-          tint-color="orange"
-          align-items="start"
-          @start-edit="startEdit('notes')"
-        >
-          <template #view>
-            <p
-              class="text-sm leading-relaxed whitespace-pre-line text-[var(--color-text)] dark:text-gray-300"
-            >
-              {{ activity.notes }}
-            </p>
-          </template>
-          <template #edit>
-            <div class="space-y-2">
-              <textarea
-                ref="notesRef"
-                v-model="draftNotes"
-                rows="3"
-                class="w-full rounded-[14px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-2.5 text-sm text-[var(--color-text)] ring-2 ring-orange-500/30 transition-all focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] focus:outline-none dark:bg-slate-700 dark:text-gray-200"
-                :placeholder="t('planner.field.notes')"
-                @keydown="handleNotesKeydown"
-              />
-              <div class="flex items-center justify-between">
-                <span class="text-xs text-[var(--color-text-muted)]">
-                  Ctrl+Enter {{ t('modal.toSave') }}
-                </span>
-                <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  @click.stop="saveField('notes')"
-                >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </template>
-        </InlineEditField>
-      </FormFieldGroup>
-
-      <!-- Linked Recurring Payment -->
-      <FormFieldGroup v-if="linkedRecurringItem" :label="t('txLink.monthlyTransaction')">
-        <div class="space-y-1">
+        <!-- Recent Transactions -->
+        <div v-if="linkedTransactions.length > 0" class="space-y-2">
           <div
-            class="flex items-center justify-between rounded-xl bg-[var(--tint-orange-8)] px-3 py-2"
+            class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+          >
+            {{ t('txLink.recentTransactions') }}
+          </div>
+          <button
+            v-for="tx in linkedTransactions"
+            :key="tx.id"
+            type="button"
+            class="group flex w-full items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-8)] dark:bg-slate-700 dark:hover:bg-slate-600"
+            @click="
+              emit('close');
+              router.push({ path: '/transactions', query: { view: tx.id } });
+            "
           >
             <div class="text-sm text-[var(--color-text)]">
-              <span class="font-outfit font-bold"
-                >{{ linkedRecurringItem.currency }}
-                {{
-                  linkedRecurringItem.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
-                }}/{{ linkedRecurringItem.frequency === 'yearly' ? 'yr' : 'mo' }}</span
-              >
-              <span v-if="linkedPayFromAccount" class="text-[var(--color-text-muted)]">
-                &middot; from {{ linkedPayFromAccount.name }}
-              </span>
+              <span class="text-[var(--color-text-muted)]">{{ tx.date.slice(0, 10) }}</span>
+              &middot; {{ tx.description || tx.category }}
             </div>
-            <button
-              type="button"
-              class="hover:text-primary-500 text-xs font-semibold text-[var(--color-text-muted)] transition-colors"
-              @click="
-                emit('close');
-                router.push({
-                  path: '/transactions',
-                  query: { recurringItem: linkedRecurringItem.id },
-                });
-              "
-            >
-              {{ t('action.view') }} &rarr;
-            </button>
-          </div>
+            <div class="flex items-center gap-2">
+              <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+                {{ tx.currency }}
+                {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
+              </span>
+              <span
+                class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
+                >&rarr;</span
+              >
+            </div>
+          </button>
         </div>
-      </FormFieldGroup>
 
-      <!-- Recent Transactions -->
-      <div v-if="linkedTransactions.length > 0" class="space-y-2">
-        <div
-          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
-        >
-          {{ t('txLink.recentTransactions') }}
+        <!-- Created by — subtle footer -->
+        <div class="border-t border-gray-100 pt-2 dark:border-slate-700">
+          <span class="text-xs text-[var(--color-text-muted)]">
+            {{ t('planner.createdBy') }}: {{ getMemberName(activity.createdBy) }}
+          </span>
         </div>
-        <button
-          v-for="tx in linkedTransactions"
-          :key="tx.id"
-          type="button"
-          class="group flex w-full items-center justify-between rounded-xl bg-[var(--tint-slate-5)] px-3 py-2 text-left transition-colors hover:bg-[var(--tint-slate-8)] dark:bg-slate-700 dark:hover:bg-slate-600"
-          @click="
-            emit('close');
-            router.push({ path: '/transactions', query: { view: tx.id } });
-          "
-        >
-          <div class="text-sm text-[var(--color-text)]">
-            <span class="text-[var(--color-text-muted)]">{{ tx.date.slice(0, 10) }}</span>
-            &middot; {{ tx.description || tx.category }}
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-              {{ tx.currency }}
-              {{ tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 }) }}
-            </span>
-            <span
-              class="text-xs text-[var(--color-text-muted)] opacity-0 transition-opacity group-hover:opacity-100"
-              >&rarr;</span
-            >
-          </div>
-        </button>
       </div>
-
-      <!-- Created by — subtle footer -->
-      <div class="border-t border-gray-100 pt-2 dark:border-slate-700">
-        <span class="text-xs text-[var(--color-text-muted)]">
-          {{ t('planner.createdBy') }}: {{ getMemberName(activity.createdBy) }}
-        </span>
-      </div>
+      <!-- /reschedule dim wrapper -->
     </div>
 
     <template #footer-start>
       <button
         type="button"
-        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold transition-all duration-300"
+        :class="
+          showReschedule
+            ? 'pointer-events-none cursor-not-allowed text-[var(--color-text)] opacity-25 dark:text-gray-200'
+            : 'text-[var(--color-text)] hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700'
+        "
+        :disabled="showReschedule"
         @click="handleOpenEdit"
       >
         ✏️ {{ t('action.edit') }}

@@ -128,6 +128,7 @@ const STRING_DEFS = {
   'modal.whatNeedsDoing': { en: 'What needs doing?', beanie: 'what needs doing?' },
   'modal.costPerSession': { en: 'Cost', beanie: 'cost' },
   'modal.whosGoing': { en: 'Who?', beanie: 'who?' },
+  'modal.time': { en: 'Time', beanie: 'time' },
   'modal.startTime': { en: 'Start Time', beanie: 'start time' },
   'modal.endTime': { en: 'End Time', beanie: 'end time' },
   'modal.addActivity': { en: 'Add Activity', beanie: 'add activity' },
@@ -2656,8 +2657,12 @@ const STRING_DEFS = {
   'planner.createdBy': { en: 'Created By', beanie: 'created by' },
   'planner.reschedule': { en: 'Reschedule This Session', beanie: 'reschedule this session' },
   'planner.rescheduleHint': {
-    en: 'Move this occurrence to a different date or time',
-    beanie: 'move this session to a new date or time',
+    en: 'Move to a different date or time',
+    beanie: 'move to a new date or time',
+  },
+  'planner.rescheduleEditHint': {
+    en: 'To change the recurring schedule, use Edit below',
+    beanie: 'to change the recurring schedule, use edit below',
   },
   'planner.rescheduleTo': { en: 'New Date', beanie: 'new date' },
   'planner.rescheduleConfirm': { en: 'Reschedule', beanie: 'reschedule' },
