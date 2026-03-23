@@ -239,3 +239,18 @@ if (activeFamilyId && activeFamilyId !== familyCtx.activeFamilyId) {
 2. **Always sync both key locations** — any path that decrypts with `familyKey.value` must call `syncService.setFamilyKey()` (not just `setEnvelope()`) to keep the service in sync
 3. **Save handlers must recover from desync** — `beforeunload` and `visibilitychange` → hidden handlers should restore the service key from the store ref before saving
 4. **Broader principle:** When the same state is mirrored in two locations (Vue ref + module variable), every mutation path must update both. Silent divergence causes data loss that's invisible until refresh
+
+## 14. Beanie mode text must stay intuitive — fun but never cryptic
+
+**Date:** 2026-03-23
+**Context:** "counted a bean" was the beanie-mode override for "completed a task" — too cute, meaning lost
+
+**Pattern:** Beanie mode (`beanie` values in `uiStrings.ts`) uses playful, lowercase language as a cosmetic overlay. But some overrides deviate so far from the original meaning that users can't understand what happened. "counted a bean" in the activity feed gave no indication it meant a task was completed.
+
+**Rule:** Beanie-mode text should be fun and on-brand but NEVER sacrifice clarity for cuteness:
+
+1. The beanie override must be immediately understandable without seeing the `en` version
+2. If a user seeing only the beanie text can't tell what the action/item is, the override is too abstract
+3. Good: "add a beanie" (for "Add Member"), "counting beans..." (for "Loading...")
+4. Bad: "counted a bean" (for "completed a task") — what bean? what count?
+5. When in doubt, keep the beanie text close to the English meaning with lowercase styling only
