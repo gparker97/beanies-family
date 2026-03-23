@@ -552,6 +552,10 @@ const STRING_DEFS = {
 
   // Transaction — Link Payment
   'txLink.linkPayment': { en: 'Link Payment', beanie: 'link payment' },
+  'txLink.quickLinkPrompt': {
+    en: 'Link to a loan or activity?',
+    beanie: 'link to a loan or activity?',
+  },
   'txLink.hintLinkPaymentIntro': {
     en: 'Link this outgoing payment to an activity or loan:',
     beanie: 'link this outgoing payment to an activity or loan:',
