@@ -19,6 +19,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { formatDate } from '@/utils/date';
 import type { Asset, AssetType, CreateAssetInput, UpdateAssetInput } from '@/types/models';
 
 const route = useRoute();
@@ -164,7 +165,7 @@ function getAssetTypeConfig(type: AssetType): {
 
 function formatPurchaseDate(isoString: string | undefined): string {
   if (!isoString) return '';
-  return new Date(isoString).toLocaleDateString();
+  return formatDate(isoString);
 }
 
 // Modal handlers

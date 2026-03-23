@@ -14,6 +14,7 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
+import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import type { TodoItem } from '@/types/models';
 
@@ -173,8 +174,8 @@ const viewIsOverdue = computed(() => {
 
 const viewFormattedDate = computed(() => {
   if (!todo.value?.dueDate) return null;
-  const date = new Date(todo.value.dueDate);
-  return date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const dateStr = todo.value.dueDate.split('T')[0] ?? todo.value.dueDate;
+  return formatDateWithDay(dateStr);
 });
 
 // Detected links from title + description

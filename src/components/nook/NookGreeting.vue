@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
+import { formatDateFull, toDateInputValue } from '@/utils/date';
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
@@ -15,14 +16,7 @@ const greetingParts = computed(() => {
   return { before: raw.slice(0, idx), after: raw.slice(idx + 6) };
 });
 
-const todayDate = computed(() =>
-  new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
-);
+const todayDate = computed(() => formatDateFull(toDateInputValue(new Date())));
 </script>
 
 <template>

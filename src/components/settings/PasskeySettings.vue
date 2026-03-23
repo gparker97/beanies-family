@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useTranslation } from '@/composables/useTranslation';
+import { formatDate as formatDateUtil } from '@/utils/date';
 import type { PasskeyRegistration } from '@/types/models';
 
 const { t } = useTranslation();
@@ -96,7 +97,7 @@ async function saveLabel(credentialId: string) {
 }
 
 function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString();
+  return formatDateUtil(dateStr);
 }
 </script>
 

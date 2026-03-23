@@ -7,7 +7,13 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { toDateInputValue, isDateBetween, extractDatePart } from '@/utils/date';
+import {
+  toDateInputValue,
+  isDateBetween,
+  extractDatePart,
+  formatDateWithDay,
+  formatNookDate,
+} from '@/utils/date';
 import { tripTypeEmoji, tripDurationDays } from '@/utils/vacation';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
@@ -29,14 +35,9 @@ const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 
-/** Format the selected date as a readable header (e.g. "Saturday, March 15") */
+/** Format the selected date as a readable header (e.g. "Wed, 6 Mar") */
 const dateHeader = computed(() => {
-  const d = new Date(props.date + 'T00:00:00');
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+  return formatDateWithDay(props.date);
 });
 
 /** Activities for the selected day, sorted by startTime */
@@ -146,8 +147,7 @@ function formatGroupDate(dateStr: string): string {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return formatNookDate(dateStr);
 }
 </script>
 

@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, formatNookDate } from '@/utils/date';
 import ActivityListCard from '@/components/planner/ActivityListCard.vue';
 
 const activityStore = useActivityStore();
@@ -39,8 +39,7 @@ function formatGroupDate(dateStr: string): string {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return formatNookDate(dateStr);
 }
 
 function showMore() {

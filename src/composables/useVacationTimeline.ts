@@ -1,5 +1,11 @@
 import { computed, type ComputedRef } from 'vue';
-import { formatNookDate, formatDateShort, extractDatePart } from '@/utils/date';
+import {
+  formatNookDate,
+  formatDateShort,
+  formatDateFull,
+  extractDatePart,
+  formatTime12,
+} from '@/utils/date';
 import {
   computeAccommodationGaps,
   buildTravelSegmentTitle,
@@ -13,6 +19,8 @@ import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 export interface DetailRow {
   label: string;
   value: string;
+  /** Formatted value for display (falls back to value if not set) */
+  displayValue?: string;
   /** Model field name for inline editing (omit for read-only display) */
   field?: string;
   /** Input type for inline editing (default: 'text') */
@@ -154,6 +162,18 @@ export function buildTravelKeyValue(seg: {
  * Dropdown/selection fields (airline, airports, cruise line/ship/port, car type): read-only.
  * Location/address fields: mapLink (opens maps). Link fields: isLink (clickable URL).
  */
+/** Add formatted displayValue to date/time rows */
+function enrichRows(rows: DetailRow[]): DetailRow[] {
+  for (const row of rows) {
+    if (row.inputType === 'date' && row.value) {
+      row.displayValue = formatDateFull(row.value);
+    } else if (row.inputType === 'time' && row.value) {
+      row.displayValue = formatTime12(row.value);
+    }
+  }
+  return rows;
+}
+
 export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
@@ -269,7 +289,7 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
   if (seg.bookingReference)
     rows.push({ label: 'booking ref', value: seg.bookingReference, copyable: true });
   if (seg.notes) rows.push({ label: 'notes', value: seg.notes, field: 'notes' });
-  return rows;
+  return enrichRows(rows);
 }
 
 // ── Composable ──────────────────────────────────────────────────────────────
@@ -349,7 +369,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         status: acc.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
         stepNumber: 3,
-        detailRows: rows,
+        detailRows: enrichRows(rows),
         arrayIndex: i,
       });
     }
@@ -446,7 +466,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         status: trans.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
         stepNumber: 4,
-        detailRows: rows,
+        detailRows: enrichRows(rows),
         arrayIndex: i,
       });
     }

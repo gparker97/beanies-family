@@ -141,8 +141,7 @@ function formatGroupDate(dateStr: string): string {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return formatNookDate(dateStr);
 }
 
 interface WeekGroup {

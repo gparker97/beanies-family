@@ -30,6 +30,7 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { isTemporaryEmail } from '@/utils/email';
+import { formatDateFull, toDateInputValue } from '@/utils/date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -59,12 +60,7 @@ const greeting = computed(() => {
 });
 
 const todayFormatted = computed(() => {
-  return new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  return formatDateFull(toDateInputValue(new Date()));
 });
 
 const pageTitle = computed(() => {

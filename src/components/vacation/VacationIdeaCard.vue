@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import type { VacationIdea, VacationIdeaCategory } from '@/types/models';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
+import { formatDateShort } from '@/utils/date';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 
@@ -58,10 +59,8 @@ const costTag = computed(() => {
 
 const authorDateLine = computed(() => {
   if (!author.value) return '';
-  const date = new Date(props.idea.createdAt);
-  const month = date.toLocaleString('en', { month: 'short' }).toLowerCase();
-  const day = date.getDate();
-  return `${author.value.name.toLowerCase()} · ${month} ${day}`;
+  const datePart = formatDateShort(props.idea.createdAt).toLowerCase();
+  return `${author.value.name.toLowerCase()} · ${datePart}`;
 });
 
 const voters = computed(() => {

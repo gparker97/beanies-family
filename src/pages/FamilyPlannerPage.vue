@@ -24,6 +24,7 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { getActivityFallbackEmoji, getActivityCategoryName } from '@/constants/activityCategories';
+import { formatDateFull } from '@/utils/date';
 import VacationSidebarCard from '@/components/vacation/VacationSidebarCard.vue';
 import NookSectionCard from '@/components/nook/NookSectionCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
@@ -280,13 +281,7 @@ async function handleSave(
 }
 
 function showActivityCreatedConfirmation(data: CreateFamilyActivityInput) {
-  const d = new Date(data.date + 'T00:00:00');
-  const dateStr = d.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const dateStr = formatDateFull(data.date);
   const details: ConfirmDetail[] = [
     { label: t('planner.field.title'), value: data.title },
     { label: t('form.category'), value: getActivityCategoryName(data.category) },

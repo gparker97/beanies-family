@@ -833,16 +833,50 @@ function addQuickIdea() {
                           <span class="text-xs opacity-30">📋</span>
                         </button>
 
-                        <!-- Inline-editable field with pencil hint -->
+                        <!-- Inline-editable date/time: show formatted text with hidden native picker -->
+                        <div
+                          v-else-if="
+                            row.field && (row.inputType === 'date' || row.inputType === 'time')
+                          "
+                          class="group/field relative min-w-0 shrink"
+                        >
+                          <span
+                            class="font-outfit cursor-pointer border-b border-dashed border-transparent pr-6 text-sm font-medium text-gray-900 transition-colors hover:border-gray-300 dark:text-gray-100"
+                            @click="
+                              (
+                                $refs[`input-${row.field}`] as HTMLInputElement[]
+                              )?.[0]?.showPicker?.()
+                            "
+                          >
+                            {{ row.displayValue || row.value }}
+                          </span>
+                          <input
+                            :ref="`input-${row.field}`"
+                            :type="row.inputType"
+                            :value="row.value"
+                            class="pointer-events-none absolute inset-0 opacity-0"
+                            tabindex="-1"
+                            @change="
+                              saveInlineField(
+                                item,
+                                row.field!,
+                                ($event.target as HTMLInputElement).value
+                              )
+                            "
+                          />
+                          <span
+                            class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
+                          >
+                            ✏️
+                          </span>
+                        </div>
+
+                        <!-- Inline-editable text field with pencil hint -->
                         <div v-else-if="row.field" class="group/field relative min-w-0 shrink">
                           <input
                             :type="row.inputType ?? 'text'"
                             :value="row.value"
-                            :size="
-                              row.inputType === 'date' || row.inputType === 'time'
-                                ? undefined
-                                : Math.max(String(row.value).length, 8)
-                            "
+                            :size="Math.max(String(row.value).length, 8)"
                             class="font-outfit w-auto border-0 border-b border-dashed border-transparent bg-transparent pr-5 text-sm font-medium text-gray-900 transition-colors outline-none hover:border-gray-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
                             @change="
                               saveInlineField(
