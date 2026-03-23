@@ -45,6 +45,17 @@ const { toasts, activeModal, dismissModal } = useCelebration();
             >
               Let's go!
             </button>
+            <button
+              v-if="activeModal.onUndo"
+              type="button"
+              class="font-outfit mt-3 block w-full text-xs font-medium text-gray-400 transition-colors hover:text-[var(--heritage-orange)] dark:text-gray-500"
+              @click="
+                activeModal.onUndo?.();
+                dismissModal();
+              "
+            >
+              made a mistake? undo
+            </button>
           </div>
         </Transition>
       </div>
