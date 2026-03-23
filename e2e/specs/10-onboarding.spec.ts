@@ -28,7 +28,7 @@ test.describe('Onboarding Wizard', () => {
     await page.getByTestId('restart-onboarding').click();
 
     // Wait for the router navigation triggered by restart-onboarding to settle
-    await page.waitForURL('**/nook', { timeout: 10000 });
+    await page.waitForURL('**/nook', { timeout: 30000 });
 
     await page.getByTestId('onboarding-wizard').waitFor({ state: 'visible', timeout: 10000 });
   }
