@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
@@ -24,6 +24,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
 import { useFormModal } from '@/composables/useFormModal';
+import { useAttentionPulse } from '@/composables/useAttentionPulse';
 
 import type {
   Transaction,
@@ -237,6 +238,7 @@ const { isEditing, isSubmitting } = useFormModal(
         endDate.value = '';
         recurrenceFrequency.value = 'monthly';
       }
+      linkPromptDismissed.value = false;
       suppressDaySync = false;
     },
     onNew: () => {
@@ -261,6 +263,7 @@ const { isEditing, isSubmitting } = useFormModal(
       dayOfMonth.value = new Date().getDate();
       monthOfYear.value = new Date().getMonth() + 1;
       isActive.value = true;
+      linkPromptDismissed.value = false;
       suppressDaySync = false;
     },
   }
@@ -503,6 +506,47 @@ function handleDelete() {
     emit('delete', props.transaction.id);
   }
 }
+
+// ── Quick-link prompt ─────────────────────────────────────────────────────
+const linkPromptDismissed = ref(false);
+const linkDropdownRef = ref<any>(null);
+
+const hasLinkableLoans = computed(
+  () =>
+    assetsStore.assets.some((a) => a.loan?.hasLoan && (a.loan.outstandingBalance ?? 0) > 0) ||
+    accountsStore.accounts.some(
+      (a) => a.type === 'loan' && a.isActive && a.balance > 0 && !a.linkedAssetId
+    )
+);
+
+const hasLinkableActivities = computed(() => activityStore.activeActivities.length > 0);
+
+const showLinkPrompt = computed(
+  () =>
+    direction.value === 'out' &&
+    !isLinkLocked.value &&
+    !hasActiveLink.value &&
+    linkType.value === '' &&
+    !linkPromptDismissed.value &&
+    (hasLinkableLoans.value || hasLinkableActivities.value)
+);
+
+const { pulse } = useAttentionPulse();
+
+async function selectQuickLink(type: 'loan' | 'activity') {
+  linkType.value = type;
+  linkPromptDismissed.value = true;
+  await nextTick();
+  const root = (linkDropdownRef.value as any)?.$el as HTMLElement | undefined;
+  // Target the clickable button inside the dropdown for a tight pulse
+  const target = root?.querySelector('button') ?? root;
+  target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => pulse(target as HTMLElement | undefined), 400);
+}
+
+function dismissLinkPrompt() {
+  linkPromptDismissed.value = true;
+}
 </script>
 
 <template>
@@ -650,6 +694,42 @@ function handleDelete() {
         </div>
       </div>
     </FormFieldGroup>
+
+    <!-- 2a. Quick-link prompt (outgoing only, when linkable items exist) -->
+    <div
+      v-if="showLinkPrompt"
+      class="flex items-center gap-2 rounded-2xl border border-orange-200/50 bg-gradient-to-r from-orange-50/80 to-amber-50/50 px-4 py-2.5 dark:border-orange-800/30 dark:from-orange-900/10 dark:to-amber-900/10"
+    >
+      <span class="text-sm">🔗</span>
+      <span class="min-w-0 flex-1 text-xs text-[var(--color-text-muted)]">
+        {{ t('txLink.quickLinkPrompt') }}
+      </span>
+      <div class="flex shrink-0 items-center gap-1.5">
+        <button
+          v-if="hasLinkableActivities"
+          type="button"
+          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
+          @click="selectQuickLink('activity')"
+        >
+          📋 {{ t('txLink.activity') }}
+        </button>
+        <button
+          v-if="hasLinkableLoans"
+          type="button"
+          class="font-outfit rounded-lg bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--color-text)] shadow-sm transition-all hover:shadow-md dark:bg-slate-700 dark:text-gray-200"
+          @click="selectQuickLink('loan')"
+        >
+          🏦 {{ t('txLink.loan') }}
+        </button>
+        <button
+          type="button"
+          class="rounded-lg px-1.5 py-1 text-[11px] text-[var(--color-text-muted)] transition-colors hover:bg-gray-100 dark:hover:bg-slate-600"
+          @click="dismissLinkPrompt"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
 
     <!-- 3. Description -->
     <FormFieldGroup :label="t('form.description')" required>
@@ -900,11 +980,11 @@ function handleDelete() {
           </div>
 
           <FormFieldGroup v-if="linkType === 'activity'" :label="t('txLink.activity')">
-            <ActivityLinkDropdown v-model="activityId" />
+            <ActivityLinkDropdown ref="linkDropdownRef" v-model="activityId" />
           </FormFieldGroup>
 
           <FormFieldGroup v-if="linkType === 'loan'" :label="t('txLink.loan')">
-            <LoanLinkDropdown v-model="loanId" />
+            <LoanLinkDropdown ref="linkDropdownRef" v-model="loanId" />
           </FormFieldGroup>
         </template>
 
