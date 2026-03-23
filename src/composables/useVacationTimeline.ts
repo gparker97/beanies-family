@@ -115,6 +115,12 @@ export function buildTravelKeyValue(seg: {
     } else if (seg.departureTime) {
       p.push(seg.departureTime);
     }
+    // Late-night / early-morning indicator
+    if (seg.departureTime) {
+      const hour = parseInt(seg.departureTime.split(':')[0] ?? '12', 10);
+      if (hour < 3) p.push('🌙 early morning');
+      else if (hour >= 21) p.push('🌙 late night');
+    }
   } else if (seg.type === 'cruise') {
     if (seg.shipName) p.push(seg.shipName);
     if (seg.embarkationDate && seg.disembarkationDate) {
