@@ -360,7 +360,32 @@ export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHin
     }
   }
 
-  // 3. Flights during a cruise
+  // 3. Late-night / early-morning flight warnings
+  for (const seg of v.travelSegments) {
+    if (!seg.type?.startsWith('flight') || !seg.departureTime) continue;
+    const [hStr, mStr] = seg.departureTime.split(':');
+    const hour = parseInt(hStr ?? '12', 10);
+    const min = parseInt(mStr ?? '0', 10);
+    const totalMin = hour * 60 + min;
+    // Early morning: 00:00–02:59
+    if (totalMin < 180) {
+      addHint(
+        seg.id,
+        `This flight departs at ${seg.departureTime} — just after midnight. Double-check the date to make sure you're travelling on the right day.`,
+        [seg.id]
+      );
+    }
+    // Late night: 21:00–23:59
+    if (totalMin >= 1260) {
+      addHint(
+        seg.id,
+        `This flight departs at ${seg.departureTime} — just before midnight. Make sure you have the correct departure date and allow extra time for late-night airport operations.`,
+        [seg.id]
+      );
+    }
+  }
+
+  // 4. Flights during a cruise
   for (const flight of flightItems) {
     for (const cruise of cruiseItems) {
       if (flight.range.start >= cruise.range.start && flight.range.start < cruise.range.end) {
