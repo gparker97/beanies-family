@@ -295,6 +295,39 @@ Active nav item:       orange gradient bg + 4px Heritage Orange left bar
 Progress bars:         Heritage Orange → Terracotta gradient, 10px radius
 ```
 
+### Attention Pulse — Focus Guidance
+
+When the UI needs to guide a user's eye to a specific field, section, or element (e.g., after scrolling to a section, highlighting a newly revealed field, or drawing attention to an important control), use the **attention pulse** system.
+
+**CSS class:** `.attention-pulse` — a Heritage Orange glow that pulses once and fades out over 1.5s. Defined in `src/style.css`.
+
+**Composable:** `useAttentionPulse()` from `src/composables/useAttentionPulse.ts` — provides a `pulse(el)` function that adds the class and auto-removes it after the animation completes. Supports re-triggering.
+
+```ts
+import { useAttentionPulse } from '@/composables/useAttentionPulse';
+
+const { pulse } = useAttentionPulse();
+const targetRef = ref<HTMLElement>();
+
+// After scroll or state change:
+await nextTick();
+pulse(targetRef.value);
+```
+
+**When to use:**
+- After programmatic scroll to a field (e.g., quick-link prompt scrolls to link dropdown)
+- When a field becomes relevant due to a user action elsewhere in the form
+- To highlight a newly revealed or auto-populated field
+- After navigation to a page with a specific element that needs attention
+
+**Target individual fields, not wrapper sections.** The inset effect works best on elements with defined bounds (inputs, dropdowns, cards). Pulsing a large wrapper area looks broken because the animation covers too much space. Instead, pulse the specific interactive element the user should act on (e.g., the `FormFieldGroup` containing the dropdown, not the entire link section).
+
+**When NOT to use:**
+- On page load for standard content — only for directed user flows
+- On hover or focus states — those have their own styling
+- Repeatedly on the same element without user action in between
+- On large wrapper divs or sections — target the specific field instead
+
 ### Modal System — Three-Tier Architecture
 
 The app uses a three-tier modal system. **Always use the appropriate tier** — never build modals from scratch.

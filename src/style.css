@@ -486,3 +486,29 @@ input[type='time']::-webkit-calendar-picker-indicator:hover {
     color-scheme: dark;
   }
 }
+
+/* ───── Attention Pulse ─────────────────────────────────────────────────────
+   Reusable focus-grab animation. Add .attention-pulse to any element to draw
+   the user's eye with a warm Heritage Orange glow that fades out.
+   Use via useAttentionPulse() composable for auto-cleanup.
+──────────────────────────────────────────────────────────────────────────── */
+@keyframes attention-pulse {
+  0% {
+    background-color: rgb(241 93 34 / 6%);
+    box-shadow: inset 0 0 0 2px rgb(241 93 34 / 50%);
+  }
+
+  60% {
+    background-color: rgb(241 93 34 / 3%);
+    box-shadow: inset 0 0 0 2px rgb(241 93 34 / 20%);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 0 rgb(241 93 34 / 0%);
+  }
+}
+
+.attention-pulse {
+  animation: attention-pulse 1.5s ease-out;
+}
