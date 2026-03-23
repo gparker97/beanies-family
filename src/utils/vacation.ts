@@ -1,4 +1,10 @@
-import { parseLocalDate, extractDatePart, addDays, toDateInputValue } from '@/utils/date';
+import {
+  parseLocalDate,
+  extractDatePart,
+  addDays,
+  toDateInputValue,
+  detectNightFlight,
+} from '@/utils/date';
 import { AIRLINES } from '@/constants/airlines';
 import { AIRPORTS } from '@/constants/airports';
 import { CRUISE_LINES } from '@/constants/cruiseLines';
@@ -258,6 +264,8 @@ export interface TimelineHint {
   message: string;
   /** IDs of all items affected by this hint */
   affectedIds: string[];
+  /** Night-flight type, if applicable */
+  nightFlight?: 'early-morning' | 'late-night';
 }
 
 /** Date range helper */
@@ -360,28 +368,24 @@ export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHin
     }
   }
 
-  // 3. Late-night / early-morning flight warnings
+  // 3. Late-night / early-morning travel warnings (all segment types)
   for (const seg of v.travelSegments) {
-    if (!seg.type?.startsWith('flight') || !seg.departureTime) continue;
-    const [hStr, mStr] = seg.departureTime.split(':');
-    const hour = parseInt(hStr ?? '12', 10);
-    const min = parseInt(mStr ?? '0', 10);
-    const totalMin = hour * 60 + min;
-    // Early morning: 00:00–02:59
-    if (totalMin < 180) {
+    const depTime = seg.departureTime || seg.embarkationTime || seg.leavingTime || seg.startTime;
+    const night = detectNightFlight(depTime);
+    if (night === 'early-morning') {
       addHint(
         seg.id,
-        `This flight departs at ${seg.departureTime} — just after midnight. Double-check the date to make sure you're travelling on the right day.`,
+        `Departs at ${depTime} — just after midnight. Double-check the date to make sure you're travelling on the right day.`,
         [seg.id]
       );
-    }
-    // Late night: 21:00–23:59
-    if (totalMin >= 1260) {
+      hintMap.get(seg.id)!.nightFlight = 'early-morning';
+    } else if (night === 'late-night') {
       addHint(
         seg.id,
-        `This flight departs at ${seg.departureTime} — just before midnight. Make sure you have the correct departure date and allow extra time for late-night airport operations.`,
+        `Departs at ${depTime} — just before midnight. Make sure you have the correct departure date and allow extra time.`,
         [seg.id]
       );
+      hintMap.get(seg.id)!.nightFlight = 'late-night';
     }
   }
 

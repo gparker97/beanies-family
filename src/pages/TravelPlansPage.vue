@@ -798,7 +798,14 @@ function addQuickIdea() {
                     :icon="item.icon"
                     :title="item.title"
                     :status="item.status"
-                    :key-value="item.keyValue"
+                    :key-value="
+                      item.keyValue +
+                      (hintMap.get(item.id)?.nightFlight === 'early-morning'
+                        ? ' · 🌙 early morning'
+                        : hintMap.get(item.id)?.nightFlight === 'late-night'
+                          ? ' · 🌙 late night'
+                          : '')
+                    "
                     :collapsed="isCollapsed(item.id)"
                     :read-only="false"
                     show-edit
@@ -848,7 +855,16 @@ function addQuickIdea() {
                               )?.[0]?.showPicker?.()
                             "
                           >
-                            {{ row.displayValue || row.value }}
+                            {{ row.displayValue || row.value
+                            }}{{
+                              row.inputType === 'date' &&
+                              hintMap.get(item.id)?.nightFlight === 'early-morning'
+                                ? ' 🌙 early morning'
+                                : row.inputType === 'date' &&
+                                    hintMap.get(item.id)?.nightFlight === 'late-night'
+                                  ? ' 🌙 late night'
+                                  : ''
+                            }}
                           </span>
                           <input
                             :ref="`input-${row.field}`"
