@@ -351,7 +351,8 @@ async function tryUnwrapFamilyKeyFromPRF(
   const prfOutput = getPRFOutput(extensionResults);
   if (!prfOutput) return null;
 
-  const memberSecrets = passkeySecrets.filter((s) => s.memberId === memberId);
+  // Try member-specific secrets first, then any without a memberId (from envelope)
+  const memberSecrets = passkeySecrets.filter((s) => s.memberId === memberId || s.memberId === '');
   for (const secret of memberSecrets) {
     try {
       const hkdfSalt = new Uint8Array(base64ToBuffer(secret.hkdfSalt));
