@@ -295,7 +295,7 @@ describe('useCriticalItems', () => {
     const { criticalItems } = useCriticalItems();
     expect(criticalItems.value).toHaveLength(1);
     expect(criticalItems.value[0]!.message).toContain('overdue task');
-    expect(criticalItems.value[0]!.message).toContain('Mar 8');
+    expect(criticalItems.value[0]!.message).toContain('8 Mar');
     expect(criticalItems.value[0]!.icon).toBe('⏰');
   });
 
