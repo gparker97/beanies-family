@@ -23,6 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string | number];
+  blur: [event: FocusEvent];
 }>();
 
 const inputId = computed(() => props.id || `input-${Math.random().toString(36).slice(2, 9)}`);
@@ -69,6 +70,7 @@ function handleInput(event: Event) {
       :required="required"
       :class="inputClasses"
       @input="handleInput"
+      @blur="emit('blur', $event)"
     />
 
     <p v-if="error" class="text-sm text-red-600 dark:text-red-400">

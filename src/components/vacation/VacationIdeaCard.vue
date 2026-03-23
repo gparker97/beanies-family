@@ -152,7 +152,7 @@ function patch(fields: Partial<VacationIdea>) {
             class="inline-flex items-center gap-0.5 rounded-full bg-[rgba(0,180,216,0.08)] px-2 py-0.5 text-[9px] font-semibold text-[#00B4D8] transition-colors hover:bg-[rgba(0,180,216,0.15)]"
             @click.stop
           >
-            🔗 link
+            🔗 {{ idea.linkPreview?.siteName || idea.linkPreview?.title || 'link' }}
           </a>
           <span
             v-if="author"

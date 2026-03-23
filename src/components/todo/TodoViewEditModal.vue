@@ -576,28 +576,28 @@ async function handleDelete() {
           </span>
         </FormFieldGroup>
       </div>
-
-      <!-- Complete / Reopen action (bottom of modal) -->
-      <div class="border-t border-gray-100 pt-3 dark:border-slate-700">
-        <button
-          v-if="!todo.completed"
-          type="button"
-          class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold text-white transition-all duration-150 hover:opacity-90 active:scale-[0.98]"
-          style="background: linear-gradient(135deg, #27ae60, #2ecc71)"
-          @click="handleToggleComplete"
-        >
-          <span>✓</span>
-          {{ t('action.markCompleted') }}
-        </button>
-        <button
-          v-else
-          type="button"
-          class="font-outfit flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold text-purple-600 transition-colors hover:bg-purple-50 active:bg-purple-100 dark:hover:bg-purple-900/20"
-          @click="handleToggleComplete"
-        >
-          {{ t('todo.reopenTask') }}
-        </button>
-      </div>
     </div>
+
+    <!-- Complete / Reopen button in the footer, next to close -->
+    <template #footer-start>
+      <button
+        v-if="!todo.completed"
+        type="button"
+        class="font-outfit flex flex-1 items-center justify-center gap-2 rounded-[16px] py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98]"
+        style="background: linear-gradient(135deg, #27ae60, #2ecc71)"
+        @click="handleToggleComplete"
+      >
+        <span>✓</span>
+        {{ t('action.markCompleted') }}
+      </button>
+      <button
+        v-else
+        type="button"
+        class="font-outfit flex flex-1 items-center justify-center gap-2 rounded-[16px] py-3.5 text-sm font-semibold text-purple-600 transition-colors hover:bg-purple-50 active:bg-purple-100 dark:hover:bg-purple-900/20"
+        @click="handleToggleComplete"
+      >
+        {{ t('todo.reopenTask') }}
+      </button>
+    </template>
   </BeanieFormModal>
 </template>
