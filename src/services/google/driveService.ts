@@ -132,7 +132,10 @@ export async function updateFile(token: string, fileId: string, content: string)
  * Read a file's content.
  */
 export async function readFile(token: string, fileId: string): Promise<string | null> {
-  const res = await driveRequest(token, `${DRIVE_API}/files/${fileId}?alt=media`);
+  // Cache-bust with timestamp to avoid Google CDN serving stale content
+  // (critical for invite flows where file was just updated by another session)
+  const cb = `_cb=${Date.now()}`;
+  const res = await driveRequest(token, `${DRIVE_API}/files/${fileId}?alt=media&${cb}`);
   const text = await res.text();
   return text || null;
 }
