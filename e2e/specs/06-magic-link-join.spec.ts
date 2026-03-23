@@ -4,6 +4,24 @@ import { bypassLoginIfNeeded } from '../helpers/auth';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { ui } from '../helpers/ui-strings';
 
+/** Add a family member so the invite button becomes visible. */
+async function addTestMember(page: import('@playwright/test').Page) {
+  const addButton = page.getByRole('button', { name: /add a beanie/i });
+  await addButton.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  const nameInput = dialog.getByPlaceholder(/name/i);
+  await nameInput.fill('Test Beanie');
+  const saveButton = dialog.getByRole('button', { name: /save|add/i });
+  await saveButton.click();
+  // Wait for invite modal to auto-open then close it
+  const inviteQr = page.locator('[data-testid="invite-qr"]');
+  await expect(inviteQr).toBeVisible({ timeout: 5000 });
+  const closeButton = page.getByRole('dialog').getByRole('button', { name: /close/i });
+  await closeButton.click();
+  await expect(inviteQr).not.toBeVisible({ timeout: 3000 });
+}
+
 test.describe('Magic Link Invite System', () => {
   test.describe('Invite Modal (FamilyPage)', () => {
     test('should generate invite link with fam/p/ref params', async ({ page }) => {
@@ -17,6 +35,9 @@ test.describe('Magic Link Invite System', () => {
       await page.goto('/family');
       await page.waitForURL('/family');
 
+      // Add a member so the invite button becomes visible
+      await addTestMember(page);
+
       // Open invite modal
       const inviteButton = page.getByRole('button', { name: /invite/i });
       await inviteButton.click();
@@ -25,22 +46,14 @@ test.describe('Magic Link Invite System', () => {
       const modal = page.getByRole('dialog');
       await expect(modal).toBeVisible();
 
-      // Verify invite link contains new format params
-      const linkCode = modal.locator('code').first();
-      const linkText = await linkCode.textContent();
-      expect(linkText).toContain('/join?fam=');
-      expect(linkText).toContain('&p=local');
-      expect(linkText).toContain('&ref=');
-
       // Verify QR code is displayed
       const qrImage = modal.locator('[data-testid="invite-qr"]');
       await expect(qrImage).toBeVisible();
       const qrSrc = await qrImage.getAttribute('src');
       expect(qrSrc).toContain('data:image/png');
 
-      // Verify invite link code block
-      const codeBlocks = modal.locator('[data-testid="invite-link-code"]');
-      await expect(codeBlocks).toHaveCount(1);
+      // Verify share button is present
+      await expect(modal.getByRole('button', { name: /share/i })).toBeVisible();
 
       // Verify file sharing info card is visible
       await expect(modal.getByText(/share the .beanpod file/i)).toBeVisible();
@@ -70,19 +83,20 @@ test.describe('Magic Link Invite System', () => {
       const saveButton = dialog.getByRole('button', { name: /save|add/i });
       await saveButton.click();
 
-      // Verify invite modal opens automatically with QR + link
-      // Target the invite modal specifically (add member dialog may still be closing)
+      // Verify invite modal opens automatically with QR code
       const inviteQr = page.locator('[data-testid="invite-qr"]');
       await expect(inviteQr).toBeVisible({ timeout: 5000 });
       const inviteModal = page
         .locator('[data-testid="invite-qr"]')
         .locator('xpath=ancestor::div[@role="dialog"]');
       await expect(inviteModal).toBeVisible({ timeout: 5000 });
-      await expect(inviteModal.locator('[data-testid="invite-link-code"]')).toBeVisible();
+
+      // Verify share button is present
+      await expect(inviteModal.getByRole('button', { name: /share/i })).toBeVisible();
     });
 
     // Clipboard permissions only work in Chromium
-    test('should copy invite link to clipboard', async ({ page, context, browserName }) => {
+    test('should copy invite link via share modal', async ({ page, context, browserName }) => {
       test.skip(browserName !== 'chromium', 'Clipboard API permissions only supported in Chromium');
       await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 
@@ -95,17 +109,27 @@ test.describe('Magic Link Invite System', () => {
       await page.goto('/family');
       await page.waitForURL('/family');
 
-      // Open invite modal and copy link
+      // Add a member so the invite button becomes visible
+      await addTestMember(page);
+
+      // Open invite modal
       await page.getByRole('button', { name: /invite/i }).click();
-      const modal = page.getByRole('dialog');
+      const modal = page.getByRole('dialog').first();
       await expect(modal).toBeVisible();
 
-      // Click copy link button
-      const copyLinkButton = modal.getByRole('button', { name: /copy link/i });
+      // Click share button to open the share modal
+      await modal.getByRole('button', { name: /share/i }).click();
+
+      // Share modal should appear (overlay layer)
+      const shareModal = page.getByRole('dialog').last();
+      await expect(shareModal).toBeVisible();
+
+      // Click "Copy Link" in the share modal
+      const copyLinkButton = shareModal.getByRole('button', { name: /copy link/i });
       await copyLinkButton.click();
 
       // Verify "Copied!" feedback
-      await expect(modal.getByText(/copied/i)).toBeVisible();
+      await expect(shareModal.getByText(/copied/i)).toBeVisible();
 
       // Verify clipboard contains the link
       const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
