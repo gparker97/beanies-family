@@ -88,8 +88,8 @@ test.describe('Setup Flow', () => {
     // Member should appear in the list
     await expect(page.getByText('Jane Doe')).toBeVisible();
 
-    // Form should be reset — add button disabled again
-    await expect(addButton).toBeDisabled();
+    // Form should collapse after adding — "add another" prompt shown
+    await expect(page.getByText(/add another family member/i)).toBeVisible();
 
     // Finish setup
     await page.getByRole('button', { name: ui('loginV6.finish') }).click();
