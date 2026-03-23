@@ -201,10 +201,12 @@ async function attemptFileLoad() {
         } else if (!inviteToken.value) {
           showDecryptModal.value = true;
         } else {
-          // Preserve the specific error from tryInviteTokenDecrypt if set
+          // Invite token failed — show error with manual fallback
           if (!formError.value) {
             formError.value = 'Invite token could not decrypt the file. Ask for a new invite link.';
           }
+          cloudLoadFailed.value = true;
+          needsManualFileLoad.value = true;
         }
       } else {
         // Cloud load failed — fall back to manual file load

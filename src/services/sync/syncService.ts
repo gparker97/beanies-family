@@ -589,6 +589,12 @@ async function doSave(): Promise<boolean> {
     }
 
     // Re-encrypt the Automerge doc with the family key and update the envelope
+    const inviteKeyCount = currentEnvelope.inviteKeys
+      ? Object.keys(currentEnvelope.inviteKeys).length
+      : 0;
+    if (inviteKeyCount > 0) {
+      console.warn('[syncService] doSave: writing envelope with', inviteKeyCount, 'invite key(s)');
+    }
     const fileContent = await reEncryptEnvelope(currentEnvelope, currentFamilyKey);
 
     // Write via the storage provider abstraction

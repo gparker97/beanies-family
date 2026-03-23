@@ -946,11 +946,23 @@ export const useSyncStore = defineStore('sync', () => {
     envelope.value = env;
     syncService.setEnvelope(env);
 
+    console.warn(
+      '[syncStore] addInvitePackage: added key',
+      tokenHash.slice(0, 8) + '...',
+      'inviteKeys count:',
+      Object.keys(env.inviteKeys).length
+    );
+
     // Persist updated envelope and sync
     if (familyKey.value) {
       persistEnvelope(env).catch(console.warn);
     }
-    await syncNow(true);
+    const saved = await syncNow(true);
+    if (!saved) {
+      console.error(
+        '[syncStore] addInvitePackage: syncNow failed — invite key may not be on Drive'
+      );
+    }
   }
 
   /**
@@ -1356,6 +1368,18 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       const env = parseBeanpodV4(text);
+
+      const loadedInviteKeyCount = env.inviteKeys ? Object.keys(env.inviteKeys).length : 0;
+      console.warn(
+        '[syncStore] loadFromGoogleDrive: parsed envelope, inviteKeys:',
+        loadedInviteKeyCount,
+        loadedInviteKeyCount > 0
+          ? 'hashes: ' +
+              Object.keys(env.inviteKeys!)
+                .map((h) => h.slice(0, 8) + '...')
+                .join(', ')
+          : '(none)'
+      );
 
       // Store as pending — needs password
       pendingEncryptedFile.value = {
