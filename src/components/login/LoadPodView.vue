@@ -9,16 +9,19 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { getGoogleAccountEmail } from '@/services/google/googleAuth';
 import {
   isPlatformAuthenticatorAvailable,
   hasRegisteredPasskeys,
+  registerPasskeyForMember,
 } from '@/services/auth/passkeyService';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const authStore = useAuthStore();
+const familyStore = useFamilyStore();
 
 const props = defineProps<{
   needsPermissionGrant?: boolean;
@@ -27,6 +30,11 @@ const props = defineProps<{
   forceNewGoogleAccount?: boolean;
   loadError?: string;
   providerHint?: 'local' | 'google_drive';
+  crossDeviceContext?: {
+    crossDevice: true;
+    memberId: string;
+    credentialId?: string;
+  } | null;
 }>();
 
 const emit = defineEmits<{
@@ -226,6 +234,39 @@ async function handleLoadFile() {
   }
 }
 
+/**
+ * Register a new passkey on this device after cross-device password fallback.
+ * Wraps the family key with fresh PRF material and saves to the envelope.
+ */
+async function registerCrossDevicePasskey(memberId: string) {
+  try {
+    const fk = syncStore.familyKey;
+    if (!fk) return;
+
+    const member = familyStore.members.find((m) => m.id === memberId);
+    if (!member) return;
+
+    const familyId = syncStore.envelope?.familyId ?? authStore.currentUser?.familyId;
+    if (!familyId) return;
+
+    const result = await registerPasskeyForMember({
+      memberId,
+      memberName: member.name,
+      memberEmail: member.email,
+      familyId,
+      familyKey: fk,
+    });
+
+    if (result.success && result.passkeySecret) {
+      syncStore.addPasskeySecret(result.passkeySecret);
+      await syncStore.syncNow(true);
+    }
+  } catch (e) {
+    // Non-critical — passkey registration failure shouldn't block login
+    console.warn('[LoadPodView] Cross-device passkey registration failed:', e);
+  }
+}
+
 async function handleDecrypt() {
   if (!decryptPassword.value) {
     formError.value = t('password.required');
@@ -245,6 +286,10 @@ async function handleDecrypt() {
         const signInResult = await authStore.signIn(result.memberId, decryptPassword.value);
         decryptPassword.value = '';
         if (signInResult.success) {
+          // Cross-device: register passkey on this device and wrap family key with new PRF
+          if (props.crossDeviceContext) {
+            await registerCrossDevicePasskey(result.memberId);
+          }
           emit('signed-in', '/nook');
           return;
         }

@@ -15,7 +15,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'signed-in': [destination: string];
-  'use-password': [];
+  'use-password': [context?: { crossDevice: true; memberId: string; credentialId?: string }];
   back: [];
 }>();
 
@@ -26,13 +26,21 @@ const familyStore = useFamilyStore();
 
 const isAuthenticating = ref(false);
 const errorMessage = ref<string | null>(null);
+const crossDeviceContext = ref<{
+  crossDevice: true;
+  memberId: string;
+  credentialId?: string;
+} | null>(null);
 
 async function handleBiometricLogin() {
   isAuthenticating.value = true;
   errorMessage.value = null;
 
   try {
-    const result = await authStore.signInWithPasskey(props.familyId, syncStore.passkeySecrets);
+    const result = await authStore.signInWithPasskey(
+      props.familyId,
+      syncStore.effectivePasskeySecrets
+    );
 
     if (!result.success) {
       if (result.error === 'WRONG_FAMILY_CREDENTIAL') {
@@ -58,8 +66,14 @@ async function handleBiometricLogin() {
         }
       }
     } else {
-      // Passkey verified member but no family key — prompt for password
-      emit('use-password');
+      // Passkey verified member but no family key — cross-device or no PRF.
+      // Show informative message and fall back to password with context.
+      errorMessage.value = t('passkey.crossDeviceNoCache');
+      crossDeviceContext.value = {
+        crossDevice: true,
+        memberId: result.memberId!,
+        credentialId: result.credentialId,
+      };
       return;
     }
 
@@ -148,9 +162,23 @@ async function handleBiometricLogin() {
         </template>
       </button>
 
+      <!-- Cross-device info message -->
+      <div
+        v-if="crossDeviceContext"
+        class="rounded-xl border border-[#AED6F1] bg-[#AED6F1]/10 p-4 text-center text-sm text-gray-700 dark:border-slate-600 dark:bg-slate-700/50 dark:text-gray-300"
+      >
+        <p>{{ t('passkey.crossDeviceNoCache') }}</p>
+        <button
+          class="mt-3 font-medium text-[#F15D22] underline"
+          @click="emit('use-password', crossDeviceContext)"
+        >
+          {{ t('passkey.usePassword') }}
+        </button>
+      </div>
+
       <!-- Error message -->
       <div
-        v-if="errorMessage"
+        v-else-if="errorMessage"
         class="rounded-xl bg-red-50 p-3 text-center text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400"
       >
         {{ errorMessage }}
@@ -164,6 +192,7 @@ async function handleBiometricLogin() {
 
       <!-- Password fallback -->
       <button
+        v-if="!crossDeviceContext"
         class="w-full text-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
         @click="emit('use-password')"
       >

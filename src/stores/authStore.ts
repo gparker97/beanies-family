@@ -343,6 +343,7 @@ export const useAuthStore = defineStore('auth', () => {
     passkeySecrets?: PasskeySecret[]
   ): Promise<{
     success: boolean;
+    memberId?: string;
     familyKey?: CryptoKey;
     credentialId?: string;
     error?: string;
@@ -373,6 +374,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       return {
         success: true,
+        memberId: result.memberId,
         familyKey: result.familyKey,
       };
     } catch (e) {
