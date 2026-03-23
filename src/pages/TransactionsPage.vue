@@ -45,11 +45,14 @@ import type {
 } from '@/types/models';
 import {
   formatMonthYear,
+  formatDateFull,
+  formatDateWithDay,
   toISODateString,
   getStartOfMonth,
   getEndOfMonth,
   isDateBetween,
   toDateInputValue,
+  formatDateShort,
 } from '@/utils/date';
 
 const route = useRoute();
@@ -269,13 +272,11 @@ function getCategoryName(categoryId: string): string {
 }
 
 function formatDateGroupHeader(dateKey: string): string {
-  const d = new Date(dateKey + 'T00:00:00');
   const today = toDateInputValue(new Date());
   if (dateKey === today) {
-    const dayMonth = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(d);
-    return `${t('date.today')} \u2014 ${dayMonth}`;
+    return `${t('date.today')} \u2014 ${formatDateShort(dateKey)}`;
   }
-  return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'long' }).format(d).toUpperCase();
+  return formatDateWithDay(dateKey).toUpperCase();
 }
 
 function isDateToday(dateKey: string): boolean {
@@ -351,13 +352,7 @@ function showCreatedConfirmation(opts: {
   category: string;
   recurring?: string | null;
 }) {
-  const d = new Date(opts.date + 'T00:00:00');
-  const dateStr = d.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const dateStr = formatDateFull(opts.date);
   const details: ConfirmDetail[] = [
     { label: t('transactions.title'), value: opts.description },
     {
@@ -1036,13 +1031,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
               {{ tx.description }}
             </p>
             <p class="text-xs text-[var(--color-text)] opacity-40">
-              {{
-                new Date(tx.date + 'T00:00:00').toLocaleDateString('en-US', {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })
-              }}
+              {{ formatDateWithDay(tx.date) }}
               <span v-if="tx.recurringItemId" class="ml-1">
                 &middot; {{ getRecurringFrequencyLabel(tx) }}
               </span>

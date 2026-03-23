@@ -4,7 +4,7 @@ import { useActivityStore, CATEGORY_COLORS } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { extractDatePart } from '@/utils/date';
+import { extractDatePart, formatMonthYear } from '@/utils/date';
 import { tripTypeEmoji } from '@/utils/vacation';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import type { ActivityCategory } from '@/types/models';
@@ -43,8 +43,7 @@ const dayLabels = computed(() => {
 });
 
 const monthLabel = computed(() => {
-  const date = new Date(currentYear.value, currentMonth.value, 1);
-  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  return formatMonthYear(new Date(currentYear.value, currentMonth.value, 1));
 });
 
 const todayStr = computed(() => formatDate(today));

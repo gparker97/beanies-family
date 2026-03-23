@@ -21,7 +21,7 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { formatDate } from '@/utils/date';
+import { formatDate, formatMonthYearShort, parseLocalDate } from '@/utils/date';
 import type {
   Goal,
   GoalType,
@@ -579,12 +579,7 @@ async function deleteCompletedGoal(id: string) {
                 <template v-if="goal.deadline && new Date(goal.deadline) < new Date()">
                   {{ t('goals.letsCatchUp') }} ·
                 </template>
-                {{
-                  new Date(goal.deadline).toLocaleDateString('en-US', {
-                    month: 'short',
-                    year: 'numeric',
-                  })
-                }}
+                {{ formatMonthYearShort(parseLocalDate(goal.deadline)) }}
               </span>
             </div>
           </div>

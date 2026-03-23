@@ -31,6 +31,8 @@ import {
   getEndOfMonth,
   toISODateString,
   isDateBetween,
+  formatMonthYear,
+  formatMonthYearShort,
 } from '@/utils/date';
 import { useTranslation } from '@/composables/useTranslation';
 import type {
@@ -252,12 +254,13 @@ const netWorthProjection = computed(() => {
   for (let i = 0; i <= months; i += step) {
     const date = addMonths(now, i);
     const showYear = i === 0 || date.getMonth() === 0 || step >= 12;
-    labels.push(
-      date.toLocaleDateString('en-US', {
-        month: step >= 12 ? undefined : 'short',
-        year: showYear ? 'numeric' : undefined,
-      })
-    );
+    if (step >= 12) {
+      labels.push(showYear ? String(date.getFullYear()) : '');
+    } else {
+      labels.push(
+        showYear ? formatMonthYearShort(date) : formatMonthYearShort(date).split(' ')[0]!
+      );
+    }
 
     const netWorth = currentNetWorth + monthlyNet * i;
     data.push(netWorth);
@@ -429,14 +432,11 @@ const incomeExpenseChartData = computed(() => {
     const monthIndex = months - 1 - i + startOffset;
 
     if (months === 1) {
-      labels.push(monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+      labels.push(formatMonthYear(monthDate));
     } else {
+      const showYear = monthDate.getMonth() === 0 || i === months - 1 + startOffset;
       labels.push(
-        monthDate.toLocaleDateString('en-US', {
-          month: 'short',
-          year:
-            monthDate.getMonth() === 0 || i === months - 1 + startOffset ? 'numeric' : undefined,
-        })
+        showYear ? formatMonthYearShort(monthDate) : formatMonthYearShort(monthDate).split(' ')[0]!
       );
     }
 

@@ -3,6 +3,7 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { formatDate as formatDateUtil, formatTime12, toDateInputValue } from '@/utils/date';
 
 const { t } = useTranslation();
 
@@ -20,13 +21,14 @@ const emit = defineEmits<{
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const d = new Date(iso);
+    const datePart = formatDateUtil(toDateInputValue(d));
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    const timePart = formatTime12(
+      `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+    );
+    return `${datePart} ${timePart}`;
   } catch {
     return iso;
   }
