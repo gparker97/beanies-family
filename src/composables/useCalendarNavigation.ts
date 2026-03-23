@@ -1,6 +1,6 @@
 import { computed, type Ref } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { addDays, toDateInputValue, formatTime12 } from '@/utils/date';
+import { addDays, toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
 
 // ── Week Navigation ────────────────────────────────────────────────────────
 
@@ -36,10 +36,10 @@ export function useWeekNavigation(referenceDate: Ref<Date>) {
     const sameMonth = first.getMonth() === last.getMonth();
     const sameYear = first.getFullYear() === last.getFullYear();
 
-    const fmtDay = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const fmtDay = (d: Date) => formatDateShort(toDateInputValue(d));
 
     if (sameMonth) {
-      return `${first.toLocaleDateString('en-US', { month: 'short' })} ${first.getDate()} – ${last.getDate()}, ${first.getFullYear()}`;
+      return `${fmtDay(first)} – ${last.getDate()}, ${first.getFullYear()}`;
     }
     if (sameYear) {
       return `${fmtDay(first)} – ${fmtDay(last)}, ${first.getFullYear()}`;

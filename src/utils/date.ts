@@ -1,5 +1,22 @@
 import type { ISODateString } from '@/types/models';
 
+// ── Shared month abbreviations (dd MMM yyyy standard) ──────────────────────
+const MONTHS_SHORT = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 export function toISODateString(date: Date): ISODateString {
   return date.toISOString();
 }
@@ -8,41 +25,59 @@ export function fromISODateString(isoString: ISODateString): Date {
   return new Date(isoString);
 }
 
-export function formatDate(isoString: ISODateString, locale: string = 'en-US'): string {
+/**
+ * Format: "8 Jan 2026" — unambiguous date with year.
+ * Accepts ISO date strings or YYYY-MM-DD.
+ */
+export function formatDate(isoString: ISODateString): string {
   const date = fromISODateString(isoString);
-  return date.toLocaleDateString(locale, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-export function formatDateShort(isoString: ISODateString, locale: string = 'en-US'): string {
+/**
+ * Format: "8 Jan" — compact date without year.
+ * Accepts ISO date strings or YYYY-MM-DD.
+ */
+export function formatDateShort(isoString: ISODateString): string {
   const date = fromISODateString(isoString);
-  return date.toLocaleDateString(locale, {
-    month: 'short',
-    day: 'numeric',
-  });
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
 }
 
 /**
  * Standard date format for nook cards and similar compact displays.
- * Shows "Wed, Mar 6" for current year, "Wed, Mar 6, 2027" for other years.
+ * Shows "Wed, 6 Mar" for current year, "Wed, 6 Mar 2027" for other years.
  * Accepts ISO date strings or YYYY-MM-DD.
  */
 export function formatNookDate(dateStr: string): string {
   const date = parseLocalDate(dateStr);
   const now = new Date();
-  const sameYear = date.getFullYear() === now.getFullYear();
-  if (sameYear) {
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const day = date.getDate();
+  const mon = MONTHS_SHORT[date.getMonth()];
+  const dow = DAYS_SHORT[date.getDay()];
+  if (date.getFullYear() === now.getFullYear()) {
+    return `${dow}, ${day} ${mon}`;
   }
-  return date.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return `${dow}, ${day} ${mon} ${date.getFullYear()}`;
+}
+
+/**
+ * Format: "Wed, 6 Mar 2026" — full date with day-of-week and year.
+ */
+export function formatDateFull(dateStr: string): string {
+  const date = parseLocalDate(dateStr);
+  const dow = DAYS_SHORT[date.getDay()];
+  const day = date.getDate();
+  const mon = MONTHS_SHORT[date.getMonth()];
+  return `${dow}, ${day} ${mon} ${date.getFullYear()}`;
+}
+
+/**
+ * Format: "Wed, 6 Mar" — date with day-of-week, no year.
+ */
+export function formatDateWithDay(dateStr: string): string {
+  const date = parseLocalDate(dateStr);
+  const dow = DAYS_SHORT[date.getDay()];
+  return `${dow}, ${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
 }
 
 export function getStartOfDay(date: Date): Date {
@@ -152,18 +187,42 @@ export function timeAgo(isoString: ISODateString): string {
   return formatDate(isoString);
 }
 
+const MONTHS_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
 /**
- * Format a date as "Month Year" (e.g. "February 2026")
+ * Format a date as "January 2026"
  */
 export function formatMonthYear(date: Date): string {
-  return new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric' }).format(date);
+  return `${MONTHS_LONG[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /**
- * Format a date as "Mon YYYY" (e.g. "Feb 2026")
+ * Format a date as "Jan 2026"
  */
 export function formatMonthYearShort(date: Date): string {
-  return new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(date);
+  return `${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/**
+ * Format: "8 Jan 2026 9:25am" — full date + 12-hour time.
+ */
+export function formatDateTime(dateStr: string, time?: string): string {
+  const datePart = formatDateFull(dateStr);
+  if (!time) return datePart;
+  return `${datePart} ${formatTime12(time)}`;
 }
 
 /**

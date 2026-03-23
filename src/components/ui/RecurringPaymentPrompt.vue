@@ -7,6 +7,7 @@ import InfoHintBadge from './InfoHintBadge.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
+import { formatMonthYearShort } from '@/utils/date';
 import type { CurrencyCode } from '@/types/models';
 
 const props = withDefaults(
@@ -51,10 +52,7 @@ const summaryText = computed(() => {
   const amt = formatCurrencyWithCode(props.paymentAmount, props.currency as CurrencyCode);
   const freqSuffix = props.frequency === 'yearly' ? '/yr' : '/mo';
   const dateStr = props.startDate
-    ? new Date(props.startDate + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'short',
-        year: 'numeric',
-      })
+    ? formatMonthYearShort(new Date(props.startDate + 'T00:00:00'))
     : '';
   return `${amt}${freqSuffix} from ${selectedAccountName.value}${dateStr ? ` starting ${dateStr}` : ''}`;
 });

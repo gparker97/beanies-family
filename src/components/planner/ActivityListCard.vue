@@ -3,7 +3,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { normalizeAssignees } from '@/utils/assignees';
-import { toDateInputValue } from '@/utils/date';
+import { toDateInputValue, formatNookDate } from '@/utils/date';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import type { FamilyActivity } from '@/types/models';
 
@@ -27,8 +27,7 @@ function formatDisplayDate(dateStr: string): string {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return formatNookDate(dateStr);
 }
 </script>
 

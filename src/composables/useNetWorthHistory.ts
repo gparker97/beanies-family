@@ -12,6 +12,9 @@ import {
   getStartOfDay,
   toISODateString,
   isDateBetween,
+  formatDateShort,
+  formatMonthYearShort,
+  toDateInputValue,
 } from '@/utils/date';
 
 export type PeriodKey = '1W' | '1M' | '3M' | '1Y' | 'all';
@@ -27,14 +30,16 @@ export interface PeriodComparison {
   changePercent: number;
 }
 
+const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 function formatLabel(date: Date, period: PeriodKey): string {
   if (period === '1W') {
-    return date.toLocaleDateString('en-US', { weekday: 'short' });
+    return DAYS_SHORT[date.getDay()]!;
   }
   if (period === '1M' || period === '3M') {
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatDateShort(toDateInputValue(date));
   }
-  return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  return formatMonthYearShort(date);
 }
 
 export function useNetWorthHistory() {

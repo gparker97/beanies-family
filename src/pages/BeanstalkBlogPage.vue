@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { useBlog } from '@/composables/useBlog';
 import PublicNav from '@/components/public/PublicNav.vue';
 import PublicFooter from '@/components/public/PublicFooter.vue';
+import { formatDate } from '@/utils/date';
 
 const router = useRouter();
 const { featuredPost } = useBlog();
@@ -13,11 +14,6 @@ const comingSoonCards = [
   { emoji: '📅', title: 'Managing the Family Calendar', subtitle: 'coming soon' },
   { emoji: '🎯', title: 'Setting Family Goals Together', subtitle: 'coming soon' },
 ];
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function openPost(slug: string) {
   router.push(`/beanstalk/${slug}`);

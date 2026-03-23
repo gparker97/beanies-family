@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useBlog, BLOG_CATEGORIES } from '@/composables/useBlog';
 import PublicNav from '@/components/public/PublicNav.vue';
 import PublicFooter from '@/components/public/PublicFooter.vue';
+import { formatDateFull } from '@/utils/date';
 
 const route = useRoute();
 const router = useRouter();
@@ -13,16 +14,6 @@ const post = computed(() => getPostBySlug(route.params.slug as string));
 const categoryInfo = computed(() =>
   post.value ? BLOG_CATEGORIES.find((c) => c.id === post.value!.category) : undefined
 );
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 const currentIndex = computed(() =>
   post.value ? posts.value.findIndex((p) => p.slug === post.value!.slug) : -1
@@ -77,7 +68,7 @@ const navLinks = [
         <div class="post-header-meta">
           <span>{{ post.author }}</span>
           <span class="post-header-dot">·</span>
-          <span>{{ formatDate(post.date) }}</span>
+          <span>{{ formatDateFull(post.date) }}</span>
         </div>
       </header>
 
