@@ -25,6 +25,8 @@ export interface WrappedPasskeyKey {
   wrapped: string;
   /** HKDF salt used to derive the wrapping key (base64, 32 bytes) */
   hkdfSalt: string;
+  /** Member who owns this passkey (optional for backward compat with older envelopes) */
+  memberId?: string;
 }
 
 /** A family key wrapped for an invite link (token-derived AES-KW, time-limited). */

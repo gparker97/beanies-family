@@ -50,6 +50,11 @@ const isInitializing = ref(true);
 const biometricFamilyId = ref('');
 const biometricFamilyName = ref<string | undefined>();
 const biometricDeclined = ref(false);
+const crossDeviceContext = ref<{
+  crossDevice: true;
+  memberId: string;
+  credentialId?: string;
+} | null>(null);
 const forceNewGoogleAccount = ref(false);
 const loadError = ref<string | undefined>();
 const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
@@ -333,9 +338,14 @@ function handleFileLoaded() {
   activeView.value = 'pick-bean';
 }
 
-function handleBiometricFallback() {
+function handleBiometricFallback(context?: {
+  crossDevice: true;
+  memberId: string;
+  credentialId?: string;
+}) {
   // Fall back to password flow — go to load-pod with auto-load
   biometricDeclined.value = true;
+  crossDeviceContext.value = context ?? null;
   autoLoadPod.value = syncStore.isConfigured && !syncStore.needsPermission;
   needsPermissionGrant.value = syncStore.isConfigured && syncStore.needsPermission;
   activeView.value = 'load-pod';
@@ -403,6 +413,7 @@ function handleSignedIn(destination: string) {
         :force-new-google-account="forceNewGoogleAccount"
         :load-error="loadError"
         :provider-hint="loadErrorProviderHint"
+        :cross-device-context="crossDeviceContext"
         @back="activeView = isSingleFamilyAutoSelect ? 'welcome' : 'family-picker'"
         @file-loaded="handleFileLoaded"
         @signed-in="handleSignedIn"

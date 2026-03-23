@@ -1418,16 +1418,57 @@ export const useSyncStore = defineStore('sync', () => {
     });
   }
 
-  // --- Passkey secret management (V4: stored in envelope, not separate) ---
-  // Kept as stubs for backward compat — #114 will redesign
+  // --- Passkey secret management (V4: stored in envelope's passkeyWrappedKeys) ---
 
   const passkeySecrets = ref<import('@/types/models').PasskeySecret[]>([]);
+
+  /**
+   * Effective passkey secrets: merge in-memory secrets with those from the
+   * pending/loaded envelope. This ensures PRF unwrap works on login even
+   * after a fresh session (when the in-memory ref is empty).
+   */
+  const effectivePasskeySecrets = computed<import('@/types/models').PasskeySecret[]>(() => {
+    const fromRef = passkeySecrets.value;
+    const env = pendingEncryptedFile.value?.envelope ?? envelope.value;
+    if (!env?.passkeyWrappedKeys) return fromRef;
+
+    const fromEnvelope: import('@/types/models').PasskeySecret[] = Object.entries(
+      env.passkeyWrappedKeys
+    ).map(([credentialId, wpk]) => ({
+      credentialId,
+      memberId: wpk.memberId ?? '', // Older envelopes may not have memberId
+      wrappedFamilyKey: wpk.wrapped,
+      hkdfSalt: wpk.hkdfSalt,
+      createdAt: '' as import('@/types/models').ISODateString,
+    }));
+
+    // Merge: in-memory secrets take precedence (they have full metadata)
+    const seen = new Set(fromRef.map((s) => s.credentialId));
+    return [...fromRef, ...fromEnvelope.filter((s) => !seen.has(s.credentialId))];
+  });
 
   function addPasskeySecret(secret: import('@/types/models').PasskeySecret): void {
     passkeySecrets.value = [
       ...passkeySecrets.value.filter((s) => s.credentialId !== secret.credentialId),
       secret,
     ];
+
+    // Persist to envelope's passkeyWrappedKeys so it survives re-encryption
+    if (envelope.value) {
+      const env: import('@/types/syncFileV4').BeanpodFileV4 = {
+        ...envelope.value,
+        passkeyWrappedKeys: {
+          ...envelope.value.passkeyWrappedKeys,
+          [secret.credentialId]: {
+            wrapped: secret.wrappedFamilyKey,
+            hkdfSalt: secret.hkdfSalt,
+            memberId: secret.memberId,
+          },
+        },
+      };
+      envelope.value = env;
+      syncService.setEnvelope(env);
+    }
   }
 
   function removePasskeySecretsForCredential(credentialId: string): void {
@@ -1524,6 +1565,7 @@ export const useSyncStore = defineStore('sync', () => {
     ensureRegistered,
     // Passkey secrets
     passkeySecrets,
+    effectivePasskeySecrets,
     addPasskeySecret,
     removePasskeySecretsForCredential,
     clearAllPasskeySecrets,
