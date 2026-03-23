@@ -216,7 +216,7 @@ const STRING_DEFS = {
   'action.loading': { en: 'Loading...', beanie: 'counting beans...' },
   'action.pause': { en: 'Pause', beanie: 'pause' },
   'action.resume': { en: 'Resume', beanie: 'resume' },
-  'action.markCompleted': { en: 'Mark as completed', beanie: 'mark as completed' },
+  'action.markCompleted': { en: 'Mark Complete', beanie: 'mark complete' },
   'action.export': { en: 'Export', beanie: 'export' },
   'action.import': { en: 'Import', beanie: 'import' },
 
