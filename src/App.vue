@@ -126,7 +126,12 @@ function handleDeclinePasskey() {
  * reset failure state, reload data from Drive, and re-arm auto-sync.
  */
 async function handleGoogleReconnected() {
-  await syncStore.handleGoogleReconnected();
+  try {
+    await syncStore.handleGoogleReconnected();
+    showToast('success', t('googleDrive.reconnected'));
+  } catch {
+    showToast('warning', t('googleDrive.reconnectFailed'));
+  }
 }
 
 /**
@@ -589,8 +594,11 @@ async function attemptSilentReconnect() {
     const { attemptSilentRefresh } = await import('@/services/google/googleAuth');
     const refreshed = await attemptSilentRefresh();
     if (refreshed) {
-      if (syncStore.showGoogleReconnect || syncStore.saveFailureLevel !== 'none') {
+      const hadVisibleError =
+        syncStore.showGoogleReconnect || syncStore.saveFailureLevel !== 'none';
+      if (hadVisibleError) {
         await syncStore.handleGoogleReconnected();
+        showToast('success', t('googleDrive.reconnected'));
       }
     }
   } catch {
@@ -630,6 +638,7 @@ function handleBeforeUnload() {
 }
 
 function handleOnline() {
+  showToast('success', t('pwa.backOnline'));
   attemptSilentReconnect().catch(console.warn);
 }
 

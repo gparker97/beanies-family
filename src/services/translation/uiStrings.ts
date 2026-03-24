@@ -2004,6 +2004,10 @@ const STRING_DEFS = {
     en: "You're offline — changes are saved locally",
     beanie: "you're offline — beans are safe in the pod",
   },
+  'pwa.backOnline': {
+    en: 'Back online',
+    beanie: 'back online',
+  },
   'pwa.installTitle': { en: 'Install beanies.family', beanie: 'install beanies.family' },
   'pwa.installDescription': {
     en: 'Add to your home screen for the best experience',
@@ -2502,6 +2506,10 @@ const STRING_DEFS = {
   'googleDrive.reconnectFailed': {
     en: 'Could not reconnect. Try again.',
     beanie: "couldn't reconnect. try again",
+  },
+  'googleDrive.reconnected': {
+    en: 'Reconnected — all data saved',
+    beanie: 'reconnected — all beans safe',
   },
   'googleDrive.noFilesHint': {
     en: 'Make sure the file is in a folder named "beanies.family" on this account.',
