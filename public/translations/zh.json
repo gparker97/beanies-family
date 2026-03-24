@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-23",
-    "translationCount": 1885
+    "lastUpdated": "2026-03-24",
+    "translationCount": 1891
   },
   "translations": {
     "app.name": {
@@ -9430,6 +9430,36 @@
       "translation": "链接已复制！打开微信并粘贴到聊天中，与您的联系人分享。",
       "hash": "24yc0p",
       "lastUpdated": "2026-03-23"
+    },
+    "header.refreshAll": {
+      "translation": "刷新所有数据",
+      "hash": "1uxz9q",
+      "lastUpdated": "2026-03-24"
+    },
+    "header.refreshSuccess": {
+      "translation": "数据已刷新",
+      "hash": "myoe8s",
+      "lastUpdated": "2026-03-24"
+    },
+    "header.refreshNoSync": {
+      "translation": "未配置云同步",
+      "hash": "x9a2gp",
+      "lastUpdated": "2026-03-24"
+    },
+    "pwa.backOnline": {
+      "translation": "返回在线日期",
+      "hash": "5rx3m4",
+      "lastUpdated": "2026-03-24"
+    },
+    "googleDrive.reconnected": {
+      "translation": "已重新连接—已保存所有数据",
+      "hash": "2hymgq",
+      "lastUpdated": "2026-03-24"
+    },
+    "sync.backgroundError": {
+      "translation": "无法从云端刷新。使用缓存数据。",
+      "hash": "gu29cs",
+      "lastUpdated": "2026-03-24"
     }
   }
 }
