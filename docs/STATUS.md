@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-21
-> **Updated by:** Claude (Dedicated Travel Plans Page)
+> **Last updated:** 2026-03-24
+> **Updated by:** Claude (Cache-First Loading & Reconnection UX)
 
 ## Current Phase
 
@@ -34,6 +34,7 @@
 - Node.js 24 across all CI/CD workflows and local development
 - Family key encryption service: AES-256-GCM family key with AES-KW per-member wrapping, invite link service, v4.0 beanpod file format types, QR code utility, shared encoding helpers (#111)
 - Permission roles: `canViewFinances`, `canEditActivities`, `canManagePod` fields on FamilyMember, `usePermissions()` composable, route guards, sidebar/mobile nav filtering, readOnly modal pattern, NoAccessPage (#132)
+- Cache-first loading architecture: loads from encrypted IndexedDB persistence cache for instant display (<500ms), then background-syncs from Google Drive via CRDT merge. Skeleton screens replace full-screen spinner when no cache. BackgroundSyncBar (3px Heritage Orange progress bar) shows sync activity. Manual refresh in profile dropdown. Success toasts on reconnection/online recovery
 
 ### UI Components
 
@@ -85,6 +86,18 @@
 - **DRY**: `useVacationTimeline` composable, shared option builders in `vacation.ts`, `buildTravelKeyValue` shared function
 - **Files**: 6 new components, 1 new composable, ~25 modified files. VacationViewModal deleted (replaced by dedicated page)
 - Plan: `docs/plans/2026-03-21-dedicated-travel-plans-page.md`
+
+### Cache-First Loading & Reconnection UX (2026-03-24)
+
+- **Cache-first loading**: App loads from encrypted IndexedDB persistence cache first (<500ms), then background-syncs from Google Drive via Automerge CRDT merge. Eliminates 4-5s blocking spinner for returning users
+- **Skeleton screens**: `ContentSkeleton.vue` — generic card-grid skeleton with Heritage Orange shimmer animation (`beanie-shimmer`), shown in content area while data loads from Drive. Matches NookSectionCard styling
+- **App shell renders immediately**: `isInitializing` dismissed after auth (~150ms) instead of after data load. New `isLoadingData` ref gates skeleton vs router-view
+- **BackgroundSyncBar**: 3px Heritage Orange indeterminate progress bar at top of viewport (z-200), shown during background sync
+- **Manual refresh**: Refresh icon in profile dropdown banner (both mobile and desktop). Triggers Drive sync + SW update check. Spinning icon during refresh, success/error toasts
+- **Reconnection success toasts**: Explicit confirmation when Google Drive reconnects ("Reconnected — all data saved"), silent auto-reconnect recovery, "Back online" toast on network restore
+- **DRY refactor**: `tryDecryptWithCachedKey()` shared helper in syncStore deduplicates needsPassword pattern from 3 call sites. `preservePermissionState` option on `loadFromPersistenceCache()`
+- **Files**: 2 new components (`ContentSkeleton.vue`, `BackgroundSyncBar.vue`), 5 modified files
+- Plan: `docs/plans/2026-03-24-cache-first-loading.md`
 
 ### Nook Schedule Card Grouping (2026-03-19)
 
