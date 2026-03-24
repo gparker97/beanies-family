@@ -29,6 +29,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull, toDateInputValue } from '@/utils/date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -43,6 +44,7 @@ const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const settingsStore = useSettingsStore();
+const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { t } = useTranslation();
 
@@ -159,6 +161,36 @@ function handleOpenSettings() {
 function handleOpenHelp() {
   showProfileDropdown.value = false;
   router.push('/help');
+}
+
+const isRefreshing = ref(false);
+
+async function handleRefreshAll() {
+  showProfileDropdown.value = false;
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+
+  try {
+    // Check for app updates (SW)
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) registration.update();
+    }
+
+    // Refresh data from Drive
+    if (syncStore.isConfigured && !syncStore.needsPermission) {
+      await syncStore.backgroundSyncFromFile();
+      if (!syncStore.backgroundSyncError) {
+        showToast('success', t('header.refreshSuccess'));
+      }
+    } else {
+      showToast('info', t('header.refreshNoSync'));
+    }
+  } catch {
+    showToast('warning', t('sync.backgroundError'));
+  } finally {
+    isRefreshing.value = false;
+  }
 }
 
 function promptSignOut() {
@@ -284,13 +316,13 @@ async function confirmSignOutAndClearData() {
             <div
               class="bg-gradient-to-r from-[var(--color-secondary-500)] to-[var(--color-secondary-500)]/90 px-4 py-3"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
                 <BeanieAvatar
                   :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
                   :color="currentMember?.color || '#3b82f6'"
                   size="md"
                 />
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <p class="font-outfit truncate text-sm font-semibold text-white">
                     {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
                   </p>
@@ -309,6 +341,29 @@ async function confirmSignOutAndClearData() {
                     {{ authStore.currentUser.email }}
                   </p>
                 </div>
+                <!-- Refresh all data -->
+                <button
+                  type="button"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 transition-colors hover:bg-white/30"
+                  :title="t('header.refreshAll')"
+                  :disabled="isRefreshing"
+                  @mousedown.prevent="handleRefreshAll"
+                >
+                  <svg
+                    class="h-4 w-4 text-white"
+                    :class="{ 'animate-spin': isRefreshing }"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -629,13 +684,13 @@ async function confirmSignOutAndClearData() {
             <div
               class="bg-gradient-to-r from-[var(--color-secondary-500)] to-[var(--color-secondary-500)]/90 px-4 py-3"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-2">
                 <BeanieAvatar
                   :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
                   :color="currentMember?.color || '#3b82f6'"
                   size="md"
                 />
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <p class="font-outfit truncate text-sm font-semibold text-white">
                     {{ currentMember?.name || authStore.currentUser?.email || 'User' }}
                   </p>
@@ -654,6 +709,29 @@ async function confirmSignOutAndClearData() {
                     {{ authStore.currentUser.email }}
                   </p>
                 </div>
+                <!-- Refresh all data -->
+                <button
+                  type="button"
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 transition-colors hover:bg-white/30"
+                  :title="t('header.refreshAll')"
+                  :disabled="isRefreshing"
+                  @mousedown.prevent="handleRefreshAll"
+                >
+                  <svg
+                    class="h-4 w-4 text-white"
+                    :class="{ 'animate-spin': isRefreshing }"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
 

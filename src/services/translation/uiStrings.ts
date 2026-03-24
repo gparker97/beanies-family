@@ -1107,6 +1107,12 @@ const STRING_DEFS = {
   },
   'header.editProfile': { en: 'Edit Profile', beanie: 'edit profile' },
   'header.settings': { en: 'Settings', beanie: 'settings' },
+  'header.refreshAll': { en: 'Refresh All Data', beanie: 'refresh all beans' },
+  'header.refreshSuccess': { en: 'Data refreshed', beanie: 'beans are fresh' },
+  'header.refreshNoSync': {
+    en: 'No cloud sync configured',
+    beanie: 'no cloud sync configured',
+  },
 
   // Sidebar
   'sidebar.noDataFile': { en: 'No data file', beanie: 'no data file' },
@@ -2508,6 +2514,10 @@ const STRING_DEFS = {
   'googleDrive.switchAccount': {
     en: 'Switch account',
     beanie: 'different account',
+  },
+  'sync.backgroundError': {
+    en: 'Could not refresh from cloud. Using cached data.',
+    beanie: 'beans got lost in the cloud... using fresh-ish beans',
   },
   'storage.localFile': { en: 'Local File', beanie: 'local file' },
   'storage.dropbox': { en: 'Dropbox', beanie: 'dropbox' },
