@@ -149,6 +149,10 @@ export const useSyncStore = defineStore('sync', () => {
     }
   });
 
+  // Background sync state (cache-first loading)
+  const isBackgroundSyncing = ref(false);
+  const backgroundSyncError = ref<string | null>(null);
+
   // Subscribe to cache persistence failure changes
   const cachePersistFailed = ref(false);
   syncService.onCacheFailureChange((failed) => {
@@ -637,7 +641,8 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function loadFromPersistenceCache(
     keyB64: string,
-    activeFamilyId: string
+    activeFamilyId: string,
+    options?: { preservePermissionState?: boolean }
   ): Promise<{ success: boolean }> {
     try {
       await initPersistenceDB(activeFamilyId);
@@ -660,8 +665,10 @@ export const useSyncStore = defineStore('sync', () => {
       familyKey.value = fk;
       envelope.value = cachedEnvelope;
       syncService.setFamilyKey(fk, cachedEnvelope);
-      isConfigured.value = true; // Data is loaded — show configured UI
-      needsPermission.value = true; // Still need file permission for future saves
+      if (!options?.preservePermissionState) {
+        isConfigured.value = true; // Data is loaded — show configured UI
+        needsPermission.value = true; // Still need file permission for future saves
+      }
       lastSync.value = toISODateString(new Date());
 
       await reloadAllStores();
@@ -1103,6 +1110,97 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
+  /**
+   * Try to decrypt a pending encrypted file using the cached family key.
+   * Shared helper for loadFamilyData, reloadIfFileChanged, and backgroundSyncFromFile.
+   * Returns true if decryption succeeded.
+   */
+  async function tryDecryptWithCachedKey(): Promise<boolean> {
+    const familyCtx = useFamilyContextStore();
+    const settingsStore = useSettingsStore();
+    const famId = familyCtx.activeFamilyId;
+    const cachedKeyB64 = famId ? settingsStore.getCachedFamilyKey(famId) : null;
+    if (!cachedKeyB64) return false;
+
+    try {
+      const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
+      const { base64ToBuffer } = await import('@/utils/encoding');
+      const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
+      const result = await decryptPendingFileWithKey(fk);
+      return result.success;
+    } catch {
+      // Cached key invalid — caller handles fallback
+      if (famId) await settingsStore.clearCachedFamilyKey(famId);
+      return false;
+    }
+  }
+
+  /**
+   * Background sync from file after cache-first load.
+   * Fetches fresh data from Drive, CRDT-merges into the live doc.
+   * Non-blocking — UI remains interactive throughout.
+   */
+  async function backgroundSyncFromFile(): Promise<void> {
+    if (isBackgroundSyncing.value) return;
+
+    isBackgroundSyncing.value = true;
+    backgroundSyncError.value = null;
+
+    try {
+      const loadResult = await loadFromFile({ merge: true });
+
+      if (loadResult.success) {
+        setupAutoSync();
+        return;
+      }
+
+      if (loadResult.needsPassword) {
+        // Try existing family key first (loadFromFile already tried, but pending may need it)
+        if (familyKey.value && pendingEncryptedFile.value) {
+          try {
+            const doc = await decryptBeanpodPayload(
+              pendingEncryptedFile.value.envelope,
+              familyKey.value
+            );
+            mergeDoc(doc);
+            envelope.value = pendingEncryptedFile.value.envelope;
+            syncService.setFamilyKey(familyKey.value!, pendingEncryptedFile.value.envelope);
+            pendingEncryptedFile.value = null;
+            await reloadAllStores();
+            syncService.triggerDebouncedSave();
+            setupAutoSync();
+            return;
+          } catch {
+            // Family key doesn't work — try cached key
+          }
+        }
+
+        const success = await tryDecryptWithCachedKey();
+        if (success) {
+          setupAutoSync();
+          return;
+        }
+
+        // Can't decrypt — stale cached data is still usable
+        backgroundSyncError.value = 'Could not refresh data — password may have changed';
+        pendingEncryptedFile.value = null;
+        return;
+      }
+
+      // Non-password failure (network, 404, etc.)
+      backgroundSyncError.value = 'Could not refresh data from cloud';
+    } catch (e) {
+      backgroundSyncError.value =
+        e instanceof Error ? e.message : 'Could not refresh data from cloud';
+    } finally {
+      isBackgroundSyncing.value = false;
+      // Always start polling — even on error, next poll may succeed
+      if (!filePollingTimer) {
+        startDeferredPolling();
+      }
+    }
+  }
+
   // Track the stop handle so we never register duplicate watchers
   let autoSyncStopHandle: (() => void) | null = null;
 
@@ -1146,22 +1244,13 @@ export const useSyncStore = defineStore('sync', () => {
               syncService.triggerDebouncedSave();
               return true;
             } catch {
-              // Family key doesn't work — try cached password
+              // Family key doesn't work — try cached key
             }
           }
 
-          // Try cached password
-          const familyCtx = useFamilyContextStore();
-          const settingsStore = useSettingsStore();
-          const famId = familyCtx.activeFamilyId;
-          const cachedKeyB64 = famId ? settingsStore.getCachedFamilyKey(famId) : null;
-          if (cachedKeyB64) {
-            const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
-            const { base64ToBuffer } = await import('@/utils/encoding');
-            const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
-            const result = await decryptPendingFileWithKey(fk);
-            return result.success;
-          }
+          // Try cached family key
+          const success = await tryDecryptWithCachedKey();
+          if (success) return true;
 
           pendingEncryptedFile.value = null;
         }
@@ -1550,6 +1639,8 @@ export const useSyncStore = defineStore('sync', () => {
     lastSaveError,
     showSaveFailureBanner,
     cachePersistFailed,
+    isBackgroundSyncing,
+    backgroundSyncError,
     // Actions
     initialize,
     requestPermission,
@@ -1580,6 +1671,8 @@ export const useSyncStore = defineStore('sync', () => {
     setupAutoSync,
     deferPolling,
     startDeferredPolling,
+    backgroundSyncFromFile,
+    tryDecryptWithCachedKey,
     reloadIfFileChanged,
     handleGoogleReconnected,
     pauseFilePolling,

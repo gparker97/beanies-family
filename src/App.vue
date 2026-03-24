@@ -17,6 +17,8 @@ import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
+import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
+import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
 import { isPlatformAuthenticatorAvailable } from '@/services/auth/passkeyService';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { updateRatesIfStale, forceUpdateRates } from '@/services/exchangeRate';
@@ -64,6 +66,7 @@ const { t } = useTranslation();
 const { isMobile, isDesktop } = useBreakpoint();
 
 const isInitializing = ref(true);
+const isLoadingData = ref(true);
 const initError = ref<string | null>(null);
 const initErrorDetail = ref<string | null>(null);
 const showClearConfirm = ref(false);
@@ -173,14 +176,46 @@ async function loadFamilyData() {
     syncStore.needsPermission
   );
 
-  // Path 1: File configured + we have permission → load from file (source of truth)
+  // Path 1: File configured + we have permission → cache-first, then background sync
   if (syncStore.isConfigured && !syncStore.needsPermission) {
-    initBreadcrumbs.push('path1: loading from sync file');
-    console.log('[loadFamilyData] path1: calling loadFromFile...');
+    // Step 1a: Try loading from IndexedDB persistence cache for instant display
+    const activeFamilyId = familyContextStore.activeFamilyId;
+    const cachedKeyB64 = activeFamilyId ? settingsStore.getCachedFamilyKey(activeFamilyId) : null;
+
+    if (activeFamilyId && cachedKeyB64) {
+      initBreadcrumbs.push('path1a: trying persistence cache for fast start');
+      console.log('[loadFamilyData] path1a: trying cache-first load...');
+      try {
+        const cacheResult = await syncStore.loadFromPersistenceCache(cachedKeyB64, activeFamilyId, {
+          preservePermissionState: true,
+        });
+        if (cacheResult.success) {
+          initBreadcrumbs.push('path1a: cache loaded — showing data, background sync starting');
+          console.log('[loadFamilyData] path1a: cache hit — instant data');
+          memberFilterStore.initialize();
+          isLoadingData.value = false; // Show real data immediately
+          const result = await processRecurringItems();
+          if (result.processed > 0) {
+            await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
+          }
+          // Fire-and-forget: fetch fresh data from Drive in background
+          syncStore.backgroundSyncFromFile();
+          return;
+        }
+        initBreadcrumbs.push('path1a: cache miss or failed — falling through to Drive fetch');
+        console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
+      } catch {
+        initBreadcrumbs.push('path1a: cache error — falling through to Drive fetch');
+      }
+    }
+
+    // Step 1b: No cache available — fall back to blocking Drive fetch (skeleton shows in UI)
+    initBreadcrumbs.push('path1b: loading from sync file (Drive fetch)');
+    console.log('[loadFamilyData] path1b: calling loadFromFile...');
     try {
       const loadResult = await syncStore.loadFromFile();
-      initBreadcrumbs.push(`path1: loadFromFile result=${loadResult.success}`);
-      console.log('[loadFamilyData] path1: loadFromFile returned', loadResult);
+      initBreadcrumbs.push(`path1b: loadFromFile result=${loadResult.success}`);
+      console.log('[loadFamilyData] path1b: loadFromFile returned', loadResult);
       if (loadResult.success) {
         memberFilterStore.initialize();
         const result = await processRecurringItems();
@@ -191,53 +226,28 @@ async function loadFamilyData() {
         return;
       }
 
-      // File needs password — try cached family key from trusted device
+      // File needs password — try cached family key via shared helper
       if (loadResult.needsPassword) {
-        const activeFamilyId = familyContextStore.activeFamilyId;
-        const cachedKeyB64 = activeFamilyId
-          ? settingsStore.getCachedFamilyKey(activeFamilyId)
-          : null;
-        console.log(
-          '[loadFamilyData] needsPassword: familyId=',
-          activeFamilyId,
-          'hasCachedKey=',
-          !!cachedKeyB64
-        );
-        if (cachedKeyB64) {
-          try {
-            const { importFamilyKey } = await import('@/services/crypto/familyKeyService');
-            const { base64ToBuffer } = await import('@/utils/encoding');
-            const fk = await importFamilyKey(new Uint8Array(base64ToBuffer(cachedKeyB64)));
-            console.log('[loadFamilyData] calling decryptPendingFileWithKey...');
-            const decryptResult = await syncStore.decryptPendingFileWithKey(fk);
-            console.log('[loadFamilyData] decryptResult=', decryptResult);
-            if (decryptResult.success) {
-              memberFilterStore.initialize();
-              const result = await processRecurringItems();
-              if (result.processed > 0) {
-                await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
-              }
-              return;
-            }
-          } catch {
-            // Cached key was invalid — clear it
+        console.log('[loadFamilyData] needsPassword — trying cached key');
+        const success = await syncStore.tryDecryptWithCachedKey();
+        if (success) {
+          memberFilterStore.initialize();
+          const result = await processRecurringItems();
+          if (result.processed > 0) {
+            await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
           }
-          if (activeFamilyId) {
-            await settingsStore.clearCachedFamilyKey(activeFamilyId);
-          }
+          return;
         }
 
         // Can't auto-decrypt — redirect to login page for password/biometric entry
-        // instead of falling through to an empty doc (which shows blank Nook)
-        initBreadcrumbs.push('path1: needsPassword but no cached key — redirecting to login');
+        initBreadcrumbs.push('path1b: needsPassword but no cached key — redirecting to login');
         console.warn('[loadFamilyData] Cannot auto-decrypt — redirecting to login');
         router.replace('/welcome');
         return;
       }
 
       // File load failed for non-password reasons (network error, 404, etc.)
-      // Redirect to login so user sees proper error handling instead of blank state
-      initBreadcrumbs.push('path1: loadFromFile failed — redirecting to login');
+      initBreadcrumbs.push('path1b: loadFromFile failed — redirecting to login');
       console.warn('[loadFamilyData] File load failed — redirecting to login');
       router.replace('/welcome');
       return;
@@ -454,6 +464,11 @@ onMounted(async () => {
       }
     }
 
+    // Step 4: Dismiss full-screen spinner — app shell can now render.
+    // Data loading continues with skeleton/progress bar in the content area.
+    isInitializing.value = false;
+    initBreadcrumbs.push('shell: app shell visible, loading data...');
+
     // Step 5: Load family data from the active per-family DB
     // Defer file polling until after processRecurringItems to prevent the
     // reload cascade (init mutations → file poll detects "change" → reload → loop).
@@ -463,14 +478,14 @@ onMounted(async () => {
     await closeDb();
 
     // Timeout guard: if loading takes too long (Google Drive 5xx, network issues),
-    // dismiss the spinner so the app is usable. Data continues loading in background.
+    // dismiss the skeleton so the app is usable. Data continues loading in background.
     const INIT_TIMEOUT_MS = 30_000;
     let initTimedOut = false;
     const timeoutId = setTimeout(() => {
       initTimedOut = true;
       initBreadcrumbs.push('data: loadFamilyData TIMED OUT after 30s');
-      console.warn('[App] loadFamilyData timed out — dismissing spinner');
-      isInitializing.value = false;
+      console.warn('[App] loadFamilyData timed out — dismissing skeleton');
+      isLoadingData.value = false;
     }, INIT_TIMEOUT_MS);
 
     try {
@@ -478,6 +493,7 @@ onMounted(async () => {
       initBreadcrumbs.push('data: loadFamilyData completed');
     } finally {
       clearTimeout(timeoutId);
+      isLoadingData.value = false;
       // Init complete — start deferred file polling for cross-device sync
       syncStore.startDeferredPolling();
       if (initTimedOut) {
@@ -532,8 +548,9 @@ onMounted(async () => {
     initErrorDetail.value = `${stack}\n\n--- Breadcrumbs ---\n${breadcrumbLog}`;
     console.error('[App] Initialization failed:', err, '\nBreadcrumbs:', breadcrumbLog);
   } finally {
-    // Always dismiss the loading overlay, even on early return or error
+    // Always dismiss loading states, even on early return or error
     isInitializing.value = false;
+    isLoadingData.value = false;
   }
 });
 
@@ -824,6 +841,9 @@ watch(
       <InstallPrompt />
     </div>
 
+    <!-- Background sync progress bar (cache-first loading) -->
+    <BackgroundSyncBar />
+
     <!-- General toast notifications (errors, success, info) -->
     <ToastContainer />
 
@@ -853,7 +873,8 @@ watch(
           class="flex-1 overflow-auto overscroll-y-contain p-4 md:p-6"
           :class="{ 'pb-24': isMobile }"
         >
-          <router-view />
+          <ContentSkeleton v-if="isLoadingData" />
+          <router-view v-show="!isLoadingData" />
         </main>
       </div>
 
