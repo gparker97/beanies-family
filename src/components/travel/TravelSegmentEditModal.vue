@@ -634,30 +634,13 @@ async function handleSave() {
           </div>
         </FormFieldGroup>
 
-        <!-- Booking ref + Link (same row) -->
-        <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup :label="t('vacation.field.bookingReference')">
-            <BaseInput
-              v-model="bookingReference"
-              :placeholder="t('vacation.field.bookingReference')"
-            />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.link')">
-            <div class="flex items-center gap-2">
-              <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
-              <a
-                v-if="link"
-                :href="link.startsWith('http') ? link : `https://${link}`"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
-                title="Visit link"
-              >
-                🔗
-              </a>
-            </div>
-          </FormFieldGroup>
-        </div>
+        <!-- Booking reference -->
+        <FormFieldGroup :label="t('vacation.field.bookingReference')">
+          <BaseInput
+            v-model="bookingReference"
+            :placeholder="t('vacation.field.bookingReference')"
+          />
+        </FormFieldGroup>
       </template>
 
       <!-- ═══ Train/Ferry fields ═══ -->
@@ -741,6 +724,23 @@ async function handleSave() {
           />
         </FormFieldGroup>
       </template>
+
+      <!-- Link (common) -->
+      <FormFieldGroup :label="t('vacation.field.link')">
+        <div class="flex items-center gap-2">
+          <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+          <a
+            v-if="link"
+            :href="link.startsWith('http') ? link : `https://${link}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+            title="Visit link"
+          >
+            🔗
+          </a>
+        </div>
+      </FormFieldGroup>
 
       <!-- Notes (common) -->
       <FormFieldGroup :label="t('vacation.field.notes')">

@@ -14,6 +14,7 @@
 > - `docs/adr/` — Architectural Decision Records (ADRs) for all major design decisions
 > - `docs/plans/` — Accepted implementation plans (saved before work begins, kept as historical record)
 > - `docs/prompts/` — Prompt archive (all user prompts logged per task with timestamps and categories)
+> - `CHANGELOG.md` — Human-readable changelog (updated every push)
 >
 > **Brand:**
 >
@@ -303,6 +304,19 @@ When asked to implement a GitHub issue/ticket:
 3. **Implement** the feature/fix
 4. **Mark ready for testing**: Once complete, remove the `in-progress` label, apply the `ready-for-testing` label, and add a comment summarizing the changes made
 5. **Ask questions** before starting if requirements are unclear
+
+## Changelog
+
+`CHANGELOG.md` must be updated **every time changes are pushed** to the repository. This is a mandatory part of every commit/push workflow.
+
+**Format rules:**
+
+- Group entries by date (`## YYYY-MM-DD`), most recent at the top
+- Use [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) categories: `Added`, `Changed`, `Fixed`, `Removed`, `Security`, `Performance`
+- Write brief, human-readable summaries — not commit messages. Focus on what the user would notice, not implementation details
+- One bullet per logical change (a feature, fix, or improvement — not per file touched)
+- Add to the existing date section if pushing multiple times on the same day
+- If the date section doesn't exist yet, create it at the top (below the header)
 
 ## Issue Labeling
 
