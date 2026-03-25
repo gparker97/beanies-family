@@ -4,8 +4,8 @@ export default defineConfig({
   testDir: './e2e/specs',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: 0,
-  timeout: 30000,
+  retries: process.env.CI ? 1 : 0,
+  timeout: 20000,
   reporter: [['html'], ['junit', { outputFile: 'test-results/junit.xml' }]],
   use: {
     baseURL: 'http://localhost:5173',
@@ -16,6 +16,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Firefox and WebKit available for local testing: npx playwright test --project=firefox
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],

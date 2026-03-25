@@ -15,6 +15,7 @@
 > - `docs/plans/` — Accepted implementation plans (saved before work begins, kept as historical record)
 > - `docs/prompts/` — Prompt archive (all user prompts logged per task with timestamps and categories)
 > - `CHANGELOG.md` — Human-readable changelog (updated every push)
+> - `docs/E2E_HEALTH.md` — E2E test failure tracking log
 >
 > **Brand:**
 >
@@ -370,6 +371,25 @@ Implementation plans created during plan mode must be saved to `docs/plans/` **b
 
 <List of files to be created or modified>
 ```
+
+## E2E Testing
+
+E2E tests live in `e2e/specs/` and cover **critical user journeys only**. See `docs/adr/007-testing-strategy.md` for the full strategy.
+
+**Before writing an E2E test**, apply the Three-Gate Filter:
+
+1. Would a real user be blocked or lose data if this broke? → If no, skip E2E.
+2. Does it require full-stack integration (UI + store + IndexedDB)? → If a unit test covers it, use that instead.
+3. Can it run without `waitForTimeout` or copy-dependent selectors? → If not, fix the flakiness first.
+
+**Key rules:**
+
+- Budget cap: **25 tests max**. Adding one requires removing or consolidating another.
+- Assert data (IndexedDB exports), not DOM (element counts, text visibility).
+- One clear user goal per test, 5–8 steps max.
+- No testing your own mocks. No `waitForTimeout`.
+- CI runs **Chromium only**. Use `--project=firefox` locally for cross-browser checks.
+- Log E2E failures in `docs/E2E_HEALTH.md` as (a) bug caught, (b) intentional change, or (c) flake.
 
 ## Notes for AI Assistants
 
