@@ -695,7 +695,7 @@ async function handleSave() {
             <BaseInput v-model="arrivalStation" :placeholder="t('vacation.field.arrivalStation')" />
           </FormFieldGroup>
         </div>
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <FormFieldGroup
             :label="t('vacation.field.departureDate')"
             :error="bookedErrors.has('departureDate')"
@@ -707,6 +707,9 @@ async function handleSave() {
             :error="bookedErrors.has('departureTime')"
           >
             <BaseInput v-model="departureTime" type="time" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.arrivalTime')">
+            <BaseInput v-model="arrivalTime" type="time" />
           </FormFieldGroup>
         </div>
         <FormFieldGroup :label="t('vacation.field.bookingReference')">
