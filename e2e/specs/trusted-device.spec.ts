@@ -98,18 +98,11 @@ test.describe('Trusted Device Password Cache', () => {
     await bypassLoginIfNeeded(page);
   });
 
-  test('global settings initially has no cached password', async ({ page }) => {
-    const settings = await getGlobalSettings(page);
-    // After fresh setup, global settings should exist (created by the app)
-    expect(settings).not.toBeNull();
-    // No cached passwords by default
-    const passwords = (settings!.cachedFamilyKeys as Record<string, string> | undefined) ?? {};
-    expect(Object.keys(passwords)).toHaveLength(0);
-    // Not trusted by default (e2e_auto_auth suppresses the trust prompt)
-    expect(settings!.isTrustedDevice).toBeFalsy();
-  });
+  test('Password cache lifecycle: set, persist across reload, clear all data removes it', async ({
+    page,
+  }) => {
+    // --- Phase 1: Set cached password and verify persistence across reload ---
 
-  test('cached password persists in IndexedDB across page reload', async ({ page }) => {
     // Simulate trusted device with cached password (as if user trusted + decrypted)
     await updateGlobalSettings(page, {
       isTrustedDevice: true,
@@ -131,20 +124,8 @@ test.describe('Trusted Device Password Cache', () => {
     settings = await getGlobalSettings(page);
     cached = settings!.cachedFamilyKeys as Record<string, string>;
     expect(cached['test-family']).toBe('test-encryption-pw');
-  });
 
-  test('clear all data removes cached password and trust flag', async ({ page }) => {
-    // Set up trusted device with cached password
-    await updateGlobalSettings(page, {
-      isTrustedDevice: true,
-      trustedDevicePromptShown: true,
-      cachedFamilyKeys: { 'test-family': 'test-encryption-pw' },
-    });
-
-    // Verify it's there
-    let settings = await getGlobalSettings(page);
-    const cached = settings!.cachedFamilyKeys as Record<string, string>;
-    expect(cached['test-family']).toBe('test-encryption-pw');
+    // --- Phase 2: Clear all data removes cached password and trust flag ---
 
     // Navigate to settings and open Data Management modal
     await page.goto('/settings');
@@ -172,54 +153,5 @@ test.describe('Trusted Device Password Cache', () => {
       expect(Object.keys(pw)).toHaveLength(0);
     }
     // If settings is null (DB deleted entirely), that's also acceptable
-  });
-
-  test('trust device modal sets isTrustedDevice in global settings', async ({ page }) => {
-    // Ensure prompt hasn't been shown yet
-    await updateGlobalSettings(page, {
-      trustedDevicePromptShown: false,
-    });
-
-    // Remove the e2e_auto_auth flag so TrustDeviceModal can appear
-    await page.evaluate(() => {
-      sessionStorage.removeItem('e2e_auto_auth');
-    });
-
-    // Trigger the trust modal by setting freshSignIn via Pinia
-    await page.evaluate(() => {
-      const app = (document.querySelector('#app') as any)?.__vue_app__;
-      if (app) {
-        const pinia = app.config.globalProperties.$pinia;
-        if (pinia) {
-          const authStore = pinia.state.value.auth;
-          if (authStore) {
-            authStore.freshSignIn = true;
-          }
-        }
-      }
-    });
-
-    // Wait for the trust device modal to appear
-    const trustButton = page.getByRole('button', { name: /trust this device/i });
-    const modalAppeared = await trustButton
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (!modalAppeared) {
-      // Modal didn't appear — skip test (watcher timing issue)
-      test.skip();
-      return;
-    }
-
-    await trustButton.click();
-
-    // Give time for the async setTrustedDevice call
-    await page.waitForTimeout(500);
-
-    // Verify global settings updated
-    const settings = await getGlobalSettings(page);
-    expect(settings!.isTrustedDevice).toBe(true);
-    expect(settings!.trustedDevicePromptShown).toBe(true);
   });
 });

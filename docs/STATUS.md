@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-24
-> **Updated by:** Claude (Cache-First Loading & Reconnection UX)
+> **Last updated:** 2026-03-25
+> **Updated by:** Claude (E2E Test Strategy Overhaul)
 
 ## Current Phase
 
@@ -16,7 +16,7 @@
 - Pinia stores for all entities (family, accounts, transactions, assets, goals, settings, sync, recurring, translation, memberFilter)
 - Vue Router with all page routes (lazy-loaded)
 - Dark mode / theme support
-- E2E test infrastructure (Playwright — Chromium/Firefox/WebKit)
+- E2E test infrastructure (Playwright — Chromium in CI, 21 focused tests covering critical user journeys)
 - Unit test infrastructure (Vitest with happy-dom)
 - Linting (ESLint + Prettier + Stylelint + Husky pre-commit hooks)
 - File-based sync via File System Access API (with encryption support)

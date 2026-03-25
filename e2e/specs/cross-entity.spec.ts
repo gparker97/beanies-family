@@ -1,21 +1,211 @@
 import { test, expect } from '../fixtures/test';
-import { IndexedDBHelper } from '../helpers/indexeddb';
 import { AccountsPage } from '../page-objects/AccountsPage';
+import { AssetsPage } from '../page-objects/AssetsPage';
+import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { ui } from '../helpers/ui-strings';
 
-/**
- * E2E tests for the Loan & Activity Linking feature.
- *
- * All data is created through the UI (no dbHelper.seedData) because the
- * Automerge CRDT store does not load from IndexedDB seeds.
- *
- * Covers:
- * - Creating a recurring payment from an activity's cost section
- * - Activity view modal shows linked monthly transaction section
- * - Navigation from activity modal to linked transaction
- * - Data integrity when creating and removing linked payments
- */
+// ---------------------------------------------------------------------------
+// Institution Combobox
+// ---------------------------------------------------------------------------
+
+test.describe('Account Institution Combobox', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    const dbHelper = new IndexedDBHelper(page);
+    await dbHelper.clearAllData();
+    await page.goto('/');
+    await bypassLoginIfNeeded(page);
+  });
+
+  test('Select predefined institution', async ({ page }) => {
+    const accountsPage = new AccountsPage(page);
+    await accountsPage.goto();
+
+    await accountsPage.addAccountWithInstitution({
+      name: 'DBS Savings',
+      type: 'savings',
+      balance: 10000,
+      institution: 'DBS Bank',
+    });
+
+    // Verify account card shows the institution
+    const card = page.locator('[data-testid="account-card"]');
+    await expect(card).toContainText('DBS Bank');
+  });
+
+  test('Search and filter institutions', async ({ page }) => {
+    const accountsPage = new AccountsPage(page);
+    await accountsPage.goto();
+
+    // Open the add modal — institution fields are now inline
+    await page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .first()
+      .click();
+
+    const instCombobox = accountsPage.getInstitutionCombobox();
+    await instCombobox.open();
+    await instCombobox.search('HSBC');
+    await instCombobox.expectDropdownContains('HSBC');
+    // Institutions that don't match should be filtered out
+    await instCombobox.expectDropdownNotContains('DBS Bank');
+    // Select the filtered result
+    await page.getByRole('button', { name: 'HSBC' }).click();
+
+    // Fill remaining required fields and save
+    await page.getByPlaceholder(ui('modal.accountName')).fill('HSBC Account');
+    // Select type: Bank category → Checking subtype
+    await page.getByRole('button', { name: '🏦 Bank', exact: true }).click();
+    await page.getByRole('button', { name: '🏦 Checking', exact: true }).click();
+    await page.locator('input[type="number"]').first().fill('5000');
+    await page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .last()
+      .click();
+
+    // Dismiss celebration modal
+    const letsGoButton = page.getByRole('button', { name: "Let's go!" });
+    try {
+      await letsGoButton.waitFor({ state: 'visible', timeout: 2000 });
+      await letsGoButton.click();
+    } catch {
+      // No celebration modal
+    }
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+
+    const card = page.locator('[data-testid="account-card"]');
+    await expect(card).toContainText('HSBC');
+  });
+
+  test('Custom institution persists and appears in asset lender dropdown', async ({ page }) => {
+    const accountsPage = new AccountsPage(page);
+    await accountsPage.goto();
+
+    // --- Part 1: Enter custom institution via Other (from combobox test #3) ---
+
+    await accountsPage.addAccountWithInstitution({
+      name: 'Local Bank Account',
+      type: 'checking',
+      balance: 3000,
+      customInstitution: 'My Local Bank',
+    });
+
+    // Verify account card shows custom institution
+    const card = page.locator('[data-testid="account-card"]');
+    await expect(card).toContainText('My Local Bank');
+
+    // Verify custom institution is persisted: open add account again and check dropdown
+    await page
+      .getByRole('button', { name: ui('modal.addAccount') })
+      .first()
+      .click();
+    const instCombobox = accountsPage.getInstitutionCombobox();
+    await instCombobox.open();
+    await instCombobox.expectDropdownContains('My Local Bank');
+    // The custom entry should show "Custom" badge
+    await instCombobox.expectDropdownContains(ui('form.customBadge'));
+
+    // Close the account modal
+    await page.keyboard.press('Escape');
+
+    // --- Part 2: Cross-page verification — custom institution in asset lender dropdown (from combobox test #8) ---
+
+    // Now go to Assets page and verify custom institution appears in lender dropdown
+    const assetsPage = new AssetsPage(page);
+    await assetsPage.goto();
+
+    await page
+      .getByRole('button', { name: ui('assets.addAsset') })
+      .first()
+      .click();
+    const dialog = page.locator('[role="dialog"]');
+    await dialog.getByText(ui('assets.hasLoan')).click();
+
+    const lenderCombobox = assetsPage.getLenderCombobox();
+    await lenderCombobox.open();
+    await lenderCombobox.expectDropdownContains('My Local Bank');
+    await lenderCombobox.expectDropdownContains(ui('form.customBadge'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Onboarding Wizard
+// ---------------------------------------------------------------------------
+
+test.describe('Onboarding Wizard', () => {
+  /**
+   * Helper: create a pod via normal setup flow, then restart onboarding
+   * so the wizard is visible (bypassing the e2e_auto_auth auto-skip).
+   */
+  async function setupWithOnboarding(page: import('@playwright/test').Page) {
+    await page.goto('/');
+    const dbHelper = new IndexedDBHelper(page);
+    await dbHelper.clearAllData();
+    await page.goto('/');
+    await bypassLoginIfNeeded(page);
+
+    // bypassLoginIfNeeded sets e2e_auto_auth which auto-skips onboarding.
+    // Set e2e_force_onboarding so the wizard renders despite auto-auth.
+    await page.evaluate(() => {
+      sessionStorage.setItem('e2e_force_onboarding', 'true');
+    });
+
+    // Restart onboarding via Settings → Appearance modal
+    await page.goto('/settings');
+    await page.getByText(ui('settings.card.appearance')).first().click();
+    await page.getByTestId('restart-onboarding').waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByTestId('restart-onboarding').click();
+
+    // Wait for the router navigation triggered by restart-onboarding to settle
+    await page.waitForURL('**/nook', { timeout: 30000 });
+
+    await page.getByTestId('onboarding-wizard').waitFor({ state: 'visible', timeout: 10000 });
+  }
+
+  test('Onboarding wizard: complete all steps with data persistence', async ({ page }) => {
+    test.slow(); // Setup restarts onboarding via settings + walks through all wizard steps
+    await setupWithOnboarding(page);
+
+    // --- Step 1: Welcome screen (from onboarding test #1) ---
+    await expect(page.getByTestId('onboarding-wizard')).toBeVisible();
+    await expect(page.getByTestId('onboarding-start')).toBeVisible();
+
+    // --- Step 1 → Step 2 (from onboarding test #4) ---
+    await page.getByTestId('onboarding-start').click();
+    await page.getByTestId('onboarding-add-account').waitFor({ state: 'visible', timeout: 5000 });
+
+    // Add an account via the bank combobox
+    await page.getByTestId('onboarding-bank-select').getByTestId('combobox-trigger').click();
+    await page.getByTestId('combobox-dropdown').waitFor({ state: 'visible', timeout: 3000 });
+    await page.getByTestId('combobox-dropdown').locator('button').first().click();
+    await page.getByTestId('onboarding-add-account').click();
+
+    // Should show the added account list with "Add Another" button
+    await expect(page.getByText(/add another/i)).toBeVisible({ timeout: 5000 });
+
+    // --- Step 2 → Step 3: Activity presets (from onboarding test #6) ---
+    await page.getByTestId('onboarding-next').click();
+    await expect(page.getByText(/family life/i)).toBeVisible({ timeout: 5000 });
+
+    // --- Step 3 → Completion screen (from onboarding test #8) ---
+    await page.getByTestId('onboarding-next').click();
+    await page.getByTestId('onboarding-finish').waitFor({ state: 'visible', timeout: 5000 });
+
+    // Click "Enter The Nook" to close wizard
+    await page.getByTestId('onboarding-finish').click();
+    await expect(page.getByTestId('onboarding-wizard')).not.toBeVisible({ timeout: 5000 });
+
+    // --- Verify data persistence: account was created ---
+    const dbHelper = new IndexedDBHelper(page);
+    const data = await dbHelper.exportData();
+    expect(data.accounts.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Loan & Activity Linking
+// ---------------------------------------------------------------------------
 
 test.describe('Loan & Activity Linking', () => {
   let dbHelper: IndexedDBHelper;
@@ -138,7 +328,7 @@ test.describe('Loan & Activity Linking', () => {
     await expect(confirmOk).not.toBeVisible({ timeout: 3000 });
   }
 
-  test('activity with monthly fee creates a recurring item', async ({ page }) => {
+  test('Activity with monthly fee creates recurring item', async ({ page }) => {
     await setup(page);
 
     // Create an account through the UI
@@ -170,12 +360,15 @@ test.describe('Loan & Activity Linking', () => {
     expect(activity.payFromAccountId).toBe(account!.id);
   });
 
-  test('activity view modal shows linked monthly transaction section', async ({ page }) => {
+  test('View linked payment section and navigate to transactions', async ({ page }) => {
+    test.slow(); // Creates account + activity with payment, then opens view modal and navigates
     await setup(page);
 
     // Create an account and activity with monthly payment through the UI
     await createCheckingAccount(page);
     await createActivityWithMonthlyPayment(page, 'Piano Lesson', 200, 'Main Checking');
+
+    // --- Part 1: Verify linked monthly transaction section in view modal (from test #2) ---
 
     // The activity should be visible on the planner page — click it to open view modal
     const activityTitle = page.getByText('Piano Lesson');
@@ -193,29 +386,8 @@ test.describe('Loan & Activity Linking', () => {
 
     // Verify the payment amount appears in the monthly transaction section
     await expect(viewDialog.getByText(/200\.00\/mo/)).toBeVisible();
-  });
 
-  test('clicking linked transaction in activity modal navigates to transactions', async ({
-    page,
-  }) => {
-    await setup(page);
-
-    // Create account and activity with monthly payment
-    await createCheckingAccount(page);
-    await createActivityWithMonthlyPayment(page, 'Swimming Class', 100, 'Main Checking');
-
-    // Open the activity view modal
-    const activityTitle = page.getByText('Swimming Class');
-    await expect(activityTitle.first()).toBeVisible({ timeout: 5000 });
-    await activityTitle.first().click();
-
-    const viewDialog = page.locator('div[role="dialog"]');
-    await expect(viewDialog).toBeVisible({ timeout: 5000 });
-
-    // Verify the "Monthly Transaction" section is present
-    await expect(viewDialog.getByText(ui('txLink.monthlyTransaction'))).toBeVisible({
-      timeout: 5000,
-    });
+    // --- Part 2: Click linked transaction to navigate to transactions page (from test #3) ---
 
     // Click the "View →" link on the monthly transaction section
     const viewLink = viewDialog.getByRole('button', { name: /view/i }).last();
@@ -225,7 +397,8 @@ test.describe('Loan & Activity Linking', () => {
     await page.waitForURL(/\/transactions/, { timeout: 10000 });
   });
 
-  test('data integrity — creating and deleting linked payment', async ({ page }) => {
+  test('Data integrity: add then remove linked payment', async ({ page }) => {
+    test.slow(); // Creates account + activity, edits to add payment, then edits again to remove
     await setup(page);
 
     // Create an account through the UI

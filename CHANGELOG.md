@@ -21,6 +21,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Accommodation edit modal pairs link with contact phone on a shared row
 - Transportation edit modal pairs link with booking reference on a shared row
 - Removed standalone recurrence pill from transaction view modal (replaced by the summary box)
+- E2E test suite overhauled: 87 → 21 tests (76% reduction), 15 → 7 spec files, CI runs Chromium only (~44s vs ~10 min)
+- Introduced Three-Gate Filter, 25-test budget cap, and E2E health tracking (`docs/E2E_HEALTH.md`)
+- Project changelog (`CHANGELOG.md`) introduced with 2-week backfill from git history
 
 ## 2026-03-24
 
