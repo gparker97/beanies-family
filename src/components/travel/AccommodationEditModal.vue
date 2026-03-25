@@ -34,6 +34,7 @@ const confirmationNumber = ref('');
 const roomType = ref('');
 const contactPhone = ref('');
 const breakfastIncluded = ref(false);
+const link = ref('');
 const notes = ref('');
 
 const { isEditing, isSubmitting } = useFormModal(
@@ -51,6 +52,7 @@ const { isEditing, isSubmitting } = useFormModal(
       roomType.value = acc.roomType ?? '';
       contactPhone.value = acc.contactPhone ?? '';
       breakfastIncluded.value = acc.breakfastIncluded ?? false;
+      link.value = acc.link ?? '';
       notes.value = acc.notes ?? '';
     },
     onNew() {
@@ -64,6 +66,7 @@ const { isEditing, isSubmitting } = useFormModal(
       roomType.value = '';
       contactPhone.value = '';
       breakfastIncluded.value = false;
+      link.value = '';
       notes.value = '';
     },
   }
@@ -125,6 +128,7 @@ async function handleSave() {
       roomType: roomType.value,
       contactPhone: contactPhone.value,
       breakfastIncluded: breakfastIncluded.value,
+      link: link.value || undefined,
       notes: notes.value,
     };
     await vacationStore.updateVacation(props.vacationId, { accommodations });
@@ -203,10 +207,27 @@ async function handleSave() {
         />
       </FormFieldGroup>
 
-      <!-- Contact phone -->
-      <FormFieldGroup :label="t('vacation.field.contactPhone')">
-        <BaseInput v-model="contactPhone" :placeholder="t('vacation.field.contactPhone')" />
-      </FormFieldGroup>
+      <!-- Contact phone + Link -->
+      <div class="grid grid-cols-2 gap-3">
+        <FormFieldGroup :label="t('vacation.field.contactPhone')">
+          <BaseInput v-model="contactPhone" :placeholder="t('vacation.field.contactPhone')" />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.field.link')">
+          <div class="flex items-center gap-2">
+            <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+            <a
+              v-if="link"
+              :href="link.startsWith('http') ? link : `https://${link}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+              title="Visit link"
+            >
+              🔗
+            </a>
+          </div>
+        </FormFieldGroup>
+      </div>
 
       <!-- Notes -->
       <FormFieldGroup :label="t('vacation.field.notes')">

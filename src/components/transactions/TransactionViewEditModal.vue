@@ -290,6 +290,56 @@ async function handleDelete() {
         {{ typeBadge.label }}
       </span>
 
+      <!-- Schedule summary box -->
+      <div class="rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700">
+        <div class="space-y-1.5">
+          <template v-if="linkedRecurringItem">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.recurrence') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ formatFrequency(linkedRecurringItem) }}
+              </span>
+            </div>
+            <div v-if="linkedRecurringItem.startDate" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('form.startDate') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ formatDate(linkedRecurringItem.startDate) }}
+              </span>
+            </div>
+            <div v-if="linkedRecurringItem.endDate" class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('planner.field.endDate') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ formatDate(linkedRecurringItem.endDate) }}
+              </span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+                {{ t('form.date') }}
+              </span>
+              <span
+                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+              >
+                {{ formatDate(transaction.date) }}
+              </span>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- Description — inline editable -->
       <InlineEditField
         :editing="editingField === 'description'"
@@ -456,15 +506,6 @@ async function handleDelete() {
       <FormFieldGroup :label="t('form.account')">
         <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
           {{ accountName }}
-        </span>
-      </FormFieldGroup>
-
-      <!-- Recurrence schedule — read-only -->
-      <FormFieldGroup v-if="linkedRecurringItem" :label="t('transactions.filterRecurring')">
-        <span
-          class="font-outfit inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-        >
-          🔁 {{ formatFrequency(linkedRecurringItem) }}
         </span>
       </FormFieldGroup>
 

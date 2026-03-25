@@ -548,11 +548,13 @@ export interface VacationTravelSegment {
   carLabel?: string;
   leavingTime?: string;
 
+  // Common optional
+  link?: string;
+
   // Activity fields
   activityCategory?: VacationActivityCategory;
   description?: string;
   location?: string;
-  link?: string;
   startTime?: string;
   duration?: string;
 }
@@ -570,6 +572,7 @@ export interface VacationAccommodation {
   roomType?: string;
   contactPhone?: string;
   breakfastIncluded?: boolean;
+  link?: string;
   notes?: string;
 }
 
@@ -592,6 +595,7 @@ export interface VacationTransportation {
   arrivalStation?: string;
   departureDate?: ISODateString;
   departureTime?: string;
+  link?: string;
   notes?: string;
 }
 
