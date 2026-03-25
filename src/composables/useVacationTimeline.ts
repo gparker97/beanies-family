@@ -258,7 +258,6 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
       rows.push({ label: 'time', value: seg.startTime, field: 'startTime', inputType: 'time' });
     if (seg.duration) rows.push({ label: 'duration', value: seg.duration, field: 'duration' });
     if (seg.location) rows.push({ label: 'location', value: seg.location, mapLink: true });
-    if (seg.link) rows.push({ label: 'link', value: seg.link, isLink: true });
   } else {
     // Train / Ferry
     if (seg.operator) rows.push({ label: 'operator', value: seg.operator });
@@ -282,6 +281,7 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
   }
   if (seg.bookingReference)
     rows.push({ label: 'booking ref', value: seg.bookingReference, copyable: true });
+  if (seg.link) rows.push({ label: 'link', value: seg.link, isLink: true });
   if (seg.notes) rows.push({ label: 'notes', value: seg.notes, field: 'notes' });
   return enrichRows(rows);
 }
@@ -345,6 +345,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
       if (acc.contactPhone)
         rows.push({ label: 'phone', value: acc.contactPhone, field: 'contactPhone' });
       if (acc.breakfastIncluded) rows.push({ label: 'breakfast', value: 'included' });
+      if (acc.link) rows.push({ label: 'link', value: acc.link, isLink: true });
       if (acc.notes) rows.push({ label: 'notes', value: acc.notes, field: 'notes' });
 
       const kvParts: string[] = [];
@@ -422,6 +423,7 @@ export function useVacationTimeline(vacation: ComputedRef<FamilyVacation | undef
         });
       if (trans.bookingReference)
         rows.push({ label: 'booking ref', value: trans.bookingReference, copyable: true });
+      if (trans.link) rows.push({ label: 'link', value: trans.link, isLink: true });
       if (trans.notes) rows.push({ label: 'notes', value: trans.notes, field: 'notes' });
 
       const kvParts: string[] = [];

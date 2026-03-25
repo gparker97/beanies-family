@@ -214,7 +214,6 @@ const bookedErrors = computed<Set<string>>(() => {
     if (!embarkationDate.value) missing.add('embarkationDate');
     if (!embarkationTime.value) missing.add('embarkationTime');
     if (!disembarkationDate.value) missing.add('disembarkationDate');
-    if (!bookingReference.value) missing.add('bookingReference');
   } else if (isTrainFerry.value) {
     if (!departureStation.value) missing.add('departureStation');
     if (!arrivalStation.value) missing.add('arrivalStation');
@@ -222,7 +221,6 @@ const bookedErrors = computed<Set<string>>(() => {
     if (!route.value) missing.add('route');
     if (!departureDate.value) missing.add('departureDate');
     if (!departureTime.value) missing.add('departureTime');
-    if (!bookingReference.value) missing.add('bookingReference');
   } else if (isCar.value) {
     if (!carType.value) missing.add('carType');
     if (!departureDate.value) missing.add('departureDate');
@@ -555,10 +553,7 @@ async function handleSave() {
             <BaseInput v-model="disembarkationDate" type="date" />
           </FormFieldGroup>
         </div>
-        <FormFieldGroup
-          :label="t('vacation.field.bookingReference')"
-          :error="bookedErrors.has('bookingReference')"
-        >
+        <FormFieldGroup :label="t('vacation.field.bookingReference')">
           <BaseInput
             v-model="bookingReference"
             :placeholder="t('vacation.field.bookingReference')"
@@ -714,10 +709,7 @@ async function handleSave() {
             <BaseInput v-model="departureTime" type="time" />
           </FormFieldGroup>
         </div>
-        <FormFieldGroup
-          :label="t('vacation.field.bookingReference')"
-          :error="bookedErrors.has('bookingReference')"
-        >
+        <FormFieldGroup :label="t('vacation.field.bookingReference')">
           <BaseInput
             v-model="bookingReference"
             :placeholder="t('vacation.field.bookingReference')"

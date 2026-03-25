@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-03-25
-> **Updated by:** Claude (E2E Test Strategy Overhaul)
+> **Updated by:** Claude (Travel links, transaction summary, E2E overhaul, changelog)
 
 ## Current Phase
 
@@ -57,6 +57,25 @@
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### E2E Test Strategy Overhaul (2026-03-25)
+
+- **Suite reduction**: 87 → 21 tests (76%), 15 → 7 spec files (53%)
+- **CI optimization**: Chromium-only (dropped Firefox matrix), CI time 10+ min → 4.5 min
+- **Three-Gate Filter**: Every E2E test must pass business-critical outcome, full-stack integration, and deterministic gates
+- **Budget cap**: 25 tests max — forces prioritization when adding new tests
+- **8 conventions**: Assert data not DOM, no testing mocks, no `waitForTimeout`, separate tests for separate outcomes, etc.
+- **Removed**: Homepage routing (4), date filters (3), beanie avatars (4), beanie mode (4), sound effects (3), Google Drive mock API (6), onboarding step-by-step (9), simple CRUD duplicates
+- **Consolidated**: Planner 16 → 5, invite/join 9 → 3, combobox 9 → 3, loan-activity 4 → 3
+- **Health tracking**: `docs/E2E_HEALTH.md` — log each CI failure as bug/intentional/flake, quarterly review
+- **ADR-007 revised**: Full strategy, conventions, and health tracking documented
+- Plan: `docs/plans/2026-03-25-e2e-test-strategy-overhaul.md`
+
+### Travel Link Field & Transaction Schedule Summary (2026-03-25)
+
+- **Link field on all travel segments**: Optional URL added to flights, cruise, train/ferry, car, accommodations, and transportation (previously only activities and ideas). Shares row with booking ref or contact phone for space efficiency
+- **Transaction view schedule summary box**: Grey summary box matching activity view convention — shows recurrence pattern + start/end dates for recurring, or formatted date for one-time transactions. Replaces standalone recurrence pill
+- **Changelog introduced**: `CHANGELOG.md` with Keep a Changelog format, 2-week git history backfill. CLAUDE.md updated to mandate changelog update on every push
 
 ### Dedicated Travel Plans Page (2026-03-21)
 
@@ -1036,3 +1055,7 @@ A v7 UI framework proposal has been uploaded to `docs/brand/beanies-ui-framework
 | 2026-03-17 | Weekly calendar view as default planner view                | Week view provides more at-a-glance utility than month view on desktop/tablet. Month view retained for overview. Day/agenda views removed as redundant (sidebar + weekly cover the use cases). DRY extraction of shared components before building new views                                                                               |
 | 2026-03-17 | All-day multi-day activities with spanning display          | `isAllDay` + `endDate` fields on FamilyActivity; expandRecurring generates per-day occurrences; WeeklyCalendarView renders as single spanning bar using CSS grid column placement instead of per-day pills                                                                                                                                 |
 | 2026-03-08 | Join/load flow loading spinners                             | Added BeanieSpinner to all async gaps: file picker, invite token decryption, password creation step. Replaced CSS border spinners with branded BeanieSpinner. Buttons use `:loading` prop for spinner display. Fixed both JoinPodView and LoadPodView                                                                                      |
+| 2026-03-25 | Link field on all travel segments                           | Optional URL field added to all travel segment types (flights, cruise, train, car, accommodations, transportation). Previously only activities and ideas had links. Space-efficient layout: shares row with booking ref or contact phone                                                                                                   |
+| 2026-03-25 | Transaction view schedule summary box                       | Grey summary box in transaction view modal showing recurrence pattern + start/end dates for recurring, or date for one-time. Matches the activity view convention. Replaces standalone recurrence pill                                                                                                                                     |
+| 2026-03-25 | E2E test suite overhaul (ADR-007 revised)                   | 87 → 21 tests (76% reduction), 15 → 7 files, Chromium-only CI. Three-Gate Filter, 25-test budget cap, 8 conventions. CI time reduced from 10+ min to 4.5 min. Health tracking in `docs/E2E_HEALTH.md`                                                                                                                                      |
+| 2026-03-25 | Project changelog introduced                                | `CHANGELOG.md` with Keep a Changelog format, backfilled 2 weeks. CLAUDE.md updated to require changelog update on every push                                                                                                                                                                                                               |
