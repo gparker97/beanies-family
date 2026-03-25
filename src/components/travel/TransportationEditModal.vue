@@ -116,15 +116,12 @@ const bookedErrors = computed<Set<string>>(() => {
     if (!agencyName.value) missing.add('agencyName');
     if (!pickupDate.value) missing.add('pickupDate');
     if (!returnDate.value) missing.add('returnDate');
-    if (!bookingReference.value) missing.add('bookingReference');
   } else if (isBus.value) {
     if (!departureDate.value) missing.add('departureDate');
     if (!departureTime.value) missing.add('departureTime');
-    if (!bookingReference.value) missing.add('bookingReference');
   } else if (isShuttleOrTaxi.value) {
     if (!pickupDate.value) missing.add('pickupDate');
     if (!pickupTime.value) missing.add('pickupTime');
-    if (!bookingReference.value) missing.add('bookingReference');
   }
   return missing;
 });
@@ -288,10 +285,7 @@ async function handleSave() {
 
       <!-- Booking reference + Link -->
       <div class="grid grid-cols-2 gap-3">
-        <FormFieldGroup
-          :label="t('vacation.field.bookingReference')"
-          :error="bookedErrors.has('bookingReference')"
-        >
+        <FormFieldGroup :label="t('vacation.field.bookingReference')">
           <BaseInput
             v-model="bookingReference"
             :placeholder="t('vacation.field.bookingReference')"
