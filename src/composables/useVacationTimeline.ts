@@ -106,11 +106,13 @@ export function buildTravelKeyValue(seg: {
   disembarkationDate?: string;
   operator?: string;
   route?: string;
+  arrivalTime?: string;
   startTime?: string;
   location?: string;
   description?: string;
 }): string {
   const p: string[] = [];
+  const t12 = (v: string) => formatTime12(v);
   const isF = seg.type?.startsWith('flight');
   if (isF) {
     if (seg.airline) {
@@ -119,9 +121,19 @@ export function buildTravelKeyValue(seg: {
     }
     if (seg.departureDate) {
       const datePart = formatDateShort(seg.departureDate).toLowerCase();
-      p.push(seg.departureTime ? `${datePart} · ${seg.departureTime}` : datePart);
+      const timePart =
+        seg.departureTime && seg.arrivalTime
+          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
+          : seg.departureTime
+            ? t12(seg.departureTime)
+            : '';
+      p.push(timePart ? `${datePart} · ${timePart}` : datePart);
     } else if (seg.departureTime) {
-      p.push(seg.departureTime);
+      p.push(
+        seg.arrivalTime
+          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
+          : t12(seg.departureTime)
+      );
     }
   } else if (seg.type === 'cruise') {
     if (seg.shipName) p.push(seg.shipName);
@@ -134,7 +146,7 @@ export function buildTravelKeyValue(seg: {
     }
   } else if (seg.type === 'activity') {
     if (seg.location) p.push(seg.location);
-    if (seg.startTime) p.push(seg.startTime);
+    if (seg.startTime) p.push(t12(seg.startTime));
     if (seg.description) p.push(seg.description.slice(0, 40));
   } else {
     // Train / Ferry
@@ -142,9 +154,19 @@ export function buildTravelKeyValue(seg: {
     if (seg.route) p.push(seg.route);
     if (seg.departureDate) {
       const datePart = formatDateShort(seg.departureDate).toLowerCase();
-      p.push(seg.departureTime ? `${datePart} · ${seg.departureTime}` : datePart);
+      const timePart =
+        seg.departureTime && seg.arrivalTime
+          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
+          : seg.departureTime
+            ? t12(seg.departureTime)
+            : '';
+      p.push(timePart ? `${datePart} · ${timePart}` : datePart);
     } else if (seg.departureTime) {
-      p.push(seg.departureTime);
+      p.push(
+        seg.arrivalTime
+          ? `${t12(seg.departureTime)} – ${t12(seg.arrivalTime)}`
+          : t12(seg.departureTime)
+      );
     }
   }
   return p.join(' · ');
@@ -276,6 +298,13 @@ export function travelDetailRows(seg: VacationTravelSegment): DetailRow[] {
         label: 'departs',
         value: seg.departureTime,
         field: 'departureTime',
+        inputType: 'time',
+      });
+    if (seg.arrivalTime)
+      rows.push({
+        label: 'arrives',
+        value: seg.arrivalTime,
+        field: 'arrivalTime',
         inputType: 'time',
       });
   }
