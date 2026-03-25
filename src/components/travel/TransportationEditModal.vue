@@ -39,6 +39,7 @@ const departureStation = ref('');
 const arrivalStation = ref('');
 const departureDate = ref('');
 const departureTime = ref('');
+const link = ref('');
 const notes = ref('');
 
 const { isEditing, isSubmitting } = useFormModal(
@@ -61,6 +62,7 @@ const { isEditing, isSubmitting } = useFormModal(
       arrivalStation.value = trans.arrivalStation ?? '';
       departureDate.value = trans.departureDate ?? '';
       departureTime.value = trans.departureTime ?? '';
+      link.value = trans.link ?? '';
       notes.value = trans.notes ?? '';
     },
     onNew() {
@@ -79,6 +81,7 @@ const { isEditing, isSubmitting } = useFormModal(
       arrivalStation.value = '';
       departureDate.value = '';
       departureTime.value = '';
+      link.value = '';
       notes.value = '';
     },
   }
@@ -155,6 +158,7 @@ async function handleSave() {
       arrivalStation: arrivalStation.value,
       departureDate: departureDate.value,
       departureTime: departureTime.value,
+      link: link.value || undefined,
       notes: notes.value,
     };
     await vacationStore.updateVacation(props.vacationId, { transportation });
@@ -282,13 +286,33 @@ async function handleSave() {
         </div>
       </template>
 
-      <!-- Common: Booking reference -->
-      <FormFieldGroup
-        :label="t('vacation.field.bookingReference')"
-        :error="bookedErrors.has('bookingReference')"
-      >
-        <BaseInput v-model="bookingReference" :placeholder="t('vacation.field.bookingReference')" />
-      </FormFieldGroup>
+      <!-- Booking reference + Link -->
+      <div class="grid grid-cols-2 gap-3">
+        <FormFieldGroup
+          :label="t('vacation.field.bookingReference')"
+          :error="bookedErrors.has('bookingReference')"
+        >
+          <BaseInput
+            v-model="bookingReference"
+            :placeholder="t('vacation.field.bookingReference')"
+          />
+        </FormFieldGroup>
+        <FormFieldGroup :label="t('vacation.field.link')">
+          <div class="flex items-center gap-2">
+            <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+            <a
+              v-if="link"
+              :href="link.startsWith('http') ? link : `https://${link}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(0,180,216,0.08)] text-sm transition-colors hover:bg-[rgba(0,180,216,0.15)]"
+              title="Visit link"
+            >
+              🔗
+            </a>
+          </div>
+        </FormFieldGroup>
+      </div>
 
       <!-- Notes -->
       <FormFieldGroup :label="t('vacation.field.notes')">
