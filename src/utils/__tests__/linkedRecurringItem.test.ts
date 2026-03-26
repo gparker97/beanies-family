@@ -267,6 +267,111 @@ describe('syncEntityLinkedRecurringItem', () => {
     expect(callArg).not.toHaveProperty('monthOfYear');
   });
 
+  // --- One-time frequency (used by 'all' fee schedule) ---
+
+  it('should create item with endDate=startDate for one-time frequency', async () => {
+    vi.mocked(recurringRepo.createRecurringItem).mockResolvedValue({
+      id: 'one-time-item-1',
+      accountId: 'account-1',
+      type: 'expense',
+      amount: 500,
+      currency: 'USD',
+      category: 'lesson_fees',
+      description: 'Swimming Term Fee',
+      frequency: 'monthly',
+      dayOfMonth: 10,
+      startDate: '2026-03-10',
+      endDate: '2026-03-10',
+      isActive: true,
+      createdAt: '2026-03-10T00:00:00.000Z',
+      updatedAt: '2026-03-10T00:00:00.000Z',
+    });
+
+    const result = await syncEntityLinkedRecurringItem({
+      ...baseOpts,
+      description: 'Swimming Term Fee',
+      frequency: 'one-time',
+      startDate: '2026-03-10',
+      activityId: 'activity-swim-1',
+    });
+
+    expect(result).toBe('one-time-item-1');
+    const callArg = vi.mocked(recurringRepo.createRecurringItem).mock.calls[0]![0];
+    // Uses monthly frequency internally but endDate = startDate limits to one occurrence
+    expect(callArg).toMatchObject({
+      frequency: 'monthly',
+      startDate: '2026-03-10',
+      endDate: '2026-03-10',
+      amount: 500,
+      activityId: 'activity-swim-1',
+    });
+  });
+
+  it('should update existing item to one-time (endDate=startDate)', async () => {
+    vi.mocked(recurringRepo.updateRecurringItem).mockResolvedValue({
+      id: 'existing-recurring-1',
+      accountId: 'account-1',
+      type: 'expense',
+      amount: 300,
+      currency: 'USD',
+      category: 'lesson_fees',
+      description: 'Piano Term Fee',
+      frequency: 'monthly',
+      dayOfMonth: 5,
+      startDate: '2026-04-05',
+      endDate: '2026-04-05',
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-04-01T00:00:00.000Z',
+    });
+
+    const result = await syncEntityLinkedRecurringItem({
+      ...baseOpts,
+      amount: 300,
+      description: 'Piano Term Fee',
+      existingItemId: 'existing-recurring-1',
+      frequency: 'one-time',
+      startDate: '2026-04-05',
+    });
+
+    expect(result).toBe('existing-recurring-1');
+    const callArg = vi.mocked(recurringRepo.updateRecurringItem).mock.calls[0]![1];
+    expect(callArg).toMatchObject({
+      frequency: 'monthly',
+      startDate: '2026-04-05',
+      endDate: '2026-04-05',
+    });
+  });
+
+  it('should NOT set endDate for non-one-time frequency', async () => {
+    vi.mocked(recurringRepo.createRecurringItem).mockResolvedValue({
+      id: 'monthly-item-1',
+      accountId: 'account-1',
+      type: 'expense',
+      amount: 200,
+      currency: 'USD',
+      category: 'lesson_fees',
+      description: 'Monthly Lesson',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2026-03-15',
+      isActive: true,
+      createdAt: '2026-03-15T00:00:00.000Z',
+      updatedAt: '2026-03-15T00:00:00.000Z',
+    });
+
+    await syncEntityLinkedRecurringItem({
+      ...baseOpts,
+      amount: 200,
+      description: 'Monthly Lesson',
+      frequency: 'monthly',
+      startDate: '2026-03-15',
+    });
+
+    const callArg = vi.mocked(recurringRepo.createRecurringItem).mock.calls[0]![0];
+    expect(callArg).not.toHaveProperty('endDate');
+  });
+
   it('should set monthOfYear for yearly frequency', async () => {
     vi.mocked(recurringRepo.createRecurringItem).mockResolvedValue({
       id: 'yearly-item-1',
