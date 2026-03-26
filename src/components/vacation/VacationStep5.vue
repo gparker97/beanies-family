@@ -128,6 +128,16 @@ function handleDeleteIdea(index: number) {
       {{ t('vacation.ideas.empty') }}
     </p>
   </div>
+
+  <!-- Collaboration hint -->
+  <div
+    class="mt-5 flex items-start gap-2.5 rounded-xl border border-[var(--vacation-teal-15)] bg-[var(--vacation-teal-tint)] px-3.5 py-2.5 dark:border-teal-800/40 dark:bg-teal-900/15"
+  >
+    <span class="shrink-0 text-base leading-none">👨‍👩‍👧‍👦</span>
+    <p class="text-xs leading-relaxed text-[var(--color-text-muted)]">
+      {{ t('vacation.ideas.collabHint') }}
+    </p>
+  </div>
 </template>
 
 <style scoped>
