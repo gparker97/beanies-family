@@ -157,6 +157,8 @@ function isLiability(type: AccountType): boolean {
         :hint="t('hints.dashboardIncome')"
         tint="green"
         test-id="stat-monthly-income"
+        clickable
+        @click="router.push({ path: '/transactions', query: { direction: 'income' } })"
       />
       <SummaryStatCard
         :label="t('dashboard.monthlyExpenses')"
@@ -166,6 +168,8 @@ function isLiability(type: AccountType): boolean {
         :hint="t('hints.dashboardExpenses')"
         tint="orange"
         test-id="stat-monthly-expenses"
+        clickable
+        @click="router.push({ path: '/transactions', query: { direction: 'expense' } })"
       />
       <SummaryStatCard
         :label="t('dashboard.netCashFlow')"

@@ -1171,6 +1171,10 @@ const STRING_DEFS = {
   'transactions.filterAll': { en: 'All', beanie: 'all beans' },
   'transactions.filterRecurring': { en: 'Recurring', beanie: 'recurring' },
   'transactions.filterOneTime': { en: 'One-time', beanie: 'one-off' },
+  'transactions.filterIncoming': { en: 'Incoming', beanie: 'beans in' },
+  'transactions.filterOutgoing': { en: 'Outgoing', beanie: 'beans out' },
+  'transactions.showingIncome': { en: 'Showing: Income', beanie: 'showing: beans in' },
+  'transactions.showingExpenses': { en: 'Showing: Expenses', beanie: 'showing: beans out' },
   'transactions.searchPlaceholder': {
     en: 'Search transactions...',
     beanie: 'find a bean...',

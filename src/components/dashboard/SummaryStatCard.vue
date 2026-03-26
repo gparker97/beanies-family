@@ -30,7 +30,15 @@ interface Props {
   hint?: string;
   /** Subtitle text below the label (e.g., month name) */
   subtitle?: string;
+  /** Whether the card is clickable (shows pointer cursor, hover effects) */
+  clickable?: boolean;
+  /** Whether the card is in an active/selected state */
+  active?: boolean;
 }
+
+const emit = defineEmits<{
+  (e: 'click'): void;
+}>();
 
 const props = withDefaults(defineProps<Props>(), {
   changeAmount: 0,
@@ -38,6 +46,20 @@ const props = withDefaults(defineProps<Props>(), {
   tint: 'green',
   dark: false,
   testId: undefined,
+  clickable: false,
+  active: false,
+});
+
+const activeRing = computed(() => {
+  if (!props.active) return '';
+  switch (props.tint) {
+    case 'green':
+      return 'ring-2 ring-[#27AE60]/40 shadow-[0_0_12px_rgba(39,174,96,0.15)]';
+    case 'orange':
+      return 'ring-2 ring-[var(--color-primary)]/40 shadow-[0_0_12px_rgba(241,93,34,0.15)]';
+    default:
+      return 'ring-2 ring-[var(--color-secondary)]/40';
+  }
 });
 
 const { isUnlocked, MASK } = usePrivacyMode();
@@ -87,12 +109,19 @@ const changeColor = computed(() => {
 <template>
   <div
     :data-testid="testId"
-    class="rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
-    :class="
+    class="rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow,ring-color] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
+    :class="[
       dark
         ? 'from-secondary-500 bg-gradient-to-br to-[#3D5368] text-white'
-        : 'bg-white dark:bg-slate-800'
-    "
+        : 'bg-white dark:bg-slate-800',
+      clickable ? 'cursor-pointer select-none' : '',
+      activeRing,
+    ]"
+    :role="clickable ? 'button' : undefined"
+    :tabindex="clickable ? 0 : undefined"
+    @click="clickable && emit('click')"
+    @keydown.enter="clickable && emit('click')"
+    @keydown.space.prevent="clickable && emit('click')"
   >
     <!-- Icon + Label row -->
     <div class="mb-3 flex items-center gap-2.5">
