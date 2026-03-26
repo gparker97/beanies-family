@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-03-26
+
+### Added
+
+- Clickable summary cards on Transactions page — tap Income or Expense card to filter the list by direction, with a colored ring highlight on the active card and a dismissible filter chip
+- Dashboard Income and Expense summary cards now navigate to the Transactions page pre-filtered to the corresponding direction
+
 ## 2026-03-25
 
 ### Added
