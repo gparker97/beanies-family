@@ -232,13 +232,35 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-const feeScheduleChipOptions = computed(() =>
-  (['per_session', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'] as FeeSchedule[]).map(
-    (f) => ({
-      value: f,
-      label: t(`planner.fee.${f}` as const),
-    })
-  )
+const allScheduleEnabled = computed(
+  () => recurrenceMode.value === 'recurring' && !!recurrenceEndDate.value
+);
+
+const feeScheduleChipOptions = computed(() => {
+  const allChip = {
+    value: 'all',
+    label: t('planner.fee.all'),
+    ...(allScheduleEnabled.value
+      ? {}
+      : { disabled: true, disabledHint: t('planner.fee.allDisabledHint') }),
+  };
+  // Order: Per Session, All Sessions, then periodic options
+  const periodic: FeeSchedule[] = ['weekly', 'monthly', 'yearly', 'custom'];
+  return [
+    { value: 'per_session', label: t('planner.fee.per_session') },
+    allChip,
+    ...periodic.map((f) => ({ value: f, label: t(`planner.fee.${f}` as const) })),
+  ];
+});
+
+// Reset feeSchedule away from 'all' if end date is cleared
+watch(
+  () => allScheduleEnabled.value,
+  (enabled) => {
+    if (!enabled && feeSchedule.value === 'all') {
+      feeSchedule.value = 'per_session';
+    }
+  }
 );
 
 const reminderChipOptions = [
@@ -256,8 +278,10 @@ const frequencyOptions = [
 
 const hasCost = computed(() => (feeAmount.value ?? 0) > 0);
 
+const isAllSchedule = computed(() => feeSchedule.value === 'all');
+
 const calculatedMonthly = computed(() => {
-  if (!hasCost.value || feeSchedule.value === 'none') return 0;
+  if (!hasCost.value || feeSchedule.value === 'none' || isAllSchedule.value) return 0;
   return calculateMonthlyFee({
     feeSchedule: feeSchedule.value,
     feeAmount: feeAmount.value ?? 0,
@@ -265,6 +289,35 @@ const calculatedMonthly = computed(() => {
     feeCustomPeriod: feeCustomPeriod.value,
     feeCustomPeriodUnit: feeCustomPeriodUnit.value,
   });
+});
+
+// Estimated session count for 'all' schedule breakdown
+const totalSessions = computed(() => {
+  if (!isAllSchedule.value || !date.value || !recurrenceEndDate.value) return 0;
+  const start = new Date(date.value + 'T00:00:00');
+  const end = new Date(recurrenceEndDate.value + 'T00:00:00');
+  if (end < start) return 1;
+
+  if (recurrenceFrequency.value === 'weekly') {
+    // Count exact matching days-of-week between start and end (inclusive)
+    const targetDays = daysOfWeek.value.length > 0 ? daysOfWeek.value : [start.getDay()];
+    let count = 0;
+    const cursor = new Date(start);
+    while (cursor <= end) {
+      if (targetDays.includes(cursor.getDay())) count++;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return Math.max(count, 1);
+  }
+  // Monthly: count months from start to end (inclusive of both)
+  const months =
+    (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1;
+  return Math.max(months, 1);
+});
+
+const perSessionCost = computed(() => {
+  if (!isAllSchedule.value || !hasCost.value || totalSessions.value <= 0) return 0;
+  return Math.round((Math.abs(feeAmount.value ?? 0) / totalSessions.value) * 100) / 100;
 });
 
 const canSave = computed(() => {
@@ -583,7 +636,9 @@ function handleSave() {
       </div>
 
       <!-- 9. Cost + Fee Schedule -->
-      <FormFieldGroup :label="t('modal.costPerSession')">
+      <FormFieldGroup
+        :label="isAllSchedule ? t('planner.fee.totalCost') : t('modal.costPerSession')"
+      >
         <CurrencyAmountInput
           v-model:amount="feeAmount"
           v-model:currency="feeCurrency"
@@ -591,6 +646,19 @@ function handleSave() {
         />
       </FormFieldGroup>
       <FormFieldGroup :label="t('planner.field.feeSchedule')">
+        <template #label-extra>
+          <InfoHintBadge
+            :text="t('planner.fee.scheduleHintIntro')"
+            :items="[
+              t('planner.fee.scheduleHintPerSession'),
+              t('planner.fee.scheduleHintAll'),
+              t('planner.fee.scheduleHintWeekly'),
+              t('planner.fee.scheduleHintMonthly'),
+              t('planner.fee.scheduleHintYearly'),
+              t('planner.fee.scheduleHintCustom'),
+            ]"
+          />
+        </template>
         <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
       </FormFieldGroup>
 
@@ -609,10 +677,27 @@ function handleSave() {
         />
       </div>
 
-      <!-- Calculated monthly display -->
+      <!-- Per-session breakdown for 'all' schedule -->
+      <div v-if="isAllSchedule && hasCost && totalSessions > 0" class="flex items-center gap-2">
+        <span
+          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+        >
+          {{ t('planner.fee.perSessionBreakdown') }}
+        </span>
+        <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+          {{ formatCurrencyWithCode(perSessionCost, (feeCurrency || 'USD') as any) }}
+          <span class="font-normal opacity-50"> ({{ totalSessions }} sessions) </span>
+        </span>
+      </div>
+
+      <!-- Calculated monthly display (non-all schedules) -->
       <div
         v-if="
-          hasCost && feeSchedule !== 'none' && feeSchedule !== 'monthly' && calculatedMonthly > 0
+          !isAllSchedule &&
+          hasCost &&
+          feeSchedule !== 'none' &&
+          feeSchedule !== 'monthly' &&
+          calculatedMonthly > 0
         "
         class="flex items-center gap-2"
       >
@@ -627,15 +712,15 @@ function handleSave() {
         <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
       </div>
 
-      <!-- Recurring payment prompt -->
+      <!-- Linked payment prompt -->
       <RecurringPaymentPrompt
         v-if="hasCost && feeSchedule !== 'none'"
         v-model="createRecurringPayment"
         :pay-from-account-id="feePayFromAccountId"
-        :payment-amount="calculatedMonthly"
+        :payment-amount="isAllSchedule ? (feeAmount ?? 0) : calculatedMonthly"
         :currency="feeCurrency || 'USD'"
         :start-date="date"
-        frequency="monthly"
+        :frequency="isAllSchedule ? 'one-time' : 'monthly'"
         @update:pay-from-account-id="feePayFromAccountId = $event"
       />
 
