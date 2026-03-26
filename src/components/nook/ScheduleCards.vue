@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
-import { toDateInputValue, formatNookDate } from '@/utils/date';
+import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import NookSectionCard from './NookSectionCard.vue';
 
@@ -208,7 +208,12 @@ function handleClick(item: ScheduleItem) {
               {{ item.title }}
             </div>
             <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
-              {{ item.time ? item.time + (item.endTime ? ' - ' + item.endTime : '') + ' · ' : ''
+              {{
+                item.time
+                  ? formatTime12(item.time) +
+                    (item.endTime ? ' - ' + formatTime12(item.endTime) : '') +
+                    ' · '
+                  : ''
               }}{{ item.displayDate }}
             </div>
           </div>
@@ -257,7 +262,12 @@ function handleClick(item: ScheduleItem) {
                   {{ item.title }}
                 </div>
                 <div class="font-outfit mt-0.5 text-xs font-medium opacity-45">
-                  {{ item.time ? item.time + (item.endTime ? ' - ' + item.endTime : '') : '' }}
+                  {{
+                    item.time
+                      ? formatTime12(item.time) +
+                        (item.endTime ? ' - ' + formatTime12(item.endTime) : '')
+                      : ''
+                  }}
                 </div>
               </div>
             </div>

@@ -14,7 +14,7 @@ import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
-import { toDateInputValue, extractDatePart } from '@/utils/date';
+import { toDateInputValue, extractDatePart, formatTime12 } from '@/utils/date';
 import { tripTypeEmoji } from '@/utils/vacation';
 import type { FamilyActivity, TodoItem } from '@/types/models';
 
@@ -467,7 +467,8 @@ defineExpose({ weekLabel, activityCount });
                   {{ activity.title }}
                 </span>
                 <span class="text-primary-500 text-xs leading-tight opacity-70">
-                  {{ activity.startTime }}{{ activity.endTime ? `-${activity.endTime}` : '' }}
+                  {{ formatTime12(activity.startTime!)
+                  }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
                 </span>
                 <div v-if="normalizeAssignees(activity).length > 0" class="flex gap-0.5">
                   <MemberChip

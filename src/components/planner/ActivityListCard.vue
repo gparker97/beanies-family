@@ -3,7 +3,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { normalizeAssignees } from '@/utils/assignees';
-import { toDateInputValue, formatNookDate } from '@/utils/date';
+import { toDateInputValue, formatNookDate, formatTime12 } from '@/utils/date';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import type { FamilyActivity } from '@/types/models';
 
@@ -62,7 +62,8 @@ function formatDisplayDate(dateStr: string): string {
       <!-- Line 2: Time + recurrence + reminder + assignees -->
       <div class="mt-0.5 flex items-center gap-2">
         <span v-if="activity.startTime" class="text-primary-500 text-xs font-medium">
-          {{ activity.startTime }}{{ activity.endTime ? ` - ${activity.endTime}` : '' }}
+          {{ formatTime12(activity.startTime)
+          }}{{ activity.endTime ? ` - ${formatTime12(activity.endTime)}` : '' }}
         </span>
         <span
           v-if="activity.recurrence !== 'none'"

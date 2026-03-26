@@ -13,7 +13,14 @@ import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { getActivityCategoryName } from '@/constants/activityCategories';
-import { formatDate, addHourToTime, toDateInputValue, addDays, parseLocalDate } from '@/utils/date';
+import {
+  formatDate,
+  addHourToTime,
+  toDateInputValue,
+  addDays,
+  parseLocalDate,
+  formatTime12,
+} from '@/utils/date';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -717,7 +724,7 @@ async function confirmReschedule() {
               </span>
             </div>
           </template>
-          <!-- One-time: show date + time -->
+          <!-- One-time: show date -->
           <template v-else>
             <div class="flex items-center gap-2">
               <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
@@ -739,25 +746,27 @@ async function confirmReschedule() {
                 {{ viewFormattedEndDate }}
               </span>
             </div>
-            <div v-if="viewIsAllDay" class="flex items-center gap-2">
-              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-                {{ t('modal.time') }}
-              </span>
-              <span class="font-outfit text-primary-500 text-sm font-semibold">
-                ☀️ {{ t('planner.allDay') }}
-              </span>
-            </div>
-            <div v-else-if="activity.startTime" class="flex items-center gap-2">
-              <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
-                {{ t('modal.time') }}
-              </span>
-              <span
-                class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-              >
-                {{ activity.startTime }}{{ activity.endTime ? ` – ${activity.endTime}` : '' }}
-              </span>
-            </div>
           </template>
+          <!-- Time row (shown for both recurring and one-time) -->
+          <div v-if="viewIsAllDay" class="flex items-center gap-2">
+            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+              {{ t('modal.time') }}
+            </span>
+            <span class="font-outfit text-primary-500 text-sm font-semibold">
+              ☀️ {{ t('planner.allDay') }}
+            </span>
+          </div>
+          <div v-else-if="activity.startTime" class="flex items-center gap-2">
+            <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase">
+              {{ t('modal.time') }}
+            </span>
+            <span
+              class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+            >
+              {{ formatTime12(activity.startTime)
+              }}{{ activity.endTime ? ` – ${formatTime12(activity.endTime)}` : '' }}
+            </span>
+          </div>
         </div>
       </div>
 
