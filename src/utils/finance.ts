@@ -52,6 +52,10 @@ export function calculateMonthlyFee(opts: {
     case 'yearly':
       monthly = feeAmount / 12;
       break;
+    case 'all':
+      // Total for all sessions — not a per-period charge, return full amount
+      monthly = feeAmount;
+      break;
     case 'custom':
       if (feeCustomPeriodUnit === 'weeks' && feeCustomPeriod && feeCustomPeriod > 0) {
         monthly = (feeAmount / feeCustomPeriod) * (52 / 12);

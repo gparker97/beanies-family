@@ -648,6 +648,15 @@ const STRING_DEFS = {
     beanie:
       'Enable this to automatically create a recurring monthly transaction linked to this item. This helps you accurately track your spending each month and keeps your payments and activities connected — so you always know where your money is going.',
   },
+  'recurringPrompt.createOneTimePayment': {
+    en: 'Create One-Time Payment',
+    beanie: 'create one-time payment',
+  },
+  'recurringPrompt.createOneTimePaymentHint': {
+    en: 'Create a single expense transaction for the full amount on the start date. Use this for upfront payments that cover all sessions in the activity.',
+    beanie:
+      'create a single expense transaction for the full amount on the start date. use this for upfront payments that cover all sessions in the activity.',
+  },
   'recurringPrompt.payFrom': { en: 'Pay From', beanie: 'pay from' },
   'recurringPrompt.paymentCreated': {
     en: 'Monthly Payment Created',
@@ -2663,18 +2672,58 @@ const STRING_DEFS = {
 
   // Planner — Fee schedule labels
   'planner.fee.none': { en: 'No fees', beanie: 'no fees' },
-  'planner.fee.per_session': { en: 'Per Session', beanie: 'per session' },
+  'planner.fee.per_session': { en: 'Each', beanie: 'each' },
   'planner.fee.weekly': { en: 'Weekly', beanie: 'weekly' },
   'planner.fee.monthly': { en: 'Monthly', beanie: 'monthly' },
   'planner.fee.quarterly': { en: 'Quarterly', beanie: 'quarterly' },
   'planner.fee.yearly': { en: 'Yearly', beanie: 'yearly' },
   'planner.fee.custom': { en: 'Custom', beanie: 'custom' },
+  'planner.fee.all': { en: 'All', beanie: 'all' },
+  'planner.fee.allDisabledHint': {
+    en: 'Set an end date to use this option',
+    beanie: 'set an end date to use this option',
+  },
   'planner.fee.termly': { en: 'Per Term', beanie: 'per term' },
   'planner.fee.calculatedMonthly': { en: 'Monthly Charge', beanie: 'monthly charge' },
+  'planner.fee.totalCost': { en: 'Total Cost', beanie: 'total cost' },
+  'planner.fee.perSessionBreakdown': { en: 'Per Session', beanie: 'per session' },
   'planner.fee.monthlyCalcHint': {
     en: 'Calculated monthly equivalent based on your fee schedule. Linked transactions always use this monthly amount for consistent tracking.',
     beanie:
       'Calculated monthly equivalent based on your fee schedule. Linked transactions always use this monthly amount for consistent tracking.',
+  },
+  'planner.fee.scheduleHintIntro': {
+    en: 'How often you pay this fee:',
+    beanie: 'how often you pay this fee:',
+  },
+  'planner.fee.scheduleHintPerSession': {
+    en: 'Each — charged per session the activity occurs',
+    beanie: 'each — charged per session the activity occurs',
+  },
+  'planner.fee.scheduleHintWeekly': {
+    en: 'Weekly — a fixed charge every week',
+    beanie: 'weekly — a fixed charge every week',
+  },
+  'planner.fee.scheduleHintMonthly': {
+    en: 'Monthly — a fixed charge every month',
+    beanie: 'monthly — a fixed charge every month',
+  },
+  'planner.fee.scheduleHintQuarterly': {
+    en: 'Quarterly — a fixed charge every 3 months',
+    beanie: 'quarterly — a fixed charge every 3 months',
+  },
+  'planner.fee.scheduleHintYearly': {
+    en: 'Yearly — a fixed charge once per year',
+    beanie: 'yearly — a fixed charge once per year',
+  },
+  'planner.fee.scheduleHintCustom': {
+    en: 'Custom — a set amount every N weeks or months',
+    beanie: 'custom — a set amount every N weeks or months',
+  },
+  'planner.fee.scheduleHintAll': {
+    en: 'All Sessions — one upfront payment covering every session from start to end date. Creates a one-time transaction instead of a recurring one',
+    beanie:
+      'all sessions — one upfront payment covering every session from start to end date. creates a one-time transaction instead of a recurring one',
   },
   'planner.fee.customPeriod': { en: 'Every', beanie: 'every' },
   'planner.fee.weeks': { en: 'Weeks', beanie: 'weeks' },

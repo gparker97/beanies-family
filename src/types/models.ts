@@ -377,6 +377,7 @@ export type FeeSchedule =
   | 'quarterly'
   | 'yearly'
   | 'custom'
+  | 'all'
   | 'termly'; // @deprecated — legacy, treated as monthly passthrough
 export type ReminderMinutes = 0 | 5 | 10 | 15 | 30 | 60 | 120 | 1440;
 
