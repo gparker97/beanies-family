@@ -19,6 +19,7 @@ const showCustomInput = ref(false);
 const customValue = ref('');
 const dropdownRef = ref<HTMLElement | null>(null);
 const customInputRef = ref<HTMLInputElement | null>(null);
+const timeListRef = ref<HTMLElement | null>(null);
 
 // 30-min intervals from 07:00 to 22:00
 const presets = [
@@ -74,6 +75,14 @@ const isCustomTime = computed(() => {
 function toggleDropdown() {
   isOpen.value = !isOpen.value;
   showCustomInput.value = false;
+  if (isOpen.value) {
+    nextTick(() => {
+      const active = timeListRef.value?.querySelector('[data-active="true"]') as HTMLElement | null;
+      if (active) {
+        active.scrollIntoView({ block: 'center' });
+      }
+    });
+  }
 }
 
 function selectPreset(time: string) {
@@ -183,11 +192,12 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', handleClickOutsi
         </div>
 
         <!-- Scrollable time list -->
-        <div class="max-h-48 overflow-y-auto py-1">
+        <div ref="timeListRef" class="max-h-48 overflow-y-auto py-1">
           <button
             v-for="time in presets"
             :key="time"
             type="button"
+            :data-active="modelValue === time || undefined"
             class="font-outfit flex w-full items-center px-4 py-1.5 text-xs font-semibold transition-colors"
             :class="
               modelValue === time
