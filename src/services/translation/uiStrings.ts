@@ -2100,7 +2100,7 @@ const STRING_DEFS = {
   'todo.section.completed': { en: 'Completed', beanie: 'completed' },
   'todo.assignTo': { en: 'Assign to', beanie: 'assign to' },
   'todo.unassigned': { en: 'Unassigned', beanie: 'unassigned' },
-  'todo.allBeans': { en: 'All Beans', beanie: 'all beans' },
+  'todo.allBeans': { en: 'All Beans', beanie: 'all beanies' },
   'todo.selectDueDate': { en: 'Due Date', beanie: 'due date' },
   'todo.who': { en: 'Who', beanie: 'who' },
   'todo.dueDate': { en: 'Due date', beanie: 'due date' },
@@ -2513,7 +2513,7 @@ const STRING_DEFS = {
   },
   'googleDrive.reconnected': {
     en: 'Reconnected — all data saved',
-    beanie: 'reconnected — all beans safe',
+    beanie: 'reconnected — all beanies safe & sound',
   },
   'googleDrive.noFilesHint': {
     en: 'Make sure the file is in a folder named "beanies.family" on this account.',
@@ -3430,7 +3430,7 @@ const STRING_DEFS = {
   // Step 1
   'vacation.step1.title': {
     en: 'Where Are the Beans Going?',
-    beanie: 'where are the beans going?',
+    beanie: 'where are the beanies going?',
   },
   'vacation.step1.subtitle': {
     en: 'Pick your adventure type and give it a name!',
@@ -3634,7 +3634,7 @@ const STRING_DEFS = {
   'vacation.celebration.who': { en: 'Who', beanie: 'who' },
   'vacation.celebration.booked': { en: 'Booked', beanie: 'booked' },
   'vacation.celebration.ideas': { en: 'Ideas', beanie: 'ideas' },
-  'vacation.celebration.allBeans': { en: 'All Beans!', beanie: 'all beans!' },
+  'vacation.celebration.allBeans': { en: 'All Beans!', beanie: 'all beanies!' },
   'vacation.celebration.going': { en: 'going', beanie: 'going' },
   'vacation.celebration.letsGo': { en: "Awesome, Let's Go!", beanie: "awesome, let's go!" },
   'vacation.celebration.daysToTakeoff': {
@@ -3727,10 +3727,15 @@ const STRING_DEFS = {
   'vacation.field.startTime': { en: 'Start Time', beanie: 'start time' },
   'vacation.field.duration': { en: 'Duration', beanie: 'duration' },
 
-  // Ideas empty state
+  // Ideas empty state & collaboration hint
   'vacation.ideas.empty': {
     en: 'No ideas yet \u2014 add your first one above!',
     beanie: 'no ideas yet \u2014 add your first one above!',
+  },
+  'vacation.ideas.collabHint': {
+    en: 'More ideas can be added anytime \u2014 all family members can suggest and vote on ideas together!',
+    beanie:
+      'more ideas can be added anytime \u2014 all beanies can suggest and vote on ideas together!',
   },
 
   // Notes placeholder

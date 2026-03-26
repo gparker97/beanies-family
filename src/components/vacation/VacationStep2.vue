@@ -90,6 +90,17 @@ const sortedSegments = computed(() =>
     })
 );
 
+/** Show large selector cards when no travel segments exist yet */
+const hasSegments = computed(() => sortedSegments.value.length > 0);
+
+const segmentTypeCards: { type: VacationTravelType; emoji: string; key: string }[] = [
+  { type: 'flight_outbound', emoji: '✈️', key: 'vacation.travel.flights' },
+  { type: 'cruise', emoji: '🚢', key: 'vacation.segment.cruise' },
+  { type: 'car', emoji: '🚗', key: 'vacation.travel.addCar' },
+  { type: 'train', emoji: '🚅', key: 'vacation.segment.train' },
+  { type: 'ferry', emoji: '⛴️', key: 'vacation.segment.ferry' },
+];
+
 function segmentIcon(type: VacationTravelType): string {
   return segmentIcons[type] || '✈️';
 }
@@ -631,8 +642,57 @@ function removeSegment(index: number) {
     </VacationSegmentCard>
   </div>
 
-  <!-- Add segment pills -->
-  <div class="mt-4 flex flex-wrap gap-2">
+  <!-- ═══ Initial selector — large cards (shown when no segments yet) ═══ -->
+  <div v-if="!hasSegments && !showFlightTypeChoice" class="grid grid-cols-3 gap-2">
+    <button
+      v-for="card in segmentTypeCards"
+      :key="card.type"
+      type="button"
+      class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-3 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+      @click="addSegment(card.type)"
+    >
+      <span class="text-2xl">{{ card.emoji }}</span>
+      <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+        {{ t(card.key as any) }}
+      </span>
+    </button>
+  </div>
+
+  <!-- Flight type sub-choice (initial selector variant) -->
+  <div v-else-if="!hasSegments && showFlightTypeChoice" class="space-y-3">
+    <div class="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-4 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+        @click="addFlightSegments(false)"
+      >
+        <span class="text-2xl">✈️</span>
+        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t('vacation.travel.oneWay') }}
+        </span>
+      </button>
+      <button
+        type="button"
+        class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-4 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+        @click="addFlightSegments(true)"
+      >
+        <span class="text-2xl">🔄</span>
+        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t('vacation.travel.return') }}
+        </span>
+      </button>
+    </div>
+    <button
+      type="button"
+      class="mx-auto block text-xs text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+      @click="showFlightTypeChoice = false"
+    >
+      ← {{ t('vacation.back') }}
+    </button>
+  </div>
+
+  <!-- ═══ Add-more pills (shown after at least one segment exists) ═══ -->
+  <div v-if="hasSegments" class="mt-4 flex flex-wrap gap-2">
     <template v-if="showFlightTypeChoice">
       <div
         class="flex items-center gap-1.5 rounded-xl border border-teal-300 bg-teal-50/60 px-2 py-1 dark:border-teal-600 dark:bg-teal-900/20"

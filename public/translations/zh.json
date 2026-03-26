@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-24",
-    "translationCount": 1891
+    "lastUpdated": "2026-03-26",
+    "translationCount": 1896
   },
   "translations": {
     "app.name": {
@@ -9460,6 +9460,31 @@
       "translation": "无法从云端刷新。使用缓存数据。",
       "hash": "gu29cs",
       "lastUpdated": "2026-03-24"
+    },
+    "transactions.filterIncoming": {
+      "translation": "在途",
+      "hash": "2lqibq",
+      "lastUpdated": "2026-03-26"
+    },
+    "transactions.filterOutgoing": {
+      "translation": "在途出库",
+      "hash": "237ma4",
+      "lastUpdated": "2026-03-26"
+    },
+    "transactions.showingIncome": {
+      "translation": "显示：收入",
+      "hash": "gok93o",
+      "lastUpdated": "2026-03-26"
+    },
+    "transactions.showingExpenses": {
+      "translation": "显示：支出",
+      "hash": "g6rnie",
+      "lastUpdated": "2026-03-26"
+    },
+    "vacation.ideas.collabHint": {
+      "translation": "创意可以随时添加\\ u2014所有家庭成员都可以一起提出建议并对创意进行投票！",
+      "hash": "x8p2ff",
+      "lastUpdated": "2026-03-26"
     }
   }
 }

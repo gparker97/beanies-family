@@ -348,8 +348,24 @@ function isBus(type: VacationTransportationType): boolean {
       </div>
     </VacationSegmentCard>
 
-    <!-- Add transportation pills -->
-    <div class="mt-4 flex flex-wrap gap-2">
+    <!-- ═══ Initial selector — large cards (shown when no transportation yet) ═══ -->
+    <div v-if="transportation.length === 0" class="grid grid-cols-2 gap-2">
+      <button
+        v-for="tt in transportTypes"
+        :key="tt.type"
+        type="button"
+        class="relative flex flex-col items-center rounded-xl border border-transparent bg-white p-3 transition-all duration-150 hover:-translate-y-[1px] hover:border-[var(--vacation-teal-15)] dark:bg-slate-800"
+        @click="addItem(tt.type)"
+      >
+        <span class="text-2xl">{{ tt.emoji }}</span>
+        <span class="font-outfit text-xs font-semibold text-[var(--color-text)] dark:text-gray-100">
+          {{ t(`vacation.transport.${tt.key}` as any) }}
+        </span>
+      </button>
+    </div>
+
+    <!-- ═══ Add-more pills (shown after at least one transportation exists) ═══ -->
+    <div v-else class="mt-4 flex flex-wrap gap-2">
       <button
         v-for="tt in transportTypes"
         :key="tt.type"
