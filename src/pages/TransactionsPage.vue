@@ -73,6 +73,7 @@ const { playWhoosh } = useSounds();
 const selectedMonth = ref(new Date());
 const { isFutureMonth, projectedTransactions } = useProjectedTransactions(selectedMonth);
 const activeFilter = ref<'all' | 'recurring' | 'one-time'>('all');
+const directionFilter = ref<'all' | 'income' | 'expense'>('all');
 const searchQuery = ref('');
 
 // Modal state
@@ -106,9 +107,17 @@ function handleTransactionQueryParam() {
     const ri = recurringStore.getRecurringItemById(riId);
     if (ri) openEditRecurringModal(ri);
   }
-  if (viewId || riId) {
+  const direction = route.query.direction as string | undefined;
+  if (direction === 'income' || direction === 'expense') {
+    directionFilter.value = direction;
+  }
+  if (viewId || riId || direction) {
     router.replace({ query: {} });
   }
+}
+
+function toggleDirection(direction: 'income' | 'expense') {
+  directionFilter.value = directionFilter.value === direction ? 'all' : direction;
 }
 watch(
   () => route.query.view,
@@ -162,11 +171,17 @@ const filteredByType = computed(() => {
   return monthTransactions.value;
 });
 
+// Apply direction filter (income / expense)
+const filteredByDirection = computed(() => {
+  if (directionFilter.value === 'all') return filteredByType.value;
+  return filteredByType.value.filter((tx) => tx.type === directionFilter.value);
+});
+
 // Apply search
 const displayTransactions = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
-  if (!q) return filteredByType.value;
-  return filteredByType.value.filter(
+  if (!q) return filteredByDirection.value;
+  return filteredByDirection.value.filter(
     (tx) =>
       tx.description.toLowerCase().includes(q) ||
       getCategoryName(tx.category).toLowerCase().includes(q) ||
@@ -750,6 +765,9 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         :hint="t('hints.transactionsIncome')"
         :subtitle="formatMonthYear(selectedMonth)"
         tint="green"
+        clickable
+        :active="directionFilter === 'income'"
+        @click="toggleDirection('income')"
       >
         <template #icon>
           <BeanieIcon name="arrow-up" size="md" class="text-[#27AE60]" />
@@ -764,6 +782,9 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         :hint="t('hints.transactionsExpenses')"
         :subtitle="formatMonthYear(selectedMonth)"
         tint="orange"
+        clickable
+        :active="directionFilter === 'expense'"
+        @click="toggleDirection('expense')"
       >
         <template #icon>
           <BeanieIcon name="arrow-down" size="md" class="text-primary-500" />
@@ -779,6 +800,9 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         :subtitle="formatMonthYear(selectedMonth)"
         tint="slate"
         :dark="monthNet >= 0"
+        clickable
+        :active="false"
+        @click="directionFilter = 'all'"
       >
         <template #icon>
           <BeanieIcon
@@ -788,6 +812,37 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
           />
         </template>
       </SummaryStatCard>
+    </div>
+
+    <!-- Direction filter chip -->
+    <div v-if="directionFilter !== 'all'" class="flex items-center gap-2">
+      <button
+        type="button"
+        class="font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors"
+        :class="
+          directionFilter === 'income'
+            ? 'bg-[rgba(39,174,96,0.12)] text-[#27AE60] dark:bg-[rgba(39,174,96,0.2)]'
+            : 'text-primary-500 dark:bg-primary-900/20 bg-[var(--tint-orange-8)]'
+        "
+        @click="directionFilter = 'all'"
+      >
+        {{
+          directionFilter === 'income'
+            ? t('transactions.showingIncome')
+            : t('transactions.showingExpenses')
+        }}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        >
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
     </div>
 
     <!-- Transaction list -->
