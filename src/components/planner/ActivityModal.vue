@@ -500,63 +500,6 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- 3b. Cost + Fee Schedule -->
-      <FormFieldGroup :label="t('modal.costPerSession')">
-        <CurrencyAmountInput
-          v-model:amount="feeAmount"
-          v-model:currency="feeCurrency"
-          font-size="1.1rem"
-        />
-      </FormFieldGroup>
-      <FormFieldGroup :label="t('planner.field.feeSchedule')">
-        <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
-      </FormFieldGroup>
-
-      <!-- Custom period inputs -->
-      <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
-        <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-          t('planner.fee.customPeriod')
-        }}</span>
-        <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
-        <TogglePillGroup
-          v-model="feeCustomPeriodUnit"
-          :options="[
-            { value: 'weeks', label: t('planner.fee.weeks') },
-            { value: 'months', label: t('planner.fee.months') },
-          ]"
-        />
-      </div>
-
-      <!-- Calculated monthly display -->
-      <div
-        v-if="
-          hasCost && feeSchedule !== 'none' && feeSchedule !== 'monthly' && calculatedMonthly > 0
-        "
-        class="flex items-center gap-2"
-      >
-        <span
-          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
-        >
-          {{ t('planner.fee.calculatedMonthly') }}
-        </span>
-        <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-          {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
-        </span>
-        <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
-      </div>
-
-      <!-- Recurring payment prompt -->
-      <RecurringPaymentPrompt
-        v-if="hasCost && feeSchedule !== 'none'"
-        v-model="createRecurringPayment"
-        :pay-from-account-id="feePayFromAccountId"
-        :payment-amount="calculatedMonthly"
-        :currency="feeCurrency || 'USD'"
-        :start-date="date"
-        frequency="monthly"
-        @update:pay-from-account-id="feePayFromAccountId = $event"
-      />
-
       <!-- 4. Recurring frequency + day-of-week (shown only for recurring mode) -->
       <template v-if="recurrenceMode === 'recurring'">
         <FormFieldGroup :label="t('modal.schedule')">
@@ -639,7 +582,64 @@ function handleSave() {
         </FormFieldGroup>
       </div>
 
-      <!-- 9. "Add more details" collapsible -->
+      <!-- 9. Cost + Fee Schedule -->
+      <FormFieldGroup :label="t('modal.costPerSession')">
+        <CurrencyAmountInput
+          v-model:amount="feeAmount"
+          v-model:currency="feeCurrency"
+          font-size="1.1rem"
+        />
+      </FormFieldGroup>
+      <FormFieldGroup :label="t('planner.field.feeSchedule')">
+        <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+      </FormFieldGroup>
+
+      <!-- Custom period inputs -->
+      <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
+        <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+          t('planner.fee.customPeriod')
+        }}</span>
+        <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
+        <TogglePillGroup
+          v-model="feeCustomPeriodUnit"
+          :options="[
+            { value: 'weeks', label: t('planner.fee.weeks') },
+            { value: 'months', label: t('planner.fee.months') },
+          ]"
+        />
+      </div>
+
+      <!-- Calculated monthly display -->
+      <div
+        v-if="
+          hasCost && feeSchedule !== 'none' && feeSchedule !== 'monthly' && calculatedMonthly > 0
+        "
+        class="flex items-center gap-2"
+      >
+        <span
+          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+        >
+          {{ t('planner.fee.calculatedMonthly') }}
+        </span>
+        <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+          {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
+        </span>
+        <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
+      </div>
+
+      <!-- Recurring payment prompt -->
+      <RecurringPaymentPrompt
+        v-if="hasCost && feeSchedule !== 'none'"
+        v-model="createRecurringPayment"
+        :pay-from-account-id="feePayFromAccountId"
+        :payment-amount="calculatedMonthly"
+        :currency="feeCurrency || 'USD'"
+        :start-date="date"
+        frequency="monthly"
+        @update:pay-from-account-id="feePayFromAccountId = $event"
+      />
+
+      <!-- 10. "Add more details" collapsible -->
       <div>
         <button
           type="button"
