@@ -187,24 +187,30 @@ export const useActivityStore = defineStore('activities', () => {
   async function syncLinkedRecurringPayment(activity: FamilyActivity) {
     const enabled = !!(activity.payFromAccountId && activity.feeAmount);
     const settingsStore = useSettingsStore();
-    const monthlyAmount = calculateMonthlyFee({
-      feeSchedule: activity.feeSchedule,
-      feeAmount: activity.feeAmount ?? 0,
-      sessionsPerWeek: activity.daysOfWeek?.length || 1,
-      feeCustomPeriod: activity.feeCustomPeriod,
-      feeCustomPeriodUnit: activity.feeCustomPeriodUnit,
-    });
+    const isAllSchedule = activity.feeSchedule === 'all';
+
+    // For 'all' schedule, use the full amount as a one-time payment;
+    // otherwise calculate the monthly equivalent
+    const paymentAmount = isAllSchedule
+      ? (activity.feeAmount ?? 0)
+      : calculateMonthlyFee({
+          feeSchedule: activity.feeSchedule,
+          feeAmount: activity.feeAmount ?? 0,
+          sessionsPerWeek: activity.daysOfWeek?.length || 1,
+          feeCustomPeriod: activity.feeCustomPeriod,
+          feeCustomPeriodUnit: activity.feeCustomPeriodUnit,
+        });
     const newItemId = await syncEntityLinkedRecurringItem({
       enabled,
       existingItemId: activity.linkedRecurringItemId,
       accountId: activity.payFromAccountId,
-      amount: monthlyAmount,
+      amount: paymentAmount,
       currency: (activity.feeCurrency || settingsStore.displayCurrency) as CurrencyCode,
       category: activityCategoryToExpenseCategory(activity.category) || 'other_lessons',
       description: `${activity.title} Fee`,
       activityId: activity.id,
       startDate: activity.date,
-      frequency: 'monthly',
+      frequency: isAllSchedule ? 'one-time' : 'monthly',
     });
     // Sync linkedRecurringItemId on the activity (clear with '' when removed)
     const currentId = activity.linkedRecurringItemId || '';

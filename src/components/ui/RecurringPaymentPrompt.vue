@@ -17,7 +17,7 @@ const props = withDefaults(
     paymentAmount: number;
     currency: string;
     startDate?: string;
-    frequency?: 'monthly' | 'yearly';
+    frequency?: 'monthly' | 'yearly' | 'one-time';
   }>(),
   { frequency: 'monthly' }
 );
@@ -29,6 +29,8 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const accountsStore = useAccountsStore();
+
+const isOneTime = computed(() => props.frequency === 'one-time');
 
 // Filter to active, non-loan, non-credit-card accounts matching the entity's currency
 const payableAccounts = computed(() =>
@@ -50,6 +52,12 @@ const selectedAccountName = computed(() => {
 const summaryText = computed(() => {
   if (!props.payFromAccountId || !selectedAccountName.value) return '';
   const amt = formatCurrencyWithCode(props.paymentAmount, props.currency as CurrencyCode);
+  if (isOneTime.value) {
+    const dateStr = props.startDate
+      ? formatMonthYearShort(new Date(props.startDate + 'T00:00:00'))
+      : '';
+    return `${amt} one-time from ${selectedAccountName.value}${dateStr ? ` on ${dateStr}` : ''}`;
+  }
   const freqSuffix = props.frequency === 'yearly' ? '/yr' : '/mo';
   const dateStr = props.startDate
     ? formatMonthYearShort(new Date(props.startDate + 'T00:00:00'))
@@ -66,9 +74,19 @@ const summaryText = computed(() => {
     >
       <div class="flex items-center gap-1.5">
         <span class="font-outfit text-sm font-semibold text-[var(--color-text)]">
-          {{ t('recurringPrompt.createPayment') }}
+          {{
+            isOneTime
+              ? t('recurringPrompt.createOneTimePayment')
+              : t('recurringPrompt.createPayment')
+          }}
         </span>
-        <InfoHintBadge :text="t('recurringPrompt.createPaymentHint')" />
+        <InfoHintBadge
+          :text="
+            isOneTime
+              ? t('recurringPrompt.createOneTimePaymentHint')
+              : t('recurringPrompt.createPaymentHint')
+          "
+        />
       </div>
       <ToggleSwitch
         :model-value="modelValue"

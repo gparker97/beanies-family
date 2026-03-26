@@ -27,7 +27,7 @@ export async function syncEntityLinkedRecurringItem(opts: {
   loanId?: string;
   activityId?: string;
   startDate?: string;
-  frequency?: 'monthly' | 'yearly';
+  frequency?: 'monthly' | 'yearly' | 'one-time';
 }): Promise<string | undefined> {
   const recurringStore = useRecurringStore();
 
@@ -41,7 +41,14 @@ export async function syncEntityLinkedRecurringItem(opts: {
 
   const startDateObj = opts.startDate ? new Date(opts.startDate + 'T00:00:00') : new Date();
   const dayOfMonth = startDateObj.getDate();
-  const freq: RecurringFrequency = opts.frequency ?? 'monthly';
+
+  // One-time payments use 'monthly' frequency but endDate = startDate
+  // so only one occurrence is ever generated
+  const isOneTime = opts.frequency === 'one-time';
+  const freq: RecurringFrequency = isOneTime
+    ? 'monthly'
+    : ((opts.frequency ?? 'monthly') as RecurringFrequency);
+  const startDate = opts.startDate || toDateInputValue(new Date());
 
   const itemData: CreateRecurringItemInput = {
     accountId: opts.accountId,
@@ -53,7 +60,8 @@ export async function syncEntityLinkedRecurringItem(opts: {
     frequency: freq,
     dayOfMonth: Math.min(dayOfMonth, 28),
     ...(freq === 'yearly' ? { monthOfYear: startDateObj.getMonth() + 1 } : {}),
-    startDate: opts.startDate || toDateInputValue(new Date()),
+    startDate,
+    ...(isOneTime ? { endDate: startDate } : {}),
     isActive: true,
     ...(opts.loanId ? { loanId: opts.loanId } : {}),
     ...(opts.activityId ? { activityId: opts.activityId } : {}),

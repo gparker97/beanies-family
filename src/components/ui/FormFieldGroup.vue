@@ -16,7 +16,7 @@ withDefaults(defineProps<Props>(), {
 <template>
   <div class="space-y-2">
     <label
-      class="font-outfit text-xs font-semibold tracking-[0.1em] whitespace-nowrap uppercase"
+      class="font-outfit flex items-center gap-1.5 text-xs font-semibold tracking-[0.1em] whitespace-nowrap uppercase"
       :class="
         error
           ? 'text-primary-500 opacity-100'
@@ -25,6 +25,7 @@ withDefaults(defineProps<Props>(), {
     >
       {{ label }}
       <span v-if="required" class="text-primary-500 text-sm font-bold opacity-100">*</span>
+      <slot name="label-extra" />
     </label>
     <div :class="error ? 'ring-primary-500/40 rounded-2xl ring-2' : ''">
       <slot />
