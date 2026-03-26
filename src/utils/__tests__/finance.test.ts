@@ -88,6 +88,22 @@ describe('calculateMonthlyFee', () => {
     expect(result).toBe(250);
   });
 
+  it('all: $500 total → $500 (full amount passthrough)', () => {
+    const result = calculateMonthlyFee({
+      feeSchedule: 'all',
+      feeAmount: 500,
+    });
+    expect(result).toBe(500);
+  });
+
+  it('all: $0 amount → $0', () => {
+    const result = calculateMonthlyFee({
+      feeSchedule: 'all',
+      feeAmount: 0,
+    });
+    expect(result).toBe(0);
+  });
+
   it('legacy termly → passthrough (identity)', () => {
     const result = calculateMonthlyFee({
       feeSchedule: 'termly',
