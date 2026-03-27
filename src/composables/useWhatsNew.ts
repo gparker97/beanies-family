@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue';
 import { getLatestVersion, getLatestReleaseNote, type ReleaseNote } from '@/content/release-notes';
 import { useAuthStore } from '@/stores/authStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 const STORAGE_KEY = 'beanies-lastSeenWhatsNew';
 
@@ -8,11 +9,13 @@ const lastSeenVersion = ref(localStorage.getItem(STORAGE_KEY) ?? '');
 
 export function useWhatsNew() {
   const authStore = useAuthStore();
+  const settingsStore = useSettingsStore();
   const latestVersion = getLatestVersion();
 
   const shouldShowModal = computed(() => {
     if (!latestVersion) return false;
     if (!authStore.isAuthenticated) return false;
+    if (!settingsStore.onboardingCompleted) return false;
     return lastSeenVersion.value !== latestVersion;
   });
 
