@@ -10,6 +10,8 @@ export function useWhatsNew() {
 
   const shouldShowModal = computed(() => {
     if (!latestVersion) return false;
+    // Suppress during E2E tests (same flag used by TrustDeviceModal)
+    if (sessionStorage.getItem('e2e_auto_auth') === 'true') return false;
     return lastSeenVersion.value !== latestVersion;
   });
 
