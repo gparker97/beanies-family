@@ -14,6 +14,7 @@ import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import RecurringEditScopeModal from '@/components/ui/RecurringEditScopeModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
+import WhatsNewModal from '@/components/common/WhatsNewModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
@@ -870,6 +871,7 @@ watch(
       @enable="handleEnablePasskey"
       @decline="handleDeclinePasskey"
     />
+    <WhatsNewModal />
 
     <div v-if="showLayout" class="flex h-screen overflow-hidden">
       <!-- Desktop sidebar -->

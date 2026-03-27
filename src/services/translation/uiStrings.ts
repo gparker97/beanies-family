@@ -3431,7 +3431,25 @@ const STRING_DEFS = {
     beanie: 'no articles in this category yet.',
   },
 
+  // Beanie tip of the day
+  'tips.label': { en: 'Beanie Tip of the Day', beanie: 'beanie tip of the day' },
+  'tips.gotIt': { en: 'Got It', beanie: 'got it' },
+  'tips.tryIt': { en: 'Try It', beanie: 'try it' },
+  'tips.dontShowTips': { en: "Don't Show Tips", beanie: "don't show tips" },
+
+  // What's New modal
+  'whatsNew.title': { en: "What's New", beanie: "what's new" },
+  'whatsNew.gotItThanks': { en: 'Got It, Thanks', beanie: 'got it, thanks' },
+  'whatsNew.seeAll': { en: 'See All Release Notes', beanie: 'see all release notes' },
+  'whatsNew.alsoFixed': { en: 'Also Fixed', beanie: 'also fixed' },
+  'whatsNew.tryIt': { en: 'Try It', beanie: 'try it' },
+
   // Help categories
+  'help.category.whatsNew': { en: "What's New", beanie: "what's new" },
+  'help.category.whatsNewDesc': {
+    en: 'Release notes and recent improvements \u2014 straight from the head beanie developer.',
+    beanie: 'release notes and recent improvements \u2014 straight from the head beanie developer.',
+  },
   'help.category.gettingStarted': { en: 'Getting Started', beanie: 'getting started' },
   'help.category.gettingStartedDesc': {
     en: 'Create your first pod, add family members, and start tracking your beans.',

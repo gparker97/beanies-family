@@ -57,6 +57,7 @@ function handleLinkClick(link: { href: string; scrollTo?: boolean }) {
 .fnav {
   align-items: center;
   backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   background: rgb(255 255 255 / 82%);
   border: 1px solid rgb(44 62 80 / 6%);
   border-radius: 40px;

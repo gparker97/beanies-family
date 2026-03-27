@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beanie Tip of the Day & What's New — Mockup</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --deep-slate: #2C3E50;
+      --deep-slate-dark: #1a252f;
+      --deep-slate-light: #34495E;
+      --heritage-orange: #F15D22;
+      --sky-silk: #AED6F1;
+      --terracotta: #E67E22;
+      --cloud-white: #F8F9FA;
+      --success-green: #27AE60;
+      --todo-purple: #9B59B6;
+
+      --tint-orange-8: rgba(241, 93, 34, 0.08);
+      --tint-orange-15: rgba(241, 93, 34, 0.15);
+      --tint-silk-10: rgba(174, 214, 241, 0.1);
+      --tint-silk-20: rgba(174, 214, 241, 0.2);
+      --tint-slate-5: rgba(44, 62, 80, 0.05);
+      --tint-slate-10: rgba(44, 62, 80, 0.1);
+
+      --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+      --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+      --sq: 24px;
+      --color-text: #2C3E50;
+      --color-text-muted: #6B7B8D;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--deep-slate-dark);
+      color: var(--color-text);
+      height: 100vh;
+      overflow: hidden;
+    }
+    .font-outfit { font-family: 'Outfit', sans-serif; }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* SCREEN SWITCHER                                        */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .screen-switcher {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      background: var(--deep-slate);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex; align-items: center; gap: 0;
+      padding: 0 24px; height: 52px;
+      overflow-x: auto;
+    }
+    .screen-switcher .label {
+      font-family: 'Outfit', sans-serif;
+      color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      margin-right: 16px; white-space: nowrap;
+    }
+    .screen-btn {
+      background: none; border: none;
+      color: rgba(255,255,255,0.5);
+      font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 500;
+      padding: 14px 18px; cursor: pointer; transition: all 0.2s;
+      border-bottom: 2px solid transparent; white-space: nowrap;
+    }
+    .screen-btn:hover { color: rgba(255,255,255,0.8); }
+    .screen-btn.active { color: var(--heritage-orange); border-bottom-color: var(--heritage-orange); }
+
+    .screen { display: none; height: 100vh; padding-top: 52px; overflow-y: auto; }
+    .screen.active { display: block; }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* SHARED NOOK STRUCTURE                                  */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .nook-page {
+      background: var(--cloud-white);
+      min-height: calc(100vh - 52px);
+      display: flex; justify-content: center;
+      padding: 28px 24px 80px;
+    }
+    .nook-page.dark-bg {
+      background: var(--deep-slate-dark);
+    }
+    .nook-inner {
+      max-width: 820px; width: 100%;
+      display: flex; flex-direction: column; gap: 20px;
+    }
+
+    /* ───── Greeting ───── */
+    .greeting {
+      padding: 4px 0;
+    }
+    .greeting h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 24px; font-weight: 700;
+      color: var(--deep-slate); line-height: 1.2;
+    }
+    .greeting h1 .name { color: var(--heritage-orange); }
+    .greeting .sub {
+      font-size: 13px; color: var(--color-text-muted); opacity: 0.45;
+      margin-top: 3px;
+    }
+
+    /* ───── Status Toast (orange gradient bar) ───── */
+    .status-toast {
+      background: linear-gradient(135deg, #f15d22, #e67e22, #d4701e);
+      border-radius: 18px; padding: 18px 20px;
+      box-shadow: 0 6px 24px rgba(241, 93, 34, 0.2);
+      display: flex; align-items: center; gap: 14px;
+      color: white;
+    }
+    .status-toast-icon {
+      width: 42px; height: 42px; border-radius: 14px;
+      background: rgba(255,255,255,0.18);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .status-toast-body { flex: 1; min-width: 0; }
+    .status-toast-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px; font-weight: 600;
+    }
+    .status-toast-sub {
+      font-size: 12px; opacity: 0.65; margin-top: 2px;
+    }
+
+    /* ───── Your Beans Row ───── */
+    .beans-row-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--color-text-muted); opacity: 0.4;
+      margin-bottom: -10px;
+    }
+    .beans-row {
+      display: flex; gap: 20px; padding: 8px 0;
+      overflow-x: auto;
+    }
+    .bean-member {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 6px;
+      cursor: pointer; transition: transform 0.15s;
+    }
+    .bean-member:hover { transform: translateY(-3px); }
+    .bean-avatar {
+      width: 52px; height: 52px; border-radius: 50%;
+      position: relative; overflow: visible;
+    }
+    .bean-avatar img {
+      width: 100%; height: 100%; object-fit: cover;
+      border-radius: 50%;
+      border: 2.5px solid transparent;
+    }
+    .bean-avatar.greg img { border-color: #3498DB; background: #dbeafe; }
+    .bean-avatar.sarah img { border-color: #E91E63; background: #fce4ec; }
+    .bean-avatar.liam img { border-color: #27AE60; background: #d5f5e3; }
+    .bean-avatar.emma img { border-color: #9B59B6; background: #f3e5f5; }
+    .bean-avatar.noah img { border-color: #F39C12; background: #fef3cd; }
+    .bean-avatar .online {
+      position: absolute; bottom: 1px; right: 1px;
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--success-green);
+      border: 2px solid white;
+    }
+    .bean-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px; font-weight: 600;
+      color: var(--deep-slate);
+    }
+    .bean-role {
+      font-size: 10px; color: var(--color-text-muted); opacity: 0.4;
+      margin-top: -4px;
+    }
+    .bean-add {
+      width: 52px; height: 52px; border-radius: 50%;
+      border: 2px dashed rgba(44, 62, 80, 0.15);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; opacity: 0.3;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .bean-add:hover { opacity: 0.6; border-color: var(--heritage-orange); }
+
+    /* ───── Section Cards (generic nook card) ───── */
+    .nook-card {
+      background: white; border-radius: var(--sq);
+      box-shadow: var(--card-shadow); padding: 22px 24px;
+    }
+    .nook-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .nook-card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px; font-weight: 600; color: var(--deep-slate);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .nook-card-title .icon {
+      font-size: 16px;
+    }
+    .nook-card-link {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px; font-weight: 500;
+      color: var(--heritage-orange); text-decoration: none;
+      opacity: 0.7; transition: opacity 0.15s;
+    }
+    .nook-card-link:hover { opacity: 1; }
+
+    /* Schedule item rows */
+    .schedule-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(44, 62, 80, 0.05);
+    }
+    .schedule-item:last-child { border-bottom: none; }
+    .schedule-icon {
+      width: 36px; height: 36px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .schedule-icon.orange { background: var(--tint-orange-8); }
+    .schedule-icon.purple { background: rgba(155, 89, 182, 0.08); }
+    .schedule-icon.green { background: rgba(39, 174, 96, 0.08); }
+    .schedule-icon.silk { background: var(--tint-silk-20); }
+    .schedule-body { flex: 1; min-width: 0; }
+    .schedule-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px; font-weight: 600; color: var(--deep-slate);
+    }
+    .schedule-meta {
+      font-size: 11px; color: var(--color-text-muted); opacity: 0.55;
+      margin-top: 1px;
+    }
+    .schedule-time {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px; font-weight: 500;
+      color: var(--color-text-muted); opacity: 0.6;
+      white-space: nowrap;
+    }
+
+    /* Two-col grid */
+    .nook-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    /* Milestone rows */
+    .milestone-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0;
+    }
+    .milestone-icon { font-size: 18px; }
+    .milestone-body { flex: 1; }
+    .milestone-name {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px; font-weight: 600; color: var(--deep-slate);
+    }
+    .milestone-when {
+      font-size: 11px; color: var(--color-text-muted); opacity: 0.5;
+    }
+
+    /* Piggy bank card */
+    .piggy-nw {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px; font-weight: 800; color: var(--deep-slate);
+    }
+    .piggy-nw .currency {
+      font-size: 14px; font-weight: 500; opacity: 0.4; margin-left: 4px;
+    }
+    .piggy-row {
+      display: flex; gap: 24px; margin-top: 12px;
+    }
+    .piggy-stat-label {
+      font-size: 11px; color: var(--color-text-muted); opacity: 0.5;
+    }
+    .piggy-stat-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px; font-weight: 700;
+    }
+    .piggy-stat-val.income { color: var(--success-green); }
+    .piggy-stat-val.expense { color: var(--heritage-orange); }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* BEANIE TIP OF THE DAY                                  */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .beanie-tip {
+      position: relative;
+      background: linear-gradient(135deg, #fef8f4 0%, #fdf2eb 40%, #f8f0f8 100%);
+      border-radius: var(--sq);
+      box-shadow: 0 6px 28px rgba(241, 93, 34, 0.08), 0 2px 8px rgba(44, 62, 80, 0.04);
+      overflow: hidden;
+      animation: tipFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    @keyframes tipFadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .beanie-tip.dismissing {
+      animation: tipDismiss 0.35s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+    }
+    @keyframes tipDismiss {
+      from { opacity: 1; transform: translateY(0); max-height: 300px; }
+      to { opacity: 0; transform: translateY(-8px); max-height: 0; margin-bottom: -20px; padding: 0; }
+    }
+
+    /* Decorative top accent line */
+    .beanie-tip::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--sky-silk), var(--heritage-orange) 50%, var(--terracotta));
+      opacity: 0.6;
+    }
+
+    /* Subtle pattern dots (background texture) */
+    .beanie-tip::after {
+      content: '';
+      position: absolute; top: 0; right: 0;
+      width: 180px; height: 100%;
+      background: radial-gradient(circle, rgba(174, 214, 241, 0.12) 1px, transparent 1px);
+      background-size: 16px 16px;
+      pointer-events: none;
+    }
+
+    .beanie-tip-inner {
+      position: relative; z-index: 1;
+      display: flex; align-items: flex-start; gap: 0;
+      padding: 20px 22px 18px;
+    }
+
+    /* Beanie character illustration */
+    .beanie-tip-character {
+      flex-shrink: 0;
+      width: 72px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-right: 16px;
+      margin-top: 2px;
+    }
+    .beanie-tip-character img {
+      width: 64px; height: 64px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 8px rgba(44, 62, 80, 0.1));
+      animation: beanieFloat 3s ease-in-out infinite;
+    }
+    @keyframes beanieFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .beanie-tip-character .speech-tail {
+      width: 0; height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid white;
+      position: relative;
+      left: 18px; top: -2px;
+      display: none; /* only for speech bubble variant */
+    }
+
+    .beanie-tip-content {
+      flex: 1; min-width: 0;
+    }
+
+    .beanie-tip-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .beanie-tip-label {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .beanie-tip-label .bulb {
+      font-size: 15px;
+      animation: bulbPulse 2s ease-in-out infinite;
+    }
+    @keyframes bulbPulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.1); }
+    }
+    .beanie-tip-label span {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px; font-weight: 700;
+      color: var(--heritage-orange);
+      letter-spacing: 0.04em;
+    }
+
+    .beanie-tip-close {
+      width: 26px; height: 26px; border-radius: 8px;
+      border: none; background: rgba(44, 62, 80, 0.04);
+      color: var(--color-text-muted); font-size: 13px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; opacity: 0.4;
+    }
+    .beanie-tip-close:hover { opacity: 0.8; background: rgba(44, 62, 80, 0.08); }
+
+    .beanie-tip-message {
+      font-size: 14px; line-height: 1.65;
+      color: var(--deep-slate); opacity: 0.75;
+    }
+
+    .beanie-tip-actions {
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 10px; margin-top: 12px;
+    }
+    .tip-btn-tryit {
+      font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600;
+      color: var(--heritage-orange);
+      background: var(--tint-orange-8);
+      border: none; border-radius: 10px;
+      padding: 6px 14px; cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+      display: inline-flex; align-items: center; gap: 4px;
+      white-space: nowrap;
+    }
+    .tip-btn-tryit:hover {
+      background: var(--tint-orange-15);
+    }
+    .tip-btn-tryit .arrow {
+      font-size: 12px; transition: transform 0.15s;
+    }
+    .tip-btn-tryit:hover .arrow { transform: translateX(2px); }
+
+    .tip-btn-mute {
+      font-family: 'Inter', sans-serif; font-size: 11px;
+      color: var(--color-text-muted); opacity: 0.35;
+      border: none; background: none; cursor: pointer;
+      padding: 4px 0; transition: opacity 0.15s;
+    }
+    .tip-btn-mute:hover { opacity: 0.65; }
+    .tip-btn-gotit {
+      font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      border: none; border-radius: 14px;
+      padding: 8px 22px; cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 3px 12px rgba(241, 93, 34, 0.2);
+    }
+    .tip-btn-gotit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 5px 18px rgba(241, 93, 34, 0.3);
+    }
+
+    /* Category accent stripe variants */
+    .beanie-tip.cat-finance::before {
+      background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta), var(--heritage-orange));
+    }
+    .beanie-tip.cat-finance { background: linear-gradient(135deg, #fef8f4 0%, #fdf2eb 100%); }
+
+    .beanie-tip.cat-family::before {
+      background: linear-gradient(90deg, var(--sky-silk), #85c1e9, var(--sky-silk));
+    }
+    .beanie-tip.cat-family { background: linear-gradient(135deg, #f6fbfe 0%, #edf5fc 100%); }
+
+    .beanie-tip.cat-security::before {
+      background: linear-gradient(90deg, var(--deep-slate), var(--deep-slate-light), var(--deep-slate));
+    }
+    .beanie-tip.cat-security { background: linear-gradient(135deg, #f4f6f8 0%, #edf0f3 100%); }
+
+    .beanie-tip.cat-planner::before {
+      background: linear-gradient(90deg, var(--todo-purple), #8e44ad, var(--todo-purple));
+    }
+    .beanie-tip.cat-planner { background: linear-gradient(135deg, #faf6fc 0%, #f3ecf8 100%); }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* WHAT'S NEW MODAL                                       */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.45);
+      min-height: calc(100vh - 52px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 32px;
+    }
+    .whats-new-modal {
+      background: white; border-radius: var(--sq);
+      max-width: 580px; width: 100%;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+      animation: modalIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal-strip {
+      height: 3px;
+      background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta));
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 28px 0 28px;
+    }
+    .modal-title-group {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .modal-icon {
+      width: 36px; height: 36px; border-radius: 12px;
+      background: var(--tint-orange-8);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .modal-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px; font-weight: 600; color: var(--deep-slate);
+    }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 10px;
+      border: none; background: var(--tint-slate-5);
+      color: var(--color-text-muted); font-size: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .modal-close:hover { background: var(--tint-slate-10); }
+
+    .modal-body {
+      padding: 24px 28px; max-height: 60vh; overflow-y: auto;
+    }
+    .version-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+      color: var(--color-text-muted); opacity: 0.45; margin-bottom: 20px;
+    }
+
+    .feature-entry {
+      margin-bottom: 20px;
+      padding: 14px 16px;
+      background: var(--cloud-white);
+      border-radius: 16px;
+      transition: all 0.15s;
+    }
+    .feature-entry:hover {
+      background: #f0f2f4;
+    }
+    .feature-entry:last-of-type { margin-bottom: 0; }
+
+    .feature-top-row {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px;
+    }
+    .feature-text { flex: 1; min-width: 0; }
+    .feature-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px; font-weight: 600; color: var(--deep-slate);
+      letter-spacing: 0.02em; margin-bottom: 4px;
+    }
+    .feature-desc {
+      font-size: 13px; line-height: 1.6;
+      color: var(--deep-slate); opacity: 0.55;
+    }
+
+    .feature-go {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600;
+      color: var(--heritage-orange);
+      background: none; border: none; cursor: pointer;
+      padding: 6px 12px; border-radius: 10px;
+      white-space: nowrap; flex-shrink: 0;
+      transition: all 0.15s;
+      margin-top: 2px;
+      background: var(--tint-orange-8);
+    }
+    .feature-go:hover {
+      background: var(--tint-orange-15);
+      transform: translateX(2px);
+    }
+    .feature-go .arrow {
+      font-size: 14px; transition: transform 0.15s;
+    }
+    .feature-go:hover .arrow { transform: translateX(2px); }
+
+    .fixes-divider {
+      border: none; border-top: 1px dashed rgba(44, 62, 80, 0.1);
+      margin: 22px 0 16px 0;
+    }
+    .fixes-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+      color: var(--color-text-muted); opacity: 0.4; margin-bottom: 10px;
+    }
+    .fixes-list {
+      list-style: none; display: flex; flex-direction: column; gap: 5px;
+    }
+    .fixes-list li {
+      font-size: 12px; color: var(--deep-slate); opacity: 0.45;
+      line-height: 1.5; padding-left: 16px; position: relative;
+    }
+    .fixes-list li::before {
+      content: '·'; position: absolute; left: 4px;
+      font-weight: 800; font-size: 16px;
+    }
+
+    .modal-signature {
+      font-family: 'Outfit', sans-serif;
+      font-size: 12px; font-style: italic;
+      color: var(--color-text-muted); opacity: 0.45;
+      text-align: right; margin-top: 22px;
+    }
+
+    .modal-footer {
+      padding: 16px 28px 24px; display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      border-top: 1px solid rgba(44, 62, 80, 0.06);
+    }
+    .btn-primary {
+      font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+      border: none; border-radius: 16px; padding: 14px 0; width: 100%;
+      cursor: pointer; transition: all 0.2s;
+      box-shadow: 0 4px 16px rgba(241, 93, 34, 0.25);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(241, 93, 34, 0.35);
+    }
+    .btn-link {
+      font-family: 'Inter', sans-serif; font-size: 13px;
+      color: var(--color-text-muted); opacity: 0.6;
+      background: none; border: none; cursor: pointer;
+      padding: 4px 0; transition: all 0.15s;
+    }
+    .btn-link:hover { opacity: 1; color: var(--heritage-orange); }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* HELP CENTER — WHAT'S NEW ARCHIVE                      */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .help-container {
+      background: var(--cloud-white);
+      min-height: calc(100vh - 52px);
+      display: flex; justify-content: center; padding: 40px 24px;
+    }
+    .help-content { max-width: 900px; width: 100%; }
+    .help-breadcrumb {
+      font-size: 13px; color: var(--color-text-muted); margin-bottom: 8px;
+    }
+    .help-breadcrumb a { color: var(--heritage-orange); text-decoration: none; }
+    .help-page-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px; font-weight: 700; color: var(--deep-slate);
+      margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
+    }
+    .help-page-desc {
+      font-size: 14px; color: var(--color-text-muted);
+      margin-bottom: 32px; line-height: 1.5;
+    }
+
+    .category-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 14px; margin-bottom: 40px;
+    }
+    .category-chip {
+      background: white; border-radius: 16px; padding: 16px;
+      box-shadow: var(--card-shadow); text-align: center;
+      cursor: pointer; transition: all 0.2s;
+      border: 2px solid transparent; text-decoration: none; color: inherit;
+    }
+    .category-chip:hover { transform: translateY(-2px); box-shadow: var(--card-hover-shadow); }
+    .category-chip.active-cat { border-color: var(--heritage-orange); }
+    .category-chip-icon { font-size: 22px; margin-bottom: 6px; }
+    .category-chip-label {
+      font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600; color: var(--deep-slate);
+    }
+    .category-chip-count { font-size: 11px; color: var(--color-text-muted); opacity: 0.5; }
+
+    .release-list { display: flex; flex-direction: column; gap: 16px; }
+    .release-card {
+      background: white; border-radius: var(--sq);
+      box-shadow: var(--card-shadow); overflow: hidden;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .release-card:hover { transform: translateY(-2px); box-shadow: var(--card-hover-shadow); }
+    .release-card-strip {
+      height: 3px;
+      background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta));
+    }
+    .release-card-inner {
+      padding: 24px 28px; display: flex; align-items: flex-start; gap: 20px;
+    }
+    .release-card-icon {
+      width: 44px; height: 44px; border-radius: 14px;
+      background: var(--tint-orange-8);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .release-card-body { flex: 1; min-width: 0; }
+    .release-card-title {
+      font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 600;
+      color: var(--deep-slate); margin-bottom: 4px;
+    }
+    .release-card-meta {
+      font-size: 12px; color: var(--color-text-muted); opacity: 0.5; margin-bottom: 10px;
+    }
+    .release-card-excerpt {
+      font-size: 14px; color: var(--deep-slate); opacity: 0.6; line-height: 1.5;
+    }
+    .release-card-tags {
+      display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;
+    }
+    .release-tag {
+      font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 500;
+      padding: 4px 10px; border-radius: 20px;
+      background: var(--tint-slate-5); color: var(--color-text-muted);
+    }
+    .release-tag.new-feat { background: var(--tint-orange-8); color: var(--heritage-orange); }
+    .release-tag.fix { background: rgba(39, 174, 96, 0.08); color: var(--success-green); }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* DARK MODE OVERRIDES                                    */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .dark .greeting h1 { color: #e8ecf0; }
+    .dark .greeting h1 .name { color: var(--heritage-orange); }
+    .dark .greeting .sub { color: rgba(255,255,255,0.3); }
+    .dark .beans-row-label { color: rgba(255,255,255,0.25); }
+    .dark .bean-name { color: #d4dbe2; }
+    .dark .bean-role { color: rgba(255,255,255,0.25); }
+    .dark .bean-avatar .online { border-color: var(--deep-slate); }
+    .dark .bean-add { border-color: rgba(255,255,255,0.1); }
+
+    .dark .nook-card {
+      background: var(--deep-slate);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .dark .nook-card-title { color: #d4dbe2; }
+    .dark .nook-card-link { opacity: 0.6; }
+    .dark .schedule-name { color: #d4dbe2; }
+    .dark .schedule-meta { color: rgba(255,255,255,0.3); }
+    .dark .schedule-time { color: rgba(255,255,255,0.35); }
+    .dark .schedule-item { border-bottom-color: rgba(255,255,255,0.04); }
+    .dark .milestone-name { color: #d4dbe2; }
+    .dark .milestone-when { color: rgba(255,255,255,0.3); }
+    .dark .piggy-nw { color: #e8ecf0; }
+    .dark .piggy-stat-label { color: rgba(255,255,255,0.35); }
+
+    /* Dark beanie tip */
+    .dark .beanie-tip {
+      background: linear-gradient(135deg, #2a3845 0%, #263240 40%, #2d2f3d 100%);
+      box-shadow: 0 6px 28px rgba(0,0,0,0.2);
+    }
+    .dark .beanie-tip::after {
+      background: radial-gradient(circle, rgba(174, 214, 241, 0.05) 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+    .dark .beanie-tip-label span { color: var(--heritage-orange); }
+    .dark .beanie-tip-close {
+      background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.35);
+    }
+    .dark .beanie-tip-close:hover { background: rgba(255,255,255,0.08); }
+    .dark .beanie-tip-message { color: #b8c4d0; }
+    .dark .tip-btn-tryit { color: var(--heritage-orange); background: rgba(241,93,34,0.1); }
+    .dark .tip-btn-tryit:hover { background: rgba(241,93,34,0.18); }
+    .dark .tip-btn-mute { color: rgba(255,255,255,0.25); }
+    .dark .tip-btn-gotit {
+      box-shadow: 0 3px 12px rgba(241, 93, 34, 0.15);
+    }
+
+    /* Dark modal */
+    .modal-backdrop.dark-bg { background: rgba(0,0,0,0.65); }
+    .dark .whats-new-modal {
+      background: var(--deep-slate);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+    }
+    .dark .modal-title { color: #e8ecf0; }
+    .dark .modal-close { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4); }
+    .dark .version-label { color: rgba(255,255,255,0.3); }
+    .dark .feature-entry { background: rgba(255,255,255,0.04); }
+    .dark .feature-entry:hover { background: rgba(255,255,255,0.07); }
+    .dark .feature-title { color: #e0e6ec; }
+    .dark .feature-desc { color: #8898a8; opacity: 0.8; }
+    .dark .feature-go { color: var(--heritage-orange); background: rgba(241,93,34,0.1); }
+    .dark .feature-go:hover { background: rgba(241,93,34,0.18); }
+    .dark .fixes-divider { border-top-color: rgba(255,255,255,0.06); }
+    .dark .fixes-label { color: rgba(255,255,255,0.3); }
+    .dark .fixes-list li { color: #6b7b8d; }
+    .dark .modal-signature { color: rgba(255,255,255,0.25); }
+    .dark .modal-footer { border-top-color: rgba(255,255,255,0.06); }
+    .dark .btn-link { color: rgba(255,255,255,0.4); }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* MOBILE FRAME                                           */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .mobile-frame {
+      display: flex; justify-content: center; align-items: center;
+      min-height: calc(100vh - 52px);
+      background: var(--deep-slate-dark); padding: 40px 24px;
+    }
+    .phone-shell {
+      width: 390px; height: 760px;
+      background: white; border-radius: 40px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+      display: flex; flex-direction: column;
+    }
+    .phone-status-bar {
+      height: 50px; background: var(--cloud-white);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 4px;
+      font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 600;
+      color: var(--deep-slate);
+    }
+    .phone-body {
+      flex: 1; overflow-y: auto;
+      background: var(--cloud-white); padding: 16px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .phone-body .greeting h1 { font-size: 20px; }
+    .phone-body .beanie-tip-character { width: 56px; margin-right: 12px; }
+    .phone-body .beanie-tip-character img { width: 48px; height: 48px; }
+    .phone-body .beanie-tip { border-radius: 20px; }
+    .phone-body .beanie-tip-inner { padding: 16px 16px 14px; }
+    .phone-body .beanie-tip-message { font-size: 13px; }
+    .phone-body .beanie-tip-actions { margin-top: 10px; }
+
+    .phone-body .nook-card { border-radius: 20px; padding: 18px 18px; }
+    .phone-body .schedule-icon { width: 32px; height: 32px; font-size: 14px; }
+
+    .phone-tab-bar {
+      height: 68px; background: white;
+      border-top: 1px solid rgba(44,62,80,0.08);
+      display: flex; align-items: center; justify-content: space-around;
+      padding: 0 8px; flex-shrink: 0;
+    }
+    .phone-tab {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      font-size: 18px;
+    }
+    .phone-tab-label {
+      font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 500;
+      color: var(--color-text-muted); opacity: 0.5;
+    }
+    .phone-tab.active .phone-tab-label {
+      color: var(--heritage-orange); opacity: 1;
+    }
+
+    /* Phone modal overlay */
+    .phone-modal-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .phone-modal-sheet {
+      background: white; border-radius: 24px 24px 0 0;
+      max-height: 85%; display: flex; flex-direction: column;
+      animation: sheetUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+    @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+    .phone-modal-handle {
+      width: 36px; height: 4px;
+      background: rgba(44,62,80,0.15); border-radius: 2px;
+      margin: 10px auto 0;
+    }
+    .phone-modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px 0;
+    }
+    .phone-modal-body {
+      flex: 1; overflow-y: auto; padding: 18px 20px;
+    }
+    .phone-modal-body .feature-entry { padding: 12px 14px; margin-bottom: 14px; }
+    .phone-modal-body .feature-title { font-size: 13px; }
+    .phone-modal-body .feature-desc { font-size: 12px; }
+    .phone-modal-body .feature-go { font-size: 11px; padding: 5px 10px; }
+    .phone-modal-footer {
+      padding: 12px 20px 28px;
+      border-top: 1px solid rgba(44,62,80,0.06);
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+
+    /* ═══════════════════════════════════════════════════════ */
+    /* VARIATIONS PAGE                                        */
+    /* ═══════════════════════════════════════════════════════ */
+
+    .var-page {
+      background: var(--cloud-white);
+      min-height: calc(100vh - 52px);
+      padding: 40px 24px;
+      display: flex; justify-content: center;
+    }
+    .var-inner { max-width: 820px; width: 100%; }
+    .var-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px; font-weight: 700; color: var(--deep-slate); margin-bottom: 8px;
+    }
+    .var-subtitle {
+      font-size: 14px; color: var(--color-text-muted); margin-bottom: 28px; line-height: 1.5;
+    }
+    .var-group { margin-bottom: 20px; }
+    .var-label {
+      font-family: 'Outfit', sans-serif;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.08em; color: var(--color-text-muted); opacity: 0.4;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN SWITCHER                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<nav class="screen-switcher">
+  <span class="label">mockup</span>
+  <button class="screen-btn active" onclick="showScreen('nook-light')">nook (light)</button>
+  <button class="screen-btn" onclick="showScreen('nook-dark')">nook (dark)</button>
+  <button class="screen-btn" onclick="showScreen('modal-light')">what's new</button>
+  <button class="screen-btn" onclick="showScreen('modal-dark')">what's new (dark)</button>
+  <button class="screen-btn" onclick="showScreen('help')">help center</button>
+  <button class="screen-btn" onclick="showScreen('mobile-tip')">mobile tip</button>
+  <button class="screen-btn" onclick="showScreen('mobile-modal')">mobile modal</button>
+  <button class="screen-btn" onclick="showScreen('variations')">tip categories</button>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 1: NOOK — LIGHT                                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="nook-light" class="screen active">
+  <div class="nook-page">
+    <div class="nook-inner">
+
+      <!-- Greeting -->
+      <div class="greeting">
+        <h1>good morning, <span class="name">greg</span></h1>
+        <div class="sub">thursday, 27 march 2026 &middot; your family at a glance</div>
+      </div>
+
+      <!-- Status Toast -->
+      <div class="status-toast">
+        <div class="status-toast-icon">🌳</div>
+        <div class="status-toast-body">
+          <div class="status-toast-title">a busy day ahead!</div>
+          <div class="status-toast-sub">3 activities &middot; 2 tasks due today</div>
+        </div>
+      </div>
+
+      <!-- BEANIE TIP OF THE DAY -->
+      <div class="beanie-tip" id="demo-tip-1">
+        <div class="beanie-tip-inner">
+          <div class="beanie-tip-character">
+            <img src="/brand/beanies_father_son_icon_512x512.png" alt="beanies">
+          </div>
+          <div class="beanie-tip-content">
+            <div class="beanie-tip-header">
+              <div class="beanie-tip-label">
+                <span class="bulb">💡</span>
+                <span>beanie tip of the day</span>
+              </div>
+              <button class="beanie-tip-close" onclick="dismissTip('demo-tip-1')">✕</button>
+            </div>
+            <p class="beanie-tip-message">you can link transactions directly to activities. that way, when you open piano lessons, you'll see exactly what you've paid — no detective work required.</p>
+            <div class="beanie-tip-actions">
+              <button class="tip-btn-mute">don't show tips</button>
+              <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+              <button class="tip-btn-gotit" onclick="dismissTip('demo-tip-1')">got it</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Your Beans -->
+      <div class="beans-row-label">your beans</div>
+      <div class="beans-row">
+        <div class="bean-member">
+          <div class="bean-avatar greg">
+            <img src="/brand/beanies_father_icon_transparent_360x360.png" alt="Greg">
+            <span class="online"></span>
+          </div>
+          <span class="bean-name">greg</span>
+          <span class="bean-role">owner</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar sarah">
+            <img src="/brand/beanies_mother_icon_transparent_350x350.png" alt="Sarah">
+          </div>
+          <span class="bean-name">sarah</span>
+          <span class="bean-role">parent bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar liam">
+            <img src="/brand/beanies_baby_boy_icon_transparent_300x300.png" alt="Liam">
+          </div>
+          <span class="bean-name">liam</span>
+          <span class="bean-role">big bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar emma">
+            <img src="/brand/beanies_baby_girl_icon_transparent_300x300.png" alt="Emma">
+          </div>
+          <span class="bean-name">emma</span>
+          <span class="bean-role">little bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar noah">
+            <img src="/brand/beanies_baby_boy_icon_transparent_300x300.png" alt="Noah">
+          </div>
+          <span class="bean-name">noah</span>
+          <span class="bean-role">little bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-add">+</div>
+          <span class="bean-name" style="opacity:0.3;">add</span>
+        </div>
+      </div>
+
+      <!-- Today's Schedule -->
+      <div class="nook-card">
+        <div class="nook-card-header">
+          <div class="nook-card-title"><span class="icon">📅</span> today's schedule</div>
+          <a class="nook-card-link" href="#">see all →</a>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-icon orange">🎹</div>
+          <div class="schedule-body">
+            <div class="schedule-name">piano lesson — emma</div>
+            <div class="schedule-meta">mrs. chen &middot; drop-off: sarah</div>
+          </div>
+          <div class="schedule-time">3:30pm</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-icon green">⚽</div>
+          <div class="schedule-body">
+            <div class="schedule-name">soccer practice — liam</div>
+            <div class="schedule-meta">riverside fields &middot; pick-up: greg</div>
+          </div>
+          <div class="schedule-time">4:00pm</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-icon purple">✅</div>
+          <div class="schedule-body">
+            <div class="schedule-name">pay school fees</div>
+            <div class="schedule-meta">due today &middot; assigned to greg</div>
+          </div>
+          <div class="schedule-time">—</div>
+        </div>
+      </div>
+
+      <!-- Two-column: Milestones + Piggy Bank -->
+      <div class="nook-grid">
+        <div class="nook-card">
+          <div class="nook-card-header">
+            <div class="nook-card-title"><span class="icon">🎯</span> milestones</div>
+          </div>
+          <div class="milestone-item">
+            <div class="milestone-icon">🎂</div>
+            <div class="milestone-body">
+              <div class="milestone-name">noah's 7th birthday</div>
+              <div class="milestone-when">in 12 days</div>
+            </div>
+          </div>
+          <div class="milestone-item">
+            <div class="milestone-icon">🎓</div>
+            <div class="milestone-body">
+              <div class="milestone-name">liam's graduation</div>
+              <div class="milestone-when">in 3 months</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nook-card">
+          <div class="nook-card-header">
+            <div class="nook-card-title"><span class="icon">🐷</span> piggy bank</div>
+            <a class="nook-card-link" href="#">details →</a>
+          </div>
+          <div class="piggy-nw font-outfit">$47,230<span class="currency">USD</span></div>
+          <div class="piggy-row">
+            <div>
+              <div class="piggy-stat-label">income</div>
+              <div class="piggy-stat-val income font-outfit">+$8,400</div>
+            </div>
+            <div>
+              <div class="piggy-stat-label">expenses</div>
+              <div class="piggy-stat-val expense font-outfit">-$6,120</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 2: NOOK — DARK                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="nook-dark" class="screen">
+  <div class="nook-page dark-bg dark">
+    <div class="nook-inner">
+
+      <div class="greeting">
+        <h1>good evening, <span class="name">greg</span></h1>
+        <div class="sub">thursday, 27 march 2026 &middot; your family at a glance</div>
+      </div>
+
+      <div class="status-toast">
+        <div class="status-toast-icon">🌙</div>
+        <div class="status-toast-body">
+          <div class="status-toast-title">winding down</div>
+          <div class="status-toast-sub">all tasks done &middot; 1 activity tomorrow</div>
+        </div>
+      </div>
+
+      <div class="beanie-tip">
+        <div class="beanie-tip-inner">
+          <div class="beanie-tip-character">
+            <img src="/brand/beanies_family_hugging_transparent_512x512.png" alt="beanies family">
+          </div>
+          <div class="beanie-tip-content">
+            <div class="beanie-tip-header">
+              <div class="beanie-tip-label">
+                <span class="bulb">💡</span>
+                <span>beanie tip of the day</span>
+              </div>
+              <button class="beanie-tip-close">✕</button>
+            </div>
+            <p class="beanie-tip-message">set up recurring transactions once and forget about them. beanies will project them forward so you can see what's coming before it hits.</p>
+            <div class="beanie-tip-actions">
+              <button class="tip-btn-mute">don't show tips</button>
+              <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+              <button class="tip-btn-gotit">got it</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="beans-row-label">your beans</div>
+      <div class="beans-row">
+        <div class="bean-member">
+          <div class="bean-avatar greg"><img src="/brand/beanies_father_icon_transparent_360x360.png" alt="Greg"><span class="online"></span></div>
+          <span class="bean-name">greg</span><span class="bean-role">owner</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar sarah"><img src="/brand/beanies_mother_icon_transparent_350x350.png" alt="Sarah"></div>
+          <span class="bean-name">sarah</span><span class="bean-role">parent bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar liam"><img src="/brand/beanies_baby_boy_icon_transparent_300x300.png" alt="Liam"></div>
+          <span class="bean-name">liam</span><span class="bean-role">big bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar emma"><img src="/brand/beanies_baby_girl_icon_transparent_300x300.png" alt="Emma"></div>
+          <span class="bean-name">emma</span><span class="bean-role">little bean</span>
+        </div>
+        <div class="bean-member">
+          <div class="bean-avatar noah"><img src="/brand/beanies_baby_boy_icon_transparent_300x300.png" alt="Noah"></div>
+          <span class="bean-name">noah</span><span class="bean-role">little bean</span>
+        </div>
+      </div>
+
+      <div class="nook-card">
+        <div class="nook-card-header">
+          <div class="nook-card-title"><span class="icon">📅</span> today's schedule</div>
+          <a class="nook-card-link" href="#">see all →</a>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-icon orange">🎹</div>
+          <div class="schedule-body">
+            <div class="schedule-name">piano lesson — emma</div>
+            <div class="schedule-meta">mrs. chen &middot; completed</div>
+          </div>
+          <div class="schedule-time" style="opacity:0.35;">3:30pm ✓</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-icon green">⚽</div>
+          <div class="schedule-body">
+            <div class="schedule-name">soccer practice — liam</div>
+            <div class="schedule-meta">riverside fields &middot; completed</div>
+          </div>
+          <div class="schedule-time" style="opacity:0.35;">4:00pm ✓</div>
+        </div>
+      </div>
+
+      <div class="nook-grid">
+        <div class="nook-card">
+          <div class="nook-card-header">
+            <div class="nook-card-title"><span class="icon">🎯</span> milestones</div>
+          </div>
+          <div class="milestone-item">
+            <div class="milestone-icon">🎂</div>
+            <div class="milestone-body">
+              <div class="milestone-name">noah's 7th birthday</div>
+              <div class="milestone-when">in 12 days</div>
+            </div>
+          </div>
+        </div>
+        <div class="nook-card">
+          <div class="nook-card-header">
+            <div class="nook-card-title"><span class="icon">🐷</span> piggy bank</div>
+          </div>
+          <div class="piggy-nw font-outfit">$47,230<span class="currency">USD</span></div>
+          <div class="piggy-row">
+            <div>
+              <div class="piggy-stat-label">income</div>
+              <div class="piggy-stat-val income font-outfit">+$8,400</div>
+            </div>
+            <div>
+              <div class="piggy-stat-label">expenses</div>
+              <div class="piggy-stat-val expense font-outfit">-$6,120</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 3: WHAT'S NEW MODAL — LIGHT                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="modal-light" class="screen">
+  <div class="modal-backdrop">
+    <div class="whats-new-modal">
+      <div class="modal-strip"></div>
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-icon">🌱</div>
+          <span class="modal-title font-outfit">what's new</span>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="version-label">march 2026</div>
+
+        <div class="feature-entry">
+          <div class="feature-top-row">
+            <div class="feature-text">
+              <div class="feature-title font-outfit">pay for activities upfront</div>
+              <div class="feature-desc">set a single fee that covers all sessions. no more tracking individual payments for piano lessons — one transaction, done.</div>
+            </div>
+            <button class="feature-go">try it <span class="arrow">→</span></button>
+          </div>
+        </div>
+
+        <div class="feature-entry">
+          <div class="feature-top-row">
+            <div class="feature-text">
+              <div class="feature-title font-outfit">tap to filter transactions</div>
+              <div class="feature-desc">tap the income or expense card on your dashboard and jump straight to a filtered list. less scrolling, more finding.</div>
+            </div>
+            <button class="feature-go">try it <span class="arrow">→</span></button>
+          </div>
+        </div>
+
+        <div class="feature-entry">
+          <div class="feature-top-row">
+            <div class="feature-text">
+              <div class="feature-title font-outfit">links on travel segments</div>
+              <div class="feature-desc">add booking confirmation URLs to flights, hotels, and car rentals. everything in one place when you need it.</div>
+            </div>
+            <button class="feature-go">try it <span class="arrow">→</span></button>
+          </div>
+        </div>
+
+        <hr class="fixes-divider">
+
+        <div class="fixes-label">also fixed</div>
+        <ul class="fixes-list">
+          <li>time picker scrolls to your selection</li>
+          <li>all dates now show as "25 mar 2026"</li>
+          <li>12-hour time format everywhere</li>
+        </ul>
+
+        <div class="modal-signature">— greg, head beanie developer 🫘</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary">got it, thanks</button>
+        <button class="btn-link">see all release notes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 4: WHAT'S NEW MODAL — DARK                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="modal-dark" class="screen">
+  <div class="modal-backdrop dark-bg dark">
+    <div class="whats-new-modal">
+      <div class="modal-strip"></div>
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-icon">🌱</div>
+          <span class="modal-title font-outfit">what's new</span>
+        </div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="version-label">march 2026</div>
+
+        <div class="feature-entry">
+          <div class="feature-top-row">
+            <div class="feature-text">
+              <div class="feature-title font-outfit">pay for activities upfront</div>
+              <div class="feature-desc">set a single fee that covers all sessions. no more tracking individual payments for piano lessons — one transaction, done.</div>
+            </div>
+            <button class="feature-go">try it <span class="arrow">→</span></button>
+          </div>
+        </div>
+
+        <div class="feature-entry">
+          <div class="feature-top-row">
+            <div class="feature-text">
+              <div class="feature-title font-outfit">tap to filter transactions</div>
+              <div class="feature-desc">tap the income or expense card on your dashboard and jump straight to a filtered list. less scrolling, more finding.</div>
+            </div>
+            <button class="feature-go">try it <span class="arrow">→</span></button>
+          </div>
+        </div>
+
+        <div class="feature-entry">
+          <div class="feature-top-row">
+            <div class="feature-text">
+              <div class="feature-title font-outfit">links on travel segments</div>
+              <div class="feature-desc">add booking confirmation URLs to flights, hotels, and car rentals. everything in one place when you need it.</div>
+            </div>
+            <button class="feature-go">try it <span class="arrow">→</span></button>
+          </div>
+        </div>
+
+        <hr class="fixes-divider">
+
+        <div class="fixes-label">also fixed</div>
+        <ul class="fixes-list">
+          <li>time picker scrolls to your selection</li>
+          <li>all dates now show as "25 mar 2026"</li>
+          <li>12-hour time format everywhere</li>
+        </ul>
+
+        <div class="modal-signature">— greg, head beanie developer 🫘</div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary">got it, thanks</button>
+        <button class="btn-link">see all release notes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 5: HELP CENTER ARCHIVE                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="help" class="screen">
+  <div class="help-container">
+    <div class="help-content">
+      <div class="help-breadcrumb"><a href="#">help center</a> &rsaquo; what's new</div>
+      <h1 class="help-page-title font-outfit">🌱 what's new</h1>
+      <p class="help-page-desc">every update, feature, and fix — straight from the head beanie developer. newest first.</p>
+
+      <div class="category-row">
+        <a class="category-chip active-cat" href="#">
+          <div class="category-chip-icon">🌱</div>
+          <div class="category-chip-label font-outfit">what's new</div>
+          <div class="category-chip-count">3 articles</div>
+        </a>
+        <a class="category-chip" href="#">
+          <div class="category-chip-icon">🚀</div>
+          <div class="category-chip-label font-outfit">getting started</div>
+          <div class="category-chip-count">4 articles</div>
+        </a>
+        <a class="category-chip" href="#">
+          <div class="category-chip-icon">✨</div>
+          <div class="category-chip-label font-outfit">features</div>
+          <div class="category-chip-count">4 articles</div>
+        </a>
+        <a class="category-chip" href="#">
+          <div class="category-chip-icon">🔒</div>
+          <div class="category-chip-label font-outfit">security</div>
+          <div class="category-chip-count">3 articles</div>
+        </a>
+        <a class="category-chip" href="#">
+          <div class="category-chip-icon">⚙️</div>
+          <div class="category-chip-label font-outfit">how it works</div>
+          <div class="category-chip-count">3 articles</div>
+        </a>
+      </div>
+
+      <div class="release-list">
+        <div class="release-card">
+          <div class="release-card-strip"></div>
+          <div class="release-card-inner">
+            <div class="release-card-icon">🌱</div>
+            <div class="release-card-body">
+              <div class="release-card-title font-outfit">what's new — march 2026</div>
+              <div class="release-card-meta">27 mar 2026 &middot; 2 min read</div>
+              <div class="release-card-excerpt">upfront activity payments, tap-to-filter transactions, travel segment links, and more.</div>
+              <div class="release-card-tags">
+                <span class="release-tag new-feat">3 features</span>
+                <span class="release-tag fix">3 fixes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="release-card">
+          <div class="release-card-strip"></div>
+          <div class="release-card-inner">
+            <div class="release-card-icon">🌱</div>
+            <div class="release-card-body">
+              <div class="release-card-title font-outfit">what's new — february 2026</div>
+              <div class="release-card-meta">28 feb 2026 &middot; 2 min read</div>
+              <div class="release-card-excerpt">vacation planner, family to-dos, milestone tracking, and the family nook homepage.</div>
+              <div class="release-card-tags">
+                <span class="release-tag new-feat">5 features</span>
+                <span class="release-tag fix">4 fixes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="release-card">
+          <div class="release-card-strip"></div>
+          <div class="release-card-inner">
+            <div class="release-card-icon">🌱</div>
+            <div class="release-card-body">
+              <div class="release-card-title font-outfit">what's new — january 2026</div>
+              <div class="release-card-meta">31 jan 2026 &middot; 3 min read</div>
+              <div class="release-card-excerpt">passkey sign-in, dark mode, beanie mode, chinese translation, and encrypted cloud sync.</div>
+              <div class="release-card-tags">
+                <span class="release-tag new-feat">4 features</span>
+                <span class="release-tag fix">6 fixes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 6: MOBILE — BEANIE TIP                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="mobile-tip" class="screen">
+  <div class="mobile-frame">
+    <div class="phone-shell">
+      <div class="phone-status-bar">9:41</div>
+      <div class="phone-body">
+
+        <div class="greeting">
+          <h1>good morning, <span class="name">greg</span></h1>
+          <div class="sub">27 mar 2026</div>
+        </div>
+
+        <div class="status-toast" style="padding:14px 16px;">
+          <div class="status-toast-icon" style="width:36px;height:36px;font-size:16px;">🌳</div>
+          <div class="status-toast-body">
+            <div class="status-toast-title" style="font-size:13px;">a busy day ahead!</div>
+            <div class="status-toast-sub" style="font-size:11px;">3 activities &middot; 2 tasks</div>
+          </div>
+        </div>
+
+        <div class="beanie-tip">
+          <div class="beanie-tip-inner">
+            <div class="beanie-tip-character">
+              <img src="/brand/beanies_celebrating_circle_transparent_400x400.png" alt="beanie celebrating">
+            </div>
+            <div class="beanie-tip-content">
+              <div class="beanie-tip-header">
+                <div class="beanie-tip-label">
+                  <span class="bulb">💡</span>
+                  <span>beanie tip of the day</span>
+                </div>
+                <button class="beanie-tip-close">✕</button>
+              </div>
+              <p class="beanie-tip-message">not all beans need to see the money stuff. set your kids as little beans and they'll only see their activities and to-dos.</p>
+              <div class="beanie-tip-actions">
+                <button class="tip-btn-mute">don't show tips</button>
+                <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+                <button class="tip-btn-gotit">got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="nook-card">
+          <div class="nook-card-header">
+            <div class="nook-card-title"><span class="icon">📅</span> today</div>
+            <a class="nook-card-link" href="#">see all →</a>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-icon orange">🎹</div>
+            <div class="schedule-body">
+              <div class="schedule-name">piano — emma</div>
+              <div class="schedule-meta">3:30pm &middot; sarah drops off</div>
+            </div>
+          </div>
+          <div class="schedule-item">
+            <div class="schedule-icon green">⚽</div>
+            <div class="schedule-body">
+              <div class="schedule-name">soccer — liam</div>
+              <div class="schedule-meta">4:00pm &middot; greg picks up</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="phone-tab-bar">
+        <div class="phone-tab active"><span>🏡</span><span class="phone-tab-label">nook</span></div>
+        <div class="phone-tab"><span>📅</span><span class="phone-tab-label">planner</span></div>
+        <div class="phone-tab"><span>✅</span><span class="phone-tab-label">to-do</span></div>
+        <div class="phone-tab"><span>🐷</span><span class="phone-tab-label">piggy bank</span></div>
+        <div class="phone-tab"><span>⋯</span><span class="phone-tab-label">more</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 7: MOBILE — WHAT'S NEW MODAL                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="mobile-modal" class="screen">
+  <div class="mobile-frame">
+    <div class="phone-shell">
+      <div class="phone-status-bar">9:41</div>
+      <div class="phone-body" style="position:relative;">
+        <div style="opacity:0.2;">
+          <div class="greeting"><h1 style="font-size:18px;">good morning, <span class="name">greg</span></h1></div>
+        </div>
+        <div class="phone-modal-overlay">
+          <div class="phone-modal-sheet">
+            <div class="modal-strip"></div>
+            <div class="phone-modal-handle"></div>
+            <div class="phone-modal-header">
+              <div class="modal-title-group">
+                <div class="modal-icon" style="width:30px;height:30px;font-size:15px;">🌱</div>
+                <span class="modal-title font-outfit" style="font-size:16px;">what's new</span>
+              </div>
+              <button class="modal-close" style="width:28px;height:28px;font-size:13px;">✕</button>
+            </div>
+            <div class="phone-modal-body">
+              <div class="version-label">march 2026</div>
+              <div class="feature-entry">
+                <div class="feature-top-row">
+                  <div class="feature-text">
+                    <div class="feature-title font-outfit">pay for activities upfront</div>
+                    <div class="feature-desc">set a single fee that covers all sessions. no more tracking individual payments — one transaction, done.</div>
+                  </div>
+                  <button class="feature-go">try it <span class="arrow">→</span></button>
+                </div>
+              </div>
+              <div class="feature-entry">
+                <div class="feature-top-row">
+                  <div class="feature-text">
+                    <div class="feature-title font-outfit">tap to filter transactions</div>
+                    <div class="feature-desc">tap the income or expense card on your dashboard and jump straight to a filtered list.</div>
+                  </div>
+                  <button class="feature-go">try it <span class="arrow">→</span></button>
+                </div>
+              </div>
+              <div class="feature-entry">
+                <div class="feature-top-row">
+                  <div class="feature-text">
+                    <div class="feature-title font-outfit">links on travel segments</div>
+                    <div class="feature-desc">add booking URLs to flights, hotels, and rentals. everything in one place.</div>
+                  </div>
+                  <button class="feature-go">try it <span class="arrow">→</span></button>
+                </div>
+              </div>
+              <hr class="fixes-divider">
+              <div class="fixes-label">also fixed</div>
+              <ul class="fixes-list">
+                <li>time picker scrolls to your selection</li>
+                <li>all dates now show as "25 mar 2026"</li>
+                <li>12-hour time format everywhere</li>
+              </ul>
+              <div class="modal-signature">— greg, head beanie developer 🫘</div>
+            </div>
+            <div class="phone-modal-footer">
+              <button class="btn-primary" style="font-size:13px;padding:12px 0;">got it, thanks</button>
+              <button class="btn-link" style="font-size:12px;">see all release notes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCREEN 8: TIP CATEGORY VARIATIONS                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div id="variations" class="screen">
+  <div class="var-page">
+    <div class="var-inner">
+      <div class="var-title font-outfit">beanie tip of the day — category variations</div>
+      <div class="var-subtitle">the top accent stripe and background tint shift by category. the beanie character can also change to match context.</div>
+
+      <div class="var-group">
+        <div class="var-label">finance</div>
+        <div class="beanie-tip cat-finance" style="animation:none;">
+          <div class="beanie-tip-inner">
+            <div class="beanie-tip-character">
+              <img src="/brand/beanies_father_son_icon_512x512.png" alt="beanies" style="animation:none;">
+            </div>
+            <div class="beanie-tip-content">
+              <div class="beanie-tip-header">
+                <div class="beanie-tip-label"><span class="bulb" style="animation:none;">💡</span><span>beanie tip of the day</span></div>
+                <button class="beanie-tip-close">✕</button>
+              </div>
+              <p class="beanie-tip-message">set a monthly budget on the dashboard and beanies will show you how you're tracking. green means good. orange means... well.</p>
+              <div class="beanie-tip-actions">
+                <button class="tip-btn-mute">don't show tips</button>
+                <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+                <button class="tip-btn-gotit">got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="var-group">
+        <div class="var-label">family</div>
+        <div class="beanie-tip cat-family" style="animation:none;">
+          <div class="beanie-tip-inner">
+            <div class="beanie-tip-character">
+              <img src="/brand/beanies_family_hugging_transparent_512x512.png" alt="beanies family" style="animation:none;">
+            </div>
+            <div class="beanie-tip-content">
+              <div class="beanie-tip-header">
+                <div class="beanie-tip-label"><span class="bulb" style="animation:none;">💡</span><span>beanie tip of the day</span></div>
+                <button class="beanie-tip-close">✕</button>
+              </div>
+              <p class="beanie-tip-message">track your family's milestones — first day of school, lost teeth, birthdays. the small stuff matters. that's what beanies is for.</p>
+              <div class="beanie-tip-actions">
+                <button class="tip-btn-mute">don't show tips</button>
+                <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+                <button class="tip-btn-gotit">got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="var-group">
+        <div class="var-label">security</div>
+        <div class="beanie-tip cat-security" style="animation:none;">
+          <div class="beanie-tip-inner">
+            <div class="beanie-tip-character">
+              <img src="/brand/beanies_covering_eyes_transparent_512x512.png" alt="beanie covering eyes" style="animation:none;">
+            </div>
+            <div class="beanie-tip-content">
+              <div class="beanie-tip-header">
+                <div class="beanie-tip-label"><span class="bulb" style="animation:none;">💡</span><span>beanie tip of the day</span></div>
+                <button class="beanie-tip-close">✕</button>
+              </div>
+              <p class="beanie-tip-message">skip the password next time. set up a passkey in settings and sign in with your fingerprint or face. it's faster and more secure.</p>
+              <div class="beanie-tip-actions">
+                <button class="tip-btn-mute">don't show tips</button>
+                <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+                <button class="tip-btn-gotit">got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="var-group">
+        <div class="var-label">planner</div>
+        <div class="beanie-tip cat-planner" style="animation:none;">
+          <div class="beanie-tip-inner">
+            <div class="beanie-tip-character">
+              <img src="/brand/beanies_celebrating_circle_transparent_400x400.png" alt="beanie celebrating" style="animation:none;">
+            </div>
+            <div class="beanie-tip-content">
+              <div class="beanie-tip-header">
+                <div class="beanie-tip-label"><span class="bulb" style="animation:none;">💡</span><span>beanie tip of the day</span></div>
+                <button class="beanie-tip-close">✕</button>
+              </div>
+              <p class="beanie-tip-message">planning a trip? the vacation planner breaks it into flights, hotels, and activities — and totals the cost so there are no surprises.</p>
+              <div class="beanie-tip-actions">
+                <button class="tip-btn-mute">don't show tips</button>
+                <a class="tip-btn-tryit" href="#">try it <span class="arrow">→</span></a>
+                <button class="tip-btn-gotit">got it</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SCRIPTS                                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<script>
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.screen-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  function dismissTip(id) {
+    const card = document.getElementById(id);
+    if (card) {
+      card.classList.add('dismissing');
+      setTimeout(() => { card.style.display = 'none'; }, 350);
+    }
+  }
+</script>
+
+</body>
+</html>
