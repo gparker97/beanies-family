@@ -3332,6 +3332,11 @@ const STRING_DEFS = {
   'help.popularArticles': { en: 'Popular Reads', beanie: 'popular reads' },
   'help.viewAllArticles': { en: 'View all articles', beanie: 'view all articles' },
   'help.allArticles': { en: 'All Topics', beanie: 'all topics' },
+  'help.allArticlesSubtitle': {
+    en: 'Browse by category to find exactly what you need.',
+    beanie: 'browse by category to find exactly what you need.',
+  },
+  'help.exploreOtherTopics': { en: 'Explore other topics', beanie: 'explore other topics' },
   'help.securitySpotlightTitle': {
     en: 'Your beans are safe with us',
     beanie: 'your beans are safe with us',
