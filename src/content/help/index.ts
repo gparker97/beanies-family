@@ -1,4 +1,5 @@
 import type { HelpArticle, HelpCategory } from './types';
+import { WHATS_NEW_ARTICLES } from './whats-new';
 import { GETTING_STARTED_ARTICLES } from './getting-started';
 import { FEATURES_ARTICLES } from './features';
 import { SECURITY_ARTICLES } from './security';
@@ -15,6 +16,7 @@ export { HELP_CATEGORIES, getCategoryMeta } from './categories';
 
 /** All help articles, ordered by category then position. */
 export const ALL_ARTICLES: HelpArticle[] = [
+  ...WHATS_NEW_ARTICLES,
   ...GETTING_STARTED_ARTICLES,
   ...FEATURES_ARTICLES,
   ...SECURITY_ARTICLES,

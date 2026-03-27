@@ -1,4 +1,9 @@
-export type HelpCategory = 'getting-started' | 'features' | 'security' | 'how-it-works';
+export type HelpCategory =
+  | 'whats-new'
+  | 'getting-started'
+  | 'features'
+  | 'security'
+  | 'how-it-works';
 
 export type SectionType =
   | 'heading'
