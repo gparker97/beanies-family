@@ -18,6 +18,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - "The Family Nook — Your Home Base" explainer article in Help Center — every widget on the Nook homepage explained: greeting, daily briefing, schedule cards, vacation card, to-do widget, milestones, Piggy Bank, recent activity, and onboarding wizard
 - `beanies-help-docs` project-level skill for creating and auditing help center articles
 
+### Fixed
+
+- "View all articles" link on Help Center landing page no longer navigates to getting-started category — now smooth-scrolls to the full article index
+
+### Changed
+
+- Help Center landing page: article index section redesigned — category cards show article preview (up to 4 per category with overflow hint), centered header with subtitle, clickable cards navigate to category page
+- Help Center category page: redesigned with hero banner, article count badge, subtle background glow, and "Explore other topics" section linking to sibling categories
+
 ---
 
 ## 2026-03-26

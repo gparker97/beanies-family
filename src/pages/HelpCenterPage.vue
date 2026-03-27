@@ -24,7 +24,12 @@ const { prefersReducedMotion } = useReducedMotion();
 const searchQuery = ref('');
 const { results: searchResults, hasQuery } = useHelpSearch(searchQuery);
 
-const popularArticles = getPopularArticles();
+const popularArticles = getPopularArticles().slice(0, 3);
+
+function scrollToIndex() {
+  const el = document.getElementById('all-articles');
+  if (el) el.scrollIntoView({ behavior: 'smooth' });
+}
 
 // Category card icon background tints (matching wireframe stripe colors)
 const categoryIconBg: Record<string, string> = {
@@ -248,12 +253,12 @@ function navigateCategory(cat: HelpCategoryMeta) {
           >
             {{ t('help.popularArticles') }}
           </h2>
-          <router-link
-            to="/help/getting-started"
-            class="font-outfit text-primary-500 hover:text-primary-600 dark:text-primary-400 flex items-center gap-1 text-sm font-semibold transition-[gap] duration-200 hover:gap-2"
+          <button
+            class="font-outfit text-primary-500 hover:text-primary-600 dark:text-primary-400 flex cursor-pointer items-center gap-1 text-sm font-semibold transition-[gap] duration-200 hover:gap-2"
+            @click="scrollToIndex"
           >
-            {{ t('help.viewAllArticles') }} →
-          </router-link>
+            {{ t('help.viewAllArticles') }} ↓
+          </button>
         </div>
 
         <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -416,55 +421,76 @@ function navigateCategory(cat: HelpCategoryMeta) {
 
     <!-- ══════ SECTION 5: FULL ARTICLE INDEX ══════ -->
     <section
-      class="border-t border-[var(--color-border)] bg-white py-16 md:py-20 dark:bg-slate-800/50"
+      id="all-articles"
+      class="scroll-mt-8 border-t border-[var(--color-border)] bg-white py-16 md:py-20 dark:bg-slate-800/50"
     >
       <div class="mx-auto max-w-[1200px] px-6 md:px-8">
-        <h2
-          class="font-outfit text-secondary-500 mb-8 text-2xl font-bold md:text-[28px] dark:text-gray-100"
-        >
-          {{ t('help.allArticles') }}
-        </h2>
+        <div class="mb-10 text-center">
+          <h2
+            class="font-outfit text-secondary-500 text-2xl font-bold md:text-[28px] dark:text-gray-100"
+          >
+            {{ t('help.allArticles') }}
+          </h2>
+          <p class="mx-auto mt-2 max-w-md text-sm text-[var(--color-text-muted)]">
+            {{ t('help.allArticlesSubtitle') }}
+          </p>
+        </div>
 
-        <div class="grid gap-8 sm:gap-12 lg:grid-cols-2">
-          <div
+        <div class="grid gap-6 sm:gap-8 lg:grid-cols-2">
+          <router-link
             v-for="cat in HELP_CATEGORIES"
             :key="cat.id"
-            class="hover:border-sky-silk-300 dark:hover:border-sky-silk-300/40 rounded-3xl border border-[var(--color-border)] p-8 transition-colors duration-200 dark:border-slate-700"
+            :to="`/help/${cat.id}`"
+            class="group relative overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-background)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:border-slate-700 dark:bg-slate-800/80"
           >
-            <!-- Group header -->
-            <div
-              class="mb-6 flex items-center gap-3.5 border-b-2 border-[var(--color-border)] pb-4 dark:border-slate-700"
-            >
-              <div
-                class="flex h-10 w-10 items-center justify-center rounded-[14px] text-lg"
-                :class="tocIconBg[cat.color]"
-              >
-                {{ cat.icon }}
-              </div>
-              <h3 class="font-outfit text-secondary-500 text-[17px] font-bold dark:text-gray-100">
-                {{ t(cat.labelKey as any) }}
-              </h3>
-            </div>
+            <!-- Top color stripe -->
+            <div class="h-1" :class="categoryStripe[cat.color]" />
 
-            <!-- Article links -->
-            <ul class="flex flex-col gap-1">
-              <li v-for="article in getCategoryArticles(cat.id)" :key="article.slug">
-                <router-link
-                  :to="`/help/${article.category}/${article.slug}`"
-                  class="group dark:hover:bg-primary-500/8 flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm transition-[background,padding-left] duration-150 hover:bg-[var(--tint-orange-8)] hover:pl-5"
+            <div class="p-7">
+              <!-- Group header -->
+              <div class="mb-5 flex items-center gap-3.5">
+                <div
+                  class="flex h-11 w-11 items-center justify-center rounded-[16px] text-xl"
+                  :class="tocIconBg[cat.color]"
                 >
-                  <span class="min-w-[20px] text-center text-base opacity-50">{{
-                    article.icon
-                  }}</span>
-                  <span class="text-secondary-500 dark:text-gray-300">{{ article.title }}</span>
-                  <span
-                    class="text-primary-500 ml-auto text-xs opacity-0 transition-opacity group-hover:opacity-100"
-                    >→</span
+                  {{ cat.icon }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <h3
+                    class="font-outfit text-secondary-500 group-hover:text-primary-500 dark:group-hover:text-primary-400 text-lg font-bold dark:text-gray-100"
                   >
-                </router-link>
-              </li>
-            </ul>
-          </div>
+                    {{ t(cat.labelKey as any) }}
+                  </h3>
+                  <p class="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                    {{ getCategoryArticles(cat.id).length }} articles
+                  </p>
+                </div>
+                <span
+                  class="text-primary-500 text-sm opacity-0 transition-opacity group-hover:opacity-100"
+                  >→</span
+                >
+              </div>
+
+              <!-- Article links — show up to 4, with overflow hint -->
+              <ul class="flex flex-col gap-0.5">
+                <li v-for="article in getCategoryArticles(cat.id).slice(0, 4)" :key="article.slug">
+                  <span class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm">
+                    <span class="min-w-[20px] text-center text-base opacity-40">{{
+                      article.icon
+                    }}</span>
+                    <span class="text-secondary-500 dark:text-gray-300">{{ article.title }}</span>
+                  </span>
+                </li>
+                <li v-if="getCategoryArticles(cat.id).length > 4">
+                  <span
+                    class="text-primary-500 dark:text-primary-400 font-outfit mt-1 ml-3 inline-block text-xs font-semibold"
+                  >
+                    +{{ getCategoryArticles(cat.id).length - 4 }} more →
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </router-link>
         </div>
       </div>
     </section>
