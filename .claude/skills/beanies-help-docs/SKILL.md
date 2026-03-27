@@ -273,11 +273,14 @@ For reference, the current help center contains these articles:
 - Language & Currency
 - Connecting Google Drive
 
-**Features (5):**
+**Features (8):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
 - Budgets & Category Limits
+- Family To-Do Lists
+- Travel Plans & Vacations
+- The Family Nook — Your Home Base
 - Family Planner & Activities
 
 **Security (4):**
