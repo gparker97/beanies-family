@@ -16,6 +16,7 @@ import ActivityModal from '@/components/planner/ActivityModal.vue';
 import TransactionViewEditModal from '@/components/transactions/TransactionViewEditModal.vue';
 import TransactionModal from '@/components/transactions/TransactionModal.vue';
 import OnboardingWizard from '@/components/onboarding/OnboardingWizard.vue';
+import BeanTipCard from '@/components/nook/BeanTipCard.vue';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -155,6 +156,9 @@ async function handleTransactionDelete(id: string) {
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
     />
+
+    <!-- Beanie tip of the day -->
+    <BeanTipCard />
 
     <!-- Your Beans row -->
     <NookYourBeans

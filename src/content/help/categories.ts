@@ -2,6 +2,13 @@ import type { HelpCategoryMeta } from './types';
 
 export const HELP_CATEGORIES: HelpCategoryMeta[] = [
   {
+    id: 'whats-new',
+    labelKey: 'help.category.whatsNew',
+    descriptionKey: 'help.category.whatsNewDesc',
+    icon: '\u{1F331}',
+    color: 'primary',
+  },
+  {
     id: 'getting-started',
     labelKey: 'help.category.gettingStarted',
     descriptionKey: 'help.category.gettingStartedDesc',
