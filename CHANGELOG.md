@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-03-27
+
+### Added
+
+- "Your Daily Briefing" explainer article in Help Center — explains the critical activities orange box on the Family Nook, including what triggers each item type, sorting logic, and the five-item limit
+- `beanies-help-docs` project-level skill for creating and auditing help center articles
+
+---
+
 ## 2026-03-26
 
 ### Added
