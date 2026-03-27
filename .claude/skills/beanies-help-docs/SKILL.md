@@ -286,10 +286,11 @@ For reference, the current help center contains these articles:
 - Zero-Knowledge Architecture
 - Password Recovery (There Is None)
 
-**How It Works (4):**
+**How It Works (5):**
 - Net Worth Calculation
 - Cash Flow & Savings Rate
 - Dashboard Summary Cards
+- Your Daily Briefing
 - Budget Pace Status Logic
 
 *This inventory should be updated as articles are added or removed.*
