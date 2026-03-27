@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-26",
-    "translationCount": 1896
+    "lastUpdated": "2026-03-27",
+    "translationCount": 1910
   },
   "translations": {
     "app.name": {
@@ -4052,9 +4052,9 @@
       "lastUpdated": "2026-03-03"
     },
     "planner.fee.per_session": {
-      "translation": "每学期",
-      "hash": "ghbu0d",
-      "lastUpdated": "2026-03-17"
+      "translation": "每个",
+      "hash": "1a4gx",
+      "lastUpdated": "2026-03-27"
     },
     "planner.fee.weekly": {
       "translation": "每週",
@@ -9482,9 +9482,79 @@
       "lastUpdated": "2026-03-26"
     },
     "vacation.ideas.collabHint": {
-      "translation": "创意可以随时添加\\ u2014所有家庭成员都可以一起提出建议并对创意进行投票！",
-      "hash": "x8p2ff",
-      "lastUpdated": "2026-03-26"
+      "translation": "更多创意可以随时添加\\ u2014所有家庭成员都可以一起推荐和投票！",
+      "hash": "j5z0tc",
+      "lastUpdated": "2026-03-27"
+    },
+    "recurringPrompt.createOneTimePayment": {
+      "translation": "创建一次性付款",
+      "hash": "v1cdwe",
+      "lastUpdated": "2026-03-27"
+    },
+    "recurringPrompt.createOneTimePaymentHint": {
+      "translation": "在开始日期为全额创建单个费用交易记录。用于支付活动中所有会话的预付款。",
+      "hash": "xan55i",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.allDisabledHint": {
+      "translation": "设置使用此选项的结束日期",
+      "hash": "sievhr",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.totalCost": {
+      "translation": "总成本",
+      "hash": "kbdpwp",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.perSessionBreakdown": {
+      "translation": "每学期",
+      "hash": "ghbu0d",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintIntro": {
+      "translation": "您支付此费用的频率：",
+      "hash": "49kbl9",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintPerSession": {
+      "translation": "每次—活动每次进行收费",
+      "hash": "pc5etd",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintWeekly": {
+      "translation": "每周—每周固定收费",
+      "hash": "mn303z",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintMonthly": {
+      "translation": "每月—每月固定收费",
+      "hash": "tavq2h",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintQuarterly": {
+      "translation": "季度—每3个月收取一次固定费用",
+      "hash": "tmtn3h",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintYearly": {
+      "translation": "每年—固定收费，每年一次",
+      "hash": "5oz1og",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintCustom": {
+      "translation": "自定义—每N周或每月固定金额",
+      "hash": "4l8i54",
+      "lastUpdated": "2026-03-27"
+    },
+    "planner.fee.scheduleHintAll": {
+      "translation": "所有会话—一笔预付款，涵盖从开始日期到结束日期的每个会话。创建一次性交易，而不是重复性交易",
+      "hash": "smz6x1",
+      "lastUpdated": "2026-03-27"
     }
   }
 }
