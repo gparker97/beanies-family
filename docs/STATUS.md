@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-25
-> **Updated by:** Claude (Travel links, transaction summary, E2E overhaul, changelog)
+> **Last updated:** 2026-03-27
+> **Updated by:** Claude (Help center expansion, beanies-help-docs skill, help center UI improvements)
 
 ## Current Phase
 
@@ -57,6 +57,18 @@
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### Help Center Expansion & beanies-help-docs Skill (2026-03-27)
+
+- **beanies-help-docs skill** (`.claude/skills/beanies-help-docs/SKILL.md`): Project-level Claude Code skill for creating, reviewing, and auditing help center articles. Defines four article types (how-to, explainer, reference, troubleshooting), writing standards, quality checklist, audit workflow, and beanies voice guidelines. Invoke via `/beanies-help-docs`.
+- **4 new help articles** (17 → 21 total):
+  - "Your Daily Briefing" (explainer, `how-it-works`) — critical activities orange box logic on Family Nook
+  - "Family To-Do Lists" (how-to, `features`) — creating, editing, completing, filtering, Nook integration
+  - "Travel Plans & Vacations" (how-to, `features`) — 5-step wizard, timeline, booking progress, ideas voting
+  - "The Family Nook — Your Home Base" (explainer, `features`) — every Nook widget documented
+- **Bug fix**: "View all articles" link was hardcoded to `/help/getting-started` — now smooth-scrolls to article index
+- **Help Center landing page**: Article index redesigned as clickable category cards with article previews (up to 4 per card, "+N more" overflow). Popular articles capped at 3.
+- **Category page redesign**: Hero banner with glow effect, article count badge, "Explore other topics" cross-navigation section
 
 ### E2E Test Strategy Overhaul (2026-03-25)
 
