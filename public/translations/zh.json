@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-27",
-    "translationCount": 1910
+    "lastUpdated": "2026-03-28",
+    "translationCount": 1923
   },
   "translations": {
     "app.name": {
@@ -9555,6 +9555,71 @@
       "translation": "所有会话—一笔预付款，涵盖从开始日期到结束日期的每个会话。创建一次性交易，而不是重复性交易",
       "hash": "smz6x1",
       "lastUpdated": "2026-03-27"
+    },
+    "help.allArticlesSubtitle": {
+      "translation": "按类别浏览，准确查找您需要的内容。",
+      "hash": "illvnk",
+      "lastUpdated": "2026-03-28"
+    },
+    "help.exploreOtherTopics": {
+      "translation": "浏览其他主题",
+      "hash": "cld4xr",
+      "lastUpdated": "2026-03-28"
+    },
+    "tips.label": {
+      "translation": "每日豆豆提示",
+      "hash": "5n36o3",
+      "lastUpdated": "2026-03-28"
+    },
+    "tips.gotIt": {
+      "translation": "知道了",
+      "hash": "zdb3wf",
+      "lastUpdated": "2026-03-28"
+    },
+    "tips.tryIt": {
+      "translation": "免费试用",
+      "hash": "tgha8g",
+      "lastUpdated": "2026-03-28"
+    },
+    "tips.dontShowTips": {
+      "translation": "不显示",
+      "hash": "xlkpnv",
+      "lastUpdated": "2026-03-28"
+    },
+    "whatsNew.title": {
+      "translation": "新功能",
+      "hash": "9c5m6o",
+      "lastUpdated": "2026-03-28"
+    },
+    "whatsNew.gotItThanks": {
+      "translation": "明白了，谢谢！",
+      "hash": "3mobto",
+      "lastUpdated": "2026-03-28"
+    },
+    "whatsNew.seeAll": {
+      "translation": "查看所有发行说明",
+      "hash": "wmsfz8",
+      "lastUpdated": "2026-03-28"
+    },
+    "whatsNew.alsoFixed": {
+      "translation": "也已修复",
+      "hash": "swbrvf",
+      "lastUpdated": "2026-03-28"
+    },
+    "whatsNew.tryIt": {
+      "translation": "免费试用",
+      "hash": "tgha8g",
+      "lastUpdated": "2026-03-28"
+    },
+    "help.category.whatsNew": {
+      "translation": "新功能",
+      "hash": "9c5m6o",
+      "lastUpdated": "2026-03-28"
+    },
+    "help.category.whatsNewDesc": {
+      "translation": "发行说明和最近的改进\\ u2014直接来自Head Beanie开发人员。",
+      "hash": "lozt6q",
+      "lastUpdated": "2026-03-28"
     }
   }
 }
