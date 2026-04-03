@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { processRecurringItems } from './recurringProcessor';
+import { processRecurringItems, deduplicateRecurringTransactions } from './recurringProcessor';
 import type { RecurringItem, Account, Asset } from '@/types/models';
 
 // Mock the repositories
@@ -12,6 +12,7 @@ vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
 vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
   createTransaction: vi.fn(),
+  deleteTransaction: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/services/automerge/repositories/accountRepository', () => ({
@@ -688,5 +689,141 @@ describe('recurringProcessor - Activity ID Passthrough', () => {
         recurringItemId: 'recurring-activity-1',
       })
     );
+  });
+});
+
+describe('deduplicateRecurringTransactions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should remove duplicate recurring transactions keeping earliest', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      {
+        id: 'tx-1',
+        accountId: 'acc-1',
+        type: 'income',
+        amount: 5000,
+        currency: 'EUR',
+        category: 'salary',
+        date: '2026-04-01',
+        description: 'Salary',
+        recurringItemId: 'rec-1',
+        isReconciled: false,
+        createdAt: '2026-04-01T08:00:00.000Z',
+        updatedAt: '2026-04-01T08:00:00.000Z',
+      },
+      {
+        id: 'tx-2',
+        accountId: 'acc-1',
+        type: 'income',
+        amount: 5000,
+        currency: 'EUR',
+        category: 'salary',
+        date: '2026-04-01',
+        description: 'Salary',
+        recurringItemId: 'rec-1',
+        isReconciled: false,
+        createdAt: '2026-04-01T09:00:00.000Z',
+        updatedAt: '2026-04-01T09:00:00.000Z',
+      },
+      {
+        id: 'tx-3',
+        accountId: 'acc-1',
+        type: 'income',
+        amount: 5000,
+        currency: 'EUR',
+        category: 'salary',
+        date: '2026-04-01',
+        description: 'Salary',
+        recurringItemId: 'rec-1',
+        isReconciled: false,
+        createdAt: '2026-04-01T10:00:00.000Z',
+        updatedAt: '2026-04-01T10:00:00.000Z',
+      },
+    ] as any);
+
+    const deleted = await deduplicateRecurringTransactions();
+
+    expect(deleted).toBe(2);
+    // Should delete the two later-created duplicates
+    expect(transactionRepo.deleteTransaction).toHaveBeenCalledWith('tx-2');
+    expect(transactionRepo.deleteTransaction).toHaveBeenCalledWith('tx-3');
+    // Should NOT delete the earliest one
+    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalledWith('tx-1');
+  });
+
+  it('should not delete non-recurring transactions', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      {
+        id: 'tx-1',
+        accountId: 'acc-1',
+        type: 'expense',
+        amount: 50,
+        currency: 'EUR',
+        category: 'food',
+        date: '2026-04-01',
+        description: 'Groceries',
+        isReconciled: false,
+        createdAt: '2026-04-01T08:00:00.000Z',
+        updatedAt: '2026-04-01T08:00:00.000Z',
+      },
+      {
+        id: 'tx-2',
+        accountId: 'acc-1',
+        type: 'expense',
+        amount: 30,
+        currency: 'EUR',
+        category: 'food',
+        date: '2026-04-01',
+        description: 'More groceries',
+        isReconciled: false,
+        createdAt: '2026-04-01T09:00:00.000Z',
+        updatedAt: '2026-04-01T09:00:00.000Z',
+      },
+    ] as any);
+
+    const deleted = await deduplicateRecurringTransactions();
+
+    expect(deleted).toBe(0);
+    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
+  });
+
+  it('should handle different recurring items on same date independently', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      {
+        id: 'tx-1',
+        accountId: 'acc-1',
+        type: 'income',
+        amount: 5000,
+        currency: 'EUR',
+        category: 'salary',
+        date: '2026-04-01',
+        description: 'Salary',
+        recurringItemId: 'rec-1',
+        isReconciled: false,
+        createdAt: '2026-04-01T08:00:00.000Z',
+        updatedAt: '2026-04-01T08:00:00.000Z',
+      },
+      {
+        id: 'tx-2',
+        accountId: 'acc-2',
+        type: 'expense',
+        amount: 100,
+        currency: 'EUR',
+        category: 'subscription',
+        date: '2026-04-01',
+        description: 'Rent',
+        recurringItemId: 'rec-2',
+        isReconciled: false,
+        createdAt: '2026-04-01T08:00:00.000Z',
+        updatedAt: '2026-04-01T08:00:00.000Z',
+      },
+    ] as any);
+
+    const deleted = await deduplicateRecurringTransactions();
+
+    expect(deleted).toBe(0);
+    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
   });
 });

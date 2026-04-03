@@ -16,7 +16,40 @@ import type {
   UpdateTransactionInput,
   ISODateString,
 } from '@/types/models';
-import { getStartOfMonth, getEndOfMonth, toDateInputValue, isDateBetween } from '@/utils/date';
+import {
+  getStartOfMonth,
+  getEndOfMonth,
+  toDateInputValue,
+  isDateBetween,
+  extractDatePart,
+} from '@/utils/date';
+
+/**
+ * Remove CRDT-duplicated recurring transactions from a list.
+ * When Automerge merges docs from different actors, the same recurring item
+ * can produce multiple transactions for the same date (different UUIDs).
+ * This keeps only the earliest-created transaction per recurringItemId + date.
+ */
+function deduplicateRecurring<T extends Transaction>(txns: T[]): T[] {
+  const seen = new Map<string, T>();
+  const duplicateIds = new Set<string>();
+  for (const tx of txns) {
+    if (!tx.recurringItemId) continue;
+    const key = `${tx.recurringItemId}|${extractDatePart(tx.date)}`;
+    const existing = seen.get(key);
+    if (existing) {
+      if (tx.createdAt < existing.createdAt) {
+        duplicateIds.add(existing.id);
+        seen.set(key, tx);
+      } else {
+        duplicateIds.add(tx.id);
+      }
+    } else {
+      seen.set(key, tx);
+    }
+  }
+  return duplicateIds.size > 0 ? txns.filter((tx) => !duplicateIds.has(tx.id)) : txns;
+}
 
 export const useTransactionsStore = defineStore('transactions', () => {
   // State
@@ -304,7 +337,10 @@ export const useTransactionsStore = defineStore('transactions', () => {
   // Actions
   async function loadTransactions() {
     await wrapAsync(isLoading, error, async () => {
-      transactions.value = await transactionRepo.getAllTransactions();
+      const raw = await transactionRepo.getAllTransactions();
+      // Remove CRDT-duplicated recurring transactions at the source so all
+      // consumers (budget, reports, dashboard) see clean data.
+      transactions.value = deduplicateRecurring(raw);
     });
   }
 

@@ -137,9 +137,34 @@ const monthEnd = computed(() => toISODateString(getEndOfMonth(selectedMonth.valu
 
 // Filter transactions to selected month, merging projected recurring transactions
 const monthTransactions = computed<DisplayTransaction[]>(() => {
-  const actual: DisplayTransaction[] = transactionsStore.filteredSortedTransactions.filter((tx) =>
+  let actual: DisplayTransaction[] = transactionsStore.filteredSortedTransactions.filter((tx) =>
     isDateBetween(tx.date, monthStart.value, monthEnd.value)
   );
+
+  // Dedup real recurring transactions: CRDT merges can create duplicate transactions
+  // for the same recurringItemId + date (different UUIDs from different actors/sessions).
+  // Keep only the earliest-created transaction per recurringItemId + date group.
+  const seen = new Map<string, DisplayTransaction>();
+  const duplicateIds = new Set<string>();
+  for (const tx of actual) {
+    if (!tx.recurringItemId) continue;
+    const key = `${tx.recurringItemId}|${toDateInputValue(new Date(tx.date))}`;
+    const existing = seen.get(key);
+    if (existing) {
+      // Keep the earlier-created one, mark the other as duplicate
+      if (tx.createdAt < existing.createdAt) {
+        duplicateIds.add(existing.id);
+        seen.set(key, tx);
+      } else {
+        duplicateIds.add(tx.id);
+      }
+    } else {
+      seen.set(key, tx);
+    }
+  }
+  if (duplicateIds.size > 0) {
+    actual = actual.filter((tx) => !duplicateIds.has(tx.id));
+  }
 
   // Build set of recurring item IDs that already have a real transaction this month.
   // Dedup by recurringItemId alone (not date) — if a real transaction exists for a
