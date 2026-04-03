@@ -114,6 +114,11 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
 
   await page.waitForURL('/nook', { timeout: 60000 });
 
+  // Wait for data loading to complete — the ContentSkeleton covers the
+  // router-view until isLoadingData becomes false. Without this, tests
+  // timeout trying to click elements hidden behind the skeleton.
+  await page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 30000 });
+
   // Dismiss TrustDeviceModal if it appears (triggered by freshSignIn).
   // The modal races with navigation, so give it a short window to show up.
   const notNowButton = page.getByRole('button', { name: ui('trust.notNow') });

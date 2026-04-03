@@ -885,7 +885,7 @@ watch(
           :class="{ 'pb-24': isMobile }"
         >
           <ContentSkeleton v-if="isLoadingData" />
-          <router-view v-show="!isLoadingData" />
+          <router-view v-show="!isLoadingData" data-testid="app-content" />
         </main>
       </div>
 
