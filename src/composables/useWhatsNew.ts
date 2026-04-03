@@ -16,6 +16,8 @@ export function useWhatsNew() {
     if (!latestVersion) return false;
     if (!authStore.isAuthenticated) return false;
     if (!settingsStore.onboardingCompleted) return false;
+    // Suppress during E2E tests — the modal blocks all interactions
+    if (sessionStorage.getItem('e2e_auto_auth')) return false;
     return lastSeenVersion.value !== latestVersion;
   });
 
