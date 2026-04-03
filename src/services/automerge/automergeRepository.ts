@@ -84,11 +84,26 @@ export function createAutomergeRepository<
     if (!existing) return undefined;
 
     const now = toISODateString(new Date());
-    const cleanInput = toPlain(stripUndefined(input as Record<string, unknown>));
+    const rawInput = input as Record<string, unknown>;
+
+    // Collect keys explicitly set to undefined — these should be deleted
+    // from the Automerge doc (e.g., clearing goalId to unlink a goal).
+    // Keys NOT present in the input are left untouched.
+    const keysToDelete: string[] = [];
+    for (const key of Object.keys(rawInput)) {
+      if (rawInput[key] === undefined) keysToDelete.push(key);
+    }
+
+    const cleanInput = toPlain(stripUndefined(rawInput));
     changeDoc((d) => {
       const col = d[collectionName] as Record<string, Entity>;
       const target = col[id];
-      if (target) Object.assign(target, cleanInput, { updatedAt: now });
+      if (target) {
+        Object.assign(target, cleanInput, { updatedAt: now });
+        for (const key of keysToDelete) {
+          delete (target as Record<string, unknown>)[key];
+        }
+      }
     });
 
     // Return the updated entity from the new doc state

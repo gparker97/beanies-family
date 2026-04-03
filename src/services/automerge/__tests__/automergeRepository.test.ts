@@ -144,6 +144,32 @@ describe('createAutomergeRepository', () => {
       const result = await repo.update('non-existent', { name: 'Nope' });
       expect(result).toBeUndefined();
     });
+
+    it('deletes fields explicitly set to undefined', async () => {
+      const created = await repo.create({
+        name: 'Eve',
+        email: 'eve@example.com',
+        gender: 'female',
+        ageGroup: 'adult',
+        role: 'member',
+        color: '#DEF',
+        requiresPassword: false,
+      });
+
+      // Set institution field (simulates linking to a goal/entity)
+      await repo.update(created.id, { institution: 'Test Bank' } as any);
+      let fetched = await repo.getById(created.id);
+      expect((fetched as any).institution).toBe('Test Bank');
+
+      // Now clear it by passing explicit undefined (simulates unlinking)
+      await repo.update(created.id, { institution: undefined } as any);
+      fetched = await repo.getById(created.id);
+      expect((fetched as any).institution).toBeUndefined();
+
+      // Other fields should be untouched
+      expect(fetched!.name).toBe('Eve');
+      expect(fetched!.email).toBe('eve@example.com');
+    });
   });
 
   describe('remove', () => {
