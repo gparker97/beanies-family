@@ -480,6 +480,9 @@ function handleSave() {
       goalId: goalId.value || undefined,
       goalAllocMode: goalId.value ? goalAllocMode.value : undefined,
       goalAllocValue: goalId.value ? goalAllocValue.value : undefined,
+      // Clear computed allocation so the store's reversal + reapply cycle
+      // starts fresh when goal fields change or goal is unlinked.
+      goalAllocApplied: undefined,
       type: effectiveType.value,
       amount: amount.value!,
       currency: currency.value,

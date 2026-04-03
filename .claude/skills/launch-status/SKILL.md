@@ -57,24 +57,69 @@ Determine:
 - Days remaining in current phase estimate
 - Whether dates need adjusting
 
-### Step 3: Update Notion
+### Step 3: Update Notion — Launch HQ Page (MANDATORY)
 
-If dates, progress, or phase status has changed, update the relevant Notion blocks:
+**ALWAYS update the Launch HQ page on every /launch-status run.** This is the user's at-a-glance dashboard — it must reflect the latest status, metrics, and next actions. Never skip this step, even for minor updates.
 
-**Launch HQ target date** (block `32c247d9-a99f-8195-b127-e0d0901b6f97`):
-- Update if launch estimate has shifted
+First, read the current Launch HQ page to get all block IDs:
+```
+mcp__notion__API-get-block-children(block_id: "32c247d9-a99f-8188-b169-eacfdc48c057")
+```
 
-**Launch Roadmap strategy update** (block `32e247d9-a99f-8181-95e0-e5534a53d7a2`):
-- Add or update the latest strategy note with current date and status
+Then update ALL of the following sections. Use the block IDs from the page read — do not hardcode IDs (they may change if the page is reorganized).
 
-**Metrics Dashboard weeks** (blocks on Metrics Dashboard page):
-- Adjust weekly date ranges if launch dates shifted
+#### A. Intro line (first paragraph, italic)
+Update `Last updated: [today's date]`.
 
-**Karma Building page** (block `336247d9-a99f-81ea-9ec3-c6e75ed250ed`):
-- Update current karma level: "Current karma: X | Target: 100+ comment karma | Account age: ~N weeks"
+#### B. Target launch date paragraph
+Block `32c247d9-a99f-8195-b127-e0d0901b6f97` — update with current target dates and phase status.
 
-Use `mcp__notion__API-update-a-block` with the `paragraph` property to update block content.
-Use `mcp__notion__API-get-block-children` to read current page content when needed.
+#### C. CURRENT STATUS section (all blocks between "━━━ CURRENT STATUS ━━━" and the next section)
+Update every block in this section:
+- **Phase:** Current phase number, name, and whether previous phase gate was cleared
+- **Reddit karma:** Current karma level, target, cleared status, account age
+- **Quora:** Current status (update if changed)
+- **Content ready:** Update with latest content prep status
+- **Blockers:** Current blockers or "None" with context
+
+#### D. PHASE TIMELINE section
+Update each phase line with:
+- Current dates and gate status
+- Status emoji: ✅ COMPLETE / 🟢 Active / 🟡 Prep starting / ⚪ Pending
+
+#### E. KEY METRICS section
+Update the Reddit karma bullet with current karma level and gate status.
+
+#### F. NEXT STEPS section (all bulleted items)
+Replace with current, actionable next steps organized by timeframe:
+- **TODAY:** Single most important action
+- **DAILY:** Recurring daily actions for this phase
+- **THIS WEEK:** Key deliverables for the current week
+- **NEXT MILESTONE:** What triggers the next phase transition
+
+#### G. Karma Building summary (bottom of page, before child pages)
+Update the summary paragraph with current karma status and strategy.
+
+#### H. Launch Roadmap strategy update
+Block `32e247d9-a99f-8181-95e0-e5534a53d7a2` — update with `[DATE] latest strategy note`.
+
+#### I. Karma Building child page
+Block `336247d9-a99f-81ea-9ec3-c6e75ed250ed` — update current karma level and gate status.
+
+**API format:** Use `mcp__notion__API-update-a-block` with the block type at the top level (NOT nested in `type`):
+```
+# For paragraphs:
+paragraph: {"rich_text": [{"type": "text", "text": {"content": "..."}}]}
+
+# For bold labels:
+paragraph: {"rich_text": [
+  {"type": "text", "text": {"content": "Label: "}, "annotations": {"bold": true}},
+  {"type": "text", "text": {"content": "value"}}
+]}
+
+# For bulleted lists:
+bulleted_list_item: {"rich_text": [...]}
+```
 
 ### Step 4: Present Status Report
 
@@ -149,9 +194,11 @@ Track these across phases — report on uncompleted items:
 
 ## Rules
 
+- **ALWAYS update Launch HQ.** Every single /launch-status run must update the Launch HQ page in Notion with the latest status, metrics, and next steps. This is the user's at-a-glance dashboard — if it's stale, the skill has failed.
+- **Read before writing.** Always `get-block-children` on Launch HQ first to get current block IDs and see what needs changing.
 - **Be concise.** The status report should be scannable in 30 seconds.
 - **Be honest about timeline.** If karma building is slower than expected, say so and adjust dates.
 - **Next steps must be specific and actionable.** Not "continue building karma" but "run /karma-run daily, focus on r/AskReddit rising posts, target 2-3 comments per day."
-- **Always check current state before updating.** Read Notion pages first, don't assume they're unchanged.
 - **Update memory only for significant changes** (phase transitions, major date shifts). Don't update for minor progress.
 - **Track prep tasks.** Each status check should flag uncompleted prep items that are becoming time-sensitive for the next phase.
+- **Reddit account age is 8 months** (as of Apr 2026). Do not refer to it as "5 weeks" — that was an earlier error.
