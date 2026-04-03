@@ -65,6 +65,7 @@ import { bufferToBase64 } from '@/utils/encoding';
 import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
+import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -314,6 +315,8 @@ export const useSyncStore = defineStore('sync', () => {
 
     if (cachedDoc) {
       mergeDoc(cachedDoc);
+      // Clean up duplicate recurring transactions from CRDT merge
+      await deduplicateRecurringTransactions();
       // Persist merged result so the cache reflects the merge
       persistDoc(fk).catch(console.warn);
       // Save merged result back to remote file (debounced)
@@ -394,6 +397,13 @@ export const useSyncStore = defineStore('sync', () => {
           await reloadAllStores();
 
           if (merging) {
+            // CRDT merges can produce duplicate recurring transactions
+            // (same recurringItemId + date, different UUIDs from different actors).
+            // Clean them up before saving back.
+            const dupsRemoved = await deduplicateRecurringTransactions();
+            if (dupsRemoved > 0) {
+              await reloadAllStores();
+            }
             // After merge, save back to persist our local changes
             syncService.triggerDebouncedSave();
           }
@@ -1167,6 +1177,9 @@ export const useSyncStore = defineStore('sync', () => {
             syncService.setFamilyKey(familyKey.value!, pendingEncryptedFile.value.envelope);
             pendingEncryptedFile.value = null;
             await reloadAllStores();
+            // Clean up duplicate recurring transactions from CRDT merge
+            const dupsRemoved = await deduplicateRecurringTransactions();
+            if (dupsRemoved > 0) await reloadAllStores();
             syncService.triggerDebouncedSave();
             setupAutoSync();
             return;
@@ -1241,6 +1254,9 @@ export const useSyncStore = defineStore('sync', () => {
               syncService.setFamilyKey(familyKey.value!, pendingEncryptedFile.value.envelope);
               pendingEncryptedFile.value = null;
               await reloadAllStores();
+              // Clean up duplicate recurring transactions from CRDT merge
+              const dupsRemoved = await deduplicateRecurringTransactions();
+              if (dupsRemoved > 0) await reloadAllStores();
               syncService.triggerDebouncedSave();
               return true;
             } catch {

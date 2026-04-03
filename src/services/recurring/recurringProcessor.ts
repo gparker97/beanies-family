@@ -389,3 +389,49 @@ function getMonthName(month: number): string {
   ];
   return months[(month - 1) % 12] ?? 'Jan';
 }
+
+/**
+ * Remove duplicate recurring transactions from the Automerge document.
+ *
+ * CRDT merges can create duplicates when processRecurringItems runs on a
+ * stale cache and the background sync later merges in the remote doc that
+ * already has transactions for the same recurringItemId + date (but with
+ * different UUIDs from a different actor). This function scans all
+ * transactions, groups them by recurringItemId + date, and deletes extras
+ * — keeping only the earliest-created transaction per group.
+ *
+ * Should be called after any CRDT merge that could introduce duplicates.
+ */
+export async function deduplicateRecurringTransactions(): Promise<number> {
+  const allTransactions = await transactionRepo.getAllTransactions();
+
+  // Group recurring transactions by recurringItemId + date
+  const groups = new Map<string, { id: string; createdAt: string }[]>();
+  for (const tx of allTransactions) {
+    if (!tx.recurringItemId) continue;
+    const key = `${tx.recurringItemId}|${extractDatePart(tx.date)}`;
+    const group = groups.get(key);
+    if (group) {
+      group.push({ id: tx.id, createdAt: tx.createdAt });
+    } else {
+      groups.set(key, [{ id: tx.id, createdAt: tx.createdAt }]);
+    }
+  }
+
+  // Delete duplicates (keep the earliest-created transaction per group)
+  let deleted = 0;
+  for (const entries of groups.values()) {
+    if (entries.length <= 1) continue;
+    // Sort by createdAt ascending — keep the first, delete the rest
+    entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    for (let i = 1; i < entries.length; i++) {
+      await transactionRepo.deleteTransaction(entries[i]!.id);
+      deleted++;
+    }
+  }
+
+  if (deleted > 0) {
+    console.warn(`[recurringProcessor] Removed ${deleted} duplicate recurring transaction(s)`);
+  }
+  return deleted;
+}
