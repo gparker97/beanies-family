@@ -473,10 +473,31 @@ async function deleteTransaction(id: string) {
 
 /** After updating a recurring template, propagate field changes to linked
  *  non-reconciled materialized transactions so the UI reflects the edit. */
+/** Extract transaction-level fields from a recurring item input.
+ *  Used by syncLinkedTransactions and scope handlers to avoid
+ *  repeating the same field list (and forgetting goal fields). */
+function recurringToTransactionFields(data: CreateRecurringItemInput): UpdateTransactionInput {
+  return {
+    accountId: data.accountId,
+    type: data.type,
+    amount: data.amount,
+    currency: data.currency,
+    category: data.category,
+    description: data.description,
+    goalId: data.goalId,
+    goalAllocMode: data.goalId ? data.goalAllocMode : undefined,
+    goalAllocValue: data.goalId ? data.goalAllocValue : undefined,
+    // Clear computed allocation so updateTransaction's reversal + reapply
+    // cycle starts fresh (applyGoalAllocation will recompute it).
+    goalAllocApplied: undefined,
+  };
+}
+
 async function syncLinkedTransactions(recurringItemId: string, data: CreateRecurringItemInput) {
   const linked = transactionsStore.transactions.filter(
     (tx) => tx.recurringItemId === recurringItemId && !tx.isReconciled
   );
+  const fields = recurringToTransactionFields(data);
   for (const tx of linked) {
     // Recalculate date: keep the transaction's year/month, use new dayOfMonth
     const txDate = new Date(tx.date + 'T00:00:00');
@@ -487,12 +508,7 @@ async function syncLinkedTransactions(recurringItemId: string, data: CreateRecur
     const dd = String(newDay).padStart(2, '0');
 
     await transactionsStore.updateTransaction(tx.id, {
-      amount: data.amount,
-      description: data.description,
-      category: data.category,
-      type: data.type,
-      currency: data.currency,
-      accountId: data.accountId,
+      ...fields,
       date: `${yyyy}-${mm}-${dd}`,
     });
   }
@@ -519,27 +535,18 @@ async function handleSaveRecurring(data: CreateRecurringItemInput) {
 
         if (existingTx) {
           // Materialized transaction — update the existing record in place
-          await transactionsStore.updateTransaction(existingTx.id, {
-            accountId: data.accountId,
-            type: data.type,
-            amount: data.amount,
-            currency: data.currency,
-            category: data.category,
-            description: data.description,
-          });
+          await transactionsStore.updateTransaction(
+            existingTx.id,
+            recurringToTransactionFields(data)
+          );
         } else {
           // Projected transaction — materialize a one-off transaction
           await transactionsStore.createTransaction({
-            accountId: data.accountId,
-            type: data.type,
-            amount: data.amount,
-            currency: data.currency,
-            category: data.category,
+            ...recurringToTransactionFields(data),
             date: projectedDate,
-            description: data.description,
             isReconciled: false,
             recurringItemId: pendingProjectedTx.value.recurringItemId,
-          });
+          } as CreateTransactionInput);
         }
       } else if (scope === 'this-and-future') {
         const newItem = await recurringStore.splitRecurringItem(itemId, projectedDate);
