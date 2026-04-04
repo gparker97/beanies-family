@@ -8,6 +8,7 @@ import { toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
 import { isTodoOverdue } from '@/utils/todo';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
+import type { DutyCompletion } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
@@ -17,9 +18,17 @@ export interface CriticalItem {
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
   occurrenceDate?: string; // for activity modal opening
+  completable?: boolean; // whether this item can be checked off inline
+  completed?: boolean; // whether this item is done
+  dutyType?: 'dropoff' | 'pickup' | 'dropoff-pickup'; // for duty items only
 }
 
 const MAX_ITEMS = 5;
+
+/** Check whether a duty has been completed for a given occurrence date. */
+function isDutyDone(completions: DutyCompletion[] | undefined, date: string): boolean {
+  return completions?.some((c) => c.date === date) ?? false;
+}
 
 export function useCriticalItems() {
   const familyStore = useFamilyStore();
@@ -39,13 +48,45 @@ export function useCriticalItems() {
     // ── Activities where current member has a role today ──────────────
     const todayActivities = activityStore.activitiesForDate(todayStr.value);
     for (const { activity, date } of todayActivities) {
+      // Vacation notifications only on departure day
+      if (activity.vacationId && date !== activity.date) continue;
+
       const isPickup = activity.pickupMemberId === memberId;
       const isDropoff = activity.dropoffMemberId === memberId;
       const isAssignee = normalizeAssignees(activity).includes(memberId);
 
-      if (isPickup) {
-        const assignees = normalizeAssignees(activity);
-        const child = assignees.length ? getMemberName(assignees[0], '') : '';
+      const assignees = normalizeAssignees(activity);
+      const child = assignees.length ? getMemberName(assignees[0], '') : '';
+
+      if (isDropoff && isPickup) {
+        // Combined dropoff + pickup for same person
+        const key: UIStringKey =
+          activity.startTime && activity.endTime
+            ? 'nook.criticalDropoffPickup'
+            : activity.startTime
+              ? 'nook.criticalDropoffPickupStartOnly'
+              : activity.endTime
+                ? 'nook.criticalDropoffPickupEndOnly'
+                : 'nook.criticalDropoffPickupNoTime';
+        const dropoffDone = isDutyDone(activity.dropoffCompletions, date);
+        const pickupDone = isDutyDone(activity.pickupCompletions, date);
+        items.push({
+          id: activity.id,
+          type: 'activity',
+          message: buildMessage(key, {
+            child,
+            activity: activity.title,
+            startTime: formatTime12(activity.startTime ?? ''),
+            endTime: formatTime12(activity.endTime ?? ''),
+          }),
+          icon: '🚗',
+          time: activity.startTime ?? '',
+          occurrenceDate: date,
+          completable: true,
+          completed: dropoffDone && pickupDone,
+          dutyType: 'dropoff-pickup',
+        });
+      } else if (isPickup) {
         items.push({
           id: activity.id,
           type: 'activity',
@@ -56,12 +97,11 @@ export function useCriticalItems() {
           icon: '🚗',
           time: activity.endTime ?? '',
           occurrenceDate: date,
+          completable: true,
+          completed: isDutyDone(activity.pickupCompletions, date),
+          dutyType: 'pickup',
         });
-      }
-
-      if (isDropoff) {
-        const assignees = normalizeAssignees(activity);
-        const child = assignees.length ? getMemberName(assignees[0], '') : '';
+      } else if (isDropoff) {
         items.push({
           id: activity.id,
           type: 'activity',
@@ -72,6 +112,9 @@ export function useCriticalItems() {
           icon: '🚗',
           time: activity.startTime ?? '',
           occurrenceDate: date,
+          completable: true,
+          completed: isDutyDone(activity.dropoffCompletions, date),
+          dutyType: 'dropoff',
         });
       }
 
@@ -143,6 +186,8 @@ export function useCriticalItems() {
         message,
         icon: isOverdue ? '⏰' : '📋',
         time: isDueToday ? (todo.dueTime ?? '') : '',
+        completable: true,
+        completed: false, // open todos are never completed (completed ones are filtered out)
       });
     }
 
@@ -163,12 +208,16 @@ export function useCriticalItems() {
     if (!memberId) return 0;
     const totalActivities = activityStore
       .activitiesForDate(todayStr.value)
-      .reduce((n, { activity }) => {
+      .reduce((n, { activity, date }) => {
+        // Vacation notifications only on departure day
+        if (activity.vacationId && date !== activity.date) return n;
         const isPickup = activity.pickupMemberId === memberId;
         const isDropoff = activity.dropoffMemberId === memberId;
         const isAssignee = normalizeAssignees(activity).includes(memberId);
-        if (isPickup) n++;
-        if (isDropoff) n++;
+        // Combined dropoff+pickup counts as 1
+        if (isDropoff && isPickup) n++;
+        else if (isPickup) n++;
+        else if (isDropoff) n++;
         if (isAssignee && !isPickup && !isDropoff) n++;
         return n;
       }, 0);

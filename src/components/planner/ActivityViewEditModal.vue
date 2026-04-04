@@ -8,6 +8,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useInlineEdit } from '@/composables/useInlineEdit';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useAccountsStore } from '@/stores/accountsStore';
@@ -29,7 +30,7 @@ import MemberChip from '@/components/ui/MemberChip.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
-import type { FamilyActivity } from '@/types/models';
+import type { FamilyActivity, DutyCompletion } from '@/types/models';
 
 type EditableField =
   | 'title'
@@ -61,10 +62,53 @@ const { t, isBeanieMode } = useTranslation();
 const router = useRouter();
 const { playWhoosh } = useSounds();
 const activityStore = useActivityStore();
+const familyStore = useFamilyStore();
 const transactionsStore = useTransactionsStore();
 const recurringStore = useRecurringStore();
 const accountsStore = useAccountsStore();
 const { getMemberName } = useMemberInfo();
+
+/** Find the completion record for a given occurrence date. */
+function findCompletion(
+  completions: DutyCompletion[] | undefined,
+  date: string | undefined
+): DutyCompletion | undefined {
+  if (!completions || !date) return undefined;
+  return completions.find((c) => c.date === date);
+}
+
+/** Format a completion record as "Done by {name} at {time}". */
+function formatCompletion(completion: DutyCompletion): string {
+  const name = getMemberName(completion.completedBy);
+  const time = formatTime12(
+    new Date(completion.completedAt).toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+  );
+  return `${t('nook.dutyDone')} — ${name}, ${time}`;
+}
+
+/** Toggle duty completion for the current occurrence. */
+async function toggleDuty(duty: 'dropoff' | 'pickup') {
+  if (!activity.value || !props.occurrenceDate) return;
+  const memberId = familyStore.currentMemberId;
+  if (!memberId) return;
+  const field = duty === 'dropoff' ? 'dropoffCompletions' : 'pickupCompletions';
+  const completions = [...(activity.value[field] ?? [])];
+  const idx = completions.findIndex((c) => c.date === props.occurrenceDate);
+  if (idx >= 0) {
+    completions.splice(idx, 1);
+  } else {
+    completions.push({
+      date: props.occurrenceDate,
+      completedBy: memberId,
+      completedAt: new Date().toISOString(),
+    });
+  }
+  await activityStore.updateActivity(activity.value.id, { [field]: completions });
+}
 
 // Live-lookup from store so display stays reactive after inline edits
 const activity = computed(() =>
@@ -1031,11 +1075,33 @@ async function confirmReschedule() {
                 @start-edit="startEdit('dropoff')"
               >
                 <template #view>
-                  <span
-                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-                  >
-                    {{ getMemberName(activity.dropoffMemberId) }}
-                  </span>
+                  <div>
+                    <span
+                      class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                    >
+                      {{ getMemberName(activity.dropoffMemberId) }}
+                    </span>
+                    <button
+                      v-if="findCompletion(activity.dropoffCompletions, occurrenceDate)"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      @click.stop="toggleDuty('dropoff')"
+                    >
+                      <span>✓</span>
+                      {{
+                        formatCompletion(
+                          findCompletion(activity.dropoffCompletions, occurrenceDate)!
+                        )
+                      }}
+                    </button>
+                    <button
+                      v-else-if="occurrenceDate"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
+                      @click.stop="toggleDuty('dropoff')"
+                    >
+                      <span class="h-3 w-3 rounded-sm border-[1.5px] border-current" />
+                      {{ t('nook.dutyMarkDone') }}
+                    </button>
+                  </div>
                 </template>
                 <template #edit>
                   <FamilyChipPicker
@@ -1062,11 +1128,33 @@ async function confirmReschedule() {
                 @start-edit="startEdit('pickup')"
               >
                 <template #view>
-                  <span
-                    class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
-                  >
-                    {{ getMemberName(activity.pickupMemberId) }}
-                  </span>
+                  <div>
+                    <span
+                      class="font-outfit text-sm font-semibold text-[var(--color-text)] dark:text-gray-100"
+                    >
+                      {{ getMemberName(activity.pickupMemberId) }}
+                    </span>
+                    <button
+                      v-if="findCompletion(activity.pickupCompletions, occurrenceDate)"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 transition-colors hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                      @click.stop="toggleDuty('pickup')"
+                    >
+                      <span>✓</span>
+                      {{
+                        formatCompletion(
+                          findCompletion(activity.pickupCompletions, occurrenceDate)!
+                        )
+                      }}
+                    </button>
+                    <button
+                      v-else-if="occurrenceDate"
+                      class="mt-1 flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-orange-50 hover:text-[var(--color-primary-500)] dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
+                      @click.stop="toggleDuty('pickup')"
+                    >
+                      <span class="h-3 w-3 rounded-sm border-[1.5px] border-current" />
+                      {{ t('nook.dutyMarkDone') }}
+                    </button>
+                  </div>
                 </template>
                 <template #edit>
                   <FamilyChipPicker
