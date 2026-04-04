@@ -2377,6 +2377,30 @@ const STRING_DEFS = {
     en: 'A gentle reminder: {task} — it was due {date}',
     beanie: 'a gentle nudge: {task} — was due {date}',
   },
+  'nook.criticalDropoffPickup': {
+    en: 'Drop off & pick up {child} at {activity} ({startTime} → {endTime})',
+    beanie: 'drop off & pick up {child} at {activity} ({startTime} → {endTime})',
+  },
+  'nook.criticalDropoffPickupStartOnly': {
+    en: 'Drop off {child} at {activity} at {startTime} & pick up later!',
+    beanie: 'drop off {child} at {activity} at {startTime} & pick up later!',
+  },
+  'nook.criticalDropoffPickupEndOnly': {
+    en: 'Drop off & pick up {child} from {activity} at {endTime}!',
+    beanie: 'drop off & pick up {child} from {activity} at {endTime}!',
+  },
+  'nook.criticalDropoffPickupNoTime': {
+    en: 'Drop off & pick up {child} at {activity} today!',
+    beanie: 'drop off & pick up {child} at {activity} today!',
+  },
+  'nook.dutyDone': {
+    en: 'Done',
+    beanie: 'done',
+  },
+  'nook.dutyMarkDone': {
+    en: 'Mark done',
+    beanie: 'mark done',
+  },
   'nook.criticalMore': {
     en: 'more for you today',
     beanie: 'more beans for you today',
