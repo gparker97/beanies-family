@@ -381,6 +381,12 @@ export type FeeSchedule =
   | 'termly'; // @deprecated — legacy, treated as monthly passthrough
 export type ReminderMinutes = 0 | 5 | 10 | 15 | 30 | 60 | 120 | 1440;
 
+export interface DutyCompletion {
+  date: string; // occurrence date (ISO date string)
+  completedBy: UUID; // member who completed
+  completedAt: ISODateString; // timestamp of completion
+}
+
 export interface FamilyActivity {
   id: UUID;
   title: string;
@@ -430,6 +436,10 @@ export interface FamilyActivity {
 
   // Reminders
   reminderMinutes: ReminderMinutes;
+
+  // Duty completion tracking (per-occurrence for recurring activities)
+  dropoffCompletions?: DutyCompletion[];
+  pickupCompletions?: DutyCompletion[];
 
   // Notes
   notes?: string;

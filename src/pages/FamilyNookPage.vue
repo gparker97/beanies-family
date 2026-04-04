@@ -19,6 +19,7 @@ import OnboardingWizard from '@/components/onboarding/OnboardingWizard.vue';
 import BeanTipCard from '@/components/nook/BeanTipCard.vue';
 import { usePermissions } from '@/composables/usePermissions';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
@@ -28,6 +29,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import type {
   FamilyActivity,
+  DutyCompletion,
   Transaction,
   CreateFamilyActivityInput,
   UpdateFamilyActivityInput,
@@ -37,6 +39,7 @@ import type {
 
 const router = useRouter();
 const settingsStore = useSettingsStore();
+const familyStore = useFamilyStore();
 const { canViewFinances } = usePermissions();
 const todoStore = useTodoStore();
 const activityStore = useActivityStore();
@@ -61,6 +64,42 @@ const {
   handleViewOpenEdit: scopedActivityOpenEdit,
   handleScopedSave,
 } = useActivityScopeEdit();
+
+// ── Duty completion toggle ──────────────────────────────────────────────────
+async function handleDutyComplete(id: string, dutyType: string, occurrenceDate: string) {
+  const activity = activityStore.activities.find((a) => a.id === id);
+  if (!activity || !occurrenceDate) return;
+  const memberId = familyStore.currentMemberId;
+  if (!memberId) return;
+  const now = new Date().toISOString();
+  const updates: Record<string, DutyCompletion[]> = {};
+  if (dutyType.includes('dropoff')) {
+    const completions = [...(activity.dropoffCompletions ?? [])];
+    const idx = completions.findIndex((c) => c.date === occurrenceDate);
+    if (idx >= 0) completions.splice(idx, 1);
+    else completions.push({ date: occurrenceDate, completedBy: memberId, completedAt: now });
+    updates.dropoffCompletions = completions;
+  }
+  if (dutyType.includes('pickup')) {
+    const completions = [...(activity.pickupCompletions ?? [])];
+    const idx = completions.findIndex((c) => c.date === occurrenceDate);
+    if (idx >= 0) completions.splice(idx, 1);
+    else completions.push({ date: occurrenceDate, completedBy: memberId, completedAt: now });
+    updates.pickupCompletions = completions;
+  }
+  await activityStore.updateActivity(id, updates);
+}
+
+// ── Todo completion toggle (from critical items) ────────────────────────────
+async function handleTodoComplete(id: string) {
+  const memberId = familyStore.currentMemberId;
+  if (!memberId) return;
+  await todoStore.toggleComplete(id, memberId);
+}
+
+function scrollToSchedule() {
+  document.getElementById('today-schedule')?.scrollIntoView({ behavior: 'smooth' });
+}
 
 function handleActivityOpenEdit(activity: FamilyActivity) {
   const { activity: target, occurrenceDate } = scopedActivityOpenEdit(activity);
@@ -155,6 +194,9 @@ async function handleTransactionDelete(id: string) {
     <FamilyStatusToast
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
+      @complete-duty="handleDutyComplete"
+      @complete-todo="handleTodoComplete"
+      @show-full-schedule="scrollToSchedule"
     />
 
     <!-- Beanie tip of the day -->
@@ -168,6 +210,7 @@ async function handleTransactionDelete(id: string) {
 
     <!-- Today's Schedule + This Week -->
     <ScheduleCards
+      id="today-schedule"
       @open-todo="selectedTodoId = $event"
       @open-activity="(id: string, date: string) => openActivity(id, date)"
     />

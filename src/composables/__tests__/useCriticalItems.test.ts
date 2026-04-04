@@ -146,7 +146,7 @@ describe('useCriticalItems', () => {
     expect(msg.icon).toBe('🚗');
   });
 
-  it('shows both pickup and dropoff when current member has both roles', () => {
+  it('shows combined item when current member has both dropoff and pickup roles', () => {
     familyStore.setCurrentMember('parent-1');
     activityStore.activities.push(
       makeActivity({
@@ -157,10 +157,10 @@ describe('useCriticalItems', () => {
     );
 
     const { criticalItems } = useCriticalItems();
-    expect(criticalItems.value).toHaveLength(2);
-    // Both items reference the child and activity
-    expect(criticalItems.value.every((i) => i.message.includes('Emma'))).toBe(true);
-    expect(criticalItems.value.every((i) => i.icon === '🚗')).toBe(true);
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toContain('Emma');
+    expect(criticalItems.value[0]!.icon).toBe('🚗');
+    expect(criticalItems.value[0]!.dutyType).toBe('dropoff-pickup');
   });
 
   it('shows assignee message when current member is assignee (not pickup/dropoff)', () => {
@@ -457,5 +457,127 @@ describe('useCriticalItems', () => {
 
     const { criticalItems } = useCriticalItems();
     expect(criticalItems.value).toHaveLength(0);
+  });
+
+  // ── Vacation start-date filter ──────────────────────────────────────
+
+  it('shows vacation activity only on the start date', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        id: 'vacation-activity',
+        assigneeId: 'parent-1',
+        date: TODAY, // start date = today
+        endDate: '2026-03-14',
+        isAllDay: true,
+        recurrence: 'none',
+        vacationId: 'vacation-1',
+        startTime: undefined,
+        endTime: undefined,
+        pickupMemberId: undefined,
+        dropoffMemberId: undefined,
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.id).toBe('vacation-activity');
+  });
+
+  it('skips vacation activity on non-start dates', () => {
+    familyStore.setCurrentMember('parent-1');
+    // Vacation started yesterday, still active today
+    activityStore.activities.push(
+      makeActivity({
+        id: 'vacation-activity',
+        assigneeId: 'parent-1',
+        date: '2026-03-09', // started yesterday
+        endDate: '2026-03-14',
+        isAllDay: true,
+        recurrence: 'none',
+        vacationId: 'vacation-1',
+        startTime: undefined,
+        endTime: undefined,
+        pickupMemberId: undefined,
+        dropoffMemberId: undefined,
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    // Today (2026-03-10) is not the start date, so should be filtered out
+    expect(criticalItems.value).toHaveLength(0);
+  });
+
+  // ── Duty completion ─────────────────────────────────────────────────
+
+  it('marks dropoff duty as completed when occurrence date has a completion record', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        dropoffMemberId: 'parent-1',
+        assigneeId: 'child-1',
+        dropoffCompletions: [{ date: TODAY, completedBy: 'parent-1', completedAt: NOW }],
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.dutyType).toBe('dropoff');
+    expect(criticalItems.value[0]!.completed).toBe(true);
+  });
+
+  it('marks combined duty as incomplete when only one duty is completed', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        dropoffMemberId: 'parent-1',
+        pickupMemberId: 'parent-1',
+        assigneeId: 'child-1',
+        dropoffCompletions: [{ date: TODAY, completedBy: 'parent-2', completedAt: NOW }],
+        pickupCompletions: [],
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.dutyType).toBe('dropoff-pickup');
+    expect(criticalItems.value[0]!.completed).toBe(false);
+  });
+
+  it('marks combined duty as complete when both duties are completed', () => {
+    familyStore.setCurrentMember('parent-1');
+    activityStore.activities.push(
+      makeActivity({
+        dropoffMemberId: 'parent-1',
+        pickupMemberId: 'parent-1',
+        assigneeId: 'child-1',
+        dropoffCompletions: [{ date: TODAY, completedBy: 'parent-2', completedAt: NOW }],
+        pickupCompletions: [{ date: TODAY, completedBy: 'parent-1', completedAt: NOW }],
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.dutyType).toBe('dropoff-pickup');
+    expect(criticalItems.value[0]!.completed).toBe(true);
+  });
+
+  // ── Todo completable flag ─────────────────────────────────────────
+
+  it('marks todos as completable in critical items', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        assigneeId: 'parent-1',
+        dueDate: TODAY,
+        createdBy: 'parent-1',
+        title: 'Test task',
+      })
+    );
+
+    const { criticalItems } = useCriticalItems();
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.completable).toBe(true);
+    expect(criticalItems.value[0]!.completed).toBe(false);
   });
 });

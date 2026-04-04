@@ -14,7 +14,18 @@ const { criticalItems, overflowCount } = useCriticalItems();
 const emit = defineEmits<{
   'open-todo': [id: string];
   'open-activity': [id: string, date: string];
+  'complete-duty': [id: string, dutyType: string, occurrenceDate: string];
+  'complete-todo': [id: string];
+  'show-full-schedule': [];
 }>();
+
+function handleComplete(item: CriticalItem) {
+  if (item.dutyType) {
+    emit('complete-duty', item.id, item.dutyType, item.occurrenceDate ?? '');
+  } else if (item.type === 'todo') {
+    emit('complete-todo', item.id);
+  }
+}
 
 const todayActivitiesCount = computed(() => {
   const todayStr = toDateInputValue(new Date());
@@ -114,16 +125,41 @@ function handleItemClick(item: CriticalItem) {
           v-for="(item, index) in criticalItems"
           :key="item.id + item.type + item.time"
           class="critical-item"
+          :class="{ 'opacity-50': item.completed }"
           :style="{ animationDelay: `${index * 60}ms` }"
           @click="handleItemClick(item)"
         >
+          <!-- Completion circle for completable items (todos + duties) -->
+          <button
+            v-if="item.completable"
+            type="button"
+            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors"
+            :class="
+              item.completed ? 'border-white/50 bg-white/25' : 'border-white/40 hover:bg-white/15'
+            "
+            @click.stop="handleComplete(item)"
+          >
+            <svg v-if="item.completed" class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none">
+              <path
+                d="M2.5 6l2.5 2.5 4.5-5"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+
           <!-- Icon with subtle glow ring -->
           <span class="critical-icon">
             {{ item.icon }}
           </span>
 
           <!-- Message text -->
-          <span class="line-clamp-2 flex-1 text-xs leading-snug font-medium text-white/90">
+          <span
+            class="line-clamp-2 flex-1 text-xs leading-snug font-medium text-white/90"
+            :class="{ 'line-through': item.completed }"
+          >
             {{ item.message }}
           </span>
 
@@ -144,10 +180,14 @@ function handleItemClick(item: CriticalItem) {
         </button>
       </div>
 
-      <!-- Overflow indicator -->
-      <p v-if="overflowCount > 0" class="mt-2 px-1 text-xs text-white/45">
-        +{{ overflowCount }} {{ t('nook.criticalMore') }}
-      </p>
+      <!-- Overflow indicator — tappable to scroll to full schedule -->
+      <button
+        v-if="overflowCount > 0"
+        class="mt-2 px-1 text-xs text-white/45 transition-colors hover:text-white/70"
+        @click="emit('show-full-schedule')"
+      >
+        +{{ overflowCount }} {{ t('nook.criticalMore') }} ↓
+      </button>
     </div>
   </div>
 </template>
