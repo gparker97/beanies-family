@@ -41,15 +41,19 @@ Collect the following information:
 
 ### Step 2: Assess Phase & Progress
 
-**Current phase structure (as of Apr 2, 2026):**
+**Current phase structure (as of Apr 3, 2026):**
 
 | Phase | Description | Gate |
 |-------|-------------|------|
 | Phase 0 | Karma Building via Daily Karma Runs | Until 100+ karma |
-| Phase 1 | First Feedback Posts (r/daddit, r/Parenting, r/SideProject) | Until engagement reviewed |
-| Phase 2 | Launch Week (Blog, HN, Reddit) | After Phase 1 checkpoint |
+| Phase 1 | First Feedback Posts (r/daddit, r/Parenting, r/SideProject) + Quora prep | Until engagement reviewed |
+| Phase 2 | Launch Week (Blog, HN, Reddit, Quora) | After Phase 1 checkpoint |
 | Phase 3 | Product Hunt + Amplify | After Phase 2 |
-| Phase 4 | Engage & Iterate | Ongoing |
+| Phase 4 | Engage & Iterate (incl. weekly Quora answers) | Ongoing |
+
+**Key account assets:**
+- Reddit: 8-month-old account (well past all sub age gates), 76 karma as of Apr 3
+- Quora: 10-year-old account, viral answer (1.4M views, 16K upvotes, 289 followers). Secondary long-tail channel.
 
 Determine:
 - Which phase we're currently in (based on karma level and date)
@@ -182,6 +186,13 @@ Track these across phases — report on uncompleted items:
 - [ ] Product Hunt account
 - [ ] Buffer account
 - [ ] Join 3-5 Facebook groups (family/parenting focused)
+
+**Quora (Phase 1 prep — leverage 10-year account):**
+- [ ] Update Quora profile bio + per-topic credentials to mention beanies.family
+- [ ] Search and identify 3-5 high-traffic family finance questions (sort by followers/views)
+- [ ] Write Quora answer #1: highest-traffic "best family budgeting app" question (500+ words, genuine, app mention near end)
+- [ ] Write Quora answer #2: parenting/family logistics question (weave app in naturally)
+- [ ] Write Quora answer #3 (optional): multi-currency or expat finance angle
 
 **Post Drafts (Phase 1 prep):**
 - [x] r/daddit feedback post (v2, saved in Post Drafts)
