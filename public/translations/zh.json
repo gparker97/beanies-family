@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-03-28",
-    "translationCount": 1923
+    "lastUpdated": "2026-04-05",
+    "translationCount": 1929
   },
   "translations": {
     "app.name": {
@@ -9620,6 +9620,36 @@
       "translation": "发行说明和最近的改进\\ u2014直接来自Head Beanie开发人员。",
       "hash": "lozt6q",
       "lastUpdated": "2026-03-28"
+    },
+    "nook.criticalDropoffPickup": {
+      "translation": "在{activity} （ {startTime} {endTime} ）下车并接送→{child}",
+      "hash": "glivxc",
+      "lastUpdated": "2026-04-05"
+    },
+    "nook.criticalDropoffPickupStartOnly": {
+      "translation": "{child}在{activity}的{startTime}下车，稍后接机！",
+      "hash": "iv9lpp",
+      "lastUpdated": "2026-04-05"
+    },
+    "nook.criticalDropoffPickupEndOnly": {
+      "translation": "在{endTime}从{activity}接送{child} ！",
+      "hash": "dnbbmp",
+      "lastUpdated": "2026-04-05"
+    },
+    "nook.criticalDropoffPickupNoTime": {
+      "translation": "立即前往{activity}接送{child} ！",
+      "hash": "ns2dx6",
+      "lastUpdated": "2026-04-05"
+    },
+    "nook.dutyDone": {
+      "translation": "完成",
+      "hash": "19s4i",
+      "lastUpdated": "2026-04-05"
+    },
+    "nook.dutyMarkDone": {
+      "translation": "标记完成",
+      "hash": "gmy579",
+      "lastUpdated": "2026-04-05"
     }
   }
 }
