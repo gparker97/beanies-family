@@ -319,6 +319,23 @@ const navLinks = [
   margin: 2rem 0;
 }
 
+.blog-prose :deep(img) {
+  border: 1px solid rgb(44 62 80 / 8%);
+  border-radius: 16px;
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 360px;
+  width: 100%;
+}
+
+.blog-prose :deep(img + em) {
+  color: rgb(44 62 80 / 40%);
+  display: block;
+  font-size: 0.8125rem;
+  margin-top: -0.75rem;
+  text-align: center;
+}
+
 /* ── Post nav ── */
 .post-nav {
   display: flex;
