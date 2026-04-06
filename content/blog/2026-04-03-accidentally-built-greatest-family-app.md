@@ -28,7 +28,7 @@ _my real, live, actual beanies.family nook view right now_
 
 Beanies started as a throwaway project (in fact, it wasn't even called beanies at first - it actually had a way, way more boring name which I will never divulge) and morphed, through a combined 20 years of parenting and financial pain and suffering, into an app I genuinely enjoy using. And there's not too many apps (whether built by me or not) I can say that about.
 
-**Beanies sits at the intersection of family, finance, and data security**, like no other app I know of today built by big software companies or VC-backed startups, who have this pesky obsession with making money, harvesting your data, or both.
+**Beanies sits at the intersection of family, finance, and data security**, like no other app I know of today built by major software companies or VC-backed startups, who have this pesky obsession with making money, harvesting your data, or both.
 
 I'll be writing small notes and updates here about cool new features or things I'm thinking of building. As a former (and I guess now, in a way, current) founder, this is a crazy new world of SaaS. A place where founders can build as fast as we can think. Which, in my case perhaps, is a truly scary thought.
 
