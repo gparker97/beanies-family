@@ -1,7 +1,7 @@
 ---
-title: "i might have accidentally built the world's greatest family planning app"
+title: "I might have accidentally built the world's greatest family planning app"
 slug: accidentally-built-greatest-family-app
-date: 2026-04-06
+date: 2026-04-03
 category: updates
 coverEmoji: 🚀
 excerpt: '800 commits, 250 cups of coffee, and 89,000 gloriously vibe-coded lines later, I found myself gazing proudly at a nano banana generated image of my actual family in beanie form.'
