@@ -1101,10 +1101,10 @@ onUnmounted(() => {
         <div class="story__signoff reveal">
           <p class="story__signoff-tagline">simplify your family life. every bean counts.</p>
           <p class="story__signoff-name">Peace out, my beans.</p>
-          <p class="story__signoff-name">&mdash; Greg</p>
+          <p class="story__signoff-name">greg</p>
           <img
             src="/brand/beanies_father_son_icon_512x512.png"
-            alt="Greg and beanie"
+            alt="greg and beanie"
             class="story__signoff-img"
           />
         </div>

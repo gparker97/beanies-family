@@ -56,4 +56,5 @@ If you have a question, comment, suggestion, or just wanna say hi, you can reach
 _simplify your family life. every bean counts._
 
 Peace out, my beans.
-— Greg 🫘
+
+greg 🫘
