@@ -1102,11 +1102,34 @@ onUnmounted(() => {
           <p class="story__signoff-tagline">simplify your family life. every bean counts.</p>
           <p class="story__signoff-name">Peace out, my beans.</p>
           <p class="story__signoff-name">greg</p>
+        </div>
+
+        <!-- Signoff row: icon + next post -->
+        <div class="story__signoff-row reveal">
           <img
             src="/brand/beanies_father_son_icon_512x512.png"
             alt="greg and beanie"
             class="story__signoff-img"
           />
+          <button
+            type="button"
+            class="story__next-post"
+            @click="router.push('/beanstalk/accidentally-built-greatest-family-app')"
+          >
+            <p class="story__next-post-text">want to read more? here's my next post!</p>
+            <div class="story__next-post-arrow">
+              <svg
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                viewBox="0 0 24 24"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </div>
+          </button>
         </div>
 
         <p
@@ -2805,10 +2828,99 @@ onUnmounted(() => {
   margin-top: 24px;
 }
 
+/* ── Signoff row: icon + next post ── */
+.story__signoff-row {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  margin: 32px auto 0;
+  max-width: 480px;
+}
+
 .story__signoff-img {
   border-radius: 20px;
-  margin: 16px auto 0;
-  width: 80px;
+  flex-shrink: 0;
+  width: 64px;
+}
+
+.story__next-post {
+  align-items: center;
+  background: rgb(241 93 34 / 3%);
+  border: 1px solid rgb(241 93 34 / 10%);
+  border-radius: 16px;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  height: 64px;
+  min-width: 0;
+  padding: 0 16px;
+  text-align: left;
+  transition:
+    border-color 250ms,
+    background 250ms,
+    box-shadow 250ms;
+}
+
+.story__next-post:hover {
+  background: rgb(241 93 34 / 6%);
+  border-color: rgb(241 93 34 / 25%);
+  box-shadow: 0 4px 16px rgb(241 93 34 / 8%);
+}
+
+.story__body .story__next-post-text {
+  color: var(--deep-slate);
+  flex: 1;
+  font-family: Outfit, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+  min-width: 0;
+  opacity: 0.7;
+  text-align: center;
+}
+
+.story__next-post:hover .story__next-post-text {
+  color: var(--heritage-orange);
+  opacity: 1;
+}
+
+.story__next-post-arrow {
+  align-items: center;
+  color: var(--heritage-orange);
+  display: flex;
+  flex-shrink: 0;
+  opacity: 0.35;
+  transition:
+    opacity 250ms,
+    transform 250ms;
+}
+
+.story__next-post:hover .story__next-post-arrow {
+  opacity: 0.8;
+  transform: translateX(3px);
+}
+
+@media (width <= 480px) {
+  .story__signoff-row {
+    gap: 14px;
+  }
+
+  .story__signoff-img {
+    height: 48px;
+    width: 48px;
+  }
+
+  .story__next-post {
+    height: 48px;
+    padding: 0 12px;
+  }
+
+  .story__next-post-text {
+    font-size: 0.75rem;
+  }
 }
 
 /* ═══════════════════════════════════════════════

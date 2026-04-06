@@ -1,15 +1,15 @@
 ---
-title: "Okay, Here's the Deal: Why I Built beanies.family"
+title: "okay, here's the deal: why I built beanies.family"
 slug: welcome-to-the-beanstalk
 date: 2026-03-22
 category: updates
 coverEmoji: 🫘
 excerpt: 'The story of how a janky spreadsheet, a Chinese nickname, and three kids at school age led to building a family planning app at 3am.'
 featured: true
-author: Greg
+author: greg
 ---
 
-Hey, guys! 🫘
+**Hey, guys!** 🫘
 
 Yes, it's _actually_ me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart outside taco trucks on Wednesday afternoons. But getting back to the point...
 

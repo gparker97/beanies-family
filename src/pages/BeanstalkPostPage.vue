@@ -79,13 +79,13 @@ const navLinks = [
 
       <div class="post-divider" />
 
-      <!-- Prev / Next -->
+      <!-- Previous / Next -->
       <div class="post-nav">
+        <!-- ← Previous (older post) or back to blog -->
         <button
-          v-if="prevPost"
           type="button"
           class="post-nav-btn"
-          @click="router.push(`/beanstalk/${prevPost.slug}`)"
+          @click="router.push(nextPost ? `/beanstalk/${nextPost.slug}` : '/beanstalk')"
         >
           <svg
             width="14"
@@ -98,19 +98,20 @@ const navLinks = [
             <polyline points="15 18 9 12 15 6" />
           </svg>
           <div>
-            <div class="post-nav-label">newer</div>
-            <div class="post-nav-title">{{ prevPost.title }}</div>
+            <div class="post-nav-label">previous</div>
+            <div class="post-nav-title">{{ nextPost ? nextPost.title : 'all posts' }}</div>
           </div>
         </button>
+
+        <!-- → Next (newer post) or back to blog -->
         <button
-          v-if="nextPost"
           type="button"
           class="post-nav-btn post-nav-btn-right"
-          @click="router.push(`/beanstalk/${nextPost.slug}`)"
+          @click="router.push(prevPost ? `/beanstalk/${prevPost.slug}` : '/beanstalk')"
         >
           <div>
-            <div class="post-nav-label">older</div>
-            <div class="post-nav-title">{{ nextPost.title }}</div>
+            <div class="post-nav-label">next</div>
+            <div class="post-nav-title">{{ prevPost ? prevPost.title : 'all posts' }}</div>
           </div>
           <svg
             width="14"

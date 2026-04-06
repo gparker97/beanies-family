@@ -6,13 +6,12 @@ import PublicFooter from '@/components/public/PublicFooter.vue';
 import { formatDate } from '@/utils/date';
 
 const router = useRouter();
-const { featuredPost } = useBlog();
+const { featuredPost, regularPosts } = useBlog();
 
 const comingSoonCards = [
-  { emoji: '💰', title: 'Teaching Kids About Money', subtitle: 'coming soon' },
-  { emoji: '✈️', title: 'Family Travel Planning Tips', subtitle: 'coming soon' },
-  { emoji: '📅', title: 'Managing the Family Calendar', subtitle: 'coming soon' },
-  { emoji: '🎯', title: 'Setting Family Goals Together', subtitle: 'coming soon' },
+  { emoji: '✈️', title: 'travel plans — stress less, plan more', subtitle: 'coming soon' },
+  { emoji: '✅', title: 'introducing todos', subtitle: 'coming soon' },
+  { emoji: '🔍', title: 'best cozi & maple alternatives in 2026', subtitle: 'coming soon' },
 ];
 
 function openPost(slug: string) {
@@ -89,6 +88,26 @@ const navLinks = [
           </div>
         </div>
       </button>
+
+      <!-- Published posts grid -->
+      <div v-if="regularPosts.length" class="posts-grid">
+        <button
+          v-for="post in regularPosts"
+          :key="post.slug"
+          type="button"
+          class="post-card"
+          @click="openPost(post.slug)"
+        >
+          <div class="post-card-emoji">{{ post.coverEmoji }}</div>
+          <h3 class="post-card-title">{{ post.title }}</h3>
+          <p class="post-card-excerpt">{{ post.excerpt }}</p>
+          <div class="post-card-meta">
+            <span>{{ post.author }}</span>
+            <span class="post-card-meta-dot">·</span>
+            <span>{{ formatDate(post.date) }}</span>
+          </div>
+        </button>
+      </div>
 
       <!-- Coming soon grid -->
       <div class="coming-grid">
@@ -350,6 +369,84 @@ const navLinks = [
 .featured-card:hover .featured-card-arrow {
   background: white;
   color: var(--heritage-orange);
+}
+
+/* ── Published posts grid ── */
+.posts-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 40px;
+}
+
+@media (width <= 480px) {
+  .posts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.post-card {
+  background: white;
+  border: 1.5px solid rgb(44 62 80 / 8%);
+  border-radius: 20px;
+  cursor: pointer;
+  padding: 28px 20px;
+  text-align: left;
+  transition:
+    transform 200ms ease,
+    border-color 200ms,
+    box-shadow 200ms;
+  width: 100%;
+}
+
+.post-card:hover {
+  border-color: var(--heritage-orange);
+  box-shadow: 0 8px 24px rgb(241 93 34 / 8%);
+  transform: translateY(-2px);
+}
+
+.post-card-emoji {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.post-card-title {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.post-card:hover .post-card-title {
+  color: var(--heritage-orange);
+}
+
+.post-card-excerpt {
+  -webkit-box-orient: vertical;
+  color: var(--deep-slate);
+  display: -webkit-box;
+  font-size: 0.8125rem;
+  -webkit-line-clamp: 3;
+  line-height: 1.6;
+  opacity: 0.5;
+  overflow: hidden;
+}
+
+.post-card-meta {
+  align-items: center;
+  color: var(--deep-slate);
+  display: flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.6875rem;
+  gap: 6px;
+  margin-top: 12px;
+  opacity: 0.3;
+}
+
+.post-card-meta-dot {
+  opacity: 0.5;
 }
 
 /* ── Coming soon grid ── */
