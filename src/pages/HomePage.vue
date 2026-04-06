@@ -1009,8 +1009,8 @@ onUnmounted(() => {
           If you want the cloud version so you can share it with your family (don't worry, your data
           still stays with you), create a family account at
           <a href="https://beanies.family" class="story__link">beanies.family</a>. Just drop me a
-          line for an invite code. You could also set up the infra by yourself, but that's a pain
-          and you know it.
+          line for an invite code. You could also set up the infra by yourself (and pay for it), but
+          that's a pain and you know it.
         </p>
 
         <p class="reveal" style="margin-bottom: 0.8em">Here's the fun stuff:</p>
