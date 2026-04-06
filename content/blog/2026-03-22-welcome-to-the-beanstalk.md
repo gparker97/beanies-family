@@ -1,10 +1,10 @@
 ---
-title: "okay, here's the deal: why I built beanies.family"
+title: 'why I built beanies.family'
 slug: welcome-to-the-beanstalk
 date: 2026-03-22
 category: updates
 coverEmoji: 🫘
-excerpt: 'The story of how a janky spreadsheet, a Chinese nickname, and three kids at school age led to building a family planning app at 3am.'
+excerpt: "The story of how a janky spreadsheet, my son's nickname, and three crazy boys naturally led to vibe coding a family planning app at 3am."
 featured: true
 author: greg
 ---
