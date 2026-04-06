@@ -1,7 +1,7 @@
 ---
 title: 'why I built beanies.family'
 slug: welcome-to-the-beanstalk
-date: 2026-03-22
+date: 2026-03-27
 category: updates
 coverEmoji: 🫘
 excerpt: "The story of how a janky spreadsheet, my son's nickname, and three crazy boys naturally led to vibe coding a family planning app at 3am."
