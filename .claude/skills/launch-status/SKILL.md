@@ -213,3 +213,4 @@ Track these across phases — report on uncompleted items:
 - **Update memory only for significant changes** (phase transitions, major date shifts). Don't update for minor progress.
 - **Track prep tasks.** Each status check should flag uncompleted prep items that are becoming time-sensitive for the next phase.
 - **Reddit account age is 8 months** (as of Apr 2026). Do not refer to it as "5 weeks" — that was an earlier error.
+- **NEVER save launch content to the repo.** All launch plans, strategy docs, post drafts, subreddit content, marketing ideas, and related material must live ONLY in Notion. Never create files in the repo (e.g., `docs/launch/`, `docs/plans/` for launch items, or anywhere else) containing launch or marketing content. The repo is for code and product docs only.

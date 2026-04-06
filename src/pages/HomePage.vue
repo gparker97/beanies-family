@@ -247,8 +247,8 @@ onUnmounted(() => {
 
       <h1 class="hero__headline">every. bean.<br /><em>counts.</em></h1>
       <p class="hero__sub">
-        one app to manage your family's money, activities, and all the chaos. open source and fully
-        encrypted. no ads, no tracking, no nonsense.
+        one app to manage your family's money, activities, and all the little beans. open source and
+        fully encrypted. no ads, no tracking, no nonsense.
       </p>
 
       <div class="hero__cta-group">

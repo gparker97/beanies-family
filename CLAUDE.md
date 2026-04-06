@@ -6,6 +6,9 @@
 > **IMPORTANT — Deployment:**
 > NEVER deploy to production unless the user explicitly asks you to deploy. The deploy workflow (`Deploy beanies PROD`) is manual-only (`workflow_dispatch`). Do not trigger it proactively — wait for an explicit instruction like "deploy to prod" or "push to prod".
 >
+> **IMPORTANT — Launch & Marketing Content:**
+> NEVER save launch plans, marketing strategy, post drafts, subreddit content, Reddit/social media strategy, or any launch-related material to the repo. All launch and marketing content lives ONLY in Notion. The repo is for code, product docs, and architecture only. This includes `docs/launch/`, `docs/plans/` (for launch items), or any other directory. If asked to create launch content, write it to Notion, not the filesystem.
+>
 > **Key project documents in `docs/`:**
 >
 > - `docs/STATUS.md` — Current project status and progress
