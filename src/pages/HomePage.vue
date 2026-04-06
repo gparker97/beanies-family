@@ -1156,7 +1156,7 @@ onUnmounted(() => {
       <div class="container">
         <h2 class="final-cta__title reveal">so... ready to count some beans? <em>&#x1FAD8;</em></h2>
         <p class="final-cta__sub reveal">
-          it's free. run it locally or login below, whatever works. yes, it's really free.
+          it's free. run it locally or login below. yes, it's really free. probably not forever.
         </p>
         <div
           style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center"
