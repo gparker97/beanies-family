@@ -798,7 +798,7 @@ onUnmounted(() => {
             <p class="security-card__title">real encryption, not marketing talk</p>
             <p class="security-card__text">
               AES-256-GCM on everything, at rest and in transit. your data is genuinely unreadable
-              to anyone without your key &mdash; including me.
+              to anyone without your key - including me.
             </p>
           </div>
           <div class="security-card reveal reveal-delay-2">
@@ -815,7 +815,7 @@ onUnmounted(() => {
             <p class="security-card__title">your storage, your rules</p>
             <p class="security-card__text">
               your encrypted data file lives in your own personal storage. it travels directly to
-              your browser &mdash; we never see it, touch it, or store it.
+              your browser - we never see it, touch it, or store it.
             </p>
           </div>
           <div class="security-card reveal reveal-delay-1">
