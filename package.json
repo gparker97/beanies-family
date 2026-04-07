@@ -35,13 +35,13 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@automerge/automerge": "^3.2.4",
+    "@automerge/automerge": "^3.2.5",
     "chart.js": "^4.5.1",
     "idb": "^8.0.3",
-    "marked": "^17.0.5",
+    "marked": "^17.0.6",
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
-    "vue": "^3.5.29",
+    "vue": "^3.5.32",
     "vue-chartjs": "^5.3.3",
     "vue-router": "^4.6.4"
   },
