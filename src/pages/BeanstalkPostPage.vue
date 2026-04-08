@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useBlog, BLOG_CATEGORIES } from '@/composables/useBlog';
 import PublicNav from '@/components/public/PublicNav.vue';
 import PublicFooter from '@/components/public/PublicFooter.vue';
+import SubstackSubscribe from '@/components/public/SubstackSubscribe.vue';
 import { formatDateFull } from '@/utils/date';
 
 const route = useRoute();
@@ -125,6 +126,9 @@ const navLinks = [
           </svg>
         </button>
       </div>
+
+      <!-- Subscribe -->
+      <SubstackSubscribe class="post-subscribe" />
     </div>
 
     <!-- 404 -->
@@ -400,6 +404,11 @@ const navLinks = [
 
 .post-nav-btn:hover .post-nav-title {
   color: var(--heritage-orange);
+}
+
+/* ── Subscribe ── */
+.post-subscribe {
+  margin-top: 32px;
 }
 
 /* ── 404 ── */
