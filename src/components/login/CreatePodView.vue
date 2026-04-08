@@ -7,6 +7,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAuthStore } from '@/stores/authStore';
@@ -55,7 +56,7 @@ const showLocalFileWarning = ref(false);
 // Step 3 state
 const addedMembers = ref<FamilyMember[]>([]);
 const isAddingMember = ref(false);
-const isFinishing = ref(false);
+const showSetupModal = ref(false);
 const newMemberName = ref('');
 const newMemberRole = ref<'parent' | 'child'>('parent');
 const dobMonth = ref('');
@@ -303,24 +304,12 @@ function getNextColor(): string {
   return memberColors[usedCount % memberColors.length] ?? '#3b82f6';
 }
 
-async function handleFinish() {
-  isFinishing.value = true;
-  // Save to file if configured — the doc + family key are initialized by createNewFile() in Step 2
-  if (syncStore.isConfigured) {
-    let saved = await syncStore.syncNow(true);
-    if (!saved) {
-      // Retry once — transient errors (Google Drive token refresh, permission prompt) often resolve
-      console.warn('[CreatePod] Initial save failed, retrying...');
-      saved = await syncStore.syncNow(true);
-      if (!saved) {
-        console.warn(
-          '[CreatePod] Save failed after retry — data is cached locally but not persisted to file'
-        );
-      }
-    }
-    syncStore.setupAutoSync();
-    syncStore.ensureRegistered();
-  }
+function handleFinish() {
+  showSetupModal.value = true;
+}
+
+function handleSetupComplete() {
+  showSetupModal.value = false;
   const memberNames = addedMembers.value.map((m) => m.name);
   const allMembers = [name.value, ...memberNames];
   const storage = storageType.value === 'google_drive' ? 'Google Drive' : 'Local File';
@@ -328,6 +317,10 @@ async function handleFinish() {
     `🎉 *Family pod created!*\n*Family:* ${familyName.value}\n*Members (${allMembers.length}):* ${allMembers.join(', ')}\n*Storage:* ${storage}`
   );
   emit('signed-in', '/nook');
+}
+
+function handleSetupBack() {
+  showSetupModal.value = false;
 }
 
 function handleBack() {
@@ -938,12 +931,7 @@ function handleBack() {
         </div>
       </div>
 
-      <BaseButton
-        class="mt-6 w-full"
-        :disabled="isFinishing"
-        :loading="isFinishing"
-        @click="handleFinish"
-      >
+      <BaseButton class="mt-6 w-full" @click="handleFinish">
         {{ t('loginV6.finish') }}
       </BaseButton>
       <button
@@ -1135,5 +1123,12 @@ function handleBack() {
         </BaseButton>
       </template>
     </BaseModal>
+
+    <!-- Setup progress modal -->
+    <SetupProgressModal
+      :open="showSetupModal"
+      @complete="handleSetupComplete"
+      @back="handleSetupBack"
+    />
   </div>
 </template>
