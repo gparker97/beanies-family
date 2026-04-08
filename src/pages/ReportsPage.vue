@@ -24,7 +24,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
-import { ALL_CATEGORIES, getCategoryById } from '@/constants/categories';
+import { ALL_CATEGORIES, getCategoryById, normalizeCategoryId } from '@/constants/categories';
 import {
   addMonths,
   getStartOfMonth,
@@ -447,16 +447,17 @@ const incomeExpenseChartData = computed(() => {
 
     // Process transactions by category
     for (const t of monthTransactions) {
+      const catId = normalizeCategoryId(t.category);
       // Apply category filter if selected
-      if (selectedCategory.value !== 'all' && t.category !== selectedCategory.value) continue;
+      if (selectedCategory.value !== 'all' && catId !== selectedCategory.value) continue;
 
       const amount = convertToBaseCurrency(t.amount, t.currency);
       const categoryMap = t.type === 'income' ? incomeByCategoryByMonth : expenseByCategoryByMonth;
 
-      if (!categoryMap.has(t.category)) {
-        categoryMap.set(t.category, new Array(months).fill(0));
+      if (!categoryMap.has(catId)) {
+        categoryMap.set(catId, new Array(months).fill(0));
       }
-      const catData = categoryMap.get(t.category)!;
+      const catData = categoryMap.get(catId)!;
       catData[monthIndex] = (catData[monthIndex] ?? 0) + amount;
     }
 

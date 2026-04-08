@@ -711,6 +711,21 @@ export function getCategoriesGrouped(type: 'income' | 'expense'): CategoryGroup[
   });
 }
 
+/**
+ * Map legacy category IDs (removed in the Mar 15 2026 category overhaul)
+ * to their current equivalents so old transactions and recurring items
+ * still match budget lookups.
+ */
+const LEGACY_CATEGORY_MAP: Record<string, string> = {
+  subscriptions: 'other_subscriptions',
+  education: 'other_education',
+};
+
+/** Normalize a category ID, mapping removed legacy IDs to current equivalents. */
+export function normalizeCategoryId(categoryId: string): string {
+  return LEGACY_CATEGORY_MAP[categoryId] ?? categoryId;
+}
+
 /** Get the list of category IDs belonging to a given expense group name */
 export function getCategoryIdsForGroup(groupName: string): string[] {
   return EXPENSE_CATEGORIES.filter((c) => c.group === groupName).map((c) => c.id);
