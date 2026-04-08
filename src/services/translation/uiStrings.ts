@@ -2171,6 +2171,87 @@ const STRING_DEFS = {
     beanie: 'debt-free! the beanies are celebrating!',
   },
 
+  // Setup Progress Modal
+  'setupProgress.title': {
+    en: 'setting up the {name} pod',
+    beanie: 'setting up the {name} pod',
+  },
+  'setupProgress.subtitle': {
+    en: "hang tight — we're getting everything ready",
+    beanie: "hang tight — we're planting your beans",
+  },
+  'setupProgress.step0.label': { en: 'planting your beans', beanie: 'planting your beans' },
+  'setupProgress.step0.active': {
+    en: 'creating family profile...',
+    beanie: 'creating family profile...',
+  },
+  'setupProgress.step0.done': { en: 'family profile created', beanie: 'family profile created' },
+  'setupProgress.step1.label': { en: 'sealing the pod', beanie: 'sealing the pod' },
+  'setupProgress.step1.active': {
+    en: 'generating encryption keys...',
+    beanie: 'generating encryption keys...',
+  },
+  'setupProgress.step1.done': {
+    en: 'pod sealed with AES-256',
+    beanie: 'pod sealed with AES-256',
+  },
+  'setupProgress.step2.label': { en: 'gathering the family', beanie: 'gathering the beanies' },
+  'setupProgress.step2.active': {
+    en: 'setting up member profiles...',
+    beanie: 'setting up beanie profiles...',
+  },
+  'setupProgress.step2.done': { en: 'members added', beanie: 'beanies gathered' },
+  'setupProgress.step3.label': { en: 'saving your beanpod', beanie: 'saving your beanpod' },
+  'setupProgress.step3.active': { en: 'saving to storage...', beanie: 'saving to storage...' },
+  'setupProgress.step3.done': { en: 'beanpod saved', beanie: 'beanpod saved' },
+  'setupProgress.step4.label': { en: 'finishing touches', beanie: 'finishing touches' },
+  'setupProgress.step4.active': {
+    en: 'preparing your home...',
+    beanie: 'preparing your nook...',
+  },
+  'setupProgress.step4.done': { en: 'home is ready', beanie: 'nook is ready' },
+  'setupProgress.msg0': {
+    en: 'every bean counts — yours are being counted right now',
+    beanie: 'every bean counts — yours are being counted right now',
+  },
+  'setupProgress.msg1': {
+    en: "your data is yours — we're making sure it stays that way",
+    beanie: "your beans are yours — we're making sure it stays that way",
+  },
+  'setupProgress.msg2': {
+    en: 'the more beans, the merrier',
+    beanie: 'the more beanies, the merrier',
+  },
+  'setupProgress.msg3': {
+    en: "almost there — writing your family's story",
+    beanie: "almost there — writing your beanies' story",
+  },
+  'setupProgress.msg4': {
+    en: 'just a moment — putting the finishing touches on your home',
+    beanie: 'just a moment — putting the finishing touches on your nook',
+  },
+  'setupProgress.error.title': {
+    en: 'something went wrong',
+    beanie: 'oh no, a bean got stuck',
+  },
+  'setupProgress.error.description': {
+    en: "Don't worry — your data is safely cached on this device. You can try again, continue without saving to your file, or go back.",
+    beanie:
+      "don't worry — your beans are safely cached on this device. you can try again, continue without saving to your beanpod, or go back.",
+  },
+  'setupProgress.error.retry': { en: 'Try Again', beanie: 'try again' },
+  'setupProgress.error.continue': { en: 'Continue Anyway', beanie: 'continue anyway' },
+  'setupProgress.error.back': { en: 'Go Back', beanie: 'go back' },
+  'setupProgress.success.title': { en: 'welcome home!', beanie: 'welcome to the nook!' },
+  'setupProgress.success.subtitle': {
+    en: 'the {name} pod is ready to go',
+    beanie: 'the {name} beanpod is ready to go',
+  },
+  'setupProgress.success.cta': {
+    en: "let's count some beans",
+    beanie: "let's count some beans",
+  },
+
   // Family Nook
   'nook.welcomeHome': { en: 'Welcome Home, {name}', beanie: 'welcome to your nook, {name}' },
   'nook.familyAtAGlance': {

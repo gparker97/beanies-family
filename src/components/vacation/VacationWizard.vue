@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
+import ConfettiEffect from '@/components/ui/ConfettiEffect.vue';
 import VacationStep1 from './VacationStep1.vue';
 import VacationStep2 from './VacationStep2.vue';
 import VacationStep3 from './VacationStep3.vue';
@@ -363,28 +364,7 @@ const saveLabel = computed(() => {
   <!-- Celebration modal -->
   <BaseModal :open="celebrationOpen" size="md" layer="overlay" :closable="false">
     <div class="cele-body relative text-center">
-      <!-- Confetti -->
-      <div class="confetti-container">
-        <div class="confetti-piece" style="animation-delay: 0s; background: #00b4d8; left: 5%" />
-        <div class="confetti-piece" style="animation-delay: 0.2s; background: #ffd93d; left: 15%" />
-        <div class="confetti-piece" style="animation-delay: 0.4s; background: #f15d22; left: 28%" />
-        <div class="confetti-piece" style="animation-delay: 0.1s; background: #27ae60; left: 40%" />
-        <div class="confetti-piece" style="animation-delay: 0.5s; background: #00b4d8; left: 52%" />
-        <div class="confetti-piece" style="animation-delay: 0.3s; background: #ffd93d; left: 65%" />
-        <div class="confetti-piece" style="animation-delay: 0.6s; background: #f15d22; left: 75%" />
-        <div
-          class="confetti-piece"
-          style="animation-delay: 0.15s; background: #27ae60; left: 85%"
-        />
-        <div
-          class="confetti-piece"
-          style="animation-delay: 0.45s; background: #00b4d8; border-radius: 50%; left: 92%"
-        />
-        <div
-          class="confetti-piece"
-          style="animation-delay: 0.7s; background: #ffd93d; border-radius: 50%; left: 48%"
-        />
-      </div>
+      <ConfettiEffect :active="celebrationOpen" />
 
       <!-- Trip emoji circle -->
       <div class="cele-img">{{ celebrationEmoji }}</div>
@@ -554,35 +534,5 @@ const saveLabel = computed(() => {
   font-family: Outfit, sans-serif;
   font-size: 12px;
   font-weight: 600;
-}
-
-/* Confetti */
-.confetti-container {
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  position: absolute;
-}
-
-.confetti-piece {
-  animation: confetti-fall 2s ease-out forwards;
-  border-radius: 2px;
-  height: 8px;
-  opacity: 0;
-  position: absolute;
-  top: -10px;
-  width: 8px;
-}
-
-@keyframes confetti-fall {
-  0% {
-    opacity: 1;
-    transform: translateY(-20px) rotate(0deg);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translateY(300px) rotate(720deg);
-  }
 }
 </style>
