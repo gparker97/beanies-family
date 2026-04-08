@@ -9,6 +9,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import {
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
 const transactionsStore = useTransactionsStore();
+const { convertToDisplay } = useCurrencyDisplay();
 
 // Form state
 const mode = ref<'percentage' | 'fixed'>('percentage');
@@ -60,7 +62,10 @@ const { isEditing, isSubmitting } = useFormModal(
       mode.value = budget.mode;
       percentage.value = budget.percentage ?? 20;
       totalAmount.value = budget.totalAmount;
-      currency.value = budget.currency;
+      // For percentage mode, always use display currency since the amount is recalculated.
+      // For fixed mode, load the stored currency (user can change it).
+      currency.value =
+        budget.mode === 'percentage' ? settingsStore.displayCurrency : budget.currency;
 
       const gAllocs: Record<string, number | undefined> = {};
       const cAllocs: Record<string, number | undefined> = {};
@@ -103,11 +108,14 @@ const saveLabel = computed(() => (isEditing.value ? t('common.save') : t('budget
 
 const currSymbol = computed(() => getCurrencyInfo(currency.value)?.symbol ?? '$');
 
-// Effective spending budget preview for percentage mode
+// Effective spending budget preview for percentage mode (always in display currency)
 const effectiveAmount = computed(() => {
   if (mode.value === 'percentage') {
     const spendingPercent = 100 - percentage.value;
-    return Math.round(transactionsStore.thisMonthIncome * (spendingPercent / 100));
+    const amountInBase = transactionsStore.thisMonthIncome * (spendingPercent / 100);
+    // Convert from base currency to display currency so the preview matches the UI symbol
+    const result = convertToDisplay(amountInBase, settingsStore.baseCurrency);
+    return Math.round(result.displayAmount);
   }
   return totalAmount.value ?? 0;
 });
@@ -171,13 +179,12 @@ function handleSave() {
     }
   }
 
-  // For percentage mode, the effective amount is derived from base-currency income,
-  // so store with baseCurrency. For fixed mode, the user enters in their selected currency.
+  // All amounts are captured in display currency. The store converts to base for calculations.
   const base = {
     mode: mode.value,
     totalAmount: mode.value === 'fixed' ? (totalAmount.value ?? 0) : effectiveAmount.value,
     percentage: mode.value === 'percentage' ? percentage.value : undefined,
-    currency: mode.value === 'fixed' ? currency.value : settingsStore.baseCurrency,
+    currency: currency.value,
     categories,
     isActive: true,
   };
