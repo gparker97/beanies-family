@@ -42,7 +42,7 @@ const transactionsStore = useTransactionsStore();
 const mode = ref<'percentage' | 'fixed'>('percentage');
 const percentage = ref(20);
 const totalAmount = ref<number | undefined>(undefined);
-const currency = ref(settingsStore.baseCurrency);
+const currency = ref(settingsStore.displayCurrency);
 const showCategories = ref(false);
 
 // Group-level allocations: keyed by group name
@@ -86,7 +86,7 @@ const { isEditing, isSubmitting } = useFormModal(
       mode.value = 'percentage';
       percentage.value = 20;
       totalAmount.value = undefined;
-      currency.value = settingsStore.baseCurrency;
+      currency.value = settingsStore.displayCurrency;
       groupAllocations.value = {};
       categoryAllocations.value = {};
       expandedGroups.value = new Set();
@@ -171,11 +171,13 @@ function handleSave() {
     }
   }
 
+  // For percentage mode, the effective amount is derived from base-currency income,
+  // so store with baseCurrency. For fixed mode, the user enters in their selected currency.
   const base = {
     mode: mode.value,
     totalAmount: mode.value === 'fixed' ? (totalAmount.value ?? 0) : effectiveAmount.value,
     percentage: mode.value === 'percentage' ? percentage.value : undefined,
-    currency: currency.value,
+    currency: mode.value === 'fixed' ? currency.value : settingsStore.baseCurrency,
     categories,
     isActive: true,
   };

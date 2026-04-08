@@ -12,7 +12,8 @@ import {
   getCategoryIdsForGroup,
 } from '@/constants/categories';
 import { toDateInputValue } from '@/utils/date';
-import type { Budget, CreateBudgetInput, UpdateBudgetInput } from '@/types/models';
+import { convertToBaseCurrency } from '@/utils/currency';
+import type { Budget, CreateBudgetInput, UpdateBudgetInput, CurrencyCode } from '@/types/models';
 
 export type PaceStatus = 'great' | 'onTrack' | 'caution' | 'overBudget';
 export type CategoryBudgetStatus = 'ok' | 'warning' | 'over';
@@ -66,8 +67,10 @@ export const useBudgetStore = defineStore('budget', () => {
     return Math.round((monthlySavings.value / monthlyIncome.value) * 100);
   });
 
-  // Effective budget amount (resolves percentage mode to actual amount)
+  // Effective budget amount in base currency (resolves percentage mode to actual amount)
   // In percentage mode, `percentage` is the savings goal — spending budget = 100% - savings%
+  // For fixed mode, converts from budget's stored currency to base currency so all
+  // comparisons with spending (which is always in base currency) are consistent.
   const effectiveBudgetAmount = computed(() => {
     const budget = activeBudget.value;
     if (!budget) return 0;
@@ -75,7 +78,7 @@ export const useBudgetStore = defineStore('budget', () => {
       const spendingPercent = 100 - (budget.percentage ?? 0);
       return Math.round(monthlyIncome.value * (spendingPercent / 100));
     }
-    return budget.totalAmount;
+    return convertToBaseCurrency(budget.totalAmount, budget.currency as CurrencyCode);
   });
 
   // Spending by category (respects global member filter)
@@ -85,9 +88,12 @@ export const useBudgetStore = defineStore('budget', () => {
   });
 
   // Category budget status array (supports both group-level and category-level entries)
+  // All amounts (budgeted & spent) are normalized to base currency for consistent comparison.
   const categoryBudgetStatus = computed<CategoryBudgetInfo[]>(() => {
     const budget = activeBudget.value;
     if (!budget || budget.categories.length === 0) return [];
+
+    const budgetCurrency = budget.currency as CurrencyCode;
 
     return budget.categories
       .map((bc) => {
@@ -113,7 +119,9 @@ export const useBudgetStore = defineStore('budget', () => {
           color = cat?.color ?? '#6B7280';
         }
 
-        const percentUsed = bc.amount > 0 ? (spent / bc.amount) * 100 : 0;
+        // Convert budgeted amount from budget's currency to base for comparison
+        const budgetedInBase = convertToBaseCurrency(bc.amount, budgetCurrency);
+        const percentUsed = budgetedInBase > 0 ? (spent / budgetedInBase) * 100 : 0;
 
         let status: CategoryBudgetStatus = 'ok';
         if (percentUsed >= 100) status = 'over';
@@ -124,7 +132,7 @@ export const useBudgetStore = defineStore('budget', () => {
           name,
           icon,
           color,
-          budgeted: bc.amount,
+          budgeted: budgetedInBase,
           spent,
           percentUsed: Math.round(percentUsed),
           status,
