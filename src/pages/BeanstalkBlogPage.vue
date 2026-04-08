@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { useBlog } from '@/composables/useBlog';
 import PublicNav from '@/components/public/PublicNav.vue';
 import PublicFooter from '@/components/public/PublicFooter.vue';
+import SubstackSubscribe from '@/components/public/SubstackSubscribe.vue';
 import { formatDate } from '@/utils/date';
 
 const router = useRouter();
@@ -125,6 +126,9 @@ const navLinks = [
           <p class="coming-card-sub">{{ card.subtitle }}</p>
         </div>
       </div>
+
+      <!-- Subscribe -->
+      <SubstackSubscribe class="subscribe-section" />
     </div>
 
     <PublicFooter />
@@ -450,6 +454,11 @@ const navLinks = [
 
 .post-card-meta-dot {
   opacity: 0.5;
+}
+
+/* ── Subscribe ── */
+.subscribe-section {
+  margin-top: 40px;
 }
 
 /* ── Coming soon grid ── */
