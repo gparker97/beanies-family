@@ -23,6 +23,7 @@ import {
   isDateBetween,
   extractDatePart,
 } from '@/utils/date';
+import { normalizeCategoryId } from '@/constants/categories';
 
 /**
  * Remove CRDT-duplicated recurring transactions from a list.
@@ -120,8 +121,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
   const expensesByCategory = computed(() => {
     const categoryTotals = new Map<string, number>();
     for (const t of thisMonthTransactions.value.filter((t) => t.type === 'expense')) {
-      const current = categoryTotals.get(t.category) || 0;
-      categoryTotals.set(t.category, current + convertToBaseCurrency(t.amount, t.currency));
+      const catId = normalizeCategoryId(t.category);
+      const current = categoryTotals.get(catId) || 0;
+      categoryTotals.set(catId, current + convertToBaseCurrency(t.amount, t.currency));
     }
     return categoryTotals;
   });
@@ -206,8 +208,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
   const filteredExpensesByCategory = computed(() => {
     const categoryTotals = new Map<string, number>();
     for (const t of filteredThisMonthTransactions.value.filter((t) => t.type === 'expense')) {
-      const current = categoryTotals.get(t.category) || 0;
-      categoryTotals.set(t.category, current + convertToBaseCurrency(t.amount, t.currency));
+      const catId = normalizeCategoryId(t.category);
+      const current = categoryTotals.get(catId) || 0;
+      categoryTotals.set(catId, current + convertToBaseCurrency(t.amount, t.currency));
     }
     return categoryTotals;
   });
