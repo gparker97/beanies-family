@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-09
+
+### Added
+
+- Privacy Policy page at `/privacy` — covers local-first data model, Plausible analytics, Google Drive encryption, cookies (none), children's privacy, data portability
+- Terms of Service page at `/terms` — "as is" warranty, not financial advice, liability limitations, open source license, acceptable use
+- Twitter Card meta tags, canonical URL, and OG image metadata for better social sharing previews
+- `robots.txt` and `sitemap.xml` for SEO
+- Plausible custom event tracking for signups, logins, feature usage, and family deletions — all aggregate, no PII
+- New families auto-subscribed to the Beanstalk newsletter (Substack) during signup with opt-out checkbox
+- `/end-of-day` skill for session wrap-up and status updates
+
+### Fixed
+
+- Privacy and terms links added to blog/help page footer (PublicFooter)
+- "Back to home" link on legal pages now goes to `/home` instead of `/nook`
+- npm audit vulnerabilities resolved (0 remaining)
+- Removed emoji from beanstalk welcome post greeting
+
 ## 2026-03-27
 
 ### Added
