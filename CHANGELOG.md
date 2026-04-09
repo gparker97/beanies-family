@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Substack newsletter auto-subscribe during signup now works — replaced broken `fetch` + JSON (silently stripped by CORS) with hidden form POST that Substack actually receives
 - Privacy and terms links added to blog/help page footer (PublicFooter)
 - "Back to home" link on legal pages now goes to `/home` instead of `/nook`
 - npm audit vulnerabilities resolved (0 remaining)
