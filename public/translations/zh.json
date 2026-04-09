@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-05",
-    "translationCount": 1929
+    "lastUpdated": "2026-04-09",
+    "translationCount": 1959
   },
   "translations": {
     "app.name": {
@@ -9650,6 +9650,156 @@
       "translation": "标记完成",
       "hash": "gmy579",
       "lastUpdated": "2026-04-05"
+    },
+    "setupProgress.title": {
+      "translation": "设置{name} pod",
+      "hash": "iumzpc",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.subtitle": {
+      "translation": "请耐心等待，我们正在准备一切",
+      "hash": "22vl26",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step0.label": {
+      "translation": "种植你的豆子",
+      "hash": "2j0yf5",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step0.active": {
+      "translation": "正在创建家庭账户...",
+      "hash": "f01tq2",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step0.done": {
+      "translation": "已创建家庭账户",
+      "hash": "camvyj",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step1.label": {
+      "translation": "密封吊舱",
+      "hash": "whtbqz",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step1.active": {
+      "translation": "正在生成加密密钥...",
+      "hash": "2yrhx",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step1.done": {
+      "translation": "pOD采用AES-256密封",
+      "hash": "kq4khw",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step2.label": {
+      "translation": "聚集家人",
+      "hash": "24jxd8",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step2.active": {
+      "translation": "正在设置成员配置文件...",
+      "hash": "pmdd9p",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step2.done": {
+      "translation": "已添加成员",
+      "hash": "i364hl",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step3.label": {
+      "translation": "保存您的beanpod",
+      "hash": "njaqcy",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step3.active": {
+      "translation": "正在保存到存储...",
+      "hash": "dz6k36",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step3.done": {
+      "translation": "beanpod已保存",
+      "hash": "wzujes",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step4.label": {
+      "translation": "最后的润色",
+      "hash": "t2z2bo",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step4.active": {
+      "translation": "准备您的房源……",
+      "hash": "b4i4ta",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.step4.done": {
+      "translation": "准备好了",
+      "hash": "ajn972",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.msg0": {
+      "translation": "每一颗豆子都很重要—您的豆子现在正在计算中",
+      "hash": "digami",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.msg1": {
+      "translation": "您的数据是属于您的，我们正在确保数据保持不变",
+      "hash": "szl9gu",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.msg2": {
+      "translation": "豆子越多越好",
+      "hash": "155uh8",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.msg3": {
+      "translation": "即将完成—写下您家人的故事",
+      "hash": "kqr218",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.msg4": {
+      "translation": "请稍等片刻—对您的房源进行最后的修饰",
+      "hash": "4vu04a",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.error.title": {
+      "translation": "出了些问题！",
+      "hash": "dtz7rb",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.error.description": {
+      "translation": "别担心，您的数据会安全缓存在此设备上。您可以重试，继续而不保存到您的文件，或者返回。",
+      "hash": "mkavw4",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.error.retry": {
+      "translation": "再試一次",
+      "hash": "9ysxvf",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.error.continue": {
+      "translation": "仍然继续",
+      "hash": "jnjn6k",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.error.back": {
+      "translation": "返回",
+      "hash": "tqb0gv",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.success.title": {
+      "translation": "歡迎回家！",
+      "hash": "d3jorg",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.success.subtitle": {
+      "translation": "{name} Pod已准备就绪",
+      "hash": "7tg2fj",
+      "lastUpdated": "2026-04-09"
+    },
+    "setupProgress.success.cta": {
+      "translation": "让我们数一数豆子",
+      "hash": "gqlq2n",
+      "lastUpdated": "2026-04-09"
     }
   }
 }
