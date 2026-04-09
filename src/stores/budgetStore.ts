@@ -237,6 +237,7 @@ export const useBudgetStore = defineStore('budget', () => {
       budgets.value = [...budgets.value, budget];
       return budget;
     });
+    if (result) window.plausible('feature_used', { props: { feature: 'budget' } });
     return result ?? null;
   }
 
