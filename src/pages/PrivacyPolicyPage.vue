@@ -88,6 +88,10 @@ const { t } = useTranslation();
             <li>how many people visit the site</li>
             <li>which pages are most popular</li>
             <li>what countries visitors are from (approximate, based on anonymised IP)</li>
+            <li>
+              which features are used most (e.g., budgets, transactions — aggregate counts only)
+            </li>
+            <li>how often people sign in (aggregate login counts, not individual tracking)</li>
             <li>what devices and browsers are used</li>
           </ul>
           <p>
