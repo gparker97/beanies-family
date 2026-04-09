@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-04-09
-> **Updated by:** Claude (Product Hunt launch day — legal pages, SEO, security audit, analytics, Substack auto-subscribe, end-of-day skill)
+> **Updated by:** Claude (Substack subscribe bugfix — hidden form POST for cross-origin subscription)
 
 ## Current Phase
 
