@@ -369,7 +369,7 @@ async function handleDeleteFamilyPasswordConfirm(password: string) {
     useActivityStore().resetState();
 
     // 6. Track deletion
-    window.plausible('family_deleted');
+    window.plausible?.('family_deleted');
 
     // 7. Farewell
     await showAlert({
