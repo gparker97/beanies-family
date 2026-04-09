@@ -1618,6 +1618,10 @@ const STRING_DEFS = {
   'auth.enterYourPassword': { en: 'Enter your password', beanie: 'enter your password' },
   'auth.signInFailed': { en: 'Sign in failed', beanie: 'sign in failed' },
   'auth.signUpFailed': { en: 'Sign up failed', beanie: 'sign up failed' },
+  'auth.subscribeNewsletter': {
+    en: 'Keep me updated with product news and features',
+    beanie: 'keep me updated with product news and features',
+  },
   'auth.createPassword': { en: 'Create a password', beanie: 'create a password' },
   'auth.confirmPassword': { en: 'Confirm password', beanie: 'confirm password' },
   'auth.confirmPasswordPlaceholder': {
