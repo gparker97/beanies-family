@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-03-27
-> **Updated by:** Claude (Help center expansion, beanies-help-docs skill, help center UI improvements)
+> **Last updated:** 2026-04-09
+> **Updated by:** Claude (Blog post #4 research, budget currency fixes, setup wizard progress modal, Substack integration)
 
 ## Current Phase
 
@@ -57,6 +57,14 @@
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### Budget Currency Fixes, Setup Progress Modal, Blog & Substack (2026-04-08)
+
+- **Budget currency normalization**: All budget amounts now correctly captured and displayed in the user's display currency, fixing inconsistencies when mixing currencies (#e01441e, #69bf6b8)
+- **Setup wizard progress modal**: Added progress modal to the setup wizard finish step for better UX feedback during initial data creation (#bb9eab3)
+- **Substack subscribe embed**: "The Beanstalk" newsletter subscribe widget added to blog index and individual post pages (#371a8ce)
+- **Blog post #4 drafted** (Notion): "best cozi & maple alternatives in 2026" — SEO comparison post covering Cozi, Maple, TimeTree, FamilyWall, YNAB, Greenlight + 7 notable mentions. Status: Draft, pending review
+- **Product Hunt Alpha Day**: Launch page submitted and scheduled for Apr 9
 
 ### Help Center Expansion & beanies-help-docs Skill (2026-03-27)
 
