@@ -137,12 +137,37 @@ async function handleStep1Next() {
       `🫘 *New family pod started!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}`
     );
     if (subscribeNewsletter.value) {
-      fetch('https://gpbeanies.substack.com/api/v1/free', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.value, source: 'beanies_signup' }),
-      }).catch(() => {});
+      try {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'https://gpbeanies.substack.com/api/v1/free';
+        form.target = 'substack-subscribe-frame';
+        form.style.display = 'none';
+
+        const emailInput = document.createElement('input');
+        emailInput.name = 'email';
+        emailInput.value = email.value;
+        form.appendChild(emailInput);
+
+        const sourceInput = document.createElement('input');
+        sourceInput.name = 'first_url';
+        sourceInput.value = 'https://beanies.family/signup';
+        form.appendChild(sourceInput);
+
+        const iframe = document.createElement('iframe');
+        iframe.name = 'substack-subscribe-frame';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        document.body.appendChild(form);
+        form.submit();
+
+        setTimeout(() => {
+          form.remove();
+          iframe.remove();
+        }, 5000);
+      } catch {
+        // Newsletter subscription is best-effort
+      }
     }
     currentStep.value = 2;
     formError.value = null;
