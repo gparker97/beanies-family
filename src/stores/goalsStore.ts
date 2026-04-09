@@ -66,7 +66,7 @@ export const useGoalsStore = defineStore('goals', () => {
       goals.value = [...goals.value, goal];
       return goal;
     });
-    if (result) window.plausible('feature_used', { props: { feature: 'goal' } });
+    if (result) window.plausible?.('feature_used', { props: { feature: 'goal' } });
     return result ?? null;
   }
 

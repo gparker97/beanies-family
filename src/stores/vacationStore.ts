@@ -88,7 +88,7 @@ export const useVacationStore = defineStore('vacations', () => {
       vacations.value = [...vacations.value, vacation];
       return vacation;
     });
-    if (result) window.plausible('feature_used', { props: { feature: 'vacation' } });
+    if (result) window.plausible?.('feature_used', { props: { feature: 'vacation' } });
     return result ?? null;
   }
 
