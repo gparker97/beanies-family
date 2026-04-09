@@ -44,6 +44,7 @@ const email = ref('');
 const ownerRole = ref<'parent' | 'child'>('parent');
 const password = ref('');
 const confirmPassword = ref('');
+const subscribeNewsletter = ref(true);
 
 // Step 2 state
 const storageSaved = ref(false);
@@ -135,6 +136,14 @@ async function handleStep1Next() {
     slackNotify(
       `🫘 *New family pod started!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}`
     );
+    if (subscribeNewsletter.value) {
+      fetch('https://gpbeanies.substack.com/api/v1/free', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.value, source: 'beanies_signup' }),
+      }).catch(() => {});
+    }
     currentStep.value = 2;
     formError.value = null;
   } else {
@@ -488,6 +497,17 @@ function handleBack() {
             @input="formError = null"
           />
         </div>
+
+        <label class="mt-4 flex cursor-pointer items-start gap-3">
+          <input
+            v-model="subscribeNewsletter"
+            type="checkbox"
+            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
+          />
+          <span class="text-sm text-gray-500 dark:text-gray-400">
+            {{ t('auth.subscribeNewsletter') }}
+          </span>
+        </label>
 
         <BaseButton type="submit" class="mt-6 w-full" :disabled="authStore.isLoading">
           {{ authStore.isLoading ? t('auth.creatingAccount') : t('loginV6.createNext') }}
