@@ -13,7 +13,7 @@ const { t } = useTranslation();
 
     <article class="mx-auto max-w-3xl px-6 py-16 md:py-24">
       <router-link
-        to="/"
+        to="/home"
         class="text-primary-500 hover:text-primary-600 mb-8 inline-flex items-center gap-1 text-sm font-medium transition-colors"
       >
         &larr; {{ t('legal.backToHome') }}
@@ -249,7 +249,7 @@ const { t } = useTranslation();
           <p>
             if you have questions about this privacy policy, please reach out via the contact form
             on our
-            <router-link to="/" class="text-primary-500 hover:text-primary-600"
+            <router-link to="/home" class="text-primary-500 hover:text-primary-600"
               >homepage</router-link
             >
             or open an issue on
