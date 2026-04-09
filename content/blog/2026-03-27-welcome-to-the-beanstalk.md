@@ -9,7 +9,7 @@ featured: true
 author: greg
 ---
 
-**Hey, guys!** 🫘
+**Hey, guys!**
 
 Yes, it's _actually_ me. Even AI could not come up with a greeting as mundane as "Hey, guys!" Indeed, there are still some things humans are better at than robots, such as glorious, unadulterated, deliciously spontaneous non-sequiturs, like how I like to fart outside taco trucks on Wednesday afternoons. But getting back to the point...
 
