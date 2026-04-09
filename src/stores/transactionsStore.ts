@@ -375,7 +375,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
       return transaction;
     });
-    if (result) window.plausible('feature_used', { props: { feature: 'transaction' } });
+    if (result) window.plausible?.('feature_used', { props: { feature: 'transaction' } });
     return result ?? null;
   }
 

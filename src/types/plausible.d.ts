@@ -1,3 +1,3 @@
 interface Window {
-  plausible: (event: string, options?: { props?: Record<string, string> }) => void;
+  plausible?: (event: string, options?: { props?: Record<string, string> }) => void;
 }

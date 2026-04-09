@@ -155,7 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Track last login timestamp
       const now = toISODateString(new Date());
       familyStore.updateMember(member.id, { lastLoginAt: now });
-      window.plausible('login', { props: { method: 'password' } });
+      window.plausible?.('login', { props: { method: 'password' } });
 
       return { success: true };
     } catch (e) {
@@ -238,8 +238,8 @@ export const useAuthStore = defineStore('auth', () => {
       freshSignIn.value = true;
       persistSession(user);
       familyStore.setCurrentMember(member!.id);
-      window.plausible('signup');
-      window.plausible('login', { props: { method: 'password' } });
+      window.plausible?.('signup');
+      window.plausible?.('login', { props: { method: 'password' } });
 
       return { success: true };
     } catch (e) {
@@ -326,8 +326,8 @@ export const useAuthStore = defineStore('auth', () => {
       // Mark onboarding as completed
       const settingsStore = useSettingsStore();
       await settingsStore.setOnboardingCompleted(true);
-      window.plausible('member_joined');
-      window.plausible('login', { props: { method: 'password' } });
+      window.plausible?.('member_joined');
+      window.plausible?.('login', { props: { method: 'password' } });
 
       return { success: true };
     } catch (e) {
@@ -376,7 +376,7 @@ export const useAuthStore = defineStore('auth', () => {
       isAuthenticated.value = true;
       freshSignIn.value = true;
       persistSession(user);
-      window.plausible('login', { props: { method: 'passkey' } });
+      window.plausible?.('login', { props: { method: 'passkey' } });
 
       return {
         success: true,
@@ -412,7 +412,7 @@ export const useAuthStore = defineStore('auth', () => {
       familyStore.setCurrentMember(member.id);
       familyStore.updateMember(member.id, { lastLoginAt: toISODateString(new Date()) });
     }
-    window.plausible('login', { props: { method: 'cross_device' } });
+    window.plausible?.('login', { props: { method: 'cross_device' } });
   }
 
   /**
