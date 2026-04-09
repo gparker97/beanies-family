@@ -3994,6 +3994,12 @@ const STRING_DEFS = {
   'travel.editSegment': { en: 'Edit Segment', beanie: 'edit segment' },
   'travel.editAccommodation': { en: 'Edit Accommodation', beanie: 'edit accommodation' },
   'travel.editTransportation': { en: 'Edit Transportation', beanie: 'edit transportation' },
+
+  // Legal pages
+  'legal.privacyPolicy': { en: 'Privacy Policy', beanie: 'privacy policy' },
+  'legal.termsOfService': { en: 'Terms of Service', beanie: 'terms of service' },
+  'legal.lastUpdated': { en: 'Last Updated', beanie: 'last updated' },
+  'legal.backToHome': { en: 'Back to Home', beanie: 'back to home' },
 } satisfies Record<string, StringEntry>;
 
 /**

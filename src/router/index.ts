@@ -149,6 +149,18 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'help.title', requiresAuth: false },
   },
   {
+    path: '/privacy',
+    name: 'PrivacyPolicy',
+    component: () => import('@/pages/PrivacyPolicyPage.vue'),
+    meta: { titleKey: 'legal.privacyPolicy', requiresAuth: false },
+  },
+  {
+    path: '/terms',
+    name: 'TermsOfService',
+    component: () => import('@/pages/TermsOfServicePage.vue'),
+    meta: { titleKey: 'legal.termsOfService', requiresAuth: false },
+  },
+  {
     path: '/beanstalk',
     name: 'BeanstalkBlog',
     component: () => import('@/pages/BeanstalkBlogPage.vue'),

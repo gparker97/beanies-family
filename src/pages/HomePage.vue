@@ -1207,6 +1207,8 @@ onUnmounted(() => {
         >
         <router-link to="/beanstalk">blog</router-link>
         <router-link to="/help">help</router-link>
+        <router-link to="/privacy">privacy</router-link>
+        <router-link to="/terms">terms</router-link>
         <router-link to="/welcome">sign in</router-link>
       </div>
       <button class="footer__contact-btn" @click="openContact">

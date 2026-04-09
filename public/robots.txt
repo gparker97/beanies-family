@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+Allow: /home
+Allow: /help
+Allow: /beanstalk
+Allow: /welcome
+Allow: /login
+Allow: /join
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /accounts
+Disallow: /transactions
+Disallow: /assets
+Disallow: /goals
+Disallow: /reports
+Disallow: /forecast
+Disallow: /family
+Disallow: /nook
+Disallow: /activities
+Disallow: /travel
+Disallow: /todo
+Disallow: /budgets
+Disallow: /settings
+Disallow: /oauth
+
+Sitemap: https://beanies.family/sitemap.xml
