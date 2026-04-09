@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-04-09
-> **Updated by:** Claude (Blog post #4 research, budget currency fixes, setup wizard progress modal, Substack integration)
+> **Updated by:** Claude (Product Hunt launch day — legal pages, SEO, security audit, analytics, Substack auto-subscribe, end-of-day skill)
 
 ## Current Phase
 
@@ -57,6 +57,18 @@
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### Product Hunt Launch Day (2026-04-09)
+
+- **Privacy Policy page** (`/privacy`): Full privacy policy covering local-first data model, no data collection, Plausible analytics, Google Drive encryption, cookies (none), children's privacy, data portability. Uses `HelpPublicHeader` for unauthenticated visitors.
+- **Terms of Service page** (`/terms`): Terms covering "as is" warranty, not financial advice, liability limitations, open source license, acceptable use, data responsibility.
+- **Routes & footer links**: Both legal pages added to Vue Router (`requiresAuth: false`), footer links added to `HomePage.vue` and `PublicFooter.vue`.
+- **SEO & social sharing**: Twitter Card meta tags, canonical URL, OG image alt/width/height, `robots.txt`, `sitemap.xml` added for Product Hunt launch readiness.
+- **Security audit**: Full security, SEO, and UX audit via 3 parallel agents. No launch blockers found. npm audit vulnerabilities resolved (0 remaining).
+- **Plausible custom events**: Added analytics tracking for `signup`, `member_joined`, `family_deleted`, `login` (with method prop), `feature_used` (with feature prop). Uses `window.plausible?.()` (optional chaining for test safety). Type declaration at `src/types/plausible.d.ts`. Privacy Policy updated with disclosure.
+- **Substack auto-subscribe**: New families auto-subscribed to Beanstalk newsletter (gpbeanies.substack.com) during signup via pre-checked opt-out checkbox in `CreatePodView`. Fire-and-forget POST to Substack's `/api/v1/free` endpoint (`mode: 'no-cors'`).
+- **end-of-day skill** (`.claude/skills/end-of-day/SKILL.md`): Session wrap-up skill — cleans working tree, updates STATUS.md/CHANGELOG.md, Notion Launch HQ, checks for unfinished work.
+- **Saved plan**: Server-side DynamoDB stats counters (`docs/plans/2026-04-09-server-side-stats-counters.md`) — not yet implemented, saved for later.
 
 ### Budget Currency Fixes, Setup Progress Modal, Blog & Substack (2026-04-08)
 
