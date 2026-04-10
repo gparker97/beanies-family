@@ -530,17 +530,7 @@ function handleSave() {
         </div>
       </div>
 
-      <!-- 2. Who? -->
-      <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
-        <FamilyChipPicker v-model="assigneeIds" mode="multi" />
-      </FormFieldGroup>
-
-      <!-- 2. Category picker (grouped) -->
-      <FormFieldGroup :label="t('modal.selectCategory')">
-        <ActivityCategoryPicker v-model="category" />
-      </FormFieldGroup>
-
-      <!-- 3. Activity title (styled wrapper) -->
+      <!-- 2. Activity title -->
       <FormFieldGroup :label="t('modal.whatsTheActivity')" required :error="errorTitle">
         <div
           class="focus-within:border-primary-500 rounded-[16px] border-2 border-transparent bg-[var(--tint-slate-5)] px-4 py-3 transition-all duration-200 focus-within:shadow-[0_0_0_3px_rgba(241,93,34,0.1)] dark:bg-slate-700"
@@ -554,7 +544,7 @@ function handleSave() {
         </div>
       </FormFieldGroup>
 
-      <!-- 4. Recurring frequency + day-of-week (shown only for recurring mode) -->
+      <!-- 3. Schedule: frequency + day-of-week (recurring only) -->
       <template v-if="recurrenceMode === 'recurring'">
         <FormFieldGroup :label="t('modal.schedule')">
           <div class="space-y-3">
@@ -564,7 +554,7 @@ function handleSave() {
         </FormFieldGroup>
       </template>
 
-      <!-- 5b. All-day toggle -->
+      <!-- 4. All-day toggle -->
       <FormFieldGroup :label="t('planner.allDay')">
         <label class="inline-flex cursor-pointer items-center gap-2.5">
           <input
@@ -578,7 +568,7 @@ function handleSave() {
         </label>
       </FormFieldGroup>
 
-      <!-- 6. Date + Times -->
+      <!-- 5. Date + Times -->
       <!-- Recurring: Start Date / End Date row, then Start Time / End Time row -->
       <template v-if="recurrenceMode === 'recurring'">
         <div class="grid grid-cols-2 gap-4">
@@ -621,7 +611,17 @@ function handleSave() {
         </div>
       </template>
 
-      <!-- 7. Location -->
+      <!-- 6. Who? -->
+      <FormFieldGroup :label="t('modal.whosGoing')" required :error="errorAssignees">
+        <FamilyChipPicker v-model="assigneeIds" mode="multi" />
+      </FormFieldGroup>
+
+      <!-- 7. Category picker -->
+      <FormFieldGroup :label="t('modal.selectCategory')">
+        <ActivityCategoryPicker v-model="category" />
+      </FormFieldGroup>
+
+      <!-- 8. Location -->
       <FormFieldGroup :label="t('planner.field.location')" optional>
         <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
       </FormFieldGroup>
