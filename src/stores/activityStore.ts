@@ -188,10 +188,12 @@ export const useActivityStore = defineStore('activities', () => {
     const enabled = !!(activity.payFromAccountId && activity.feeAmount);
     const settingsStore = useSettingsStore();
     const isAllSchedule = activity.feeSchedule === 'all';
+    const isOneOff = activity.recurrence === 'none';
 
-    // For 'all' schedule, use the full amount as a one-time payment;
-    // otherwise calculate the monthly equivalent
-    const paymentAmount = isAllSchedule
+    // One-off activities and 'all' schedule use the full amount as a one-time payment;
+    // recurring activities calculate the monthly equivalent
+    const isOneTimePayment = isOneOff || isAllSchedule;
+    const paymentAmount = isOneTimePayment
       ? (activity.feeAmount ?? 0)
       : calculateMonthlyFee({
           feeSchedule: activity.feeSchedule,
@@ -210,7 +212,7 @@ export const useActivityStore = defineStore('activities', () => {
       description: `${activity.title} Fee`,
       activityId: activity.id,
       startDate: activity.date,
-      frequency: isAllSchedule ? 'one-time' : 'monthly',
+      frequency: isOneTimePayment ? 'one-time' : 'monthly',
     });
     // Sync linkedRecurringItemId on the activity (clear with '' when removed)
     const currentId = activity.linkedRecurringItemId || '';
