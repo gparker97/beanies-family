@@ -15,9 +15,9 @@ It's me again. Nope, it's **not** AI, like Wile-E-Coyote endlessly pursuing the 
 
 It's a Monday morning. You're at your desk, sipping coffee from your favorite mug. You've just finished your 3rd email, furrowing your brow in disbelief trying to understand why your colleague just escalated to your boss. You literally received that request like 2 hours ago. Friday was a public holiday. I mean, come on.
 
-Out of nowhere, the floor begins to shake. Windows rattle. Fluorescent lights sway from the ceiling. Motivational poster frames crash to the ground - goodbye "hang in there" cat, you hung in there as long as you could.
+Out of nowhere, the floor begins to shake. Windows rattle. Fluorescent lights sway from the ceiling. Motivational poster frames crash to the ground. Goodbye "hang in there" cat, you hung in there as long as you could.
 
-A black hole envelops the floor, racing towards your chair, swallowing up everything in its path. You shoot a panicked glance towards your coworkers, oblivious, happily going about their morning routines. Coffee spills out of your mug like a caffeinated waterfall as you're sucked into the void, plunging towards oblivion. You scream, but as Ridley Scott made absolutely clear, in space, nobody can hear you scream.
+A black hole envelops the floor, racing towards your chair, swallowing everything in its path. You shoot a panicked glance towards your coworkers, oblivious, going about their morning routines. Coffee spills out of your mug like a caffeinated waterfall as you're sucked into the void, plunging towards oblivion. You scream, but as Ridley Scott made absolutely clear, in space, nobody can hear you scream.
 
 A moment later you awake, resting comfortably in a chaise lounge, your toes sinking into silky white sand, a wide-brimmed hat protecting your eyes from a beaming sun, a bedazzled, umbrella-adorned daiquiri glass forming drips of moisture around your fingers - that's right, you're on holiday! Yay!
 
@@ -40,7 +40,7 @@ So check out **travel plans**, and the next time you're stressing out over plann
 
 Forget about the stress of planning, and focus on creating a lifelong memory for your beanies.
 
-[Create a pod, start a travel plan, and let's blow this bean stand.](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=travel-plans-intro&utm_content=cta)
+[Create a pod](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=travel-plans-intro&utm_content=cta), start a travel plan, and let's blow this bean stand.
 
 Peace out, my beans.
 
