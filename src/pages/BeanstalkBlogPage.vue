@@ -15,12 +15,12 @@ const comingSoonCards = [
 ];
 
 function openPost(slug: string) {
-  router.push(`/beanstalk/${slug}`);
+  router.push(`/blog/${slug}`);
 }
 
 const navLinks = [
   { label: 'home', href: '/home' },
-  { label: 'beanstalk', href: '/beanstalk' },
+  { label: 'beanstalk', href: '/blog' },
   { label: 'help', href: '/help' },
 ];
 </script>

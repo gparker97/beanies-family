@@ -48,7 +48,7 @@ const prevPost = computed(() =>
 
 const navLinks = [
   { label: 'home', href: '/home' },
-  { label: 'beanstalk', href: '/beanstalk' },
+  { label: 'beanstalk', href: '/blog' },
   { label: 'help', href: '/help' },
 ];
 </script>
@@ -59,7 +59,7 @@ const navLinks = [
 
     <div v-if="post" class="post-content">
       <!-- Back link -->
-      <button type="button" class="post-back" @click="router.push('/beanstalk')">
+      <button type="button" class="post-back" @click="router.push('/blog')">
         <svg
           width="14"
           height="14"
@@ -114,7 +114,7 @@ const navLinks = [
         <button
           type="button"
           class="post-nav-btn"
-          @click="router.push(nextPost ? `/beanstalk/${nextPost.slug}` : '/beanstalk')"
+          @click="router.push(nextPost ? `/blog/${nextPost.slug}` : '/blog')"
         >
           <svg
             width="14"
@@ -136,7 +136,7 @@ const navLinks = [
         <button
           type="button"
           class="post-nav-btn post-nav-btn-right"
-          @click="router.push(prevPost ? `/beanstalk/${prevPost.slug}` : '/beanstalk')"
+          @click="router.push(prevPost ? `/blog/${prevPost.slug}` : '/blog')"
         >
           <div>
             <div class="post-nav-label">next</div>
@@ -163,7 +163,7 @@ const navLinks = [
     <div v-else class="post-404">
       <div class="post-404-emoji">🫘</div>
       <p>this post seems to have wandered off...</p>
-      <button type="button" @click="router.push('/beanstalk')">back to blog</button>
+      <button type="button" @click="router.push('/blog')">back to blog</button>
     </div>
 
     <PublicFooter />

@@ -22,7 +22,7 @@ function handleContact() {
     </p>
     <div class="footer-links">
       <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a>
-      <router-link to="/beanstalk">beanstalk</router-link>
+      <router-link to="/blog">beanstalk</router-link>
       <router-link to="/help">help</router-link>
       <router-link to="/privacy">privacy</router-link>
       <router-link to="/terms">terms</router-link>
