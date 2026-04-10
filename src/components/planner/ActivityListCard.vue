@@ -65,6 +65,9 @@ function formatDisplayDate(dateStr: string): string {
           {{ formatTime12(activity.startTime)
           }}{{ activity.endTime ? ` - ${formatTime12(activity.endTime)}` : '' }}
         </span>
+        <span v-else-if="activity.isAllDay" class="text-primary-500 text-xs font-medium">
+          {{ t('planner.allDay') }}
+        </span>
         <span
           v-if="activity.recurrence !== 'none'"
           class="bg-sky-silk-300/20 text-secondary-500/50 dark:bg-sky-silk-300/10 rounded-full px-1.5 py-px text-xs font-semibold dark:text-gray-400"

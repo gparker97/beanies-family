@@ -637,7 +637,13 @@ function handleSave() {
 
       <!-- 9. Cost + Fee Schedule -->
       <FormFieldGroup
-        :label="isAllSchedule ? t('planner.fee.totalCost') : t('modal.costPerSession')"
+        :label="
+          recurrenceMode === 'one-off'
+            ? t('planner.fee.totalCost')
+            : isAllSchedule
+              ? t('planner.fee.totalCost')
+              : t('modal.costPerSession')
+        "
       >
         <CurrencyAmountInput
           v-model:amount="feeAmount"
@@ -645,82 +651,91 @@ function handleSave() {
           font-size="1.1rem"
         />
       </FormFieldGroup>
-      <FormFieldGroup :label="t('planner.field.feeSchedule')">
-        <template #label-extra>
-          <InfoHintBadge
-            :text="t('planner.fee.scheduleHintIntro')"
-            :items="[
-              t('planner.fee.scheduleHintPerSession'),
-              t('planner.fee.scheduleHintAll'),
-              t('planner.fee.scheduleHintWeekly'),
-              t('planner.fee.scheduleHintMonthly'),
-              t('planner.fee.scheduleHintYearly'),
-              t('planner.fee.scheduleHintCustom'),
+      <!-- Fee schedule chips (recurring only — one-off activities just have a flat cost) -->
+      <template v-if="recurrenceMode === 'recurring'">
+        <FormFieldGroup :label="t('planner.field.feeSchedule')">
+          <template #label-extra>
+            <InfoHintBadge
+              :text="t('planner.fee.scheduleHintIntro')"
+              :items="[
+                t('planner.fee.scheduleHintPerSession'),
+                t('planner.fee.scheduleHintAll'),
+                t('planner.fee.scheduleHintWeekly'),
+                t('planner.fee.scheduleHintMonthly'),
+                t('planner.fee.scheduleHintYearly'),
+                t('planner.fee.scheduleHintCustom'),
+              ]"
+            />
+          </template>
+          <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+        </FormFieldGroup>
+
+        <!-- Custom period inputs -->
+        <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
+          <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+            t('planner.fee.customPeriod')
+          }}</span>
+          <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
+          <TogglePillGroup
+            v-model="feeCustomPeriodUnit"
+            :options="[
+              { value: 'weeks', label: t('planner.fee.weeks') },
+              { value: 'months', label: t('planner.fee.months') },
             ]"
           />
-        </template>
-        <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
-      </FormFieldGroup>
+        </div>
 
-      <!-- Custom period inputs -->
-      <div v-if="feeSchedule === 'custom'" class="flex items-center gap-2">
-        <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-          t('planner.fee.customPeriod')
-        }}</span>
-        <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
-        <TogglePillGroup
-          v-model="feeCustomPeriodUnit"
-          :options="[
-            { value: 'weeks', label: t('planner.fee.weeks') },
-            { value: 'months', label: t('planner.fee.months') },
-          ]"
-        />
-      </div>
+        <!-- Per-session breakdown for 'all' schedule -->
+        <div v-if="isAllSchedule && hasCost && totalSessions > 0" class="flex items-center gap-2">
+          <span
+            class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+          >
+            {{ t('planner.fee.perSessionBreakdown') }}
+          </span>
+          <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+            {{ formatCurrencyWithCode(perSessionCost, (feeCurrency || 'USD') as any) }}
+            <span class="font-normal opacity-50"> ({{ totalSessions }} sessions) </span>
+          </span>
+        </div>
 
-      <!-- Per-session breakdown for 'all' schedule -->
-      <div v-if="isAllSchedule && hasCost && totalSessions > 0" class="flex items-center gap-2">
-        <span
-          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+        <!-- Calculated monthly display (non-all schedules) -->
+        <div
+          v-if="
+            !isAllSchedule &&
+            hasCost &&
+            feeSchedule !== 'none' &&
+            feeSchedule !== 'monthly' &&
+            calculatedMonthly > 0
+          "
+          class="flex items-center gap-2"
         >
-          {{ t('planner.fee.perSessionBreakdown') }}
-        </span>
-        <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-          {{ formatCurrencyWithCode(perSessionCost, (feeCurrency || 'USD') as any) }}
-          <span class="font-normal opacity-50"> ({{ totalSessions }} sessions) </span>
-        </span>
-      </div>
-
-      <!-- Calculated monthly display (non-all schedules) -->
-      <div
-        v-if="
-          !isAllSchedule &&
-          hasCost &&
-          feeSchedule !== 'none' &&
-          feeSchedule !== 'monthly' &&
-          calculatedMonthly > 0
-        "
-        class="flex items-center gap-2"
-      >
-        <span
-          class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
-        >
-          {{ t('planner.fee.calculatedMonthly') }}
-        </span>
-        <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-          {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
-        </span>
-        <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
-      </div>
+          <span
+            class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+          >
+            {{ t('planner.fee.calculatedMonthly') }}
+          </span>
+          <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+            {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any) }}/mo
+          </span>
+          <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
+        </div>
+      </template>
 
       <!-- Linked payment prompt -->
       <RecurringPaymentPrompt
-        v-if="hasCost && feeSchedule !== 'none'"
+        v-if="hasCost && (recurrenceMode === 'recurring' ? feeSchedule !== 'none' : true)"
         v-model="createRecurringPayment"
         :pay-from-account-id="feePayFromAccountId"
-        :payment-amount="isAllSchedule ? (feeAmount ?? 0) : calculatedMonthly"
+        :payment-amount="
+          recurrenceMode === 'one-off'
+            ? (feeAmount ?? 0)
+            : isAllSchedule
+              ? (feeAmount ?? 0)
+              : calculatedMonthly
+        "
         :currency="feeCurrency || 'USD'"
         :start-date="date"
-        :frequency="isAllSchedule ? 'one-time' : 'monthly'"
+        :frequency="recurrenceMode === 'one-off' || isAllSchedule ? 'one-time' : 'monthly'"
         @update:pay-from-account-id="feePayFromAccountId = $event"
       />
 
