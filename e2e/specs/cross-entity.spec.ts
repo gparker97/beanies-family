@@ -230,12 +230,16 @@ test.describe('Loan & Activity Linking', () => {
 
   /**
    * Click the fee schedule "Monthly" chip.
-   * Use exact: true to avoid matching the Recurring schedule-mode button
-   * whose description ("Repeats weekly or monthly") also contains "Monthly".
+   * Scoped to the Fee Schedule FormFieldGroup to avoid matching the
+   * recurrence frequency "Monthly" chip which has the same label text.
    */
   async function clickFeeScheduleMonthly(page: import('@playwright/test').Page) {
     const dialog = page.locator('div[role="dialog"]');
-    await dialog.getByRole('button', { name: ui('planner.fee.monthly'), exact: true }).click();
+    // Find the Fee Schedule section by its label, then click Monthly within it
+    const feeSection = dialog
+      .locator('div.space-y-2')
+      .filter({ has: page.locator('label', { hasText: ui('planner.field.feeSchedule') }) });
+    await feeSection.getByRole('button', { name: ui('planner.fee.monthly'), exact: true }).click();
   }
 
   /** Create an account through the UI so the RecurringPaymentPrompt has something to select. */
@@ -276,11 +280,9 @@ test.describe('Loan & Activity Linking', () => {
     // Select assignee
     await selectAssignee(page);
 
-    // Switch to one-time mode FIRST so only one "Monthly" button exists in the DOM
+    // Stay in recurring mode (default) — fee schedule chips are only visible in recurring mode.
+    // Fill start date
     const dialog = page.locator('div[role="dialog"]');
-    await dialog.getByRole('button', { name: /one-time/i }).click();
-
-    // Fill date
     const dateInput = dialog.locator('input[type="date"]');
     await dateInput.first().waitFor({ state: 'visible', timeout: 5000 });
     await dateInput.first().fill('2026-04-15');
@@ -442,6 +444,12 @@ test.describe('Loan & Activity Linking', () => {
 
     // Wait for ActivityModal (edit mode) to open
     await expect(page.getByText(ui('planner.editActivity'))).toBeVisible({ timeout: 5000 });
+
+    // Switch from one-time to recurring — fee schedule chips only appear in recurring mode
+    await page
+      .locator('div[role="dialog"]')
+      .getByRole('button', { name: /recurring/i })
+      .click();
 
     // Set cost amount (now visible by default, above schedule section)
     const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
