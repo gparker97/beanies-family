@@ -7,6 +7,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
+import DailyCalendarView from '@/components/planner/DailyCalendarView.vue';
 import UpcomingActivities from '@/components/planner/UpcomingActivities.vue';
 import TodoPreview from '@/components/planner/TodoPreview.vue';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
@@ -110,6 +111,8 @@ const createdConfirm = ref<{
 
 const calendarGridRef = ref<InstanceType<typeof CalendarGrid> | null>(null);
 const weeklyViewRef = ref<InstanceType<typeof WeeklyCalendarView> | null>(null);
+const dailyViewRef = ref<InstanceType<typeof DailyCalendarView> | null>(null);
+const defaultAssigneeId = ref<string | undefined>(undefined);
 
 // Vacation wizard state
 const showVacationWizard = ref(false);
@@ -133,6 +136,11 @@ function handleVacationClick(id: string) {
 }
 
 const headerSubtitle = computed(() => {
+  if (activeView.value === 'day') {
+    const label = dailyViewRef.value?.dayLabel ?? '';
+    const count = dailyViewRef.value?.activityCount ?? 0;
+    return t('planner.subtitle').replace('{month}', label).replace('{count}', String(count));
+  }
   if (activeView.value === 'week') {
     const label = weeklyViewRef.value?.weekLabel ?? '';
     const count = weeklyViewRef.value?.activityCount ?? 0;
@@ -143,12 +151,13 @@ const headerSubtitle = computed(() => {
   return t('planner.subtitle').replace('{month}', month).replace('{count}', String(count));
 });
 
-function openAddModal(date?: string, time?: string) {
+function openAddModal(date?: string, time?: string, memberId?: string) {
   sidebarDate.value = null;
   editingActivity.value = null;
   editingOccurrenceDate.value = undefined;
   selectedDate.value = date;
   defaultStartTime.value = time;
+  defaultAssigneeId.value = memberId;
   showModal.value = true;
 }
 
@@ -492,6 +501,18 @@ function handleActivitySwapped(newId: string) {
       @vacation-click="handleVacationClick"
     />
 
+    <DailyCalendarView
+      v-else-if="activeView === 'day'"
+      ref="dailyViewRef"
+      @select-date="handleCalendarDateClick"
+      @add-activity="
+        (date: string, time?: string, memberId?: string) => openAddModal(date, time, memberId)
+      "
+      @view-activity="(id: string, date: string) => openViewModal(id, date)"
+      @view-todo="openTodoViewModal"
+      @vacation-click="handleVacationClick"
+    />
+
     <!-- Two-column layout: Upcoming + Todo preview -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <UpcomingActivities @edit="(id: string, date: string) => openViewModal(id, date)" />
@@ -553,11 +574,13 @@ function handleActivitySwapped(newId: string) {
       :activity="editingActivity"
       :default-date="selectedDate"
       :default-start-time="defaultStartTime"
+      :default-assignee-ids="defaultAssigneeId ? [defaultAssigneeId] : undefined"
       :read-only="!canEditActivities"
       :occurrence-date="editingOccurrenceDate"
       @close="
         showModal = false;
         defaultStartTime = undefined;
+        defaultAssigneeId = undefined;
       "
       @save="handleSave"
       @delete="handleDelete"

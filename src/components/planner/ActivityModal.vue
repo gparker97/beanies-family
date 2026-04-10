@@ -38,6 +38,7 @@ const props = defineProps<{
   activity?: FamilyActivity | null;
   defaultDate?: string;
   defaultStartTime?: string;
+  defaultAssigneeIds?: string[];
   readOnly?: boolean;
   occurrenceDate?: string;
 }>();
@@ -163,7 +164,7 @@ const { isEditing, isSubmitting } = useFormModal(
       daysOfWeek.value = [];
       recurrenceEndDate.value = '';
       category.value = '' as ActivityCategory;
-      assigneeIds.value = [];
+      assigneeIds.value = props.defaultAssigneeIds ?? [];
       dropoffMemberId.value = '';
       pickupMemberId.value = '';
       location.value = '';
