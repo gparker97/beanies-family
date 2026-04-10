@@ -10,7 +10,6 @@ const router = useRouter();
 const { featuredPost, regularPosts } = useBlog();
 
 const comingSoonCards = [
-  { emoji: '✈️', title: 'travel plans — stress less, plan more', subtitle: 'coming soon' },
   { emoji: '✅', title: 'introducing todos', subtitle: 'coming soon' },
   { emoji: '🔍', title: 'best cozi & maple alternatives in 2026', subtitle: 'coming soon' },
 ];
@@ -21,7 +20,7 @@ function openPost(slug: string) {
 
 const navLinks = [
   { label: 'home', href: '/home' },
-  { label: 'blog', href: '/beanstalk' },
+  { label: 'beanstalk', href: '/beanstalk' },
   { label: 'help', href: '/help' },
 ];
 </script>
