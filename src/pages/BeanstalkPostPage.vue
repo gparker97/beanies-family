@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useBlog, BLOG_CATEGORIES } from '@/composables/useBlog';
 import PublicNav from '@/components/public/PublicNav.vue';
@@ -10,6 +10,24 @@ import { formatDateFull } from '@/utils/date';
 const route = useRoute();
 const router = useRouter();
 const { getPostBySlug, posts } = useBlog();
+
+const lightboxSrc = ref<string | null>(null);
+
+function onArticleClick(e: MouseEvent) {
+  const img = (e.target as HTMLElement).closest('img');
+  if (img) lightboxSrc.value = img.src;
+}
+
+function closeLightbox() {
+  lightboxSrc.value = null;
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeLightbox();
+}
+
+onMounted(() => document.addEventListener('keydown', onKeydown));
+onUnmounted(() => document.removeEventListener('keydown', onKeydown));
 
 const post = computed(() => getPostBySlug(route.params.slug as string));
 const categoryInfo = computed(() =>
@@ -30,7 +48,7 @@ const prevPost = computed(() =>
 
 const navLinks = [
   { label: 'home', href: '/home' },
-  { label: 'blog', href: '/beanstalk' },
+  { label: 'beanstalk', href: '/beanstalk' },
   { label: 'help', href: '/help' },
 ];
 </script>
@@ -76,7 +94,17 @@ const navLinks = [
       <div class="post-divider" />
 
       <!-- eslint-disable-next-line vue/no-v-html -->
-      <article class="blog-prose" v-html="post.html" />
+      <article ref="articleEl" class="blog-prose" @click="onArticleClick" v-html="post.html" />
+
+      <!-- Image lightbox -->
+      <Teleport to="body">
+        <Transition name="lightbox-fade">
+          <div v-if="lightboxSrc" class="lightbox-overlay" @click="closeLightbox">
+            <img :src="lightboxSrc" alt="" class="lightbox-img" @click.stop />
+            <button type="button" class="lightbox-close" @click="closeLightbox">&times;</button>
+          </div>
+        </Transition>
+      </Teleport>
 
       <div class="post-divider" />
 
@@ -326,9 +354,10 @@ const navLinks = [
 .blog-prose :deep(img) {
   border: 1px solid rgb(44 62 80 / 8%);
   border-radius: 16px;
+  cursor: zoom-in;
   display: block;
   margin: 1.5rem auto;
-  max-width: 360px;
+  max-width: 100%;
   width: 100%;
 }
 
@@ -441,6 +470,56 @@ const navLinks = [
 
 .post-404 button:hover {
   text-decoration: underline;
+}
+
+/* ── Lightbox ── */
+.lightbox-overlay {
+  align-items: center;
+  background: rgb(0 0 0 / 70%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 9999;
+}
+
+.lightbox-img {
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 40%);
+  max-height: 90vh;
+  max-width: 90vw;
+  object-fit: contain;
+}
+
+.lightbox-close {
+  background: rgb(255 255 255 / 15%);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  font-size: 1.5rem;
+  height: 40px;
+  line-height: 1;
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  transition: background 200ms;
+  width: 40px;
+}
+
+.lightbox-close:hover {
+  background: rgb(255 255 255 / 30%);
+}
+
+.lightbox-fade-enter-active,
+.lightbox-fade-leave-active {
+  transition: opacity 200ms ease;
+}
+
+.lightbox-fade-enter-from,
+.lightbox-fade-leave-to {
+  opacity: 0;
 }
 
 /* ── Mobile ── */
