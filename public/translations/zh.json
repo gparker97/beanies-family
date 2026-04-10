@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-09",
-    "translationCount": 1959
+    "lastUpdated": "2026-04-10",
+    "translationCount": 1964
   },
   "translations": {
     "app.name": {
@@ -9800,6 +9800,31 @@
       "translation": "让我们数一数豆子",
       "hash": "gqlq2n",
       "lastUpdated": "2026-04-09"
+    },
+    "auth.subscribeNewsletter": {
+      "translation": "随时向我提供产品新闻和功能的最新信息",
+      "hash": "l3ecme",
+      "lastUpdated": "2026-04-10"
+    },
+    "legal.privacyPolicy": {
+      "translation": "隐私条款",
+      "hash": "hop62e",
+      "lastUpdated": "2026-04-10"
+    },
+    "legal.termsOfService": {
+      "translation": "服務條款",
+      "hash": "zhf2aj",
+      "lastUpdated": "2026-04-10"
+    },
+    "legal.lastUpdated": {
+      "translation": "上次更新",
+      "hash": "47xqdr",
+      "lastUpdated": "2026-04-10"
+    },
+    "legal.backToHome": {
+      "translation": "返回首页",
+      "hash": "weah05",
+      "lastUpdated": "2026-04-10"
     }
   }
 }
