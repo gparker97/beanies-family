@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-04-09
-> **Updated by:** Claude (Substack subscribe bugfix — hidden form POST for cross-origin subscription)
+> **Last updated:** 2026-04-10
+> **Updated by:** Claude (Daily calendar view, blog publish, activity drawer improvements, pilot-scout skill)
 
 ## Current Phase
 
@@ -65,6 +65,17 @@
 - **Routes & footer links**: Both legal pages added to Vue Router (`requiresAuth: false`), footer links added to `HomePage.vue` and `PublicFooter.vue`.
 - **SEO & social sharing**: Twitter Card meta tags, canonical URL, OG image alt/width/height, `robots.txt`, `sitemap.xml` added for Product Hunt launch readiness.
 - **Security audit**: Full security, SEO, and UX audit via 3 parallel agents. No launch blockers found. npm audit vulnerabilities resolved (0 remaining).
+
+### Blog, Planner & Skills (2026-04-10)
+
+- **Blog post #3 published** ("does family trip planning stress you out? me too"): Travel plans intro with screenshot, UTM-tracked links across all blog posts, image lightbox on post pages. Blog URL changed from `/beanstalk` to `/blog` (redirects from old URLs). Blog title renamed to "beanie beanstalk". Coming soon cards updated.
+- **Daily calendar view** (`DailyCalendarView.vue`): Per-member columns showing one day's schedule for the whole family. Adults sorted first (oldest→youngest), then children. Column separators with member-color accent bars and subtle gradient tints. Click-to-create pre-fills date + time + member. Mobile: MemberChipFilter strip + ActivityListCard agenda.
+- **Hover time labels**: Weekly and daily calendar hover "+" indicators now show the time range (e.g., "3pm – 4pm") for clarity.
+- **Activity drawer improvements**: Field order reordered to Title → Schedule → Who → Category (matches natural "what + when + who" flow). One-time activities no longer show fee schedule chips, monthly charge, or per-session breakdown — linked payment wired as one-time. All-day activities show "all day" label in list views. `defaultAssigneeIds` prop added for pre-filling from daily view.
+- **DRY cleanup**: `familyStore.sortedMembers` computed consolidates 3 duplicated inline member sorts (MemberChipFilter, FamilyChipPicker, FamilyTodoPage). `useDayNavigation` composable + `formatDayLong` utility added.
+- **View toggle**: Day view added to month/week toggle. Auto-scroll on view switch fixed (only scrolls on fresh page load).
+- **Pilot-scout skill** (`/pilot-scout`): Multi-platform internet scouting for potential pilot users across Reddit, HN, Twitter/X, Quora, MetaFilter, Product Hunt, Indie Hackers, and more. Logs to Notion. Platform-specific freshness cutoffs, dedup against existing entries.
+- **Nav link rename**: "blog" → "beanstalk" across all nav links and footers (URL remains `/blog`).
 - **Plausible custom events**: Added analytics tracking for `signup`, `member_joined`, `family_deleted`, `login` (with method prop), `feature_used` (with feature prop). Uses `window.plausible?.()` (optional chaining for test safety). Type declaration at `src/types/plausible.d.ts`. Privacy Policy updated with disclosure.
 - **Substack auto-subscribe**: New families auto-subscribed to Beanstalk newsletter (gpbeanies.substack.com) during signup via pre-checked opt-out checkbox in `CreatePodView`. Fire-and-forget POST to Substack's `/api/v1/free` endpoint (`mode: 'no-cors'`).
 - **end-of-day skill** (`.claude/skills/end-of-day/SKILL.md`): Session wrap-up skill — cleans working tree, updates STATUS.md/CHANGELOG.md, Notion Launch HQ, checks for unfinished work.

@@ -8,6 +8,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-10
+
+### Added
+
+- Daily calendar view — see your whole family's day at a glance with per-member columns, color-coded headers, and click-to-create with pre-filled member
+- Blog post: "does family trip planning stress you out? me too" — travel plans feature intro with screenshot
+- Image lightbox on blog posts — click any image to view enlarged in an overlay
+- UTM tracking on all blog post links for analytics
+- Hover "+" on weekly and daily calendar time slots now shows the time range (e.g., "3pm – 4pm")
+- "all day" label shown beneath all-day activities in list views
+- `/pilot-scout` skill for finding potential pilot users across Reddit, HN, Quora, Product Hunt, and more
+
+### Changed
+
+- Activity drawer field order: title → schedule → who → category (more natural creation flow)
+- Blog URL changed from `/beanstalk` to `/blog` (old URLs redirect automatically)
+- Blog title renamed from "beanstalk blog" to "beanie beanstalk"
+- Nav links renamed from "blog" to "beanstalk" across all pages
+- Family members now sorted adults-first (oldest→youngest), then children, across all member pickers
+- One-time activities no longer show recurring fee schedule chips or monthly charge — linked payment is one-time only
+
+### Fixed
+
+- Calendar view switch (month → week → day) no longer auto-scrolls to bottom of page
+- Coming soon blog cards updated (travel plans removed, 2 cards remain)
+
+---
+
 ## 2026-04-09
 
 ### Added
