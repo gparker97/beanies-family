@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { isDateBetween, toDateInputValue, parseLocalDate, formatTime12 } from '../date';
+import {
+  isDateBetween,
+  toDateInputValue,
+  parseLocalDate,
+  formatTime12,
+  formatDayLong,
+} from '../date';
 
 describe('toDateInputValue', () => {
   it('returns YYYY-MM-DD format', () => {
@@ -124,5 +130,22 @@ describe('formatTime12', () => {
   it('formats midnight correctly', () => {
     expect(formatTime12('00:00')).toBe('12am');
     expect(formatTime12('00:15')).toBe('12:15am');
+  });
+});
+
+describe('formatDayLong', () => {
+  it('formats as "DayName, D MonthName Year"', () => {
+    // 2026-04-10 is a Friday
+    expect(formatDayLong('2026-04-10')).toBe('Friday, 10 April 2026');
+  });
+
+  it('handles single-digit days', () => {
+    // 2026-03-01 is a Sunday
+    expect(formatDayLong('2026-03-01')).toBe('Sunday, 1 March 2026');
+  });
+
+  it('handles year boundaries', () => {
+    // 2026-01-01 is a Thursday
+    expect(formatDayLong('2026-01-01')).toBe('Thursday, 1 January 2026');
   });
 });
