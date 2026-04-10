@@ -36,7 +36,7 @@ const STRING_DEFS = {
 
   // Global search
   // Blog
-  'blog.title': { en: 'Beanstalk Blog', beanie: 'beanstalk blog' },
+  'blog.title': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
   'blog.tagline': {
     en: 'The latest beanie news and updates',
     beanie: 'the latest beanie news and updates',
@@ -3584,7 +3584,7 @@ const STRING_DEFS = {
   },
 
   // Navigation
-  'nav.beanstalk': { en: 'Beanstalk Blog', beanie: 'beanstalk blog' },
+  'nav.beanstalk': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
   'nav.help': { en: 'Help', beanie: 'help' },
 
   // ── Vacation Planner ──────────────────────────────────────────────────────

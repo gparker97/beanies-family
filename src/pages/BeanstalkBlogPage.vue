@@ -38,7 +38,7 @@ const navLinks = [
           alt="the beanies family"
           class="blog-hero-mascot"
         />
-        <h1 class="blog-hero-title">beanstalk blog</h1>
+        <h1 class="blog-hero-title">beanie beanstalk</h1>
         <p class="blog-hero-tagline">
           the latest beanie news and updates — posted every friday, or roughly whenever I feel like
           it
