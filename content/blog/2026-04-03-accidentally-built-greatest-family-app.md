@@ -34,7 +34,7 @@ I'll be writing small notes and updates here about cool new features or things I
 
 I'll keep a lid (don't worry I'm not jumping back into that cauldron metaphor) on my craziest ideas, but even whittling things down, there's more to build than ever. Don't worry, builders will keep on building, cuz that's what builders do. I'm not sure if that's a good thing or a bad thing, but I'll leave the judging to others.
 
-If you have a crazy family like me and haven't tried beanies yet, give it a shot and let me know what you think. Yes, it's still free. Probably not forever.
+If you have a crazy family like me and haven't tried beanies yet, give it a shot at [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=accidentally-built-greatest-family-app) and let me know what you think. Yes, it's still free. Probably not forever.
 
 Speak soon my beans. Wishing you peace.
 

@@ -37,11 +37,11 @@ But also, I built this to track your _actual_ family life: piano lessons, school
 
 It's not a perfect app. It doesn't pull in stuff from Google Calendar (yet) or sync with banks (I doubt it ever will). But it gives you a rough idea of how much you have, how much you will have, and what in this heavenly world you actually have to do _today_. (Of course, only if you tell it that stuff first. It's not magic.)
 
-Treat [beanies.family](https://beanies.family) like a friend, and it will reward you in spades. Maybe it'll even buy you a beer the next time you can spare 22 minutes after work and have $7 saved from meticulously tracking your budget every month. (Is that how much beers cost nowadays? I wouldn't know.)
+Treat [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=welcome-to-the-beanstalk) like a friend, and it will reward you in spades. Maybe it'll even buy you a beer the next time you can spare 22 minutes after work and have $7 saved from meticulously tracking your budget every month. (Is that how much beers cost nowadays? I wouldn't know.)
 
 You can clone and install it for free if you want to run it locally. The data never leaves your machine if you don't want it to. We don't even own a database (well, not a real one). I don't want your janky finance data anyway, and I'm not picking up your kid for you.
 
-If you want the cloud version so you can share it with your family (don't worry, your data still stays with you), create a family account at [beanies.family](https://beanies.family). Just drop me a line for an invite code. You could also set up the infra by yourself (and pay for it), but that's a pain and you know it.
+If you want the cloud version so you can share it with your family (don't worry, your data still stays with you), create a family account at [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=welcome-to-the-beanstalk). Just drop me a line for an invite code. You could also set up the infra by yourself (and pay for it), but that's a pain and you know it.
 
 Here's the fun stuff:
 
@@ -53,7 +53,7 @@ Here's the fun stuff:
 - 🧪 **Vitest + Playwright + Dependabot** — unit tests, E2E tests, and automated dependency updates to keep things secure (seriously, how cool is Dependabot!?)
 - ☁️ **One single, stupid, plain vanilla DynamoDB** — in the cloud to map your family ID to your (encrypted) data file, so we can locate it in your personal location that only you can access. Nothing else. Anywhere. Ever.
 
-So there it is. If you're a techie nerd like me, run it locally. If you don't want to deal with the bs, use [beanies.family](https://beanies.family).
+So there it is. If you're a techie nerd like me, run it locally. If you don't want to deal with the bs, use [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=welcome-to-the-beanstalk).
 
 I'm using beanies to track our money, our various (1) houses, our (0) boats, my wife's (currently missing) diamond ring (ask my wife where she lost hers... unfortunately beanies can't tell you that), and more. I'll use it even more for their piano lessons, soccer practices, school plays that, as a respectable father, I really should attend, and to make sure we don't forget to pick up our son from his after school math tutor (again). All while keeping our data safe and secure on my family's personal storage (unless I open read access on my data file to the world and tell everyone the key. Which I won't. Probably.).
 

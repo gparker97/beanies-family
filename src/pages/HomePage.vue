@@ -143,7 +143,7 @@ onUnmounted(() => {
         <div class="fnav__links">
           <a href="#story" @click.prevent="scrollTo('story')">my story</a>
           <a href="#security" @click.prevent="scrollTo('security')">security</a>
-          <a href="/beanstalk">blog</a>
+          <a href="/beanstalk">beanstalk</a>
         </div>
         <button class="fnav__cta" @click="goToWelcome">create your bean pod</button>
       </div>
@@ -1205,7 +1205,7 @@ onUnmounted(() => {
         <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener"
           >GitHub</a
         >
-        <router-link to="/beanstalk">blog</router-link>
+        <router-link to="/beanstalk">beanstalk</router-link>
         <router-link to="/help">help</router-link>
         <router-link to="/privacy">privacy</router-link>
         <router-link to="/terms">terms</router-link>
