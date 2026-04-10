@@ -44,10 +44,7 @@ const selectedTodo = computed(() =>
   selectedTodoId.value ? (todoStore.todos.find((t) => t.id === selectedTodoId.value) ?? null) : null
 );
 
-// Sorted members for chip filter
-const sortedMembers = computed(() =>
-  [...familyStore.members].sort((a, b) => a.name.localeCompare(b.name))
-);
+const sortedMembers = computed(() => familyStore.sortedMembers);
 
 // Computed: filtered + sorted todos
 const displayedOpenTodos = computed(() => {

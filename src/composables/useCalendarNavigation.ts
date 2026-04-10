@@ -1,6 +1,42 @@
 import { computed, type Ref } from 'vue';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { addDays, toDateInputValue, formatTime12, formatDateShort } from '@/utils/date';
+import {
+  addDays,
+  toDateInputValue,
+  formatTime12,
+  formatDateShort,
+  formatDayLong,
+} from '@/utils/date';
+
+// ── Day Navigation ─────────────────────────────────────────────────────────
+
+export interface DayInfo {
+  date: Date;
+  dateStr: string;
+  isToday: boolean;
+}
+
+export function useDayNavigation(referenceDate: Ref<Date>) {
+  const currentDay = computed<DayInfo>(() => {
+    const d = referenceDate.value;
+    const dateStr = toDateInputValue(d);
+    return { date: d, dateStr, isToday: dateStr === toDateInputValue(new Date()) };
+  });
+
+  const dayLabel = computed(() => formatDayLong(currentDay.value.dateStr));
+
+  function prevDay() {
+    referenceDate.value = addDays(referenceDate.value, -1);
+  }
+  function nextDay() {
+    referenceDate.value = addDays(referenceDate.value, 1);
+  }
+  function goToToday() {
+    referenceDate.value = new Date();
+  }
+
+  return { currentDay, dayLabel, prevDay, nextDay, goToToday };
+}
 
 // ── Week Navigation ────────────────────────────────────────────────────────
 

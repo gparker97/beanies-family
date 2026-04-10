@@ -24,6 +24,17 @@ export const useFamilyStore = defineStore('family', () => {
 
   const isSetupComplete = computed(() => hasOwner.value || members.value.length > 0);
 
+  /** Members sorted: adults first (oldest→youngest), then children, alphabetical fallback */
+  const sortedMembers = computed(() =>
+    [...members.value].sort((a, b) => {
+      if (a.ageGroup !== b.ageGroup) return a.ageGroup === 'adult' ? -1 : 1;
+      const yearA = a.dateOfBirth?.year ?? Infinity;
+      const yearB = b.dateOfBirth?.year ?? Infinity;
+      if (yearA !== yearB) return yearA - yearB;
+      return a.name.localeCompare(b.name);
+    })
+  );
+
   // Diagnostic: track permission changes on currentMember
   watch(currentMember, (newMember, oldMember) => {
     if (!oldMember || !newMember) return;
@@ -194,6 +205,7 @@ export const useFamilyStore = defineStore('family', () => {
     owner,
     hasOwner,
     isSetupComplete,
+    sortedMembers,
     // Actions
     loadMembers,
     createMember,

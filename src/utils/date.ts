@@ -187,6 +187,8 @@ export function timeAgo(isoString: ISODateString): string {
   return formatDate(isoString);
 }
 
+const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const MONTHS_LONG = [
   'January',
   'February',
@@ -201,6 +203,14 @@ const MONTHS_LONG = [
   'November',
   'December',
 ];
+
+/**
+ * Format: "Thursday, 10 April 2026" — full day name + date + long month + year.
+ */
+export function formatDayLong(dateStr: string): string {
+  const date = parseLocalDate(dateStr);
+  return `${DAYS_LONG[date.getDay()]}, ${date.getDate()} ${MONTHS_LONG[date.getMonth()]} ${date.getFullYear()}`;
+}
 
 /**
  * Format a date as "January 2026"

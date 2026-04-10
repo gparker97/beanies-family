@@ -126,16 +126,15 @@ onMounted(async () => {
   updateNow();
   nowTimer = setInterval(updateNow, 60000);
   await nextTick();
-  if (gridRef.value) {
+  // Only auto-scroll to current time on fresh page load (scrollTop near top).
+  // Skip when switching views to avoid jarring scroll jumps.
+  const mainEl = document.querySelector('main');
+  if (gridRef.value && mainEl && mainEl.scrollTop < 100) {
     const scrollHour = Math.max(0, Math.floor(nowMinutes.value / 60) - 1);
     const start = hours.value[0] ?? 7;
     const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT);
     const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
-    // Scroll the page so the current time area is visible, accounting for header
-    const mainEl = document.querySelector('main');
-    if (mainEl) {
-      mainEl.scrollTop = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
-    }
+    mainEl.scrollTop = gridTop - mainEl.getBoundingClientRect().top + offsetWithinGrid - 80;
   }
 });
 
@@ -434,9 +433,12 @@ defineExpose({ weekLabel, activityCount });
               @click="handleEmptySlotClick(day.dateStr, hour)"
             >
               <span
-                class="from-primary-500/80 to-terracotta-400/80 pointer-events-none flex h-full items-center justify-center rounded-xl bg-gradient-to-r bg-clip-text text-2xl font-black text-transparent opacity-0 transition-all group-hover/slot:scale-110 group-hover/slot:opacity-50"
+                class="from-primary-500/80 to-terracotta-400/80 pointer-events-none flex h-full flex-col items-center justify-center gap-0 rounded-xl bg-gradient-to-r bg-clip-text text-transparent opacity-0 transition-all group-hover/slot:scale-110 group-hover/slot:opacity-50"
               >
-                +
+                <span class="text-xl leading-none font-black">+</span>
+                <span class="font-outfit text-[9px] leading-tight font-bold">
+                  {{ formatHourLabel(hour) }} &ndash; {{ formatHourLabel(hour + 1) }}
+                </span>
               </span>
             </div>
 
