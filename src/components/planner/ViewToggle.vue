@@ -8,6 +8,7 @@ const { t } = useTranslation();
 const views = [
   { id: 'month', labelKey: 'planner.view.month' as const },
   { id: 'week', labelKey: 'planner.view.week' as const },
+  { id: 'day', labelKey: 'planner.view.day' as const },
 ];
 </script>
 

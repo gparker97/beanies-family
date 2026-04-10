@@ -26,9 +26,7 @@ const emit = defineEmits<{
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
-const sortedMembers = computed(() =>
-  [...familyStore.members].sort((a, b) => a.name.localeCompare(b.name))
-);
+const sortedMembers = computed(() => familyStore.sortedMembers);
 
 const chipBase =
   'inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-sm font-medium transition-all';
