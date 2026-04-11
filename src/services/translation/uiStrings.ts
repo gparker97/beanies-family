@@ -36,7 +36,10 @@ const STRING_DEFS = {
 
   // Global search
   // Blog
-  'blog.title': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
+  'blog.title': {
+    en: 'Welcome to the Beanie Beanstalk!',
+    beanie: 'welcome to the beanie beanstalk!',
+  },
   'blog.tagline': {
     en: 'The latest beanie news and updates',
     beanie: 'the latest beanie news and updates',
