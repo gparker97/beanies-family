@@ -2,7 +2,7 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-10",
+    "lastUpdated": "2026-04-11",
     "translationCount": 1964
   },
   "translations": {
@@ -9177,9 +9177,9 @@
       "lastUpdated": "2026-03-22"
     },
     "blog.title": {
-      "translation": "Beanstalk博客",
-      "hash": "wcxaq5",
-      "lastUpdated": "2026-03-23"
+      "translation": "欢迎来到Beanie Beanstalk ！",
+      "hash": "kefwog",
+      "lastUpdated": "2026-04-11"
     },
     "blog.tagline": {
       "translation": "最新的豆豆新闻和更新",
@@ -9302,9 +9302,9 @@
       "lastUpdated": "2026-03-23"
     },
     "nav.beanstalk": {
-      "translation": "Beanstalk博客",
-      "hash": "wcxaq5",
-      "lastUpdated": "2026-03-23"
+      "translation": "豆茎",
+      "hash": "8j4p7f",
+      "lastUpdated": "2026-04-11"
     },
     "vacation.travel.oneWay": {
       "translation": "单程票",
