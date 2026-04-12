@@ -61,6 +61,9 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const freshSignIn = ref(false);
+  // Newsletter opt-in captured during signUp; read by syncStore when
+  // registering the family so the choice is forwarded to the registry.
+  const newsletterOptIn = ref<boolean | null>(null);
 
   // Getters
   const needsAuth = computed(() => !isAuthenticated.value);
@@ -175,9 +178,12 @@ export const useAuthStore = defineStore('auth', () => {
     password: string;
     familyName: string;
     memberName: string;
+    subscribeNewsletter?: boolean;
   }): Promise<{ success: boolean; error?: string }> {
     isLoading.value = true;
     error.value = null;
+    newsletterOptIn.value =
+      typeof params.subscribeNewsletter === 'boolean' ? params.subscribeNewsletter : null;
 
     try {
       // Create the family
@@ -500,6 +506,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
+    newsletterOptIn.value = null;
     clearSession();
   }
 
@@ -547,6 +554,7 @@ export const useAuthStore = defineStore('auth', () => {
     // Clear auth state
     currentUser.value = null;
     isAuthenticated.value = false;
+    newsletterOptIn.value = null;
     clearSession();
   }
 
@@ -559,6 +567,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     error,
     freshSignIn,
+    newsletterOptIn,
     // Getters
     needsAuth,
     displayName,
