@@ -59,13 +59,32 @@ export async function handler(event) {
 
     if (method === 'PUT') {
       const body = JSON.parse(event.body || '{}');
+      const now = new Date().toISOString();
+
+      // Read existing row to preserve write-once fields (createdAt, ownerEmail,
+      // subscribeNewsletter). registerFamily() fires on every sync-config change,
+      // so only the first write should stamp these.
+      const { Item: existingRaw } = await client.send(
+        new GetItemCommand({
+          TableName: TABLE_NAME,
+          Key: marshall({ familyId }),
+        })
+      );
+      const existing = existingRaw ? unmarshall(existingRaw) : {};
+
       const item = {
         familyId,
         provider: body.provider || 'local',
         fileId: body.fileId || null,
         displayPath: body.displayPath || null,
         familyName: body.familyName || null,
-        updatedAt: new Date().toISOString(),
+        createdAt: existing.createdAt || now,
+        ownerEmail: body.ownerEmail ?? existing.ownerEmail ?? null,
+        subscribeNewsletter:
+          typeof body.subscribeNewsletter === 'boolean'
+            ? body.subscribeNewsletter
+            : (existing.subscribeNewsletter ?? null),
+        updatedAt: now,
       };
       await client.send(
         new PutItemCommand({
