@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-12
+
+### Added
+
+- Family registry now captures owner email, newsletter opt-in, and join date (write-once `createdAt`) — enables early-adopter identification and future contact (e.g. manual Substack onboarding)
+
+### Changed
+
+- Consolidated the three `registerFamily()` payloads in `syncStore` into a single shared helper (DRY)
+
 ## 2026-04-10
 
 ### Added

@@ -130,6 +130,7 @@ async function handleStep1Next() {
     password: password.value,
     familyName: familyName.value,
     memberName: name.value,
+    subscribeNewsletter: subscribeNewsletter.value,
   });
 
   if (result.success) {

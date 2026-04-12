@@ -13,6 +13,7 @@ import { useVacationStore } from './vacationStore';
 import { useBudgetStore } from './budgetStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
+import { useAuthStore } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
@@ -23,6 +24,7 @@ import {
 } from '@/services/sync/capabilities';
 import { downloadAsFile } from '@/services/sync/fileSync';
 import * as registry from '@/services/registry/registryService';
+import type { RegistryEntry } from '@/types/models';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import {
@@ -223,16 +225,7 @@ export const useSyncStore = defineStore('sync', () => {
         lastSyncTimestamp: toISODateString(new Date()),
       });
       setupAutoSync();
-      const ctx = useFamilyContextStore();
-      if (ctx.activeFamilyId) {
-        registry
-          .registerFamily(ctx.activeFamilyId, {
-            provider: 'local',
-            displayPath: fileName.value,
-            familyName: ctx.activeFamilyName,
-          })
-          .catch(() => {});
-      }
+      registerCurrentFamily({ provider: 'local', displayPath: fileName.value });
     }
     return success;
   }
@@ -1432,16 +1425,11 @@ export const useSyncStore = defineStore('sync', () => {
         isReloading = false;
       }
 
-      if (ctx.activeFamilyId) {
-        registry
-          .registerFamily(ctx.activeFamilyId, {
-            provider: 'google_drive',
-            fileId: provider.getFileId(),
-            displayPath: provider.getDisplayName(),
-            familyName: ctx.activeFamilyName,
-          })
-          .catch(() => {});
-      }
+      registerCurrentFamily({
+        provider: 'google_drive',
+        fileId: provider.getFileId(),
+        displayPath: provider.getDisplayName(),
+      });
 
       setupTokenExpiryHandler();
       return true;
@@ -1609,20 +1597,33 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Ensure the current family is registered in the cloud registry.
+   * Register (or re-register) the current family in the cloud registry.
+   * Fire-and-forget: always a single PUT with the current sync + owner state.
+   * Write-once fields (createdAt, ownerEmail, subscribeNewsletter) are
+   * preserved server-side, so all three call sites (file configure, Drive
+   * connect, ensureRegistered) can share one payload.
    */
-  function ensureRegistered(): void {
+  function registerCurrentFamily(
+    overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {}
+  ): void {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) return;
+    const authStore = useAuthStore();
     const provider = syncService.getProvider();
     registry
       .registerFamily(ctx.activeFamilyId, {
-        provider: storageProviderType.value ?? 'local',
-        fileId: provider?.getFileId() ?? undefined,
-        displayPath: provider?.getDisplayName() ?? fileName.value,
+        provider: overrides.provider ?? storageProviderType.value ?? 'local',
+        fileId: overrides.fileId ?? provider?.getFileId() ?? null,
+        displayPath: overrides.displayPath ?? provider?.getDisplayName() ?? fileName.value ?? null,
         familyName: ctx.activeFamilyName,
+        ownerEmail: authStore.currentUser?.email ?? null,
+        subscribeNewsletter: authStore.newsletterOptIn ?? null,
       })
       .catch(() => {});
+  }
+
+  function ensureRegistered(): void {
+    registerCurrentFamily();
   }
 
   return {

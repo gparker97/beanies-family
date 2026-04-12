@@ -780,5 +780,8 @@ export interface RegistryEntry {
   fileId?: string | null; // Google Drive file ID (future)
   displayPath?: string | null;
   familyName?: string | null;
+  createdAt?: ISODateString; // write-once, set server-side on first PUT
+  ownerEmail?: string | null;
+  subscribeNewsletter?: boolean | null;
   updatedAt: ISODateString;
 }
