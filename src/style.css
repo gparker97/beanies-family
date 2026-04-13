@@ -385,16 +385,20 @@
     transform: none;
   }
 
-  /* Disable all infinite CSS animations globally — covers the decorative
-     floats on HomePage (decoFloat1/2, mascotFloat, heroFloat) and anywhere
-     else we use infinite keyframes. This also eliminates a class of
-     Playwright-webkit "stable" timeouts caused by repaint churn from
-     animated siblings. */
+  /* Universal kill-switch: removes every transition and animation so
+     Playwright's "stable" check (two-frame bounding-box equality) passes
+     immediately. Essential on WebKit CI, which otherwise stalls on infinite
+     decorative animations (floating mascots, hero device mocks) and on
+     modal/drawer enter transitions (see issue #155). */
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-delay: 0s !important;
+    transition-duration: 0.001ms !important;
   }
 }
 

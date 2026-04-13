@@ -6,7 +6,7 @@ export class AccountsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/accounts');
+    await this.page.goto('/accounts', { waitUntil: 'domcontentloaded' });
   }
 
   getInstitutionCombobox() {

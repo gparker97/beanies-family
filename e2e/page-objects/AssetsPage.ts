@@ -6,7 +6,7 @@ export class AssetsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/assets');
+    await this.page.goto('/assets', { waitUntil: 'domcontentloaded' });
   }
 
   getLenderCombobox() {

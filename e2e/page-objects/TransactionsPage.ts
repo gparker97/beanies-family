@@ -19,7 +19,7 @@ export class TransactionsPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/transactions');
+    await this.page.goto('/transactions', { waitUntil: 'domcontentloaded' });
   }
 
   /**
