@@ -25,7 +25,10 @@ jobs:
   browsers:
     name: Select browsers
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    # Only fire for the `labeled` event when the `run-e2e` label itself was
+    # just added — otherwise GitHub fires a fresh `labeled` event for every
+    # other label the PR already has, producing duplicate runs on the same SHA.
+    if: github.event_name != 'pull_request' || github.event.label.name == 'run-e2e'
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
     steps:
