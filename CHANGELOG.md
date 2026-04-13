@@ -12,11 +12,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
-- Onboarding wizard overlay no longer sticks on Safari/iOS — the backdrop blur has been isolated onto a pseudo-element so Vue's leave transition completes correctly on WebKit (#153)
+- Onboarding wizard overlay no longer sticks on Safari/iOS — replaced the outer Vue `<Transition>` with a deterministic class toggle + timed unmount so the overlay always clears after you finish onboarding (#153)
+- App init loading spinner no longer blocks clicks on Safari after the app is ready — the overlay now has `pointer-events-none` since it only contains a spinner (#153)
 
 ### Changed
 
-- CI now runs E2E tests on WebKit on demand (apply the `run-e2e` label to a PR) in addition to the weekly full-browser sweep, so Safari/iOS regressions can be surfaced before merge without slowing every push
+- E2E tests run with `prefers-reduced-motion: reduce` and decorative infinite CSS animations are disabled under that preference — improves test reliability on WebKit and respects the accessibility preference for real users (#153)
+- E2E CI workflows consolidated — `main-ci.yml` no longer duplicates the Playwright pipeline; `e2e.yml` handles all E2E runs with an event-aware matrix (main push: Chromium; `run-e2e` PR label: Chromium + WebKit; weekly: all three)
 
 ---
 
