@@ -384,6 +384,18 @@
   .beanie-lift:hover {
     transform: none;
   }
+
+  /* Disable all infinite CSS animations globally — covers the decorative
+     floats on HomePage (decoFloat1/2, mascotFloat, heroFloat) and anywhere
+     else we use infinite keyframes. This also eliminates a class of
+     Playwright-webkit "stable" timeouts caused by repaint churn from
+     animated siblings. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
 
 /* ─── Base styles ───────────────────────────────────────────────────────── */

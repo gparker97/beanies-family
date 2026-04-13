@@ -13,6 +13,10 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     serviceWorkers: 'allow',
+    // Signal prefers-reduced-motion so decorative infinite animations are
+    // disabled during E2E. Avoids WebKit "waiting for element to be stable"
+    // stalls caused by repaint churn from animated siblings.
+    reducedMotion: 'reduce',
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
