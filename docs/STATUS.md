@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-04-10
-> **Updated by:** Claude (Daily calendar view, blog publish, activity drawer improvements, pilot-scout skill)
+> **Last updated:** 2026-04-13
+> **Updated by:** Claude (WebKit onboarding overlay fix + E2E infrastructure hardening, issues #153 / #155)
 
 ## Current Phase
 
@@ -57,6 +57,15 @@
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### WebKit Overlay Fixes & E2E Hardening (2026-04-13)
+
+- **Onboarding overlay stuck on Safari/iOS (#153)**: Vue's `<Transition>` inside `<Teleport>` was stalling the leave transition on WebKit, leaving an invisible click-blocking overlay on top of the app after onboarding completion. Replaced the outer fade `<Transition>` with a deterministic class toggle (`ob-overlay-hidden`) + `setTimeout`-driven unmount. Visual behaviour identical, no Vue-transition dependency. Inner step `<Transition>` untouched (never the issue).
+- **Global E2E reduced-motion**: `playwright.config.ts` now sets `reducedMotion: 'reduce'` on the shared `use` block. `src/style.css` extends the `prefers-reduced-motion` block with a universal `*, *::before, *::after { animation-iteration-count: 1; animation-duration: 0.01ms }` rule that disables all infinite keyframe animations at once — resolved WebKit "waiting for element to be stable" stalls caused by HomePage decorative float animations. Real users with the accessibility preference also benefit.
+- **App loading overlay defused**: The init spinner in `App.vue` (`z-[300]` full-screen div in a `<Transition>`) was getting stuck at `opacity: 0` on WebKit and blocking all clicks. Added `pointer-events-none` — the overlay only holds a spinner, nothing clickable, so this is always the correct behaviour.
+- **E2E workflow consolidation**: Deleted the duplicate `e2e-tests` job from `main-ci.yml`. `e2e.yml` is now the single source of truth, with an event-aware matrix: push to `main` → Chromium only (temporarily, pending #155), `run-e2e` PR label → Chromium + WebKit on demand, weekly → full 3-browser sweep. Playwright browser cache added.
+- **Follow-up #155** tracks 10 remaining WebKit-only timeouts (Account Institution combobox, planner recurring flows, financial data dashboard) — unrelated to overlays; look like CI perf / timing or genuine WebKit-specific app behaviour. Chromium + Firefox still green.
+- **ADR-007 updated** to reflect the new browser-coverage policy.
 
 ### Product Hunt Launch Day (2026-04-09)
 
