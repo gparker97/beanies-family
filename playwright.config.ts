@@ -24,10 +24,12 @@ export default defineConfig({
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     {
       name: 'webkit',
-      // WebKit on Linux CI is ~2–3× slower than Chromium for the same flows.
-      // Bump per-test timeout so genuine webkit regressions surface distinctly
-      // from general slowness (see issue #155).
-      timeout: 40000,
+      // WebKit on Linux CI is ~2–3× slower than Chromium and occasionally
+      // emits transient "internal error" crashes on page.goto. Headroom +
+      // one extra retry absorb this without masking genuine regressions
+      // (see issue #155).
+      timeout: 60000,
+      retries: process.env.CI ? 2 : 0,
       use: { ...devices['Desktop Safari'] },
     },
   ],
