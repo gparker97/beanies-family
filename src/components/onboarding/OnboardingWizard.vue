@@ -1,5 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+
+// Outer overlay fade is driven by a class toggle + setTimeout unmount rather
+// than Vue's <Transition>. On WebKit/Safari, <Transition> inside <Teleport>
+// occasionally fails to fire `transitionend`, leaving the overlay stuck in
+// `leave-from + leave-active` and blocking all clicks (issue #153). A plain
+// class + timeout is deterministic across browsers.
+const OVERLAY_FADE_MS = 300;
 import OnboardingWelcome from './OnboardingWelcome.vue';
 import OnboardingMoney from './OnboardingMoney.vue';
 import OnboardingFamily from './OnboardingFamily.vue';
@@ -21,7 +28,15 @@ const { t } = useTranslation();
 
 const currentStep = ref(1);
 const direction = ref<'forward' | 'backward'>('forward');
+const mounted = ref(true);
 const visible = ref(true);
+
+function dismiss() {
+  visible.value = false;
+  setTimeout(() => {
+    mounted.value = false;
+  }, OVERLAY_FADE_MS);
+}
 
 // Summary data for completion screen
 const savingsPercent = ref(20);
@@ -40,6 +55,7 @@ onMounted(() => {
   ) {
     settingsStore.setOnboardingCompleted(true);
     visible.value = false;
+    mounted.value = false;
   }
 });
 
@@ -62,7 +78,7 @@ async function handleSkip() {
   if (syncStore.isConfigured) {
     await syncStore.syncNow(true);
   }
-  visible.value = false;
+  dismiss();
 }
 
 async function handleFinish() {
@@ -70,7 +86,7 @@ async function handleFinish() {
   if (syncStore.isConfigured) {
     await syncStore.syncNow(true);
   }
-  visible.value = false;
+  dismiss();
   celebrate('setup-complete');
 }
 
@@ -81,82 +97,77 @@ const transitionName = computed(() =>
 
 <template>
   <Teleport to="body">
-    <Transition name="ob-fade">
-      <div v-if="visible" class="ob-overlay" data-testid="onboarding-wizard">
-        <div class="ob-container">
-          <!-- Step content -->
-          <div class="ob-content">
-            <Transition :name="transitionName" mode="out-in">
-              <OnboardingWelcome v-if="currentStep === 1" :key="1" @next="goNext" />
-              <OnboardingMoney
-                v-else-if="currentStep === 2"
-                :key="2"
-                @next="goNext"
-                @back="goBack"
-              />
-              <OnboardingFamily
-                v-else-if="currentStep === 3"
-                :key="3"
-                @next="goNext"
-                @back="goBack"
-              />
-              <OnboardingComplete
-                v-else
-                :key="4"
-                :account-count="accountCount"
-                :recurring-count="recurringCount"
-                :savings-percent="savingsPercent"
-                :activity-count="activityCount"
-                @finish="handleFinish"
-              />
-            </Transition>
-          </div>
+    <div
+      v-if="mounted"
+      class="ob-overlay"
+      :class="{ 'ob-overlay-hidden': !visible }"
+      data-testid="onboarding-wizard"
+    >
+      <div class="ob-container">
+        <!-- Step content -->
+        <div class="ob-content">
+          <Transition :name="transitionName" mode="out-in">
+            <OnboardingWelcome v-if="currentStep === 1" :key="1" @next="goNext" />
+            <OnboardingMoney v-else-if="currentStep === 2" :key="2" @next="goNext" @back="goBack" />
+            <OnboardingFamily
+              v-else-if="currentStep === 3"
+              :key="3"
+              @next="goNext"
+              @back="goBack"
+            />
+            <OnboardingComplete
+              v-else
+              :key="4"
+              :account-count="accountCount"
+              :recurring-count="recurringCount"
+              :savings-percent="savingsPercent"
+              :activity-count="activityCount"
+              @finish="handleFinish"
+            />
+          </Transition>
+        </div>
 
-          <!-- Nav bar (steps 2 & 3 only) -->
-          <div v-if="currentStep === 2 || currentStep === 3" class="ob-nav">
-            <button class="ob-nav-back" @click="goBack">
-              {{ t('onboarding.back') }}
+        <!-- Nav bar (steps 2 & 3 only) -->
+        <div v-if="currentStep === 2 || currentStep === 3" class="ob-nav">
+          <button class="ob-nav-back" @click="goBack">
+            {{ t('onboarding.back') }}
+          </button>
+          <div class="flex items-center gap-3 sm:gap-4">
+            <button class="ob-nav-skip" @click="handleSkip">
+              {{ t('onboarding.skip') }}
             </button>
-            <div class="flex items-center gap-3 sm:gap-4">
-              <button class="ob-nav-skip" @click="handleSkip">
-                {{ t('onboarding.skip') }}
-              </button>
-              <button
-                class="ob-nav-next"
-                data-testid="onboarding-next"
-                @click="currentStep === 3 ? ((direction = 'forward'), (currentStep = 4)) : goNext()"
-              >
-                {{ currentStep === 3 ? t('onboarding.allDone') : t('onboarding.nextFamily') }}
-              </button>
-            </div>
+            <button
+              class="ob-nav-next"
+              data-testid="onboarding-next"
+              @click="currentStep === 3 ? ((direction = 'forward'), (currentStep = 4)) : goNext()"
+            >
+              {{ currentStep === 3 ? t('onboarding.allDone') : t('onboarding.nextFamily') }}
+            </button>
           </div>
         </div>
       </div>
-    </Transition>
+    </div>
   </Teleport>
 </template>
 
 <style scoped>
 .ob-overlay {
   align-items: center;
+  backdrop-filter: blur(8px);
   background: rgb(44 62 80 / 60%);
   display: flex;
   inset: 0;
   justify-content: center;
+  opacity: 1;
   padding: 0;
   position: fixed;
+  transition: opacity 0.3s ease;
   z-index: 9999;
 }
 
-/* Blur lives on a pseudo-element so the Vue-transitioned .ob-overlay itself
-   carries no backdrop-filter — webkit stalls the leave transition when the
-   transitioning element has an active backdrop-filter. See issue #153. */
-.ob-overlay::before {
-  backdrop-filter: blur(8px);
-  content: '';
-  inset: 0;
-  position: absolute;
-  z-index: -1;
+.ob-overlay-hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (width >= 640px) {
@@ -274,17 +285,6 @@ const transitionName = computed(() =>
 
 .ob-nav-next:hover {
   transform: translateY(-2px);
-}
-
-/* Overlay fade transition */
-.ob-fade-enter-active,
-.ob-fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.ob-fade-enter-from,
-.ob-fade-leave-to {
-  opacity: 0;
 }
 
 /* Step slide transitions */
