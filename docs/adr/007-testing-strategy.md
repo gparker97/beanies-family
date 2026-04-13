@@ -29,7 +29,7 @@ Use a **two-tier testing strategy**:
 - **Config**: `playwright.config.ts`
 - **CI browsers**:
   - Per-PR: none (kept fast; opt in by labelling a PR `run-e2e`)
-  - Push to `main`: Chromium (WebKit temporarily off while remaining webkit timeouts are investigated — see issue #155)
+  - Push to `main`: Chromium + WebKit (Safari/iOS is a large share of real users — see issue #155 for the stability work that made this viable)
   - `run-e2e` label on a PR: Chromium + WebKit (opt-in)
   - Weekly schedule: Chromium + Firefox + WebKit (full sweep)
 - **Structure**:

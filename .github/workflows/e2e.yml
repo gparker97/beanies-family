@@ -25,7 +25,10 @@ jobs:
   browsers:
     name: Select browsers
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    # Only fire for the `labeled` event when the `run-e2e` label itself was
+    # just added — otherwise GitHub fires a fresh `labeled` event for every
+    # other label the PR already has, producing duplicate runs on the same SHA.
+    if: github.event_name != 'pull_request' || github.event.label.name == 'run-e2e'
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
     steps:
@@ -36,10 +39,10 @@ jobs:
               # Full sweep: Chromium + Firefox + WebKit.
               echo 'matrix=["chromium","firefox","webkit"]' >> $GITHUB_OUTPUT ;;
             push)
-              # Main-branch merges: Chromium only for now. WebKit will be
-              # re-added once the remaining webkit-only timeouts are fixed
-              # (see issue #155).
-              echo 'matrix=["chromium"]' >> $GITHUB_OUTPUT ;;
+              # Main-branch merges: Chromium + WebKit. Safari/iOS is a major
+              # share of our real users, so we guard against webkit regressions
+              # on every merge (issue #155 stabilised webkit enough for this).
+              echo 'matrix=["chromium","webkit"]' >> $GITHUB_OUTPUT ;;
             *)
               # Opt-in PR runs (run-e2e label): Chromium + WebKit so WebKit
               # regressions can still be surfaced on demand.
