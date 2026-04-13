@@ -4,7 +4,7 @@ export class DashboardPage {
   constructor(private page: Page) {}
 
   async goto() {
-    await this.page.goto('/dashboard');
+    await this.page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
   }
 
   /** Click the privacy mode unlock button to reveal masked financial figures */

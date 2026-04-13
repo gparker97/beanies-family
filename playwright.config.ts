@@ -22,7 +22,14 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     // Firefox and WebKit available for local testing: npx playwright test --project=firefox
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    {
+      name: 'webkit',
+      // WebKit on Linux CI is ~2–3× slower than Chromium for the same flows.
+      // Bump per-test timeout so genuine webkit regressions surface distinctly
+      // from general slowness (see issue #155).
+      timeout: 40000,
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
   webServer: {
     command: 'npm run dev',
