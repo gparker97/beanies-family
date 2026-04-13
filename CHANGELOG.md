@@ -16,7 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
-- CI now runs E2E tests on both Chromium and WebKit for every push to `main` (and for PRs labelled `run-e2e`), so Safari/iOS regressions are caught at merge time rather than weekly
+- CI now runs E2E tests on WebKit on demand (apply the `run-e2e` label to a PR) in addition to the weekly full-browser sweep, so Safari/iOS regressions can be surfaced before merge without slowing every push
 
 ---
 
