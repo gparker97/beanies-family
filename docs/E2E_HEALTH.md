@@ -18,6 +18,7 @@ After each CI E2E failure, add a row:
 
 ## Log
 
-| Date       | Test | Category | Notes                                                               |
-| ---------- | ---- | -------- | ------------------------------------------------------------------- |
-| 2026-03-25 | —    | —        | E2E suite overhauled: 87 → 21 tests, 15 → 7 files. Tracking begins. |
+| Date       | Test                                                 | Category | Notes                                                                                                                                                                                                                                                  |
+| ---------- | ---------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-03-25 | —                                                    | —        | E2E suite overhauled: 87 → 21 tests, 15 → 7 files. Tracking begins.                                                                                                                                                                                    |
+| 2026-04-13 | OnboardingWizard overlay + 10 cascading webkit tests | (a)      | Real Safari bug: `<Transition>` + `backdrop-filter: blur()` on the transitioning element stalls webkit's leave transition, leaving an invisible click-blocking overlay. Fixed in #153 by moving blur to `::before`. WebKit restored to main-branch CI. |
