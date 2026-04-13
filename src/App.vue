@@ -721,7 +721,7 @@ watch(
     >
       <div
         v-if="isInitializing"
-        class="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-[#FDFBF9] dark:bg-[#1a252f]"
+        class="pointer-events-none fixed inset-0 z-[300] flex flex-col items-center justify-center bg-[#FDFBF9] dark:bg-[#1a252f]"
       >
         <BeanieSpinner size="xl" label />
       </div>

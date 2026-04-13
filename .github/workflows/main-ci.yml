@@ -42,56 +42,6 @@ jobs:
       - name: Build
         run: npm run build
 
-  e2e-tests:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    needs: [tests]
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline
-
-      - name: Get Playwright version
-        id: pw-version
-        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
-
-      - name: Cache Playwright browsers
-        id: pw-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ steps.pw-version.outputs.version }}
-
-      - name: Install Playwright
-        run: npx playwright install --with-deps chromium
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-
-      - name: Install Playwright deps (OS libraries only)
-        run: npx playwright install-deps chromium
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-
-      - name: Run E2E tests
-        run: npx playwright test --project=chromium
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
-
-      - name: Upload failure videos
-        uses: actions/upload-artifact@v7
-        if: failure()
-        with:
-          name: test-videos
-          path: test-results/
-          retention-days: 7
+  # E2E tests run in the dedicated `E2E Tests` workflow (.github/workflows/e2e.yml)
+  # on push to main (chromium + webkit), on PRs labelled `run-e2e`, and weekly
+  # (all three browsers).
