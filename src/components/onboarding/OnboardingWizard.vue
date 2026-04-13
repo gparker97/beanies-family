@@ -139,7 +139,6 @@ const transitionName = computed(() =>
 <style scoped>
 .ob-overlay {
   align-items: center;
-  backdrop-filter: blur(8px);
   background: rgb(44 62 80 / 60%);
   display: flex;
   inset: 0;
@@ -147,6 +146,17 @@ const transitionName = computed(() =>
   padding: 0;
   position: fixed;
   z-index: 9999;
+}
+
+/* Blur lives on a pseudo-element so the Vue-transitioned .ob-overlay itself
+   carries no backdrop-filter — webkit stalls the leave transition when the
+   transitioning element has an active backdrop-filter. See issue #153. */
+.ob-overlay::before {
+  backdrop-filter: blur(8px);
+  content: '';
+  inset: 0;
+  position: absolute;
+  z-index: -1;
 }
 
 @media (width >= 640px) {

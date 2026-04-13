@@ -27,7 +27,10 @@ Use a **two-tier testing strategy**:
 ### E2E Tests (Playwright)
 
 - **Config**: `playwright.config.ts`
-- **CI browser**: Chromium only (Firefox/WebKit available for local testing via `--project=firefox`)
+- **CI browsers**:
+  - Per-PR: none (kept fast; opt in by labelling a PR `run-e2e`)
+  - `run-e2e` label / push to `main`: Chromium + WebKit (Blink + WebKit cover the engines our users actually run, including all iOS browsers)
+  - Weekly schedule: Chromium + Firefox + WebKit (full sweep)
 - **Structure**:
   - `e2e/specs/` — Test specifications (descriptive names, no numbered prefixes)
   - `e2e/page-objects/` — Page object model abstractions

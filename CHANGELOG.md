@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-13
+
+### Fixed
+
+- Onboarding wizard overlay no longer sticks on Safari/iOS — the backdrop blur has been isolated onto a pseudo-element so Vue's leave transition completes correctly on WebKit (#153)
+
+### Changed
+
+- CI now runs E2E tests on both Chromium and WebKit for every push to `main` (and for PRs labelled `run-e2e`), so Safari/iOS regressions are caught at merge time rather than weekly
+
+---
+
 ## 2026-04-12
 
 ### Added

@@ -1,6 +1,14 @@
-name: Full E2E Tests (All Browsers)
+name: E2E Tests
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - 'tasks/**'
+      - 'LICENSE'
+      - '.claude/**'
   pull_request:
     types: [labeled]
   schedule:
@@ -14,14 +22,30 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  browsers:
+    name: Select browsers
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - id: pick
+        run: |
+          case "${{ github.event_name }}" in
+            schedule|workflow_dispatch)
+              echo 'matrix=["chromium","firefox","webkit"]' >> $GITHUB_OUTPUT ;;
+            *)
+              echo 'matrix=["chromium","webkit"]' >> $GITHUB_OUTPUT ;;
+          esac
+
   e2e:
     name: E2E — ${{ matrix.browser }}
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    needs: [browsers]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        browser: [chromium, firefox, webkit]
+        browser: ${{ fromJson(needs.browsers.outputs.matrix) }}
 
     steps:
       - name: Checkout code
@@ -34,10 +58,26 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefer-offline
+
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(npx playwright --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ matrix.browser }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps ${{ matrix.browser }}
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+
+      - name: Install Playwright OS deps (cached browser)
+        run: npx playwright install-deps ${{ matrix.browser }}
+        if: steps.pw-cache.outputs.cache-hit == 'true'
 
       - name: Run E2E tests
         run: npx playwright test --project=${{ matrix.browser }}
@@ -49,3 +89,11 @@ jobs:
           name: playwright-report-${{ matrix.browser }}
           path: playwright-report/
           retention-days: 14
+
+      - name: Upload failure videos
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: test-videos-${{ matrix.browser }}
+          path: test-results/
+          retention-days: 7
