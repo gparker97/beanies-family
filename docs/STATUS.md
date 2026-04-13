@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-04-13
-> **Updated by:** Claude (WebKit onboarding overlay fix + E2E infrastructure hardening, issues #153 / #155)
+> **Updated by:** Claude (WebKit E2E restored to main-push CI, flakiness hardened, duplicate-run trigger fixed — #155, #156, #165, #166)
 
 ## Current Phase
 
@@ -65,6 +65,13 @@
 - **App loading overlay defused**: The init spinner in `App.vue` (`z-[300]` full-screen div in a `<Transition>`) was getting stuck at `opacity: 0` on WebKit and blocking all clicks. Added `pointer-events-none` — the overlay only holds a spinner, nothing clickable, so this is always the correct behaviour.
 - **E2E workflow consolidation**: Deleted the duplicate `e2e-tests` job from `main-ci.yml`. `e2e.yml` is now the single source of truth, with an event-aware matrix: push to `main` → Chromium only (temporarily, pending #155), `run-e2e` PR label → Chromium + WebKit on demand, weekly → full 3-browser sweep. Playwright browser cache added.
 - **Follow-up #155** tracks 10 remaining WebKit-only timeouts (Account Institution combobox, planner recurring flows, financial data dashboard) — unrelated to overlays; look like CI perf / timing or genuine WebKit-specific app behaviour. Chromium + Firefox still green.
+
+### WebKit E2E Restored to Main-Push CI (2026-04-13 — later)
+
+- **#155 resolved (PR #156)**: reduced-motion rule now zeroes out `transition-duration` globally (not just `animation-*`), so Vue modal/drawer enter transitions no longer keep dialog buttons "unstable" on webkit. Page-object `goto()` uses `waitUntil: 'domcontentloaded'` to fix the `/transactions` navigation hang on webkit's `load` event. Webkit Playwright project gets its own 40s test timeout for headroom.
+- **Webkit flakiness hardened (PR #165)**: a duplicate parallel PR run exposed residual flakiness on identical SHAs — webkit timeout raised to 60s and webkit retries to 2 (CI only) to absorb transient "WebKit encountered an internal error" crashes on page.goto. Also hardened `google-drive.spec.ts` "Create Pod step 2" with an explicit `waitFor` before the Create click — previously raced the WelcomeGate → CreatePodView transition.
+- **CI cleanup (PR #166)**: (a) duplicate E2E runs fixed — `e2e.yml` now gates on `github.event.label.name == 'run-e2e'` so only the actual `run-e2e` label add triggers a run (previously every label added to a PR with `run-e2e` fired another run on the same SHA). (b) Webkit is back on every main-push alongside chromium — Safari/iOS is a large share of our users. ADR-007 updated.
+- **Current matrix**: PR (opt-in `run-e2e`) → chromium + webkit; push to main → chromium + webkit; weekly schedule → chromium + firefox + webkit.
 - **ADR-007 updated** to reflect the new browser-coverage policy.
 
 ### Product Hunt Launch Day (2026-04-09)
