@@ -36,11 +36,13 @@ test.describe('Google Drive Sync', () => {
       sessionStorage.setItem('e2e_auto_auth', 'true');
     });
 
-    await page
-      .getByRole('button', { name: /create/i })
-      .first()
-      .click();
+    const createButton = page.getByRole('button', { name: /create/i }).first();
+    await createButton.waitFor({ state: 'visible', timeout: 5000 });
+    await createButton.click();
 
+    // Wait for step 1 to render before filling — the WelcomeGate → CreatePodView
+    // transition has raced clicks in CI, leaving us on WelcomeGate.
+    await page.getByLabel('Family Name').waitFor({ state: 'visible', timeout: 10000 });
     await page.getByLabel('Family Name').fill('E2E Drive Family');
     await page.getByLabel('Your Name').fill('Drive Test');
     await page.getByLabel('Email').fill('drive@test.com');
