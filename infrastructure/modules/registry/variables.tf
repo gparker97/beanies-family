@@ -27,5 +27,10 @@ variable "api_key" {
 variable "cors_origins" {
   description = "Allowed CORS origins"
   type        = list(string)
-  default     = ["https://beanies.family", "http://localhost:5173"]
+  default = [
+    "https://beanies.family",     # apex (legacy / pre-cutover)
+    "https://app.beanies.family", # PWA subdomain (post-cutover primary)
+    "http://localhost:5173",      # Vite dev server
+    "http://localhost:4173",      # Vite preview server
+  ]
 }
