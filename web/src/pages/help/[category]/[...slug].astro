@@ -1,0 +1,93 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../../components/Breadcrumbs.astro';
+import Byline from '../../../components/Byline.astro';
+import HelpArticleRenderer from '../../../components/HelpArticleRenderer.astro';
+import RelatedArticles from '../../../components/RelatedArticles.astro';
+import {
+  ALL_ARTICLES,
+  getCategoryArticles,
+  getCategoryMeta,
+  type HelpCategory,
+} from '@/content/help';
+import { SITE_URL } from '@beanies/brand/nav';
+
+export function getStaticPaths() {
+  return ALL_ARTICLES.map((article) => ({
+    params: { category: article.category, slug: article.slug },
+    props: { article },
+  }));
+}
+
+const { article } = Astro.props;
+const meta = getCategoryMeta(article.category);
+const categoryLabel = article.category.replace(/-/g, ' ');
+const canonicalPath = `/help/${article.category}/${article.slug}`;
+const related = getCategoryArticles(article.category as HelpCategory)
+  .filter((a) => a.slug !== article.slug)
+  .slice(0, 3)
+  .map((a) => ({
+    title: a.title,
+    href: `/help/${a.category}/${a.slug}`,
+    excerpt: a.excerpt,
+  }));
+
+const updatedDate = new Date(article.updatedDate);
+const articleSchema = {
+  '@type': 'Article',
+  headline: article.title,
+  description: article.excerpt,
+  datePublished: updatedDate.toISOString(),
+  dateModified: updatedDate.toISOString(),
+  author: { '@id': `${SITE_URL}#org` },
+  publisher: { '@id': `${SITE_URL}#org` },
+  mainEntityOfPage: `${SITE_URL}${canonicalPath}`,
+  url: `${SITE_URL}${canonicalPath}`,
+  articleSection: categoryLabel,
+  inLanguage: 'en',
+};
+---
+
+<BaseLayout
+  title={`${article.title} — help center — beanies.family`}
+  description={article.excerpt}
+  canonicalPath={canonicalPath}
+  ogType="article"
+  publishedTime={updatedDate.toISOString()}
+  modifiedTime={updatedDate.toISOString()}
+  jsonLd={articleSchema}
+>
+  <article class="mx-auto max-w-3xl px-6 py-12">
+    <Breadcrumbs
+      items={[
+        { label: 'home', href: '/' },
+        { label: 'help', href: '/help' },
+        { label: categoryLabel, href: `/help/${article.category}` },
+        { label: article.title, href: canonicalPath },
+      ]}
+    />
+
+    <header class="mt-8 space-y-3">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl" aria-hidden="true">{article.icon}</span>
+        <p class="text-xs uppercase tracking-wide text-secondary-400">{categoryLabel}</p>
+      </div>
+      <h1 class="font-outfit text-3xl font-bold leading-tight text-secondary-500 sm:text-4xl">
+        {article.title}
+      </h1>
+      <p class="text-secondary-400">{article.excerpt}</p>
+      <Byline
+        author="greg"
+        date={updatedDate}
+        updatedDate={updatedDate}
+        readTime={article.readTime}
+      />
+    </header>
+
+    <div class="mt-10">
+      <HelpArticleRenderer sections={article.sections} />
+    </div>
+
+    <RelatedArticles items={related} heading={`more in ${categoryLabel}`} />
+  </article>
+</BaseLayout>
