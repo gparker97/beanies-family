@@ -25,6 +25,25 @@ resource "aws_dynamodb_table" "registry" {
   }
 }
 
+# Separate table for local-dev / preview registrations so they don't pollute
+# the prod table used for real-user metrics + outbound contact. The Lambda
+# routes by Origin header (see infrastructure/lambda/registry/index.mjs).
+resource "aws_dynamodb_table" "registry_dev" {
+  name         = "${var.app_name}-registry-dev"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "familyId"
+
+  attribute {
+    name = "familyId"
+    type = "S"
+  }
+
+  tags = {
+    Name        = "${var.app_name}-registry-dev"
+    Environment = "dev"
+  }
+}
+
 # ── IAM Role for Lambda ──────────────────────────────────────────────────────
 
 resource "aws_iam_role" "lambda" {
@@ -60,7 +79,10 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
         "dynamodb:PutItem",
         "dynamodb:DeleteItem",
       ]
-      Resource = aws_dynamodb_table.registry.arn
+      Resource = [
+        aws_dynamodb_table.registry.arn,
+        aws_dynamodb_table.registry_dev.arn,
+      ]
     }]
   })
 }
@@ -91,6 +113,8 @@ resource "aws_lambda_function" "registry" {
   environment {
     variables = {
       TABLE_NAME       = aws_dynamodb_table.registry.name
+      DEV_TABLE_NAME   = aws_dynamodb_table.registry_dev.name
+      DEV_ORIGINS      = join(",", var.dev_origins)
       REGISTRY_API_KEY = var.api_key
       CORS_ORIGIN      = join(",", var.cors_origins)
     }

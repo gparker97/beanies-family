@@ -34,3 +34,12 @@ variable "cors_origins" {
     "http://localhost:4173",      # Vite preview server
   ]
 }
+
+variable "dev_origins" {
+  description = "Subset of cors_origins that should write to the dev DynamoDB table instead of the prod table. The Lambda routes by Origin header — see infrastructure/lambda/registry/index.mjs."
+  type        = list(string)
+  default = [
+    "http://localhost:5173",
+    "http://localhost:4173",
+  ]
+}
