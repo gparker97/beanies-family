@@ -1,33 +1,66 @@
 ---
-import { FOOTER_NAV } from '@beanies/brand/nav';
+import { APP_URL } from '@beanies/brand/nav';
 
+const currentPath = Astro.url.pathname;
+const isHome = currentPath === '/';
 const year = new Date().getFullYear();
 ---
 
-<footer class="mt-24 border-t border-secondary-100/60 bg-white">
-  <div class="mx-auto max-w-6xl px-6 py-10 text-sm text-secondary-400">
-    <div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-      <div class="font-inter">
-        <p class="font-outfit text-base font-semibold text-secondary-500">beanies.family</p>
-        <p class="mt-1">every bean counts</p>
-      </div>
-      <ul class="flex flex-wrap gap-5">
-        {
-          FOOTER_NAV.map((link) => (
-            <li>
-              <a
-                href={link.href}
-                class="transition-colors hover:text-primary-500"
-                target={link.external ? '_blank' : undefined}
-                rel={link.external ? 'noopener noreferrer' : undefined}
-              >
-                {link.label}
-              </a>
-            </li>
-          ))
-        }
-      </ul>
-    </div>
-    <p class="mt-6 text-xs text-secondary-400/80">© {year} beanies.family. local-first, private, and yours.</p>
+<footer class="page-footer">
+  <p class="page-footer__brand">beanies<span class="page-footer__brand-orange">.family</span></p>
+  <div class="page-footer__links">
+    <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a>
+    <a href="/blog">beanstalk</a>
+    <a href="/help">help</a>
+    <a href="/privacy">privacy</a>
+    <a href="/terms">terms</a>
+    <a href={`${APP_URL}/welcome`}>sign in</a>
   </div>
+  {
+    isHome ? (
+      <button type="button" id="open-contact" class="page-footer__contact-btn">
+        💬 get in touch with me
+      </button>
+    ) : (
+      <a href="/#contact" class="page-footer__contact-btn">
+        💬 get in touch with me
+      </a>
+    )
+  }
+  <p class="page-footer__tag">every bean counts.</p>
+  <p class="page-footer__copy">© {year} beanies.family. open source under MIT license.</p>
 </footer>
+
+<style>
+  :root {
+    --heritage-orange: #f15d22;
+    --deep-slate: #2c3e50;
+  }
+
+  .page-footer { background: var(--deep-slate); padding: 32px 24px; text-align: center; }
+  .page-footer__brand { color: rgb(255 255 255 / 50%); font-family: Outfit, sans-serif; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
+  .page-footer__brand-orange { color: var(--heritage-orange); }
+  .page-footer__links { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 8px; }
+  .page-footer__links a { color: rgb(255 255 255 / 30%); font-size: 0.78rem; text-decoration: none; transition: color 150ms; }
+  .page-footer__links a:hover { color: var(--heritage-orange); }
+  .page-footer__copy { color: rgb(255 255 255 / 20%); font-size: 0.72rem; margin-top: 12px; }
+  .page-footer__tag { color: var(--heritage-orange); font-family: Outfit, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; margin-top: 8px; opacity: 0.5; }
+  .page-footer__contact-btn {
+    align-items: center;
+    background: var(--heritage-orange);
+    border: none;
+    border-radius: 24px;
+    color: white;
+    cursor: pointer;
+    display: inline-flex;
+    font-family: Outfit, sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 10px 24px;
+    text-decoration: none;
+    transition: all 200ms ease;
+  }
+  .page-footer__contact-btn:hover { background: #d14d1a; transform: translateY(-1px); }
+</style>

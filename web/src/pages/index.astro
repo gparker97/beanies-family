@@ -9,27 +9,8 @@ import { APP_URL } from '@beanies/brand/nav';
   description="one app to manage your family's money, activities, and all the little beans. open source and fully encrypted. no ads, no tracking, no nonsense."
   canonicalPath="/"
   jsonLd={SOFTWARE_APPLICATION}
-  hideChrome={true}
 >
   <div class="landing-page">
-    <!-- Scroll progress bar -->
-    <div id="scroll-progress" class="scroll-progress"></div>
-
-    <!-- FLOATING PILL NAV -->
-    <nav id="fnav" class="fnav">
-      <a href="#top" class="fnav__logo" data-scroll-top>
-        <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />beanies<span class="fnav__logo-orange">.family</span>
-      </a>
-      <div class="fnav__right">
-        <div class="fnav__links">
-          <a href="#story" data-scroll-to="story">my story</a>
-          <a href="#security" data-scroll-to="security">security</a>
-          <a href="/blog">beanstalk</a>
-        </div>
-        <a href={`${APP_URL}/welcome`} class="fnav__cta">create your bean pod</a>
-      </div>
-    </nav>
-
     <!-- HERO -->
     <section id="top" class="hero">
       <div class="hero__bean" style="left: 6%; top: 10%; transform: rotate(-15deg)">🫘</div>
@@ -659,24 +640,6 @@ import { APP_URL } from '@beanies/brand/nav';
       </div>
     </section>
 
-    <!-- FOOTER -->
-    <footer class="footer">
-      <p class="footer__brand">beanies<span class="footer__brand-orange">.family</span></p>
-      <div class="footer__links">
-        <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a>
-        <a href="/blog">beanstalk</a>
-        <a href="/help">help</a>
-        <a href="/privacy">privacy</a>
-        <a href="/terms">terms</a>
-        <a href={`${APP_URL}/welcome`}>sign in</a>
-      </div>
-      <button type="button" id="open-contact" class="footer__contact-btn">
-        💬 get in touch with me
-      </button>
-      <p class="footer__tag">every bean counts.</p>
-      <p class="footer__copy">© 2026 beanies.family. open source under MIT license.</p>
-    </footer>
-
     <!-- BACK TO TOP -->
     <button id="back-to-top" class="back-to-top" aria-label="Back to top" hidden>↑</button>
 
@@ -720,16 +683,10 @@ import { APP_URL } from '@beanies/brand/nav';
   // NOTE: Set PUBLIC_CONTACT_WEBHOOK_URL at build time via .env or GitHub Actions secret.
   const WEBHOOK_URL = import.meta.env.PUBLIC_CONTACT_WEBHOOK_URL as string | undefined;
 
-  const scrollProgress = document.getElementById('scroll-progress') as HTMLElement | null;
-  const fnav = document.getElementById('fnav') as HTMLElement | null;
   const backToTop = document.getElementById('back-to-top') as HTMLButtonElement | null;
 
   function onScroll() {
     const sy = window.scrollY;
-    const dh = document.documentElement.scrollHeight - window.innerHeight;
-    const pct = dh > 0 ? (sy / dh) * 100 : 0;
-    if (scrollProgress) scrollProgress.style.width = pct + '%';
-    if (fnav) fnav.classList.toggle('scrolled', sy > 20);
     if (backToTop) {
       if (sy > 400) backToTop.removeAttribute('hidden');
       else backToTop.setAttribute('hidden', '');
@@ -738,27 +695,10 @@ import { APP_URL } from '@beanies/brand/nav';
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  function scrollToId(id: string) {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
   function scrollTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  document.querySelectorAll<HTMLAnchorElement>('[data-scroll-to]').forEach((a) => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault();
-      const id = a.getAttribute('data-scroll-to');
-      if (id) scrollToId(id);
-    });
-  });
-  document.querySelectorAll<HTMLAnchorElement>('[data-scroll-top]').forEach((a) => {
-    a.addEventListener('click', (e) => {
-      e.preventDefault();
-      scrollTop();
-    });
-  });
   backToTop?.addEventListener('click', scrollTop);
 
   // Reveal observer
@@ -876,83 +816,6 @@ import { APP_URL } from '@beanies/brand/nav';
   font-family: Inter, sans-serif;
   line-height: 1.7;
   overflow-x: hidden;
-}
-
-/* FLOATING PILL NAV */
-.fnav {
-  align-items: center;
-  backdrop-filter: blur(24px);
-  background: rgb(255 255 255 / 82%);
-  border: 1px solid rgb(44 62 80 / 6%);
-  border-radius: 40px;
-  display: flex;
-  gap: 12px;
-  left: 50%;
-  padding: 6px 10px 6px 16px;
-  position: fixed;
-  top: 16px;
-  transform: translateX(-50%);
-  transition: box-shadow 300ms ease, background 500ms ease;
-  z-index: 200;
-}
-.fnav.scrolled { box-shadow: 0 4px 24px rgb(44 62 80 / 8%); }
-
-.fnav__logo {
-  align-items: center;
-  color: var(--deep-slate);
-  display: flex;
-  font-family: Outfit, sans-serif;
-  font-size: 1rem;
-  font-weight: 700;
-  gap: 0;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.fnav__logo img { border-radius: 8px; height: 26px; margin-right: 7px; width: 26px; }
-.fnav__logo-orange { color: var(--heritage-orange); }
-
-.fnav__right { align-items: center; display: flex; gap: 8px; }
-.fnav__links { display: flex; gap: 2px; }
-.fnav__links a {
-  border-radius: 16px;
-  color: var(--deep-slate);
-  font-family: Outfit, sans-serif;
-  font-size: 0.85rem;
-  font-weight: 600;
-  opacity: 0.35;
-  padding: 4px 10px;
-  text-decoration: none;
-  transition: all 200ms;
-  white-space: nowrap;
-}
-.fnav__links a:hover { background: rgb(44 62 80 / 5%); opacity: 0.7; }
-
-.fnav__cta {
-  background: var(--heritage-orange);
-  border: none;
-  border-radius: 20px;
-  color: white;
-  cursor: pointer;
-  display: inline-block;
-  font-family: Outfit, sans-serif;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 6px 16px;
-  text-decoration: none;
-  transition: all 200ms;
-  white-space: nowrap;
-}
-.fnav__cta:hover { background: #d14d1a; transform: translateY(-1px); }
-
-.scroll-progress {
-  background: var(--heritage-orange);
-  height: 2px;
-  left: 0;
-  position: fixed;
-  top: 0;
-  transition: width 150ms linear;
-  width: 0%;
-  z-index: 300;
 }
 
 /* HERO */
@@ -1398,18 +1261,6 @@ import { APP_URL } from '@beanies/brand/nav';
 .btn-secondary { background: white; border: 1px solid rgb(44 62 80 / 8%); border-radius: 60px; box-shadow: var(--card-shadow); color: var(--deep-slate); cursor: pointer; display: inline-block; font-family: Outfit, sans-serif; font-size: 0.85rem; font-weight: 600; padding: 12px 28px; text-decoration: none; transition: all 200ms ease; }
 .btn-secondary:hover { box-shadow: var(--card-hover-shadow); transform: translateY(-2px); }
 
-/* FOOTER */
-.footer { background: var(--deep-slate); padding: 32px 24px; text-align: center; }
-.footer__brand { color: rgb(255 255 255 / 50%); font-family: Outfit, sans-serif; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; }
-.footer__brand-orange { color: var(--heritage-orange); }
-.footer__links { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 8px; }
-.footer__links a { color: rgb(255 255 255 / 30%); font-size: 0.78rem; text-decoration: none; transition: color 150ms; }
-.footer__links a:hover { color: var(--heritage-orange); }
-.footer__copy { color: rgb(255 255 255 / 20%); font-size: 0.72rem; margin-top: 12px; }
-.footer__tag { color: var(--heritage-orange); font-family: Outfit, sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; margin-top: 8px; opacity: 0.5; }
-.footer__contact-btn { align-items: center; background: var(--heritage-orange); border: none; border-radius: 24px; color: white; cursor: pointer; display: inline-flex; font-family: Outfit, sans-serif; font-size: 0.8rem; font-weight: 600; gap: 8px; margin-top: 16px; padding: 10px 24px; transition: all 200ms ease; }
-.footer__contact-btn:hover { background: #d14d1a; transform: translateY(-1px); }
-
 /* CONTACT MODAL */
 .contact-overlay { align-items: center; backdrop-filter: blur(8px); background: rgb(44 62 80 / 60%); display: none; inset: 0; justify-content: center; opacity: 0; padding: 24px; position: fixed; transition: opacity 300ms ease; z-index: 500; }
 .contact-overlay.active { display: flex; opacity: 1; }
@@ -1458,9 +1309,6 @@ import { APP_URL } from '@beanies/brand/nav';
 
 /* RESPONSIVE */
 @media (max-width: 900px) {
-  .fnav { flex-wrap: wrap; justify-content: center; max-width: 95vw; padding: 6px 12px 6px 14px; }
-  .fnav__logo { flex-basis: 100%; justify-content: center; }
-  .fnav__right { flex-shrink: 0; }
   .showcase { height: 340px; }
   .showcase__device--center { width: 280px; }
   .showcase__device--left { left: -2%; width: 250px; }
@@ -1470,12 +1318,6 @@ import { APP_URL } from '@beanies/brand/nav';
 
 @media (max-width: 640px) {
   .hero { padding: 120px 20px 40px; }
-  .fnav { gap: 6px; padding: 5px 10px 5px 12px; }
-  .fnav__logo { font-size: 0.85rem; }
-  .fnav__logo img { height: 22px; margin-right: 5px; width: 22px; }
-  .fnav__links { gap: 0; }
-  .fnav__links a { font-size: 0.75rem; padding: 4px 6px; }
-  .fnav__cta { font-size: 0.75rem; padding: 5px 12px; }
   .showcase { display: flex; flex-direction: column; gap: 16px; height: auto; }
   .showcase__device { left: auto !important; position: relative !important; right: auto !important; top: auto !important; transform: none !important; width: 100% !important; }
   .showcase__device:hover { transform: translateY(-4px) !important; }
