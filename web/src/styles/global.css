@@ -1,0 +1,21 @@
+@import url('tailwindcss');
+@import url('@beanies/brand/theme.css');
+
+/* Base defaults for the marketing site. Keep minimal — content pages should be
+   zero-JS and structurally clean for AI crawlers. */
+
+html {
+  background: #f8f9fa;
+  color: #2c3e50;
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-outfit);
+}
