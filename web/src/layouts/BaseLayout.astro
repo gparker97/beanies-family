@@ -24,8 +24,6 @@ interface Props {
   jsonLd?: Record<string, unknown> | Record<string, unknown>[];
   /** Mark the page as noindex (e.g. staging preview, utility pages). */
   noindex?: boolean;
-  /** Suppress the global Nav + Footer chrome (for self-contained landing pages). */
-  hideChrome?: boolean;
 }
 
 const {
@@ -40,7 +38,6 @@ const {
   tags,
   jsonLd,
   noindex = false,
-  hideChrome = false,
 } = Astro.props;
 
 const canonical = new URL(canonicalPath, SITE_URL).toString();
@@ -53,7 +50,16 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" type="image/png" href="/brand/beanies-logo.png" />
+    <!-- Favicon set matches the Vue app 1:1 so the tab icon is identical
+         across prod (apex) and this site during Phase B / after cutover. -->
+    <link rel="icon" type="image/png" href="/brand/beanies_small_bean_favicon_32x32.png" />
+    <link rel="apple-touch-icon" href="/brand/beanies_father_son_icon_192x192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <SEO
       title={title}
       description={description}
@@ -103,8 +109,8 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     </script>
   </head>
   <body class="min-h-screen bg-[#f8f9fa] text-secondary-500">
-    {!hideChrome && <Nav />}
+    <Nav />
     <slot />
-    {!hideChrome && <Footer />}
+    <Footer />
   </body>
 </html>
