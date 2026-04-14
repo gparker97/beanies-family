@@ -54,6 +54,8 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1030.0",
+    "@aws-sdk/util-dynamodb": "^3.996.2",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
     "@microsoft/eslint-plugin-sdl": "^1.1.0",
