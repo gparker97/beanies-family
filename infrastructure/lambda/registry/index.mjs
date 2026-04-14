@@ -8,11 +8,28 @@ import {
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
 const client = new DynamoDBClient({});
-const TABLE_NAME = process.env.TABLE_NAME;
+const PROD_TABLE = process.env.TABLE_NAME;
+const DEV_TABLE = process.env.DEV_TABLE_NAME || PROD_TABLE; // safe fallback
 const API_KEY = process.env.REGISTRY_API_KEY;
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
   .split(',')
   .map((o) => o.trim());
+const DEV_ORIGINS = new Set(
+  (process.env.DEV_ORIGINS || 'http://localhost:5173,http://localhost:4173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+);
+
+/**
+ * Pick the DynamoDB table based on the request Origin. Localhost origins
+ * write to the dev table; everything else writes to prod. Unknown origins
+ * default to prod for safety — but they would also fail CORS upstream so
+ * in practice only allowlisted origins ever reach the Lambda body.
+ */
+function tableForOrigin(origin) {
+  return origin && DEV_ORIGINS.has(origin) ? DEV_TABLE : PROD_TABLE;
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -44,12 +61,13 @@ export async function handler(event) {
   }
 
   const method = event.requestContext?.http?.method;
+  const tableName = tableForOrigin(event.headers?.origin);
 
   try {
     if (method === 'GET') {
       const { Item } = await client.send(
         new GetItemCommand({
-          TableName: TABLE_NAME,
+          TableName: tableName,
           Key: marshall({ familyId }),
         })
       );
@@ -66,7 +84,7 @@ export async function handler(event) {
       // so only the first write should stamp these.
       const { Item: existingRaw } = await client.send(
         new GetItemCommand({
-          TableName: TABLE_NAME,
+          TableName: tableName,
           Key: marshall({ familyId }),
         })
       );
@@ -88,7 +106,7 @@ export async function handler(event) {
       };
       await client.send(
         new PutItemCommand({
-          TableName: TABLE_NAME,
+          TableName: tableName,
           Item: marshall(item, { removeUndefinedValues: true }),
         })
       );
@@ -98,7 +116,7 @@ export async function handler(event) {
     if (method === 'DELETE') {
       await client.send(
         new DeleteItemCommand({
-          TableName: TABLE_NAME,
+          TableName: tableName,
           Key: marshall({ familyId }),
         })
       );
