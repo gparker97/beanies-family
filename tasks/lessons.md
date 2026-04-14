@@ -4,7 +4,36 @@ Patterns and rules to prevent repeated mistakes.
 
 ---
 
-## 1. E2E: Wait for async step transitions before manipulating state
+## Default GitHub Actions config items to **variables**, not secrets
+
+**Date:** 2026-04-14
+**Context:** Writing the `deploy-web.yml` workflow for the Astro marketing site cutover — initially used `${{ secrets.WEB_S3_BUCKET }}` and `${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }}` by copying the pattern from the legacy `deploy.yml`.
+
+**Pattern:** Mis-classifying non-sensitive config as secrets means:
+
+- The value cannot be viewed or edited in the GitHub UI (secrets are write-only after creation)
+- Any correction requires deleting + recreating the secret
+- Teammates can't discover what the workflow is actually pointing at without reading Terraform output or AWS
+
+**Rule:** **Use `secrets` only if leaking the value enables an attack you couldn't otherwise perform.** For everything else, use repository `variables`.
+
+| Sensitive (secrets)                  | Not sensitive (variables)            |
+| ------------------------------------ | ------------------------------------ |
+| AWS access keys                      | S3 bucket names                      |
+| API client secrets (OAuth, Stripe …) | CloudFront distribution IDs          |
+| Database passwords                   | Region names, account IDs¹           |
+| Webhook signing keys                 | Lambda function names, table names   |
+| Private API keys                     | Domain names, workflow feature flags |
+
+¹ Account IDs are debatable — treat as public by default unless your org's threat model says otherwise.
+
+**Reference in workflows:** `${{ vars.NAME }}` for variables, `${{ secrets.NAME }}` for secrets.
+
+**Migration:** if something is already stored as a secret but is non-sensitive, delete it and re-add as a variable (GitHub UI: Settings → Secrets and variables → Actions → Variables tab).
+
+---
+
+## E2E: Wait for async step transitions before manipulating state
 
 **Date:** 2026-02-23
 **Context:** Create Pod wizard E2E bypass

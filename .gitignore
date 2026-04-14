@@ -49,3 +49,4 @@ infrastructure/**/.terraform/
 *.tfstate
 *.tfstate.backup
 *.tfplan
+infrastructure/*.plan

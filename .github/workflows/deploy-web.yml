@@ -73,12 +73,17 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
-        run: aws s3 sync web/dist/ s3://${{ secrets.WEB_S3_BUCKET }} --delete
+        # WEB_S3_BUCKET is a repository variable (not a secret) — bucket names
+        # are not sensitive and keeping them as vars means they can be viewed
+        # and edited from the GitHub UI without rotating.
+        run: aws s3 sync web/dist/ s3://${{ vars.WEB_S3_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
+        # WEB_CLOUDFRONT_DISTRIBUTION_ID is a repository variable for the same
+        # reason — distribution IDs are not sensitive.
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --distribution-id ${{ vars.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
 
       - name: Ping IndexNow (production only)

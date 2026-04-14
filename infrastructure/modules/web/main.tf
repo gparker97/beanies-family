@@ -90,7 +90,9 @@ resource "aws_acm_certificate_validation" "web" {
 # Prevents search engines from indexing the staging mirror as duplicate content.
 
 resource "aws_cloudfront_response_headers_policy" "noindex" {
-  name    = "${var.apex_domain}-staging-noindex"
+  # CloudFront policy names allow only alphanumerics, dashes, and underscores —
+  # no dots. Replace dots in the apex with dashes.
+  name    = "${replace(var.apex_domain, ".", "-")}-staging-noindex"
   comment = "Adds X-Robots-Tag: noindex to every response — only attached on staging"
 
   custom_headers_config {

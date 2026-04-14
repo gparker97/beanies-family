@@ -21,16 +21,25 @@ Phase A (Terraform for the new subdomains + staging distribution) is already mer
 - [ ] You have AWS CLI authenticated with the deploy role
 - [ ] You have access to the Google Cloud Console project that owns the OAuth client
 - [ ] You have GSC and Bing Webmaster Tools access for `beanies.family`
-- [ ] You have the current `CLOUDFRONT_DISTRIBUTION_ID` and `S3_BUCKET` GitHub secrets (existing Vue deploy)
+- [ ] You have the current `CLOUDFRONT_DISTRIBUTION_ID` and `S3_BUCKET` GitHub secrets (existing Vue deploy — see §C.2 note on migrating these to variables)
 
-## GitHub Actions secrets required (add before Phase B)
+## GitHub Actions **variables** required (add before Phase B)
 
-| Secret                           | Value                                                | Used by          |
+These are **repository variables**, not secrets. Bucket names and CloudFront distribution IDs are not sensitive (visible in the AWS console to anyone with account access); storing them as variables means you can view and edit them from the GitHub UI without rotation.
+
+| Variable                         | Value                                                | Used by          |
 | -------------------------------- | ---------------------------------------------------- | ---------------- |
 | `WEB_S3_BUCKET`                  | Output `web_s3_bucket_name` from `terraform output`  | `deploy-web.yml` |
 | `WEB_CLOUDFRONT_DISTRIBUTION_ID` | Output `web_distribution_id` from `terraform output` | `deploy-web.yml` |
 
-Existing `CLOUDFRONT_DISTRIBUTION_ID` and `S3_BUCKET` (for the Vue deploy) stay as-is through Phase B. They're updated in Phase C.
+Add via GitHub UI: **Settings → Secrets and variables → Actions → Variables tab → New repository variable**. Or via `gh`:
+
+```bash
+gh variable set WEB_S3_BUCKET --body "$(cd infrastructure && terraform output -raw web_s3_bucket_name)"
+gh variable set WEB_CLOUDFRONT_DISTRIBUTION_ID --body "$(cd infrastructure && terraform output -raw web_distribution_id)"
+```
+
+Existing `CLOUDFRONT_DISTRIBUTION_ID` and `S3_BUCKET` for the Vue deploy are currently stored as **secrets** (legacy). They should be migrated to variables at some point, but that's outside this cutover's scope.
 
 ---
 
@@ -107,16 +116,18 @@ This is the one-way door. Plan a **low-traffic window** (suggested: weekend morn
 
 **Rollback note**: the old apex URIs stay registered for 30 days as a safety net.
 
-### C.2 Update GitHub secrets for the apex swap
+### C.2 Update the Vue deploy config for the apex swap
 
-Before running Terraform, set up the secret swap — the existing Vue deploy workflow will next deploy the Vue app to the **`app.` distribution** instead of the apex one:
+Before running Terraform, update the existing Vue deploy config so it next targets the **`app.` distribution** instead of the apex one:
 
-| Secret                       | Old value               | New value                                 |
-| ---------------------------- | ----------------------- | ----------------------------------------- |
-| `CLOUDFRONT_DISTRIBUTION_ID` | apex (Vue) distribution | output of `app_subdomain_distribution_id` |
-| `S3_BUCKET`                  | unchanged — same bucket | (no change; Vue bucket is reused)         |
+| Config item                  | Storage         | Old value               | New value                                 |
+| ---------------------------- | --------------- | ----------------------- | ----------------------------------------- |
+| `CLOUDFRONT_DISTRIBUTION_ID` | secret (legacy) | apex (Vue) distribution | output of `app_subdomain_distribution_id` |
+| `S3_BUCKET`                  | secret (legacy) | unchanged — same bucket | (no change; Vue bucket is reused)         |
 
 Only the distribution ID changes; the S3 bucket stays the same.
+
+> Sidebar: these are stored as secrets for historical reasons but should really be variables (see §"GitHub Actions variables required" above). Migrating them is a nice cleanup to do alongside this cutover — just delete each secret and re-add as a variable in the GitHub UI, then update `deploy.yml` to use `${{ vars.* }}` instead of `${{ secrets.* }}`.
 
 ### C.3 Verify Vue app is configured for the new origin
 
