@@ -1,0 +1,71 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Breadcrumbs from '../components/Breadcrumbs.astro';
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath: string;
+  lastUpdated: string;
+  breadcrumbLabel: string;
+}
+
+const { title, description, canonicalPath, lastUpdated, breadcrumbLabel } = Astro.props;
+---
+
+<BaseLayout title={title} description={description} canonicalPath={canonicalPath}>
+  <article class="mx-auto max-w-3xl px-6 py-16">
+    <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: breadcrumbLabel, href: canonicalPath }]} />
+
+    <header class="mt-8">
+      <h1 class="font-outfit text-3xl font-bold text-secondary-500 sm:text-4xl">{breadcrumbLabel}</h1>
+      <p class="mt-2 text-sm text-secondary-400">last updated: {lastUpdated}</p>
+    </header>
+
+    <div class="legal-content mt-10 space-y-8 text-secondary-500">
+      <slot />
+    </div>
+  </article>
+</BaseLayout>
+
+<style is:global>
+  .legal-content section { margin-bottom: 2rem; }
+  .legal-content h2 {
+    font-family: var(--font-outfit);
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 0.75rem;
+  }
+  .legal-content p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #5d7a8a;
+    margin-bottom: 0.75rem;
+  }
+  .legal-content ul { list-style: none; padding-left: 0; margin-bottom: 0.75rem; }
+  .legal-content ul li {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #5d7a8a;
+    padding-left: 1.5rem;
+    position: relative;
+    margin-bottom: 0.5rem;
+  }
+  .legal-content ul li::before {
+    content: '•';
+    position: absolute;
+    left: 0.25rem;
+    color: #f15d22;
+    font-weight: bold;
+  }
+  .legal-content a { color: #f15d22; text-decoration: none; transition: color 150ms; }
+  .legal-content a:hover { color: #d14d1a; text-decoration: underline; }
+  .legal-content code {
+    background: #f5f1ed;
+    border-radius: 4px;
+    font-size: 0.85em;
+    padding: 0.15em 0.4em;
+  }
+  .legal-content strong { font-weight: 600; color: #2c3e50; }
+</style>

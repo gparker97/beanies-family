@@ -1,0 +1,47 @@
+---
+import JsonLd from './JsonLd.astro';
+import { SITE_URL } from '@beanies/brand/nav';
+
+export interface Crumb {
+  label: string;
+  href: string;
+}
+
+interface Props {
+  items: Crumb[];
+}
+
+const { items } = Astro.props;
+
+const schema = {
+  '@type': 'BreadcrumbList',
+  itemListElement: items.map((c, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    name: c.label,
+    item: `${SITE_URL}${c.href}`,
+  })),
+};
+---
+
+<nav aria-label="Breadcrumb" class="text-sm text-secondary-400">
+  <ol class="flex flex-wrap items-center gap-1.5">
+    {
+      items.map((c, i) => (
+        <li class="flex items-center gap-1.5">
+          {i > 0 && <span aria-hidden="true" class="text-secondary-400/60">/</span>}
+          {i === items.length - 1 ? (
+            <span class="text-secondary-500" aria-current="page">
+              {c.label}
+            </span>
+          ) : (
+            <a href={c.href} class="hover:text-primary-500">
+              {c.label}
+            </a>
+          )}
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+<JsonLd data={schema} />

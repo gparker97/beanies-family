@@ -1,0 +1,96 @@
+---
+import type { ArticleSection } from '@/content/help';
+
+interface Props {
+  sections: ArticleSection[];
+}
+
+const { sections } = Astro.props;
+---
+
+<div class="help-article-content space-y-5">
+  {
+    sections.map((section) => {
+      if (section.type === 'heading') {
+        const Tag = section.level === 3 ? 'h3' : 'h2';
+        const cls =
+          section.level === 3
+            ? 'font-outfit text-secondary-500 text-lg font-semibold'
+            : 'font-outfit text-secondary-500 mt-8 text-xl font-semibold first:mt-0';
+        return <Tag id={section.id} class={cls}>{section.content}</Tag>;
+      }
+
+      if (section.type === 'paragraph') {
+        return (
+          <p class="leading-relaxed text-secondary-400" set:html={section.content} />
+        );
+      }
+
+      if (section.type === 'callout') {
+        return (
+          <div class="rounded-2xl border-l-4 border-primary-500 bg-primary-50 p-4">
+            {section.title && (
+              <div class="mb-1 flex items-center gap-2 font-outfit text-sm font-semibold text-secondary-500">
+                {section.icon && <span>{section.icon}</span>}
+                {section.title}
+              </div>
+            )}
+            <p class="text-sm leading-relaxed text-secondary-400" set:html={section.content} />
+          </div>
+        );
+      }
+
+      if (section.type === 'infoBox') {
+        return (
+          <div class="rounded-2xl bg-sky-silk-50 p-4">
+            {section.title && (
+              <div class="mb-1 flex items-center gap-2 font-outfit text-sm font-semibold text-secondary-500">
+                {section.icon && <span>{section.icon}</span>}
+                {section.title}
+              </div>
+            )}
+            <p class="text-sm leading-relaxed text-secondary-400" set:html={section.content} />
+          </div>
+        );
+      }
+
+      if (section.type === 'codeBlock') {
+        return (
+          <pre class="overflow-x-auto rounded-2xl bg-secondary-500 p-4 font-mono text-sm leading-relaxed text-sky-silk-300">{section.content}</pre>
+        );
+      }
+
+      if (section.type === 'list') {
+        const Tag = section.ordered ? 'ol' : 'ul';
+        const cls = `space-y-2 pl-5 ${section.ordered ? 'list-decimal' : 'list-disc'}`;
+        return (
+          <Tag class={cls}>
+            {(section.items ?? []).map((item) => (
+              <li
+                class="marker:text-primary-400 text-sm leading-relaxed text-secondary-400"
+                set:html={item}
+              />
+            ))}
+          </Tag>
+        );
+      }
+
+      if (section.type === 'steps') {
+        return (
+          <div class="space-y-3">
+            {(section.items ?? []).map((step, j) => (
+              <div class="flex gap-3">
+                <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-500 text-xs font-bold text-white">
+                  {j + 1}
+                </div>
+                <p class="pt-0.5 text-sm leading-relaxed text-secondary-400" set:html={step} />
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      return null;
+    })
+  }
+</div>

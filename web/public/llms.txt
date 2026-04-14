@@ -1,0 +1,32 @@
+# beanies.family
+
+> beanies.family is a local-first, privacy-first family planning PWA. It helps families track finances (accounts, transactions, budgets, goals), plan activities and travel, and collaborate as a unit. All data lives on the user's device; optional Google Drive sync uses AES-GCM encryption with user-controlled keys. Open-source (MIT), built with Vue 3, Automerge CRDTs, and the Web Crypto API.
+
+## core
+
+- [homepage](https://beanies.family): value prop, features, links
+- [the beanstalk (blog)](https://beanies.family/blog): stories, updates, philosophy from the making of beanies.family
+- [help center](https://beanies.family/help): 24+ articles across 5 categories — getting started, features, security, how it works, what's new
+- [about greg](https://beanies.family/about/greg): founder bio
+
+## policies
+
+- [privacy policy](https://beanies.family/privacy): local-first architecture, no server-side PII, Plausible analytics, Google Drive opt-in with client-side encryption
+- [terms of service](https://beanies.family/terms): MIT open source, plain-language terms, no financial advice
+
+## concepts
+
+- [the .beanpod file explained](https://beanies.family/help/security/the-beanpod-file-explained): the encrypted family data file
+- [how your data is encrypted](https://beanies.family/help/security/how-your-data-is-encrypted): AES-GCM, AES-KW, Web Crypto API
+- [zero-knowledge architecture](https://beanies.family/help/security/zero-knowledge-architecture): what "local-first" means in practice
+- [net worth calculation](https://beanies.family/help/how-it-works/net-worth-calculation)
+
+## feeds
+
+- [rss](https://beanies.family/blog/rss.xml): beanstalk blog feed
+- [sitemap](https://beanies.family/sitemap-index.xml): full URL index with lastmod
+- [llms-full.txt](https://beanies.family/llms-full.txt): concatenated blog + help content for LLM context windows
+
+## the app
+
+- The PWA itself is at https://app.beanies.family — authenticated, user-specific, not indexed. Use the marketing site (this domain) for public content.

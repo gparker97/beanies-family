@@ -1,0 +1,76 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import HelpSearch from '../../components/HelpSearch.astro';
+import { HELP_CATEGORIES, ALL_ARTICLES, getPopularArticles, getCategoryArticles } from '@/content/help';
+
+const popular = getPopularArticles().slice(0, 6);
+---
+
+<BaseLayout
+  title="help center — beanies.family"
+  description="everything you need to know about using beanies.family — getting started, features, security, and how it all works."
+  canonicalPath="/help"
+>
+  <section class="mx-auto max-w-4xl px-6 py-16 text-center">
+    <h1 class="font-outfit text-4xl font-bold text-secondary-500 sm:text-5xl">how can we help?</h1>
+    <p class="mx-auto mt-4 max-w-xl text-secondary-400">
+      search the help center, browse by category, or jump to a popular article below.
+    </p>
+    <div class="mx-auto mt-8 max-w-xl">
+      <HelpSearch />
+    </div>
+  </section>
+
+  <section class="mx-auto max-w-6xl px-6 pb-16">
+    <h2 class="font-outfit text-xl font-semibold text-secondary-500">browse by category</h2>
+    <ul class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        HELP_CATEGORIES.map((cat) => {
+          const count = getCategoryArticles(cat.id).length;
+          return (
+            <li>
+              <a
+                href={`/help/${cat.id}`}
+                class="block rounded-2xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <div class="flex items-start gap-4">
+                  <span class="text-3xl" aria-hidden="true">{cat.icon}</span>
+                  <div>
+                    <h3 class="font-outfit text-lg font-semibold text-secondary-500">
+                      {cat.id.replace(/-/g, ' ')}
+                    </h3>
+                    <p class="mt-1 text-sm text-secondary-400">{count} article{count === 1 ? '' : 's'}</p>
+                  </div>
+                </div>
+              </a>
+            </li>
+          );
+        })
+      }
+    </ul>
+  </section>
+
+  {
+    popular.length > 0 && (
+      <section class="mx-auto max-w-6xl px-6 pb-20">
+        <h2 class="font-outfit text-xl font-semibold text-secondary-500">popular articles</h2>
+        <ul class="mt-6 grid gap-4 sm:grid-cols-2">
+          {popular.map((article) => (
+            <li>
+              <a
+                href={`/help/${article.category}/${article.slug}`}
+                class="flex items-start gap-3 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+              >
+                <span class="text-2xl" aria-hidden="true">{article.icon}</span>
+                <div class="flex-1">
+                  <h3 class="font-outfit text-sm font-semibold text-secondary-500">{article.title}</h3>
+                  <p class="mt-1 line-clamp-2 text-xs text-secondary-400">{article.excerpt}</p>
+                </div>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+</BaseLayout>

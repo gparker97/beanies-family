@@ -1,0 +1,86 @@
+---
+import { SEO } from 'astro-seo';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import JsonLd from '../components/JsonLd.astro';
+import { ORGANIZATION, WEBSITE } from '@beanies/brand/schema';
+import { SITE_URL } from '@beanies/brand/nav';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  /** Canonical path starting with "/" (the site URL is prepended). Defaults to current pathname. */
+  canonicalPath?: string;
+  ogImage?: string;
+  ogType?: 'website' | 'article';
+  /** Article-specific OG fields (used on blog posts). */
+  publishedTime?: string;
+  modifiedTime?: string;
+  author?: string;
+  /** Tags rendered as article:tag OG meta. */
+  tags?: string[];
+  /** Additional per-page JSON-LD nodes merged into the @graph. */
+  jsonLd?: Record<string, unknown> | Record<string, unknown>[];
+  /** Mark the page as noindex (e.g. staging preview, utility pages). */
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description,
+  canonicalPath = Astro.url.pathname,
+  ogImage = `${SITE_URL}/brand/beanies-logo.png`,
+  ogType = 'website',
+  publishedTime,
+  modifiedTime,
+  author,
+  tags,
+  jsonLd,
+  noindex = false,
+} = Astro.props;
+
+const canonical = new URL(canonicalPath, SITE_URL).toString();
+const globalLd = [ORGANIZATION, WEBSITE];
+const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" href="/brand/beanies-logo.png" />
+    <SEO
+      title={title}
+      description={description}
+      canonical={canonical}
+      noindex={noindex}
+      openGraph={{
+        basic: { title, type: ogType, image: ogImage, url: canonical },
+        optional: { description, siteName: 'beanies.family', locale: 'en_US' },
+        article:
+          ogType === 'article'
+            ? {
+                publishedTime,
+                modifiedTime,
+                authors: author ? [author] : undefined,
+                tags,
+              }
+            : undefined,
+      }}
+      twitter={{
+        card: 'summary_large_image',
+        title,
+        description,
+        image: ogImage,
+      }}
+    />
+    <JsonLd data={[...globalLd, ...extraLd]} />
+  </head>
+  <body class="min-h-screen bg-[#f8f9fa] text-secondary-500">
+    <Nav />
+    <slot />
+    <Footer />
+  </body>
+</html>

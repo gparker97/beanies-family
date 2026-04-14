@@ -1,0 +1,115 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import Byline from '../../components/Byline.astro';
+import RelatedArticles from '../../components/RelatedArticles.astro';
+import { AUTHOR } from '@beanies/brand/schema';
+import { SITE_URL } from '@beanies/brand/nav';
+
+export async function getStaticPaths() {
+  const posts = await getCollection('blog');
+  return posts.map((post) => ({
+    params: { slug: post.data.slug },
+    props: { post, allPosts: posts },
+  }));
+}
+
+const { post, allPosts } = Astro.props;
+const { Content } = await render(post);
+
+const canonicalPath = `/blog/${post.data.slug}`;
+const related = allPosts
+  .filter((p) => p.data.slug !== post.data.slug)
+  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+  .slice(0, 3)
+  .map((p) => ({
+    title: p.data.title,
+    href: `/blog/${p.data.slug}`,
+    excerpt: p.data.excerpt,
+  }));
+
+const blogPosting = {
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.excerpt,
+  datePublished: post.data.date.toISOString(),
+  dateModified: post.data.date.toISOString(),
+  author: { '@id': `${SITE_URL}/about/${post.data.author}#${post.data.author}` },
+  publisher: { '@id': `${SITE_URL}#org` },
+  mainEntityOfPage: `${SITE_URL}${canonicalPath}`,
+  url: `${SITE_URL}${canonicalPath}`,
+  inLanguage: 'en',
+};
+
+const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPosting];
+---
+
+<BaseLayout
+  title={`${post.data.title} — the beanstalk`}
+  description={post.data.excerpt}
+  canonicalPath={canonicalPath}
+  ogType="article"
+  publishedTime={post.data.date.toISOString()}
+  author={post.data.author}
+  jsonLd={jsonLd}
+>
+  <article class="mx-auto max-w-3xl px-6 py-12">
+    <Breadcrumbs
+      items={[
+        { label: 'home', href: '/' },
+        { label: 'beanstalk', href: '/blog' },
+        { label: post.data.title, href: canonicalPath },
+      ]}
+    />
+
+    <header class="mt-8 space-y-4">
+      {post.data.coverEmoji && <div class="text-5xl">{post.data.coverEmoji}</div>}
+      <h1 class="font-outfit text-3xl font-bold leading-tight text-secondary-500 sm:text-4xl">
+        {post.data.title}
+      </h1>
+      <Byline author={post.data.author} date={post.data.date} />
+    </header>
+
+    <div class="prose-content mt-10 space-y-5 leading-relaxed text-secondary-500">
+      <Content />
+    </div>
+
+    <RelatedArticles items={related} heading="more from the beanstalk" />
+  </article>
+</BaseLayout>
+
+<style is:global>
+  .prose-content h1,
+  .prose-content h2,
+  .prose-content h3 {
+    font-family: var(--font-outfit);
+    color: #2c3e50;
+    font-weight: 600;
+    margin-top: 2rem;
+  }
+  .prose-content h1 { font-size: 1.75rem; }
+  .prose-content h2 { font-size: 1.5rem; }
+  .prose-content h3 { font-size: 1.25rem; }
+  .prose-content p { color: #5d7a8a; }
+  .prose-content a { color: #f15d22; text-decoration: none; }
+  .prose-content a:hover { text-decoration: underline; color: #d14d1a; }
+  .prose-content strong { color: #2c3e50; font-weight: 600; }
+  .prose-content ul, .prose-content ol { padding-left: 1.5rem; color: #5d7a8a; }
+  .prose-content ul li { list-style: disc; }
+  .prose-content ol li { list-style: decimal; }
+  .prose-content blockquote {
+    border-left: 4px solid #f15d22;
+    padding-left: 1rem;
+    margin: 1rem 0;
+    font-style: italic;
+    color: #5d7a8a;
+  }
+  .prose-content code {
+    background: #f5f1ed;
+    border-radius: 4px;
+    padding: 0.15em 0.4em;
+    font-size: 0.9em;
+  }
+  .prose-content img { border-radius: 1rem; margin: 1.5rem 0; }
+</style>

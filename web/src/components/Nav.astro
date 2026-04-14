@@ -1,0 +1,40 @@
+---
+import { PUBLIC_NAV, APP_URL } from '@beanies/brand/nav';
+
+const currentPath = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? currentPath === '/' : currentPath === href || currentPath.startsWith(`${href}/`);
+---
+
+<header class="border-b border-secondary-100/60 bg-white">
+  <nav class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
+    <a href="/" class="flex items-center gap-2 font-outfit text-lg font-bold text-secondary-500">
+      <img src="/brand/beanies-logo.png" alt="" width="32" height="32" class="h-8 w-8" />
+      <span>beanies.family</span>
+    </a>
+    <ul class="hidden items-center gap-6 sm:flex">
+      {
+        PUBLIC_NAV.map((link) => (
+          <li>
+            <a
+              href={link.href}
+              class:list={[
+                'font-inter text-sm transition-colors hover:text-primary-500',
+                isActive(link.href) ? 'text-primary-500 font-semibold' : 'text-secondary-500',
+              ]}
+              aria-current={isActive(link.href) ? 'page' : undefined}
+            >
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+    <a
+      href={APP_URL}
+      class="rounded-xl bg-primary-500 px-4 py-2 font-outfit text-sm font-semibold text-white transition-colors hover:bg-primary-600"
+    >
+      open app
+    </a>
+  </nav>
+</header>

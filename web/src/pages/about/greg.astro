@@ -1,0 +1,49 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import { AUTHOR } from '@beanies/brand/schema';
+---
+
+<BaseLayout
+  title="about greg — beanies.family"
+  description="greg is the founder of beanies.family. father of three, software engineer, believer in local-first software, and the hand that writes the beanstalk."
+  canonicalPath="/about/greg"
+  jsonLd={{ ...AUTHOR, description: 'founder of beanies.family, father, software engineer' }}
+>
+  <article class="mx-auto max-w-3xl px-6 py-16">
+    <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'about', href: '/about/greg' }, { label: 'greg', href: '/about/greg' }]} />
+
+    <header class="mt-8 space-y-4">
+      <h1 class="font-outfit text-4xl font-bold text-secondary-500">greg</h1>
+      <p class="text-lg text-secondary-400">founder, beanies.family</p>
+    </header>
+
+    <section class="mt-10 space-y-5 text-secondary-500 leading-relaxed">
+      <p>
+        hi. i'm greg. i built beanies.family because my family needed a way to stay organized
+        without handing our lives over to a data broker.
+      </p>
+      <p>
+        i've been writing software for two decades. local-first, CRDTs, privacy-preserving systems —
+        this is the space i love. beanies.family is the focal point of our family, and i'm sharing
+        it with yours.
+      </p>
+      <p>
+        the <a href="/blog" class="text-primary-500 hover:text-primary-600">beanstalk blog</a> is
+        where i write about the making of beanies.family, the philosophy behind local-first
+        software, and the chaotic comedy of raising a family in public.
+      </p>
+    </section>
+
+    <section class="mt-10 space-y-2">
+      <h2 class="font-outfit text-lg font-semibold text-secondary-500">find me elsewhere</h2>
+      <ul class="space-y-1 text-sm text-secondary-400">
+        <li>
+          <a href="https://github.com/gparker97" class="text-primary-500 hover:text-primary-600" rel="me">
+            github: @gparker97
+          </a>
+        </li>
+      </ul>
+    </section>
+  </article>
+</BaseLayout>
