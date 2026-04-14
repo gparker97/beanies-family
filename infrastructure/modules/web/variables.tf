@@ -18,3 +18,9 @@ variable "staging_subdomain" {
   type        = string
   default     = "staging"
 }
+
+variable "additional_distribution_arns" {
+  description = "Extra CloudFront distribution ARNs that may read from this module's S3 bucket via OAC. Used during Phase C cutover to let the apex distribution serve the Astro build from this bucket."
+  type        = list(string)
+  default     = []
+}

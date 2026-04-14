@@ -69,11 +69,40 @@ module "web" {
   environment    = var.environment
   hosted_zone_id = var.hosted_zone_id
 
+  # Pre-authorize the apex distribution to OAC-read this bucket. Pre-cutover
+  # the apex distribution doesn't reach for it (origin is still the Vue
+  # bucket); at Phase C cutover it starts serving Astro from here without
+  # needing a separate bucket-policy update in the same apply.
+  additional_distribution_arns = [module.frontend.cloudfront_distribution_arn]
+
   providers = {
     aws           = aws
     aws.us_east_1 = aws.us_east_1
   }
 }
+
+# ────────────────────────────────────────────────────────────────────────────
+# Phase C cutover — UNCOMMENT (and run terraform apply) to flip apex to Astro.
+# See docs/runbooks/cutover-apex-to-astro.md for the full procedure.
+#
+# When uncommented, three things change on the apex distribution:
+#   1. Origin swaps from the Vue S3 bucket to the Astro S3 bucket
+#   2. The apex-cutover CloudFront Function is attached (PWA path 301s,
+#      legacy /beanstalk redirects, Astro .html URL rewrites)
+#   3. The SPA 403/404 → /index.html fallback is removed (Astro emits real
+#      status codes)
+#
+# To activate, change `module "frontend"` above to:
+#
+#   module "frontend" {
+#     ...existing args...
+#     origin_bucket_regional_domain_name = module.web.s3_bucket_regional_domain_name
+#     viewer_request_function_arn        = module.web.apex_cutover_function_arn
+#     enable_spa_fallback                = false
+#   }
+#
+# Then: terraform plan → review → apply. Single commit, single apply.
+# ────────────────────────────────────────────────────────────────────────────
 
 module "registry" {
   source = "./modules/registry"

@@ -41,6 +41,22 @@ gh variable set WEB_CLOUDFRONT_DISTRIBUTION_ID --body "$(cd infrastructure && te
 
 Existing `CLOUDFRONT_DISTRIBUTION_ID` and `S3_BUCKET` for the Vue deploy are currently stored as **secrets** (legacy). They should be migrated to variables at some point, but that's outside this cutover's scope.
 
+The `CONTACT_WEBHOOK_URL` GitHub secret (already used by the Vue deploy) is also referenced by `deploy-web.yml` and exposed to the Astro build as `PUBLIC_CONTACT_WEBHOOK_URL`. No separate setup needed.
+
+---
+
+## Lessons from Phase B (apply during any future cutover)
+
+These are issues we hit during the actual Phase B verification — captured here so future cutovers don't rediscover them. Already addressed in the current code; document for awareness.
+
+1. **CORS allowlist on the API Gateway and OAuth Lambda env vars** must include the new origin (`app.beanies.family`). The `cors_origins` variable in `modules/registry/` and `modules/oauth/` was apex-only. Adding the new subdomain is a fast Terraform apply (~10s, no CloudFront involved).
+2. **OAuth Lambda has its own hardcoded `ALLOWED_REDIRECT_URIS` allowlist** at `infrastructure/lambda/oauth/index.mjs`. Defense-in-depth against open-redirect attacks. Add the new origin's `/oauth/callback` here in addition to the Google Cloud Console.
+3. **Astro static sites need a CloudFront Function URL rewriter** because S3 doesn't serve clean URLs natively. Astro emits `/blog/foo.html`; the function rewrites `/blog/foo` → `/blog/foo.html` before S3 lookup. Already part of the apex-cutover function.
+4. **Brand assets must be copied to `web/public/`** wherever Astro pages reference them. Current locations: `web/public/brand/` (logos, mascots, icons) and `web/public/blog/` (post screenshots). When new images are added, copy them; consider scripting if it gets repetitive.
+5. **CloudFront Response Headers Policy names reject dots** — use dashes only. The Phase A naming bug `beanies.family-staging-noindex` failed; replaced with `beanies-family-staging-noindex`.
+6. **GitHub Actions config: vars not secrets** for non-sensitive values (bucket names, distribution IDs). Webhook URLs ARE sensitive and stay as secrets. See `tasks/lessons.md` and the project memory.
+7. **OAuth Cross-Origin-Opener-Policy warnings** in the browser console during Google sign-in are noise (Google's popup gets stricter COOP per origin). They don't break the flow.
+
 ---
 
 ## Phase B — staging verification
@@ -153,35 +169,54 @@ Wait for success. Verify `https://app.beanies.family` still works.
 
 ### C.5 Terraform cutover — swap apex origin to Astro, attach 301 function
 
-The cutover commit (separate from Phase A) will contain these changes:
+All Phase C Terraform code has already been authored (Phase A prep + post-Phase-B refinements). The cutover is now a **two-line edit + one apply**.
 
-1. `modules/frontend/main.tf`:
-   - Change origin to the Astro bucket (`module.web.s3_bucket_name` via a new `origin_bucket_regional_domain_name` variable on the frontend module)
-   - **Remove** the two `custom_error_response` blocks (Astro emits real 404s)
-   - **Attach** the `apex-redirects.js` CloudFront Function (currently at `modules/web/functions/apex-redirects.js`) to the default cache behavior as a `viewer-request` association
-2. `modules/web/main.tf`:
-   - Swap `aliases` from `[staging.<apex>]` to `[<apex>, www.<apex>]` — wait, actually we keep the apex distribution on apex. The `web` module keeps serving `staging.` during Phase C as a rollback safety net; we can decommission it 2 weeks after cutover. See §C.8.
-   - Actually no — the apex distribution serves Astro content by pointing its origin at the web bucket. The web distribution (at staging.) is redundant from a URL perspective but still serves as a preview environment. Keep it as staging permanently.
-3. `modules/frontend/main.tf` cert SAN: if the current cert needs re-issuing with an updated SAN list (e.g. to remove `www` redirect handling that moves to the CF function), do it here. Most likely the existing cert covering apex + www is fine — no change needed.
+**Edit `infrastructure/main.tf`** — find the `module "frontend"` block and add three args:
 
-**Order of operations**:
+```hcl
+module "frontend" {
+  source = "./modules/frontend"
+
+  domain_name    = var.domain_name
+  environment    = var.environment
+  hosted_zone_id = var.hosted_zone_id
+
+  additional_distribution_arns = [module.app_subdomain.cloudfront_distribution_arn]
+
+  # ↓↓↓ ADD THESE THREE LINES FOR CUTOVER ↓↓↓
+  origin_bucket_regional_domain_name = module.web.s3_bucket_regional_domain_name
+  viewer_request_function_arn        = module.web.apex_cutover_function_arn
+  enable_spa_fallback                = false
+  # ↑↑↑ ADD THESE THREE LINES FOR CUTOVER ↑↑↑
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+}
+```
+
+**Apply**:
 
 ```bash
 cd infrastructure
-terraform plan -out=phase-c.plan
-# REVIEW CAREFULLY. Expected changes:
-#   ~ module.frontend.aws_cloudfront_distribution.frontend — origin change,
-#     custom_error_response removals, function_associations added
-#   + module.frontend.aws_cloudfront_function.apex_redirects — new
-#   ~ module.frontend.aws_s3_bucket_policy.frontend — add Astro bucket? No:
-#     the apex distribution now reads from the Astro bucket, which has its
-#     own bucket policy. The Vue bucket policy drops the apex distribution
-#     ARN from its additional list (no longer needed).
+terraform plan -var-file=environments/prod.tfvars -out=phase-c.plan
+# Expected single-resource change:
+#   ~ module.frontend.aws_cloudfront_distribution.frontend
+#       - origin.domain_name: <vue bucket> → <web bucket>
+#       - default_cache_behavior.function_association: + apex-cutover
+#       - custom_error_response (403, 404): removed
+#
+# Zero resource creates, zero destroys. Just a distribution config update.
 
 terraform apply phase-c.plan
 ```
 
-CloudFront deploys take 5-15 minutes. Watch for "Deployed" status in the AWS console.
+The CloudFront distribution redeploy takes 5-15 minutes. Watch for "Deployed" status in the AWS console.
+
+**The apex-cutover CloudFront Function is already created and tested** — it lives at `modules/web/functions/apex-cutover.js` and is a single function combining: (1) `/dashboard` etc. → `app.beanies.family` 301s, (2) legacy `/beanstalk*` → `/blog*` 301s, (3) Astro `.html` URL rewrite. CloudFront only allows one viewer-request function per cache behavior, hence the merge.
+
+**The web bucket policy already authorizes the apex distribution** to read it (configured during Phase A prep so the cutover doesn't need a separate bucket-policy update).
 
 ### C.6 Deploy Astro to apex
 

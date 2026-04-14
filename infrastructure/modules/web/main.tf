@@ -38,7 +38,13 @@ resource "aws_s3_bucket_policy" "web" {
         Resource  = "${aws_s3_bucket.web.arn}/*"
         Condition = {
           StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.web.arn
+            # Both the staging distribution and any sibling distributions
+            # (e.g. the apex frontend distribution after Phase C cutover)
+            # may read this bucket via OAC.
+            "AWS:SourceArn" = concat(
+              [aws_cloudfront_distribution.web.arn],
+              var.additional_distribution_arns,
+            )
           }
         }
       }
@@ -107,12 +113,28 @@ resource "aws_cloudfront_response_headers_policy" "noindex" {
 # ── CloudFront Function: clean URL → .html rewriter ────────────────────────
 # Astro emits flat .html files; S3 needs the exact path. This function runs
 # on viewer-request and rewrites "/blog/foo" → "/blog/foo.html" etc.
+# Currently attached to the staging distribution only.
 
 resource "aws_cloudfront_function" "rewrite_to_html" {
   name    = "${replace(var.apex_domain, ".", "-")}-web-rewrite-to-html"
   runtime = "cloudfront-js-2.0"
   code    = file("${path.module}/functions/rewrite-to-html.js")
   comment = "Rewrite clean Astro URLs to their underlying .html paths before S3 lookup"
+  publish = true
+}
+
+# ── CloudFront Function: apex-cutover (Phase C, attached to apex distribution) ──
+# Combines apex 301 redirects (authenticated paths → app.<apex>; legacy
+# /beanstalk* → /blog*) with the Astro URL rewriter. Single function because
+# CloudFront allows only one viewer-request function per cache behavior.
+# Authored now (Phase A prep) but only attached when the frontend module's
+# viewer_request_function_arn variable is set during the cutover commit.
+
+resource "aws_cloudfront_function" "apex_cutover" {
+  name    = "${replace(var.apex_domain, ".", "-")}-web-apex-cutover"
+  runtime = "cloudfront-js-2.0"
+  code    = file("${path.module}/functions/apex-cutover.js")
+  comment = "Phase C: 301 PWA paths to app.<apex> + legacy /beanstalk redirects + Astro .html URL rewrite"
   publish = true
 }
 

@@ -104,7 +104,10 @@ resource "aws_cloudfront_distribution" "frontend" {
   comment             = "beanies.family ${var.environment}"
 
   origin {
-    domain_name              = aws_s3_bucket.frontend.bucket_regional_domain_name
+    # Defaults to this module's own bucket (Vue SPA). During Phase C cutover,
+    # main.tf passes module.web.s3_bucket_regional_domain_name to swap apex
+    # to the Astro bucket without redeploying the distribution from scratch.
+    domain_name              = coalesce(var.origin_bucket_regional_domain_name, aws_s3_bucket.frontend.bucket_regional_domain_name)
     origin_id                = "s3-frontend"
     origin_access_control_id = aws_cloudfront_origin_access_control.frontend.id
   }
@@ -115,6 +118,17 @@ resource "aws_cloudfront_distribution" "frontend" {
     target_origin_id       = "s3-frontend"
     viewer_protocol_policy = "redirect-to-https"
     compress               = true
+
+    # Phase C: attach the apex-cutover CloudFront Function (301 PWA paths to
+    # app.<apex>, /beanstalk → /blog, Astro .html URL rewrite). No-op until
+    # var.viewer_request_function_arn is set.
+    dynamic "function_association" {
+      for_each = var.viewer_request_function_arn != null ? [1] : []
+      content {
+        event_type   = "viewer-request"
+        function_arn = var.viewer_request_function_arn
+      }
+    }
 
     forwarded_values {
       query_string = false
@@ -149,19 +163,17 @@ resource "aws_cloudfront_distribution" "frontend" {
     max_ttl     = 31536000
   }
 
-  # SPA routing — return index.html for 403/404
-  custom_error_response {
-    error_code            = 403
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
-  }
-
-  custom_error_response {
-    error_code            = 404
-    response_code         = 200
-    response_page_path    = "/index.html"
-    error_caching_min_ttl = 10
+  # SPA routing — return index.html for 403/404. Disabled at Phase C cutover
+  # because Astro emits real status codes (search engines + AI crawlers should
+  # see actual 404s, not soft 200s on a missing page).
+  dynamic "custom_error_response" {
+    for_each = var.enable_spa_fallback ? [403, 404] : []
+    content {
+      error_code            = custom_error_response.value
+      response_code         = 200
+      response_page_path    = "/index.html"
+      error_caching_min_ttl = 10
+    }
   }
 
   viewer_certificate {
