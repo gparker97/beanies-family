@@ -1,0 +1,20 @@
+{
+  "name": "@beanies/brand",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared brand tokens, fonts, assets, nav, and JSON-LD schema for beanies.family",
+  "exports": {
+    "./theme.css": "./theme.css",
+    "./nav": "./nav.ts",
+    "./schema": "./schema.ts",
+    "./assets/*": "./assets/*"
+  },
+  "files": [
+    "theme.css",
+    "nav.ts",
+    "schema.ts",
+    "assets",
+    "fonts"
+  ]
+}

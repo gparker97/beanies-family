@@ -1,0 +1,31 @@
+{
+  "name": "@beanies/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "^4.3.0",
+    "@astrojs/rss": "^4.0.11",
+    "@astrojs/sitemap": "^3.4.0",
+    "@beanies/brand": "*",
+    "@tailwindcss/vite": "^4.1.18",
+    "astro": "^5.14.0",
+    "astro-og-canvas": "^0.7.0",
+    "astro-seo": "^0.8.4",
+    "canvaskit-wasm": "^0.39.1",
+    "minisearch": "^7.1.2",
+    "sharp": "^0.34.4",
+    "tailwindcss": "^4.1.18",
+    "web-vitals": "^5.0.2"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.4",
+    "typescript": "~5.9.3"
+  }
+}

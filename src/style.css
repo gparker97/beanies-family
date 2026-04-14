@@ -1,50 +1,8 @@
 @import url('tailwindcss');
+@import url('@beanies/brand/theme.css');
 
 /* Use class-based dark mode (.dark on <html>) instead of prefers-color-scheme */
 @custom-variant dark (&:where(.dark, .dark *));
-
-/* ─── Brand colour theme (Tailwind 4 @theme) ──────────────────────────────
-   Defines semantic utility classes: bg-primary-500, text-secondary, etc.
-   Heritage Orange  #F15D22  — primary actions, CTAs, growth
-   Deep Slate       #2C3E50  — foundation, text, security
-   Sky Silk         #AED6F1  — calm, backgrounds, shadows
-   Terracotta       #E67E22  — warmth, children, milestones
-──────────────────────────────────────────────────────────────────────────── */
-@theme {
-  /* Heritage Orange scale */
-  --color-primary-50: #fef3ee;
-  --color-primary-100: #fde6d4;
-  --color-primary-200: #fbc9a8;
-  --color-primary-400: #f48347;
-  --color-primary-500: #f15d22;
-  --color-primary-600: #d14d1a;
-  --color-primary-700: #b33e15;
-
-  /* Deep Slate scale */
-  --color-secondary-50: #edf0f3;
-  --color-secondary-100: #d2dae2;
-  --color-secondary-400: #5d7a8a;
-  --color-secondary-500: #2c3e50;
-  --color-secondary-600: #243442;
-  --color-secondary-700: #1a252f;
-
-  /* Sky Silk */
-  --color-sky-silk-50: #f0f7fd;
-  --color-sky-silk-100: #daeef9;
-  --color-sky-silk-300: #aed6f1;
-
-  /* Terracotta */
-  --color-terracotta-400: #e67e22;
-  --color-terracotta-500: #ca6f1e;
-
-  /* Purple (To-Do accent) */
-  --color-purple-400: #9b59b6;
-  --color-purple-500: #8e44ad;
-
-  /* Fonts */
-  --font-outfit: 'Outfit', sans-serif;
-  --font-inter: 'Inter', system-ui, sans-serif;
-}
 
 /* ─── CSS custom properties (used in non-Tailwind contexts) ─────────────── */
 :root {
