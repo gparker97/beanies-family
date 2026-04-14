@@ -28,7 +28,11 @@ export async function navigateToSetupStep3(page: Page): Promise<void> {
   await createPodButton.click();
 
   // Step 1: Name & Password
-  await page.getByLabel('Family Name').fill('Test Family');
+  // Distinctive name so any future registry-table scrub can grep for it.
+  // The E2E suite also calls deleteFamilyFromRegistry() in afterEach to
+  // clean up properly; this name is the safety net for failed tests that
+  // crash before teardown.
+  await page.getByLabel('Family Name').fill('E2E Test Family');
   await page.getByLabel('Your Name').fill('John Doe');
   await page.getByLabel('Email').fill('john@example.com');
   await page.getByLabel('Password').first().fill(E2E_PASSWORD);
@@ -84,7 +88,11 @@ export async function bypassLoginIfNeeded(page: Page): Promise<void> {
     await createPodButton.click();
 
     // Step 1: Name & Password
-    await page.getByLabel('Family Name').fill('Test Family');
+    // Distinctive name so any future registry-table scrub can grep for it.
+    // The E2E suite also calls deleteFamilyFromRegistry() in afterEach to
+    // clean up properly; this name is the safety net for failed tests that
+    // crash before teardown.
+    await page.getByLabel('Family Name').fill('E2E Test Family');
     await page.getByLabel('Your Name').fill('John Doe');
     await page.getByLabel('Email').fill('john@example.com');
     await page.getByLabel('Password').first().fill(E2E_PASSWORD);
