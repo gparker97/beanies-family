@@ -35,7 +35,13 @@ resource "aws_s3_bucket_policy" "frontend" {
         Resource  = "${aws_s3_bucket.frontend.arn}/*"
         Condition = {
           StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.frontend.arn
+            # Use ArnLike-style list so additional sibling distributions
+            # (e.g. app.beanies.family during Phase A of the SEO cutover)
+            # can read from the same bucket via OAC without conflict.
+            "AWS:SourceArn" = concat(
+              [aws_cloudfront_distribution.frontend.arn],
+              var.additional_distribution_arns,
+            )
           }
         }
       }
@@ -46,10 +52,10 @@ resource "aws_s3_bucket_policy" "frontend" {
 # ── ACM Certificate (must be us-east-1 for CloudFront) ──────────────────────
 
 resource "aws_acm_certificate" "frontend" {
-  provider          = aws.us_east_1
-  domain_name       = var.domain_name
+  provider                  = aws.us_east_1
+  domain_name               = var.domain_name
   subject_alternative_names = ["www.${var.domain_name}"]
-  validation_method = "DNS"
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true

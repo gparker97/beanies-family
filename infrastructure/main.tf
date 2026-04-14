@@ -25,9 +25,49 @@ provider "aws" {
 module "frontend" {
   source = "./modules/frontend"
 
-  domain_name     = var.domain_name
-  environment     = var.environment
-  hosted_zone_id  = var.hosted_zone_id
+  domain_name    = var.domain_name
+  environment    = var.environment
+  hosted_zone_id = var.hosted_zone_id
+
+  # Let the app.<apex> distribution (Phase A cutover prep for #167) read
+  # from the same Vue S3 bucket via OAC.
+  additional_distribution_arns = [module.app_subdomain.cloudfront_distribution_arn]
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+}
+
+# ── app.beanies.family — PWA subdomain (added 2026-04-14 for #167) ──────────
+# Serves the Vue PWA at app.<apex>, sharing the frontend module's S3 bucket
+# via OAC. After the apex cutover, this becomes the sole home of the PWA.
+
+module "app_subdomain" {
+  source = "./modules/app-subdomain"
+
+  apex_domain                        = var.domain_name
+  environment                        = var.environment
+  hosted_zone_id                     = var.hosted_zone_id
+  origin_bucket_regional_domain_name = module.frontend.s3_bucket_regional_domain_name
+
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+}
+
+# ── web — Astro marketing site (added 2026-04-14 for #167) ──────────────────
+# Staging-only during Phase A (staging.<apex>). After cutover, this
+# distribution's aliases become [apex, www.apex] and the apex distribution
+# above is decommissioned.
+
+module "web" {
+  source = "./modules/web"
+
+  apex_domain    = var.domain_name
+  environment    = var.environment
+  hosted_zone_id = var.hosted_zone_id
 
   providers = {
     aws           = aws

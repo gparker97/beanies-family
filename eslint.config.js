@@ -85,6 +85,11 @@ export default [
       'playwright-report/**',
       'test-results/**',
       '.github/**',
+      // CloudFront Functions use a constrained JS runtime with a global
+      // `handler` entrypoint — not ESM. Linted via the AWS console on upload.
+      'infrastructure/modules/web/functions/**',
+      // Astro site has its own ESLint config (or none); handled separately.
+      'web/**',
     ],
   },
 ];
