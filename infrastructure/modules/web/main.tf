@@ -104,6 +104,18 @@ resource "aws_cloudfront_response_headers_policy" "noindex" {
   }
 }
 
+# ── CloudFront Function: clean URL → .html rewriter ────────────────────────
+# Astro emits flat .html files; S3 needs the exact path. This function runs
+# on viewer-request and rewrites "/blog/foo" → "/blog/foo.html" etc.
+
+resource "aws_cloudfront_function" "rewrite_to_html" {
+  name    = "${replace(var.apex_domain, ".", "-")}-web-rewrite-to-html"
+  runtime = "cloudfront-js-2.0"
+  code    = file("${path.module}/functions/rewrite-to-html.js")
+  comment = "Rewrite clean Astro URLs to their underlying .html paths before S3 lookup"
+  publish = true
+}
+
 # ── CloudFront distribution ─────────────────────────────────────────────────
 
 resource "aws_cloudfront_origin_access_control" "web" {
@@ -137,6 +149,11 @@ resource "aws_cloudfront_distribution" "web" {
     compress                   = true
     response_headers_policy_id = aws_cloudfront_response_headers_policy.noindex.id
 
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.rewrite_to_html.arn
+    }
+
     forwarded_values {
       query_string = false
       cookies {
@@ -149,7 +166,8 @@ resource "aws_cloudfront_distribution" "web" {
     max_ttl     = 86400
   }
 
-  # Long-cache hashed Astro assets.
+  # Long-cache hashed Astro assets (already have .js/.css/.png extensions —
+  # no URL rewrite needed).
   ordered_cache_behavior {
     path_pattern               = "/_astro/*"
     allowed_methods            = ["GET", "HEAD"]
