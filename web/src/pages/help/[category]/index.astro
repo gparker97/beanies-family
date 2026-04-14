@@ -1,0 +1,68 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../../components/Breadcrumbs.astro';
+import {
+  HELP_CATEGORIES,
+  getCategoryArticles,
+  getCategoryMeta,
+  type HelpCategory,
+} from '@/content/help';
+
+export function getStaticPaths() {
+  return HELP_CATEGORIES.map((cat) => ({ params: { category: cat.id } }));
+}
+
+const { category } = Astro.params;
+const meta = getCategoryMeta(category!);
+const articles = getCategoryArticles(category as HelpCategory);
+
+if (!meta) {
+  return Astro.redirect('/help');
+}
+
+const label = category!.replace(/-/g, ' ');
+const canonicalPath = `/help/${category}`;
+---
+
+<BaseLayout
+  title={`${label} — help center — beanies.family`}
+  description={`help articles for ${label} — ${articles.length} article${articles.length === 1 ? '' : 's'}.`}
+  canonicalPath={canonicalPath}
+>
+  <article class="mx-auto max-w-5xl px-6 py-12">
+    <Breadcrumbs
+      items={[
+        { label: 'home', href: '/' },
+        { label: 'help', href: '/help' },
+        { label, href: canonicalPath },
+      ]}
+    />
+
+    <header class="mt-8 flex items-center gap-4">
+      <span class="text-4xl" aria-hidden="true">{meta.icon}</span>
+      <div>
+        <h1 class="font-outfit text-3xl font-bold text-secondary-500 sm:text-4xl">{label}</h1>
+        <p class="mt-1 text-sm text-secondary-400">{articles.length} article{articles.length === 1 ? '' : 's'}</p>
+      </div>
+    </header>
+
+    <ul class="mt-10 grid gap-4 sm:grid-cols-2">
+      {
+        articles.map((a) => (
+          <li>
+            <a
+              href={`/help/${a.category}/${a.slug}`}
+              class="flex items-start gap-3 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <span class="text-2xl" aria-hidden="true">{a.icon}</span>
+              <div class="flex-1">
+                <h2 class="font-outfit text-sm font-semibold text-secondary-500">{a.title}</h2>
+                <p class="mt-1 line-clamp-2 text-xs text-secondary-400">{a.excerpt}</p>
+              </div>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </article>
+</BaseLayout>

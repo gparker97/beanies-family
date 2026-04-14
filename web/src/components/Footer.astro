@@ -1,0 +1,33 @@
+---
+import { FOOTER_NAV } from '@beanies/brand/nav';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="mt-24 border-t border-secondary-100/60 bg-white">
+  <div class="mx-auto max-w-6xl px-6 py-10 text-sm text-secondary-400">
+    <div class="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
+      <div class="font-inter">
+        <p class="font-outfit text-base font-semibold text-secondary-500">beanies.family</p>
+        <p class="mt-1">every bean counts</p>
+      </div>
+      <ul class="flex flex-wrap gap-5">
+        {
+          FOOTER_NAV.map((link) => (
+            <li>
+              <a
+                href={link.href}
+                class="transition-colors hover:text-primary-500"
+                target={link.external ? '_blank' : undefined}
+                rel={link.external ? 'noopener noreferrer' : undefined}
+              >
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+    <p class="mt-6 text-xs text-secondary-400/80">© {year} beanies.family. local-first, private, and yours.</p>
+  </div>
+</footer>

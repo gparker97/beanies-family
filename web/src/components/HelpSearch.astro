@@ -1,0 +1,105 @@
+---
+/**
+ * MiniSearch island — lazy-loads `/help-index.json` on first input focus, then
+ * runs fuzzy search entirely client-side. ~10 KB JS; only ships on pages that
+ * include this component.
+ */
+
+interface Props {
+  placeholder?: string;
+}
+const { placeholder = 'search the help center' } = Astro.props;
+---
+
+<div class="relative" data-help-search>
+  <input
+    type="search"
+    placeholder={placeholder}
+    autocomplete="off"
+    class="w-full rounded-2xl border border-secondary-100 bg-white px-4 py-3 font-inter text-sm text-secondary-500 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+    data-help-search-input
+  />
+  <ul
+    role="listbox"
+    class="absolute left-0 right-0 top-full z-20 mt-2 hidden max-h-96 overflow-y-auto rounded-2xl border border-secondary-100 bg-white shadow-lg"
+    data-help-search-results
+  ></ul>
+</div>
+
+<script>
+  import MiniSearch from 'minisearch';
+
+  interface Doc {
+    id: string;
+    title: string;
+    excerpt: string;
+    category: string;
+    slug: string;
+    text: string;
+  }
+
+  let search: MiniSearch<Doc> | null = null;
+  let loading: Promise<void> | null = null;
+
+  function loadIndex(): Promise<void> {
+    if (search || loading) return loading ?? Promise.resolve();
+    loading = fetch('/help-index.json')
+      .then((r) => r.json() as Promise<Doc[]>)
+      .then((docs) => {
+        const idx = new MiniSearch<Doc>({
+          fields: ['title', 'excerpt', 'text'],
+          storeFields: ['title', 'excerpt', 'category', 'slug'],
+          searchOptions: {
+            boost: { title: 3, excerpt: 2 },
+            fuzzy: 0.2,
+            prefix: true,
+          },
+        });
+        idx.addAll(docs);
+        search = idx;
+      });
+    return loading;
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-help-search]').forEach((root) => {
+    const input = root.querySelector<HTMLInputElement>('[data-help-search-input]');
+    const results = root.querySelector<HTMLUListElement>('[data-help-search-results]');
+    if (!input || !results) return;
+
+    const render = (q: string) => {
+      if (!search || !q.trim()) {
+        results.classList.add('hidden');
+        results.innerHTML = '';
+        return;
+      }
+      const hits = search.search(q, { combineWith: 'AND' }).slice(0, 8);
+      if (hits.length === 0) {
+        results.innerHTML =
+          '<li class="px-4 py-3 text-sm text-secondary-400">no matches</li>';
+        results.classList.remove('hidden');
+        return;
+      }
+      results.innerHTML = hits
+        .map((h) => {
+          const href = `/help/${h.category}/${h.slug}`;
+          return `<li><a href="${href}" class="block px-4 py-3 text-sm text-secondary-500 hover:bg-secondary-50"><span class="font-semibold">${escape(h.title as string)}</span><span class="block text-xs text-secondary-400">${escape(h.excerpt as string)}</span></a></li>`;
+        })
+        .join('');
+      results.classList.remove('hidden');
+    };
+
+    const escape = (s: string) =>
+      s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+
+    input.addEventListener('focus', () => void loadIndex(), { once: true });
+    input.addEventListener('input', async () => {
+      await loadIndex();
+      render(input.value);
+    });
+    document.addEventListener('click', (e) => {
+      if (!root.contains(e.target as Node)) {
+        results.classList.add('hidden');
+      }
+    });
+  });
+</script>

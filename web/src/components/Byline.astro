@@ -1,0 +1,39 @@
+---
+interface Props {
+  author: string;
+  date: Date;
+  updatedDate?: Date;
+  readTime?: number;
+}
+
+const { author, date, updatedDate, readTime } = Astro.props;
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+const showUpdated = updatedDate && updatedDate.getTime() !== date.getTime();
+---
+
+<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-secondary-400">
+  <span>
+    by <a href={`/about/${author}`} class="font-medium text-secondary-500 hover:text-primary-500">{author}</a>
+  </span>
+  <span aria-hidden="true">·</span>
+  <time datetime={date.toISOString()}>{fmt(date)}</time>
+  {
+    showUpdated && (
+      <>
+        <span aria-hidden="true">·</span>
+        <span>
+          last updated <time datetime={updatedDate.toISOString()}>{fmt(updatedDate)}</time>
+        </span>
+      </>
+    )
+  }
+  {
+    readTime && (
+      <>
+        <span aria-hidden="true">·</span>
+        <span>{readTime} min read</span>
+      </>
+    )
+  }
+</p>
