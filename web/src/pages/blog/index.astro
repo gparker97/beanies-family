@@ -2,82 +2,432 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
 
-const posts = (await getCollection('blog')).sort(
+const allPosts = (await getCollection('blog')).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime(),
 );
-const featured = posts.find((p) => p.data.featured);
-const rest = posts.filter((p) => p !== featured);
+const featuredPost = allPosts.find((p) => p.data.featured);
+const regularPosts = allPosts.filter((p) => p !== featuredPost);
+
+const comingSoonCards = [
+  { emoji: '✅', title: 'introducing todos', subtitle: 'coming soon' },
+  { emoji: '🔍', title: 'best cozi & maple alternatives in 2026', subtitle: 'coming soon' },
+];
+
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 ---
 
 <BaseLayout
   title="the beanstalk — the beanies.family blog"
-  description="stories, updates, and philosophy from the making of beanies.family. local-first, privacy-first, family-first."
+  description="the latest beanie news and updates — posted every friday, or roughly whenever I feel like it."
   canonicalPath="/blog"
 >
-  <header class="mx-auto max-w-6xl px-6 py-16">
-    <h1 class="font-outfit text-4xl font-bold text-secondary-500 sm:text-5xl">the beanstalk</h1>
-    <p class="mt-3 max-w-xl text-lg text-secondary-400">
-      stories, updates, and philosophy from the making of beanies.family.
-    </p>
-  </header>
+  <div class="blog-page">
+    <!-- Hero header -->
+    <div class="blog-hero">
+      <div class="blog-hero-pattern"></div>
+      <div class="blog-hero-content">
+        <img
+          src="/brand/beanies_family_hugging_transparent_512x512.png"
+          alt="the beanies family"
+          class="blog-hero-mascot"
+        />
+        <h1 class="blog-hero-title">welcome to the beanie beanstalk!</h1>
+        <p class="blog-hero-tagline">
+          the latest beanie news and updates — posted every friday, or roughly whenever I feel like it
+        </p>
+      </div>
+    </div>
 
-  {
-    featured && (
-      <section class="mx-auto max-w-6xl px-6 pb-10">
+    <!-- Content -->
+    <div class="blog-content">
+      {featuredPost && (
         <a
-          href={`/blog/${featured.data.slug}`}
-          class="block rounded-3xl bg-white p-8 shadow-sm transition-shadow hover:shadow-md sm:p-10"
+          href={`/blog/${featuredPost.data.slug}`}
+          class="featured-card"
         >
-          <div class="flex items-start gap-5">
-            {featured.data.coverEmoji && (
-              <span class="text-5xl" aria-hidden="true">
-                {featured.data.coverEmoji}
-              </span>
-            )}
-            <div class="flex-1">
-              <p class="text-xs font-semibold uppercase tracking-wide text-primary-500">featured</p>
-              <h2 class="mt-2 font-outfit text-2xl font-semibold text-secondary-500 sm:text-3xl">
-                {featured.data.title}
-              </h2>
-              <p class="mt-3 text-secondary-400">{featured.data.excerpt}</p>
-              <p class="mt-4 text-sm text-secondary-400">
-                by {featured.data.author} ·{' '}
-                <time datetime={featured.data.date.toISOString()}>
-                  {featured.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                </time>
-              </p>
+          <div class="featured-card-bg"></div>
+          <div class="featured-card-inner">
+            <div class="featured-card-left">
+              <img
+                src="/brand/beanies_father_son_icon_192x192.png"
+                alt=""
+                class="featured-card-illustration"
+              />
+            </div>
+            <div class="featured-card-right">
+              <div class="featured-card-badge">
+                <span class="featured-card-badge-dot"></span>
+                featured
+              </div>
+              <h2 class="featured-card-title">{featuredPost.data.title}</h2>
+              <p class="featured-card-excerpt">{featuredPost.data.excerpt}</p>
+              <div class="featured-card-meta">
+                <span>{featuredPost.data.author}</span>
+                <span class="featured-card-meta-dot">·</span>
+                <span>{fmt(featuredPost.data.date)}</span>
+              </div>
+            </div>
+            <div class="featured-card-arrow">
+              <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
             </div>
           </div>
         </a>
-      </section>
-    )
-  }
+      )}
 
-  <section class="mx-auto max-w-6xl px-6 pb-20">
-    <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {
-        rest.map((post) => (
-          <li>
-            <a
-              href={`/blog/${post.data.slug}`}
-              class="block h-full rounded-2xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
-            >
-              {post.data.coverEmoji && (
-                <span class="text-3xl" aria-hidden="true">
-                  {post.data.coverEmoji}
-                </span>
-              )}
-              <h3 class="mt-3 font-outfit text-lg font-semibold text-secondary-500">{post.data.title}</h3>
-              <p class="mt-2 line-clamp-3 text-sm text-secondary-400">{post.data.excerpt}</p>
-              <p class="mt-4 text-xs text-secondary-400">
-                <time datetime={post.data.date.toISOString()}>
-                  {post.data.date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                </time>
-              </p>
+      {regularPosts.length > 0 && (
+        <div class="posts-grid">
+          {regularPosts.map((post) => (
+            <a href={`/blog/${post.data.slug}`} class="post-card">
+              <div class="post-card-emoji">{post.data.coverEmoji}</div>
+              <h3 class="post-card-title">{post.data.title}</h3>
+              <p class="post-card-excerpt">{post.data.excerpt}</p>
+              <div class="post-card-meta">
+                <span>{post.data.author}</span>
+                <span class="post-card-meta-dot">·</span>
+                <span>{fmt(post.data.date)}</span>
+              </div>
             </a>
-          </li>
-        ))
-      }
-    </ul>
-  </section>
+          ))}
+        </div>
+      )}
+
+      <div class="coming-grid">
+        {comingSoonCards.map((card, i) => (
+          <div class={`coming-card coming-card-${i % 3}`}>
+            <div class="coming-card-emoji">{card.emoji}</div>
+            <h3 class="coming-card-title">{card.title}</h3>
+            <p class="coming-card-sub">{card.subtitle}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
 </BaseLayout>
+
+<style>
+.blog-page {
+  --deep-slate: #2c3e50;
+  --heritage-orange: #f15d22;
+  --terracotta: #e67e22;
+  --cloud-white: #f8f9fa;
+  background: var(--cloud-white);
+  min-height: 100vh;
+}
+
+.blog-hero {
+  overflow: hidden;
+  padding: 60px 24px 48px;
+  position: relative;
+  text-align: center;
+}
+
+.blog-hero-pattern {
+  background-image:
+    radial-gradient(circle at 25% 25%, var(--heritage-orange) 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, var(--terracotta) 1px, transparent 1px);
+  background-size: 32px 32px;
+  inset: 0;
+  opacity: 0.03;
+  position: absolute;
+}
+
+.blog-hero-content { position: relative; z-index: 1; }
+
+.blog-hero-mascot {
+  animation: hero-bounce 600ms ease-out;
+  filter: drop-shadow(0 12px 32px rgb(44 62 80 / 10%));
+  height: 160px;
+  margin: 0 auto 20px;
+  width: 160px;
+}
+
+.blog-hero-title {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.blog-hero-tagline {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 0.875rem;
+  margin-top: 8px;
+  opacity: 0.4;
+}
+
+@keyframes hero-bounce {
+  0% { opacity: 0; transform: translateY(-20px); }
+  60% { opacity: 1; transform: translateY(4px); }
+  100% { transform: translateY(0); }
+}
+
+.blog-content {
+  margin: 0 auto;
+  max-width: 800px;
+  padding: 0 24px 48px;
+}
+
+.featured-card {
+  border: none;
+  border-radius: 24px;
+  cursor: pointer;
+  display: block;
+  margin-bottom: 40px;
+  overflow: hidden;
+  position: relative;
+  text-align: left;
+  text-decoration: none;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  width: 100%;
+}
+
+.featured-card:hover {
+  box-shadow: 0 16px 48px rgb(241 93 34 / 15%);
+  transform: translateY(-2px);
+}
+
+.featured-card-bg {
+  background: linear-gradient(135deg, var(--heritage-orange) 0%, var(--terracotta) 40%, #d4721e 100%);
+  inset: 0;
+  position: absolute;
+}
+
+.featured-card-bg::after {
+  background-image:
+    radial-gradient(circle at 20% 80%, white 1.5px, transparent 1.5px),
+    radial-gradient(circle at 80% 20%, white 1px, transparent 1px);
+  background-size: 28px 28px, 20px 20px;
+  content: '';
+  inset: 0;
+  opacity: 0.06;
+  position: absolute;
+}
+
+.featured-card-inner {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  padding: 28px 24px;
+  position: relative;
+}
+
+.featured-card-left { flex-shrink: 0; }
+
+.featured-card-illustration {
+  backdrop-filter: blur(8px);
+  background: rgb(255 255 255 / 15%);
+  border-radius: 20px;
+  height: 80px;
+  padding: 8px;
+  width: 80px;
+}
+
+.featured-card-right { flex: 1; min-width: 0; }
+
+.featured-card-badge {
+  align-items: center;
+  color: rgb(255 255 255 / 80%);
+  display: inline-flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.625rem;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.featured-card-badge-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+  background: white;
+  border-radius: 50%;
+  height: 6px;
+  width: 6px;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.featured-card-title {
+  color: white;
+  font-family: Outfit, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.featured-card:hover .featured-card-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.featured-card-excerpt {
+  -webkit-box-orient: vertical;
+  color: rgb(255 255 255 / 60%);
+  display: -webkit-box;
+  font-size: 0.8125rem;
+  -webkit-line-clamp: 2;
+  line-height: 1.6;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.featured-card-meta {
+  align-items: center;
+  color: rgb(255 255 255 / 40%);
+  display: flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.featured-card-meta-dot { opacity: 0.3; }
+
+.featured-card-arrow {
+  align-items: center;
+  background: rgb(255 255 255 / 10%);
+  border-radius: 50%;
+  color: rgb(255 255 255 / 60%);
+  display: flex;
+  flex-shrink: 0;
+  height: 40px;
+  justify-content: center;
+  transition: background 200ms, color 200ms;
+  width: 40px;
+}
+
+.featured-card:hover .featured-card-arrow {
+  background: white;
+  color: var(--heritage-orange);
+}
+
+.posts-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+  margin-bottom: 40px;
+}
+
+@media (max-width: 480px) {
+  .posts-grid { grid-template-columns: 1fr; }
+}
+
+.post-card {
+  background: white;
+  border: 1.5px solid rgb(44 62 80 / 8%);
+  border-radius: 20px;
+  cursor: pointer;
+  display: block;
+  padding: 28px 20px;
+  text-align: left;
+  text-decoration: none;
+  transition: transform 200ms ease, border-color 200ms, box-shadow 200ms;
+  width: 100%;
+}
+
+.post-card:hover {
+  border-color: var(--heritage-orange);
+  box-shadow: 0 8px 24px rgb(241 93 34 / 8%);
+  transform: translateY(-2px);
+}
+
+.post-card-emoji { font-size: 2rem; margin-bottom: 12px; }
+
+.post-card-title {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.post-card:hover .post-card-title { color: var(--heritage-orange); }
+
+.post-card-excerpt {
+  -webkit-box-orient: vertical;
+  color: var(--deep-slate);
+  display: -webkit-box;
+  font-size: 0.8125rem;
+  -webkit-line-clamp: 3;
+  line-height: 1.6;
+  opacity: 0.5;
+  overflow: hidden;
+}
+
+.post-card-meta {
+  align-items: center;
+  color: var(--deep-slate);
+  display: flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.6875rem;
+  gap: 6px;
+  margin-top: 12px;
+  opacity: 0.3;
+}
+
+.post-card-meta-dot { opacity: 0.5; }
+
+.coming-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 480px) {
+  .coming-grid { grid-template-columns: 1fr; }
+}
+
+.coming-card {
+  border: 1.5px dashed rgb(44 62 80 / 8%);
+  border-radius: 20px;
+  padding: 28px 20px;
+  text-align: center;
+  transition: border-color 200ms;
+}
+
+.coming-card:hover { border-color: rgb(44 62 80 / 15%); }
+
+.coming-card-0 { background: linear-gradient(135deg, rgb(241 93 34 / 4%), rgb(230 126 34 / 2%)); }
+.coming-card-1 { background: linear-gradient(135deg, rgb(174 214 241 / 8%), rgb(174 214 241 / 3%)); }
+.coming-card-2 { background: linear-gradient(135deg, rgb(39 174 96 / 5%), rgb(39 174 96 / 2%)); }
+
+.coming-card-emoji { font-size: 2rem; margin-bottom: 12px; }
+
+.coming-card-title {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.coming-card-sub {
+  color: var(--heritage-orange);
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  text-transform: lowercase;
+}
+
+@media (max-width: 520px) {
+  .blog-hero { padding-top: 60px; }
+  .blog-hero-mascot { height: 120px; width: 120px; }
+  .blog-hero-title { font-size: 1.75rem; }
+  .featured-card-inner { flex-direction: column; text-align: center; }
+  .featured-card-arrow { display: none; }
+}
+</style>
+</content>
+</invoke>

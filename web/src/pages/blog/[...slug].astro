@@ -1,34 +1,41 @@
 ---
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import Breadcrumbs from '../../components/Breadcrumbs.astro';
-import Byline from '../../components/Byline.astro';
-import RelatedArticles from '../../components/RelatedArticles.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
 
 export async function getStaticPaths() {
   const posts = await getCollection('blog');
-  return posts.map((post) => ({
-    params: { slug: post.data.slug },
-    props: { post, allPosts: posts },
-  }));
+  const sorted = [...posts].sort((a, b) => a.data.date.getTime() - b.data.date.getTime());
+  return posts.map((post) => {
+    const i = sorted.findIndex((p) => p.data.slug === post.data.slug);
+    const prevPost = i > 0 ? sorted[i - 1] : undefined;
+    const nextPost = i < sorted.length - 1 ? sorted[i + 1] : undefined;
+    return {
+      params: { slug: post.data.slug },
+      props: { post, prevPost, nextPost },
+    };
+  });
 }
 
-const { post, allPosts } = Astro.props;
+const { post, prevPost, nextPost } = Astro.props;
 const { Content } = await render(post);
 
 const canonicalPath = `/blog/${post.data.slug}`;
 const ogImageUrl = new URL(`/og/${post.data.slug}.png`, SITE_URL).toString();
-const related = allPosts
-  .filter((p) => p.data.slug !== post.data.slug)
-  .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
-  .slice(0, 3)
-  .map((p) => ({
-    title: p.data.title,
-    href: `/blog/${p.data.slug}`,
-    excerpt: p.data.excerpt,
-  }));
+
+const fmtFull = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+const CATEGORIES: Record<string, { emoji: string; label: string }> = {
+  updates: { emoji: '📣', label: 'updates' },
+  'how-to': { emoji: '🛠️', label: 'how-to' },
+  philosophy: { emoji: '💭', label: 'philosophy' },
+  security: { emoji: '🔒', label: 'security' },
+  stories: { emoji: '📖', label: 'stories' },
+  travel: { emoji: '✈️', label: 'travel' },
+};
+const categoryInfo = CATEGORIES[post.data.category];
 
 const blogPosting = {
   '@type': 'BlogPosting',
@@ -42,7 +49,6 @@ const blogPosting = {
   url: `${SITE_URL}${canonicalPath}`,
   inLanguage: 'en',
 };
-
 const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPosting];
 ---
 
@@ -56,62 +62,357 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   author={post.data.author}
   jsonLd={jsonLd}
 >
-  <article class="mx-auto max-w-3xl px-6 py-12">
-    <Breadcrumbs
-      items={[
-        { label: 'home', href: '/' },
-        { label: 'beanstalk', href: '/blog' },
-        { label: post.data.title, href: canonicalPath },
-      ]}
-    />
+  <div class="post-page">
+    <div class="post-content">
+      <a href="/blog" class="post-back">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        all posts
+      </a>
 
-    <header class="mt-8 space-y-4">
-      {post.data.coverEmoji && <div class="text-5xl">{post.data.coverEmoji}</div>}
-      <h1 class="font-outfit text-3xl font-bold leading-tight text-secondary-500 sm:text-4xl">
-        {post.data.title}
-      </h1>
-      <Byline author={post.data.author} date={post.data.date} />
-    </header>
+      <header class="post-header">
+        <div class="post-header-top">
+          <img src="/brand/beanies_father_son_icon_192x192.png" alt="" class="post-header-avatar" />
+          <div>
+            {categoryInfo && (
+              <span class="post-header-cat">
+                {categoryInfo.emoji} {categoryInfo.label}
+              </span>
+            )}
+          </div>
+        </div>
+        <h1 class="post-header-title">{post.data.title}</h1>
+        <div class="post-header-meta">
+          <span>{post.data.author}</span>
+          <span class="post-header-dot">·</span>
+          <span>{fmtFull(post.data.date)}</span>
+        </div>
+      </header>
 
-    <div class="prose-content mt-10 space-y-5 leading-relaxed text-secondary-500">
-      <Content />
+      <div class="post-divider"></div>
+
+      <article class="blog-prose" id="blog-article">
+        <Content />
+      </article>
+
+      <div class="post-divider"></div>
+
+      <div class="post-nav">
+        <a
+          class="post-nav-btn"
+          href={prevPost ? `/blog/${prevPost.data.slug}` : '/blog'}
+        >
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          <div>
+            <div class="post-nav-label">previous</div>
+            <div class="post-nav-title">{prevPost ? prevPost.data.title : 'all posts'}</div>
+          </div>
+        </a>
+
+        <a
+          class="post-nav-btn post-nav-btn-right"
+          href={nextPost ? `/blog/${nextPost.data.slug}` : '/blog'}
+        >
+          <div>
+            <div class="post-nav-label">next</div>
+            <div class="post-nav-title">{nextPost ? nextPost.data.title : 'all posts'}</div>
+          </div>
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </a>
+      </div>
     </div>
 
-    <RelatedArticles items={related} heading="more from the beanstalk" />
-  </article>
+    <div id="lightbox-overlay" class="lightbox-overlay" hidden>
+      <img id="lightbox-img" src="" alt="" class="lightbox-img" />
+      <button type="button" id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
+    </div>
+  </div>
 </BaseLayout>
 
+<script is:inline>
+(function() {
+  const article = document.getElementById('blog-article');
+  const overlay = document.getElementById('lightbox-overlay');
+  const lightboxImg = document.getElementById('lightbox-img');
+  const closeBtn = document.getElementById('lightbox-close');
+  if (!article || !overlay || !lightboxImg || !closeBtn) return;
+
+  function open(src) {
+    lightboxImg.src = src;
+    overlay.hidden = false;
+  }
+  function close() {
+    overlay.hidden = true;
+    lightboxImg.src = '';
+  }
+
+  article.addEventListener('click', function(e) {
+    const img = e.target.closest('img');
+    if (img) open(img.src);
+  });
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) close();
+  });
+  closeBtn.addEventListener('click', close);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') close();
+  });
+})();
+</script>
+
 <style is:global>
-  .prose-content h1,
-  .prose-content h2,
-  .prose-content h3 {
-    font-family: var(--font-outfit);
-    color: #2c3e50;
-    font-weight: 600;
-    margin-top: 2rem;
-  }
-  .prose-content h1 { font-size: 1.75rem; }
-  .prose-content h2 { font-size: 1.5rem; }
-  .prose-content h3 { font-size: 1.25rem; }
-  .prose-content p { color: #5d7a8a; }
-  .prose-content a { color: #f15d22; text-decoration: none; }
-  .prose-content a:hover { text-decoration: underline; color: #d14d1a; }
-  .prose-content strong { color: #2c3e50; font-weight: 600; }
-  .prose-content ul, .prose-content ol { padding-left: 1.5rem; color: #5d7a8a; }
-  .prose-content ul li { list-style: disc; }
-  .prose-content ol li { list-style: decimal; }
-  .prose-content blockquote {
-    border-left: 4px solid #f15d22;
-    padding-left: 1rem;
-    margin: 1rem 0;
-    font-style: italic;
-    color: #5d7a8a;
-  }
-  .prose-content code {
-    background: #f5f1ed;
-    border-radius: 4px;
-    padding: 0.15em 0.4em;
-    font-size: 0.9em;
-  }
-  .prose-content img { border-radius: 1rem; margin: 1.5rem 0; }
+.blog-prose h2 {
+  color: #2c3e50;
+  font-family: Outfit, sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 2rem 0 0.75rem;
+}
+.blog-prose h3 {
+  color: #2c3e50;
+  font-family: Outfit, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+}
+.blog-prose p {
+  color: rgb(44 62 80 / 70%);
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  margin-bottom: 1rem;
+}
+.blog-prose strong { color: #2c3e50; font-weight: 600; }
+.blog-prose em { font-style: italic; }
+.blog-prose a {
+  color: #f15d22;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.blog-prose a:hover { color: #e67e22; }
+.blog-prose ul, .blog-prose ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+.blog-prose li {
+  color: rgb(44 62 80 / 70%);
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  margin-bottom: 0.35rem;
+}
+.blog-prose ul li { list-style-type: disc; }
+.blog-prose ol li { list-style-type: decimal; }
+.blog-prose blockquote {
+  border-left: 3px solid #f15d22;
+  color: rgb(44 62 80 / 55%);
+  font-style: italic;
+  margin: 1.5rem 0;
+  padding-left: 1rem;
+}
+.blog-prose code {
+  background: rgb(44 62 80 / 4%);
+  border-radius: 6px;
+  font-size: 0.85em;
+  padding: 0.15em 0.4em;
+}
+.blog-prose hr {
+  background: rgb(44 62 80 / 8%);
+  border: none;
+  height: 1px;
+  margin: 2rem 0;
+}
+.blog-prose img {
+  border: 1px solid rgb(44 62 80 / 8%);
+  border-radius: 16px;
+  cursor: zoom-in;
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 100%;
+  width: 100%;
+}
+.blog-prose img + em {
+  color: rgb(44 62 80 / 40%);
+  display: block;
+  font-size: 0.8125rem;
+  margin-top: -0.75rem;
+  text-align: center;
+}
 </style>
+
+<style>
+.post-page {
+  --deep-slate: #2c3e50;
+  --heritage-orange: #f15d22;
+  --terracotta: #e67e22;
+  --cloud-white: #f8f9fa;
+  background: var(--cloud-white);
+  min-height: 100vh;
+}
+
+.post-content {
+  margin: 0 auto;
+  max-width: 640px;
+  padding: 40px 24px 48px;
+}
+
+.post-back {
+  align-items: center;
+  background: none;
+  border: none;
+  color: rgb(44 62 80 / 35%);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  gap: 4px;
+  margin-bottom: 24px;
+  text-decoration: none;
+  transition: color 200ms;
+}
+.post-back:hover { color: var(--heritage-orange); }
+
+.post-header { margin-bottom: 32px; }
+
+.post-header-top {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.post-header-avatar {
+  background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(174 214 241 / 8%));
+  border-radius: 14px;
+  height: 48px;
+  padding: 4px;
+  width: 48px;
+}
+
+.post-header-cat {
+  background: rgb(44 62 80 / 4%);
+  border-radius: 20px;
+  color: rgb(44 62 80 / 45%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+
+.post-header-title {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.post-header-meta {
+  align-items: center;
+  color: rgb(44 62 80 / 35%);
+  display: flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.75rem;
+  gap: 6px;
+  margin-top: 12px;
+}
+.post-header-dot { opacity: 0.4; }
+
+.post-divider {
+  background: linear-gradient(90deg, transparent, rgb(44 62 80 / 8%), transparent);
+  height: 1px;
+  margin: 32px 0;
+}
+
+.post-nav { display: flex; gap: 12px; }
+
+.post-nav-btn {
+  align-items: center;
+  background: white;
+  border: 1px solid rgb(44 62 80 / 6%);
+  border-radius: 16px;
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  padding: 16px;
+  text-align: left;
+  text-decoration: none;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+.post-nav-btn:hover {
+  border-color: rgb(241 93 34 / 15%);
+  box-shadow: 0 4px 16px rgb(241 93 34 / 6%);
+}
+.post-nav-btn-right { justify-content: flex-end; text-align: right; }
+.post-nav-btn svg { color: rgb(44 62 80 / 25%); flex-shrink: 0; }
+.post-nav-btn:hover svg { color: var(--heritage-orange); }
+
+.post-nav-label {
+  color: rgb(44 62 80 / 35%);
+  font-family: Outfit, sans-serif;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.post-nav-title {
+  color: var(--deep-slate);
+  font-family: Outfit, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-top: 2px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.post-nav-btn:hover .post-nav-title { color: var(--heritage-orange); }
+
+.lightbox-overlay {
+  align-items: center;
+  background: rgb(0 0 0 / 70%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 9999;
+}
+.lightbox-overlay[hidden] { display: none; }
+
+.lightbox-img {
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgb(0 0 0 / 40%);
+  max-height: 90vh;
+  max-width: 90vw;
+  object-fit: contain;
+}
+
+.lightbox-close {
+  background: rgb(255 255 255 / 15%);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  font-size: 1.5rem;
+  height: 40px;
+  line-height: 1;
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  transition: background 200ms;
+  width: 40px;
+}
+.lightbox-close:hover { background: rgb(255 255 255 / 30%); }
+
+@media (max-width: 520px) {
+  .post-content { padding-top: 40px; }
+  .post-header-title { font-size: 1.375rem; }
+}
+</style>
+</content>
+</invoke>
