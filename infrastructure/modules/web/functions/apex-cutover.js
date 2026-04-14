@@ -1,20 +1,19 @@
 /**
- * CloudFront Function — runs on viewer-request at the apex distribution
- * AFTER the cutover. Two responsibilities:
+ * Apex CloudFront Function — runs on viewer-request at the apex distribution
+ * AFTER the Phase C cutover. Combines two responsibilities so we stay within
+ * CloudFront's "one function per event type per cache behavior" limit:
  *
- * 1. 301 any authenticated-app path (`/dashboard`, `/login`, etc.) to
- *    `https://app.beanies.family` preserving the path + query.
- * 2. 301 legacy `/beanstalk` URLs to `/blog`.
+ * 1. 301 any authenticated PWA path (`/dashboard`, `/login`, etc.) to
+ *    `https://app.beanies.family` preserving path + querystring.
+ * 2. 301 legacy `/beanstalk*` URLs to `/blog*` (keeps inbound links alive).
+ * 3. Rewrite clean Astro URLs to their `.html` paths so S3 finds the file
+ *    (Astro emits flat .html files; without rewriting, `/blog/foo` 403s).
  *
- * Anything else falls through to S3 (Astro static HTML).
+ * This function supersedes apex-redirects.js (Phase A, never attached) and
+ * rewrite-to-html.js (Phase A, attached to staging only). It is the single
+ * function attached to the apex distribution post-cutover.
  *
- * This function is NOT attached to any distribution in Phase A. It will be
- * attached to the apex distribution as part of the Phase C cutover, at which
- * point its behavior becomes live.
- *
- * CloudFront Functions run in a constrained JS environment (no `let` scope
- * in some older runtimes — the `cloudfront-js-2.0` runtime used here is
- * modern ECMAScript and supports `let`/`const` plus `Array.prototype.some`).
+ * Runtime: cloudfront-js-2.0 (ES 2020). No network, no modules, 1ms CPU.
  */
 
 // prettier-ignore
@@ -48,7 +47,6 @@ function isAppPath(path) {
 }
 
 function buildQueryString(qs) {
-  // CloudFront passes querystring as an object keyed by param name.
   var parts = [];
   for (var k in qs) {
     if (!Object.prototype.hasOwnProperty.call(qs, k)) continue;
@@ -80,16 +78,26 @@ function handler(event) {
   var uri = request.uri;
   var qs = buildQueryString(request.querystring || {});
 
-  // Legacy /beanstalk* → /blog*
+  // 1. Legacy /beanstalk* → /blog*
   if (uri === '/beanstalk' || uri.indexOf('/beanstalk/') === 0) {
     var newUri = uri.replace(/^\/beanstalk/, '/blog');
     return redirect('https://beanies.family' + newUri + qs);
   }
 
-  // Authenticated PWA paths → app.beanies.family
+  // 2. Authenticated PWA paths → app.beanies.family
   if (isAppPath(uri)) {
     return redirect('https://app.beanies.family' + uri + qs);
   }
 
+  // 3. Astro static-site URL rewrite (clean URL → .html on S3)
+  if (uri === '/' || uri.endsWith('/')) {
+    request.uri = uri + 'index.html';
+    return request;
+  }
+  var lastSlash = uri.lastIndexOf('/');
+  var lastSegment = uri.slice(lastSlash + 1);
+  if (lastSegment.indexOf('.') === -1) {
+    request.uri = uri + '.html';
+  }
   return request;
 }
