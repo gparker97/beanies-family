@@ -9,9 +9,13 @@
  * Anything else is "uncertain" and listed for manual review.
  *
  * Run modes:
- *   node scripts/migrate-registry-dev-rows.mjs              # dry-run (default)
+ *   node scripts/migrate-registry-dev-rows.mjs              # dry-run (default), email-pattern auto-classification
  *   node scripts/migrate-registry-dev-rows.mjs --copy       # copy classified-dev rows to dev table (no deletes)
  *   node scripts/migrate-registry-dev-rows.mjs --copy-and-purge   # copy + delete from prod
+ *
+ * After human review of the auto-classification, switch to:
+ *   node scripts/migrate-registry-dev-rows.mjs --keep-prod-only   # treat ANY row not in KEEP_PROD_IDS as dev (dry-run)
+ *   node scripts/migrate-registry-dev-rows.mjs --keep-prod-only --copy-and-purge   # final migration
  *
  * Requires AWS creds in env (same role used for terraform apply).
  *
@@ -53,7 +57,38 @@ function normalizeGmail(email) {
 
 const DEV_GMAIL = 'gpsp2001@gmail.com';
 
+/**
+ * Hardcoded list of family IDs that are CONFIRMED real-user pods and must
+ * stay in the prod table. Built from the human review of the dry-run output
+ * on 2026-04-14 (see commit message). When --keep-prod-only mode is used,
+ * everything NOT in this list is treated as dev.
+ */
+const KEEP_PROD_IDS = new Set([
+  // Auto-classified as real (had real-user emails)
+  'dd11f715-b2ef-4e12-abdd-f034cb3a03f5', // jlcst100@gmail.com — Ponce
+  'a9fa216e-85a8-46ea-aa3a-74e74b55ac7d', // richard@richardhsmith.co.uk — Parada dos montes
+  // Manually identified as real (no email but recognized family names)
+  '2ea57e06-3882-45c8-8988-6ea8c8416af0', // Tan
+  '1d14bcfe-ea31-4910-9142-f851ebf66996', // Ando
+  '19d03eb6-c6d6-41c9-b1c5-f09d438a8281', // Seesters
+  '6053f1d8-1d9c-496a-92df-a79c8cee9d09', // The yamamichi family
+  'cf6e3f2f-ad07-4567-9561-f388f0e55848', // W
+  '13015bde-61a8-4f34-a994-adbad90f518d', // Graglios
+  'c15380e2-68af-481a-823c-ad75884a22d7', // the big sausage family
+  '9186db2b-976c-4b16-86f8-97af1c200cd1', // Desquiens
+  '020cbbee-429c-428e-b0f3-3fa82fecbff2', // Soboszek
+  'ae92950b-68c7-462a-b5b9-5f98fa046620', // Parker Meng Beanies
+  '5e1ac66e-ec30-4a50-a737-28fb6b716bd6', // Quach
+]);
+
+const KEEP_PROD_ONLY = args.has('--keep-prod-only');
+
 function classify(item) {
+  // --keep-prod-only mode: any row not in KEEP_PROD_IDS is dev. Used for the
+  // final migration after the human review.
+  if (KEEP_PROD_ONLY) {
+    return KEEP_PROD_IDS.has(item.familyId) ? 'real' : 'dev';
+  }
   const email = (item.ownerEmail || '').toLowerCase();
   if (!email) return 'uncertain'; // no email — manual review
   if (email.endsWith('@test.com')) return 'dev';
