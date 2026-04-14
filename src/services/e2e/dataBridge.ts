@@ -12,6 +12,8 @@
 import { getDoc, changeDoc, saveDoc } from '@/services/automerge/docService';
 import { bufferToBase64 } from '@/utils/encoding';
 import type { FamilyDocument, CollectionName } from '@/types/automerge';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
+import { removeFamily } from '@/services/registry/registryService';
 
 /** sessionStorage key for the persisted Automerge binary */
 export const E2E_SEED_KEY = '__e2eSeedDoc';
@@ -43,6 +45,20 @@ export function initDataBridge(): void {
 
       // Strip Automerge Proxy wrappers for safe structured-cloning
       return JSON.parse(JSON.stringify(result));
+    },
+
+    /**
+     * E2E afterEach cleanup hook — removes the active family from the
+     * registry DDB table so test pods don't accumulate. Fire-and-forget
+     * (registryService.removeFamily already swallows errors). Returns
+     * the familyId that was deleted (or null if none was active) so the
+     * Playwright helper can log it.
+     */
+    async cleanupActiveFamily(): Promise<string | null> {
+      const id = getActiveFamilyId();
+      if (!id) return null;
+      await removeFamily(id);
+      return id;
     },
 
     seedData(data: Partial<Record<keyof FamilyDocument, unknown>>) {
