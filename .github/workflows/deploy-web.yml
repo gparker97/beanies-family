@@ -1,0 +1,106 @@
+name: Deploy web (Astro marketing site)
+
+# Manual-only for Phase A. After the apex cutover (Phase C), we may wire
+# this to main-branch pushes that touch web/ or packages/brand. Keeping it
+# manual for now matches the Vue deploy workflow pattern and keeps full
+# control of production cut-overs in human hands.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deployment target'
+        required: true
+        type: choice
+        default: 'staging'
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  NODE_VERSION: '24'
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  build:
+    name: Build Astro site
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Astro site
+        run: npm --workspace=@beanies/web run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-dist
+          path: web/dist/
+          retention-days: 1
+
+  deploy:
+    name: Deploy to ${{ inputs.target }}
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: web-dist
+          path: web/dist/
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: aws s3 sync web/dist/ s3://${{ secrets.WEB_S3_BUCKET }} --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Ping IndexNow (production only)
+        if: ${{ inputs.target == 'production' }}
+        env:
+          INDEXNOW_KEY: e7a3f2b1c9d4487895612d0a4f8b3e67
+        run: |
+          # Fire-and-forget notify to Bing/Yandex. No auth required beyond
+          # the key file being hosted at /<key>.txt on the site.
+          curl -sS -X POST https://api.indexnow.org/indexnow \
+            -H "Content-Type: application/json" \
+            -d "$(cat <<EOF
+          {
+            "host": "beanies.family",
+            "key": "${INDEXNOW_KEY}",
+            "keyLocation": "https://beanies.family/${INDEXNOW_KEY}.txt",
+            "urlList": [
+              "https://beanies.family/",
+              "https://beanies.family/blog",
+              "https://beanies.family/help",
+              "https://beanies.family/sitemap-index.xml"
+            ]
+          }
+          EOF
+          )" || echo "IndexNow ping failed (non-fatal)"
