@@ -19,6 +19,7 @@ const { post, allPosts } = Astro.props;
 const { Content } = await render(post);
 
 const canonicalPath = `/blog/${post.data.slug}`;
+const ogImageUrl = new URL(`/og/${post.data.slug}.png`, SITE_URL).toString();
 const related = allPosts
   .filter((p) => p.data.slug !== post.data.slug)
   .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
@@ -49,6 +50,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   title={`${post.data.title} — the beanstalk`}
   description={post.data.excerpt}
   canonicalPath={canonicalPath}
+  ogImage={ogImageUrl}
   ogType="article"
   publishedTime={post.data.date.toISOString()}
   author={post.data.author}
