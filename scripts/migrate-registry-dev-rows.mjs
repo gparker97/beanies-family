@@ -17,6 +17,11 @@
  *   node scripts/migrate-registry-dev-rows.mjs --keep-prod-only   # treat ANY row not in KEEP_PROD_IDS as dev (dry-run)
  *   node scripts/migrate-registry-dev-rows.mjs --keep-prod-only --copy-and-purge   # final migration
  *
+ * Clean the dev table itself (delete "Test Family" / "E2E Test Family" rows
+ * that may have leaked from earlier migration passes or pre-cleanup E2E):
+ *   node scripts/migrate-registry-dev-rows.mjs --scrub-dev          # dry-run
+ *   node scripts/migrate-registry-dev-rows.mjs --scrub-dev --apply  # actually delete
+ *
  * Requires AWS creds in env (same role used for terraform apply).
  *
  * Tables (hardcoded — change if names differ):
@@ -39,6 +44,8 @@ const REGION = 'ap-southeast-1';
 const args = new Set(process.argv.slice(2));
 const COPY = args.has('--copy') || args.has('--copy-and-purge');
 const PURGE = args.has('--copy-and-purge');
+const SCRUB_DEV = args.has('--scrub-dev');
+const APPLY = args.has('--apply');
 
 const client = new DynamoDBClient({ region: REGION });
 
@@ -119,6 +126,34 @@ async function scanAll(tableName) {
 }
 
 (async () => {
+  if (SCRUB_DEV) {
+    console.log(`Mode: SCRUB-DEV ${APPLY ? '(APPLY)' : '(dry-run)'}`);
+    console.log(`Scanning ${DEV_TABLE}…`);
+    const items = await scanAll(DEV_TABLE);
+    const purgeTargets = items.filter((it) => PURGE_FAMILY_NAMES.has(it.familyName || ''));
+    console.log(`Total dev rows: ${items.length}`);
+    console.log(
+      `Will purge ${purgeTargets.length} (familyName ∈ {${[...PURGE_FAMILY_NAMES].join(', ')}})\n`
+    );
+    for (const it of purgeTargets.slice(0, 5)) {
+      console.log(`  ${it.familyId}  familyName=${it.familyName}`);
+    }
+    if (purgeTargets.length > 5) console.log(`  …and ${purgeTargets.length - 5} more`);
+    if (!APPLY) {
+      console.log(`\nDry-run complete. Re-run with --scrub-dev --apply to actually delete.`);
+      return;
+    }
+    console.log(`\nDeleting ${purgeTargets.length} rows from ${DEV_TABLE}…`);
+    for (const it of purgeTargets) {
+      await client.send(
+        new DeleteItemCommand({ TableName: DEV_TABLE, Key: marshall({ familyId: it.familyId }) })
+      );
+      process.stdout.write('.');
+    }
+    console.log(`\nDone. Dev table now has ${items.length - purgeTargets.length} rows.`);
+    return;
+  }
+
   console.log(`Mode: ${COPY ? (PURGE ? 'COPY-AND-PURGE' : 'COPY-ONLY') : 'DRY-RUN'}`);
   console.log(`Scanning ${PROD_TABLE}…`);
   const items = await scanAll(PROD_TABLE);
