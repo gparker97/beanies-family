@@ -196,6 +196,14 @@ module "frontend" {
 }
 ```
 
+**Set the apex distribution ID as a GitHub variable** (so production deploys invalidate both apex + staging):
+
+```bash
+gh variable set APEX_CLOUDFRONT_DISTRIBUTION_ID --body "$(cd infrastructure && terraform output -raw cloudfront_distribution_id)"
+```
+
+The `deploy-web.yml` workflow already gates on this — pre-cutover it was a no-op (variable unset); post-cutover it'll invalidate the apex distribution on every `target=production` deploy.
+
 **Apply**:
 
 ```bash

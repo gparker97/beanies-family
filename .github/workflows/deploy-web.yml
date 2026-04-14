@@ -84,12 +84,25 @@ jobs:
         # and edited from the GitHub UI without rotating.
         run: aws s3 sync web/dist/ s3://${{ vars.WEB_S3_BUCKET }} --delete
 
-      - name: Invalidate CloudFront cache
+      - name: Invalidate staging CloudFront cache
         # WEB_CLOUDFRONT_DISTRIBUTION_ID is a repository variable for the same
         # reason — distribution IDs are not sensitive.
+        # Always invalidated because both staging and production deploys
+        # update the same Astro S3 bucket, and the staging distribution
+        # serves from it.
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ vars.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+      - name: Invalidate apex CloudFront cache (production only, post-cutover)
+        # Set APEX_CLOUDFRONT_DISTRIBUTION_ID as a repo variable AFTER the
+        # Phase C apex cutover (#167). Empty-string check makes this step
+        # a graceful no-op pre-cutover when the variable is unset.
+        if: ${{ inputs.target == 'production' && vars.APEX_CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
 
       - name: Ping IndexNow (production only)
