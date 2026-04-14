@@ -83,9 +83,18 @@ const KEEP_PROD_IDS = new Set([
 
 const KEEP_PROD_ONLY = args.has('--keep-prod-only');
 
+/** Family names that mark a row as E2E / dev pollution — delete entirely
+ *  (do NOT move to the dev table). Going forward E2E uses the more obvious
+ *  "E2E Test Family" name AND cleans up after itself in afterEach hooks;
+ *  this list keeps draining historical "Test Family" rows + catches any
+ *  E2E run that crashes before its teardown fires. */
+const PURGE_FAMILY_NAMES = new Set(['Test Family', 'E2E Test Family']);
+
 function classify(item) {
-  // --keep-prod-only mode: any row not in KEEP_PROD_IDS is dev. Used for the
-  // final migration after the human review.
+  // Always purge garbage rows — even in --keep-prod-only mode.
+  if (PURGE_FAMILY_NAMES.has(item.familyName || '')) return 'purge';
+
+  // --keep-prod-only mode: any other row not in KEEP_PROD_IDS is dev.
   if (KEEP_PROD_ONLY) {
     return KEEP_PROD_IDS.has(item.familyId) ? 'real' : 'dev';
   }
@@ -118,9 +127,13 @@ async function scanAll(tableName) {
   const dev = [];
   const real = [];
   const uncertain = [];
+  const purge = [];
   for (const it of items) {
     const c = classify(it);
-    (c === 'dev' ? dev : c === 'real' ? real : uncertain).push(it);
+    if (c === 'dev') dev.push(it);
+    else if (c === 'real') real.push(it);
+    else if (c === 'purge') purge.push(it);
+    else uncertain.push(it);
   }
 
   const fmt = (it) =>
@@ -130,6 +143,11 @@ async function scanAll(tableName) {
   for (const it of dev) console.log(`  ${fmt(it)}`);
   console.log(`\n=== AUTO-CLASSIFIED AS REAL (${real.length}) — will stay in prod ===`);
   for (const it of real) console.log(`  ${fmt(it)}`);
+  console.log(
+    `\n=== PURGE (${purge.length}) — "Test Family" rows, deleted from prod, NOT copied ===`
+  );
+  console.log(`  (showing first 5)`);
+  for (const it of purge.slice(0, 5)) console.log(`  ${fmt(it)}`);
   console.log(`\n=== UNCERTAIN — NEEDS YOUR REVIEW (${uncertain.length}) ===`);
   for (const it of uncertain) console.log(`  ${fmt(it)}`);
 
@@ -157,13 +175,24 @@ async function scanAll(tableName) {
     return;
   }
 
-  console.log(`\nDeleting ${dev.length} dev rows from ${PROD_TABLE}…`);
+  console.log(`\nDeleting ${dev.length} migrated dev rows from ${PROD_TABLE}…`);
   for (const it of dev) {
     await client.send(
       new DeleteItemCommand({ TableName: PROD_TABLE, Key: marshall({ familyId: it.familyId }) })
     );
     process.stdout.write('.');
   }
+
+  if (purge.length > 0) {
+    console.log(`\nPurging ${purge.length} "Test Family" rows from ${PROD_TABLE} (no copy)…`);
+    for (const it of purge) {
+      await client.send(
+        new DeleteItemCommand({ TableName: PROD_TABLE, Key: marshall({ familyId: it.familyId }) })
+      );
+      process.stdout.write('.');
+    }
+  }
+
   console.log(
     `\nDone. Prod table now has ${real.length} real rows + ${uncertain.length} uncertain rows.`
   );
