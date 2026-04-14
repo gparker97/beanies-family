@@ -9,7 +9,10 @@
   ],
   "scripts": {
     "dev": "vite",
+    "dev:web": "npm --workspace=@beanies/web run dev",
+    "dev:all": "concurrently --names 'vue,astro' --prefix-colors 'cyan,magenta' --kill-others-on-fail 'npm:dev' 'npm:dev:web'",
     "build": "vue-tsc -b && vite build",
+    "build:web": "npm --workspace=@beanies/web run build",
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
@@ -62,6 +65,7 @@
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.9.1",
     "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
