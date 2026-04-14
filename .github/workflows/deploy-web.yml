@@ -44,6 +44,12 @@ jobs:
         run: npm ci
 
       - name: Build Astro site
+        # PUBLIC_* env vars are inlined by Vite/Astro at build time and shipped
+        # to the browser. Webhook URLs ARE sensitive (anyone with the URL can
+        # POST to it), so keep this one as a GitHub secret — same pattern the
+        # Vue deploy uses for VITE_CONTACT_WEBHOOK_URL.
+        env:
+          PUBLIC_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
         run: npm --workspace=@beanies/web run build
 
       - name: Upload build artifact
