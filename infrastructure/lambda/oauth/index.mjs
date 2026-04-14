@@ -18,9 +18,12 @@ const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
 
 const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 
-// Allowed redirect URIs (prevent open-redirect attacks)
+// Allowed redirect URIs (prevent open-redirect attacks).
+// Apex stays during the Phase A→C cutover for #167; remove ~30 days after
+// the apex cutover ships and the Google OAuth Console apex URI is removed.
 const ALLOWED_REDIRECT_URIS = [
   'https://beanies.family/oauth/callback',
+  'https://app.beanies.family/oauth/callback',
   'http://localhost:5173/oauth/callback',
   'http://localhost:4173/oauth/callback',
 ];
