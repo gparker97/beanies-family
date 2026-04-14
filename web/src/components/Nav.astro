@@ -1,40 +1,164 @@
 ---
-import { PUBLIC_NAV, APP_URL } from '@beanies/brand/nav';
+import { APP_URL } from '@beanies/brand/nav';
 
 const currentPath = Astro.url.pathname;
-const isActive = (href: string) =>
-  href === '/' ? currentPath === '/' : currentPath === href || currentPath.startsWith(`${href}/`);
+const isHome = currentPath === '/';
+
+// In-page anchors on the homepage stay as #anchors so the same-page smooth-scroll
+// handler can intercept them. From other pages we prepend "/" so the browser
+// navigates to the homepage first, then resolves the anchor.
+const storyHref = isHome ? '#story' : '/#story';
+const securityHref = isHome ? '#security' : '/#security';
 ---
 
-<header class="border-b border-secondary-100/60 bg-white">
-  <nav class="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
-    <a href="/" class="flex items-center gap-2 font-outfit text-lg font-bold text-secondary-500">
-      <img src="/brand/beanies-logo.png" alt="" width="32" height="32" class="h-8 w-8" />
-      <span>beanies.family</span>
-    </a>
-    <ul class="hidden items-center gap-6 sm:flex">
-      {
-        PUBLIC_NAV.map((link) => (
-          <li>
-            <a
-              href={link.href}
-              class:list={[
-                'font-inter text-sm transition-colors hover:text-primary-500',
-                isActive(link.href) ? 'text-primary-500 font-semibold' : 'text-secondary-500',
-              ]}
-              aria-current={isActive(link.href) ? 'page' : undefined}
-            >
-              {link.label}
-            </a>
-          </li>
-        ))
-      }
-    </ul>
-    <a
-      href={APP_URL}
-      class="rounded-xl bg-primary-500 px-4 py-2 font-outfit text-sm font-semibold text-white transition-colors hover:bg-primary-600"
-    >
-      open app
-    </a>
-  </nav>
-</header>
+<div id="scroll-progress" class="scroll-progress"></div>
+
+<nav id="fnav" class="fnav">
+  <a href="/" class="fnav__logo" data-scroll-top={isHome ? '' : undefined}>
+    <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />beanies<span class="fnav__logo-orange">.family</span>
+  </a>
+  <div class="fnav__right">
+    <div class="fnav__links">
+      <a href={storyHref} data-scroll-to={isHome ? 'story' : undefined}>my story</a>
+      <a href={securityHref} data-scroll-to={isHome ? 'security' : undefined}>security</a>
+      <a href="/blog">beanstalk</a>
+    </div>
+    <a href={`${APP_URL}/welcome`} class="fnav__cta">create your bean pod</a>
+  </div>
+</nav>
+
+<script>
+  const scrollProgress = document.getElementById('scroll-progress') as HTMLElement | null;
+  const fnav = document.getElementById('fnav') as HTMLElement | null;
+
+  function onScroll() {
+    const sy = window.scrollY;
+    const dh = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = dh > 0 ? (sy / dh) * 100 : 0;
+    if (scrollProgress) scrollProgress.style.width = pct + '%';
+    if (fnav) fnav.classList.toggle('scrolled', sy > 20);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  function scrollToId(id: string) {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function scrollTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Same-page smooth-scroll only on homepage (where data-scroll-to is set).
+  document.querySelectorAll<HTMLAnchorElement>('#fnav [data-scroll-to]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const id = a.getAttribute('data-scroll-to');
+      if (id) scrollToId(id);
+    });
+  });
+  document.querySelectorAll<HTMLAnchorElement>('#fnav [data-scroll-top]').forEach((a) => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      scrollTop();
+    });
+  });
+</script>
+
+<style>
+  :root {
+    --heritage-orange: #f15d22;
+    --deep-slate: #2c3e50;
+  }
+
+  .fnav {
+    align-items: center;
+    backdrop-filter: blur(24px);
+    background: rgb(255 255 255 / 82%);
+    border: 1px solid rgb(44 62 80 / 6%);
+    border-radius: 40px;
+    display: flex;
+    gap: 12px;
+    left: 50%;
+    padding: 6px 10px 6px 16px;
+    position: fixed;
+    top: 16px;
+    transform: translateX(-50%);
+    transition: box-shadow 300ms ease, background 500ms ease;
+    z-index: 200;
+  }
+  .fnav.scrolled { box-shadow: 0 4px 24px rgb(44 62 80 / 8%); }
+
+  .fnav__logo {
+    align-items: center;
+    color: var(--deep-slate);
+    display: flex;
+    font-family: Outfit, sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    gap: 0;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .fnav__logo img { border-radius: 8px; height: 26px; margin-right: 7px; width: 26px; }
+  .fnav__logo-orange { color: var(--heritage-orange); }
+
+  .fnav__right { align-items: center; display: flex; gap: 8px; }
+  .fnav__links { display: flex; gap: 2px; }
+  .fnav__links a {
+    border-radius: 16px;
+    color: var(--deep-slate);
+    font-family: Outfit, sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0.55;
+    padding: 4px 10px;
+    text-decoration: none;
+    transition: all 200ms;
+    white-space: nowrap;
+  }
+  .fnav__links a:hover { background: rgb(44 62 80 / 5%); opacity: 0.9; }
+
+  .fnav__cta {
+    background: var(--heritage-orange);
+    border: none;
+    border-radius: 20px;
+    color: white;
+    cursor: pointer;
+    display: inline-block;
+    font-family: Outfit, sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 16px;
+    text-decoration: none;
+    transition: all 200ms;
+    white-space: nowrap;
+  }
+  .fnav__cta:hover { background: #d14d1a; transform: translateY(-1px); }
+
+  .scroll-progress {
+    background: var(--heritage-orange);
+    height: 2px;
+    left: 0;
+    position: fixed;
+    top: 0;
+    transition: width 150ms linear;
+    width: 0%;
+    z-index: 300;
+  }
+
+  @media (max-width: 900px) {
+    .fnav { flex-wrap: wrap; justify-content: center; max-width: 95vw; padding: 6px 12px 6px 14px; }
+    .fnav__logo { flex-basis: 100%; justify-content: center; }
+    .fnav__right { flex-shrink: 0; }
+  }
+
+  @media (max-width: 640px) {
+    .fnav { gap: 6px; padding: 5px 10px 5px 12px; }
+    .fnav__logo { font-size: 0.85rem; }
+    .fnav__logo img { height: 22px; margin-right: 5px; width: 22px; }
+    .fnav__links { gap: 0; }
+    .fnav__links a { font-size: 0.75rem; padding: 4px 6px; }
+    .fnav__cta { font-size: 0.75rem; padding: 5px 12px; }
+  }
+</style>
