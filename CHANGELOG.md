@@ -24,6 +24,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - Repo is now an npm workspace monorepo (root, `web/`, `packages/*`). The Vue app stays at the repo root for now; it will move to `apps/app/` in a later focused refactor
+- Vue PWA is now reachable at `app.beanies.family` (in addition to the apex). New CloudFront distribution shares the existing Vue S3 bucket via OAC. OAuth + Google Drive sign-in verified end-to-end on the new origin
+- Astro homepage and blog are now pixel-perfect ports of the Vue production pages — same hero, mascot, decorative beans, 3-device showcase, security cards, personal story with pinyin ruby, contact modal, scroll progress bar, reveal-on-scroll animations, back-to-top, image lightbox. Vue interactive logic ported to vanilla JS in `<script>` tags so no Vue runtime ships with the Astro site
+- Unified site chrome — pill nav + dark page-footer extracted into shared components and rendered on every page (homepage, blog, help, privacy, terms). One header + one footer everywhere
+- Astro now loads Outfit + Inter from Google Fonts (matches the Vue prod typography 1:1; system-font fallback was making text look subtly stretched)
+- Astro favicon set matches the Vue app — `beanies_small_bean_favicon_32x32.png` + apple-touch-icon `beanies_father_son_icon_192x192.png`
+- Registry DDB split into prod + dev tables. The OAuth Lambda routes by request `Origin`: localhost dev sessions write to `beanies-family-registry-dev`; production origins write to `beanies-family-registry-prod`. Real-user metrics + outbound contact lists now come from a clean prod table (13 real users after migration; 232 historical "Test Family" E2E rows purged)
+- E2E suite auto-cleans up after each test — every test pod is removed from the registry table in the Playwright fixture's `afterEach` hook (no more accumulating "Test Family" rows). E2E pod also renamed to "E2E Test Family" so any future cleanup can grep for it
+- CORS allowlist on the registry + OAuth APIs extended to `https://app.beanies.family` and `http://localhost:4173` (preview server)
+
+### Added
+
+- Phase C cutover code authored — frontend Terraform module parameterized with `origin_bucket_regional_domain_name`, `viewer_request_function_arn`, and `enable_spa_fallback` variables (all defaults preserve current behavior). Merged `apex-cutover.js` CloudFront Function combines authenticated-path 301s, legacy `/beanstalk*` redirects, and Astro `.html` URL rewriter into one function. Cutover is now a 3-line edit in `infrastructure/main.tf` + one `terraform apply`
+- `npm run dev:all` script — starts both the Vue dev server (5173) and the Astro dev server (4321) in parallel with color-coded prefixes, killable with one Ctrl+C
+- Cutover runbook (`docs/runbooks/cutover-apex-to-astro.md`) — full step-by-step Phase B/C procedure with verification checklists, rollback plan, and a "Lessons from Phase B" section capturing CORS/OAuth/URL-rewriter/naming gotchas so future cutovers don't rediscover them
+- Migration script (`scripts/migrate-registry-dev-rows.mjs`) — multi-mode tool for one-time cleanup of the registry tables. Auto-classifies by email pattern, supports `--keep-prod-only` with a hardcoded keep-list of confirmed real users, plus `--scrub-dev` for cleaning the dev table
+
+### Fixed
+
+- Apex distribution now invalidates correctly on `target=production` deploys via the new `APEX_CLOUDFRONT_DISTRIBUTION_ID` repository variable (gracefully no-op pre-cutover when unset)
 
 ---
 

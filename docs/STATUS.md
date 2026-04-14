@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-04-13
-> **Updated by:** Claude (WebKit E2E restored to main-push CI, flakiness hardened, duplicate-run trigger fixed — #155, #156, #165, #166)
+> **Last updated:** 2026-04-14
+> **Updated by:** Claude (SEO + AIO/GEO Astro marketing site shipped to staging.beanies.family with pixel-perfect homepage + blog port; Phase A infra applied: app.beanies.family PWA subdomain live; Phase C cutover code authored as a 3-line edit + 1 apply; registry DDB split into prod/dev tables with origin-based Lambda routing + E2E auto-cleanup — #167)
 
 ## Current Phase
 
@@ -57,6 +57,57 @@
 - Family Hub / Bean Pod (`/family`) — v7 redesign (#73): 3-column layout (sidebar, member cards, quick-info panel), activity-focused member cards (upcoming events, milestones, activity count, tasks — no financial data), role tags ("Parent Bean"/"Little Bean"), Heritage Orange selected state, events this week panel. Calendar removed (→ Family Planner #98)
 - Travel Plans page (`/travel`) — dedicated trip planning with timeline, edit modals, ideas, helpful hints, inline editing. Route `/planner` renamed to `/activities`
 - Landing page (`/home`) — full implementation from mockup (#72): hero with hugging beanie mascot + animated headline, 3 floating device screenshots (Nook, Piggy Bank, Planner), trust badges, security section with 6 cards, Greg's full beanies story, animated CTA with celebrating beanies circle, footer with Slack-wired contact form (`VITE_CONTACT_WEBHOOK_URL`), scroll progress bar, IntersectionObserver reveal animations, smooth-scroll anchor navigation, back-to-top button. Scoped CSS (not Tailwind) for pixel-perfect mockup fidelity. Decorative brand character images as low-opacity background accents. E2E tests updated.
+
+### SEO + AIO/GEO Initiative — Phases A + B Shipped, Phase C Authored (2026-04-14)
+
+The marketing surface moved off the Vue SPA (invisible to AI crawlers) onto a dedicated Astro 5 static site at `staging.beanies.family`, with the apex cutover authored and pre-staged for tomorrow. Tracked in epic #167 and `docs/plans/2026-04-14-seo-aio-optimization.md`.
+
+**Architecture:** Astro at apex `beanies.family` for marketing/blog/help (zero-JS static HTML — readable by GPTBot/ClaudeBot/PerplexityBot/CCBot, none of which execute JS). Vue PWA moves to `app.beanies.family` to cleanly isolate service-worker scope, cookies, and the auth entry point.
+
+**Stage 1 — Astro scaffold + content (live on staging.beanies.family):**
+
+- npm workspaces monorepo: root (Vue PWA), `web/` (Astro 5.14), `packages/brand/`
+- `@beanies/brand` package: `theme.css` (Tailwind v4 `@theme` block — single source of truth, both apps `@import`), `nav.ts`, `schema.ts` (Organization/WebSite/SoftwareApplication/Author JSON-LD)
+- 36 Astro pages — homepage, /about/greg, /blog (index + 3 posts), /help (index + 5 categories + 24 articles), /privacy, /terms — each with unique title, canonical, OG/Twitter meta, JSON-LD in raw HTML
+- Help search: MiniSearch island lazy-loaded on /help only (~10 KB JS)
+- SEO plumbing: `robots.txt` with allowlist for 24 AI/search crawlers, hand-curated `llms.txt`, auto-generated `llms-full.txt` (56 KB), RSS feed at `/blog/rss.xml`, IndexNow key file, dynamic sitemap (36 URLs)
+- Dynamic 1200×630 OG images per blog post via `astro-og-canvas`
+- Web Vitals RUM (LCP/INP/CLS/FCP/TTFB) → Plausible custom events
+- `npm run dev:all` (concurrently): runs Vue (5173) + Astro (4321) in parallel with color-coded prefixes
+- Pixel-perfect Vue port of homepage (3,535 lines), blog index (547), blog post (535) — full hero, mascot, decorative beans, 3-device showcase, trust badges, security cards, personal story with pinyin ruby, contact modal, scroll progress, reveal animations, image lightbox. Vue interactive logic ported to vanilla JS (no Vue runtime in Astro). Google Fonts loaded in BaseLayout (Outfit + Inter) matching prod 1:1. Favicon set matches prod 1:1. Pill nav + dark page-footer extracted into shared `Nav.astro` + `Footer.astro` so every page renders identical chrome.
+
+**Stage 2 Phase A — Infrastructure (applied to AWS):**
+
+- New `modules/app-subdomain/`: ACM cert + CloudFront distribution + Route53 alias for `app.beanies.family` (origin shares Vue S3 bucket via OAC).
+- New `modules/web/`: S3 bucket `beanies.family-web-prod` + CloudFront distribution for `staging.beanies.family` with `X-Robots-Tag: noindex` response-headers policy.
+- CloudFront Function `rewrite-to-html.js` attached to staging — rewrites Astro clean URLs to `.html` paths (S3 doesn't serve clean URLs natively).
+- New `deploy-web.yml` workflow (manual-trigger, staging|production target, builds Astro, syncs S3, invalidates CF, pings IndexNow on production). Conditional apex invalidation gated on `APEX_CLOUDFRONT_DISTRIBUTION_ID` variable (no-op pre-cutover).
+- GitHub repo VARIABLES (not secrets — see `tasks/lessons.md`): `WEB_S3_BUCKET`, `WEB_CLOUDFRONT_DISTRIBUTION_ID`.
+- CORS + OAuth fixes for new app subdomain: oauth/registry Lambda CORS allowlists extended to `https://app.beanies.family` + `http://localhost:4173`; oauth Lambda hardcoded `ALLOWED_REDIRECT_URIS` extended likewise; Google Cloud Console OAuth client redirect URI added.
+- Self-unregistering SW shipped at apex (`web/public/sw.js`, 10 lines) — takes effect at Phase C cutover.
+
+**Stage 2 Phase C — Authored, awaiting trigger:**
+
+- Frontend module parameterized: `origin_bucket_regional_domain_name`, `viewer_request_function_arn`, `enable_spa_fallback`. All defaults preserve current behavior — Phase C is a no-op until you set these vars.
+- Merged CloudFront Function `apex-cutover.js` authored — combines authenticated-path 301s (→ `app.beanies.family`), legacy `/beanstalk*` → `/blog*` 301s, and Astro `.html` URL rewrites in a single function.
+- Web bucket policy pre-authorizes apex distribution to read it.
+- Cutover is now a 3-line edit in `infrastructure/main.tf` + one `terraform apply`. See `docs/runbooks/cutover-apex-to-astro.md`.
+
+**Registry DDB Split (prod / dev):**
+
+- New DDB table `beanies-family-registry-dev` alongside existing `beanies-family-registry-prod`.
+- Lambda env vars `DEV_TABLE_NAME` + `DEV_ORIGINS`; `tableForOrigin()` helper picks table from request `Origin` header — localhost → dev table, production origins → prod table. IAM extended for both tables.
+- Migration script `scripts/migrate-registry-dev-rows.mjs` with multiple modes (auto-classify by email, `--keep-prod-only` with hardcoded keep-list of 13 confirmed real-user familyIds, `--scrub-dev` for cleaning Test Family rows from dev table).
+- E2E pod renamed "Test Family" → "E2E Test Family" (distinctive grep target). E2E `afterEach` cleanup: `__e2eDataBridge.cleanupActiveFamily()` calls `removeFamily()` on the active familyId — wired via the existing Playwright fixture base, all 7 specs inherit automatically.
+- Migration result: prod table reduced from 248 rows to **13 real users**; dev table cleaned to **3 named non-prod rows**.
+
+**Production state after today:**
+
+- `beanies.family` (apex) — still serves Vue PWA (cutover deferred to tomorrow)
+- `app.beanies.family` — new, serves Vue PWA (origin shared with apex), OAuth verified end-to-end
+- `staging.beanies.family` — Astro marketing site preview with `X-Robots-Tag: noindex`
+- `api.beanies.family` — registry + OAuth APIs with extended CORS allowlist + Lambda redirect-URI allowlist
+- Two DDB tables — prod (13 real) and dev (3 preserved)
 
 ### WebKit Overlay Fixes & E2E Hardening (2026-04-13)
 
