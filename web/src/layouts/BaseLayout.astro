@@ -77,6 +77,27 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
       }}
     />
     <JsonLd data={[...globalLd, ...extraLd]} />
+
+    <!-- Plausible analytics (cookie-free, privacy-first) -->
+    <script is:inline async src="https://plausible.io/js/pa-3pxexgz2YF03NyMDucQKN.js"></script>
+    <script is:inline>
+      ((window.plausible =
+        window.plausible ||
+        function () {
+          (plausible.q = plausible.q || []).push(arguments);
+        }),
+        (plausible.init =
+          plausible.init ||
+          function (i) {
+            plausible.o = i || {};
+          }));
+      plausible.init();
+    </script>
+
+    <!-- Web Vitals RUM → Plausible custom events -->
+    <script>
+      import '../scripts/vitals';
+    </script>
   </head>
   <body class="min-h-screen bg-[#f8f9fa] text-secondary-500">
     <Nav />
