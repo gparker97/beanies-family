@@ -232,4 +232,277 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'install-as-app',
+    category: 'getting-started',
+    title: 'Installing beanies.family as an app',
+    excerpt:
+      'Add beanies.family to your home screen or desktop so it opens like a real app — full screen, one tap away, works offline.',
+    icon: '\u{1F4F1}',
+    readTime: 3,
+    popular: true,
+    updatedDate: '2026-04-15',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why install?',
+        level: 2,
+        id: 'why-install',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'beanies.family is a <strong>Progressive Web App (PWA)</strong> — the same app you use in your browser, but with a home-screen icon and a full-screen launch (no browser bars). Installing gets you:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'A real app icon on your home screen / dock',
+          'Opens instantly in full-screen, no URL bar',
+          'Works offline once it\u2019s loaded',
+          'Still 100% local-first \u2014 no app-store account, no review process, no data leaves your device unless you enable sync',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'The easy way: use the install prompt',
+        level: 2,
+        id: 'install-prompt',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'After using beanies.family for a minute or two, your browser may show a small pop-up asking if you want to install the app. If you see it, tap <strong>Install</strong> (or <strong>Add</strong>) and you\u2019re done \u2014 skip to <a href="#sign-in-after">After installing</a>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/01-install-prompt.jpg" alt="The install prompt that appears in the browser, with an Install button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If no prompt appears, no problem \u2014 the manual steps below work every time, and on iPhone/iPad you\u2019ll always need to use the manual method.',
+        title: 'Didn\u2019t see the prompt?',
+        icon: '\u{1F4A1}',
+      },
+      {
+        type: 'heading',
+        content: 'iPhone / iPad (Safari)',
+        level: 2,
+        id: 'install-ios',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On iOS and iPadOS, you install through the <strong>Share</strong> menu in Safari. This is the only browser on iPhone that can install a PWA \u2014 if you\u2019re using Chrome or Firefox on iPhone, switch to Safari first.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>https://app.beanies.family</strong> in <strong>Safari</strong>',
+          'Tap the <strong>Share</strong> button at the bottom of the screen (the square with an up-arrow)',
+          'Scroll down in the share sheet and tap <strong>Add to Home Screen</strong>',
+          'Edit the name if you want (or leave it as "beanies.family") and tap <strong>Add</strong> in the top-right',
+          'The beanies icon now appears on your home screen. Tap it to open the app full-screen.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/02-ios-share-button.jpg" alt="Safari browser with the Share button highlighted at the bottom" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/03-ios-add-to-home-screen.jpg" alt="The iOS share sheet with Add to Home Screen highlighted" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'heading',
+        content: 'Android (Chrome)',
+        level: 2,
+        id: 'install-android',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On Android, Chrome handles the install. If you didn\u2019t see the automatic prompt:',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>https://app.beanies.family</strong> in <strong>Chrome</strong>',
+          'Tap the <strong>three-dot menu</strong> (\u22EE) in the top-right corner',
+          'Tap <strong>Install app</strong> or <strong>Add to Home screen</strong> (exact label depends on your Android version)',
+          'Tap <strong>Install</strong> in the pop-up to confirm',
+          'The beanies icon appears on your home screen. Tap it to launch the app.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/04-android-menu.jpg" alt="Chrome on Android with the three-dot menu open, showing Install app" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Other Android browsers (Edge, Samsung Internet, Firefox) can also install PWAs \u2014 the steps are similar: open the browser menu and look for "Install app" or "Add to Home screen".',
+        title: 'Using a different browser?',
+        icon: '\u2139\uFE0F',
+      },
+      {
+        type: 'heading',
+        content: 'Desktop (Chrome, Edge, Brave)',
+        level: 2,
+        id: 'install-desktop',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On your computer, Chrome-based browsers (Chrome, Edge, Brave, Arc, and others) all support PWA install. Look for the <strong>install icon</strong> at the right edge of the URL bar \u2014 it looks like a small monitor with a down-arrow.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>https://app.beanies.family</strong> in Chrome / Edge / Brave',
+          'Click the <strong>install icon</strong> in the URL bar (right side, near the bookmark star)',
+          'If you don\u2019t see the icon, open the browser menu (\u22EE or \u2026) and look for <strong>Install beanies.family</strong> or <strong>Apps \u2192 Install this site as an app</strong>',
+          'Click <strong>Install</strong> in the confirmation pop-up',
+          'beanies.family opens in its own window and is added to your Applications / Start Menu',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/05-desktop-install-icon.jpg" alt="Chrome desktop with the install icon highlighted in the URL bar" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Safari on macOS can also install PWAs as of Sonoma (14.0+). Open app.beanies.family in Safari, then from the menu bar choose <strong>File \u2192 Add to Dock</strong>.',
+        title: 'Safari on macOS',
+        icon: '\u{1F4BB}',
+      },
+      {
+        type: 'heading',
+        content: 'After installing',
+        level: 2,
+        id: 'sign-in-after',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Launch the app from its new icon and sign in with your Google account. If you already have a family pod, choose <strong>Load Existing Family</strong> and pick your <code>.beanpod</code> file from Google Drive. Enter your password and you\u2019re in.',
+      },
+      {
+        type: 'heading',
+        content: 'How to uninstall',
+        level: 2,
+        id: 'uninstall',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Uninstalling removes the app icon and clears the app\u2019s local cache on that device. <strong>Your pod file on Google Drive is not affected</strong> \u2014 you can re-install any time and load it back.',
+      },
+      {
+        type: 'heading',
+        content: 'Uninstall on iPhone / iPad',
+        level: 3,
+        id: 'uninstall-ios',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Find the <strong>beanies</strong> icon on your home screen',
+          'Touch and hold the icon until a menu appears',
+          'Tap <strong>Remove App</strong> (or <strong>Delete Bookmark</strong> on older iOS)',
+          'Confirm <strong>Delete from Home Screen</strong> or <strong>Delete App</strong>',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Uninstall on Android',
+        level: 3,
+        id: 'uninstall-android',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Find the <strong>beanies</strong> icon on your home screen or app drawer',
+          'Touch and hold the icon',
+          'Drag it to <strong>Uninstall</strong> at the top of the screen, or tap <strong>Uninstall</strong> in the pop-up menu',
+          'Confirm <strong>OK</strong> / <strong>Uninstall</strong>',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Uninstall on desktop (Chrome / Edge / Brave)',
+        level: 3,
+        id: 'uninstall-desktop',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the installed app',
+          'Click the <strong>three-dot menu</strong> (\u22EE) in the app window\u2019s top-right',
+          'Click <strong>Uninstall beanies.family</strong>',
+          'Confirm <strong>Remove</strong> (optionally tick "Also clear data" to wipe the cache)',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'Uninstalling clears local data on that device only. As long as your <code>.beanpod</code> file is still on Google Drive (or wherever you saved it), your pod is safe and you can restore it by re-installing and choosing <strong>Load Existing Family</strong>.',
+        title: 'Your data is safe',
+        icon: '\u2705',
+      },
+      {
+        type: 'heading',
+        content: 'Troubleshooting',
+        level: 2,
+        id: 'troubleshooting',
+      },
+      {
+        type: 'heading',
+        content: '"Install app" option is greyed out or missing',
+        level: 3,
+        id: 'troubleshoot-missing',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Make sure you\u2019re using a supported browser (Chrome, Edge, Brave, Safari on iOS 16.4+). If you\u2019re already in private / incognito mode, switch to a normal window \u2014 private browsing blocks PWA install on most browsers.',
+      },
+      {
+        type: 'heading',
+        content: 'The app opens but shows a URL bar at the top',
+        level: 3,
+        id: 'troubleshoot-url-bar',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'That means the app wasn\u2019t installed directly from <strong>app.beanies.family</strong>. Uninstall the current icon (steps above), then visit <strong>https://app.beanies.family</strong> fresh and re-install using the steps for your device. The new install will launch in full-screen mode.',
+      },
+      {
+        type: 'heading',
+        content: 'I don\u2019t see the icon after installing',
+        level: 3,
+        id: 'troubleshoot-icon',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On Android and iOS, check your full app drawer / all apps list \u2014 the icon might have been placed there rather than on the main home screen. On desktop, look in your Applications folder (macOS) or Start Menu (Windows).',
+      },
+    ],
+  },
 ];
