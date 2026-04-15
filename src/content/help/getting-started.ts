@@ -278,7 +278,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<img src="/help/pwa-install/01-install-prompt.jpg" alt="The install prompt that appears in the browser, with an Install button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+          '<img src="/help/pwa-install/install-app-android-prompt.jpg" alt="The install prompt that appears in the browser, with an Install button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'infoBox',
@@ -312,7 +312,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<img src="/help/pwa-install/06-settings-install-button.jpg" alt="The Install App section in beanies.family Settings with the Install beanies.family button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+          '<img src="/help/pwa-install/install-app-android-addtohome-settings.jpg" alt="The Install App section in beanies.family Settings with the Install beanies.family button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'infoBox',
@@ -346,12 +346,12 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<img src="/help/pwa-install/02-ios-share-button.jpg" alt="Safari browser with the Share button highlighted at the bottom" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+          '<img src="/help/pwa-install/install-app-iphone-share.jpg" alt="Safari browser with the Share button highlighted at the bottom" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'paragraph',
         content:
-          '<img src="/help/pwa-install/03-ios-add-to-home-screen.jpg" alt="The iOS share sheet with Add to Home Screen highlighted" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+          '<img src="/help/pwa-install/install-app-iphone-addtohome.jpg" alt="The iOS share sheet with Add to Home Screen highlighted" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'heading',
@@ -378,7 +378,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<img src="/help/pwa-install/04-android-menu.jpg" alt="Chrome on Android with the three-dot menu open, showing Install app" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+          '<img src="/help/pwa-install/install-app-android-3-dot-menu.jpg" alt="Chrome on Android with the three-dot menu open, showing Install app" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'infoBox',
@@ -408,11 +408,6 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'Click <strong>Install</strong> in the confirmation pop-up',
           'beanies.family opens in its own window and is added to your Applications / Start Menu',
         ],
-      },
-      {
-        type: 'paragraph',
-        content:
-          '<img src="/help/pwa-install/05-desktop-install-icon.jpg" alt="Chrome desktop with the install icon highlighted in the URL bar" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'infoBox',
@@ -474,6 +469,11 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'Drag it to <strong>Uninstall</strong> at the top of the screen, or tap <strong>Uninstall</strong> in the pop-up menu',
           'Confirm <strong>OK</strong> / <strong>Uninstall</strong>',
         ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/install-app-android-uninstall.jpg" alt="Android app info screen with the Uninstall button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
         type: 'heading',
