@@ -1,0 +1,327 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import DraftPlaceholder from '../../components/DraftPlaceholder.astro';
+import { isDraftHidden } from '~/utils/draftPage';
+import { SITE_URL } from '@beanies/brand/nav';
+
+const DRAFT = true;
+const hidden = isDraftHidden(DRAFT);
+
+/**
+ * Product + concept glossary. Each term renders as an <article> with an
+ * anchor id (so URLs like /help/glossary#crdt jump there), and all terms
+ * are aggregated into a single DefinedTermSet JSON-LD block so AI crawlers
+ * can index individual terms for citation.
+ */
+type Term = {
+  id: string;
+  term: string;
+  /** Short definition (1-2 sentences, quotable — the AI-citation chunk). */
+  short: string;
+  /** Optional longer elaboration rendered as HTML after the short definition. */
+  long?: string;
+};
+
+const terms: Term[] = [
+  {
+    id: 'beanies-family',
+    term: 'beanies.family',
+    short:
+      'A local-first, privacy-first progressive web app for family planning — finances, activities, goals, and shared logistics, all in a single encrypted file that lives on your device.',
+    long: 'Built as an alternative to cloud-native family apps that harvest data. Open source (MIT), works offline, optional Google Drive sync with client-side encryption.',
+  },
+  {
+    id: 'pod',
+    term: 'pod',
+    short:
+      "A family's private data unit in beanies.family. One pod holds everything one family tracks: members, finances, activities, goals, travel.",
+    long: 'Each pod is backed by a single `.beanpod` file that the family controls. Inviting family members grants them access to the same pod; sharing a pod across families is not supported by design.',
+  },
+  {
+    id: 'beanpod-file',
+    term: '.beanpod file',
+    short:
+      'The encrypted file format that holds an entire family pod. A single `.beanpod` is a portable, self-contained backup — you can email it, save it to a USB stick, or sync it to Google Drive.',
+    long: 'Internally it is an Automerge CRDT document wrapped in an AES-GCM-encrypted envelope (V4 format). The file extension is beanies-specific. Without the pod password, the contents are unreadable — not even the beanies team can decrypt it.',
+  },
+  {
+    id: 'bean-beanie',
+    term: 'bean / beanie',
+    short:
+      'The affectionate term for a family member inside the app. Each member has a personalised bean avatar in the brand illustration style.',
+    long: "Every beanie on screen is a real person in your family. The brand philosophy is that every family member counts — including the smallest ones — hence 'every bean counts' as the tagline.",
+  },
+  {
+    id: 'family-nook',
+    term: 'family nook',
+    short:
+      "The home screen of the app — a personalised, calm dashboard showing what's happening in your family today, this week, and in the near future.",
+    long: "Designed to be the single source of truth a family member checks first thing in the morning. Replaces the need for separate calendar, to-do, and finance apps open simultaneously.",
+  },
+  {
+    id: 'local-first',
+    term: 'local-first',
+    short:
+      'A software architecture where data lives on the user\'s device first and the cloud is optional. Local-first apps work offline, do not require an account on a remote server, and survive the company going out of business.',
+    long: 'The term was popularised by the <a href="https://www.inkandswitch.com/local-first/">Ink & Switch essay</a> of the same name. Local-first is a core positioning choice for beanies.family: your family data should not require a continuously-running server owned by someone else.',
+  },
+  {
+    id: 'crdt',
+    term: 'CRDT',
+    short:
+      'Conflict-free Replicated Data Type. A class of data structures that can be edited on multiple devices at once and reliably merged back together without conflicts — even if the edits happened offline.',
+    long: 'CRDTs are what make it possible for two parents on two devices to both edit the family calendar at the same time, offline, and have the changes merge cleanly when they reconnect. beanies.family uses the Automerge CRDT library for its entire data layer.',
+  },
+  {
+    id: 'automerge',
+    term: 'Automerge',
+    short:
+      'The specific CRDT library beanies.family uses under the hood. An open-source project originally from the University of Cambridge and Ink & Switch that provides a JSON-like data structure with automatic conflict-free merging.',
+    long: 'Automerge is loaded into the browser as a WebAssembly module (~2.6 MB). The family pod is stored as an Automerge document in memory, cached to IndexedDB, and persisted as the `.beanpod` file.',
+  },
+  {
+    id: 'e2ee',
+    term: 'end-to-end encryption (E2EE)',
+    short:
+      "Encryption where only the endpoints (you and your family) can read the data. Intermediate servers — including the service provider's — see only ciphertext and cannot decrypt it.",
+    long: 'beanies.family\'s optional Google Drive sync is E2EE: the `.beanpod` file is encrypted with your pod password before it leaves your browser. Google stores the ciphertext; they cannot read it. No beanies server ever touches your data.',
+  },
+  {
+    id: 'aes-gcm',
+    term: 'AES-GCM',
+    short:
+      'The symmetric encryption algorithm used to encrypt the contents of the `.beanpod` file. Industry-standard authenticated encryption with a 256-bit key.',
+    long: 'AES-GCM provides both confidentiality (nobody can read the file without the key) and integrity (any tampering is detected on decryption). It is implemented via the browser\'s native Web Crypto API — no third-party crypto libraries involved.',
+  },
+  {
+    id: 'aes-kw',
+    term: 'AES-KW',
+    short:
+      'AES Key Wrap — a smaller companion algorithm used by beanies.family to encrypt per-member copies of the family\'s master encryption key. Each family member has their own wrapped key.',
+    long: 'When you invite a new family member, beanies.family wraps the family master key with a key derived from the invitee\'s passphrase. They unwrap it on their device. The master key itself is never exposed in plaintext across the network.',
+  },
+  {
+    id: 'web-crypto-api',
+    term: 'Web Crypto API',
+    short:
+      'The browser\'s built-in cryptography toolkit. All encryption, decryption, key derivation, and key wrapping in beanies.family uses the native Web Crypto API rather than a third-party library.',
+    long: 'Using the browser-native API means the cryptographic primitives are audited by browser vendors (Chromium, Firefox, Safari security teams). There is no beanies-family-specific crypto code to review — the code just calls `crypto.subtle.encrypt()` and trusts the browser.',
+  },
+  {
+    id: 'pwa',
+    term: 'PWA (Progressive Web App)',
+    short:
+      'A web app that can be installed on a phone, tablet, or desktop and behaves like a native app — with a home-screen icon, full-screen launch, and offline support.',
+    long: 'beanies.family is a PWA. You install it via your browser\'s "Install app" or "Add to Home Screen" option. See the <a href="/help/getting-started/install-as-app">install guide</a> for step-by-step instructions per platform.',
+  },
+  {
+    id: 'google-drive-sync',
+    term: 'Google Drive sync',
+    short:
+      "Optional cross-device backup for your pod. beanies.family can save the encrypted `.beanpod` file to your personal Google Drive so you can load it on another device.",
+    long: 'Sync is opt-in and uses the `drive.file` OAuth scope — beanies.family can only see files it created in your Drive, never your other files. The synced file is encrypted client-side before upload; Google sees ciphertext only.',
+  },
+  {
+    id: 'mental-load',
+    term: 'mental load',
+    short:
+      "The invisible cognitive labour of running a household — remembering birthdays, tracking appointments, planning meals, knowing which kid is allergic to what. It's usually concentrated in one adult and rarely gets discussed explicitly.",
+    long: "The concept was popularised by <a href=\"https://www.fairplaylife.com/\">Eve Rodsky's \"Fair Play\"</a> and is a driver of family-planning overwhelm. beanies.family's shared-pod model is designed so mental load can be *externalised and redistributed* — once it's in the pod, anyone in the family can see and own it.",
+  },
+  {
+    id: 'kin-keeping',
+    term: 'kin-keeping',
+    short:
+      'The sociological term for the unpaid work of maintaining family relationships — remembering to call grandma, organising the birthday dinner, keeping track of extended-family events and milestones.',
+    long: 'Closely related to mental load, but specifically the relational/ceremonial labour across extended family. Historically gendered work. A family-planning app that accounts for kin-keeping (not just task scheduling) meets real family reality more accurately than a generic calendar does.',
+  },
+  {
+    id: 'indexeddb',
+    term: 'IndexedDB',
+    short:
+      "The browser's built-in local database, used by beanies.family as an ephemeral cache for the decrypted pod data and as PWA offline support.",
+    long: 'The cache is deleted on sign-out — so leaving a device clears all decrypted data from that device. The authoritative copy of your pod lives in the `.beanpod` file; IndexedDB is just a performance cache.',
+  },
+  {
+    id: 'pod-password',
+    term: 'pod password',
+    short:
+      "The password that encrypts your family's `.beanpod` file. Without it, the pod cannot be decrypted — not by you, not by beanies, not by anyone.",
+    long: 'There is **no password recovery** by design. If you lose the pod password and don\'t have the file cached on any device, the pod is unrecoverable. beanies.family strongly recommends writing it down somewhere safe. See the <a href="/help/security/password-recovery">password recovery help article</a> for more.',
+  },
+];
+
+const canonicalPath = '/help/glossary';
+
+// DefinedTermSet JSON-LD — each term becomes a DefinedTerm the AI can cite.
+const glossarySchema = {
+  '@type': 'DefinedTermSet',
+  '@id': `${SITE_URL}${canonicalPath}#glossary`,
+  name: 'beanies.family glossary',
+  description:
+    'definitions of product terms, concepts, and technology used by beanies.family and in family planning generally.',
+  hasDefinedTerm: terms.map((t) => ({
+    '@type': 'DefinedTerm',
+    '@id': `${SITE_URL}${canonicalPath}#${t.id}`,
+    name: t.term,
+    description: t.short,
+    inDefinedTermSet: `${SITE_URL}${canonicalPath}#glossary`,
+  })),
+};
+---
+
+{
+  hidden ? (
+    <DraftPlaceholder backHref="/help" backLabel="back to help" />
+  ) : (
+    <BaseLayout
+      title="glossary — beanies.family"
+      description="definitions of the terms, concepts, and technology used throughout beanies.family. from CRDTs to kin-keeping."
+      canonicalPath={canonicalPath}
+      jsonLd={glossarySchema}
+    >
+      <article class="glossary-page">
+        <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'help', href: '/help' }, { label: 'glossary', href: canonicalPath }]} />
+
+        <header class="glossary-header">
+          <h1 class="glossary-title">glossary</h1>
+          <p class="glossary-intro">
+            definitions of the product terms, family-planning concepts, and technology you'll see across beanies.family. each term is linkable (use the # anchor in the URL) so you can share specific definitions.
+          </p>
+        </header>
+
+        <nav class="glossary-toc" aria-label="jump to term">
+          <p class="glossary-toc-label">jump to</p>
+          <ul class="glossary-toc-list">
+            {terms.map((t) => (
+              <li><a href={`#${t.id}`}>{t.term}</a></li>
+            ))}
+          </ul>
+        </nav>
+
+        <div class="glossary-terms">
+          {terms.map((t) => (
+            <article class="glossary-term" id={t.id}>
+              <h2 class="glossary-term-name">{t.term}</h2>
+              <p class="glossary-term-short" set:html={t.short} />
+              {t.long && <p class="glossary-term-long" set:html={t.long} />}
+              <a class="glossary-term-anchor" href={`#${t.id}`} aria-label={`copy link to ${t.term}`}>#</a>
+            </article>
+          ))}
+        </div>
+      </article>
+    </BaseLayout>
+  )
+}
+
+<style>
+  .glossary-page {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 760px;
+    padding: 88px 24px 64px;
+  }
+  .glossary-header { margin: 24px 0 32px; }
+  .glossary-title {
+    color: #2c3e50;
+    font-family: Outfit, sans-serif;
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .glossary-intro {
+    color: rgb(44 62 80 / 65%);
+    font-size: 1rem;
+    line-height: 1.65;
+    margin: 12px 0 0;
+    max-width: 600px;
+  }
+
+  .glossary-toc {
+    background: white;
+    border: 1px solid rgb(44 62 80 / 8%);
+    border-radius: 20px;
+    margin-bottom: 32px;
+    padding: 20px 24px;
+  }
+  .glossary-toc-label {
+    color: rgb(44 62 80 / 50%);
+    font-family: Outfit, sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin: 0 0 10px;
+    text-transform: uppercase;
+  }
+  .glossary-toc-list { display: flex; flex-wrap: wrap; gap: 6px 12px; list-style: none; margin: 0; padding: 0; }
+  .glossary-toc-list a {
+    color: #2c3e50;
+    font-family: Outfit, sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .glossary-toc-list a:hover { color: #f15d22; }
+
+  .glossary-terms { display: flex; flex-direction: column; gap: 28px; }
+  .glossary-term {
+    background: white;
+    border: 1px solid rgb(44 62 80 / 6%);
+    border-radius: 20px;
+    padding: 24px 28px;
+    position: relative;
+    scroll-margin-top: 90px;
+  }
+  .glossary-term:target {
+    border-color: rgb(241 93 34 / 30%);
+    box-shadow: 0 4px 16px rgb(241 93 34 / 10%);
+  }
+  .glossary-term-name {
+    color: #2c3e50;
+    font-family: Outfit, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 10px;
+  }
+  .glossary-term-short {
+    color: #2c3e50;
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1.65;
+    margin: 0 0 8px;
+  }
+  .glossary-term-long {
+    color: rgb(44 62 80 / 65%);
+    font-size: 0.9rem;
+    line-height: 1.7;
+    margin: 0;
+  }
+  .glossary-term-long a, .glossary-term-short a {
+    color: #f15d22;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .glossary-term-long a:hover, .glossary-term-short a:hover { text-decoration: underline; }
+  .glossary-term-anchor {
+    color: rgb(44 62 80 / 20%);
+    font-family: ui-monospace, monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    opacity: 0;
+    position: absolute;
+    right: 20px;
+    text-decoration: none;
+    top: 20px;
+    transition: opacity 150ms, color 150ms;
+  }
+  .glossary-term:hover .glossary-term-anchor { opacity: 1; }
+  .glossary-term-anchor:hover { color: #f15d22; }
+
+  @media (max-width: 520px) {
+    .glossary-page { padding-top: 76px; }
+    .glossary-title { font-size: 1.75rem; }
+    .glossary-term { padding: 20px; }
+  }
+</style>

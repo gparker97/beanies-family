@@ -1,0 +1,340 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import DraftPlaceholder from '../../components/DraftPlaceholder.astro';
+import { isDraftHidden } from '~/utils/draftPage';
+import { SITE_URL } from '@beanies/brand/nav';
+
+const DRAFT = true;
+const hidden = isDraftHidden(DRAFT);
+
+/**
+ * Frequently-asked questions, grouped by category. Each FAQ contributes a
+ * Question + Answer node to the FAQPage JSON-LD block. Rich results for
+ * FAQPage were restricted by Google in 2023, but AI systems (ChatGPT,
+ * Claude, Perplexity) still consume the schema heavily — so it remains
+ * valuable for AIO even without the SERP rich results.
+ */
+type FAQ = {
+  id: string;
+  q: string;
+  /** Short answer paragraph — the AI-citation chunk. Supports inline HTML. */
+  a: string;
+};
+
+type FAQGroup = {
+  heading: string;
+  faqs: FAQ[];
+};
+
+const groups: FAQGroup[] = [
+  {
+    heading: 'getting started',
+    faqs: [
+      {
+        id: 'is-it-free',
+        q: 'Is beanies.family free?',
+        a: 'Yes — beanies.family is free to use. It is open-source (MIT licensed) and there are no paid tiers today. Because your data lives on your own device and optional Google Drive, there are no per-user cloud costs for us to pass on.',
+      },
+      {
+        id: 'what-devices',
+        q: 'What devices can I use beanies.family on?',
+        a: 'Any modern device with a browser — desktop (Chrome, Edge, Safari, Firefox, Brave) or mobile (iOS Safari, Android Chrome). Install it as an app via your browser\'s "Add to Home Screen" or "Install app" option. See the <a href="/help/getting-started/install-as-app">install guide</a> for per-platform instructions.',
+      },
+      {
+        id: 'need-google-account',
+        q: 'Do I need a Google account?',
+        a: 'You don\'t *need* one to try it — you can create and use a pod entirely offline. But signing in with Google unlocks optional Google Drive sync across devices, which most families want after they decide beanies.family is for them.',
+      },
+      {
+        id: 'how-to-install',
+        q: 'How do I install beanies.family as an app on my phone?',
+        a: 'Open <a href="https://app.beanies.family">app.beanies.family</a> in Safari (iPhone) or Chrome (Android), then tap the browser\'s share or menu button and choose "Add to Home Screen" (iPhone) or "Install app" (Android). Full step-by-step with screenshots: <a href="/help/getting-started/install-as-app">installing beanies.family as an app</a>.',
+      },
+      {
+        id: 'add-family-members',
+        q: 'How do I add my partner / kids to my pod?',
+        a: 'From Settings → Family members, create an invite link and send it to them (text, email, whatever). They open the link on their device, set their own password, and they are in the same pod. All your data is shared live from that point.',
+      },
+    ],
+  },
+  {
+    heading: 'privacy & security',
+    faqs: [
+      {
+        id: 'where-is-my-data',
+        q: 'Where is my data stored?',
+        a: 'On your device, in an encrypted file called a `.beanpod`. If you opt in to sync, a copy is also stored in your own Google Drive — encrypted before it leaves your browser. **beanies.family does not have servers that store your family data.** There is nothing on our side to breach or subpoena.',
+      },
+      {
+        id: 'how-is-data-encrypted',
+        q: 'How is my data encrypted?',
+        a: 'AES-GCM with a 256-bit key, using the browser\'s native Web Crypto API (no third-party crypto libraries). Per-member keys are wrapped with AES-KW. The key is derived from your pod password via a strong password-derivation function. Full details in <a href="/help/security/how-your-data-is-encrypted">how your data is encrypted</a>.',
+      },
+      {
+        id: 'lose-password',
+        q: 'What happens if I lose my pod password?',
+        a: 'We cannot recover it. By design — the whole point of local-first encryption is that nobody except you can decrypt the pod. If you lose the password AND don\'t have the unlocked pod cached on any device, the pod is unrecoverable. Please write the password down somewhere safe. See <a href="/help/security/password-recovery">password recovery</a> for more.',
+      },
+      {
+        id: 'can-beanies-see-my-data',
+        q: 'Can the beanies.family team see my family data?',
+        a: 'No. We never receive it. The pod data is encrypted on your device with a key derived from your password, and we never see the password. Even the optional Google Drive sync stores ciphertext only — Google also cannot read it. We have zero ability to access, inspect, or share your family data.',
+      },
+      {
+        id: 'is-this-really-secure',
+        q: 'Is beanies.family really secure, or is this just marketing?',
+        a: 'The code is open source and auditable at <a href="https://github.com/gparker97/beanies-family">github.com/gparker97/beanies-family</a>. You can verify the encryption approach yourself. The crypto primitives are the browser\'s native Web Crypto API — no custom "roll-your-own" crypto. No servers means no server-side breach surface.',
+      },
+      {
+        id: 'google-drive-permissions',
+        q: 'What does beanies.family access in my Google Drive?',
+        a: 'Only files it creates itself — the `drive.file` OAuth scope. beanies.family cannot see or read any of your other Google Drive files, emails, calendar, or account data. You can revoke access at any time from your Google account settings.',
+      },
+    ],
+  },
+  {
+    heading: 'features & usage',
+    faqs: [
+      {
+        id: 'offline',
+        q: 'Can I use beanies.family offline?',
+        a: 'Yes. After the first load, the app works fully offline — you can view and edit your pod without an internet connection. Changes sync to Google Drive (if enabled) next time you come online. This is the "local-first" architecture at work.',
+      },
+      {
+        id: 'multiple-currencies',
+        q: 'Does beanies.family support multiple currencies?',
+        a: 'Yes. You can record accounts, transactions, assets, and goals in any currency, and beanies.family converts everything into your chosen base currency for totals and dashboards. Exchange rates update automatically from a public rates API.',
+      },
+      {
+        id: 'kids-privacy',
+        q: 'Can my kids use beanies.family?',
+        a: "Yes, with parental setup. The recommended flow is for a parent to own the pod and invite kids as family members once they're old enough to want their own view. Because all data is local (not on a server), there is no data-processing of children's information — the parent controls everything.",
+      },
+      {
+        id: 'export',
+        q: 'Can I export my data?',
+        a: 'Yes. Your entire pod is already a single file (`.beanpod`) that you can download anytime from Settings. You can also export structured data as JSON for use in other tools. No lock-in: your data is yours, exportable, and portable.',
+      },
+      {
+        id: 'what-can-i-track',
+        q: 'What can I track in beanies.family?',
+        a: 'Accounts (checking, savings, investments, crypto), transactions, assets (real estate, vehicles), financial goals, family activities, to-dos, travel plans, and family members with their own avatars and settings. It is designed to be the single place for your family\'s planning.',
+      },
+    ],
+  },
+  {
+    heading: 'technical',
+    faqs: [
+      {
+        id: 'open-source',
+        q: 'Is beanies.family open source?',
+        a: 'Yes — MIT licensed. The full source code is at <a href="https://github.com/gparker97/beanies-family">github.com/gparker97/beanies-family</a>. You can audit the encryption, self-host, fork it, or just read the code to confirm it does what we say it does.',
+      },
+      {
+        id: 'how-is-it-built',
+        q: 'What is beanies.family built with?',
+        a: 'Vue 3 + TypeScript + Vite for the app, with Automerge (a CRDT library) as the data layer for conflict-free multi-device merging. Styling is Tailwind CSS 4. It runs entirely in the browser — no backend server for application logic. Full stack details in <a href="/help/how-it-works">how it works</a>.',
+      },
+      {
+        id: 'service-goes-down',
+        q: 'What happens if beanies.family goes out of business or the website goes down?',
+        a: 'Your data survives. You already have the `.beanpod` file on your device and (if you enabled sync) in your Google Drive — we never had it. You can still open the pod file in any beanies.family build (the code is open source, so someone could run it indefinitely). This is the local-first architecture\'s best feature.',
+      },
+      {
+        id: 'self-host',
+        q: 'Can I self-host beanies.family?',
+        a: "Yes — the repository is a standard Vue 3 + Vite project. Clone it, `npm install && npm run build`, and serve the `dist/` directory from any static host. The only external service is Google Drive (for optional sync), and that's the user's own Drive, not ours.",
+      },
+    ],
+  },
+  {
+    heading: 'about the project',
+    faqs: [
+      {
+        id: 'why-beanies',
+        q: 'Why is it called "beanies"?',
+        a: 'The founder\'s son, when he was little, started calling family members "beanies" — tiny, precious, countable. The name stuck. The tagline "every bean counts" came from the same place.',
+      },
+      {
+        id: 'who-built-it',
+        q: 'Who built beanies.family?',
+        a: 'greg, a software engineer and father, built it for his own family after years of frustration with existing family apps that either harvested data or became cluttered add-feature-mills. Read the full origin story: <a href="/blog/why-i-built-beanies-family">why I built beanies.family</a>.',
+      },
+      {
+        id: 'comparison-with-others',
+        q: 'How does beanies.family compare to Cozi, YNAB, Copilot, etc.?',
+        a: 'Different positioning. Cozi is cloud-native family planning; YNAB and Copilot are finance-focused. beanies.family is the intersection of family logistics + family finances, with privacy-first local-first architecture as a differentiator. Dedicated comparison posts coming to <a href="/blog">the beanstalk</a>.',
+      },
+      {
+        id: 'feedback',
+        q: 'How can I give feedback or suggest features?',
+        a: 'Open an issue on <a href="https://github.com/gparker97/beanies-family/issues">GitHub</a>, or use the contact form on the <a href="/">homepage</a>. Every message is read by a real human (the founder). Feedback from early users has a disproportionate impact on what gets built next.',
+      },
+    ],
+  },
+];
+
+const canonicalPath = '/help/faq';
+
+// Strip HTML from answer text for JSON-LD (schema wants plain text)
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Flatten all FAQs for JSON-LD
+const allFaqs = groups.flatMap((g) => g.faqs);
+
+const faqSchema = {
+  '@type': 'FAQPage',
+  '@id': `${SITE_URL}${canonicalPath}#faq`,
+  mainEntity: allFaqs.map((f) => ({
+    '@type': 'Question',
+    '@id': `${SITE_URL}${canonicalPath}#${f.id}`,
+    name: f.q,
+    acceptedAnswer: {
+      '@type': 'Answer',
+      text: stripHtml(f.a),
+    },
+  })),
+};
+---
+
+{
+  hidden ? (
+    <DraftPlaceholder backHref="/help" backLabel="back to help" />
+  ) : (
+    <BaseLayout
+      title="frequently asked questions — beanies.family"
+      description="answers to the most common questions about beanies.family: privacy, pricing, security, supported devices, and how things work under the hood."
+      canonicalPath={canonicalPath}
+      jsonLd={faqSchema}
+    >
+      <article class="faq-page">
+        <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'help', href: '/help' }, { label: 'faq', href: canonicalPath }]} />
+
+        <header class="faq-header">
+          <h1 class="faq-title">frequently asked questions</h1>
+          <p class="faq-intro">
+            the questions we get asked most, answered in full. if your question isn't here, open an issue on <a href="https://github.com/gparker97/beanies-family/issues">GitHub</a> or reach out via the <a href="/#contact">contact form</a>.
+          </p>
+        </header>
+
+        {groups.map((group) => (
+          <section class="faq-group">
+            <h2 class="faq-group-heading">{group.heading}</h2>
+            <div class="faq-list">
+              {group.faqs.map((f) => (
+                <article class="faq-item" id={f.id}>
+                  <h3 class="faq-q">{f.q}</h3>
+                  <p class="faq-a" set:html={f.a} />
+                  <a class="faq-anchor" href={`#${f.id}`} aria-label={`copy link to this question`}>#</a>
+                </article>
+              ))}
+            </div>
+          </section>
+        ))}
+      </article>
+    </BaseLayout>
+  )
+}
+
+<style>
+  .faq-page {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 760px;
+    padding: 88px 24px 64px;
+  }
+
+  .faq-header { margin: 24px 0 40px; }
+  .faq-title {
+    color: #2c3e50;
+    font-family: Outfit, sans-serif;
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+  .faq-intro {
+    color: rgb(44 62 80 / 65%);
+    font-size: 1rem;
+    line-height: 1.65;
+    margin: 12px 0 0;
+    max-width: 600px;
+  }
+  .faq-intro a { color: #f15d22; font-weight: 600; text-decoration: none; }
+  .faq-intro a:hover { text-decoration: underline; }
+
+  .faq-group { margin-bottom: 40px; }
+  .faq-group-heading {
+    color: rgb(44 62 80 / 45%);
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin: 0 0 16px;
+    text-transform: uppercase;
+  }
+
+  .faq-list { display: flex; flex-direction: column; gap: 16px; }
+  .faq-item {
+    background: white;
+    border: 1px solid rgb(44 62 80 / 6%);
+    border-radius: 20px;
+    padding: 22px 28px;
+    position: relative;
+    scroll-margin-top: 90px;
+  }
+  .faq-item:target {
+    border-color: rgb(241 93 34 / 30%);
+    box-shadow: 0 4px 16px rgb(241 93 34 / 10%);
+  }
+  .faq-q {
+    color: #2c3e50;
+    font-family: Outfit, sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 0 0 10px;
+  }
+  .faq-a {
+    color: rgb(44 62 80 / 80%);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin: 0;
+  }
+  .faq-a a {
+    color: #f15d22;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .faq-a a:hover { text-decoration: underline; }
+  .faq-a code {
+    background: rgb(44 62 80 / 5%);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.88em;
+    padding: 0.1em 0.35em;
+  }
+
+  .faq-anchor {
+    color: rgb(44 62 80 / 20%);
+    font-family: ui-monospace, monospace;
+    font-size: 0.875rem;
+    font-weight: 600;
+    opacity: 0;
+    position: absolute;
+    right: 20px;
+    text-decoration: none;
+    top: 20px;
+    transition: opacity 150ms, color 150ms;
+  }
+  .faq-item:hover .faq-anchor { opacity: 1; }
+  .faq-anchor:hover { color: #f15d22; }
+
+  @media (max-width: 520px) {
+    .faq-page { padding-top: 76px; }
+    .faq-title { font-size: 1.75rem; }
+    .faq-item { padding: 20px; }
+  }
+</style>
