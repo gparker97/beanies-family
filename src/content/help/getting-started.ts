@@ -283,8 +283,42 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'If no prompt appears, no problem \u2014 the manual steps below work every time, and on iPhone/iPad you\u2019ll always need to use the manual method.',
+          'If no prompt appears, no problem \u2014 try the in-app option below, or jump to the manual steps for your device.',
         title: 'Didn\u2019t see the prompt?',
+        icon: '\u{1F4A1}',
+      },
+      {
+        type: 'heading',
+        content: 'Install from Settings (inside the app)',
+        level: 2,
+        id: 'install-from-settings',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When you\u2019re signed in and using beanies.family in a regular browser tab, there\u2019s a shortcut right inside the app:',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open beanies.family in your browser and sign in as normal',
+          'Click the <strong>Settings</strong> link in the sidebar (or menu on mobile)',
+          'Scroll down to the <strong>Install App</strong> section',
+          'Click the <strong>Install beanies.family</strong> button',
+          'Confirm in the browser pop-up that appears \u2014 the app icon is added to your device',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/06-settings-install-button.jpg" alt="The Install App section in beanies.family Settings with the Install beanies.family button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'The Install App section only appears when the app isn\u2019t already installed and your browser supports PWA install. On iPhone/iPad (Safari), you won\u2019t see this button \u2014 use the Share-menu method below instead.',
+        title: 'Don\u2019t see the Install App section?',
         icon: '\u{1F4A1}',
       },
       {
