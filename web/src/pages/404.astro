@@ -1,0 +1,114 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="page not found — beanies.family"
+  description="this bean has wandered off the path. let's get you back to the pod."
+  canonicalPath="/404"
+  noindex={true}
+>
+  <section class="not-found">
+    <img
+      src="/brand/beanies_covering_eyes_transparent_512x512.png"
+      alt="a bean covering its eyes"
+      width="180"
+      height="180"
+      class="not-found__mascot"
+      fetchpriority="high"
+    />
+    <h1 class="not-found__code">404</h1>
+    <p class="not-found__headline">this bean has wandered off the path</p>
+    <p class="not-found__sub">
+      the page you're looking for doesn't exist, has moved, or never did. let's get you back to
+      familiar ground.
+    </p>
+    <div class="not-found__ctas">
+      <a href="/" class="not-found__btn not-found__btn--primary">back home</a>
+      <a href="/blog" class="not-found__btn">the beanstalk</a>
+      <a href="/help" class="not-found__btn">help center</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .not-found {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 auto;
+    max-width: 560px;
+    padding: 120px 24px 64px;
+    text-align: center;
+  }
+
+  .not-found__mascot {
+    height: 180px;
+    margin-bottom: 8px;
+    width: 180px;
+  }
+
+  .not-found__code {
+    color: var(--color-primary-500, #f15d22);
+    font-family: var(--font-outfit, Outfit, sans-serif);
+    font-size: 4rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin: 0;
+  }
+
+  .not-found__headline {
+    color: var(--color-secondary-500, #2c3e50);
+    font-family: var(--font-outfit, Outfit, sans-serif);
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .not-found__sub {
+    color: rgb(44 62 80 / 60%);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0 auto;
+    max-width: 440px;
+  }
+
+  .not-found__ctas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 16px;
+  }
+
+  .not-found__btn {
+    background: white;
+    border: 1px solid rgb(44 62 80 / 10%);
+    border-radius: 24px;
+    color: var(--color-secondary-500, #2c3e50);
+    font-family: var(--font-outfit, Outfit, sans-serif);
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 10px 20px;
+    text-decoration: none;
+    transition: all 200ms ease;
+  }
+  .not-found__btn:hover {
+    border-color: var(--color-primary-500, #f15d22);
+    color: var(--color-primary-500, #f15d22);
+    transform: translateY(-1px);
+  }
+  .not-found__btn--primary {
+    background: var(--color-primary-500, #f15d22);
+    border-color: var(--color-primary-500, #f15d22);
+    color: white;
+  }
+  .not-found__btn--primary:hover {
+    background: #d14d1a;
+    border-color: #d14d1a;
+    color: white;
+    transform: translateY(-1px);
+  }
+</style>

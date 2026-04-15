@@ -176,6 +176,20 @@ resource "aws_cloudfront_distribution" "frontend" {
     }
   }
 
+  # Post-Phase-C (Astro mode): S3 returns 403 for paths that don't exist in
+  # the bucket, and real 404s for misses that CloudFront can detect. Both
+  # should render the branded Astro 404 page with a real 404 status so
+  # search engines + AI crawlers see the correct signal.
+  dynamic "custom_error_response" {
+    for_each = var.enable_spa_fallback ? [] : [403, 404]
+    content {
+      error_code            = custom_error_response.value
+      response_code         = 404
+      response_page_path    = "/404.html"
+      error_caching_min_ttl = 10
+    }
+  }
+
   viewer_certificate {
     acm_certificate_arn      = aws_acm_certificate_validation.frontend.certificate_arn
     ssl_support_method       = "sni-only"
