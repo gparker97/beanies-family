@@ -24,8 +24,18 @@ export const FOOTER_NAV: NavLink[] = [
   { label: 'github', href: 'https://github.com/gparker97/beanies-family', external: true },
 ];
 
-/** URL of the app itself (authenticated PWA). */
-export const APP_URL = 'https://app.beanies.family';
+/**
+ * URL of the app itself (authenticated PWA).
+ *
+ * In Astro dev mode (`npm run dev:web`) this points at the local Vue dev
+ * server (http://localhost:5173) so "create your bean pod" / "sign in" CTAs
+ * on the marketing site can be tested end-to-end without deploying. In
+ * production builds it points at the real app subdomain.
+ *
+ * The Vue app itself doesn't import from this module — it has its own
+ * navigation constants — so this DEV branch only affects the Astro site.
+ */
+export const APP_URL = import.meta.env.DEV ? 'http://localhost:5173' : 'https://app.beanies.family';
 
 /** Public marketing site URL. */
 export const SITE_URL = 'https://beanies.family';
