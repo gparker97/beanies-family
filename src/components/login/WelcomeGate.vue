@@ -3,6 +3,13 @@ import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
 
+// Marketing homepage lives on the Astro site at the apex (post-Phase-C).
+// DEV points at the local Astro dev server (4321) for parity; in prod
+// it's the live apex.
+const MARKETING_HOME_URL = import.meta.env.DEV
+  ? 'http://localhost:4321/'
+  : 'https://beanies.family/';
+
 type LoginView = 'load-pod' | 'create' | 'join';
 
 const emit = defineEmits<{
@@ -103,7 +110,7 @@ const emit = defineEmits<{
       <!-- Marketing homepage now lives on the Astro site at the apex, not in
            the Vue app. Cross-origin nav via anchor — no SPA routing. -->
       <a
-        :href="(import.meta.env.DEV ? 'http://localhost:4321' : 'https://beanies.family') + '/'"
+        :href="MARKETING_HOME_URL"
         class="font-outfit inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 no-underline shadow-sm transition-all hover:border-[var(--heritage-orange)] hover:text-[var(--heritage-orange)] hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:text-gray-400 dark:hover:border-[var(--heritage-orange)] dark:hover:text-[var(--heritage-orange)]"
       >
         <svg
