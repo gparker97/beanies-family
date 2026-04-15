@@ -9,6 +9,7 @@ Drop these 5 screenshots into this directory (`web/public/help/pwa-install/`) to
 | `03-ios-add-to-home-screen.jpg` | ~900px wide | The iOS Share sheet scrolled to show "Add to Home Screen", highlighted |
 | `04-android-menu.jpg` | ~900px wide | Chrome on Android with the three-dot menu open, "Install app" highlighted |
 | `05-desktop-install-icon.jpg` | ~1400px wide | Chrome desktop URL bar with the install icon at the right, circled or highlighted |
+| `06-settings-install-button.jpg` | ~1200px wide | beanies.family Settings page showing the "Install App" section + "Install beanies.family" button |
 
 **Format:** JPG (smaller than PNG for screenshots). Optimize to ~200 KB each — they load as `loading="lazy"`.
 
