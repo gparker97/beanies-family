@@ -190,6 +190,24 @@ const router = createRouter({
   },
 });
 
+// Already-authenticated guard: redirect away from pre-auth landing pages
+// (/welcome, /login) when the user already has a valid session. Prevents
+// the confusing "sign in again / create a new family" screen for users
+// who are already in.
+//
+// /join and /oauth/callback are intentionally excluded — an authenticated
+// user may legitimately be accepting an invite to a different pod, and the
+// OAuth callback must always execute its handler regardless of state.
+const ALREADY_AUTH_REDIRECT_FROM = new Set(['/welcome', '/login']);
+
+router.beforeEach((to) => {
+  if (!ALREADY_AUTH_REDIRECT_FROM.has(to.path)) return;
+  const authStore = useAuthStore();
+  if (authStore.isAuthenticated) {
+    return { name: 'Nook' };
+  }
+});
+
 // Permission guard: redirect to /no-access if finance permission is missing
 router.beforeEach((to) => {
   if (to.meta.requiresFinance) {
