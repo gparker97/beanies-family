@@ -350,11 +350,22 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   cursor: pointer;
   display: flex;
   flex: 1;
+  /* Flex items default to min-width: auto (= min-content). Combined with the
+     nowrap title inside, that forces each button to be at least the title's
+     full non-wrapped width — pushing the flex row past the container on
+     mobile. Override so the ellipsis in .post-nav-title can actually kick in. */
+  min-width: 0;
   gap: 10px;
   padding: 16px;
   text-align: left;
   text-decoration: none;
   transition: border-color 200ms, box-shadow 200ms;
+}
+
+/* The inner content div (holding label + title) also needs min-width: 0 so
+   the nowrap title doesn't prop it wider than the flex allowance. */
+.post-nav-btn > div {
+  min-width: 0;
 }
 .post-nav-btn:hover {
   border-color: rgb(241 93 34 / 15%);
@@ -379,7 +390,10 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   font-size: 0.8125rem;
   font-weight: 600;
   margin-top: 2px;
-  max-width: 200px;
+  /* Fill parent instead of a fixed 200px cap — parent's own min-width: 0
+     lets this shrink freely while overflow: hidden + ellipsis clip the
+     overflowing text visually. */
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
