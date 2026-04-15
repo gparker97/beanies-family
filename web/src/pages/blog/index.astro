@@ -1,8 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { isPublished } from '~/utils/content';
 
-const allPosts = (await getCollection('blog')).sort(
+const allPosts = (await getCollection('blog', isPublished)).sort(
   (a, b) => b.data.date.getTime() - a.data.date.getTime(),
 );
 const featuredPost = allPosts.find((p) => p.data.featured);

@@ -1,11 +1,12 @@
 ---
 import { getCollection, render } from 'astro:content';
+import { isPublished } from '~/utils/content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
 
 export async function getStaticPaths() {
-  const posts = await getCollection('blog');
+  const posts = await getCollection('blog', isPublished);
   const sorted = [...posts].sort((a, b) => a.data.date.getTime() - b.data.date.getTime());
   return posts.map((post) => {
     const i = sorted.findIndex((p) => p.data.slug === post.data.slug);

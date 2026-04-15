@@ -1,11 +1,12 @@
 ---
-import { getCollection, getEntry, render } from 'astro:content';
+import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
+import { isPublished } from '~/utils/content';
 
 export async function getStaticPaths() {
-  const guides = await getCollection('guides');
+  const guides = await getCollection('guides', isPublished);
   return guides.map((guide) => ({
     params: { slug: guide.data.slug },
     props: { guide },
@@ -22,8 +23,8 @@ const canonicalPath = `/guides/${guide.data.slug}`;
 // default slugger (rehype-slug-style).
 const toc = headings.filter((h) => h.depth === 2);
 
-// Resolve related blog posts from frontmatter slugs
-const allPosts = await getCollection('blog');
+// Resolve related blog posts from frontmatter slugs (drafts stay excluded)
+const allPosts = await getCollection('blog', isPublished);
 const related = guide.data.relatedPosts
   .map((slug) => allPosts.find((p) => p.data.slug === slug))
   .filter((p): p is NonNullable<typeof p> => p !== undefined)

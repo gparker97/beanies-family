@@ -1,30 +1,52 @@
 # Guides source directory
 
-Place pillar/guide markdown files here. They're loaded by Astro's `guides` content collection (see `web/src/content.config.ts`).
+Pillar / reference content for the /guides/ section of the site. Lives in
+the `guides` Astro content collection (see web/src/content.config.ts).
 
-**Kept separate from the beanstalk blog** so:
-- Guides don't appear in the RSS feed
-- Guides don't syndicate to Substack (blog-only)
-- Guides live at `/guides/<slug>` (evergreen, reference material)
-- Blog posts live at `/blog/<slug>` (personal, dated, weekly)
+Distinct from the beanstalk blog so:
+  - Guides don't appear in the RSS feed
+  - Guides don't syndicate to Substack
+  - Guides live at /guides/<slug> (evergreen, reference)
+  - Blog posts live at /blog/<slug> (personal, dated, weekly)
 
-Frontmatter shape (enforced by Zod):
+## Frontmatter (enforced by Zod — invalid frontmatter fails the build)
 
 ```yaml
 ---
-title: "overwhelmed with family planning"
-slug: overwhelmed-family-planning
-excerpt: "Comprehensive guide to cutting through family-planning chaos."
-heroEmoji: 🌀
+title: "pillar title, lowercase, human-voice"
+slug: url-safe-slug
+excerpt: "one-to-two-sentence hook. appears in /guides list + meta description."
+heroEmoji: 🌀                              # optional, shown in list card + hero
 publishedDate: 2026-04-16
 lastUpdated: 2026-04-16
-relatedPosts:
-  - why-i-built-beanies-family
+relatedPosts:                              # blog slugs that act as spokes
+  - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
-tags:
-  - family-organization
+tags:                                      # for AI-citation + future filtering
   - mental-load
+draft: true                                # hide from prod until ready
 ---
 ```
 
-Body uses standard markdown with H2/H3 headings — the template auto-generates a table of contents from H2s.
+## Draft workflow
+
+Draft entries (`draft: true`) are:
+  - Hidden from the /guides list page
+  - Excluded from getStaticPaths (no production URL)
+  - Excluded from the sitemap
+  - NEVER visible to real users or search engines
+
+In local dev (`npm run dev:web`), drafts ARE visible so you can iterate
+and share preview links locally. The filter lives in web/src/utils/content.ts.
+
+When ready to ship: flip `draft: false`, bump `lastUpdated`, commit, deploy.
+
+## Body conventions
+
+Body uses standard markdown with `## H2` headings. Each H2 should:
+  - Be question-shaped or topic-shaped (AI-citation friendly)
+  - Open with a "short answer" in **bold** (the extractable chunk)
+  - Keep sections self-contained (AI chunks content for retrieval)
+
+The page template auto-generates a Table of Contents from H2 headings.
+H3s are skipped from the ToC (too granular) but render normally in content.

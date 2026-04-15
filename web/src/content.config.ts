@@ -18,6 +18,10 @@ const blog = defineCollection({
     excerpt: z.string(),
     featured: z.boolean().default(false),
     author: z.string().default('greg'),
+    /** When true, the entry is hidden from production builds (list pages,
+     *  sitemap, RSS, direct URL). Visible in `npm run dev:web` so drafts
+     *  can be iterated locally. See `isPublished()` in utils/content.ts. */
+    draft: z.boolean().default(false),
   }),
 });
 
@@ -44,6 +48,10 @@ const guides = defineCollection({
     /** Blog post slugs that act as spokes for this pillar — rendered in "further reading". */
     relatedPosts: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
+    /** When true, the entry is hidden from production builds (list pages,
+     *  sitemap, direct URL). Visible in `npm run dev:web` so drafts can
+     *  be iterated locally. See `isPublished()` in utils/content.ts. */
+    draft: z.boolean().default(false),
   }),
 });
 
