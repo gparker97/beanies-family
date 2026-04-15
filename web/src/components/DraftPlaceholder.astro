@@ -1,0 +1,78 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+interface Props {
+  /** Where the "go back" link points. Defaults to /help. */
+  backHref?: string;
+  /** Label for the back link. Defaults to "back to help". */
+  backLabel?: string;
+}
+
+const { backHref = '/help', backLabel = 'back to help' } = Astro.props;
+---
+
+<BaseLayout
+  title="not ready yet — beanies.family"
+  description="this page isn't ready to read yet — come back soon."
+  noindex={true}
+>
+  <section class="draft-placeholder">
+    <img
+      src="/brand/beanies_covering_eyes_transparent_512x512.png"
+      alt="a bean covering its eyes"
+      width="140"
+      height="140"
+      class="draft-placeholder__mascot"
+    />
+    <h1 class="draft-placeholder__headline">not ready yet</h1>
+    <p class="draft-placeholder__sub">
+      this page is still being written. come back soon, or wander back to what's already live.
+    </p>
+    <a href={backHref} class="draft-placeholder__btn">← {backLabel}</a>
+  </section>
+</BaseLayout>
+
+<style>
+  .draft-placeholder {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 auto;
+    max-width: 480px;
+    padding: 120px 24px 64px;
+    text-align: center;
+  }
+  .draft-placeholder__mascot { height: 140px; margin-bottom: 8px; width: 140px; }
+  .draft-placeholder__headline {
+    color: #2c3e50;
+    font-family: var(--font-outfit, Outfit, sans-serif);
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0;
+  }
+  .draft-placeholder__sub {
+    color: rgb(44 62 80 / 60%);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .draft-placeholder__btn {
+    background: white;
+    border: 1px solid rgb(44 62 80 / 10%);
+    border-radius: 24px;
+    color: #2c3e50;
+    font-family: var(--font-outfit, Outfit, sans-serif);
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-top: 16px;
+    padding: 10px 20px;
+    text-decoration: none;
+    transition: all 200ms ease;
+  }
+  .draft-placeholder__btn:hover {
+    border-color: #f15d22;
+    color: #f15d22;
+    transform: translateY(-1px);
+  }
+</style>
