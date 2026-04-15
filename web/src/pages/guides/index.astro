@@ -1,8 +1,9 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
+import { isPublished } from '~/utils/content';
 
-const guides = (await getCollection('guides')).sort(
+const guides = (await getCollection('guides', isPublished)).sort(
   (a, b) => b.data.lastUpdated.getTime() - a.data.lastUpdated.getTime(),
 );
 

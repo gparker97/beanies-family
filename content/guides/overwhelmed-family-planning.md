@@ -13,6 +13,10 @@ tags:
   - family-organization
   - overwhelm
   - parenting
+# `draft: true` hides this entry from production builds (list page,
+# sitemap, direct URL). Visible locally via `npm run dev:web`. Flip to
+# `draft: false` when ready to ship.
+draft: true
 ---
 
 <!--
