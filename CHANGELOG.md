@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-15
+
+### Changed
+
+- CI hygiene: migrated Vue deploy (`deploy.yml`, `translation-sync.yml`) from the legacy `CLOUDFRONT_DISTRIBUTION_ID` / `S3_BUCKET` secrets to `APP_CLOUDFRONT_DISTRIBUTION_ID` / `APP_S3_BUCKET` repo variables. Non-sensitive config is now visible in the GitHub UI and follows the `APP_*` / `WEB_*` / `APEX_*` naming scheme used elsewhere. Legacy secrets deleted after a verification deploy passed
+
+### Added
+
+- Draft scaffolds for `/help/glossary` (18 terms, `DefinedTermSet` JSON-LD) and `/help/faq` (20+ Q&As, `FAQPage` JSON-LD) — both hidden in prod via the `DraftPlaceholder` pattern. Content iteration happens locally via `npm run dev:web`; flip `DRAFT=false` to publish (#167)
+
+---
+
 ## 2026-04-14
 
 ### Added
