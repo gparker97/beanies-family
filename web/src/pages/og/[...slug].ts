@@ -6,8 +6,9 @@
 
 import { OGImageRoute } from 'astro-og-canvas';
 import { getCollection } from 'astro:content';
+import { isPublished } from '~/utils/content';
 
-const posts = await getCollection('blog');
+const posts = await getCollection('blog', isPublished);
 
 const pages = Object.fromEntries(
   posts.map((post) => [post.data.slug, { title: post.data.title, description: post.data.excerpt }])

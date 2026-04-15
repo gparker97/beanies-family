@@ -23,9 +23,12 @@ export default defineConfig({
     plugins: [/** @type {any} */ (tailwindcss())],
     resolve: {
       alias: {
-        // Matches the Vue app's alias — lets us reuse help + release-notes
-        // data modules from the root src/ without path surgery.
+        // @ resolves to the Vue app's src — lets us reuse help + release-
+        // notes data modules without path surgery.
         '@': fileURLToPath(new URL('../src', import.meta.url)),
+        // ~ resolves to THIS Astro project's own src — use for Astro-only
+        // helpers (e.g. ~/utils/content).
+        '~': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
   },

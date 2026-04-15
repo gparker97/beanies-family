@@ -8,9 +8,10 @@ import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { ALL_ARTICLES, getArticleSearchText, HELP_CATEGORIES } from '@/content/help';
 import { SITE_URL } from '@beanies/brand/nav';
+import { isPublished } from '~/utils/content';
 
 export const GET: APIRoute = async () => {
-  const posts = (await getCollection('blog')).sort(
+  const posts = (await getCollection('blog', isPublished)).sort(
     (a, b) => b.data.date.getTime() - a.data.date.getTime()
   );
 
