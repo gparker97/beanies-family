@@ -84,6 +84,11 @@ function handler(event) {
     return redirect('https://beanies.family' + newUri + qs);
   }
 
+  // 1b. Legacy /home → / (was a Vue route; Astro serves the homepage at /)
+  if (uri === '/home' || uri === '/home/') {
+    return redirect('https://beanies.family/' + qs);
+  }
+
   // 2. Authenticated PWA paths → app.beanies.family
   if (isAppPath(uri)) {
     return redirect('https://app.beanies.family' + uri + qs);
