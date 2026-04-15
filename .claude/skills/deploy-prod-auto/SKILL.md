@@ -32,22 +32,27 @@ Two deploy workflows exist:
 - `deploy.yml` — Vue PWA at `app.beanies.family` (gated on CI + security)
 - `deploy-web.yml` — Astro marketing site at `beanies.family` (no CI gate)
 
-Determine which are needed from the files pushed:
+Look at each workflow independently: diff HEAD against the SHA that workflow **last shipped successfully**. This catches the case where prior commits touched one side but that workflow wasn't triggered — the next skill invocation notices the gap and catches up.
 
 ```bash
-CHANGED=$(git show HEAD --name-only --pretty=format: | sort -u)
-NEEDS_WEB=$(echo "$CHANGED" | grep -E '^(web/|packages/|content/blog/)' || true)
-NEEDS_VUE=$(echo "$CHANGED" | grep -Ev '^(web/|content/blog/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
+LAST_VUE_SHA=$(gh run list --workflow=deploy.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
+LAST_WEB_SHA=$(gh run list --workflow=deploy-web.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
+
+VUE_CHANGES=$( { [ -n "$LAST_VUE_SHA" ] && git diff --name-only "$LAST_VUE_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
+WEB_CHANGES=$( { [ -n "$LAST_WEB_SHA" ] && git diff --name-only "$LAST_WEB_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
+
+NEEDS_WEB=$(echo "$WEB_CHANGES" | grep -E '^(web/|packages/|content/blog/)' || true)
+NEEDS_VUE=$(echo "$VUE_CHANGES" | grep -Ev '^(web/|content/blog/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
 ```
 
-Rules:
+Path rules (applied to each workflow's own change set):
 
-- `web/**` or `content/blog/**` → Astro deploy (web only)
+- `web/**` or `content/blog/**` → Astro deploy
 - `packages/**` → BOTH (shared brand tokens consumed by both apps)
 - `src/**`, `public/**`, build configs, root files → Vue deploy
-- Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip all deploys (no runtime change)
+- Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip that workflow
 
-If both empty, report "no runtime changes — no deploy needed" and stop.
+If both empty, report "no runtime changes since last deploy — nothing to ship" and stop.
 
 ## Step 3: Deploy the Astro site (if NEEDS_WEB, fires immediately)
 

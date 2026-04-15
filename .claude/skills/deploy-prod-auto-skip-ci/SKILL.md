@@ -32,22 +32,30 @@ Two deploy workflows exist:
 - `deploy.yml` — Vue PWA at `app.beanies.family`
 - `deploy-web.yml` — Astro marketing site at `beanies.family`
 
-After the push, determine which are needed based on the files touched:
+Look at each workflow independently: diff HEAD against the SHA that workflow **last shipped successfully**. This catches the case where prior commits touched one side but that workflow wasn't triggered — e.g., you pushed a commit that edits `packages/**` but only ran one of the two deploys. The next skill invocation now notices the gap and catches up.
 
 ```bash
-CHANGED=$(git show HEAD --name-only --pretty=format: | sort -u)
-NEEDS_WEB=$(echo "$CHANGED" | grep -E '^(web/|packages/|content/blog/)' || true)
-NEEDS_VUE=$(echo "$CHANGED" | grep -Ev '^(web/|content/blog/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
+# Last SHA successfully deployed by each workflow (empty string if never shipped)
+LAST_VUE_SHA=$(gh run list --workflow=deploy.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
+LAST_WEB_SHA=$(gh run list --workflow=deploy-web.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
+
+# Files changed since each workflow's last success (fall back to latest commit
+# if a workflow has never shipped or the SHA is no longer reachable)
+VUE_CHANGES=$( { [ -n "$LAST_VUE_SHA" ] && git diff --name-only "$LAST_VUE_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
+WEB_CHANGES=$( { [ -n "$LAST_WEB_SHA" ] && git diff --name-only "$LAST_WEB_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
+
+NEEDS_WEB=$(echo "$WEB_CHANGES" | grep -E '^(web/|packages/|content/blog/)' || true)
+NEEDS_VUE=$(echo "$VUE_CHANGES" | grep -Ev '^(web/|content/blog/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
 ```
 
-Rules:
+Path rules (applied to each workflow's own change set):
 
-- `web/**` or `content/blog/**` → Astro deploy needed (web only)
+- `web/**` or `content/blog/**` → Astro deploy
 - `packages/**` → BOTH (shared brand tokens are consumed by both apps)
-- `src/**`, `public/**`, build configs, root files → Vue deploy needed
-- Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip all deploys (no runtime change)
+- `src/**`, `public/**`, build configs, root files → Vue deploy
+- Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip that workflow
 
-If `NEEDS_VUE` and `NEEDS_WEB` are both empty, report "no runtime changes — no deploy needed" and stop.
+If both `NEEDS_VUE` and `NEEDS_WEB` are empty, report "no runtime changes since last deploy — nothing to ship" and stop.
 
 ## Step 3: Deploy (Skip CI Gate)
 
