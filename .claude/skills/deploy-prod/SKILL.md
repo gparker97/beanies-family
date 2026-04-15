@@ -25,7 +25,48 @@ This skill commits all pending changes, pushes to `main`, monitors CI pipelines,
    - Re-commit the fix and push again.
    - Repeat until push succeeds.
 
-## Step 2: Monitor CI
+## Step 2: Classify what needs deploying
+
+Two deploy workflows exist:
+
+- `deploy.yml` — Vue PWA at `app.beanies.family` (gated on CI + security)
+- `deploy-web.yml` — Astro marketing site at `beanies.family` (no external CI gate)
+
+Determine which are needed from the files pushed:
+
+```bash
+CHANGED=$(git show HEAD --name-only --pretty=format: | sort -u)
+NEEDS_WEB=$(echo "$CHANGED" | grep -E '^(web/|packages/|content/blog/)' || true)
+NEEDS_VUE=$(echo "$CHANGED" | grep -Ev '^(web/|content/blog/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
+```
+
+Rules:
+
+- `web/**` or `content/blog/**` → Astro deploy (web only)
+- `packages/**` → BOTH (shared brand tokens consumed by both apps)
+- `src/**`, `public/**`, build configs, root files → Vue deploy
+- Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip all deploys
+
+Report the classification to the user ("Vue needed: yes/no, Astro needed: yes/no") and pause for acknowledgement before proceeding. If both are empty, stop with "no runtime changes — no deploy needed".
+
+## Step 3: Deploy the Astro site (if NEEDS_WEB)
+
+Astro has its own build inside the deploy workflow — no external CI gate is required. Confirm with the user, then:
+
+```bash
+gh workflow run deploy-web.yml --ref main -f target=production
+```
+
+Wait ~10s and watch:
+
+```bash
+gh run list --workflow=deploy-web.yml --limit=1
+gh run watch <run-id>
+```
+
+If it fails, report logs to the user. The Astro deploy doesn't block the Vue deploy path below.
+
+## Step 4: Monitor CI (only if NEEDS_VUE; skip otherwise)
 
 After a successful push, two CI workflows run automatically on `main`:
 
@@ -34,9 +75,9 @@ After a successful push, two CI workflows run automatically on `main`:
 | **Main Branch CI** | `main-ci.yml` | Type-check, lint, format, unit tests, build, E2E (Chromium + Firefox) |
 | **Security Scanning** | `security.yml` | npm audit, SAST, secrets detection, CodeQL |
 
-Monitor both workflows:
+Monitor both:
 
-1. Wait ~30 seconds after push, then check workflow status:
+1. Wait ~30 seconds after push, then check:
    ```
    gh run list --workflow=main-ci.yml --branch=main --limit=1
    gh run list --workflow=security.yml --branch=main --limit=1
@@ -46,29 +87,28 @@ Monitor both workflows:
    gh run watch <run-id>
    ```
 3. If a workflow **fails**:
-   - Fetch the failed job logs: `gh run view <run-id> --log-failed`
-   - Analyze the error and fix the root cause.
-   - Commit the fix, push, and restart monitoring from the beginning of Step 2.
-   - Maximum 3 fix attempts. If still failing after 3 rounds, stop and report the issue to the user.
-4. If both workflows pass, proceed to Step 3.
+   - Fetch failed job logs: `gh run view <run-id> --log-failed`
+   - Fix the root cause, commit, push, restart Step 4.
+   - Maximum 3 fix attempts. If still failing, stop and report.
+4. If both pass, proceed to Step 5.
 
-## Step 3: Deploy
+## Step 5: Deploy the Vue app (only if NEEDS_VUE)
 
-Once both CI and Security workflows show green:
+Once CI and Security show green:
 
-1. Confirm with the user: "CI and Security are green. Ready to deploy to production?"
+1. Confirm with the user: "CI and Security are green. Ready to deploy the Vue app to production?"
 2. Only after explicit user approval, trigger the deploy:
    ```
    gh workflow run deploy.yml
-   ```
-3. Monitor the deploy workflow:
-   ```
    gh run list --workflow=deploy.yml --limit=1
    gh run watch <run-id>
    ```
-4. The deploy workflow has its own gate that re-verifies CI/Security passed for the commit.
-5. If deploy fails, fetch logs and report to the user. Do not retry automatically.
-6. On success, report: deployed commit SHA, deploy duration, and the production URL.
+3. The deploy workflow has its own gate that re-verifies CI/Security passed for the commit.
+4. If deploy fails, fetch logs and report. Do not retry automatically.
+
+## Step 6: Report
+
+Summarize: deployed commit SHA, which workflows ran, deploy durations, production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro).
 
 ---
 
