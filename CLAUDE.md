@@ -263,6 +263,92 @@ npm run lint
   - **Constants and config**: Shared values (colors, options, validation rules) belong in constants files, not scattered across components.
   - **When unsure**: If it's unclear whether to extract or inline, ask the user before proceeding.
 
+## Marketing Site Structure & Content Workflow
+
+Post-Phase-C cutover (#167), the marketing surface is a separate Astro site, not the Vue app. Understand this split before touching any public-facing content.
+
+### Site structure (keep it simple — no nesting)
+
+```
+beanies.family          Astro marketing site (apex)
+├── /                   single-page homepage
+├── /blog               beanstalk — personal, dated, weekly, syndicates to Substack
+│   ├── /blog/<slug>
+│   └── /blog/rss.xml
+├── /guides             pillars — evergreen, authoritative, NOT in RSS
+│   └── /guides/<slug>
+├── /help               product help center
+│   └── /help/<category>/<slug>
+├── /about/greg         author bio
+├── /privacy, /terms
+└── /sitemap-index.xml, /robots.txt, /llms.txt, /llms-full.txt
+
+app.beanies.family      Vue PWA (origin-isolated)
+```
+
+**Do not add deeper URL structures** (e.g. `/topics/<x>/guides`, nested `/blog/2026/04/<slug>`). The flat tree is a deliberate choice — keeps navigation, URLs, and sitemaps simple. New content belongs in one of the existing sections.
+
+### Blog vs Guides distinction
+
+|                     | Blog (`/blog/`)                  | Guides (`/guides/`)                              |
+| ------------------- | -------------------------------- | ------------------------------------------------ |
+| Tone                | personal, opinionated, narrative | fact-based, authoritative, reference             |
+| Dated               | yes — URL + page feel            | no — evergreen, updated-in-place                 |
+| Frequency           | weekly                           | as needed                                        |
+| Substack sync       | yes                              | no                                               |
+| RSS feed            | included                         | excluded                                         |
+| Heading structure   | flexible                         | H2s required (auto-TOC, question-shaped for AIO) |
+| Short-answer blocks | optional                         | required at top of each H2 (bold, quotable)      |
+
+Blog posts are the emotional/E-E-A-T layer. Guides are the hub-and-spoke authority layer that AI crawlers cite. Each guide links to relevant blog posts as "further reading" (spokes); each blog post links into its matching pillar.
+
+### Draft workflow — ALWAYS use for unfinished content
+
+**Real users are on prod** (via Reddit, Substack, sitemap, etc.). Never ship blank or draft content to prod. The content collections both support a `draft` flag:
+
+```yaml
+---
+title: '...'
+# ...
+draft: true # hides from prod builds; still visible in `npm run dev:web`
+---
+```
+
+Filter implementation in `web/src/utils/content.ts` (`isPublished()`). All `getCollection()` call sites pipe through the filter — list pages, static paths, sitemap, RSS, llms-full.txt, OG image generation. When `draft: true`:
+
+- Production build: no static path, no sitemap entry, no list-page card, 404 at the URL
+- `npm run dev:web` (local): fully visible and hot-reloadable
+
+**Publishing checklist** (when a draft is ready):
+
+1. Remove any `<!-- TODO: ... -->` / `<!-- GREG: ... -->` authoring placeholders in the body
+2. Bump `lastUpdated` (guides) or verify `date` (blog)
+3. Flip `draft: false` (or remove the line entirely)
+4. Commit + push → deploy-web ships it
+
+**Local preview during drafting**:
+
+```bash
+npm run dev:all        # Vue (5173) + Astro (4321) together
+# or
+npm run dev:web        # Astro only, if you don't need the PWA
+```
+
+Drafts appear at normal URLs on localhost. Share preview links with collaborators by running `npm run dev:web -- --host` (Astro binds to LAN).
+
+### Content authoring rules
+
+- **Every guide / every blog post** goes through the draft workflow first. Start with `draft: true`. No exceptions.
+- **Marketing / launch content**: per the project-instructions note at the top of this file, **do not** save to the repo. Launch plans, Reddit post drafts, marketing strategy → Notion only. The blog/guides content itself is product-adjacent writing, which is fine to commit.
+- **Guide H2 pattern**: start each section with a `**short answer:**` block (1-2 sentences, bold, quotable). This is the chunk AI crawlers most likely extract for citations. Everything after is elaboration.
+- **Spoke linking**: guides reference blog posts via `relatedPosts:` frontmatter (an array of blog slugs). Those render in the auto-generated "further reading" section. Blog posts should link TO the relevant pillar inline.
+- **No AI-flavored filler**: family/finance content is YMYL — generic prose tanks rankings. Guides need author-specific anecdotes, lived experience, concrete examples. If a section feels generic, it probably is.
+
+### Authoring docs
+
+- `content/guides/AUTHORING.txt` — guides frontmatter spec + conventions
+- `content/blog/README.md` — blog frontmatter spec + conventions (draft flag applies here too)
+
 ## Current Status (MVP - Phase 1)
 
 Implemented:
