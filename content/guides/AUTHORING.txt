@@ -1,0 +1,30 @@
+# Guides source directory
+
+Place pillar/guide markdown files here. They're loaded by Astro's `guides` content collection (see `web/src/content.config.ts`).
+
+**Kept separate from the beanstalk blog** so:
+- Guides don't appear in the RSS feed
+- Guides don't syndicate to Substack (blog-only)
+- Guides live at `/guides/<slug>` (evergreen, reference material)
+- Blog posts live at `/blog/<slug>` (personal, dated, weekly)
+
+Frontmatter shape (enforced by Zod):
+
+```yaml
+---
+title: "overwhelmed with family planning"
+slug: overwhelmed-family-planning
+excerpt: "Comprehensive guide to cutting through family-planning chaos."
+heroEmoji: 🌀
+publishedDate: 2026-04-16
+lastUpdated: 2026-04-16
+relatedPosts:
+  - why-i-built-beanies-family
+  - accidentally-built-greatest-family-app
+tags:
+  - family-organization
+  - mental-load
+---
+```
+
+Body uses standard markdown with H2/H3 headings — the template auto-generates a table of contents from H2s.

@@ -1,0 +1,193 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getCollection } from 'astro:content';
+
+const guides = (await getCollection('guides')).sort(
+  (a, b) => b.data.lastUpdated.getTime() - a.data.lastUpdated.getTime(),
+);
+
+const fmt = (d: Date) =>
+  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+---
+
+<BaseLayout
+  title="guides — beanies.family"
+  description="comprehensive, evergreen guides on family organization, finances, privacy, and keeping everyone on the same page. updated as things change."
+  canonicalPath="/guides"
+>
+  <div class="guides-page">
+    <header class="guides-hero">
+      <div class="guides-hero-pattern"></div>
+      <div class="guides-hero-content">
+        <img
+          src="/brand/beanies_open_eyes_transparent_512x512.png"
+          alt="a bean with wide open eyes"
+          class="guides-hero-mascot"
+          width="150"
+          height="150"
+        />
+        <h1 class="guides-hero-title">guides</h1>
+        <p class="guides-hero-tagline">
+          long-form, evergreen reference for the things that make family planning less overwhelming.
+          updated in place as the world (and beanies) change.
+        </p>
+      </div>
+    </header>
+
+    <div class="guides-content">
+      {
+        guides.length === 0 ? (
+          <div class="guides-empty">
+            <p class="guides-empty-text">guides are on the way. in the meantime, read <a href="/blog">the beanstalk</a> for personal stories and product updates.</p>
+          </div>
+        ) : (
+          <ul class="guides-list">
+            {guides.map((guide) => (
+              <li>
+                <a href={`/guides/${guide.data.slug}`} class="guide-card">
+                  {guide.data.heroEmoji && <span class="guide-card-emoji" aria-hidden="true">{guide.data.heroEmoji}</span>}
+                  <div class="guide-card-body">
+                    <h2 class="guide-card-title">{guide.data.title}</h2>
+                    <p class="guide-card-excerpt">{guide.data.excerpt}</p>
+                    <p class="guide-card-meta">updated {fmt(guide.data.lastUpdated)}</p>
+                  </div>
+                  <svg class="guide-card-arrow" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </a>
+              </li>
+            ))}
+          </ul>
+        )
+      }
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .guides-page {
+    --deep-slate: #2c3e50;
+    --heritage-orange: #f15d22;
+    --terracotta: #e67e22;
+    --cloud-white: #f8f9fa;
+    background: var(--cloud-white);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .guides-hero {
+    overflow: hidden;
+    padding: 100px 24px 48px;
+    position: relative;
+    text-align: center;
+  }
+  .guides-hero-pattern {
+    background-image:
+      radial-gradient(circle at 25% 25%, var(--heritage-orange) 1px, transparent 1px),
+      radial-gradient(circle at 75% 75%, var(--terracotta) 1px, transparent 1px);
+    background-size: 32px 32px;
+    inset: 0;
+    opacity: 0.03;
+    position: absolute;
+  }
+  .guides-hero-content { position: relative; z-index: 1; }
+  .guides-hero-mascot {
+    filter: drop-shadow(0 12px 32px rgb(44 62 80 / 10%));
+    height: 150px;
+    margin: 0 auto 20px;
+    width: 150px;
+  }
+  .guides-hero-title {
+    color: var(--deep-slate);
+    font-family: Outfit, sans-serif;
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+  .guides-hero-tagline {
+    color: var(--deep-slate);
+    font-family: Outfit, sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin: 8px auto 0;
+    max-width: 520px;
+    opacity: 0.5;
+  }
+
+  .guides-content {
+    margin: 0 auto;
+    max-width: 800px;
+    padding: 16px 24px 48px;
+  }
+
+  .guides-empty {
+    background: white;
+    border: 1px dashed rgb(44 62 80 / 15%);
+    border-radius: 20px;
+    padding: 48px 24px;
+    text-align: center;
+  }
+  .guides-empty-text {
+    color: rgb(44 62 80 / 55%);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  .guides-empty-text a { color: var(--heritage-orange); text-decoration: none; }
+  .guides-empty-text a:hover { text-decoration: underline; }
+
+  .guides-list { display: flex; flex-direction: column; gap: 16px; list-style: none; padding: 0; }
+  .guide-card {
+    align-items: center;
+    background: white;
+    border: 1px solid rgb(44 62 80 / 6%);
+    border-radius: 24px;
+    display: flex;
+    gap: 20px;
+    padding: 24px;
+    text-decoration: none;
+    transition: border-color 200ms, box-shadow 200ms, transform 200ms;
+  }
+  .guide-card:hover {
+    border-color: rgb(241 93 34 / 25%);
+    box-shadow: 0 12px 32px rgb(241 93 34 / 10%);
+    transform: translateY(-2px);
+  }
+  .guide-card-emoji { flex-shrink: 0; font-size: 2.25rem; }
+  .guide-card-body { flex: 1; min-width: 0; }
+  .guide-card-title {
+    color: var(--deep-slate);
+    font-family: Outfit, sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 0;
+  }
+  .guide-card:hover .guide-card-title { color: var(--heritage-orange); }
+  .guide-card-excerpt {
+    color: rgb(44 62 80 / 65%);
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 6px 0 0;
+  }
+  .guide-card-meta {
+    color: rgb(44 62 80 / 35%);
+    font-family: Outfit, sans-serif;
+    font-size: 0.75rem;
+    margin: 10px 0 0;
+  }
+  .guide-card-arrow {
+    color: rgb(44 62 80 / 25%);
+    flex-shrink: 0;
+    transition: color 200ms, transform 200ms;
+  }
+  .guide-card:hover .guide-card-arrow {
+    color: var(--heritage-orange);
+    transform: translateX(3px);
+  }
+
+  @media (max-width: 520px) {
+    .guides-hero-title { font-size: 1.75rem; }
+    .guide-card { padding: 20px; }
+    .guide-card-emoji { font-size: 1.75rem; }
+  }
+</style>
