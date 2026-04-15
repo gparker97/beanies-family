@@ -19,7 +19,7 @@ Roughly 0 score and several weeks ago, I didn’t set out to do much, except exp
 
 I wrote a simple financial planner for my family, since (a) I don’t like giving away my personal finance info to random apps, and (b) I don’t actually know my true net worth, since all my finance data happens to be in a spreadsheet I last updated in march 2009 with formulas that have been broken for about 17 years.
 
-800 commits, several hundred cups of coffee, and roughly 89,000 gloriously vibe-coded lines later (I won't even mention how many lines of code we _deleted_), sitting in the dark with moonlight shining off my dreary-eyed face, I found myself gazing proudly at a nano banana generated image of my actual family in beanie form, and everything I always wanted to see about my personal, family, and financial life laid out in a way that didn't actually make me want to cry.
+800 commits, several hundred cups of coffee, and roughly 89,000 gloriously vibe-coded lines later (I won't even mention how many lines of code we _deleted_), sitting in the dark with moonlight bouncing off my dreary-eyed face, I found myself gazing proudly at a nano banana generated image of my actual family in beanie form, and everything I always wanted to see about my personal, family, and financial life laid out in a way that didn't actually make me want to cry.
 
 Even in its infancy, beanies has helped me organize my family life to a point where I legitimately feel **calmer, less stressed, and more energized**. The ability to capture my thoughts, family activities, finances, travel plans, and other critical, precious personal info in a clean and secure way gives me a genuine feeling of relief and control. No jokes or silly old school TV references here - it's a game changer for me.
 
