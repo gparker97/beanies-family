@@ -33,6 +33,14 @@ module "frontend" {
   # from the same Vue S3 bucket via OAC.
   additional_distribution_arns = [module.app_subdomain.cloudfront_distribution_arn]
 
+  # Phase C cutover (2026-04-15) — apex now serves Astro content from the
+  # web bucket, with the merged apex-cutover CF function handling PWA-path
+  # 301s (→ app.beanies.family), legacy /beanstalk* → /blog* redirects, and
+  # Astro .html URL rewrites. SPA fallback off because Astro emits real 404s.
+  origin_bucket_regional_domain_name = module.web.s3_bucket_regional_domain_name
+  viewer_request_function_arn        = module.web.apex_cutover_function_arn
+  enable_spa_fallback                = false
+
   providers = {
     aws           = aws
     aws.us_east_1 = aws.us_east_1
