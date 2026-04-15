@@ -435,6 +435,20 @@ onMounted(async () => {
       }
     }
 
+    // If the user is authenticated but landed on a pre-auth page (/welcome
+    // or /login) — e.g., a returning user clicking the marketing-site "sign
+    // in" link with an active session, or pasting app.beanies.family/welcome
+    // into the URL bar — send them straight to /nook. The router-level
+    // beforeEach guard only fires on SPA navigations; this handles the
+    // fresh-page-load case after async auth hydration completes.
+    if (!authStore.needsAuth) {
+      const preAuthPages: Array<string | undefined> = ['Welcome', 'Login'];
+      if (preAuthPages.includes(route.name as string)) {
+        initBreadcrumbs.push('auth: already signed in, redirecting from pre-auth page → /nook');
+        await router.replace('/nook');
+      }
+    }
+
     // Step 3: Resolve active family
     const authFamilyId = authStore.currentUser?.familyId;
     initBreadcrumbs.push(`family: authFamilyId=${authFamilyId ?? 'none'}`);

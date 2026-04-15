@@ -1,9 +1,7 @@
 <script setup lang="ts">
 import { useTranslation } from '@/composables/useTranslation';
-import { useRouter } from 'vue-router';
 
 const { t } = useTranslation();
-const router = useRouter();
 
 type LoginView = 'load-pod' | 'create' | 'join';
 
@@ -102,9 +100,11 @@ const emit = defineEmits<{
     </div>
 
     <div class="mt-6 text-center">
-      <button
-        class="font-outfit inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 shadow-sm transition-all hover:border-[var(--heritage-orange)] hover:text-[var(--heritage-orange)] hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:text-gray-400 dark:hover:border-[var(--heritage-orange)] dark:hover:text-[var(--heritage-orange)]"
-        @click="router.push('/home')"
+      <!-- Marketing homepage now lives on the Astro site at the apex, not in
+           the Vue app. Cross-origin nav via anchor — no SPA routing. -->
+      <a
+        :href="(import.meta.env.DEV ? 'http://localhost:4321' : 'https://beanies.family') + '/'"
+        class="font-outfit inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-500 no-underline shadow-sm transition-all hover:border-[var(--heritage-orange)] hover:text-[var(--heritage-orange)] hover:shadow-md dark:border-slate-600 dark:bg-slate-800 dark:text-gray-400 dark:hover:border-[var(--heritage-orange)] dark:hover:text-[var(--heritage-orange)]"
       >
         <svg
           class="h-3.5 w-3.5"
@@ -116,7 +116,7 @@ const emit = defineEmits<{
           <polyline points="15 18 9 12 15 6" />
         </svg>
         {{ t('homepage.learnMore') }}
-      </button>
+      </a>
     </div>
   </div>
 </template>
