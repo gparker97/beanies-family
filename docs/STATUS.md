@@ -1,7 +1,7 @@
 # Project Status
 
-> **Last updated:** 2026-04-14
-> **Updated by:** Claude (SEO + AIO/GEO Astro marketing site shipped to staging.beanies.family with pixel-perfect homepage + blog port; Phase A infra applied: app.beanies.family PWA subdomain live; Phase C cutover code authored as a 3-line edit + 1 apply; registry DDB split into prod/dev tables with origin-based Lambda routing + E2E auto-cleanup — #167)
+> **Last updated:** 2026-04-15
+> **Updated by:** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*_ repo variables matching WEB\__/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
 ## Current Phase
 
