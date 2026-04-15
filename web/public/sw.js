@@ -25,7 +25,19 @@ self.addEventListener('activate', (event) => {
       await self.registration.unregister();
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
       clients.forEach((client) => {
-        if (client.url) client.navigate(client.url);
+        // This SW only ever runs against clients that had the old Vue PWA SW
+        // registered — i.e., users who had actually used the app. Redirect
+        // them to the new app origin rather than reloading the apex marketing
+        // site (which would leave them confused about where their app went).
+        // Preserve the original path so deep-links (/dashboard, /nook, etc.)
+        // land on the matching app route.
+        try {
+          const url = new URL(client.url);
+          const target = 'https://app.beanies.family' + url.pathname + url.search + url.hash;
+          client.navigate(target);
+        } catch {
+          if (client.url) client.navigate(client.url);
+        }
       });
     })(),
   );
