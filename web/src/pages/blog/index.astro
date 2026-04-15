@@ -115,11 +115,15 @@ const fmt = (d: Date) =>
   --cloud-white: #f8f9fa;
   background: var(--cloud-white);
   min-height: 100vh;
+  /* Defensive against any inline content pushing the page horizontally. */
+  overflow-x: hidden;
 }
 
 .blog-hero {
   overflow: hidden;
-  padding: 60px 24px 48px;
+  /* Top padding (100px) clears the fixed pill nav (top:16px + ~50px height
+     + buffer). Previously 60px, which left the hero mascot partly covered. */
+  padding: 100px 24px 48px;
   position: relative;
   text-align: center;
 }

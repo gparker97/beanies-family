@@ -180,6 +180,12 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   font-weight: 600;
   margin: 1.5rem 0 0.5rem;
 }
+.blog-prose {
+  /* Break long URLs / unbreakable words so they can't push the container
+     wider than the viewport on mobile. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .blog-prose p {
   color: rgb(44 62 80 / 70%);
   font-size: 0.9375rem;
@@ -248,12 +254,20 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   --cloud-white: #f8f9fa;
   background: var(--cloud-white);
   min-height: 100vh;
+  /* Defensive: prevents any overly-wide inline content (long URLs, fixed-width
+     elements, unexpectedly wide markdown output) from pushing the page
+     horizontally beyond the viewport on mobile. */
+  overflow-x: hidden;
 }
 
 .post-content {
+  box-sizing: border-box;
   margin: 0 auto;
   max-width: 640px;
-  padding: 40px 24px 48px;
+  /* Top padding (88px) clears the fixed pill nav (top:16px + ~50px height
+     + buffer). Previously 40px, which caused the "all posts" back link to
+     be partially covered on mobile. */
+  padding: 88px 24px 48px;
 }
 
 .post-back {
@@ -410,7 +424,8 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 .lightbox-close:hover { background: rgb(255 255 255 / 30%); }
 
 @media (max-width: 520px) {
-  .post-content { padding-top: 40px; }
+  /* Mobile: slightly tighter top padding but still clears the pill nav. */
+  .post-content { padding-top: 76px; }
   .post-header-title { font-size: 1.375rem; }
 }
 </style>
