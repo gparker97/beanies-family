@@ -39,3 +39,9 @@ variable "google_client_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "site_verification_txt_records" {
+  description = "TXT strings published at the apex for domain verification (Google Search Console, Bing Webmaster Tools, etc.). All entries merged into a single TXT record on beanies.family. These values are not sensitive — they're publicly readable via DNS."
+  type        = list(string)
+  default     = []
+}

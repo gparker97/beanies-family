@@ -31,7 +31,8 @@ module "frontend" {
 
   # Let the app.<apex> distribution (Phase A cutover prep for #167) read
   # from the same Vue S3 bucket via OAC.
-  additional_distribution_arns = [module.app_subdomain.cloudfront_distribution_arn]
+  additional_distribution_arns  = [module.app_subdomain.cloudfront_distribution_arn]
+  site_verification_txt_records = var.site_verification_txt_records
 
   # Phase C cutover (2026-04-15) — apex now serves Astro content from the
   # web bucket, with the merged apex-cutover CF function handling PWA-path

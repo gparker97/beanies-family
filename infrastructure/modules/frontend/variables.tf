@@ -42,3 +42,9 @@ variable "enable_spa_fallback" {
   type        = bool
   default     = true
 }
+
+variable "site_verification_txt_records" {
+  description = "Apex TXT record values for domain verification (Google Search Console, Bing Webmaster, etc.). Each entry is a full TXT string like `google-site-verification=xxxx`. All entries are merged into a single TXT record at the apex name — Route53 supports multiple string values per record set."
+  type        = list(string)
+  default     = []
+}

@@ -240,3 +240,22 @@ resource "aws_route53_record" "www_ipv6" {
     evaluate_target_health = false
   }
 }
+
+# ── Site verification TXT record ────────────────────────────────────────────
+# Merges GSC, Bing, and any other verification strings into a single TXT
+# record at the apex. Only created when at least one string is provided.
+
+resource "aws_route53_record" "site_verification" {
+  count = length(var.site_verification_txt_records) > 0 ? 1 : 0
+
+  zone_id = var.hosted_zone_id
+  name    = var.domain_name
+  type    = "TXT"
+  ttl     = 300
+  records = var.site_verification_txt_records
+
+  # Adopts any TXT record already present at apex (e.g. one created manually
+  # during the initial Google Search Console verification). Safe because
+  # Terraform is now the source of truth for this record.
+  allow_overwrite = true
+}
