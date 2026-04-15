@@ -347,7 +347,7 @@ Drafts appear at normal URLs on localhost. Share preview links with collaborator
 ### Authoring docs
 
 - `content/guides/AUTHORING.txt` — guides frontmatter spec + conventions
-- `content/blog/README.md` — blog frontmatter spec + conventions (draft flag applies here too)
+- `content/blog/AUTHORING.txt` — blog frontmatter spec + conventions (draft flag applies here too)
 
 ## Current Status (MVP - Phase 1)
 
