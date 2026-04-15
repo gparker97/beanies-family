@@ -107,6 +107,33 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
     <script>
       import '../scripts/vitals';
     </script>
+    <!-- PWA-install escape hatch (#167): users who installed the Vue PWA
+         pre-cutover have start_url: '/' baked into the install, so every
+         launch lands here. Detect standalone display-mode and redirect
+         them to app.beanies.family preserving the path. Regular browser
+         visits never match (display-mode is 'browser') and see the
+         marketing site normally. `is:inline` + placing this at the top of
+         <body> ensures it runs before any other script or content paints. -->
+    <script is:inline>
+      (function () {
+        try {
+          var isStandalone =
+            window.matchMedia &&
+            window.matchMedia('(display-mode: standalone)').matches;
+          var isIOS = window.navigator.standalone === true;
+          if (isStandalone || isIOS) {
+            var target =
+              'https://app.beanies.family' +
+              window.location.pathname +
+              window.location.search +
+              window.location.hash;
+            window.location.replace(target);
+          }
+        } catch (e) {
+          // No-op — matchMedia unsupported, fall through to marketing page.
+        }
+      })();
+    </script>
   </head>
   <body class="min-h-screen bg-[#f8f9fa] text-secondary-500">
     <Nav />
