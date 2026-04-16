@@ -3420,129 +3420,6 @@ const STRING_DEFS = {
     en: 'Walk through the setup wizard again to add accounts, transactions, and activities.',
     beanie: 'walk through the setup wizard again to add accounts, transactions, and activities.',
   },
-  // Help Center
-  'help.title': { en: 'Help Center', beanie: 'help center' },
-  'help.heroTitle': { en: 'how can we help?', beanie: 'how can we help?' },
-  'help.heroBadge': {
-    en: 'beanies.family help center',
-    beanie: 'beanies.family help center',
-  },
-  'help.subtitle': {
-    en: 'Everything you need to know about your family\u2019s favourite bean counter \u2014 from first pod to full financial planning.',
-    beanie:
-      'everything you need to know about your family\u2019s favourite bean counter \u2014 from first pod to full financial planning.',
-  },
-  'help.searchPlaceholder': {
-    en: 'search for anything... encryption, budgets, activities...',
-    beanie: 'search for anything... encryption, budgets, activities...',
-  },
-  'help.noResults': {
-    en: 'No articles found. Try a different search term.',
-    beanie: 'no articles found. try a different search term.',
-  },
-  'help.browseByTopic': { en: 'Browse by Topic', beanie: 'browse by topic' },
-  'help.popularArticles': { en: 'Popular Reads', beanie: 'popular reads' },
-  'help.viewAllArticles': { en: 'View all articles', beanie: 'view all articles' },
-  'help.allArticles': { en: 'All Topics', beanie: 'all topics' },
-  'help.allArticlesSubtitle': {
-    en: 'Browse by category to find exactly what you need.',
-    beanie: 'browse by category to find exactly what you need.',
-  },
-  'help.exploreOtherTopics': { en: 'Explore other topics', beanie: 'explore other topics' },
-  'help.securitySpotlightTitle': {
-    en: 'Your beans are safe with us',
-    beanie: 'your beans are safe with us',
-  },
-  'help.securitySpotlightDesc': {
-    en: 'beanies.family uses bank-grade encryption that runs entirely in your browser. Your data never touches our servers unencrypted \u2014 because it never touches our servers at all.',
-    beanie:
-      'beanies.family uses bank-grade encryption that runs entirely in your browser. your data never touches our servers unencrypted \u2014 because it never touches our servers at all.',
-  },
-  'help.securityFeature1Title': { en: 'AES-256-GCM Encryption', beanie: 'AES-256-GCM encryption' },
-  'help.securityFeature1Desc': {
-    en: 'The same authenticated encryption used by governments and banks. Every byte of your family data is encrypted before it leaves memory.',
-    beanie:
-      'the same authenticated encryption used by governments and banks. every byte of your family data is encrypted before it leaves memory.',
-  },
-  'help.securityFeature2Title': { en: 'PBKDF2 Key Derivation', beanie: 'PBKDF2 key derivation' },
-  'help.securityFeature2Desc': {
-    en: 'Your password is strengthened through 100,000 rounds of PBKDF2-SHA256 before it becomes an encryption key.',
-    beanie:
-      'your password is strengthened through 100,000 rounds of PBKDF2-SHA256 before it becomes an encryption key.',
-  },
-  'help.securityFeature3Title': {
-    en: 'Per-Member Key Wrapping',
-    beanie: 'per-member key wrapping',
-  },
-  'help.securityFeature3Desc': {
-    en: 'Each family member has their own wrapped copy of the family key. Change your password without re-encrypting the entire file.',
-    beanie:
-      'each family member has their own wrapped copy of the family key. change your password without re-encrypting the entire file.',
-  },
-  'help.securityFeature4Title': { en: 'Browser-Native Crypto', beanie: 'browser-native crypto' },
-  'help.securityFeature4Desc': {
-    en: 'All encryption uses the Web Crypto API built into your browser \u2014 no third-party libraries, no external dependencies.',
-    beanie:
-      'all encryption uses the Web Crypto API built into your browser \u2014 no third-party libraries, no external dependencies.',
-  },
-  'help.diagramTitle': {
-    en: 'How your data is protected',
-    beanie: 'how your data is protected',
-  },
-  'help.diagramStep1': {
-    en: 'Your password + random salt',
-    beanie: 'your password + random salt',
-  },
-  'help.diagramStep2': {
-    en: 'PBKDF2 (100,000 rounds) \u2192 AES key',
-    beanie: 'PBKDF2 (100,000 rounds) \u2192 AES key',
-  },
-  'help.diagramStep3': {
-    en: 'AES-KW unwraps the family key',
-    beanie: 'AES-KW unwraps the family key',
-  },
-  'help.diagramStep4': {
-    en: 'Family key decrypts your .beanpod',
-    beanie: 'family key decrypts your .beanpod',
-  },
-  'help.diagramCaption': {
-    en: 'All of this happens in your browser. Nothing is sent anywhere.',
-    beanie: 'all of this happens in your browser. nothing is sent anywhere.',
-  },
-  'help.learnMoreSecurity': {
-    en: 'Learn more about security',
-    beanie: 'learn more about security',
-  },
-  'help.chatbotTeaser': {
-    en: 'Bean Assistant \u2014 Coming Soon',
-    beanie: 'bean assistant \u2014 coming soon',
-  },
-  'help.chatbotTeaserDesc': {
-    en: 'Ask anything about your finances, features, or how things work \u2014 and get instant answers from your personal bean assistant.',
-    beanie:
-      'ask anything about your finances, features, or how things work \u2014 and get instant answers from your personal bean assistant.',
-  },
-  'help.chatbotMockAnswer': {
-    en: 'Net worth = (accounts + assets) \u2212 liabilities. All converted to your base currency!',
-    beanie:
-      'net worth = (accounts + assets) \u2212 liabilities. all converted to your base currency!',
-  },
-  'help.chatbotInputPlaceholder': {
-    en: 'Ask me anything about beanies.family...',
-    beanie: 'ask me anything about beanies.family...',
-  },
-  'help.onThisPage': { en: 'On This Page', beanie: 'on this page' },
-  'help.wasHelpful': { en: 'Was this article helpful?', beanie: 'was this article helpful?' },
-  'help.yes': { en: 'Yes', beanie: 'yes' },
-  'help.no': { en: 'No', beanie: 'no' },
-  'help.feedbackThanks': { en: 'Thanks for your feedback!', beanie: 'thanks for your feedback!' },
-  'help.articleNotFound': { en: 'Article not found', beanie: 'article not found' },
-  'help.backToHelp': { en: 'Back to Help Center', beanie: 'back to help center' },
-  'help.noArticlesInCategory': {
-    en: 'No articles in this category yet.',
-    beanie: 'no articles in this category yet.',
-  },
-
   // Beanie tip of the day
   'tips.label': { en: 'Beanie Tip of the Day', beanie: 'beanie tip of the day' },
   'tips.gotIt': { en: 'Got It', beanie: 'got it' },
@@ -3555,36 +3432,6 @@ const STRING_DEFS = {
   'whatsNew.seeAll': { en: 'See All Release Notes', beanie: 'see all release notes' },
   'whatsNew.alsoFixed': { en: 'Also Fixed', beanie: 'also fixed' },
   'whatsNew.tryIt': { en: 'Try It', beanie: 'try it' },
-
-  // Help categories
-  'help.category.whatsNew': { en: "What's New", beanie: "what's new" },
-  'help.category.whatsNewDesc': {
-    en: 'Release notes and recent improvements \u2014 straight from the head beanie developer.',
-    beanie: 'release notes and recent improvements \u2014 straight from the head beanie developer.',
-  },
-  'help.category.gettingStarted': { en: 'Getting Started', beanie: 'getting started' },
-  'help.category.gettingStartedDesc': {
-    en: 'Create your first pod, add family members, and start tracking your beans.',
-    beanie: 'create your first pod, add family members, and start tracking your beans.',
-  },
-  'help.category.features': { en: 'Features & How-To', beanie: 'features & how-to' },
-  'help.category.featuresDesc': {
-    en: 'Accounts, transactions, budgets, goals, activities, the planner, and everything in between.',
-    beanie:
-      'accounts, transactions, budgets, goals, activities, the planner, and everything in between.',
-  },
-  'help.category.security': { en: 'Security & Privacy', beanie: 'security & privacy' },
-  'help.category.securityDesc': {
-    en: 'How we encrypt your data, protect your keys, and keep your beans safe \u2014 with full transparency.',
-    beanie:
-      'how we encrypt your data, protect your keys, and keep your beans safe \u2014 with full transparency.',
-  },
-  'help.category.howItWorks': { en: 'How It Works', beanie: 'how it works' },
-  'help.category.howItWorksDesc': {
-    en: 'The logic behind the numbers \u2014 how calculations, summaries, and smart features work under the hood.',
-    beanie:
-      'the logic behind the numbers \u2014 how calculations, summaries, and smart features work under the hood.',
-  },
 
   // Navigation
   'nav.beanstalk': { en: 'Beanie Beanstalk', beanie: 'beanie beanstalk' },
@@ -4001,12 +3848,6 @@ const STRING_DEFS = {
   'travel.editSegment': { en: 'Edit Segment', beanie: 'edit segment' },
   'travel.editAccommodation': { en: 'Edit Accommodation', beanie: 'edit accommodation' },
   'travel.editTransportation': { en: 'Edit Transportation', beanie: 'edit transportation' },
-
-  // Legal pages
-  'legal.privacyPolicy': { en: 'Privacy Policy', beanie: 'privacy policy' },
-  'legal.termsOfService': { en: 'Terms of Service', beanie: 'terms of service' },
-  'legal.lastUpdated': { en: 'Last Updated', beanie: 'last updated' },
-  'legal.backToHome': { en: 'Back to Home', beanie: 'back to home' },
 } satisfies Record<string, StringEntry>;
 
 /**

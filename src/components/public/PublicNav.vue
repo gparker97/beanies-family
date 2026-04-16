@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 
 interface Props {
   /** Additional nav links beyond the defaults */
-  links?: { label: string; href: string; scrollTo?: boolean }[];
+  links?: { label: string; href: string; scrollTo?: boolean; external?: boolean }[];
 }
 
 withDefaults(defineProps<Props>(), { links: () => [] });
@@ -43,6 +43,12 @@ function handleLinkClick(link: { href: string; scrollTo?: boolean }) {
               v-if="link.scrollTo"
               :href="link.href"
               @click.prevent="handleLinkClick(link)"
+            >{{ link.label }}</a>
+            <a
+              v-else-if="link.external"
+              :href="link.href"
+              target="_blank"
+              rel="noopener noreferrer"
             >{{ link.label }}</a>
             <router-link v-else :to="link.href">{{ link.label }}</router-link>
           </template>
