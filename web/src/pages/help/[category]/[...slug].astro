@@ -1,15 +1,14 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import Breadcrumbs from '../../../components/Breadcrumbs.astro';
-import Byline from '../../../components/Byline.astro';
 import HelpArticleRenderer from '../../../components/HelpArticleRenderer.astro';
-import RelatedArticles from '../../../components/RelatedArticles.astro';
 import {
   ALL_ARTICLES,
   getCategoryArticles,
   getCategoryMeta,
+  type ArticleSection,
   type HelpCategory,
 } from '@/content/help';
+import { HELP_LABELS, CATEGORY_COPY } from '~/lib/helpStyles';
 import { SITE_URL } from '@beanies/brand/nav';
 
 export function getStaticPaths() {
@@ -21,15 +20,18 @@ export function getStaticPaths() {
 
 const { article } = Astro.props;
 const meta = getCategoryMeta(article.category);
-const categoryLabel = article.category.replace(/-/g, ' ');
+const copy = CATEGORY_COPY[article.category];
+const categoryLabel = copy?.label ?? article.category;
 const canonicalPath = `/help/${article.category}/${article.slug}`;
-const related = getCategoryArticles(article.category as HelpCategory)
-  .filter((a) => a.slug !== article.slug)
-  .slice(0, 3)
-  .map((a) => ({
-    title: a.title,
-    href: `/help/${a.category}/${a.slug}`,
-    excerpt: a.excerpt,
+
+const categoryArticles = getCategoryArticles(article.category as HelpCategory);
+
+const headings = article.sections
+  .filter((s: ArticleSection) => s.type === 'heading' && s.id)
+  .map((s: ArticleSection) => ({
+    id: s.id!,
+    text: s.content,
+    level: s.level ?? 2,
   }));
 
 const updatedDate = new Date(article.updatedDate);
@@ -46,6 +48,8 @@ const articleSchema = {
   articleSection: categoryLabel,
   inLanguage: 'en',
 };
+
+const feedbackKey = `help_feedback_${article.category}_${article.slug}`;
 ---
 
 <BaseLayout
@@ -57,37 +61,169 @@ const articleSchema = {
   modifiedTime={updatedDate.toISOString()}
   jsonLd={articleSchema}
 >
-  <article class="mx-auto max-w-3xl px-6 pb-12 pt-24">
-    <Breadcrumbs
-      items={[
-        { label: 'home', href: '/' },
-        { label: 'help', href: '/help' },
-        { label: categoryLabel, href: `/help/${article.category}` },
-        { label: article.title, href: canonicalPath },
-      ]}
-    />
+  <div class="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-12">
+    <div class="flex gap-8">
+      <!-- Left sidebar: category nav (desktop only) -->
+      <aside class="hidden w-56 shrink-0 lg:block">
+        <div class="sticky top-8">
+          <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-secondary-400">
+            {categoryLabel}
+          </h3>
+          <nav class="space-y-1">
+            {categoryArticles.map((a) => {
+              const isCurrent = a.slug === article.slug;
+              const cls = isCurrent
+                ? 'block rounded-xl bg-[var(--tint-orange-8)] px-3 py-2 text-sm font-medium text-primary-500'
+                : 'block rounded-xl px-3 py-2 text-sm text-secondary-400 transition-colors hover:bg-[var(--tint-slate-5)] hover:text-secondary-500';
+              return (
+                <a href={`/help/${a.category}/${a.slug}`} class={cls}>
+                  {a.icon} {a.title}
+                </a>
+              );
+            })}
+          </nav>
+        </div>
+      </aside>
 
-    <header class="mt-8 space-y-3">
-      <div class="flex items-center gap-3">
-        <span class="text-3xl" aria-hidden="true">{article.icon}</span>
-        <p class="text-xs uppercase tracking-wide text-secondary-400">{categoryLabel}</p>
-      </div>
-      <h1 class="font-outfit text-3xl font-bold leading-tight text-secondary-500 sm:text-4xl">
-        {article.title}
-      </h1>
-      <p class="text-secondary-400">{article.excerpt}</p>
-      <Byline
-        author="greg"
-        date={updatedDate}
-        updatedDate={updatedDate}
-        readTime={article.readTime}
-      />
-    </header>
+      <!-- Center: article content -->
+      <article class="min-w-0 flex-1">
+        <nav class="mb-6 text-sm text-secondary-400">
+          <a href="/help" class="hover:text-primary-500">{HELP_LABELS.title}</a>
+          <span class="mx-2">/</span>
+          <a href={`/help/${article.category}`} class="hover:text-primary-500">{categoryLabel}</a>
+          <span class="mx-2">/</span>
+          <span class="text-secondary-500">{article.title}</span>
+        </nav>
 
-    <div class="mt-10">
-      <HelpArticleRenderer sections={article.sections} />
+        <div class="mb-8">
+          <h1 class="font-outfit text-2xl font-bold text-secondary-500 md:text-3xl">
+            {article.icon} {article.title}
+          </h1>
+          <div class="mt-2 flex items-center gap-4 text-sm text-secondary-400">
+            <span>{article.readTime} min read</span>
+            <span>·</span>
+            <span>Updated {article.updatedDate}</span>
+          </div>
+        </div>
+
+        <HelpArticleRenderer sections={article.sections} />
+
+        <!-- Feedback widget -->
+        <div
+          class="mt-12 rounded-2xl border border-[var(--color-border)] p-6 text-center"
+          data-feedback
+          data-key={feedbackKey}
+        >
+          <p class="text-sm font-medium text-secondary-500">{HELP_LABELS.wasHelpful}</p>
+          <div class="mt-3 flex justify-center gap-3" data-feedback-buttons>
+            <button
+              type="button"
+              data-feedback-btn="yes"
+              class="rounded-xl bg-[var(--tint-silk-20)] px-4 py-2 text-sm font-medium text-secondary-500 transition-colors hover:bg-[var(--tint-orange-8)]"
+            >👍 {HELP_LABELS.yes}</button>
+            <button
+              type="button"
+              data-feedback-btn="no"
+              class="rounded-xl bg-[var(--tint-silk-20)] px-4 py-2 text-sm font-medium text-secondary-500 transition-colors hover:bg-[var(--tint-orange-8)]"
+            >👎 {HELP_LABELS.no}</button>
+          </div>
+          <p class="mt-2 hidden text-sm text-secondary-400" data-feedback-thanks>
+            {HELP_LABELS.feedbackThanks}
+          </p>
+        </div>
+      </article>
+
+      <!-- Right sidebar: TOC (desktop only) -->
+      {headings.length > 0 && (
+        <aside class="hidden w-48 shrink-0 xl:block">
+          <div class="sticky top-8">
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-wider text-secondary-400">
+              {HELP_LABELS.onThisPage}
+            </h3>
+            <nav class="space-y-1" data-help-toc>
+              {headings.map((h) => {
+                const padCls = h.level === 3 ? 'pl-3' : '';
+                return (
+                  <a
+                    href={`#${h.id}`}
+                    data-toc-link={h.id}
+                    class:list={['block text-sm text-secondary-400 transition-colors hover:text-secondary-500', padCls]}
+                  >
+                    {h.text}
+                  </a>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+      )}
     </div>
-
-    <RelatedArticles items={related} heading={`more in ${categoryLabel}`} />
-  </article>
+  </div>
 </BaseLayout>
+
+<script>
+  // Scroll-spy for TOC: highlight the active heading.
+  const tocLinks = Array.from(
+    document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'),
+  );
+  if (tocLinks.length > 0) {
+    const byId = new Map(tocLinks.map((l) => [l.dataset.tocLink!, l]));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const id = entry.target.id;
+            for (const link of tocLinks) {
+              link.classList.remove('text-primary-500', 'font-medium');
+              link.classList.add('text-secondary-400');
+            }
+            const active = byId.get(id);
+            if (active) {
+              active.classList.add('text-primary-500', 'font-medium');
+              active.classList.remove('text-secondary-400');
+            }
+          }
+        }
+      },
+      { rootMargin: '-80px 0px -60% 0px', threshold: 0 },
+    );
+    for (const id of byId.keys()) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+  }
+
+  // Feedback widget: persist yes/no in localStorage so returning visitors
+  // see the "thanks" state instead of the buttons again.
+  const feedbackRoots = document.querySelectorAll<HTMLElement>('[data-feedback]');
+  for (const root of feedbackRoots) {
+    const key = root.dataset.key!;
+    const buttons = root.querySelector<HTMLElement>('[data-feedback-buttons]');
+    const thanks = root.querySelector<HTMLElement>('[data-feedback-thanks]');
+    if (!buttons || !thanks) continue;
+
+    const markDone = () => {
+      buttons.classList.add('hidden');
+      thanks.classList.remove('hidden');
+    };
+
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved === 'yes' || saved === 'no') markDone();
+    } catch {
+      /* localStorage unavailable — ignore */
+    }
+
+    for (const btn of root.querySelectorAll<HTMLButtonElement>('[data-feedback-btn]')) {
+      btn.addEventListener('click', () => {
+        const value = btn.dataset.feedbackBtn!;
+        try {
+          localStorage.setItem(key, value);
+        } catch {
+          /* ignore */
+        }
+        markDone();
+      });
+    }
+  }
+</script>
