@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-16
 
+### Added
+
+- PWA re-install notice for users who installed the app **before** the Astro cutover (2026-04-14). Those users still have a home-screen icon pointing at the old apex origin — the Astro apex already redirects them to `app.beanies.family`, and now also flags the bounce with a query param so the Vue app shows a one-time dismissable modal explaining the situation, reassuring about data safety ("your family file, Drive sync, and password are untouched"), and walking through platform-specific re-install steps (iOS Safari Share menu, Android Chrome three-dot menu, desktop Chrome install icon). Dismiss persists in localStorage. Automatically clears when the user is detected running the new PWA at `app.beanies.family`. Plausible events `pwa_stale_detected`, `pwa_stale_dismissed`, `pwa_stale_install_clicked` track rollout impact. New reusable `noticeFlag(key)` utility (`src/utils/notice.ts`) for any future one-time-notice situations
+
 ### Changed
 
 - Marketing surfaces consolidated to the Astro site — help, privacy, and terms now live only at `beanies.family/help`, `/privacy`, `/terms`. In-app links open in a new tab, preserving your PWA session. One codebase per page going forward. Direct visits to any `app.beanies.family/{help,privacy,terms}*` URL redirect cross-origin to the equivalent apex path so existing bookmarks keep working. Trade-off: these pages now require network (previously bundled into the PWA offline cache)

@@ -122,12 +122,14 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
             window.matchMedia('(display-mode: standalone)').matches;
           var isIOS = window.navigator.standalone === true;
           if (isStandalone || isIOS) {
-            var target =
+            var url = new URL(
               'https://app.beanies.family' +
-              window.location.pathname +
-              window.location.search +
-              window.location.hash;
-            window.location.replace(target);
+                window.location.pathname +
+                window.location.search +
+                window.location.hash
+            );
+            url.searchParams.set('from-stale-pwa', '1');
+            window.location.replace(url.toString());
           }
         } catch (e) {
           // No-op — matchMedia unsupported, fall through to marketing page.
