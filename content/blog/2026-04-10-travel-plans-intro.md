@@ -31,7 +31,7 @@ Well, check out our newest feature: **travel plans**.
 
 Build family (or personal - we're not judging) trips, collaborate on vacation ideas with your family, get helpful hints to improve or fix the gaps in your planning, and more. We even allow you to save pending or tentative plans with less than full detail. Because, if you're anything like me, you _never_ have the full detail until literally the last minute.
 
-![a real, actual trip i took with my son. not a simulation.](/blog/travel-plans-screenshot.jpg)
+![a real, actual trip i took with my son. not a simulation.](/blog/travel-plans-screenshot.webp)
 _a real, actual trip i took with my son. not a simulation._
 
 You might notice that the **travel plans** section on [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=travel-plans-intro) is the only place where we depart from the beanies.family theme colors, and that's not a mistake (well, it was at first, but now it's not). Vacations are a departure from your norm, and we display them that way. Your travel plans are special - so seeing them in a shade of blue or green you've never seen before across the site is a feature, _not_ a bug (let it be known).

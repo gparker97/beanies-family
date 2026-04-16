@@ -1,0 +1,27 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "staticDistDir": "./dist",
+      "url": [
+        "http://localhost/index.html",
+        "http://localhost/blog/accidentally-built-greatest-family-app.html",
+        "http://localhost/help/getting-started/install-as-app.html"
+      ]
+    },
+    "assert": {
+      "preset": "lighthouse:no-pwa",
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.95 }],
+        "categories:accessibility": ["warn", { "minScore": 0.9 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:seo": ["error", { "minScore": 0.95 }],
+        "largest-contentful-paint": ["error", { "maxNumericValue": 2500 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 200 }],
+        "resource-summary:script:size": ["warn", { "maxNumericValue": 30720 }]
+      }
+    },
+    "upload": { "target": "temporary-public-storage" }
+  }
+}
