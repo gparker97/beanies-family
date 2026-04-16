@@ -1,12 +1,18 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
-import Breadcrumbs from '../../../components/Breadcrumbs.astro';
+import HelpArticleCard from '../../../components/HelpArticleCard.astro';
 import {
   HELP_CATEGORIES,
   getCategoryArticles,
   getCategoryMeta,
   type HelpCategory,
 } from '@/content/help';
+import {
+  HELP_LABELS,
+  CATEGORY_COPY,
+  categoryStripe,
+  categoryIconBg,
+} from '~/lib/helpStyles';
 
 export function getStaticPaths() {
   return HELP_CATEGORIES.map((cat) => ({ params: { category: cat.id } }));
@@ -15,54 +21,107 @@ export function getStaticPaths() {
 const { category } = Astro.params;
 const meta = getCategoryMeta(category!);
 const articles = getCategoryArticles(category as HelpCategory);
+const copy = CATEGORY_COPY[category!];
 
 if (!meta) {
   return Astro.redirect('/help');
 }
 
-const label = category!.replace(/-/g, ' ');
 const canonicalPath = `/help/${category}`;
+const otherCategories = HELP_CATEGORIES.filter((c) => c.id !== category);
 ---
 
 <BaseLayout
-  title={`${label} — help center — beanies.family`}
-  description={`help articles for ${label} — ${articles.length} article${articles.length === 1 ? '' : 's'}.`}
+  title={`${copy?.label ?? category} — help center — beanies.family`}
+  description={copy?.description ?? `help articles for ${category}`}
   canonicalPath={canonicalPath}
 >
-  <article class="mx-auto max-w-5xl px-6 pb-12 pt-24">
-    <Breadcrumbs
-      items={[
-        { label: 'home', href: '/' },
-        { label: 'help', href: '/help' },
-        { label, href: canonicalPath },
-      ]}
-    />
+  <!-- Category hero banner -->
+  <div class="relative bg-[var(--color-background)] px-6 pt-8 pb-12 md:pt-12 md:pb-16">
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div
+        class="absolute inset-0"
+        style="background: radial-gradient(ellipse 60% 80% at 50% 0%, var(--tint-silk-10) 0%, transparent 70%);"
+      ></div>
+    </div>
 
-    <header class="mt-8 flex items-center gap-4">
-      <span class="text-4xl" aria-hidden="true">{meta.icon}</span>
-      <div>
-        <h1 class="font-outfit text-3xl font-bold text-secondary-500 sm:text-4xl">{label}</h1>
-        <p class="mt-1 text-sm text-secondary-400">{articles.length} article{articles.length === 1 ? '' : 's'}</p>
+    <div class="relative z-10 mx-auto max-w-5xl">
+      <!-- Breadcrumb -->
+      <nav class="mb-6 text-sm text-secondary-400">
+        <a href="/help" class="transition-colors hover:text-primary-500">{HELP_LABELS.title}</a>
+        <span class="mx-2">/</span>
+        <span class="text-secondary-500">{copy?.label ?? category}</span>
+      </nav>
+
+      <div class="flex items-center gap-4">
+        <div class:list={['flex h-14 w-14 items-center justify-center rounded-[18px] text-[28px]', categoryIconBg[meta.color]]}>
+          {meta.icon}
+        </div>
+        <div>
+          <h1 class="font-outfit text-2xl font-bold text-secondary-500 md:text-3xl">
+            {copy?.label ?? category}
+          </h1>
+          <p class="mt-1 text-sm text-[var(--color-text-muted)] md:text-base">
+            {copy?.description}
+          </p>
+        </div>
       </div>
-    </header>
 
-    <ul class="mt-10 grid gap-4 sm:grid-cols-2">
-      {
-        articles.map((a) => (
-          <li>
-            <a
-              href={`/help/${a.category}/${a.slug}`}
-              class="flex items-start gap-3 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <span class="text-2xl" aria-hidden="true">{a.icon}</span>
-              <div class="flex-1">
-                <h2 class="font-outfit text-sm font-semibold text-secondary-500">{a.title}</h2>
-                <p class="mt-1 line-clamp-2 text-xs text-secondary-400">{a.excerpt}</p>
-              </div>
-            </a>
-          </li>
-        ))
-      }
-    </ul>
-  </article>
+      {articles.length > 0 && (
+        <div class="font-outfit mt-5 inline-flex items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-white px-4 py-1.5 text-xs font-medium text-[var(--color-text-muted)] shadow-sm">
+          <span class="text-sm">📄</span>
+          {articles.length} {articles.length === 1 ? 'article' : 'articles'}
+        </div>
+      )}
+    </div>
+  </div>
+
+  <!-- Articles grid -->
+  <div class="mx-auto max-w-5xl px-6 pb-16 md:pb-20">
+    {articles.length > 0 ? (
+      <div class="grid gap-5 sm:grid-cols-2">
+        {articles.map((article) => <HelpArticleCard article={article} />)}
+      </div>
+    ) : (
+      <div class="py-16 text-center">
+        <p class="text-lg text-secondary-400">{HELP_LABELS.noArticlesInCategory}</p>
+      </div>
+    )}
+
+    {otherCategories.length > 0 && (
+      <div class="mt-14 border-t border-[var(--color-border)] pt-10">
+        <h2 class="font-outfit mb-6 text-lg font-bold text-secondary-500">
+          {HELP_LABELS.exploreOtherTopics}
+        </h2>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+          {otherCategories.map((cat) => {
+            const otherCopy = CATEGORY_COPY[cat.id];
+            return (
+              <a
+                href={`/help/${cat.id}`}
+                class="group relative overflow-hidden rounded-2xl border border-[var(--color-border)] bg-white p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
+              >
+                <div class:list={['absolute inset-x-0 top-0 h-0.5', categoryStripe[cat.color]]}></div>
+                <div class="flex items-center gap-3">
+                  <div class:list={['flex h-10 w-10 items-center justify-center rounded-[14px] text-lg', categoryIconBg[cat.color]]}>
+                    {cat.icon}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="font-outfit text-sm font-semibold text-secondary-500 group-hover:text-primary-500">
+                      {otherCopy?.label ?? cat.id}
+                    </h3>
+                    <p class="text-xs text-[var(--color-text-muted)]">
+                      {getCategoryArticles(cat.id).length} articles
+                    </p>
+                  </div>
+                  <span class="text-sm text-primary-500 opacity-0 transition-opacity group-hover:opacity-100">→</span>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </div>
+    )}
+  </div>
 </BaseLayout>

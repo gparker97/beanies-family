@@ -19,3 +19,78 @@ h5,
 h6 {
   font-family: var(--font-outfit);
 }
+
+/* Shared surface tokens — mirror the Vue app so the help center (and any
+   other ported surfaces) can reuse the exact same look. */
+:root {
+  --color-background: #fdfbf9;
+  --color-text: #2c3e50;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --card-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+  --card-hover-shadow: 0 12px 40px rgb(44 62 80 / 10%);
+  --soft-shadow: 0 8px 40px rgb(44 62 80 / 8%);
+  --tint-orange-4: rgb(241 93 34 / 4%);
+  --tint-orange-8: rgb(241 93 34 / 8%);
+  --tint-orange-15: rgb(241 93 34 / 15%);
+  --tint-silk-10: rgb(174 214 241 / 10%);
+  --tint-silk-20: rgb(174 214 241 / 20%);
+  --tint-slate-5: rgb(44 62 80 / 5%);
+  --tint-slate-10: rgb(44 62 80 / 10%);
+  --tint-success-10: rgb(39 174 96 / 10%);
+  --tint-terracotta-5: rgb(230 126 34 / 5%);
+}
+
+/* Keyframes reused from the Vue help center hero. */
+@keyframes help-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(20px);
+  }
+}
+
+@keyframes help-float-reverse {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes help-gentle-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.help-anim-float {
+  animation: help-float 8s ease-in-out infinite;
+}
+
+.help-anim-float-reverse {
+  animation: help-float-reverse 10s ease-in-out infinite;
+}
+
+.help-anim-bob {
+  animation: help-gentle-bob 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .help-anim-float,
+  .help-anim-float-reverse,
+  .help-anim-bob {
+    animation: none;
+  }
+}

@@ -6,6 +6,7 @@
  */
 
 import { RELEASE_2026_03 } from './2026-03';
+import { RELEASE_2026_04 } from './2026-04';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,7 +30,7 @@ export interface ReleaseNote {
 
 // ── Registry (newest first) ──────────────────────────────────────────────────
 
-const ALL_RELEASE_NOTES: ReleaseNote[] = [RELEASE_2026_03];
+const ALL_RELEASE_NOTES: ReleaseNote[] = [RELEASE_2026_04, RELEASE_2026_03];
 
 // ── Public API ───────────────────────────────────────────────────────────────
 

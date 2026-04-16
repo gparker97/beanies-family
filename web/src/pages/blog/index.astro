@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { getCollection } from 'astro:content';
 import { isPublished } from '~/utils/content';
 
@@ -103,6 +104,10 @@ const fmt = (d: Date) =>
             <p class="coming-card-sub">{card.subtitle}</p>
           </div>
         ))}
+      </div>
+
+      <div class="subscribe-section">
+        <SubstackSubscribe />
       </div>
     </div>
   </div>
@@ -387,6 +392,8 @@ const fmt = (d: Date) =>
   gap: 16px;
   grid-template-columns: repeat(2, 1fr);
 }
+
+.subscribe-section { margin-top: 40px; }
 
 @media (max-width: 480px) {
   .coming-grid { grid-template-columns: 1fr; }

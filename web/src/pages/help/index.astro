@@ -1,9 +1,20 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import HelpSearch from '../../components/HelpSearch.astro';
-import { HELP_CATEGORIES, ALL_ARTICLES, getPopularArticles, getCategoryArticles } from '@/content/help';
+import HelpArticleCard from '../../components/HelpArticleCard.astro';
+import {
+  HELP_CATEGORIES,
+  getPopularArticles,
+  getCategoryArticles,
+} from '@/content/help';
+import {
+  HELP_LABELS,
+  CATEGORY_COPY,
+  categoryStripe,
+  categoryIconBg,
+} from '~/lib/helpStyles';
 
-const popular = getPopularArticles().slice(0, 6);
+const popular = getPopularArticles().slice(0, 3);
 ---
 
 <BaseLayout
@@ -11,66 +22,298 @@ const popular = getPopularArticles().slice(0, 6);
   description="everything you need to know about using beanies.family — getting started, features, security, and how it all works."
   canonicalPath="/help"
 >
-  <section class="mx-auto max-w-4xl px-6 py-16 text-center">
-    <h1 class="font-outfit text-4xl font-bold text-secondary-500 sm:text-5xl">how can we help?</h1>
-    <p class="mx-auto mt-4 max-w-xl text-secondary-400">
-      search the help center, browse by category, or jump to a popular article below.
-    </p>
-    <div class="mx-auto mt-8 max-w-xl">
-      <HelpSearch />
+  <!-- ══════ SECTION 1: HERO ══════ -->
+  <section class="relative bg-[var(--color-background)] px-6 py-16 md:py-24">
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div class="help-anim-float absolute -top-[120px] -right-[60px] h-80 w-80 rounded-full bg-[var(--tint-orange-8)]"></div>
+      <div class="help-anim-float-reverse absolute -bottom-20 -left-10 h-60 w-60 rounded-full bg-[var(--tint-silk-20)]"></div>
+      <div
+        class="absolute inset-0"
+        style="background: radial-gradient(ellipse 80% 60% at 20% 90%, var(--tint-silk-20) 0%, transparent 70%), radial-gradient(ellipse 60% 50% at 85% 20%, var(--tint-orange-8) 0%, transparent 60%);"
+      ></div>
+    </div>
+
+    <div class="relative z-10 mx-auto max-w-[1200px]">
+      <div class="flex flex-col-reverse items-center justify-center gap-10 text-center md:flex-row md:gap-15 md:text-left">
+        <div class="max-w-[560px] flex-1">
+          <div class="font-outfit mb-8 inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-white px-5 py-2 text-xs font-medium shadow-[var(--card-shadow)]">
+            <span class="h-2 w-2 animate-pulse rounded-full bg-[#27AE60]"></span>
+            {HELP_LABELS.heroBadge}
+          </div>
+
+          <h1 class="font-outfit text-4xl font-extrabold leading-tight text-secondary-500 md:text-5xl">
+            how can we <span class="text-primary-500">help</span>?
+          </h1>
+
+          <p class="mt-4 max-w-[540px] text-lg text-[var(--color-text-muted)]">
+            {HELP_LABELS.subtitle}
+          </p>
+
+          <div class="mt-10 max-w-[560px]">
+            <HelpSearch placeholder={HELP_LABELS.searchPlaceholder} />
+            <div class="font-outfit mt-3 text-xs tracking-wide text-[var(--color-text-muted)]">
+              Try:
+              <span class="mx-0.5 rounded-md bg-[var(--tint-slate-5)] px-2 py-0.5 font-medium">getting started</span>
+              <span class="mx-0.5 rounded-md bg-[var(--tint-slate-5)] px-2 py-0.5 font-medium">encryption</span>
+              <span class="mx-0.5 rounded-md bg-[var(--tint-slate-5)] px-2 py-0.5 font-medium">how net worth works</span>
+              <span class="mx-0.5 rounded-md bg-[var(--tint-slate-5)] px-2 py-0.5 font-medium">privacy</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="relative shrink-0">
+          <div
+            class="absolute top-1/2 left-1/2 -z-10 h-[300px] w-[300px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+            style="background: radial-gradient(circle, var(--tint-orange-15) 0%, transparent 70%)"
+          ></div>
+          <img
+            src="/brand/beanies_family_hugging_transparent_512x512.png"
+            alt="The beanies family hugging"
+            width="280"
+            height="280"
+            class="help-anim-bob h-[220px] w-[220px] object-contain drop-shadow-[0_12px_32px_rgba(44,62,80,0.10)] md:h-[280px] md:w-[280px]"
+          />
+        </div>
+      </div>
     </div>
   </section>
 
-  <section class="mx-auto max-w-6xl px-6 pb-16">
-    <h2 class="font-outfit text-xl font-semibold text-secondary-500">browse by category</h2>
-    <ul class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      {
-        HELP_CATEGORIES.map((cat) => {
+  <!-- ══════ SECTION 2: CATEGORY CARDS ══════ -->
+  <section class="border-t border-[var(--color-border)] py-16 md:py-20">
+    <div class="mx-auto max-w-[1200px] px-6 md:px-8">
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {HELP_CATEGORIES.map((cat) => {
+          const copy = CATEGORY_COPY[cat.id];
           const count = getCategoryArticles(cat.id).length;
           return (
-            <li>
-              <a
-                href={`/help/${cat.id}`}
-                class="block rounded-2xl bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <div class="flex items-start gap-4">
-                  <span class="text-3xl" aria-hidden="true">{cat.icon}</span>
-                  <div>
-                    <h3 class="font-outfit text-lg font-semibold text-secondary-500">
-                      {cat.id.replace(/-/g, ' ')}
-                    </h3>
-                    <p class="mt-1 text-sm text-secondary-400">{count} article{count === 1 ? '' : 's'}</p>
-                  </div>
-                </div>
-              </a>
-            </li>
+            <a
+              href={`/help/${cat.id}`}
+              class="relative block cursor-pointer overflow-hidden rounded-3xl bg-white p-7 text-left shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)]"
+            >
+              <div class:list={['absolute inset-x-0 top-0 h-1', categoryStripe[cat.color]]}></div>
+              <div class:list={['mb-5 flex h-14 w-14 items-center justify-center rounded-[18px] text-[26px]', categoryIconBg[cat.color]]}>
+                {cat.icon}
+              </div>
+              <h3 class="font-outfit text-lg font-bold leading-tight text-secondary-500">
+                {copy?.label ?? cat.id}
+              </h3>
+              <p class="mt-2 text-sm leading-snug text-[var(--color-text-muted)]">
+                {copy?.description}
+              </p>
+              <span class="font-outfit mt-4 inline-block text-xs font-semibold tracking-wide text-primary-500">
+                {count} articles →
+              </span>
+            </a>
           );
-        })
-      }
-    </ul>
+        })}
+      </div>
+    </div>
   </section>
 
-  {
-    popular.length > 0 && (
-      <section class="mx-auto max-w-6xl px-6 pb-20">
-        <h2 class="font-outfit text-xl font-semibold text-secondary-500">popular articles</h2>
-        <ul class="mt-6 grid gap-4 sm:grid-cols-2">
-          {popular.map((article) => (
-            <li>
-              <a
-                href={`/help/${article.category}/${article.slug}`}
-                class="flex items-start gap-3 rounded-2xl bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-              >
-                <span class="text-2xl" aria-hidden="true">{article.icon}</span>
-                <div class="flex-1">
-                  <h3 class="font-outfit text-sm font-semibold text-secondary-500">{article.title}</h3>
-                  <p class="mt-1 line-clamp-2 text-xs text-secondary-400">{article.excerpt}</p>
-                </div>
-              </a>
+  <!-- ══════ SECTION 3: POPULAR ARTICLES ══════ -->
+  {popular.length > 0 && (
+    <section class="border-t border-[var(--color-border)] py-16 md:py-20">
+      <div class="mx-auto max-w-[1200px] px-6 md:px-8">
+        <div class="mb-8 flex items-center justify-between">
+          <h2 class="font-outfit text-2xl font-bold text-secondary-500 md:text-[28px]">
+            {HELP_LABELS.popularArticles}
+          </h2>
+          <a
+            href="#all-articles"
+            class="font-outfit flex items-center gap-1 text-sm font-semibold text-primary-500 transition-[gap] duration-200 hover:gap-2 hover:text-primary-600"
+          >
+            {HELP_LABELS.viewAllArticles} ↓
+          </a>
+        </div>
+
+        <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {popular.map((article) => <HelpArticleCard article={article} />)}
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ══════ SECTION 4: SECURITY SPOTLIGHT ══════ -->
+  <section class="border-t border-[var(--color-border)] py-16 md:py-20">
+    <div class="mx-auto max-w-[1200px] px-6 md:px-8">
+      <div class="grid items-center gap-10 md:gap-16 lg:grid-cols-2">
+        <div>
+          <h2 class="font-outfit text-3xl font-extrabold leading-tight text-secondary-500 md:text-4xl">
+            {HELP_LABELS.securitySpotlightTitle}
+          </h2>
+          <p class="mt-4 text-lg leading-relaxed text-[var(--color-text-muted)]">
+            {HELP_LABELS.securitySpotlightDesc}
+          </p>
+
+          <ul class="mt-8 flex flex-col gap-5">
+            <li class="flex items-start gap-4">
+              <div class="flex h-11 w-11 min-w-[44px] items-center justify-center rounded-[14px] bg-[var(--tint-orange-15)] text-xl">🔐</div>
+              <div>
+                <h3 class="font-outfit text-[15px] font-semibold text-secondary-500">{HELP_LABELS.securityFeature1Title}</h3>
+                <p class="text-sm leading-snug text-[var(--color-text-muted)]">{HELP_LABELS.securityFeature1Desc}</p>
+              </div>
             </li>
-          ))}
-        </ul>
-      </section>
-    )
-  }
+            <li class="flex items-start gap-4">
+              <div class="flex h-11 w-11 min-w-[44px] items-center justify-center rounded-[14px] bg-[var(--tint-silk-20)] text-xl">🔑</div>
+              <div>
+                <h3 class="font-outfit text-[15px] font-semibold text-secondary-500">{HELP_LABELS.securityFeature2Title}</h3>
+                <p class="text-sm leading-snug text-[var(--color-text-muted)]">{HELP_LABELS.securityFeature2Desc}</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <div class="flex h-11 w-11 min-w-[44px] items-center justify-center rounded-[14px] bg-[var(--tint-success-10)] text-xl">👪</div>
+              <div>
+                <h3 class="font-outfit text-[15px] font-semibold text-secondary-500">{HELP_LABELS.securityFeature3Title}</h3>
+                <p class="text-sm leading-snug text-[var(--color-text-muted)]">{HELP_LABELS.securityFeature3Desc}</p>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <div class="flex h-11 w-11 min-w-[44px] items-center justify-center rounded-[14px] bg-[var(--tint-slate-5)] text-xl">💻</div>
+              <div>
+                <h3 class="font-outfit text-[15px] font-semibold text-secondary-500">{HELP_LABELS.securityFeature4Title}</h3>
+                <p class="text-sm leading-snug text-[var(--color-text-muted)]">{HELP_LABELS.securityFeature4Desc}</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="rounded-[32px] bg-white p-8 shadow-[var(--soft-shadow)] md:p-10">
+            <div class="font-outfit mb-7 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--color-text-muted)]">
+              {HELP_LABELS.diagramTitle}
+            </div>
+
+            <div class="flex flex-col gap-3">
+              <div class="font-outfit flex items-center gap-3.5 rounded-2xl bg-[var(--tint-orange-8)] px-[18px] py-3.5 text-sm font-medium text-secondary-500 transition-transform hover:translate-x-1">
+                <span class="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-[10px] bg-primary-500 text-xs font-bold text-white">1</span>
+                {HELP_LABELS.diagramStep1}
+              </div>
+              <div class="text-center text-[var(--color-text-muted)] opacity-40">↓</div>
+              <div class="font-outfit flex items-center gap-3.5 rounded-2xl bg-[var(--tint-silk-10)] px-[18px] py-3.5 text-sm font-medium text-secondary-500 transition-transform hover:translate-x-1">
+                <span class="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-[10px] bg-sky-silk-300 text-xs font-bold text-secondary-500">2</span>
+                {HELP_LABELS.diagramStep2}
+              </div>
+              <div class="text-center text-[var(--color-text-muted)] opacity-40">↓</div>
+              <div class="font-outfit flex items-center gap-3.5 rounded-2xl bg-[var(--tint-success-10)] px-[18px] py-3.5 text-sm font-medium text-secondary-500 transition-transform hover:translate-x-1">
+                <span class="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-[10px] bg-[#27AE60] text-xs font-bold text-white">3</span>
+                {HELP_LABELS.diagramStep3}
+              </div>
+              <div class="text-center text-[var(--color-text-muted)] opacity-40">↓</div>
+              <div class="font-outfit flex items-center gap-3.5 rounded-2xl bg-secondary-500 px-[18px] py-3.5 text-sm font-medium text-white transition-transform hover:translate-x-1">
+                <span class="flex h-7 w-7 min-w-[28px] items-center justify-center rounded-[10px] bg-secondary-600 text-xs font-bold text-white">4</span>
+                {HELP_LABELS.diagramStep4}
+              </div>
+            </div>
+
+            <div class="mt-6 border-t border-[var(--color-border)] pt-5 text-center text-xs italic text-[var(--color-text-muted)]">
+              {HELP_LABELS.diagramCaption}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ SECTION 5: FULL ARTICLE INDEX ══════ -->
+  <section id="all-articles" class="scroll-mt-8 border-t border-[var(--color-border)] bg-white py-16 md:py-20">
+    <div class="mx-auto max-w-[1200px] px-6 md:px-8">
+      <div class="mb-10 text-center">
+        <h2 class="font-outfit text-2xl font-bold text-secondary-500 md:text-[28px]">
+          {HELP_LABELS.allArticles}
+        </h2>
+        <p class="mx-auto mt-2 max-w-md text-sm text-[var(--color-text-muted)]">
+          {HELP_LABELS.allArticlesSubtitle}
+        </p>
+      </div>
+
+      <div class="grid gap-6 sm:gap-8 lg:grid-cols-2">
+        {HELP_CATEGORIES.map((cat) => {
+          const articles = getCategoryArticles(cat.id);
+          const copy = CATEGORY_COPY[cat.id];
+          return (
+            <a
+              href={`/help/${cat.id}`}
+              class="group relative overflow-hidden rounded-3xl border border-[var(--color-border)] bg-[var(--color-background)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
+            >
+              <div class:list={['h-1', categoryStripe[cat.color]]}></div>
+              <div class="p-7">
+                <div class="mb-5 flex items-center gap-3.5">
+                  <div class:list={['flex h-11 w-11 items-center justify-center rounded-[16px] text-xl', categoryIconBg[cat.color]]}>
+                    {cat.icon}
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="font-outfit text-lg font-bold text-secondary-500 group-hover:text-primary-500">
+                      {copy?.label ?? cat.id}
+                    </h3>
+                    <p class="mt-0.5 text-xs text-[var(--color-text-muted)]">
+                      {articles.length} articles
+                    </p>
+                  </div>
+                  <span class="text-sm text-primary-500 opacity-0 transition-opacity group-hover:opacity-100">→</span>
+                </div>
+
+                <ul class="flex flex-col gap-0.5">
+                  {articles.slice(0, 4).map((article) => (
+                    <li>
+                      <span class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm">
+                        <span class="min-w-[20px] text-center text-base opacity-40">{article.icon}</span>
+                        <span class="text-secondary-500">{article.title}</span>
+                      </span>
+                    </li>
+                  ))}
+                  {articles.length > 4 && (
+                    <li>
+                      <span class="font-outfit ml-3 mt-1 inline-block text-xs font-semibold text-primary-500">
+                        +{articles.length - 4} more →
+                      </span>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ SECTION 6: CHATBOT TEASER ══════ -->
+  <section class="relative overflow-hidden py-16 md:py-20">
+    <div class="absolute inset-0 bg-gradient-to-br from-secondary-500 to-secondary-600"></div>
+    <div
+      class="pointer-events-none absolute left-1/2 top-[-100px] h-[600px] w-[600px] -translate-x-1/2 rounded-full"
+      style="background: radial-gradient(circle, rgb(241 93 34 / 12%) 0%, transparent 70%)"
+    ></div>
+
+    <div class="relative z-10 mx-auto max-w-[1200px] px-6 text-center text-white md:px-8">
+      <div class="font-outfit mb-5 inline-flex items-center gap-1.5 rounded-full bg-[rgba(241,93,34,0.15)] px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary-500">
+        ✨ Coming Soon
+      </div>
+
+      <h2 class="font-outfit text-3xl font-extrabold md:text-4xl">
+        {HELP_LABELS.chatbotTeaser}
+      </h2>
+      <p class="mx-auto mt-4 max-w-[520px] text-lg text-white/70">
+        {HELP_LABELS.chatbotTeaserDesc}
+      </p>
+
+      <div class="mx-auto mt-9 max-w-[440px] rounded-3xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-[10px]">
+        <div class="mb-4 flex gap-2.5">
+          <div class="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-[10px] bg-[rgba(241,93,34,0.2)] text-base">🧑</div>
+          <div class="rounded-[14px] bg-white/5 px-4 py-2.5 text-sm leading-snug text-white/90">
+            How is my net worth calculated?
+          </div>
+        </div>
+        <div class="mb-4 flex gap-2.5">
+          <div class="flex h-8 w-8 min-w-[32px] items-center justify-center rounded-[10px] bg-[rgba(174,214,241,0.2)] text-base">🥫</div>
+          <div class="rounded-[14px] bg-white/5 px-4 py-2.5 text-sm leading-snug text-sky-silk-300">
+            {HELP_LABELS.chatbotMockAnswer}
+          </div>
+        </div>
+        <div class="font-outfit flex items-center gap-2.5 rounded-[14px] border border-white/10 bg-white/5 px-4 py-3 text-xs italic text-white/30">
+          💬 {HELP_LABELS.chatbotInputPlaceholder}
+        </div>
+      </div>
+    </div>
+  </section>
 </BaseLayout>

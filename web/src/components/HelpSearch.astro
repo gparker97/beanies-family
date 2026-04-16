@@ -3,6 +3,9 @@
  * MiniSearch island — lazy-loads `/help-index.json` on first input focus, then
  * runs fuzzy search entirely client-side. ~10 KB JS; only ships on pages that
  * include this component.
+ *
+ * Styling mirrors the Vue HelpCenterPage hero search (rounded-3xl, soft shadow,
+ * italic serif placeholder, inline 🔍 icon).
  */
 
 interface Props {
@@ -12,16 +15,18 @@ const { placeholder = 'search the help center' } = Astro.props;
 ---
 
 <div class="relative" data-help-search>
+  <span class="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-xl opacity-40">🔍</span>
   <input
     type="search"
     placeholder={placeholder}
     autocomplete="off"
-    class="w-full rounded-2xl border border-secondary-100 bg-white px-4 py-3 font-inter text-sm text-secondary-500 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+    class="w-full rounded-3xl border-2 border-[var(--color-border)] bg-white py-[18px] pl-14 pr-6 text-[17px] text-[var(--color-text)] shadow-[var(--soft-shadow)] transition-[border-color,box-shadow] duration-200 focus:border-sky-silk-300 focus:shadow-[0_8px_40px_rgba(174,214,241,0.2)] focus:outline-none"
+    style="font-family: 'Source Serif 4', Georgia, serif; font-style: italic"
     data-help-search-input
   />
   <ul
     role="listbox"
-    class="absolute left-0 right-0 top-full z-20 mt-2 hidden max-h-96 overflow-y-auto rounded-2xl border border-secondary-100 bg-white shadow-lg"
+    class="absolute left-0 right-0 top-full z-20 mt-2 hidden max-h-80 overflow-y-auto rounded-3xl bg-white p-2 shadow-lg"
     data-help-search-results
   ></ul>
 </div>
@@ -82,7 +87,7 @@ const { placeholder = 'search the help center' } = Astro.props;
       results.innerHTML = hits
         .map((h) => {
           const href = `/help/${h.category}/${h.slug}`;
-          return `<li><a href="${href}" class="block px-4 py-3 text-sm text-secondary-500 hover:bg-secondary-50"><span class="font-semibold">${escape(h.title as string)}</span><span class="block text-xs text-secondary-400">${escape(h.excerpt as string)}</span></a></li>`;
+          return `<li><a href="${href}" class="flex items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-[var(--tint-slate-5)]"><span class="flex-1"><span class="block text-sm font-medium text-secondary-500">${escape(h.title as string)}</span><span class="block text-xs text-secondary-400">${escape(h.excerpt as string)}</span></span></a></li>`;
         })
         .join('');
       results.classList.remove('hidden');

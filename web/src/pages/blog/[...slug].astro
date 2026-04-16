@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import { isPublished } from '~/utils/content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
 
@@ -125,6 +126,10 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
             <polyline points="9 18 15 12 9 6"></polyline>
           </svg>
         </a>
+      </div>
+
+      <div class="post-subscribe">
+        <SubstackSubscribe />
       </div>
     </div>
 
@@ -342,6 +347,8 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 }
 
 .post-nav { display: flex; gap: 12px; }
+
+.post-subscribe { margin-top: 32px; }
 
 .post-nav-btn {
   align-items: center;
