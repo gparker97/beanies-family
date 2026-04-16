@@ -1,7 +1,7 @@
 # Project Status
 
 > **Last updated:** 2026-04-15
-> **Updated by:** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*_ repo variables matching WEB\__/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
+> **Updated by:** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
 ## Current Phase
 
