@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import HelpArticleRenderer from '../../../components/HelpArticleRenderer.astro';
+import Breadcrumbs from '../../../components/Breadcrumbs.astro';
 import {
   ALL_ARTICLES,
   getCategoryArticles,
@@ -87,13 +88,15 @@ const feedbackKey = `help_feedback_${article.category}_${article.slug}`;
 
       <!-- Center: article content -->
       <article class="min-w-0 flex-1">
-        <nav class="mb-6 text-sm text-secondary-400">
-          <a href="/help" class="hover:text-primary-500">{HELP_LABELS.title}</a>
-          <span class="mx-2">/</span>
-          <a href={`/help/${article.category}`} class="hover:text-primary-500">{categoryLabel}</a>
-          <span class="mx-2">/</span>
-          <span class="text-secondary-500">{article.title}</span>
-        </nav>
+        <div class="mb-6">
+          <Breadcrumbs
+            items={[
+              { label: HELP_LABELS.title, href: '/help' },
+              { label: categoryLabel, href: `/help/${article.category}` },
+              { label: article.title, href: canonicalPath },
+            ]}
+          />
+        </div>
 
         <div class="mb-8">
           <h1 class="font-outfit text-2xl font-bold text-secondary-500 md:text-3xl">

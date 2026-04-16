@@ -6,6 +6,10 @@ import JsonLd from '../components/JsonLd.astro';
 import { ORGANIZATION, WEBSITE } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
 import '../styles/global.css';
+// Self-hosted variable fonts (shipped with the build, no third-party request).
+// Variable fonts are a single file per family, covering all weights 300-800.
+import '@fontsource-variable/outfit';
+import '@fontsource-variable/inter';
 
 interface Props {
   title: string;
@@ -54,12 +58,6 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : [];
          across prod (apex) and this site during Phase B / after cutover. -->
     <link rel="icon" type="image/png" href="/brand/beanies_small_bean_favicon_32x32.png" />
     <link rel="apple-touch-icon" href="/brand/beanies_father_son_icon_192x192.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
     <SEO
       title={title}
       description={description}

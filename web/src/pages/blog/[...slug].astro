@@ -2,6 +2,9 @@
 import { getCollection, render } from 'astro:content';
 import { isPublished } from '~/utils/content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Byline from '../../components/Byline.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import RelatedArticles from '../../components/RelatedArticles.astro';
 import SubstackSubscribe from '../../components/SubstackSubscribe.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
@@ -13,21 +16,32 @@ export async function getStaticPaths() {
     const i = sorted.findIndex((p) => p.data.slug === post.data.slug);
     const prevPost = i > 0 ? sorted[i - 1] : undefined;
     const nextPost = i < sorted.length - 1 ? sorted[i + 1] : undefined;
+    // Related: same category, excluding self, most recent 3. Fallback: latest 3.
+    const sameCat = posts
+      .filter((p) => p.data.category === post.data.category && p.data.slug !== post.data.slug)
+      .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+      .slice(0, 3);
+    const fallback = posts
+      .filter((p) => p.data.slug !== post.data.slug)
+      .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+      .slice(0, 3);
+    const related = (sameCat.length >= 3 ? sameCat : fallback).map((p) => ({
+      title: p.data.title,
+      href: `/blog/${p.data.slug}`,
+      excerpt: p.data.excerpt,
+    }));
     return {
       params: { slug: post.data.slug },
-      props: { post, prevPost, nextPost },
+      props: { post, prevPost, nextPost, related },
     };
   });
 }
 
-const { post, prevPost, nextPost } = Astro.props;
+const { post, prevPost, nextPost, related } = Astro.props;
 const { Content } = await render(post);
 
 const canonicalPath = `/blog/${post.data.slug}`;
 const ogImageUrl = new URL(`/og/${post.data.slug}.png`, SITE_URL).toString();
-
-const fmtFull = (d: Date) =>
-  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
 const CATEGORIES: Record<string, { emoji: string; label: string }> = {
   updates: { emoji: '📣', label: 'updates' },
@@ -39,12 +53,14 @@ const CATEGORIES: Record<string, { emoji: string; label: string }> = {
 };
 const categoryInfo = CATEGORIES[post.data.category];
 
+const modifiedDate = post.data.updatedDate ?? post.data.date;
+
 const blogPosting = {
   '@type': 'BlogPosting',
   headline: post.data.title,
   description: post.data.excerpt,
   datePublished: post.data.date.toISOString(),
-  dateModified: post.data.date.toISOString(),
+  dateModified: modifiedDate.toISOString(),
   author: { '@id': `${SITE_URL}/about/${post.data.author}#${post.data.author}` },
   publisher: { '@id': `${SITE_URL}#org` },
   mainEntityOfPage: `${SITE_URL}${canonicalPath}`,
@@ -66,12 +82,15 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 >
   <div class="post-page">
     <div class="post-content">
-      <a href="/blog" class="post-back">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-        all posts
-      </a>
+      <div class="post-breadcrumbs">
+        <Breadcrumbs
+          items={[
+            { label: 'home', href: '/' },
+            { label: 'beanstalk', href: '/blog' },
+            { label: post.data.title, href: canonicalPath },
+          ]}
+        />
+      </div>
 
       <header class="post-header">
         <div class="post-header-top">
@@ -86,9 +105,11 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
         </div>
         <h1 class="post-header-title">{post.data.title}</h1>
         <div class="post-header-meta">
-          <span>{post.data.author}</span>
-          <span class="post-header-dot">·</span>
-          <span>{fmtFull(post.data.date)}</span>
+          <Byline
+            author={post.data.author}
+            date={post.data.date}
+            updatedDate={post.data.updatedDate}
+          />
         </div>
       </header>
 
@@ -127,6 +148,8 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
           </svg>
         </a>
       </div>
+
+      <RelatedArticles items={related} heading="further reading" />
 
       <div class="post-subscribe">
         <SubstackSubscribe />
@@ -174,14 +197,14 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 <style is:global>
 .blog-prose h2 {
   color: #2c3e50;
-  font-family: Outfit, sans-serif;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 1.25rem;
   font-weight: 700;
   margin: 2rem 0 0.75rem;
 }
 .blog-prose h3 {
   color: #2c3e50;
-  font-family: Outfit, sans-serif;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 1.05rem;
   font-weight: 600;
   margin: 1.5rem 0 0.5rem;
@@ -276,22 +299,9 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   padding: 88px 24px 48px;
 }
 
-.post-back {
-  align-items: center;
-  background: none;
-  border: none;
-  color: rgb(44 62 80 / 35%);
-  cursor: pointer;
-  display: inline-flex;
-  font-family: Outfit, sans-serif;
-  font-size: 0.75rem;
-  font-weight: 600;
-  gap: 4px;
+.post-breadcrumbs {
   margin-bottom: 24px;
-  text-decoration: none;
-  transition: color 200ms;
 }
-.post-back:hover { color: var(--heritage-orange); }
 
 .post-header { margin-bottom: 32px; }
 
@@ -314,7 +324,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   background: rgb(44 62 80 / 4%);
   border-radius: 20px;
   color: rgb(44 62 80 / 45%);
-  font-family: Outfit, sans-serif;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 0.6875rem;
   font-weight: 600;
   padding: 3px 10px;
@@ -322,7 +332,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 
 .post-header-title {
   color: var(--deep-slate);
-  font-family: Outfit, sans-serif;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 1.75rem;
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -330,15 +340,8 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 }
 
 .post-header-meta {
-  align-items: center;
-  color: rgb(44 62 80 / 35%);
-  display: flex;
-  font-family: Outfit, sans-serif;
-  font-size: 0.75rem;
-  gap: 6px;
   margin-top: 12px;
 }
-.post-header-dot { opacity: 0.4; }
 
 .post-divider {
   background: linear-gradient(90deg, transparent, rgb(44 62 80 / 8%), transparent);
@@ -385,7 +388,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 
 .post-nav-label {
   color: rgb(44 62 80 / 35%);
-  font-family: Outfit, sans-serif;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 0.625rem;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -394,7 +397,7 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 
 .post-nav-title {
   color: var(--deep-slate);
-  font-family: Outfit, sans-serif;
+  font-family: 'Outfit Variable', Outfit, sans-serif;
   font-size: 0.8125rem;
   font-weight: 600;
   margin-top: 2px;
