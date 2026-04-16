@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-16
+
+### Changed
+
+- Marketing surfaces consolidated to the Astro site — help, privacy, and terms now live only at `beanies.family/help`, `/privacy`, `/terms`. In-app links open in a new tab, preserving your PWA session. One codebase per page going forward. Direct visits to any `app.beanies.family/{help,privacy,terms}*` URL redirect cross-origin to the equivalent apex path so existing bookmarks keep working. Trade-off: these pages now require network (previously bundled into the PWA offline cache)
+
+### Removed
+
+- Five Vue pages (`HelpCenterPage`, `HelpCategoryPage`, `HelpArticlePage`, `PrivacyPolicyPage`, `TermsOfServicePage`), three help-only components (`HelpArticleCard`, `HelpArticleRenderer`, `HelpPublicHeader`), one help-search composable, 40+ `help.*` and 4 `legal.*` translation keys. Content at `src/content/help/` is untouched — still consumed by the Astro site. Net reduction: ~2100 lines deleted
+
+---
+
 ## 2026-04-15
 
 ### Changed

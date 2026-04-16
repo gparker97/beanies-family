@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
+import { MARKETING_URL } from '@/utils/marketing';
 
 const router = useRouter();
 const showContact = ref(false);
@@ -1206,9 +1207,9 @@ onUnmounted(() => {
           >GitHub</a
         >
         <router-link to="/blog">beanstalk</router-link>
-        <router-link to="/help">help</router-link>
-        <router-link to="/privacy">privacy</router-link>
-        <router-link to="/terms">terms</router-link>
+        <a :href="`${MARKETING_URL}/help`" target="_blank" rel="noopener noreferrer">help</a>
+        <a :href="`${MARKETING_URL}/privacy`" target="_blank" rel="noopener noreferrer">privacy</a>
+        <a :href="`${MARKETING_URL}/terms`" target="_blank" rel="noopener noreferrer">terms</a>
         <router-link to="/welcome">sign in</router-link>
       </div>
       <button class="footer__contact-btn" @click="openContact">

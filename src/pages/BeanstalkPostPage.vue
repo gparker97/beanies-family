@@ -6,6 +6,7 @@ import PublicNav from '@/components/public/PublicNav.vue';
 import PublicFooter from '@/components/public/PublicFooter.vue';
 import SubstackSubscribe from '@/components/public/SubstackSubscribe.vue';
 import { formatDateFull } from '@/utils/date';
+import { MARKETING_URL } from '@/utils/marketing';
 
 const route = useRoute();
 const router = useRouter();
@@ -49,7 +50,7 @@ const prevPost = computed(() =>
 const navLinks = [
   { label: 'home', href: '/home' },
   { label: 'beanstalk', href: '/blog' },
-  { label: 'help', href: '/help' },
+  { label: 'help', href: `${MARKETING_URL}/help`, external: true },
 ];
 </script>
 

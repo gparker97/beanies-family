@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
+import { MARKETING_URL } from '@/utils/marketing';
 
 const route = useRoute();
 const emit = defineEmits<{ contact: [] }>();
@@ -23,9 +24,9 @@ function handleContact() {
     <div class="footer-links">
       <a href="https://github.com/gparker97/beanies-family" target="_blank" rel="noopener">GitHub</a>
       <router-link to="/blog">beanstalk</router-link>
-      <router-link to="/help">help</router-link>
-      <router-link to="/privacy">privacy</router-link>
-      <router-link to="/terms">terms</router-link>
+      <a :href="`${MARKETING_URL}/help`" target="_blank" rel="noopener noreferrer">help</a>
+      <a :href="`${MARKETING_URL}/privacy`" target="_blank" rel="noopener noreferrer">privacy</a>
+      <a :href="`${MARKETING_URL}/terms`" target="_blank" rel="noopener noreferrer">terms</a>
       <router-link to="/welcome">sign in</router-link>
     </div>
     <button class="footer-contact-btn" @click="handleContact">
