@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-16",
-    "translationCount": 1909
+    "translationCount": 1930
   },
   "translations": {
     "app.name": {
@@ -9550,6 +9550,111 @@
       "translation": "随时向我提供产品新闻和功能的最新信息",
       "hash": "l3ecme",
       "lastUpdated": "2026-04-10"
+    },
+    "pwaReinstall.title": {
+      "translation": "需要快速重新安装",
+      "hash": "1atk1",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.reassuranceTitle": {
+      "translation": "您的豆子是安全的",
+      "hash": "rwx33x",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.reassurance": {
+      "translation": "您的家庭文件、Google云端硬盘同步和密码都没有受到影响。没有任何东西丢失。",
+      "hash": "rlvvpo",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.context": {
+      "translation": "一次性后端更新意味着您安装的主屏幕图标指向我们的旧地址。要重新获得完整的应用体验\\ u2014离线支持、快速启动、原生体验\\ u2014您\\ u2019将希望从我们的新主页app.beanies.family重新安装。",
+      "hash": "swmd9l",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.stepsHeading": {
+      "translation": "安装",
+      "hash": "el4iau",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.iosStep1": {
+      "translation": "长按主屏<strong></strong>幕上的旧beanies.family图标，然后轻点<strong>删除应用</strong>\\ u2192<strong>从主屏幕删除</strong>",
+      "hash": "vwvgaa",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.iosStep2": {
+      "translation": "打开<strong>Safari</strong>并访问<strong>app.beanies.family</strong>",
+      "hash": "p30dfe",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.iosStep3": {
+      "translation": "点击<strong>分享</strong>按钮\\ u2192<strong>添加到主屏幕</strong>",
+      "hash": "oqykul",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.iosStep4": {
+      "translation": "打开新图标并登录\\ u2014 ，您的家庭数据将从云端同步回来",
+      "hash": "c0h7ua",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.androidStep1": {
+      "translation": "长按旧的beanies.family图<strong>标</strong>，然后将其拖动到“<strong>卸载</strong>” （或轻点“<strong>删除</strong>” ）",
+      "hash": "h1quwl",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.androidStep2": {
+      "translation": "打开<strong>Chrome</strong>并访问<strong>app.beanies.family</strong>",
+      "hash": "7gq9mc",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.androidStep3": {
+      "translation": "轻触三点菜单\\ u2192<strong>安装应用</strong>（或<strong>添加到主屏幕</strong>）",
+      "hash": "b3kc61",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.androidStep4": {
+      "translation": "打开新图标并登录\\ u2014 ，您的家庭数据将从云端同步回来",
+      "hash": "c0h7ua",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.desktopStep1": {
+      "translation": "删除旧应用：在Chrome中，访问<strong>chrome://apps</strong> ，右键单<strong>击</strong>beanies.family\\ u2192<strong>从Chrome中删除</strong>",
+      "hash": "m1smj7",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.desktopStep2": {
+      "translation": "在<strong>浏览器</strong>中访问app.beanies.family",
+      "hash": "eswjam",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.desktopStep3": {
+      "translation": "点击地址栏中的安装图标（或三点菜单\\ u2192<strong>安装</strong>）",
+      "hash": "i4oedw",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.desktopStep4": {
+      "translation": "登录\\ u2014您的家庭数据将从云端同步回来",
+      "hash": "56iunb",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.screenshotAlt": {
+      "translation": "为您的平台安装说明屏幕截图",
+      "hash": "rio4h1",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.oneTimeNote": {
+      "translation": "这是一次性更改\\ u2014我们赢得了\\ u2019t定期进行此操作，承诺。",
+      "hash": "y7myzf",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.seeFullGuide": {
+      "translation": "查看完整的安装指南\\ u2192",
+      "hash": "4q87zl",
+      "lastUpdated": "2026-04-16"
+    },
+    "pwaReinstall.dismiss": {
+      "translation": "明白了，谢谢！",
+      "hash": "3mobto",
+      "lastUpdated": "2026-04-16"
     }
   }
 }
