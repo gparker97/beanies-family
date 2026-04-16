@@ -64,7 +64,14 @@ const screenshot = computed<string | null>(() => {
 </script>
 
 <template>
-  <BaseModal :open="openModal" size="lg" fullscreen-mobile custom-header @close="dismiss">
+  <BaseModal
+    :open="openModal"
+    size="lg"
+    layer="top"
+    fullscreen-mobile
+    custom-header
+    @close="dismiss"
+  >
     <!-- Custom header: gradient strip + title -->
     <template #header>
       <div>

@@ -10,8 +10,8 @@ interface Props {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
   closable?: boolean;
   fullscreenMobile?: boolean;
-  /** z-index layer: 'base' (z-50) for normal modals, 'overlay' (z-[60]) for modals that stack on top of other modals */
-  layer?: 'base' | 'overlay';
+  /** z-index layer: 'base' (z-50) for normal modals, 'overlay' (z-[60]) for modals that stack on top of other modals, 'top' (z-[250]) for modals that must overlay fixed chrome like PublicNav (z-index: 200) */
+  layer?: 'base' | 'overlay' | 'top';
   /** When true, the header slot renders edge-to-edge without padding or border */
   customHeader?: boolean;
 }
@@ -24,7 +24,11 @@ const props = withDefaults(defineProps<Props>(), {
   customHeader: false,
 });
 
-const layerClass = computed(() => (props.layer === 'overlay' ? 'z-[60]' : 'z-50'));
+const layerClass = computed(() => {
+  if (props.layer === 'top') return 'z-[250]';
+  if (props.layer === 'overlay') return 'z-[60]';
+  return 'z-50';
+});
 
 const { isMobile } = useBreakpoint();
 const isFullscreen = computed(() => props.fullscreenMobile && isMobile.value);
