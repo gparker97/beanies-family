@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-11",
-    "translationCount": 1964
+    "lastUpdated": "2026-04-16",
+    "translationCount": 1909
   },
   "translations": {
     "app.name": {
@@ -6886,241 +6886,6 @@
       "hash": "smc9ar",
       "lastUpdated": "2026-03-10"
     },
-    "help.title": {
-      "translation": "帮助中心",
-      "hash": "nqk8ic",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.heroTitle": {
-      "translation": "有什么可以帮您的吗？",
-      "hash": "ltjnh0",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.heroBadge": {
-      "translation": "beanies.family帮助中心",
-      "hash": "lu5s3j",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.subtitle": {
-      "translation": "您需要了解的关于您家人的一切\\ u2019最受欢迎的豆类计数器\\ u2014从第一个豆荚到完整的财务规划。",
-      "hash": "1cc0rw",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.searchPlaceholder": {
-      "translation": "搜索任何东西……加密、预算、活动……",
-      "hash": "41oscn",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.noResults": {
-      "translation": "未找到文章。请尝试其他搜索词。",
-      "hash": "lq53wl",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.browseByTopic": {
-      "translation": "按主题浏览",
-      "hash": "wm9n44",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.popularArticles": {
-      "translation": "热门阅读",
-      "hash": "pf3dcm",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.viewAllArticles": {
-      "translation": "全部文章",
-      "hash": "6dkasp",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.allArticles": {
-      "translation": "所有主題",
-      "hash": "slcx19",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securitySpotlightTitle": {
-      "translation": "您的豆子在我们这里是安全的",
-      "hash": "2z0oij",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securitySpotlightDesc": {
-      "translation": "beanies.family使用完全在浏览器中运行的银行级加密。您的数据绝不会未加密地触及我们的服务器\\ u2014 ，因为它根本不会触及我们的服务器。",
-      "hash": "vj54mi",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature1Title": {
-      "translation": "AES-256-GCM加密",
-      "hash": "qnr6iy",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature1Desc": {
-      "translation": "与政府和银行使用的经过身份验证的加密相同。您的家庭数据的每个字节在离开内存之前都会被加密。",
-      "hash": "epai9l",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature2Title": {
-      "translation": "PBKDF2密钥导出",
-      "hash": "9olrs1",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature2Desc": {
-      "translation": "在成为加密密钥之前，您的密码将通过100,000轮PBKDF2-SHA256进行强化。",
-      "hash": "osofzl",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature3Title": {
-      "translation": "按成员密钥包装",
-      "hash": "4pne5v",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature3Desc": {
-      "translation": "每个家庭成员都有自己的家庭钥匙包装副本。无需重新加密整个文件即可更改密码。",
-      "hash": "bssq5r",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature4Title": {
-      "translation": "浏览器原生加密",
-      "hash": "vpjme3",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.securityFeature4Desc": {
-      "translation": "所有加密都使用浏览器内置的Web Crypto API\\ u2014 ，没有第三方库，没有外部依赖关系。",
-      "hash": "xptipi",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.diagramTitle": {
-      "translation": "如何保护您的数据",
-      "hash": "axy21b",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.diagramStep1": {
-      "translation": "您的密码+随机盐",
-      "hash": "m7875m",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.diagramStep2": {
-      "translation": "PBKDF2 （ 10万发）\\ u2192 AES密钥",
-      "hash": "r4c7np",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.diagramStep3": {
-      "translation": "AES-KW打开家庭钥匙",
-      "hash": "yulszs",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.diagramStep4": {
-      "translation": "家庭密钥解密您的.beanpod",
-      "hash": "o92ejt",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.diagramCaption": {
-      "translation": "所有这些都发生在您的浏览器中。任何东西都不会发送到任何地方。",
-      "hash": "m07pub",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.learnMoreSecurity": {
-      "translation": "了解有关安全标头的详细信息",
-      "hash": "k0zhwe",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.chatbotTeaser": {
-      "translation": "Bean助手\\ u2014即将推出",
-      "hash": "xjwq2u",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.chatbotTeaserDesc": {
-      "translation": "询问有关您的财务状况、功能或工作原理的任何问题\\ u2014 ，并从您的个人Bean助手那里获得即时答案。",
-      "hash": "rv1aau",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.chatbotMockAnswer": {
-      "translation": "净值= （账户+资产）\\ u2212负债。全部转换为您的基础货币！",
-      "hash": "q0iom2",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.chatbotInputPlaceholder": {
-      "translation": "询问有关beanies.family的任何信息...",
-      "hash": "tpi3zh",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.onThisPage": {
-      "translation": "在本页面",
-      "hash": "ex7g1c",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.wasHelpful": {
-      "translation": "这篇文章帮助到你了吗？",
-      "hash": "jv4kl4",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.yes": {
-      "translation": "是",
-      "hash": "1whz",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.no": {
-      "translation": "否",
-      "hash": "1y9",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.feedbackThanks": {
-      "translation": "感谢您的反馈！",
-      "hash": "ct46n7",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.articleNotFound": {
-      "translation": "文章中没有发现",
-      "hash": "cv0ob",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.backToHelp": {
-      "translation": "返回帮助中心",
-      "hash": "j8rxuw",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.noArticlesInCategory": {
-      "translation": "此类别中没有文章。",
-      "hash": "gkecg3",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.gettingStarted": {
-      "translation": "开始",
-      "hash": "fde99h",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.gettingStartedDesc": {
-      "translation": "创建您的第一个Pod ，添加家庭成员，并开始跟踪您的Bean。",
-      "hash": "ai5qvu",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.features": {
-      "translation": "功能和操作方法",
-      "hash": "ugn0mt",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.featuresDesc": {
-      "translation": "账户、交易、预算、目标、活动、规划者以及介于两者之间的所有内容。",
-      "hash": "z9g402",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.security": {
-      "translation": "安全与隐私",
-      "hash": "27a53m",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.securityDesc": {
-      "translation": "我们如何加密您的数据、保护您的密钥，并以完全透明的方式保护您的Bean\\ u2014。",
-      "hash": "57791a",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.howItWorks": {
-      "translation": "工作原理",
-      "hash": "ptfzcz",
-      "lastUpdated": "2026-03-10"
-    },
-    "help.category.howItWorksDesc": {
-      "translation": "数字背后的逻辑\\ u2014计算、摘要和智能功能是如何工作的。",
-      "hash": "jsz5pt",
-      "lastUpdated": "2026-03-10"
-    },
     "nav.help": {
       "translation": "帮助",
       "hash": "1c4m9",
@@ -9556,16 +9321,6 @@
       "hash": "smz6x1",
       "lastUpdated": "2026-03-27"
     },
-    "help.allArticlesSubtitle": {
-      "translation": "按类别浏览，准确查找您需要的内容。",
-      "hash": "illvnk",
-      "lastUpdated": "2026-03-28"
-    },
-    "help.exploreOtherTopics": {
-      "translation": "浏览其他主题",
-      "hash": "cld4xr",
-      "lastUpdated": "2026-03-28"
-    },
     "tips.label": {
       "translation": "每日豆豆提示",
       "hash": "5n36o3",
@@ -9609,16 +9364,6 @@
     "whatsNew.tryIt": {
       "translation": "免费试用",
       "hash": "tgha8g",
-      "lastUpdated": "2026-03-28"
-    },
-    "help.category.whatsNew": {
-      "translation": "新功能",
-      "hash": "9c5m6o",
-      "lastUpdated": "2026-03-28"
-    },
-    "help.category.whatsNewDesc": {
-      "translation": "发行说明和最近的改进\\ u2014直接来自Head Beanie开发人员。",
-      "hash": "lozt6q",
       "lastUpdated": "2026-03-28"
     },
     "nook.criticalDropoffPickup": {
@@ -9804,26 +9549,6 @@
     "auth.subscribeNewsletter": {
       "translation": "随时向我提供产品新闻和功能的最新信息",
       "hash": "l3ecme",
-      "lastUpdated": "2026-04-10"
-    },
-    "legal.privacyPolicy": {
-      "translation": "隐私条款",
-      "hash": "hop62e",
-      "lastUpdated": "2026-04-10"
-    },
-    "legal.termsOfService": {
-      "translation": "服務條款",
-      "hash": "zhf2aj",
-      "lastUpdated": "2026-04-10"
-    },
-    "legal.lastUpdated": {
-      "translation": "上次更新",
-      "hash": "47xqdr",
-      "lastUpdated": "2026-04-10"
-    },
-    "legal.backToHome": {
-      "translation": "返回首页",
-      "hash": "weah05",
       "lastUpdated": "2026-04-10"
     }
   }

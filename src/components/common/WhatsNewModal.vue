@@ -4,6 +4,7 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import { useWhatsNew } from '@/composables/useWhatsNew';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { MARKETING_URL } from '@/utils/marketing';
 
 const router = useRouter();
 const settingsStore = useSettingsStore();
@@ -25,7 +26,7 @@ function handleTryIt(route: string) {
 
 function handleSeeAll() {
   dismissModal();
-  router.push('/help/whats-new');
+  window.open(`${MARKETING_URL}/help/whats-new`, '_blank', 'noopener,noreferrer');
 }
 </script>
 

@@ -1,7 +1,8 @@
 # Project Status
 
-> **Last updated:** 2026-04-15
-> **Updated by:** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
+> **Last updated:** 2026-04-16
+> **Updated by:** Claude (Help + Privacy + Terms consolidated to Astro — 5 Vue pages + 3 components + 1 composable deleted, ~2100 lines removed; in-app links open `beanies.family/{help,privacy,terms}` in new tab preserving PWA session; cross-origin redirects on all three paths so stale bookmarks still work; `MARKETING_URL` constant added; reusable `externalRedirect()` router helper for the redirect pattern; Astro now solely owns the marketing/docs/legal surfaces — plan at `docs/plans/2026-04-16-consolidate-help-to-astro.md`)
+> **Previous update (2026-04-15):** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
 ## Current Phase
 

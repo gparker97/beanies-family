@@ -39,8 +39,12 @@ function mapItems(items: NavItemDef[]) {
     emoji: item.emoji,
     comingSoon: item.comingSoon ?? false,
     badge: item.badgeKey ? (badges.value[item.badgeKey] ?? 0) : 0,
+    external: item.external ?? false,
+    externalUrl: item.externalUrl,
   }));
 }
+
+type MappedNavItem = ReturnType<typeof mapItems>[number];
 
 const treehouseItems = computed(() => mapItems(TREEHOUSE_ITEMS));
 const piggyBankItems = computed(() => mapItems(PIGGY_BANK_ITEMS));
@@ -53,8 +57,12 @@ function isActive(path: string): boolean {
   return route.path === path;
 }
 
-function navigateTo(path: string) {
-  router.push(path);
+function navigateTo(item: MappedNavItem) {
+  if (item.external && item.externalUrl) {
+    window.open(item.externalUrl, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  router.push(item.path);
 }
 
 const encryptionTitle = computed(() => {
@@ -136,7 +144,7 @@ const sections = computed(() =>
                   ? 'text-white/40 hover:text-white/70'
                   : '',
             ]"
-            @click="navigateTo(item.path)"
+            @click="navigateTo(item)"
           >
             <span class="w-6 text-center text-base">{{ item.emoji }}</span>
             <span class="flex-1">{{ item.label }}</span>
@@ -171,7 +179,7 @@ const sections = computed(() =>
             ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
             : 'border-l-4 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
         "
-        @click="navigateTo(item.path)"
+        @click="navigateTo(item)"
       >
         <span class="w-6 text-center text-base">{{ item.emoji }}</span>
         <span>{{ item.label }}</span>

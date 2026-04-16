@@ -32,6 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { isTemporaryEmail } from '@/utils/email';
 import { formatDateFull, toDateInputValue } from '@/utils/date';
+import { MARKETING_URL } from '@/utils/marketing';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { CurrencyCode, LanguageCode } from '@/types/models';
 
@@ -160,7 +161,7 @@ function handleOpenSettings() {
 
 function handleOpenHelp() {
   showProfileDropdown.value = false;
-  router.push('/help');
+  window.open(`${MARKETING_URL}/help`, '_blank', 'noopener,noreferrer');
 }
 
 const isRefreshing = ref(false);

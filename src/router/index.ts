@@ -3,6 +3,20 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { MARKETING_URL } from '@/utils/marketing';
+
+/** Route that cross-origin-redirects to the Astro marketing site, preserving the full path. */
+function externalRedirect(path: string, name: string): RouteRecordRaw {
+  return {
+    path,
+    name,
+    beforeEnter: (to) => {
+      window.location.replace(`${MARKETING_URL}${to.fullPath}`);
+    },
+    component: () => import('@/pages/NotFoundPage.vue'), // placeholder — never renders
+    meta: { requiresAuth: false },
+  };
+}
 
 const routes: RouteRecordRaw[] = [
   {
@@ -130,36 +144,9 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/NoAccessPage.vue'),
     meta: { titleKey: 'noAccess.title' },
   },
-  {
-    path: '/help',
-    name: 'HelpCenter',
-    component: () => import('@/pages/HelpCenterPage.vue'),
-    meta: { titleKey: 'help.title', requiresAuth: false },
-  },
-  {
-    path: '/help/:category',
-    name: 'HelpCategory',
-    component: () => import('@/pages/HelpCategoryPage.vue'),
-    meta: { titleKey: 'help.title', requiresAuth: false },
-  },
-  {
-    path: '/help/:category/:slug',
-    name: 'HelpArticle',
-    component: () => import('@/pages/HelpArticlePage.vue'),
-    meta: { titleKey: 'help.title', requiresAuth: false },
-  },
-  {
-    path: '/privacy',
-    name: 'PrivacyPolicy',
-    component: () => import('@/pages/PrivacyPolicyPage.vue'),
-    meta: { titleKey: 'legal.privacyPolicy', requiresAuth: false },
-  },
-  {
-    path: '/terms',
-    name: 'TermsOfService',
-    component: () => import('@/pages/TermsOfServicePage.vue'),
-    meta: { titleKey: 'legal.termsOfService', requiresAuth: false },
-  },
+  externalRedirect('/help/:pathMatch(.*)*', 'HelpRedirect'),
+  externalRedirect('/privacy', 'PrivacyRedirect'),
+  externalRedirect('/terms', 'TermsRedirect'),
   {
     path: '/blog',
     name: 'BeanstalkBlog',

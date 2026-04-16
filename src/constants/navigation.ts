@@ -1,4 +1,5 @@
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { MARKETING_URL } from '@/utils/marketing';
 
 export type NavSection = 'treehouse' | 'piggyBank' | 'pinned';
 
@@ -15,6 +16,8 @@ export interface NavItemDef {
   section: NavSection;
   comingSoon?: boolean;
   badgeKey?: string;
+  external?: boolean;
+  externalUrl?: string;
 }
 
 export const NAV_SECTIONS: NavSectionDef[] = [
@@ -68,7 +71,14 @@ export const NAV_ITEMS: NavItemDef[] = [
   },
   { labelKey: 'nav.assets', path: '/assets', emoji: '\u{1F3E2}', section: 'piggyBank' },
   // Pinned
-  { labelKey: 'nav.help', path: '/help', emoji: '\u{1F4DA}', section: 'pinned' },
+  {
+    labelKey: 'nav.help',
+    path: '/help',
+    emoji: '\u{1F4DA}',
+    section: 'pinned',
+    external: true,
+    externalUrl: `${MARKETING_URL}/help`,
+  },
   { labelKey: 'nav.settings', path: '/settings', emoji: '\u2699\uFE0F', section: 'pinned' },
 ];
 
