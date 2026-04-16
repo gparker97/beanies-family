@@ -28,7 +28,7 @@ const { sections } = Astro.props;
 
       if (section.type === 'callout') {
         return (
-          <div class="rounded-2xl border-l-4 border-primary-500 bg-primary-50 p-4">
+          <div class="rounded-2xl border-l-4 border-primary-500 bg-[var(--tint-orange-8)] p-4">
             {section.title && (
               <div class="mb-1 flex items-center gap-2 font-outfit text-sm font-semibold text-secondary-500">
                 {section.icon && <span>{section.icon}</span>}
@@ -42,7 +42,7 @@ const { sections } = Astro.props;
 
       if (section.type === 'infoBox') {
         return (
-          <div class="rounded-2xl bg-sky-silk-50 p-4">
+          <div class="rounded-2xl bg-[var(--tint-silk-20)] p-4">
             {section.title && (
               <div class="mb-1 flex items-center gap-2 font-outfit text-sm font-semibold text-secondary-500">
                 {section.icon && <span>{section.icon}</span>}
@@ -56,7 +56,14 @@ const { sections } = Astro.props;
 
       if (section.type === 'codeBlock') {
         return (
-          <pre class="overflow-x-auto rounded-2xl bg-secondary-500 p-4 font-mono text-sm leading-relaxed text-sky-silk-300">{section.content}</pre>
+          <div class="group relative rounded-2xl bg-secondary-500 p-4" data-help-code>
+            <button
+              type="button"
+              data-help-copy
+              class="absolute right-3 top-3 rounded-lg bg-white/10 px-2 py-1 text-xs text-white/60 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-white/20 hover:text-white"
+            >Copy</button>
+            <pre class="overflow-x-auto font-mono text-sm leading-relaxed text-sky-silk-300"><code>{section.content}</code></pre>
+          </div>
         );
       }
 
@@ -94,3 +101,24 @@ const { sections } = Astro.props;
     })
   }
 </div>
+
+<script>
+  // Copy-to-clipboard for code blocks in the help article renderer.
+  for (const root of document.querySelectorAll<HTMLElement>('[data-help-code]')) {
+    const btn = root.querySelector<HTMLButtonElement>('[data-help-copy]');
+    const code = root.querySelector('code');
+    if (!btn || !code) continue;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(code.textContent ?? '');
+        const original = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => {
+          btn.textContent = original;
+        }, 1500);
+      } catch {
+        /* clipboard blocked — swallow */
+      }
+    });
+  }
+</script>
