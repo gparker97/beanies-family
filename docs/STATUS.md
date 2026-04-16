@@ -8,6 +8,37 @@
 > (1-3) See prior runs on this date: (1) Help + Privacy + Terms consolidated to Astro — 5 Vue pages + 3 components + 1 composable deleted, ~2100 lines removed; in-app links open `beanies.family/{help,privacy,terms}` in new tab; `MARKETING_URL` constant + reusable `externalRedirect()` router helper. Plan: `docs/plans/2026-04-16-consolidate-help-to-astro.md`. (2) Stale-PWA re-install notice — pre-cutover PWA users (start_url baked to old apex) land at Astro → inline script redirects them to app.beanies.family with `?from-stale-pwa=1` flag → Vue app activates a one-time dismissable modal with platform-aware re-install steps (iOS/Android/desktop), reassurance copy, and link to install guide. Auto-clears flag once user is detected on the new PWA at app.beanies.family. New reusable `noticeFlag(key)` utility + `useStalePwaNotice()` composable. Plan: `docs/plans/2026-04-16-stale-pwa-reinstall-notice.md`)
 > **Previous update (2026-04-15):** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
+## Pending / Next Session
+
+**Content authoring (user is driving):**
+
+- **Pillar #1 — "overwhelmed with family planning"** — greg has written the full guide in Notion (page `343247d9-a99f-8162-9b52-cb5c0f16f019`) in his own voice. Reviewed this session; strong material. Needs a merge pass to bring into `content/guides/overwhelmed-family-planning.md`: (a) add bold `**short answer:**` blocks at the top of every H2 (biggest AIO/GEO win, ~30 min mechanical extraction), (b) fix 5 typos (manager for _a_ job; psychologist; collapses _or_ obviates; breathe ×2; experiencing), (c) rewrite the one marketing-speak sentence about beanies.family into native voice, (d) reorder sections so partner-buy-in precedes red-flags, (e) add inline links (Fair Play book, buy-fruits blog post), (f) flip `draft: false`. Feedback fully captured in session transcript.
+- **Pillars 2-4** — Family Organization, Family Finance Basics, Local-first Family Tools — not started yet.
+- **Comparison posts** — beanies vs YNAB, beanies vs Actual Budget, beanies vs Copilot Money.
+- **Glossary + FAQ body** — scaffolded in repo with `DefinedTermSet` / `FAQPage` JSON-LD and hidden via `DraftPlaceholder`. Needs content per `web/src/pages/help/glossary.astro` + `faq.astro`.
+
+**Engineering follow-ups:**
+
+- **Lighthouse CI first real run** will fire on the next PR that touches `web/`, `content/blog/`, `content/guides/`, or `packages/`. If the assertions fail (performance ≥95, LCP ≤2.5s, CLS ≤0.1, TBT ≤200ms, script ≤30KB/page), tune then. Local WSL Chrome can't validate the config; the workflow is the real test.
+- **Vue app fonts still on Google Fonts** (`index.html`). Astro is self-hosted. If we want parity + privacy parity, import `@fontsource-variable/*` in Vue too. Out of scope for #167 cleanup (Vue app is authenticated, not indexed).
+
+**External ops (outside repo, user actions):**
+
+- Google Search Console — verify property + submit sitemap
+- Bing Webmaster — verify property + submit sitemap
+- Otterly.ai — subscribe + configure 20 tracked prompts (AI-citation visibility tracking)
+- Wikidata — notability assessment, submit entry if viable
+- Directory listings — AlternativeTo, SaaSHub, PrivacyTools.io, etc.
+- YouTube demo video + transcript
+- Show HN post (timing-sensitive; pair with a milestone)
+- GoAccess monthly CloudFront-log report (schedule automation later)
+
+**Flaky E2E tests** (logged in `docs/E2E_HEALTH.md`, currently passing on retry):
+
+- `cross-entity.spec.ts:81` — Account Institution Combobox (2+ flakes this week; candidate for hardening)
+- `cross-entity.spec.ts:333` — Loan & Activity recurring monthly fee (2+ flakes this week; candidate for hardening)
+- `financial-data.spec.ts` + `google-drive.spec.ts` step-2 — occasional flakes
+
 ## Current Phase
 
 **Phase 1 — MVP** (In Progress)
