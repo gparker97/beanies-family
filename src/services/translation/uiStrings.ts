@@ -3848,6 +3848,87 @@ const STRING_DEFS = {
   'travel.editSegment': { en: 'Edit Segment', beanie: 'edit segment' },
   'travel.editAccommodation': { en: 'Edit Accommodation', beanie: 'edit accommodation' },
   'travel.editTransportation': { en: 'Edit Transportation', beanie: 'edit transportation' },
+
+  // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
+  'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },
+  'pwaReinstall.reassuranceTitle': { en: 'Your beans are safe', beanie: 'your beans are safe' },
+  'pwaReinstall.reassurance': {
+    en: 'Your family file, Google Drive sync, and password are all untouched. Nothing has been lost.',
+    beanie:
+      'your family file, Google Drive sync, and password are all untouched. nothing has been lost.',
+  },
+  'pwaReinstall.context': {
+    en: 'A one-time backend update means the home-screen icon you installed is pointing to our old address. To get the full app experience back \u2014 offline support, quick launch, native feel \u2014 you\u2019ll want to re-install from our new home at app.beanies.family.',
+    beanie:
+      'a one-time backend update means the home-screen icon you installed is pointing to our old address. to get the full app experience back \u2014 offline support, quick launch, native feel \u2014 you\u2019ll want to re-install from our new home at app.beanies.family.',
+  },
+  'pwaReinstall.stepsHeading': { en: 'To re-install', beanie: 'to re-install' },
+  'pwaReinstall.iosStep1': {
+    en: 'Long-press the old <strong>beanies.family</strong> icon on your home screen and tap <strong>Remove App</strong> \u2192 <strong>Delete from Home Screen</strong>',
+    beanie:
+      'long-press the old <strong>beanies.family</strong> icon on your home screen and tap <strong>remove app</strong> \u2192 <strong>delete from home screen</strong>',
+  },
+  'pwaReinstall.iosStep2': {
+    en: 'Open <strong>Safari</strong> and visit <strong>app.beanies.family</strong>',
+    beanie: 'open <strong>safari</strong> and visit <strong>app.beanies.family</strong>',
+  },
+  'pwaReinstall.iosStep3': {
+    en: 'Tap the <strong>Share</strong> button \u2192 <strong>Add to Home Screen</strong>',
+    beanie: 'tap the <strong>share</strong> button \u2192 <strong>add to home screen</strong>',
+  },
+  'pwaReinstall.iosStep4': {
+    en: 'Open the new icon and sign in \u2014 your family data will sync back from the cloud',
+    beanie: 'open the new icon and sign in \u2014 your family data will sync back from the cloud',
+  },
+  'pwaReinstall.androidStep1': {
+    en: 'Long-press the old <strong>beanies.family</strong> icon and drag it to <strong>Uninstall</strong> (or tap <strong>Remove</strong>)',
+    beanie:
+      'long-press the old <strong>beanies.family</strong> icon and drag it to <strong>uninstall</strong> (or tap <strong>remove</strong>)',
+  },
+  'pwaReinstall.androidStep2': {
+    en: 'Open <strong>Chrome</strong> and visit <strong>app.beanies.family</strong>',
+    beanie: 'open <strong>chrome</strong> and visit <strong>app.beanies.family</strong>',
+  },
+  'pwaReinstall.androidStep3': {
+    en: 'Tap the three-dot menu \u2192 <strong>Install app</strong> (or <strong>Add to Home screen</strong>)',
+    beanie:
+      'tap the three-dot menu \u2192 <strong>install app</strong> (or <strong>add to home screen</strong>)',
+  },
+  'pwaReinstall.androidStep4': {
+    en: 'Open the new icon and sign in \u2014 your family data will sync back from the cloud',
+    beanie: 'open the new icon and sign in \u2014 your family data will sync back from the cloud',
+  },
+  'pwaReinstall.desktopStep1': {
+    en: 'Remove the old app: in Chrome, visit <strong>chrome://apps</strong>, right-click <strong>beanies.family</strong> \u2192 <strong>Remove from Chrome</strong>',
+    beanie:
+      'remove the old app: in chrome, visit <strong>chrome://apps</strong>, right-click <strong>beanies.family</strong> \u2192 <strong>remove from chrome</strong>',
+  },
+  'pwaReinstall.desktopStep2': {
+    en: 'Visit <strong>app.beanies.family</strong> in your browser',
+    beanie: 'visit <strong>app.beanies.family</strong> in your browser',
+  },
+  'pwaReinstall.desktopStep3': {
+    en: 'Click the install icon in the address bar (or three-dot menu \u2192 <strong>Install</strong>)',
+    beanie:
+      'click the install icon in the address bar (or three-dot menu \u2192 <strong>install</strong>)',
+  },
+  'pwaReinstall.desktopStep4': {
+    en: 'Sign in \u2014 your family data will sync back from the cloud',
+    beanie: 'sign in \u2014 your family data will sync back from the cloud',
+  },
+  'pwaReinstall.screenshotAlt': {
+    en: 'Install instructions screenshot for your platform',
+    beanie: 'install instructions screenshot for your platform',
+  },
+  'pwaReinstall.oneTimeNote': {
+    en: 'This is a one-time change \u2014 we won\u2019t do this regularly, promise.',
+    beanie: 'this is a one-time change \u2014 we won\u2019t do this regularly, promise.',
+  },
+  'pwaReinstall.seeFullGuide': {
+    en: 'See the full install guide \u2192',
+    beanie: 'see the full install guide \u2192',
+  },
+  'pwaReinstall.dismiss': { en: 'Got It, Thanks', beanie: 'got it, thanks' },
 } satisfies Record<string, StringEntry>;
 
 /**
