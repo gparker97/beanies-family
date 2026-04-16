@@ -10,7 +10,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-16
 
+### Performance
+
+- **Self-hosted Outfit + Inter fonts** on the Astro marketing site using `@fontsource-variable` packages. Removed all Google Fonts third-party requests (`fonts.googleapis.com` + `fonts.gstatic.com`). Variable fonts with `unicode-range` mean browsers download only the latin subsets needed (~80KB per page vs 120+ KB previously across multiple round-trips). Privacy bonus: no request to Google on every page load
+- **Converted 26 brand/blog/help images to WebP** (siblings, originals kept for legacy URLs). Total savings: 2.96 MB across the site. The largest win: the main mascot dropped from 1.24 MB PNG to 113 KB WebP (−91%). Blog screenshots and PWA-install guide images also converted
+- **Lighthouse CI** now runs on every PR that touches `web/**`, `content/blog/**`, `content/guides/**`, or `packages/**`. Asserts performance ≥95, SEO ≥95, LCP ≤2.5s, CLS ≤0.1, TBT ≤200ms, script weight ≤30 KB/page. Blocks merges that regress perf
+
 ### Added
+
+- **Blog posts now render Byline, Breadcrumbs, and RelatedArticles** components. Every post has a linked "by greg" author byline pointing to `/about/greg`, a breadcrumb trail with BreadcrumbList JSON-LD, and a "further reading" section (3 same-category posts, or latest 3 if fewer). Help articles also gained BreadcrumbList JSON-LD. Optional `updatedDate` frontmatter field on blog posts is now supported — sets `dateModified` in BlogPosting JSON-LD when present
 
 - PWA re-install notice for users who installed the app **before** the Astro cutover (2026-04-14). Those users still have a home-screen icon pointing at the old apex origin — the Astro apex already redirects them to `app.beanies.family`, and now also flags the bounce with a query param so the Vue app shows a one-time dismissable modal explaining the situation, reassuring about data safety ("your family file, Drive sync, and password are untouched"), and walking through platform-specific re-install steps (iOS Safari Share menu, Android Chrome three-dot menu, desktop Chrome install icon). Dismiss persists in localStorage. Automatically clears when the user is detected running the new PWA at `app.beanies.family`. Plausible events `pwa_stale_detected`, `pwa_stale_dismissed`, `pwa_stale_install_clicked` track rollout impact. New reusable `noticeFlag(key)` utility (`src/utils/notice.ts`) for any future one-time-notice situations
 

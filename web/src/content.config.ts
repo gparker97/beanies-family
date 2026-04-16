@@ -18,6 +18,10 @@ const blog = defineCollection({
     excerpt: z.string(),
     featured: z.boolean().default(false),
     author: z.string().default('greg'),
+    /** Optional. Set when a post has been substantively edited after publish.
+     *  Byline renders "last updated" and BlogPosting JSON-LD uses it for
+     *  `dateModified`. If unset, JSON-LD falls back to the original `date`. */
+    updatedDate: z.coerce.date().optional(),
     /** When true, the entry is hidden from production builds (list pages,
      *  sitemap, RSS, direct URL). Visible in `npm run dev:web` so drafts
      *  can be iterated locally. See `isPublished()` in utils/content.ts. */

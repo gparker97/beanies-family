@@ -25,7 +25,7 @@ Even in its infancy, beanies has helped me organize my family life to a point wh
 
 Keeping in mind, vibe coding by yourself at 3am can potentially impact your judgement of how good an app is.
 
-![my real, live, actual beanies.family nook view right now](/blog/beanies-nook-screenshot.jpg)
+![my real, live, actual beanies.family nook view right now](/blog/beanies-nook-screenshot.webp)
 _my real, live, actual beanies.family nook view right now. well, not *right* now, but right now as of when i wrote this. roughly._
 
 Beanies started as a throwaway project (in fact, it wasn’t even called beanies at first - it actually had a way, way more boring name which I will never divulge) and morphed, through a combined 20 years of parental and financial pain and suffering, into an app I genuinely enjoy using. And there’s not too many apps (whether built by me or not) I can say that about.

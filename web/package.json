@@ -14,18 +14,21 @@
     "@astrojs/rss": "^4.0.11",
     "@astrojs/sitemap": "^3.4.0",
     "@beanies/brand": "*",
+    "@fontsource-variable/inter": "^5.2.8",
+    "@fontsource-variable/outfit": "^5.2.8",
     "@tailwindcss/vite": "^4.1.18",
     "astro": "^5.14.0",
     "astro-og-canvas": "^0.7.0",
     "astro-seo": "^0.8.4",
     "canvaskit-wasm": "^0.39.1",
     "minisearch": "^7.1.2",
-    "sharp": "^0.34.4",
     "tailwindcss": "^4.1.18",
     "web-vitals": "^5.0.2"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
+    "@lhci/cli": "^0.15.1",
+    "sharp": "^0.34.5",
     "typescript": "~5.9.3"
   }
 }

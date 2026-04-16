@@ -40,7 +40,12 @@
   --color-purple-400: #9b59b6;
   --color-purple-500: #8e44ad;
 
-  /* Fonts */
-  --font-outfit: 'Outfit', sans-serif;
-  --font-inter: 'Inter', system-ui, sans-serif;
+  /* Fonts
+     - "Outfit Variable" / "Inter Variable" are registered by the self-hosted
+       @fontsource-variable/* packages imported from each app's entry.
+     - Non-variable names kept as fallbacks for the Vue app (still on
+       Google Fonts in this PR scope) and for any environment where the
+       variable font hasn't loaded yet. */
+  --font-outfit: 'Outfit Variable', 'Outfit', sans-serif;
+  --font-inter: 'Inter Variable', 'Inter', system-ui, sans-serif;
 }
