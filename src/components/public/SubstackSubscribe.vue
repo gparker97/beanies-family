@@ -1,6 +1,6 @@
 <template>
   <div class="subscribe-strip">
-    <p class="subscribe-strip-heading">follow me here and get a new beanie blog every friday (well, usually)</p>
+    <p class="subscribe-strip-heading">follow me on substack for a new beanstalk post every friday (well, usually)</p>
     <div class="subscribe-strip-embed-wrap">
       <iframe
         src="https://gpbeanies.substack.com/embed"
