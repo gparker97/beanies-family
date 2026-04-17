@@ -95,11 +95,11 @@ jobs:
             --distribution-id ${{ vars.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
 
-      - name: Invalidate apex CloudFront cache (production only, post-cutover)
-        # Set APEX_CLOUDFRONT_DISTRIBUTION_ID as a repo variable AFTER the
-        # Phase C apex cutover (#167). Empty-string check makes this step
-        # a graceful no-op pre-cutover when the variable is unset.
-        if: ${{ inputs.target == 'production' && vars.APEX_CLOUDFRONT_DISTRIBUTION_ID != '' }}
+      - name: Invalidate apex CloudFront cache
+        # Both staging and production distributions serve from the same S3
+        # bucket, so always invalidate both. The empty-string check is a
+        # graceful no-op if the variable hasn't been set yet.
+        if: ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID }} \
