@@ -1,0 +1,96 @@
+---
+/**
+ * One-visit utility page: sets the `plausible_ignore` localStorage flag so
+ * the Plausible analytics script stops tracking this browser. Visit once per
+ * device/browser to exclude yourself from analytics.
+ *
+ * Not linked from navigation — access directly via /plausible-exclude.
+ * noindex so crawlers ignore it.
+ */
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>exclude me from analytics — beanies.family</title>
+    <style>
+      body {
+        align-items: center;
+        background: #f8f9fa;
+        color: #2c3e50;
+        display: flex;
+        font-family: 'Outfit', sans-serif;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        padding: 24px;
+        text-align: center;
+      }
+      .card {
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+        max-width: 400px;
+        padding: 40px 32px;
+      }
+      .emoji { font-size: 3rem; margin-bottom: 16px; }
+      h1 { font-size: 1.25rem; font-weight: 700; margin: 0 0 8px; }
+      p { color: #64748b; font-size: 0.875rem; line-height: 1.6; margin: 0 0 20px; }
+      .status {
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        padding: 12px 20px;
+      }
+      .status-done { background: rgb(39 174 96 / 10%); color: #27ae60; }
+      .status-already { background: rgb(174 214 241 / 20%); color: #2c3e50; }
+      a { color: #f15d22; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="emoji" id="emoji">🫘</div>
+      <h1 id="heading">checking...</h1>
+      <p id="message"></p>
+      <div class="status" id="status"></div>
+    </div>
+    <script is:inline>
+      (function () {
+        var emoji = document.getElementById('emoji');
+        var heading = document.getElementById('heading');
+        var message = document.getElementById('message');
+        var status = document.getElementById('status');
+        try {
+          var already = localStorage.getItem('plausible_ignore') === 'true';
+          if (already) {
+            emoji.textContent = '✅';
+            heading.textContent = 'already excluded';
+            message.textContent =
+              'this browser is already excluded from plausible analytics. nothing to do.';
+            status.textContent = 'plausible_ignore = true';
+            status.className = 'status status-already';
+          } else {
+            localStorage.setItem('plausible_ignore', 'true');
+            emoji.textContent = '🙈';
+            heading.textContent = 'done — you\u2019re excluded';
+            message.innerHTML =
+              'this browser will no longer be tracked by plausible. repeat on each device/browser you use. <a href="/">back to beanies.family</a>';
+            status.textContent = 'plausible_ignore set to true';
+            status.className = 'status status-done';
+          }
+        } catch (e) {
+          emoji.textContent = '⚠️';
+          heading.textContent = 'localStorage unavailable';
+          message.textContent =
+            'your browser blocked localStorage (private mode?). try from a normal browser window.';
+          status.textContent = 'could not set flag';
+          status.className = 'status status-already';
+        }
+      })();
+    </script>
+  </body>
+</html>
