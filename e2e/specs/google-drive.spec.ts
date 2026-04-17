@@ -4,13 +4,10 @@ import { ui } from '../helpers/ui-strings';
 
 test.describe('Google Drive Sync', () => {
   test('Google Drive text is visible on Load Pod view', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/welcome');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
-
-    // Click through homepage to WelcomeGate
-    await page.getByTestId('homepage-get-started').click();
+    await page.goto('/welcome');
 
     // Click "Load my pod" on welcome gate
     const loadButton = page.getByRole('button', { name: /load/i });
@@ -23,15 +20,22 @@ test.describe('Google Drive Sync', () => {
   });
 
   test('Google Drive option visible on Create Pod step 2', async ({ page }) => {
-    await page.goto('/');
+    // Kill the Vue app first so IndexedDB connections are released,
+    // then revisit the origin to clear databases while unblocked.
+    await page.goto('about:blank');
+    await page.goto('/welcome');
     const dbHelper = new IndexedDBHelper(page);
     await dbHelper.clearAllData();
-    await page.goto('/');
+    await page.evaluate(() => {
+      sessionStorage.clear();
+      localStorage.clear();
+    });
+    // Destroy the Vue app again, then re-enter clean
+    await page.goto('about:blank');
+    await page.goto('/welcome');
+    await page.waitForLoadState('networkidle');
 
-    // Click through homepage to WelcomeGate
-    await page.getByTestId('homepage-get-started').click();
-
-    // Set e2e_auto_auth before clicking create to bypass InviteGateOverlay
+    // Set e2e_auto_auth to bypass InviteGateOverlay
     await page.evaluate(() => {
       sessionStorage.setItem('e2e_auto_auth', 'true');
     });
