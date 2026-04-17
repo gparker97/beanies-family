@@ -148,7 +148,6 @@ const showLayout = computed(() => {
     'Welcome',
     'Login',
     'JoinFamily',
-    'Home',
     'BeanstalkBlog',
     'BeanstalkPost',
   ];
@@ -368,7 +367,6 @@ onMounted(async () => {
 
     // Fast path: skip heavy initialization for public-only pages
     const publicOnlyPages = [
-      'Home',
       'BeanstalkBlog',
       'BeanstalkPost',
       'HelpCenter',
@@ -421,16 +419,16 @@ onMounted(async () => {
       `auth: needsAuth=${authStore.needsAuth}, user=${authStore.currentUser?.email ?? 'none'}`
     );
 
-    // If not authenticated, redirect to login (unless already on login page)
+    // If not authenticated, redirect to the welcome/login gate (unless already on an auth page).
+    // The marketing homepage lives at beanies.family; app.beanies.family is always the app surface,
+    // so unauthenticated users land on /welcome and can sign in or create a pod from there.
     if (authStore.needsAuth) {
       // E2E auto-auth: restore from sessionStorage (dev mode only)
       if (!authStore.restoreE2EAuth()) {
-        const authPages: Array<string | undefined> = ['Welcome', 'Login', 'JoinFamily', 'Home'];
+        const authPages: Array<string | undefined> = ['Welcome', 'Login', 'JoinFamily'];
         if (!authPages.includes(route.name as string)) {
-          // No cached families → homepage; has families → welcome gate
-          const target = authStore.hasFamilies ? '/welcome' : '/home';
-          initBreadcrumbs.push(`auth: redirecting to ${target} (not authenticated)`);
-          router.replace(target);
+          initBreadcrumbs.push('auth: redirecting to /welcome (not authenticated)');
+          router.replace('/welcome');
         }
         return;
       }

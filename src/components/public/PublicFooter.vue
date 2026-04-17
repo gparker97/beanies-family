@@ -1,18 +1,10 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router';
 import { MARKETING_URL } from '@/utils/marketing';
 
-const route = useRoute();
-const emit = defineEmits<{ contact: [] }>();
-
 function handleContact() {
-  // If we're on the homepage, emit to open the contact modal
-  if (route.name === 'Home') {
-    emit('contact');
-  } else {
-    // Navigate to homepage with contact hash — homepage will open the modal
-    window.location.href = '/home#contact';
-  }
+  // Contact lives on the marketing site (beanies.family). The apex page reads
+  // window.location.hash === '#contact' on load and opens the modal.
+  window.location.href = `${MARKETING_URL}/#contact`;
 }
 </script>
 

@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { validateInviteToken } from '@/utils/inviteToken';
 import { isValidEmail } from '@/utils/email';
+import { MARKETING_URL } from '@/utils/marketing';
 
 const emit = defineEmits<{ unlocked: [] }>();
-const router = useRouter();
 const { t } = useTranslation();
+
+function goToMarketingHome() {
+  window.location.href = `${MARKETING_URL}/`;
+}
 
 type Mode = 'token' | 'request' | 'confirmed';
 const mode = ref<Mode>('token');
@@ -201,7 +204,7 @@ async function handleRequest() {
           <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">
             {{ t('inviteGate.confirmedDescription') }}
           </p>
-          <BaseButton variant="secondary" class="w-full" @click="router.push('/home')">
+          <BaseButton variant="secondary" class="w-full" @click="goToMarketingHome">
             {{ t('inviteGate.backToHome') }}
           </BaseButton>
         </div>

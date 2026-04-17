@@ -20,7 +20,7 @@ function openPost(slug: string) {
 }
 
 const navLinks = [
-  { label: 'home', href: '/home' },
+  { label: 'home', href: `${MARKETING_URL}/`, external: true },
   { label: 'beanstalk', href: '/blog' },
   { label: 'help', href: `${MARKETING_URL}/help`, external: true },
 ];
