@@ -24,10 +24,17 @@ const routes: RouteRecordRaw[] = [
     redirect: '/nook',
   },
   {
+    // /home lives on the marketing site (beanies.family). If anyone hits
+    // app.beanies.family/home, kick them over to the marketing apex. We
+    // don't use externalRedirect() here because we want to collapse /home
+    // onto the apex `/`, not preserve the /home suffix.
     path: '/home',
     name: 'Home',
-    component: () => import('@/pages/HomePage.vue'),
-    meta: { titleKey: 'app.name', requiresAuth: false },
+    beforeEnter() {
+      window.location.replace(`${MARKETING_URL}/`);
+    },
+    component: () => import('@/pages/NotFoundPage.vue'), // placeholder — never renders
+    meta: { requiresAuth: false },
   },
   {
     path: '/welcome',

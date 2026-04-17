@@ -11,6 +11,13 @@ export default defineConfig({
   build: {
     format: 'file',
   },
+  // Canonical homepage is the apex (beanies.family). Anyone hitting /home
+  // gets sent there. /welcome is an app-surface URL — kick it to the PWA so
+  // users who type beanies.family/welcome still land on the login gate.
+  redirects: {
+    '/home': '/',
+    '/welcome': 'https://app.beanies.family/welcome',
+  },
   integrations: [
     mdx(),
     sitemap({
