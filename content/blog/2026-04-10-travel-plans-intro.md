@@ -36,7 +36,7 @@ Build family (or personal - we're not judging) trips, collaborate on vacation id
 ![a real, actual trip i took with my son. not a simulation.](/blog/travel-plans-screenshot.webp)
 _a real, actual trip i took with my son. not a simulation._
 
-If you're a UI nerd like me, you might notice that the **travel plans** section on [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=travel-plans-intro) is the only place where we depart from the beanies.family theme colors, and that's not a mistake (well, it was at first, but now it's not). Vacations are a departure from your norm, and we display them that way. Your travel plans are special - so seeing them in a shade of blue or green you've never seen before across the site is a feature, _not_ a bug (let it be known).
+If you're a UI nerd like me, you might notice that the **travel plans** section on [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=travel-plans-intro) is the only place where we depart from the beanies.family theme, and that's not a mistake (well, it was at first, but now it's not). Vacations are a departure from your norm, and we display them that way. Your travel plans are special - so seeing them in a shade of blue or green you've never seen before across the site is a feature, _not_ a bug (let it be known).
 
 So check out **travel plans**, and the next time you're stressing out over planning for what is supposed to be your fun family outing, open up beanies.family, get your thoughts organized, and relax. Tentative plans, general ideas, un-booked flight segments - it's all good, just leave it here. We got you.
 
