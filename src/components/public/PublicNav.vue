@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { MARKETING_URL } from '@/utils/marketing';
 
 interface Props {
   /** Additional nav links beyond the defaults */
@@ -32,7 +33,7 @@ function handleLinkClick(link: { href: string; scrollTo?: boolean }) {
 
 <template>
   <nav ref="fnav" class="fnav">
-    <a href="/home" class="fnav-logo">
+    <a :href="`${MARKETING_URL}/`" class="fnav-logo">
       <img src="/brand/beanies_logo_transparent_logo_only_192x192.png" alt="" />beanies<span class="fnav-logo-orange">.family</span>
     </a>
     <div class="fnav-right">
