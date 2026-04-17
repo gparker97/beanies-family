@@ -1,7 +1,9 @@
 # Project Status
 
-> **Last updated:** 2026-04-16
-> **Updated by:** Claude (Four PRs today:
+> **Last updated:** 2026-04-17
+> **Updated by:** Claude (session covered: blog publishing, content authoring, infrastructure cleanup, architecture documentation, E2E fixes)
+>
+> **Previous update (2026-04-16):** Claude (Four PRs:
 >
 > (4) Epic #167 engineering cleanup — self-hosted Outfit + Inter fonts (fontsource variable, removed Google Fonts externals); 26 images converted PNG/JPG → WebP (2.96 MB saved, −91% on the main mascot); blog posts now render Byline/Breadcrumbs/RelatedArticles with BreadcrumbList JSON-LD; help articles get BreadcrumbList schema; optional `updatedDate` blog frontmatter; Lighthouse CI workflow added (gates perf ≥95, LCP ≤2.5s, CLS ≤0.1, TBT ≤200ms, JS ≤30KB/page on web/content PRs). Plan: `docs/plans/2026-04-16-epic-167-engineering-cleanup.md`.
 >
@@ -10,34 +12,33 @@
 
 ## Pending / Next Session
 
-**Content authoring (user is driving):**
+**Content authoring (greg is driving, Notion is source of truth):**
 
-- **Pillar #1 — "overwhelmed with family planning"** — greg has written the full guide in Notion (page `343247d9-a99f-8162-9b52-cb5c0f16f019`) in his own voice. Reviewed this session; strong material. Needs a merge pass to bring into `content/guides/overwhelmed-family-planning.md`: (a) add bold `**short answer:**` blocks at the top of every H2 (biggest AIO/GEO win, ~30 min mechanical extraction), (b) fix 5 typos (manager for _a_ job; psychologist; collapses _or_ obviates; breathe ×2; experiencing), (c) rewrite the one marketing-speak sentence about beanies.family into native voice, (d) reorder sections so partner-buy-in precedes red-flags, (e) add inline links (Fair Play book, buy-fruits blog post), (f) flip `draft: false`. Feedback fully captured in session transcript.
-- **Pillars 2-4** — Family Organization, Family Finance Basics, Local-first Family Tools — not started yet.
-- **Comparison posts** — beanies vs YNAB, beanies vs Actual Budget, beanies vs Copilot Money.
-- **Glossary + FAQ body** — scaffolded in repo with `DefinedTermSet` / `FAQPage` JSON-LD and hidden via `DraftPlaceholder`. Needs content per `web/src/pages/help/glossary.astro` + `faq.astro`.
+- **Pillar #1 — "overwhelmed with family planning"** — merged to repo with short-answer blocks, book links (Schulte + Rodsky), new sections, typo fixes. Still `draft: true`. Remaining Notion manual fixes: bold "short answer:" in each block, ~8 typos, book links, http→https, substack link. Review greg's voice edits before flipping to `draft: false`.
+- **Pillar #2 — "family organization"** — greg has written rough ideas/notes for all 9 H2 sections in Notion (page `343247d9-a99f-81cb-ae5b-e7e619ac91f8`). First H2 has draft body copy including Edwin Hutchins distributed cognition citation. Claude proposed full paragraphs for all 8 remaining sections (annotated `[PROPOSED — claude]:` in Notion). Greg to review voice, add personal details (math tutor story, kids' names, Oliver Burkeman citation check).
+- **Pillars 3-4** — Family Finance Basics, Local-first Family Tools — not started yet.
+- **Blog drafts reviewed** — 8 unpublished posts in Notion (from aloe vera memoir to vibe coding essay). Suggested publish order: cozi alternatives (Apr 24) → aloe vera (May 1) → beanies by your side → vibe coding (merge two drafts) → japan trip → overwhelmed spoke.
+- **Comparison posts** — cozi & maple alternatives post nearly ready (In Review status, Apr 24 target). beanies vs YNAB, Actual Budget, Copilot Money still planned.
+- **Glossary + FAQ body** — scaffolded in repo, hidden via DraftPlaceholder. Needs content.
 
 **Engineering follow-ups:**
 
-- **Lighthouse CI first real run** will fire on the next PR that touches `web/`, `content/blog/`, `content/guides/`, or `packages/`. If the assertions fail (performance ≥95, LCP ≤2.5s, CLS ≤0.1, TBT ≤200ms, script ≤30KB/page), tune then. Local WSL Chrome can't validate the config; the workflow is the real test.
-- **Vue app fonts still on Google Fonts** (`index.html`). Astro is self-hosted. If we want parity + privacy parity, import `@fontsource-variable/*` in Vue too. Out of scope for #167 cleanup (Vue app is authenticated, not indexed).
+- **Terraform apply needed** — staging distribution removal plan validated (`staging-removal.plan`). Run: `cd ~/projects/beanies-family/infrastructure && terraform apply -var-file=environments/prod.tfvars staging-removal.plan`. Destroys 7 staging-only resources (CloudFront dist, ACM cert, DNS records, noindex policy). No production impact.
+- **Lighthouse CI first real run** — fires on next PR touching `web/`. May need perf tuning if assertions fail.
+- **Vue app fonts still on Google Fonts** (`index.html`). Out of scope for #167.
+- **Dependabot `tmp` vulnerability** — transitive dep in `@lhci/cli`. Not actionable; resolves when `@lhci/cli` updates.
 
 **External ops (outside repo, user actions):**
 
 - Google Search Console — verify property + submit sitemap
 - Bing Webmaster — verify property + submit sitemap
-- Otterly.ai — subscribe + configure 20 tracked prompts (AI-citation visibility tracking)
-- Wikidata — notability assessment, submit entry if viable
-- Directory listings — AlternativeTo, SaaSHub, PrivacyTools.io, etc.
-- YouTube demo video + transcript
-- Show HN post (timing-sensitive; pair with a milestone)
-- GoAccess monthly CloudFront-log report (schedule automation later)
+- Otterly.ai — subscribe + configure 20 tracked prompts
+- Wikidata, directory listings, YouTube demo, Show HN — all pending
 
-**Flaky E2E tests** (logged in `docs/E2E_HEALTH.md`, currently passing on retry):
+**E2E tests:**
 
-- `cross-entity.spec.ts:81` — Account Institution Combobox (2+ flakes this week; candidate for hardening)
-- `cross-entity.spec.ts:333` — Loan & Activity recurring monthly fee (2+ flakes this week; candidate for hardening)
-- `financial-data.spec.ts` + `google-drive.spec.ts` step-2 — occasional flakes
+- `google-drive.spec.ts` — fixed (was broken by HomePage.vue deletion). Both tests now pass with `about:blank` state reset pattern.
+- `cross-entity.spec.ts:81` + `:333` — still flaky candidates for hardening
 
 ## Current Phase
 

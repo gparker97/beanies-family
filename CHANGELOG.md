@@ -8,6 +8,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-17
+
+### Added
+
+- **New blog post: "buy fruit"** — greg's personal story about the moment his wife assigned him a "buy fruit" todo. Published at `/blog/buy-fruit` with screenshot (WebP, 118KB). Cross-linked from the overwhelmed guide's relatedPosts and inline "buy fruit" mention
+- **Substack link** on greg's `/about/greg` bio page in the "find me elsewhere" section
+
+### Changed
+
+- **Overwhelmed guide updated** — merged Notion draft with new content: Brigid Schulte _Overwhelmed_ book reference (time confetti concept), new "5 minutes further" reset section, bold `**short answer:**` blocks at all 11 H2s for AIO/GEO extraction, book links to fairplaylife.com + brigidschulte.com
+- **Greg bio rewritten** by greg in his own voice — updated copy, fixed typos
+- **Travel plans blog** — replaced screenshot (redacted email), minor copy edits
+- **MVO architecture pattern** documented across CLAUDE.md, docs/ARCHITECTURE.md, and GitHub wiki. beanies.family follows Model/View/Orchestrator, not MVC — this now drives all architecture and coding decisions
+
+### Fixed
+
+- **Blog index** now shows new posts immediately — removed stale "introducing todos" coming-soon card, fixed CloudFront cache invalidation (was gated on staging/production target; now always invalidates apex distribution)
+- **E2E tests** updated for `/welcome` routing after HomePage.vue deletion — removed dead `homepage-get-started` references, fixed state leakage in google-drive spec with `about:blank` teardown pattern
+
+### Removed
+
+- **Staging infrastructure** cleaned up — removed `staging.beanies.family` CloudFront distribution, ACM cert, Route53 DNS records, and noindex response-headers policy from Terraform. Deleted `WEB_CLOUDFRONT_DISTRIBUTION_ID` GitHub variable. Deploy workflow simplified: no more staging/production dropdown, all deploys go to production
+
+---
+
 ## 2026-04-16
 
 ### Performance
