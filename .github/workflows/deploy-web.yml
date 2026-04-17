@@ -1,21 +1,10 @@
 name: Deploy web (Astro marketing site)
 
-# Manual-only for Phase A. After the apex cutover (Phase C), we may wire
-# this to main-branch pushes that touch web/ or packages/brand. Keeping it
-# manual for now matches the Vue deploy workflow pattern and keeps full
-# control of production cut-overs in human hands.
+# Deploys the Astro marketing site to production. Builds, syncs to S3,
+# invalidates the apex CloudFront distribution, and pings IndexNow.
 
 on:
   workflow_dispatch:
-    inputs:
-      target:
-        description: 'Deployment target'
-        required: true
-        type: choice
-        default: 'staging'
-        options:
-          - staging
-          - production
 
 permissions:
   contents: read
@@ -44,10 +33,6 @@ jobs:
         run: npm ci
 
       - name: Build Astro site
-        # PUBLIC_* env vars are inlined by Vite/Astro at build time and shipped
-        # to the browser. Webhook URLs ARE sensitive (anyone with the URL can
-        # POST to it), so keep this one as a GitHub secret — same pattern the
-        # Vue deploy uses for VITE_CONTACT_WEBHOOK_URL.
         env:
           PUBLIC_CONTACT_WEBHOOK_URL: ${{ secrets.CONTACT_WEBHOOK_URL }}
         run: npm --workspace=@beanies/web run build
@@ -60,7 +45,7 @@ jobs:
           retention-days: 1
 
   deploy:
-    name: Deploy to ${{ inputs.target }}
+    name: Deploy to production
     needs: build
     runs-on: ubuntu-latest
 
@@ -79,39 +64,18 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy to S3
-        # WEB_S3_BUCKET is a repository variable (not a secret) — bucket names
-        # are not sensitive and keeping them as vars means they can be viewed
-        # and edited from the GitHub UI without rotating.
         run: aws s3 sync web/dist/ s3://${{ vars.WEB_S3_BUCKET }} --delete
 
-      - name: Invalidate staging CloudFront cache
-        # WEB_CLOUDFRONT_DISTRIBUTION_ID is a repository variable for the same
-        # reason — distribution IDs are not sensitive.
-        # Always invalidated because both staging and production deploys
-        # update the same Astro S3 bucket, and the staging distribution
-        # serves from it.
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id ${{ vars.WEB_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
-
-      - name: Invalidate apex CloudFront cache
-        # Both staging and production distributions serve from the same S3
-        # bucket, so always invalidate both. The empty-string check is a
-        # graceful no-op if the variable hasn't been set yet.
-        if: ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID != '' }}
+      - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID }} \
             --paths "/*"
 
-      - name: Ping IndexNow (production only)
-        if: ${{ inputs.target == 'production' }}
+      - name: Ping IndexNow
         env:
           INDEXNOW_KEY: e7a3f2b1c9d4487895612d0a4f8b3e67
         run: |
-          # Fire-and-forget notify to Bing/Yandex. No auth required beyond
-          # the key file being hosted at /<key>.txt on the site.
           curl -sS -X POST https://api.indexnow.org/indexnow \
             -H "Content-Type: application/json" \
             -d "$(cat <<EOF
