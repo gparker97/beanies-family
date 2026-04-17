@@ -6,6 +6,18 @@
 
 beanies.family is a **local-first, single-page application** (SPA) built with Vue 3. All family data lives in an **Automerge CRDT document** (in memory), encrypted with a per-family AES-256-GCM key and persisted to both a local IndexedDB cache and a cloud `.beanpod` V4 file. Authentication uses the family key model — each member's password (or passkey PRF) unwraps the shared family key via AES-KW.
 
+### Architecture Pattern: MVO (Model / View / Orchestrator)
+
+The app follows the **MVO** pattern — not MVC. The distinction matters because Pinia stores and composables do far more than traditional controllers: they orchestrate multi-step async workflows across the CRDT layer, encryption, IndexedDB persistence, Google Drive sync, and UI state.
+
+| Layer            | Implementation                                                                 | Responsibility                                                                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Model**        | Automerge CRDT document (source of truth) + Pinia stores (reactive projection) | Hold and mutate data. The Automerge doc is the durable model; stores expose reactive computed state derived from it.                                                                                                   |
+| **View**         | Vue 3 components (`src/pages/`, `src/components/`)                             | Render state reactively and emit user intents. Views never call services or repositories directly — they always go through stores.                                                                                     |
+| **Orchestrator** | Pinia stores (`src/stores/`) + composables (`src/composables/`)                | Coordinate workflows: user action → CRDT mutation → bump `docVersion` → trigger persistence (IndexedDB) → trigger sync (Drive). Handle error recovery, retry logic, conflict resolution, and cross-store coordination. |
+
+Vue's reactivity system means views subscribe to state directly — there is no controller explicitly pushing data to the view. This is the defining characteristic of MVO over MVC: the orchestrator manages _workflows_, not _request/response cycles_.
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                         Browser                              │
