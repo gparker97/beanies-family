@@ -13,14 +13,8 @@ variable "hosted_zone_id" {
   type        = string
 }
 
-variable "staging_subdomain" {
-  description = "Subdomain used for Astro staging deploys pre-cutover. After the apex cutover this distribution becomes the apex distribution (aliases are updated at that time)."
-  type        = string
-  default     = "staging"
-}
-
 variable "additional_distribution_arns" {
-  description = "Extra CloudFront distribution ARNs that may read from this module's S3 bucket via OAC. Used during Phase C cutover to let the apex distribution serve the Astro build from this bucket."
+  description = "CloudFront distribution ARNs that may read from this module's S3 bucket via OAC (e.g. the apex distribution)."
   type        = list(string)
   default     = []
 }

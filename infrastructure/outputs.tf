@@ -32,21 +32,11 @@ output "app_subdomain_url" {
   value       = "https://${module.app_subdomain.fqdn}"
 }
 
-# ── web (Astro) outputs (added 2026-04-14 for #167, Phase A) ─────────────────
+# ── web (Astro) outputs ──────────────────────────────────────────────────────
 
 output "web_s3_bucket_name" {
   description = "S3 bucket for the Astro marketing site build (used by deploy-web workflow)"
   value       = module.web.s3_bucket_name
-}
-
-output "web_distribution_id" {
-  description = "CloudFront distribution ID serving the Astro build"
-  value       = module.web.cloudfront_distribution_id
-}
-
-output "web_staging_url" {
-  description = "Astro staging URL (pre-cutover)"
-  value       = "https://${module.web.staging_fqdn}"
 }
 
 # ── Registry outputs ──────────────────────────────────────────────────────────
