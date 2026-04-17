@@ -47,6 +47,18 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **Theme skill:** `.claude/skills/beanies-theme/SKILL.md` — consult for all UI copy and component design
 - **Typography standard:** Six-level scale from Display (`text-3xl`/`text-4xl`) to Caption (`text-xs`). Minimum 12px. Standard Tailwind classes only — no custom `text-[X.Xrem]`. See theme skill for full spec.
 
+## Architecture Pattern: MVO (Model / View / Orchestrator)
+
+beanies.family follows the **MVO** pattern, not MVC. This distinction drives all architecture and coding decisions.
+
+| Layer            | Maps to                                                         | Role                                                                                                                                                                                                                                                                          |
+| ---------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Model**        | Automerge CRDT document + Pinia stores                          | Automerge is the source of truth; Pinia stores are the reactive projection. Stores expose computed state and mutations.                                                                                                                                                       |
+| **View**         | Vue 3 components (`src/pages/`, `src/components/`)              | Bind reactively to store state and emit events. Views never talk to services or the data layer directly — always go through stores.                                                                                                                                           |
+| **Orchestrator** | Pinia stores (`src/stores/`) + composables (`src/composables/`) | Coordinate multi-step workflows across subsystems: CRDT mutations → encryption → IndexedDB persistence → Google Drive sync. This is more than a thin MVC controller — orchestrators manage complex async workflows with error handling, retry logic, and conflict resolution. |
+
+**Key distinction from MVC:** Vue's reactivity means views subscribe to state directly — no controller pushes data to the view. Stores _orchestrate_ workflows, they don't merely _control_ request/response cycles. When adding new features, follow this pattern: views read reactive state, emit user intents, and stores orchestrate the resulting data flow across all subsystems.
+
 ## Technology Stack
 
 - **Framework**: Vue 3.5+ (Composition API)
@@ -483,6 +495,7 @@ E2E tests live in `e2e/specs/` and cover **critical user journeys only**. See `d
 ## Notes for AI Assistants
 
 - This is a Phase 1 MVP - prioritize core functionality
+- **MVO pattern**: The app is MVO (Model/View/Orchestrator), not MVC. Views read reactive state and emit intents. Stores orchestrate workflows (CRDT → encrypt → persist → sync). Never put orchestration logic in components, and never let views call services directly. See the "Architecture Pattern" section above.
 - All data operations go through Pinia stores -> Automerge repositories
 - Use existing UI components from `src/components/ui/`
 - **UI theme**: Always read `.claude/skills/beanies-theme/SKILL.md` before any UI work. Use the three-tier modal system (BaseModal/BeanieFormModal/ConfirmModal). Use brand colors, squircle corners, and Outfit/Inter typography. Never use Alert Red — Heritage Orange is the alert color. Follow the typography standard (six levels: Display/Page Title/Section Title/Item Title/Body/Caption). Never use custom `text-[X.Xrem]` sizes — only standard Tailwind classes (`text-xs` through `text-4xl`). Minimum font size is `text-xs` (12px).
