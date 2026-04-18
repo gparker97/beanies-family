@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-18
+
+### Added
+
+- **Plan: general photo attachment capability** — reusable foundation for attaching photos across entities (activities, family members, etc.). Photos stored unencrypted in the shared `beanies.family` Drive folder (inherits `.beanpod`'s share model), referenced by Drive file ID in Automerge. Thumbnails + full-size via Drive's CDN `thumbnailLink`. Missing-photo UX (Replace / Remove). Tombstones + GC sweep. See `docs/plans/2026-04-18-photos-general-capability.md`
+
+---
+
 ## 2026-04-17
 
 ### Added
