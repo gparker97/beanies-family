@@ -49,7 +49,15 @@ function startGraceTimer() {
   graceTimer = setTimeout(() => {
     readyToAutoUpdate.value = true;
     // Install a route guard that triggers the update on next navigation
-    removeRouteGuard = router.beforeEach((_to, _from, next) => {
+    removeRouteGuard = router.beforeEach((to, _from, next) => {
+      // Persist the user's intended destination so App.vue can resume there
+      // after the hard reload — otherwise the reload returns the user to the
+      // page they were already on and the click appears to do nothing.
+      try {
+        sessionStorage.setItem('pwa-post-update-route', to.fullPath);
+      } catch {
+        /* sessionStorage unavailable (private mode) — degrade gracefully */
+      }
       // Trigger update — the page will reload
       performUpdate();
       // Don't call next() — the reload will handle navigation
