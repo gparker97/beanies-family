@@ -1,6 +1,6 @@
 ---
 name: start-of-day
-description: First-thing-in-the-morning ritual — sync the repo, surface project status, deliver a warm/silly/motivational good morning, and lay out today's pending work so you start the day knowing exactly what's in front of you
+description: First-thing-in-the-morning ritual — sync the repo, surface project status, fetch top news + today's calendar, and lay out today's pending work so you start the day knowing exactly what's in front of you
 ---
 
 # start-of-day — Morning Ritual
@@ -13,7 +13,7 @@ This skill is the bookend to `/end-of-day`: end-of-day captures yesterday's stat
 
 ## When to Invoke
 
-- **Via slash command**: `/start-of-day`
+- **Via slash command**: `/start-of-day` or `/good-morning` (both invoke this same skill — `good-morning` is a symlink wrapper)
 - **Proactively**: When the user says "good morning", "morning", "ready to start", "let's go", "what's on for today" or similar at the start of a session
 - Always recommend running it if it's a new calendar day since the last activity in the conversation
 
@@ -68,25 +68,37 @@ Surface anything that's actively waiting:
    ```
 5. Any deferred runbooks (e.g. `docs/runbooks/cutover-*.md`) that mention "scheduled" or "tomorrow"
 
-### Step 4: Compose the morning report
+### Step 4: Fetch news headlines
+
+Surface 1–2 major news stories from the last 24 hours. Use `WebSearch` with a query like `"top news today"` or `"major news headlines [today's date]"`. Pick stories that are genuinely top-of-the-news — world events, major tech/AI announcements, market moves. Skip clickbait, sports, celebrity gossip.
+
+For each story: one short line — headline + a 5-10 word context phrase. No links unless the source is canonical (Reuters, AP, official press release).
+
+If the search returns nothing useful, skip this section silently — don't pad with filler.
+
+### Step 5: Fetch today's calendar
+
+Pull today's Google Calendar events:
+
+1. **Check if Google Calendar MCP is available**: look for `mcp__claude_ai_Google_Calendar__*` tools beyond just `authenticate`/`complete_authentication`. If only the auth tools exist, the user hasn't completed authentication yet — note this gracefully ("calendar not connected — run `/mcp` to authenticate") and skip the section.
+2. **If authenticated**: fetch today's events (start of day → end of day, primary calendar). For each event: time + title, one line. Skip declined events.
+3. If there are no events today: "calendar clear — no events today."
+
+### Step 6: Compose the morning report
 
 Deliver a single message that combines:
 
 #### a) Good morning greeting
 
-A warm, fun, silly, or motivational one-liner. **Vary it every time** — never reuse yesterday's. Keep it short (one or two sentences). Match Greg's lowercase brand voice.
+One direct, low-key line. Greg is reading this with their first cup of coffee — keep it brief and easy to parse. No silly language, no metaphors, no emoji-heavy openings, no absurdist humor. A simple "Good morning, Greg." is fine. Optionally add one short factual context phrase tied to the day (date, weather if known, what shipped yesterday) — but only if it adds real signal.
 
-Examples (rotate these and invent new ones):
+Examples of the right tone:
 
-- "good morning, greg! ☕ the beanies are stretching, the apex is humming, and your terraform plan is purring like a contented capybara. let's count some beans."
-- "morning! 🫘 today is brought to you by the letter 'A' for Astro and the number 13 (your real users — not a typo, a milestone)."
-- "rise and shine, founder of focal points! the staging site is ready, the apex cutover is one terraform apply away, and somewhere in singapore an EC2 box is rooting for you."
-- "good morning! 🌅 yesterday past-greg shipped 19 commits and didn't break prod. today-greg has a low bar to clear. take it easy."
-- "morning, greg. small reminder from the universe: cutover days have a way of becoming Big Days. coffee first, then terraform."
-- "🫘 every bean counts, including the bean of getting out of bed. you did it. ten points to gryffindor."
-- "good morning! the registry table is clean, the cors headers are friendly, the OAuth lambda knows your name. the simulation is ready when you are."
+- "Good morning, Greg. Saturday, April 18."
+- "Good morning. Repo synced, nothing in flight."
+- "Morning, Greg. Yesterday shipped the buy-fruit post and the staging teardown plan."
 
-Tone: warm, lowercase, occasionally absurd. Never preachy or motivational-poster cringe. The aim is to make the user smile, not to sell them anything.
+Avoid: stacked metaphors, emoji clusters, "the beanies are stretching", "rise and shine", motivational-poster phrasing.
 
 #### b) Today's pending work — brief, actionable
 
@@ -122,12 +134,21 @@ Format example:
 
 ## Output Format
 
-Deliver as a single message. No headers, no sections — just three short paragraphs that flow naturally:
+Deliver as a single scannable message. Use bold section labels so Greg can jump to whichever section matters first. Aim for the whole thing to fit on one screen.
 
 ```
-[greeting line]
+[greeting line — one sentence]
 
 **State:** [one-liner about repo + overnight changes + key context from STATUS]
+
+**News:**
+- [Headline 1 + 5-10 word context]
+- [Headline 2 + 5-10 word context]
+
+**Today's calendar:**
+- [HH:MM] [event title]
+- [HH:MM] [event title]
+(or: "calendar clear" / "calendar not connected — run `/mcp` to authenticate")
 
 **Today's pending work:**
 - **[Verb]** [item 1]
@@ -136,7 +157,7 @@ Deliver as a single message. No headers, no sections — just three short paragr
 [etc — max 7 items]
 ```
 
-Aim for the whole message to fit comfortably on one screen. Greg is reading this with their first cup of coffee — don't overwhelm.
+Order matters: greeting → state → news → calendar → pending work. State and pending work are repo-driven and always present. News and calendar are best-effort — skip silently if unavailable.
 
 ---
 
@@ -144,9 +165,9 @@ Aim for the whole message to fit comfortably on one screen. Greg is reading this
 
 - **Always sync first.** No skipping `git fetch + pull`. Stale repos cause stale advice.
 - **Never auto-resolve unexpected git state.** Dirty working tree, diverged branches, conflicts — stop and ask.
-- **Vary the greeting.** Rotate tone (silly, warm, motivational, absurd) and content. Read the room — if Greg said "exhausted yesterday" in `/end-of-day`, today's greeting leans gentle.
+- **Greeting stays direct.** No silly metaphors, no emoji clusters, no absurdist humor. One short factual line. Reading-this-with-coffee tone, not stand-up-routine tone.
 - **Keep pending work crisp.** No essays. The user should be able to pick the next action in under 10 seconds of reading.
 - **Don't moralize.** No "remember to take breaks" lectures. Greg is an adult.
 - **Skip the launch dashboard.** That's `/launch-status`'s job. Mention it as "run /launch-status if you want today's launch metrics" only if the most recent STATUS update is launch-relevant.
-- **Be honest about empty days.** If nothing's pending, say so — don't invent busywork.
-- **Match brand voice.** lowercase, friendly, never corporate. "every bean counts" energy.
+- **Be honest about empty sections.** If nothing's pending, say so. If calendar isn't connected, say so. No filler.
+- **News stays real.** 1-2 genuinely top stories from the last 24 hours. No clickbait, no padding. Skip the section if WebSearch returns nothing useful.
