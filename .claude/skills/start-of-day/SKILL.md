@@ -78,11 +78,18 @@ If the search returns nothing useful, skip this section silently — don't pad w
 
 ### Step 5: Fetch today's calendar
 
-Pull today's Google Calendar events:
+Pull today's Google Calendar events from **both** of Greg's accounts. Query them in parallel (single message, two `list_events` calls):
 
-1. **Check if Google Calendar MCP is available**: look for `mcp__claude_ai_Google_Calendar__*` tools beyond just `authenticate`/`complete_authentication`. If only the auth tools exist, the user hasn't completed authentication yet — note this gracefully ("calendar not connected — run `/mcp` to authenticate") and skip the section.
-2. **If authenticated**: fetch today's events (start of day → end of day, primary calendar). For each event: time + title, one line. Skip declined events.
-3. If there are no events today: "calendar clear — no events today."
+1. **Personal/family calendar** — `calendarId: gregsophia@gmail.com` (query this **first**; usually has the day's family logistics — kids' lessons, sports, appointments)
+2. **Work calendar** — `calendarId: greg@grobrix.com`
+
+For both: pass `startTime` and `endTime` as today's local-day window in `Asia/Singapore` (e.g. `2026-04-18T00:00:00+08:00` → `2026-04-18T23:59:59+08:00`), `orderBy: startTime`, `timeZone: Asia/Singapore`.
+
+**Output format:** a single combined "Today's calendar" list, with `gregsophia` events first, then `grobrix` events. For each event: `HH:MM — title (location, if present and short)`. Skip declined events. Tag each line with `[family]` or `[work]` only if there's ambiguity; usually the context is obvious.
+
+**MCP availability check:** if `mcp__claude_ai_Google_Calendar__list_events` isn't available, the MCP isn't connected — note "calendar not connected — run `/mcp` to authenticate" and skip the section.
+
+**Empty days:** if both calendars return zero events, write "calendar clear — no events today."
 
 ### Step 6: Compose the morning report
 
