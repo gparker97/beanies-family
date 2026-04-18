@@ -363,6 +363,21 @@ onMounted(async () => {
   try {
     // Ensure initial route is resolved before checking route names
     await router.isReady();
+
+    // Resume navigation after a PWA hard-reload. UpdatePrompt's route guard
+    // saves the user's intended destination before triggering the reload —
+    // restore it now so the click that triggered the update isn't lost.
+    // Done before auth checks so existing redirects (e.g. unauth → /welcome)
+    // still apply naturally to the resumed route.
+    const postUpdatePath = sessionStorage.getItem('pwa-post-update-route');
+    if (postUpdatePath) {
+      sessionStorage.removeItem('pwa-post-update-route');
+      if (postUpdatePath !== route.fullPath) {
+        initBreadcrumbs.push(`pwa-resume: navigating to ${postUpdatePath}`);
+        await router.replace(postUpdatePath);
+      }
+    }
+
     initBreadcrumbs.push(`route: ${String(route.name ?? route.path)}`);
 
     // Fast path: skip heavy initialization for public-only pages
