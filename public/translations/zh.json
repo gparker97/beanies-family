@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2248
+    "translationCount": 2273
   },
   "translations": {
     "app.name": {
@@ -6712,9 +6712,9 @@
       "lastUpdated": "2026-03-08"
     },
     "family.hub.addBean": {
-      "translation": "+添加一个豆豆",
-      "hash": "ij0ie7",
-      "lastUpdated": "2026-03-09"
+      "translation": "添加Bean",
+      "hash": "kctipd",
+      "lastUpdated": "2026-04-19"
     },
     "family.hub.familyStats": {
       "translation": "家庭统计数据",
@@ -11244,6 +11244,131 @@
     "scrapbook.loadMore": {
       "translation": "加载更多",
       "hash": "fvfsnl",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.kicker": {
+      "translation": "The Pod ·家庭剪贴簿",
+      "hash": "oza6y7",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.stats.summary": {
+      "translation": "{beans}豆类· {favorites}收藏夹· {sayings}谚语· {recipes}食谱· {meds}活性药物· {allergies}过敏",
+      "hash": "955rlb",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.inviteBean": {
+      "translation": "邀请Bean",
+      "hash": "1q8cbr",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.recentSayings": {
+      "translation": "最近的家庭谚语 💬",
+      "hash": "9357be",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.recentSayings.viewAll": {
+      "translation": "查看全部",
+      "hash": "bdkl2e",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.recentSayings.empty": {
+      "translation": "记下几句话，它们就会出现在这里。",
+      "hash": "xwk7hu",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.cookbook.title": {
+      "translation": "秘密家庭食谱",
+      "hash": "3jo9x5",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.cookbook.sub": {
+      "translation": "嘘……别告诉任何人 🤫",
+      "hash": "f3prq5",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.cookbook.open": {
+      "translation": "打开烹饪书 →",
+      "hash": "arxo0p",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.cookbook.add": {
+      "translation": "添加新食谱",
+      "hash": "c6xlhw",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.cookbook.noPhoto": {
+      "translation": "无照片",
+      "hash": "efsswr",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.sidebar.allergies": {
+      "translation": "注意—过敏",
+      "hash": "ayaqfu",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.sidebar.todaysCare": {
+      "translation": "今日护理",
+      "hash": "qzbq9o",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.sidebar.noAllergies": {
+      "translation": "全家没有过敏记录。",
+      "hash": "t6qirm",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.sidebar.noMeds": {
+      "translation": "全家没有活性药物。",
+      "hash": "2238y7",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.fave": {
+      "translation": "Fave",
+      "hash": "1arwq",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.latestSaying": {
+      "translation": "最新说法",
+      "hash": "p7b5u8",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.headsUp": {
+      "translation": "单挑",
+      "hash": "hdb254",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.care": {
+      "translation": "照顾家庭成员",
+      "hash": "18uup",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.noteLabel": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.allergy": {
+      "translation": "过敏",
+      "hash": "f2rqf4",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.allergies": {
+      "translation": "allergies",
+      "hash": "1cmo7y",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.med": {
+      "translation": "med",
+      "hash": "2bbg",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.meds": {
+      "translation": "药",
+      "hash": "1zqxz",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.card.view": {
+      "translation": "查看 %{name}",
+      "hash": "u52ag4",
       "lastUpdated": "2026-04-19"
     }
   }
