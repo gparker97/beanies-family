@@ -108,6 +108,16 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.pod', requiresAuth: true },
   },
   {
+    path: '/pod/:memberId([0-9a-f-]{36})',
+    redirect: (to) => `/pod/${to.params.memberId as string}/overview`,
+  },
+  {
+    path: '/pod/:memberId([0-9a-f-]{36})/:tab(overview|favorites|sayings|allergies|medications|notes)',
+    name: 'BeanDetail',
+    component: () => import('@/pages/BeanDetailPage.vue'),
+    meta: { titleKey: 'bean.detail.title', requiresAuth: true },
+  },
+  {
     path: '/pod/scrapbook',
     redirect: '/pod',
   },
