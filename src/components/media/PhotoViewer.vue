@@ -66,9 +66,11 @@ async function resolve(): Promise<void> {
   loading.value = true;
   fullUrl.value = null;
   try {
-    fullUrl.value = await store.getImageUrl(currentPhotoId.value, 'full');
+    // Blob-download path — see PhotoThumbnail for why we're off
+    // thumbnailLink for avatars / bottle photos / recipe photos.
+    fullUrl.value = await store.getBlobUrl(currentPhotoId.value);
   } catch (e) {
-    console.warn('[PhotoViewer] getImageUrl failed', e);
+    console.warn('[PhotoViewer] getBlobUrl failed', e);
   } finally {
     loading.value = false;
   }

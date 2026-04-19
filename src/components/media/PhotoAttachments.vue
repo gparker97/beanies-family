@@ -43,7 +43,7 @@ const emit = defineEmits<{ 'update:photoIds': [ids: UUID[]] }>();
 
 const { t } = useTranslation();
 
-const { photos, pending, canAdd, atCap, add, remove } = usePhotos({
+const { photos, pending, canAdd, atCap, uploading, add, remove } = usePhotos({
   collection: props.collection,
   entityId: computed(() => props.entityId),
   photoIds: computed(() => props.photoIds),
@@ -120,6 +120,13 @@ defineExpose({
       <PhotoThumbnail
         v-for="entry in pending"
         :key="entry.id"
+        :pending-label="t('photos.uploading')"
+      />
+      <!-- In-flight online uploads — one spinner tile per upload so
+           the user sees the compress + Drive round-trip as it happens. -->
+      <PhotoThumbnail
+        v-for="n in uploading"
+        :key="`uploading-${n}`"
         :pending-label="t('photos.uploading')"
       />
       <button
