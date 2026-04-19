@@ -3929,6 +3929,56 @@ const STRING_DEFS = {
     beanie: 'see the full install guide \u2192',
   },
   'pwaReinstall.dismiss': { en: 'Got It, Thanks', beanie: 'got it, thanks' },
+
+  // Photo attachments — reusable across activities, family members, todos, etc.
+  'photos.addPhoto': { en: 'Add Photo', beanie: 'add photo' },
+  'photos.addPhotos': { en: 'Add Photos', beanie: 'add photos' },
+  'photos.noPhotos': { en: 'No photos yet', beanie: 'no photos yet' },
+  'photos.uploading': { en: 'Uploading…', beanie: 'counting beans\u2026' },
+  'photos.uploadFailed': {
+    en: "Couldn't upload photo. Please try again.",
+    beanie: "couldn't upload photo. please try again.",
+  },
+  'photos.queuedOffline': {
+    en: "You're offline. Photo will upload when you're back online.",
+    beanie: "you're offline. photo will upload when you're back online.",
+  },
+  'photos.queueAtCap': {
+    en: 'A lot of photos are waiting to upload. Reconnect soon.',
+    beanie: 'a lot of photos are waiting to upload. reconnect soon.',
+  },
+  'photos.cloudRequired': {
+    en: 'Photos need cloud sync. Turn on Google Drive in Settings.',
+    beanie: 'photos need cloud sync. turn on google drive in settings.',
+  },
+  'photos.heicUnsupported': {
+    en: "This browser can't read HEIC photos. Try a JPEG or PNG.",
+    beanie: "this browser can't read heic photos. try a jpeg or png.",
+  },
+  'photos.maxReached': { en: 'Up to 4 photos per item', beanie: 'up to 4 photos per item' },
+  'photos.invalidType': {
+    en: 'Only JPEG, PNG, and HEIC photos are supported.',
+    beanie: 'only jpeg, png, and heic photos are supported.',
+  },
+  'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
+  'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
+  'photos.missing.title': { en: "We Can't Find This Photo", beanie: "we can't find this photo" },
+  'photos.missing.body': {
+    en: "It may have been moved, deleted, or you don't have access anymore.",
+    beanie: "it may have been moved, deleted, or you don't have access anymore.",
+  },
+  'photos.replace': { en: 'Replace', beanie: 'replace' },
+  'photos.remove': { en: 'Remove', beanie: 'remove' },
+  'photos.deleteConfirm.title': { en: 'Remove This Photo?', beanie: 'remove this photo?' },
+  'photos.deleteConfirm.body': {
+    en: "It'll be cleaned up on everyone's device.",
+    beanie: "it'll be cleaned up on everyone's device.",
+  },
+  'photos.download': { en: 'Download', beanie: 'download' },
+  'photos.next': { en: 'Next photo', beanie: 'next photo' },
+  'photos.previous': { en: 'Previous photo', beanie: 'previous photo' },
+  'photos.close': { en: 'Close', beanie: 'close' },
+  'photos.viewer.of': { en: 'of', beanie: 'of' },
 } satisfies Record<string, StringEntry>;
 
 /**

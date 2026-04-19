@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-16",
-    "translationCount": 1930
+    "lastUpdated": "2026-04-19",
+    "translationCount": 1954
   },
   "translations": {
     "app.name": {
@@ -9655,6 +9655,126 @@
       "translation": "明白了，谢谢！",
       "hash": "3mobto",
       "lastUpdated": "2026-04-16"
+    },
+    "photos.addPhoto": {
+      "translation": "添加照片",
+      "hash": "8gcptf",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.addPhotos": {
+      "translation": "添加照片",
+      "hash": "m1hzhc",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.noPhotos": {
+      "translation": "还没有照片",
+      "hash": "z68gwo",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.uploading": {
+      "translation": "上传中…",
+      "hash": "syijol",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.uploadFailed": {
+      "translation": "无法上传照片。请重试。",
+      "hash": "2255fi",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.queuedOffline": {
+      "translation": "您已离线。当您重新上线时，照片将上传。",
+      "hash": "6ruagg",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.queueAtCap": {
+      "translation": "有很多照片正在等待上传。请稍后重新连接。",
+      "hash": "3l8tt7",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.cloudRequired": {
+      "translation": "照片需要云同步。在“设置”中打开Google云端硬盘。",
+      "hash": "4czrjo",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.heicUnsupported": {
+      "translation": "此浏览器无法读取HEIC照片。请尝试JPEG或PNG。",
+      "hash": "a1cazh",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.maxReached": {
+      "translation": "每件商品最多4张照片",
+      "hash": "gzjeg9",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.invalidType": {
+      "translation": "仅支持JPEG、PNG和HEIC照片。",
+      "hash": "kcf20",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.dropToAdd": {
+      "translation": "拖放照片以添加",
+      "hash": "8p9h0l",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.missing.tile": {
+      "translation": "缺少相片",
+      "hash": "utxdug",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.missing.title": {
+      "translation": "我们找不到此照片",
+      "hash": "bmuns2",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.missing.body": {
+      "translation": "它可能已被移动、删除，或者您不再具有访问权限。",
+      "hash": "br9l8z",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.replace": {
+      "translation": "替 换",
+      "hash": "pedw18",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.remove": {
+      "translation": "移除",
+      "hash": "ulvuxo",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.deleteConfirm.title": {
+      "translation": "删除这张照片？",
+      "hash": "koqzcd",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.deleteConfirm.body": {
+      "translation": "它将在每个人的设备上清理。",
+      "hash": "mrmcak",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.download": {
+      "translation": "下载",
+      "hash": "ooknmw",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.next": {
+      "translation": "下一張圖片",
+      "hash": "c5dmor",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.previous": {
+      "translation": "上一張圖片",
+      "hash": "u1arqh",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.close": {
+      "translation": "关闭",
+      "hash": "12tjh4",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.viewer.of": {
+      "translation": "关",
+      "hash": "2qf",
+      "lastUpdated": "2026-04-19"
     }
   }
 }
