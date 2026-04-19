@@ -84,7 +84,11 @@ const expectedFileName = computed(() => {
   return null;
 });
 
-const unclaimedMembers = computed(() => familyStore.members.filter((m) => m.requiresPassword));
+// Pets have requiresPassword:false so they'd already be excluded, but
+// filter explicitly in case that invariant is ever relaxed.
+const unclaimedMembers = computed(() =>
+  familyStore.members.filter((m) => m.requiresPassword && !m.isPet)
+);
 
 function getMemberRole(member: FamilyMember): string {
   if (member.ageGroup === 'child') return t('loginV6.littleBean');

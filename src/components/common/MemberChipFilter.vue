@@ -26,7 +26,11 @@ const emit = defineEmits<{
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
 
-const sortedMembers = computed(() => familyStore.sortedMembers);
+// MemberChipFilter filters items (activities, todos, etc.) by the
+// member they're assigned to. Pets can't be assignees, so filtering
+// by a pet always returns zero items — the chip is visual noise.
+// Hide pets from the filter strip globally.
+const sortedMembers = computed(() => familyStore.sortedHumans);
 
 const chipBase =
   'inline-flex cursor-pointer items-center gap-1.5 rounded-[20px] px-3 py-1.5 text-sm font-medium transition-all';

@@ -342,7 +342,7 @@ function patch(fields: Partial<VacationIdea>) {
             {{ voter!.name.charAt(0).toUpperCase() }}
           </span>
           <span
-            v-if="voters.length === familyStore.members.length && familyStore.members.length > 1"
+            v-if="voters.length === familyStore.humans.length && familyStore.humans.length > 1"
             class="font-outfit ml-1 text-xs font-medium text-[var(--color-text-muted)]"
           >
             everyone!

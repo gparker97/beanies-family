@@ -49,7 +49,8 @@ const entryId = ref<UUID | null>(null);
 
 const cookOptions = computed(() => [
   { value: '', label: t('cookLog.byline.someone') },
-  ...familyStore.members.map((m) => ({ value: m.id, label: m.name })),
+  // Humans only — pets don't cook.
+  ...familyStore.humans.map((m) => ({ value: m.id, label: m.name })),
 ]);
 
 const { isEditing, isSubmitting } = useFormModal(

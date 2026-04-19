@@ -29,8 +29,14 @@ const selectedIds = computed({
 });
 
 // Build options from family members (include gender/ageGroup for avatar rendering)
+// Global member filter drives which member's data is shown across
+// finance pages (accounts, transactions, goals, assets) and some
+// non-finance surfaces. Pets have no finance entities and their
+// Pod content (favorites, sayings, etc.) is surfaced directly from
+// member-scoped stores — not through this filter. Excluding pets
+// here prevents empty filter results on finance pages.
 const memberOptions = computed(() =>
-  familyStore.members.map((member) => ({
+  familyStore.humans.map((member) => ({
     value: member.id,
     label: member.name,
     color: member.color || '#3b82f6',

@@ -35,6 +35,22 @@ export const useFamilyStore = defineStore('family', () => {
     })
   );
 
+  /**
+   * Human members only — excludes pets. Use this for any surface where
+   * a member must take an action: assignees (todos, activities, vacations),
+   * owners (accounts, goals, assets), invite flows, login pickers,
+   * permission UI, and member-scoped financial filters. Pets lack emails,
+   * permissions, and logins, so they belong only in display / roster
+   * surfaces (Meet the Beans, Scrapbook, photo galleries).
+   */
+  const humans = computed(() => members.value.filter((m) => !m.isPet));
+
+  /** Humans sorted (same rule as sortedMembers). */
+  const sortedHumans = computed(() => sortedMembers.value.filter((m) => !m.isPet));
+
+  /** True when at least one pet exists — handy for conditional UI. */
+  const hasPets = computed(() => members.value.some((m) => m.isPet));
+
   // Diagnostic: track permission changes on currentMember
   watch(currentMember, (newMember, oldMember) => {
     if (!oldMember || !newMember) return;
@@ -261,6 +277,9 @@ export const useFamilyStore = defineStore('family', () => {
     hasOwner,
     isSetupComplete,
     sortedMembers,
+    humans,
+    sortedHumans,
+    hasPets,
     // Actions
     loadMembers,
     createMember,

@@ -44,7 +44,8 @@ const selectedTodo = computed(() =>
   selectedTodoId.value ? (todoStore.todos.find((t) => t.id === selectedTodoId.value) ?? null) : null
 );
 
-const sortedMembers = computed(() => familyStore.sortedMembers);
+// Todo member filter — humans only (pets can't be assignees).
+const sortedMembers = computed(() => familyStore.sortedHumans);
 
 // Computed: filtered + sorted todos
 const displayedOpenTodos = computed(() => {
@@ -191,10 +192,7 @@ async function handleDelete(id: string) {
     <!-- Filters (only show when there are todos) -->
     <template v-if="hasAnyTodos">
       <!-- Member chip filter (desktop only, toggle to filter) -->
-      <div
-        v-if="familyStore.members.length > 1"
-        class="hidden flex-wrap items-center gap-2 sm:flex"
-      >
+      <div v-if="sortedMembers.length > 1" class="hidden flex-wrap items-center gap-2 sm:flex">
         <button
           v-for="member in sortedMembers"
           :key="member.id"

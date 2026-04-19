@@ -10,6 +10,12 @@ import { useFamilyStore } from './familyStore';
  *
  * The filter resets on page refresh (not persisted).
  * At least one member must be selected at all times.
+ *
+ * SCOPED TO HUMANS: pets never own finance entities, so they're
+ * excluded from the filter universe. `isAllSelected` compares against
+ * `familyStore.humans.length`; initialize/syncWithMembers operate on
+ * humans only. Prevents the "all selected" chip from flipping off
+ * when a pet is added.
  */
 export const useMemberFilterStore = defineStore('memberFilter', () => {
   // State
@@ -19,15 +25,15 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
   // Getters
   const isAllSelected = computed(() => {
     const familyStore = useFamilyStore();
-    if (!isInitialized.value || familyStore.members.length === 0) return true;
-    return selectedMemberIds.value.size === familyStore.members.length;
+    if (!isInitialized.value || familyStore.humans.length === 0) return true;
+    return selectedMemberIds.value.size === familyStore.humans.length;
   });
 
   const selectedCount = computed(() => selectedMemberIds.value.size);
 
   const selectedMembers = computed(() => {
     const familyStore = useFamilyStore();
-    return familyStore.members.filter((m) => selectedMemberIds.value.has(m.id));
+    return familyStore.humans.filter((m) => selectedMemberIds.value.has(m.id));
   });
 
   // Actions
@@ -38,7 +44,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function initialize() {
     const familyStore = useFamilyStore();
-    selectedMemberIds.value = new Set(familyStore.members.map((m) => m.id));
+    selectedMemberIds.value = new Set(familyStore.humans.map((m) => m.id));
     isInitialized.value = true;
   }
 
@@ -48,7 +54,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function syncWithMembers() {
     const familyStore = useFamilyStore();
-    const currentIds = new Set(familyStore.members.map((m) => m.id));
+    const currentIds = new Set(familyStore.humans.map((m) => m.id));
 
     // Remove selections for deleted members
     for (const id of selectedMemberIds.value) {
@@ -58,15 +64,15 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
     }
 
     // Add new members to selection
-    for (const member of familyStore.members) {
+    for (const member of familyStore.humans) {
       if (!selectedMemberIds.value.has(member.id)) {
         selectedMemberIds.value.add(member.id);
       }
     }
 
     // Ensure at least one is selected
-    if (selectedMemberIds.value.size === 0 && familyStore.members.length > 0) {
-      selectedMemberIds.value.add(familyStore.members[0]!.id);
+    if (selectedMemberIds.value.size === 0 && familyStore.humans.length > 0) {
+      selectedMemberIds.value.add(familyStore.humans[0]!.id);
     }
 
     // Trigger reactivity
@@ -97,7 +103,7 @@ export const useMemberFilterStore = defineStore('memberFilter', () => {
    */
   function selectAll() {
     const familyStore = useFamilyStore();
-    selectedMemberIds.value = new Set(familyStore.members.map((m) => m.id));
+    selectedMemberIds.value = new Set(familyStore.humans.map((m) => m.id));
   }
 
   /**

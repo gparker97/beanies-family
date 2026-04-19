@@ -100,10 +100,10 @@ const dateRangeOptions = computed(() => [
 ]);
 const selectedDateRange = ref('1y');
 
-// Family member filter
+// Family member filter — humans only; pets have no financial data.
 const familyMemberOptions = computed(() => [
   { value: 'all', label: t('reports.allFamilyMembers') },
-  ...familyStore.members.map((m) => ({ value: m.id, label: m.name })),
+  ...familyStore.humans.map((m) => ({ value: m.id, label: m.name })),
 ]);
 const selectedMember = ref('all');
 

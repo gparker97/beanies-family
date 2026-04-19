@@ -23,7 +23,11 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 
-const members = computed(() => familyStore.sortedMembers);
+// FamilyChipPicker is always used for ASSIGNMENT (todos, activities,
+// account/asset/goal owners, vacation travelers). Pets can never be
+// assignees or owners — filter them out globally here so every call
+// site inherits the correct behavior.
+const members = computed(() => familyStore.sortedHumans);
 
 const SHARED_ID = '__shared__';
 
