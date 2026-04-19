@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 1966
+    "translationCount": 1991
   },
   "translations": {
     "app.name": {
@@ -9834,6 +9834,131 @@
     "photos.avatar.uploadFailed": {
       "translation": "无法上传照片。请检查您的网络连接，然后重试。",
       "hash": "pyus18",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.detail.title": {
+      "translation": "Bean详细信息",
+      "hash": "niyd6n",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.backToPod": {
+      "translation": "← 返回Pod",
+      "hash": "4zjp1i",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.tab.overview": {
+      "translation": "概述",
+      "hash": "9u3rtl",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.tab.favorites": {
+      "translation": "收藏",
+      "hash": "3m84dz",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.tab.sayings": {
+      "translation": "语录（sayings）",
+      "hash": "ch9l9g",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.tab.allergies": {
+      "translation": "过敏",
+      "hash": "yhqnsu",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.tab.medications": {
+      "translation": "药品",
+      "hash": "d1ktr0",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.tab.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.birthday": {
+      "translation": "生日",
+      "hash": "ir5zml",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.role.parent": {
+      "translation": "Parent Bean",
+      "hash": "rn7fru",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.role.child": {
+      "translation": "Little Bean",
+      "hash": "ourpt2",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.notFound.title": {
+      "translation": "我们找不到这个bean",
+      "hash": "h7iaps",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.notFound.body": {
+      "translation": "此bean不在您的pod中（或已被删除）。",
+      "hash": "3wkwqe",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.comingSoon": {
+      "translation": "关于这片豆田的更多细节很快就会在这里。",
+      "hash": "hnizy",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.favorites.empty": {
+      "translation": "还没有收藏",
+      "hash": "jpeov4",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.sayings.empty": {
+      "translation": "暂无留言",
+      "hash": "g3wtdn",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.notes.empty": {
+      "translation": "还没有笔记。",
+      "hash": "a3tw1i",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.allergies.empty": {
+      "translation": "档案上没有过敏记录",
+      "hash": "6hcpek",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.medications.empty": {
+      "translation": "档案中没有药物",
+      "hash": "6fsuv2",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.viewAll": {
+      "translation": "查看全部",
+      "hash": "m9neiw",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.overview.about": {
+      "translation": "软件简介",
+      "hash": "11jkh9",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.stats.favorites": {
+      "translation": "收藏",
+      "hash": "tivv6x",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.stats.sayings": {
+      "translation": "语录（sayings）",
+      "hash": "v0r60s",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.stats.notes": {
+      "translation": "注意",
+      "hash": "1qipc1",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.stats.age": {
+      "translation": "岁",
+      "hash": "7o7spv",
       "lastUpdated": "2026-04-19"
     }
   }
