@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanAvatarPicker from '@/components/family/BeanAvatarPicker.vue';
 import ColorCircleSelector from '@/components/ui/ColorCircleSelector.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -12,12 +12,14 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { isTemporaryEmail } from '@/utils/email';
 import { getAvatarVariant } from '@/composables/useMemberAvatar';
+import { usePhotoStore } from '@/stores/photoStore';
 import type {
   FamilyMember,
   Gender,
   AgeGroup,
   CreateFamilyMemberInput,
   UpdateFamilyMemberInput,
+  UUID,
 } from '@/types/models';
 
 const props = defineProps<{
@@ -33,6 +35,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const photoStore = usePhotoStore();
 
 // Color options with gradients
 const MEMBER_COLORS = [
@@ -97,6 +100,15 @@ const canEditActivities = ref(true);
 const canManagePod = ref(false);
 const showPermissions = ref(false);
 
+// Avatar photo state. `avatarPhotoId` holds whichever photoId the form will
+// eventually save — starts as the member's current avatar, updated by
+// BeanAvatarPicker via v-model. `initialAvatarPhotoId` and
+// `uploadedButNotSaved` track the original vs. newly-uploaded state so we
+// can tombstone orphans correctly on close/save.
+const avatarPhotoId = ref<UUID | undefined>(undefined);
+const initialAvatarPhotoId = ref<UUID | undefined>(undefined);
+const uploadedButNotSaved = ref<UUID[]>([]);
+
 // Derived ageGroup from beanRole
 const ageGroup = computed<AgeGroup>(() => (beanRole.value === 'child' ? 'child' : 'adult'));
 
@@ -120,6 +132,9 @@ const { isEditing, isSubmitting } = useFormModal(
       canViewFinances.value = member.role === 'owner' ? true : (member.canViewFinances ?? true);
       canEditActivities.value = member.role === 'owner' ? true : (member.canEditActivities ?? true);
       canManagePod.value = member.role === 'owner' ? true : (member.canManagePod ?? false);
+      avatarPhotoId.value = member.avatarPhotoId;
+      initialAvatarPhotoId.value = member.avatarPhotoId;
+      uploadedButNotSaved.value = [];
     },
     onNew: () => {
       const randomColor =
@@ -136,6 +151,9 @@ const { isEditing, isSubmitting } = useFormModal(
       canEditActivities.value = true;
       canManagePod.value = false;
       showPermissions.value = false;
+      avatarPhotoId.value = undefined;
+      initialAvatarPhotoId.value = undefined;
+      uploadedButNotSaved.value = [];
     },
   }
 );
@@ -147,6 +165,34 @@ watch(canManagePod, (val) => {
     canEditActivities.value = true;
   }
 });
+
+function onAvatarUploaded(photoId: UUID) {
+  uploadedButNotSaved.value.push(photoId);
+}
+
+function onAvatarRemoved(photoId: UUID) {
+  // If the removed photo was uploaded in THIS session (not yet saved to
+  // the member), tombstone it immediately — it's an orphan. The
+  // pre-existing avatar (if that's what was removed) is tombstoned on
+  // save instead, since the user may still hit Cancel and revert.
+  if (uploadedButNotSaved.value.includes(photoId)) {
+    photoStore.markDeleted(photoId);
+    uploadedButNotSaved.value = uploadedButNotSaved.value.filter((id) => id !== photoId);
+  }
+}
+
+/**
+ * Cleanup on modal close WITHOUT save:
+ *   - Tombstone every photo uploaded in this session (they're orphans).
+ *   - Leave the member's original avatarPhotoId untouched.
+ */
+function handleClose() {
+  for (const id of uploadedButNotSaved.value) {
+    photoStore.markDeleted(id);
+  }
+  uploadedButNotSaved.value = [];
+  emit('close');
+}
 
 const isOwnerMember = computed(() => props.member?.role === 'owner');
 
@@ -185,6 +231,30 @@ function handleSave() {
       };
     }
 
+    // Avatar photo: include the current selection (or explicit undefined to
+    // clear a removed avatar — automergeRepository treats explicit
+    // undefined as "delete this key"). Tombstone the PREVIOUS avatar if it
+    // was replaced or removed; the new one (if any) is now referenced by
+    // this member so it stays.
+    data.avatarPhotoId = avatarPhotoId.value;
+    const previousId = initialAvatarPhotoId.value;
+    if (previousId && previousId !== avatarPhotoId.value) {
+      photoStore.markDeleted(previousId);
+    }
+    // The current avatar (if it's one we just uploaded) is about to be
+    // saved as a reference on the member — it's no longer an orphan.
+    uploadedButNotSaved.value = uploadedButNotSaved.value.filter(
+      (id) => id !== avatarPhotoId.value
+    );
+    // Any other session-uploaded photos (e.g. user uploaded A, then B,
+    // saved with B) are still orphans — cleanupUnsavedUploads handled
+    // the old one on each new upload? No — re-upload doesn't auto-tombstone
+    // the previous session upload. Clean those up here.
+    for (const id of uploadedButNotSaved.value) {
+      photoStore.markDeleted(id);
+    }
+    uploadedButNotSaved.value = [];
+
     if (isEditing.value && props.member) {
       emit('save', { id: props.member.id, data: data as UpdateFamilyMemberInput });
     } else {
@@ -214,14 +284,19 @@ function handleDelete() {
     :save-disabled="readOnly ? false : !canSave"
     :is-submitting="isSubmitting"
     :show-delete="isEditing && !readOnly"
-    @close="emit('close')"
+    @close="readOnly ? emit('close') : handleClose()"
     @save="readOnly ? emit('close') : handleSave()"
     @delete="handleDelete"
   >
-    <!-- 1. Bean avatar preview -->
-    <div class="flex justify-center">
-      <BeanieAvatar :variant="avatarVariant" :color="color" size="xl" />
-    </div>
+    <!-- Bean avatar preview + upload/remove -->
+    <BeanAvatarPicker
+      v-model="avatarPhotoId"
+      :variant="avatarVariant"
+      :color="color"
+      :disabled="readOnly"
+      @uploaded="onAvatarUploaded"
+      @removed="onAvatarRemoved"
+    />
 
     <!-- 2. Color selector -->
     <div v-if="!readOnly" class="flex justify-center">
