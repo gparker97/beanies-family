@@ -11,7 +11,7 @@ import MedicationCard from '@/components/pod/MedicationCard.vue';
 import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
 import { useTranslation } from '@/composables/useTranslation';
-import { useMedicationsStore } from '@/stores/medicationsStore';
+import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import type { Medication, UUID } from '@/types/models';
 
 const props = defineProps<{
@@ -21,20 +21,12 @@ const props = defineProps<{
 const { t } = useTranslation();
 const medicationsStore = useMedicationsStore();
 
-function isActive(m: Medication): boolean {
-  if (m.ongoing) return true;
-  const today = new Date().toISOString().slice(0, 10);
-  if (m.endDate && m.endDate < today) return false;
-  if (m.startDate && m.startDate > today) return false;
-  return true;
-}
-
 const medications = computed(() => {
   const list = medicationsStore.byMember(props.memberId).value;
   // Active first, then alphabetical by name for stable ordering.
   return [...list].sort((a, b) => {
-    const aActive = isActive(a) ? 0 : 1;
-    const bActive = isActive(b) ? 0 : 1;
+    const aActive = isMedicationActive(a) ? 0 : 1;
+    const bActive = isMedicationActive(b) ? 0 : 1;
     if (aActive !== bActive) return aActive - bActive;
     return a.name.localeCompare(b.name);
   });
