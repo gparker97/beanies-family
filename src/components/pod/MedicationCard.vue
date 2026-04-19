@@ -45,10 +45,10 @@ const scheduleLabel = computed(() => {
     :class="{ 'opacity-60': !isActive }"
     @click="$emit('click')"
   >
-    <!-- Status spine -->
+    <!-- Status spine — Sky Silk for active (calm, ongoing care), slate for ended -->
     <span
       class="absolute top-0 bottom-0 left-0 w-1"
-      :class="isActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'"
+      :class="isActive ? 'bg-[#AED6F1]' : 'bg-slate-300 dark:bg-slate-600'"
       aria-hidden="true"
     />
 
@@ -142,7 +142,7 @@ const scheduleLabel = computed(() => {
           class="font-outfit flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase"
           :class="
             isActive
-              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+              ? 'bg-[#AED6F1]/35 text-[#1E5A85] dark:bg-[#AED6F1]/15 dark:text-[#AED6F1]'
               : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
           "
         >

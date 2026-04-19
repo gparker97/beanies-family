@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-19
 
+### Changed
+
+- **Meet the Beans — Pod overview redesign.** Page now matches the approved mockup: unified header with kicker ("The Pod · Family Scrapbook"), family name (editable), and one-line stats summary ("5 beans · 12 favorites · 9 sayings · 4 recipes · 2 active meds · 3 allergies"), plus inline **Invite Bean** + **Add Bean** buttons on the same row. Body switches to a pod layout (main column + 320px right sidebar): bean cards sit in a 2-col responsive grid and read their highlights directly from the content stores; a **Recent family sayings** rail shows up-to-8 tilted pastel sticky notes; a kraft-paper **Secret Family Recipes** strip surfaces up to 4 recipe thumbs + an "Add a recipe" tile. The sidebar replaces the old Family Stats / Events panel with a **Heads up — allergies** card (severity-chipped list across all beans) and a **Today's care** card (active meds across the family), with a compact Events-this-week list below.
+- **MedicationCard — pharmacy-shelf aesthetic.** Medication cards now feature the bottle photo as a prominent left-side anchor when one exists; without a photo, a brand-colored capsule illustration on a prescription-paper gradient (diagonal hatching + "Rx" watermark) fills the slot so the card never feels half-empty. A 4px Sky-Silk spine on the left edge signals active state (slate when ended); the active/ended chip uses on-brand Sky Silk for active instead of the old emerald green.
+
 ### Added
 
 - **The Pod (P6 — Family Scrapbook).** New `/pod/scrapbook` page merges favorites, sayings, and notes from every bean into a single newest-first feed. Pastel multicolor gradient hero with a faded 📖 watermark, filter toolbar (type chips + member chips + clear), CSS-columns masonry layout (3 → 2 → 1 col responsive), and a "Load more" button that appends 30 entries at a time. Sayings render as tilted sticky notes; favorites as category-emoji cards; notes as title + body clamps. Click any entry to jump to the owning bean's tab.

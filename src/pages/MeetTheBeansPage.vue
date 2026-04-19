@@ -13,7 +13,6 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
 import { isValidEmail, isTemporaryEmail } from '@/utils/email';
 import { toDateInputValue } from '@/utils/date';
-import { normalizeAssignees } from '@/utils/assignees';
 import { generateInviteQR } from '@/utils/qrCode';
 import {
   shareFileWithEmail,
@@ -26,10 +25,12 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useActivityStore } from '@/stores/activityStore';
-import { useTodoStore } from '@/stores/todoStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
-import { useMemberNotesStore } from '@/stores/memberNotesStore';
+import { useAllergiesStore } from '@/stores/allergiesStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useRecipesStore } from '@/stores/recipesStore';
+import { usePhotoStore } from '@/stores/photoStore';
 import { getActivityCategoryColor } from '@/constants/activityCategories';
 import type {
   ActivityCategory,
@@ -44,10 +45,12 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const activityStore = useActivityStore();
-const todoStore = useTodoStore();
 const favoritesStore = useFavoritesStore();
 const sayingsStore = useSayingsStore();
-const memberNotesStore = useMemberNotesStore();
+const allergiesStore = useAllergiesStore();
+const medicationsStore = useMedicationsStore();
+const recipesStore = useRecipesStore();
+const photoStore = usePhotoStore();
 const { t } = useTranslation();
 const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
@@ -57,106 +60,74 @@ function getEventBarColor(category: ActivityCategory): string {
   return getActivityCategoryColor(category);
 }
 
-/** A highlight item shown on member cards (up to 2 per member). */
-export interface MemberHighlight {
-  emoji: string;
-  title: string;
-  subtitle: string;
+// Per-member highlights now live inside BeanCard.vue — it reads
+// favorites / sayings / allergies / medications / notes directly from
+// the content stores so the card stays in sync without parent wiring.
+
+// --- Pod overview stats + cross-family rails --------------------------
+
+const headerStats = computed(() =>
+  t('family.hub.stats.summary')
+    .replace('{beans}', String(familyStore.members.length))
+    .replace('{favorites}', String(favoritesStore.favorites.length))
+    .replace('{sayings}', String(sayingsStore.sayings.length))
+    .replace('{recipes}', String(recipesStore.recipes.length))
+    .replace('{meds}', String(medicationsStore.active.length))
+    .replace('{allergies}', String(allergiesStore.allergies.length))
+);
+
+// Recent-sayings rail: most-recent-first, capped at 8.
+const recentSayings = computed(() =>
+  [...sayingsStore.sayings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8)
+);
+
+// Recipe rail: up to 4 recipes alphabetical, plus an "Add recipe" card
+// rendered directly in the template when canManagePod.
+const railRecipes = computed(() =>
+  [...recipesStore.recipes].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 4)
+);
+
+// Recipe thumbnails resolved lazily, cached by photoId so re-renders
+// don't re-fetch. Matches the pattern in FamilyCookbookPage.
+const recipeThumbCache = ref<Record<string, string | null>>({});
+function thumbForRecipe(recipeId: string): string | null {
+  const recipe = recipesStore.recipes.find((r) => r.id === recipeId);
+  const pid = recipe?.photoIds?.[0];
+  if (!pid) return null;
+  if (recipeThumbCache.value[pid] === undefined) {
+    recipeThumbCache.value = { ...recipeThumbCache.value, [pid]: null };
+    photoStore
+      .getBlobUrl(pid)
+      .then((url) => {
+        recipeThumbCache.value = { ...recipeThumbCache.value, [pid]: url };
+      })
+      .catch((e) => console.warn('[meetTheBeans] recipe thumb resolve failed', e));
+  }
+  return recipeThumbCache.value[pid] ?? null;
 }
 
-// Per-member upcoming highlights (2 most important items: activities, todos, birthdays)
-const memberHighlights = computed(() => {
-  const today = toDateInputValue(new Date());
-  const map = new Map<string, MemberHighlight[]>();
+// Sidebar: allergies across all members, severity-sorted, capped.
+const SEVERITY_ORDER = { severe: 0, moderate: 1, mild: 2 } as const;
+const sidebarAllergies = computed(() =>
+  [...allergiesStore.allergies]
+    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+    .slice(0, 5)
+);
 
-  for (const m of familyStore.members) {
-    const items: MemberHighlight[] = [];
+// Sidebar: today's active medications across the family.
+const sidebarMedications = computed(() => medicationsStore.active.slice(0, 5));
 
-    // 1. Next upcoming activity for this member
-    const nextActivity = activityStore.upcomingActivities.find((e) =>
-      normalizeAssignees(e.activity).includes(m.id)
-    );
-    if (nextActivity) {
-      items.push({
-        emoji: nextActivity.activity.icon || '📅',
-        title: `${nextActivity.activity.icon || '📅'} ${nextActivity.activity.startTime || nextActivity.date}`,
-        subtitle: nextActivity.activity.title,
-      });
-    }
+function memberFor(id: string): FamilyMember | undefined {
+  return familyStore.members.find((m) => m.id === id);
+}
 
-    // 2. Birthday milestone (if dateOfBirth is set)
-    if (m.dateOfBirth && items.length < 2) {
-      const month = String(m.dateOfBirth.month).padStart(2, '0');
-      const day = String(m.dateOfBirth.day).padStart(2, '0');
-      const birthdayThisYear = `${new Date().getFullYear()}-${month}-${day}`;
-      // Show if birthday is upcoming (within next 90 days)
-      if (birthdayThisYear >= today) {
-        items.push({
-          emoji: '🎂',
-          title: `🎂 ${month}/${day}`,
-          subtitle: t('family.hub.highlight.birthday'),
-        });
-      }
-    }
+function stickyColorFor(index: number): string {
+  return ['#fff7c8', '#d4f1f4', '#ffe4d6', '#e8f5e8'][index % 4] ?? '#fff7c8';
+}
 
-    // 3. Next open todo for this member
-    if (items.length < 2) {
-      const memberTodos = todoStore.openTodos.filter((td) => normalizeAssignees(td).includes(m.id));
-      const nextTodo = memberTodos[0];
-      if (nextTodo) {
-        items.push({
-          emoji: '📋',
-          title: `📋 ${memberTodos.length} ${memberTodos.length === 1 ? 'task' : 'tasks'}`,
-          subtitle: t('family.hub.highlight.thisWeek'),
-        });
-      }
-    }
-
-    // 4. Most-recent saying (backward-looking fallback when there's no
-    //    upcoming calendar activity for this bean).
-    if (items.length < 2) {
-      const sayings = sayingsStore.byMember(m.id).value;
-      const latest = sayings[sayings.length - 1];
-      if (latest) {
-        const clipped =
-          latest.words.length > 48 ? `${latest.words.slice(0, 45).trimEnd()}…` : latest.words;
-        items.push({
-          emoji: '💬',
-          title: `💬 "${clipped}"`,
-          subtitle: latest.saidOn ?? t('bean.tab.sayings'),
-        });
-      }
-    }
-
-    // 5. Favorites summary.
-    if (items.length < 2) {
-      const favorites = favoritesStore.byMember(m.id).value;
-      if (favorites.length > 0) {
-        items.push({
-          emoji: '💝',
-          title: `💝 ${favorites.length} ${t('bean.stats.favorites')}`,
-          subtitle: favorites[0]?.name ?? '',
-        });
-      }
-    }
-
-    // 6. Notes summary — last resort so the card surface stays populated
-    //    for beans with no calendar data but some captured details.
-    if (items.length < 2) {
-      const notes = memberNotesStore.byMember(m.id).value;
-      if (notes.length > 0) {
-        items.push({
-          emoji: '📝',
-          title: `📝 ${notes.length} ${t('bean.stats.notes')}`,
-          subtitle: notes[0]?.title ?? '',
-        });
-      }
-    }
-
-    map.set(m.id, items);
-  }
-  return map;
-});
+function goToBean(memberId: string, tab?: string): void {
+  router.push(tab ? `/pod/${memberId}/${tab}` : `/pod/${memberId}`);
+}
 
 // Upcoming activities within the next 7 days (for quick info panel)
 const upcomingThisWeek = computed(() => {
@@ -502,207 +473,316 @@ function cancelEditFamilyName() {
 
 <template>
   <div class="space-y-6">
-    <!-- Header: Bean Pod title + family name + actions -->
-    <div>
-      <div class="flex items-start justify-between">
-        <div>
-          <h1 class="font-outfit text-secondary-500 text-2xl font-bold dark:text-gray-100">
-            {{ t('family.hub.title') }} 🫘
+    <!-- Pod overview header: kicker + family name + stats line +
+         Invite Bean / Add Bean inline -->
+    <header class="flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0 flex-1">
+        <div
+          class="font-outfit text-secondary-500/60 text-[11px] font-semibold tracking-[0.08em] uppercase dark:text-gray-400"
+        >
+          {{ t('family.hub.kicker') }}
+        </div>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+          <h1 class="font-outfit text-secondary-500 text-3xl font-extrabold dark:text-gray-100">
+            {{ familyContextStore.activeFamilyName || t('family.title') }}
           </h1>
-          <!-- Family name — prominent, editable -->
-          <div class="mt-1 flex items-center gap-1.5">
-            <span
-              v-if="!isEditingFamilyName"
-              class="font-outfit text-primary-500 text-lg font-bold"
-            >
-              {{ familyContextStore.activeFamilyName || t('family.title') }}
-            </span>
-            <div v-else class="flex items-center gap-2">
-              <input
-                v-model="editFamilyName"
-                type="text"
-                class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 w-48 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
-                @keyup.enter="saveFamilyName"
-                @keyup.escape="cancelEditFamilyName"
-              />
-              <button
-                class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                @click="saveFamilyName"
-              >
-                <BeanieIcon name="check" size="md" />
-              </button>
-              <button
-                class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
-                @click="cancelEditFamilyName"
-              >
-                <BeanieIcon name="close" size="md" />
-              </button>
-            </div>
+          <div v-if="isEditingFamilyName" class="flex items-center gap-2">
+            <input
+              v-model="editFamilyName"
+              type="text"
+              class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 w-48 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+              @keyup.enter="saveFamilyName"
+              @keyup.escape="cancelEditFamilyName"
+            />
             <button
-              v-if="!isEditingFamilyName && familyContextStore.activeFamilyName && canManagePod"
-              class="text-primary-500/40 hover:text-primary-500/70 rounded p-0.5 transition-colors"
-              :title="t('family.editFamilyName')"
-              @click="startEditFamilyName"
+              class="rounded p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+              @click="saveFamilyName"
             >
-              <BeanieIcon name="edit" size="sm" />
+              <BeanieIcon name="check" size="md" />
+            </button>
+            <button
+              class="rounded p-1 text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700"
+              @click="cancelEditFamilyName"
+            >
+              <BeanieIcon name="close" size="md" />
             </button>
           </div>
-          <p class="text-secondary-500/40 mt-0.5 text-sm dark:text-gray-500">
-            {{ t('family.hub.subtitle').replace('{count}', String(familyStore.members.length)) }}
+          <button
+            v-if="!isEditingFamilyName && familyContextStore.activeFamilyName && canManagePod"
+            class="text-secondary-500/40 hover:text-primary-500 rounded p-0.5 transition-colors"
+            :title="t('family.editFamilyName')"
+            @click="startEditFamilyName"
+          >
+            <BeanieIcon name="edit" size="sm" />
+          </button>
+        </div>
+        <p class="font-inter text-secondary-500/60 mt-1 text-sm dark:text-gray-400">
+          {{ headerStats }}
+        </p>
+      </div>
+      <div v-if="canManagePod" class="flex flex-shrink-0 flex-wrap items-center gap-2">
+        <button
+          v-if="familyContextStore.activeFamilyId && hasInvitableMembers"
+          type="button"
+          class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+          @click="openInviteModal"
+        >
+          <span aria-hidden="true">💌</span>
+          <span>{{ t('family.hub.inviteBean') }}</span>
+        </button>
+        <button
+          type="button"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          @click="openAddModal"
+        >
+          <span aria-hidden="true">＋</span>
+          <span>{{ t('family.hub.addBean') }}</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Pod overview layout: main (beans grid + rails) + right sidebar -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <!-- Main column -->
+      <div class="space-y-6">
+        <!-- Member cards grid -->
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <BeanCard
+            v-for="member in familyStore.members"
+            :key="member.id"
+            :member="member"
+            :can-manage="canManagePod"
+            :class="syncHighlightClass(member.id)"
+            @edit="openEditModal(member)"
+            @delete="deleteMember(member.id)"
+            @share-invite="openShareModal"
+            @role-change="handleRoleChange(member.id, $event)"
+          />
+        </div>
+
+        <!-- Recent family sayings rail -->
+        <section>
+          <div class="mb-3 flex items-baseline justify-between gap-2">
+            <h2 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-200">
+              {{ t('family.hub.recentSayings') }}
+            </h2>
+            <router-link
+              v-if="recentSayings.length > 0"
+              to="/pod/scrapbook"
+              class="font-inter text-primary-500 text-xs font-semibold hover:underline"
+            >
+              {{ t('family.hub.recentSayings.viewAll') }}
+            </router-link>
+          </div>
+          <div
+            v-if="recentSayings.length > 0"
+            class="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2"
+          >
+            <button
+              v-for="(saying, i) in recentSayings"
+              :key="saying.id"
+              type="button"
+              class="group font-caveat flex w-56 flex-shrink-0 snap-start flex-col justify-between rounded-[18px] px-4 py-4 text-left shadow-[var(--card-shadow)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
+              :style="{
+                backgroundColor: stickyColorFor(i),
+                transform: `rotate(${i % 2 === 0 ? '-1.5deg' : '1.2deg'})`,
+              }"
+              @click="goToBean(saying.memberId, 'sayings')"
+            >
+              <blockquote class="text-secondary-500 line-clamp-4 text-lg leading-snug font-medium">
+                "{{ saying.words }}"
+              </blockquote>
+              <footer class="font-inter text-secondary-500/60 mt-3 text-[11px] font-semibold">
+                — {{ memberFor(saying.memberId)?.name ?? t('family.title') }}
+              </footer>
+            </button>
+          </div>
+          <p v-else class="font-inter text-secondary-500/40 text-sm italic dark:text-gray-500">
+            {{ t('family.hub.recentSayings.empty') }}
           </p>
-        </div>
-        <!-- Action buttons — stacked right on desktop -->
-        <div v-if="canManagePod" class="flex flex-shrink-0 flex-col items-end gap-2">
-          <button
-            type="button"
-            class="font-outfit from-primary-500 to-terracotta-400 inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
-            @click="openAddModal"
-          >
-            {{ t('family.hub.addBean') }}
-          </button>
-          <button
-            v-if="familyContextStore.activeFamilyId && hasInvitableMembers"
-            class="hidden items-center gap-2 rounded-full border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-4 py-2 shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md sm:flex dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20"
-            @click="openInviteModal"
-          >
-            <span class="text-base">💌</span>
-            <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
-              {{ t('login.inviteTitle') }}
-            </span>
-          </button>
-        </div>
+        </section>
+
+        <!-- Cookbook strip — kraft-paper backdrop -->
+        <section
+          class="rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)]"
+          style="
+            background-image:
+              linear-gradient(135deg, rgb(44 62 80 / 4%) 0%, transparent 60%),
+              linear-gradient(to bottom right, #f4e4c1, #e8d4a8);
+          "
+        >
+          <div class="mb-4 flex items-baseline justify-between gap-2">
+            <div>
+              <h2 class="font-outfit text-base font-bold" style="color: #5a4a2a">
+                {{ t('family.hub.cookbook.title') }}
+              </h2>
+              <p class="font-caveat mt-0.5 text-sm" style="color: #8a6a3a">
+                {{ t('family.hub.cookbook.sub') }}
+              </p>
+            </div>
+            <router-link
+              to="/pod/cookbook"
+              class="font-inter text-xs font-semibold hover:underline"
+              style="color: #5a4a2a"
+            >
+              {{ t('family.hub.cookbook.open') }}
+            </router-link>
+          </div>
+          <div class="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
+            <router-link
+              v-for="recipe in railRecipes"
+              :key="recipe.id"
+              :to="`/pod/cookbook/${recipe.id}`"
+              class="group flex w-36 flex-shrink-0 snap-start flex-col overflow-hidden rounded-[14px] bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div
+                class="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-[#fff5e8] to-[#ffe4d6]"
+              >
+                <img
+                  v-if="thumbForRecipe(recipe.id)"
+                  :src="thumbForRecipe(recipe.id)!"
+                  :alt="recipe.name"
+                  class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+                <div
+                  v-else
+                  class="font-caveat flex h-full w-full items-center justify-center text-center text-xs"
+                  style="color: #8a6a3a"
+                >
+                  {{ t('family.hub.cookbook.noPhoto') }}
+                </div>
+              </div>
+              <div class="px-2.5 py-2">
+                <h3 class="font-outfit truncate text-[13px] font-bold" style="color: #2c3e50">
+                  {{ recipe.name }}
+                </h3>
+              </div>
+            </router-link>
+            <button
+              v-if="canManagePod"
+              type="button"
+              class="font-inter flex w-36 flex-shrink-0 snap-start flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-dashed p-3 text-center text-xs font-semibold transition-colors hover:bg-white/40"
+              style="border-color: rgb(90 74 42 / 30%); color: #5a4a2a"
+              @click="router.push('/pod/cookbook?add=1')"
+            >
+              <span class="text-2xl leading-none" aria-hidden="true">+</span>
+              <span>{{ t('family.hub.cookbook.add') }}</span>
+            </button>
+          </div>
+        </section>
       </div>
 
-      <!-- Invite button — full-width on mobile only -->
-      <button
-        v-if="canManagePod && familyContextStore.activeFamilyId && hasInvitableMembers"
-        class="mt-4 flex w-full items-center gap-3 rounded-2xl border border-[var(--color-sky-silk-300)]/50 bg-gradient-to-r from-[var(--color-sky-silk-300)]/30 via-[var(--color-sky-silk-300)]/15 to-[var(--color-sky-silk-300)]/30 px-4 py-3 text-left shadow-sm transition-all hover:from-[var(--color-sky-silk-300)]/40 hover:via-[var(--color-sky-silk-300)]/25 hover:to-[var(--color-sky-silk-300)]/40 hover:shadow-md sm:hidden dark:border-[var(--color-sky-silk-300)]/20 dark:from-[var(--color-sky-silk-300)]/20 dark:via-[var(--color-sky-silk-300)]/10 dark:to-[var(--color-sky-silk-300)]/20"
-        @click="openInviteModal"
-      >
-        <span
-          class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/80 text-lg shadow-sm dark:bg-white/15"
+      <!-- Right sidebar -->
+      <aside class="space-y-5">
+        <!-- Heads up — allergies -->
+        <section
+          class="rounded-[var(--sq)] p-4 shadow-[var(--card-shadow)]"
+          style="
+            background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(230 126 34 / 4%));
+          "
         >
-          💌
-        </span>
-        <span class="font-outfit text-secondary-500 text-sm font-semibold dark:text-gray-200">
-          {{ t('login.inviteTitle') }}
-        </span>
-        <svg
-          class="text-secondary-500/30 ml-auto h-4 w-4 dark:text-gray-500"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-    </div>
-
-    <!-- 2-column layout: member cards + quick info panel -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      <!-- Member cards (2/3 width on desktop) -->
-      <div class="space-y-4 lg:col-span-2">
-        <BeanCard
-          v-for="member in familyStore.members"
-          :key="member.id"
-          :member="member"
-          :highlights="memberHighlights.get(member.id) ?? []"
-          :can-manage="canManagePod"
-          :class="syncHighlightClass(member.id)"
-          @edit="openEditModal(member)"
-          @delete="deleteMember(member.id)"
-          @share-invite="openShareModal"
-          @role-change="handleRoleChange(member.id, $event)"
-        />
-      </div>
-
-      <!-- Quick Info panel (1/3 width on desktop) -->
-      <div class="space-y-5">
-        <!-- Family Stats -->
-        <div
-          class="rounded-[var(--sq)] bg-gradient-to-br from-[var(--tint-silk-10)] to-[var(--tint-orange-4)] p-5 dark:from-slate-700/50 dark:to-slate-700/30"
-        >
-          <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
-            🌳 {{ t('family.hub.familyStats') }}
+          <div class="nook-section-label mb-3 flex items-center gap-1.5 text-[#F15D22]">
+            <span aria-hidden="true">⚠️</span>
+            <span>{{ t('family.hub.sidebar.allergies') }}</span>
           </div>
-          <div class="space-y-2 text-xs">
-            <div class="flex justify-between">
-              <span class="text-secondary-500/50 dark:text-gray-500">
-                {{ t('family.hub.members') }}
+          <ul v-if="sidebarAllergies.length > 0" class="space-y-2">
+            <li v-for="a in sidebarAllergies" :key="a.id" class="flex items-start gap-2">
+              <span
+                class="font-outfit mt-0.5 flex-shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase"
+                :class="
+                  a.severity === 'severe'
+                    ? 'bg-[#F15D22] text-white'
+                    : a.severity === 'moderate'
+                      ? 'bg-[#E67E22]/20 text-[#B5591A]'
+                      : 'bg-[#AED6F1]/30 text-[#1E5A85]'
+                "
+              >
+                {{ a.severity }}
               </span>
-              <span class="font-outfit text-secondary-500 font-bold dark:text-gray-200">
-                {{ familyStore.members.length }}
-                {{ t('family.hub.statBeans') }}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-secondary-500/50 dark:text-gray-500">
-                {{ t('family.hub.totalActivities') }}
-              </span>
-              <span class="font-outfit text-secondary-500 font-bold dark:text-gray-200">
-                {{ activityStore.activeActivities.length }}
-                {{ t('family.hub.highlight.thisWeek') }}
-              </span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-secondary-500/50 dark:text-gray-500">
-                {{ t('family.hub.upcomingEvents') }}
-              </span>
-              <span class="font-outfit text-secondary-500 font-bold dark:text-gray-200">
-                {{ upcomingThisWeek.length }}
-                {{ t('family.hub.statUpcoming') }}
-              </span>
-            </div>
-          </div>
-        </div>
+              <div class="min-w-0 flex-1">
+                <div
+                  class="font-outfit text-secondary-500 truncate text-xs font-bold dark:text-gray-200"
+                >
+                  {{ a.name }}
+                </div>
+                <div class="text-secondary-500/50 truncate text-[11px] dark:text-gray-500">
+                  {{ memberFor(a.memberId)?.name ?? '—' }}
+                </div>
+              </div>
+            </li>
+          </ul>
+          <p v-else class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500">
+            {{ t('family.hub.sidebar.noAllergies') }}
+          </p>
+        </section>
 
-        <!-- Events This Week -->
-        <div>
+        <!-- Today's care -->
+        <section
+          class="rounded-[var(--sq)] p-4 shadow-[var(--card-shadow)]"
+          style="
+            background: linear-gradient(
+              135deg,
+              rgb(174 214 241 / 30%),
+              rgb(174 214 241 / 8%)
+            );
+          "
+        >
+          <div class="nook-section-label mb-3 flex items-center gap-1.5 text-[#1E5A85]">
+            <span aria-hidden="true">💊</span>
+            <span>{{ t('family.hub.sidebar.todaysCare') }}</span>
+          </div>
+          <ul v-if="sidebarMedications.length > 0" class="space-y-2">
+            <li v-for="m in sidebarMedications" :key="m.id" class="flex items-start gap-2">
+              <div class="min-w-0 flex-1">
+                <div
+                  class="font-outfit text-secondary-500 truncate text-xs font-bold dark:text-gray-200"
+                >
+                  {{ m.name }}
+                </div>
+                <div class="text-secondary-500/60 truncate text-[11px] dark:text-gray-400">
+                  {{ m.dose }} · {{ m.frequency }}
+                </div>
+                <div class="text-secondary-500/40 truncate text-[10px] dark:text-gray-500">
+                  {{ memberFor(m.memberId)?.name ?? '—' }}
+                </div>
+              </div>
+            </li>
+          </ul>
+          <p v-else class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500">
+            {{ t('family.hub.sidebar.noMeds') }}
+          </p>
+        </section>
+
+        <!-- Events this week (compact) -->
+        <section v-if="upcomingThisWeek.length > 0">
           <div class="nook-section-label text-secondary-500 mb-3 dark:text-gray-400">
             {{ t('family.hub.eventsThisWeek') }}
           </div>
-          <div
-            v-if="upcomingThisWeek.length"
-            class="divide-y divide-[var(--tint-slate-5)] dark:divide-slate-700"
-          >
-            <div
-              v-for="event in upcomingThisWeek.slice(0, 5)"
+          <ul class="divide-y divide-[var(--tint-slate-5)] dark:divide-slate-700">
+            <li
+              v-for="event in upcomingThisWeek.slice(0, 4)"
               :key="event.activity.id + event.date"
-              class="flex gap-3 py-3"
+              class="flex gap-2.5 py-2.5"
             >
-              <!-- Color bar -->
               <div
                 class="w-1 flex-shrink-0 rounded-full"
                 :style="{ backgroundColor: getEventBarColor(event.activity.category) }"
               />
               <div class="min-w-0 flex-1">
-                <div class="text-secondary-500/40 text-xs dark:text-gray-500">
+                <div class="text-secondary-500/40 text-[10px] dark:text-gray-500">
                   {{ event.date
                   }}{{ event.activity.startTime ? ', ' + event.activity.startTime : '' }}
                 </div>
                 <div
-                  class="font-outfit text-secondary-500 truncate text-sm font-semibold dark:text-gray-200"
+                  class="font-outfit text-secondary-500 truncate text-xs font-semibold dark:text-gray-200"
                 >
                   {{ event.activity.title }}
                 </div>
-                <div class="text-secondary-500/40 text-xs dark:text-gray-500">
-                  {{
-                    normalizeAssignees(event.activity).length
-                      ? normalizeAssignees(event.activity)
-                          .map((id) => familyStore.members.find((m) => m.id === id)?.name || '')
-                          .filter(Boolean)
-                          .join(', ')
-                      : t('family.title')
-                  }}
-                </div>
               </div>
-            </div>
-          </div>
-          <p v-else class="text-secondary-500/40 text-xs dark:text-gray-500">
-            {{ t('family.hub.noEvents') }}
-          </p>
-        </div>
-      </div>
+            </li>
+          </ul>
+        </section>
+      </aside>
     </div>
 
     <!-- Add Member Modal -->
