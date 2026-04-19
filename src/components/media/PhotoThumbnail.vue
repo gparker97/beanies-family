@@ -36,9 +36,13 @@ async function resolve(): Promise<void> {
   loading.value = true;
   imgError.value = false;
   try {
-    url.value = await store.getImageUrl(props.photoId, 'thumb');
+    // Authorized blob download (same reliability fix used for avatars
+    // in `useAvatarPhotoUrl`). Drive's `thumbnailLink` tokens rotate
+    // within our cache TTL and fail after an <img> re-mount; blob URLs
+    // live in-process and survive.
+    url.value = await store.getBlobUrl(props.photoId);
   } catch (e) {
-    console.warn('[PhotoThumbnail] getImageUrl failed', e);
+    console.warn('[PhotoThumbnail] getBlobUrl failed', e);
     url.value = null;
   } finally {
     loading.value = false;
@@ -46,7 +50,10 @@ async function resolve(): Promise<void> {
   }
 }
 
-// A single retry after an <img> onerror — handles transient CDN blips.
+// A single retry after an <img> onerror — blob URLs generally don't
+// go bad, but the retry clears the store's cached blob so a
+// transient 404 on the underlying Drive file still gets one more
+// chance before we flip to the broken state.
 let retriedOnce = false;
 async function handleImgError(): Promise<void> {
   if (retriedOnce) {
@@ -54,6 +61,7 @@ async function handleImgError(): Promise<void> {
     return;
   }
   retriedOnce = true;
+  if (props.photoId) store.invalidateThumbCache(props.photoId);
   await resolve();
 }
 
