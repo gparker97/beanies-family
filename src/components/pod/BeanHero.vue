@@ -1,10 +1,15 @@
 <script setup lang="ts">
 /**
  * Top banner for a single bean's detail page. Large avatar on the left,
- * name + role + birthday on the right, back-to-Pod action anchored at
- * the top. The gradient background matches the mockup.
+ * name + role + birthday on the right, plus two action buttons on the
+ * far right: ✏️ Edit (opens the admin drawer) and ＋ Add Something
+ * (dropdown menu of all five per-bean content types).
+ *
+ * The Add menu navigates to `/pod/:memberId/<type>?add=1` — each tab
+ * component reads the query param on mount and auto-opens its form
+ * modal, keeping the add flow co-located with the tab that owns it.
  */
-import { computed } from 'vue';
+import { computed, ref, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -15,7 +20,7 @@ import type { AgeGroup, FamilyMember, Gender } from '@/types/models';
 
 const props = defineProps<{
   member: FamilyMember;
-  /** Hide the edit-pencil affordance when the viewer can't manage the pod. */
+  /** Hide the edit + add affordances when the viewer can't manage the pod. */
   canManage?: boolean;
 }>();
 
@@ -60,6 +65,67 @@ const birthdayLabel = computed(() => {
 const roleLabel = computed(() =>
   props.member.ageGroup === 'child' ? t('bean.hero.role.child') : t('bean.hero.role.parent')
 );
+
+// --- Add Something dropdown -------------------------------------------
+
+const addMenuOpen = ref(false);
+
+type AddType = 'favorites' | 'sayings' | 'notes' | 'allergies' | 'medications';
+
+const addOptions = computed(() => [
+  { type: 'favorites' as AddType, label: t('bean.hero.add.favorite') },
+  { type: 'sayings' as AddType, label: t('bean.hero.add.saying') },
+  { type: 'notes' as AddType, label: t('bean.hero.add.note') },
+  { type: 'allergies' as AddType, label: t('bean.hero.add.allergy') },
+  { type: 'medications' as AddType, label: t('bean.hero.add.medication') },
+]);
+
+function toggleAddMenu(): void {
+  addMenuOpen.value = !addMenuOpen.value;
+}
+
+function closeAddMenu(): void {
+  addMenuOpen.value = false;
+}
+
+function addFor(type: AddType): void {
+  closeAddMenu();
+  router.push(`/pod/${props.member.id}/${type}?add=1`);
+}
+
+// Outside-click + Escape to close the menu. Listeners only attach while
+// the menu is open, and we clean up on unmount so the component can be
+// safely re-mounted (e.g. switching bean detail pages via the route).
+function onDocClick(e: MouseEvent): void {
+  const target = e.target as HTMLElement | null;
+  if (!target?.closest('[data-add-menu-root]')) closeAddMenu();
+}
+function onKey(e: KeyboardEvent): void {
+  if (e.key === 'Escape') closeAddMenu();
+}
+function attachListeners(): void {
+  document.addEventListener('click', onDocClick);
+  document.addEventListener('keydown', onKey);
+}
+function detachListeners(): void {
+  document.removeEventListener('click', onDocClick);
+  document.removeEventListener('keydown', onKey);
+}
+onBeforeUnmount(detachListeners);
+
+// Re-attach on every toggle-on; detach on toggle-off. Simpler than
+// tracking state with a watcher.
+function onAddButtonClick(): void {
+  if (addMenuOpen.value) {
+    closeAddMenu();
+    detachListeners();
+  } else {
+    toggleAddMenu();
+    // Defer so the click that opened the menu doesn't immediately
+    // register as an outside-click on the same tick.
+    setTimeout(attachListeners, 0);
+  }
+}
 </script>
 
 <template>
@@ -84,21 +150,9 @@ const roleLabel = computed(() =>
         <BeanieIcon name="chevron-left" size="xs" />
         <span>{{ t('bean.backToPod') }}</span>
       </button>
-      <div class="flex items-center gap-3">
-        <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
-          {{ member.name }}
-        </h1>
-        <button
-          v-if="canManage"
-          type="button"
-          class="text-secondary-500/40 hover:text-primary-500 hover:bg-primary-500/10 rounded-lg p-1.5 transition-colors"
-          :title="t('action.edit')"
-          :aria-label="t('action.edit')"
-          @click="emit('edit')"
-        >
-          <BeanieIcon name="edit" size="sm" />
-        </button>
-      </div>
+      <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
+        {{ member.name }}
+      </h1>
       <div class="text-secondary-500/70 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
         <span>{{ roleLabel }}</span>
         <span v-if="birthdayLabel" aria-hidden="true" class="opacity-40">·</span>
@@ -106,6 +160,46 @@ const roleLabel = computed(() =>
           {{ t('bean.hero.birthday') }}: {{ birthdayLabel }}
           <span v-if="ageLabel !== null"> ({{ ageLabel }} {{ t('bean.stats.age') }})</span>
         </span>
+      </div>
+    </div>
+
+    <div v-if="canManage" class="flex flex-shrink-0 items-center gap-2">
+      <button
+        type="button"
+        class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+        @click="emit('edit')"
+      >
+        <BeanieIcon name="edit" size="xs" />
+        <span>{{ t('bean.hero.edit') }}</span>
+      </button>
+
+      <div class="relative" data-add-menu-root>
+        <button
+          type="button"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          :aria-expanded="addMenuOpen"
+          aria-haspopup="menu"
+          @click="onAddButtonClick"
+        >
+          <span aria-hidden="true">＋</span>
+          <span>{{ t('bean.hero.addSomething') }}</span>
+        </button>
+        <div
+          v-if="addMenuOpen"
+          class="absolute top-full right-0 z-10 mt-2 w-48 overflow-hidden rounded-2xl bg-white shadow-[var(--soft-shadow)] dark:bg-slate-800"
+          role="menu"
+        >
+          <button
+            v-for="opt in addOptions"
+            :key="opt.type"
+            type="button"
+            role="menuitem"
+            class="font-outfit text-secondary-500 hover:text-primary-500 block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[var(--tint-orange-4)] dark:text-gray-100 dark:hover:bg-slate-700"
+            @click="addFor(opt.type)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
       </div>
     </div>
   </header>

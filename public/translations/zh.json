@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2097
+    "translationCount": 2116
   },
   "translations": {
     "app.name": {
@@ -10489,6 +10489,101 @@
     "family.discardChanges.body": {
       "translation": "您已编辑此Bean ，但尚未保存。是否关闭而不保存？",
       "hash": "5ycjbg",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.edit": {
+      "translation": "修改",
+      "hash": "1a6ui",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.addSomething": {
+      "translation": "添加物体",
+      "hash": "slb7np",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.add.favorite": {
+      "translation": "最愛",
+      "hash": "btmsbg",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.add.saying": {
+      "translation": "说道",
+      "hash": "v4u26w",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.add.note": {
+      "translation": "注",
+      "hash": "h6vtam",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.add.allergy": {
+      "translation": "⚠️ 过敏",
+      "hash": "n9qoj3",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.hero.add.medication": {
+      "translation": "医疗",
+      "hash": "ijtzb2",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.role": {
+      "translation": "角色",
+      "hash": "1ipw6",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.birthday": {
+      "translation": "生日",
+      "hash": "ir5zml",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joined": {
+      "translation": "已加入The Pod",
+      "hash": "dqv40v",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.ageOnly": {
+      "translation": "年龄{age}",
+      "hash": "62wvzs",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.day": {
+      "translation": "{n}天前",
+      "hash": "fv6e3z",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.days": {
+      "translation": "${n} 天前",
+      "hash": "44sxuy",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.week": {
+      "translation": "{n}周前",
+      "hash": "odfyr7",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.weeks": {
+      "translation": "{n}周前",
+      "hash": "oj0dri",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.month": {
+      "translation": "{n}个月前",
+      "hash": "bhujzh",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.months": {
+      "translation": "${n} 个月前",
+      "hash": "qcvm",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.year": {
+      "translation": "{n}年前",
+      "hash": "978xh8",
+      "lastUpdated": "2026-04-19"
+    },
+    "bean.about.joinedAgo.years": {
+      "translation": "{n}年前",
+      "hash": "2cpwh5",
       "lastUpdated": "2026-04-19"
     }
   }
