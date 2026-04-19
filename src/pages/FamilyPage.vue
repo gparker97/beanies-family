@@ -15,7 +15,11 @@ import { isValidEmail } from '@/utils/email';
 import { toDateInputValue } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
 import { generateInviteQR } from '@/utils/qrCode';
-import { shareFileWithEmail } from '@/services/google/driveService';
+import {
+  shareFileWithEmail,
+  getFileMetadata,
+  listFilePermissions,
+} from '@/services/google/driveService';
 import { getValidToken } from '@/services/google/googleAuth';
 import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -229,7 +233,19 @@ async function handleShareWithEmail() {
   shareResult.value = null;
   try {
     const token = await getValidToken();
+    // Share the .beanpod file itself (existing behavior).
     await shareFileWithEmail(token, syncStore.driveFileId!, shareEmail.value, 'writer');
+    // Also share the parent folder so photos uploaded to it by any member
+    // are accessible to everyone. `shareFileWithEmail` works identically
+    // for folders (it hits the generic permissions endpoint).
+    const folderId = await resolveCanonicalFolderId(token);
+    if (folderId) {
+      await shareFileWithEmail(token, folderId, shareEmail.value, 'writer').catch((e) => {
+        // Folder share failures aren't fatal for a first-time invite — the
+        // .beanpod share already succeeded. Log so we notice in dev.
+        console.warn('[FamilyPage] Folder share failed (non-fatal)', e);
+      });
+    }
     shareResult.value = 'success';
     shareEmail.value = '';
     setTimeout(() => {
@@ -239,6 +255,61 @@ async function handleShareWithEmail() {
     shareResult.value = 'error';
   } finally {
     isSharing.value = false;
+  }
+}
+
+/**
+ * Lazy lookup of the canonical app-folder ID by reading `.beanpod`'s
+ * parent. Cached module-locally for the session so repeat shares don't
+ * refetch. Returns null if we can't determine the folder — callers treat
+ * folder share as best-effort.
+ */
+let cachedAppFolderId: string | null = null;
+async function resolveCanonicalFolderId(token: string): Promise<string | null> {
+  if (cachedAppFolderId) return cachedAppFolderId;
+  if (!syncStore.driveFileId) return null;
+  try {
+    const meta = await getFileMetadata(token, syncStore.driveFileId, 'parents');
+    const parents = meta.parents as string[] | undefined;
+    cachedAppFolderId = parents?.[0] ?? null;
+    return cachedAppFolderId;
+  } catch (e) {
+    console.warn('[FamilyPage] Could not resolve canonical folder', e);
+    return null;
+  }
+}
+
+/**
+ * One-time migration for existing families: ensure the app folder is
+ * shared with every existing family-member email. Idempotent — we call
+ * listFilePermissions first and only share with emails that aren't
+ * already writers. Runs once per session after sync settles.
+ */
+let folderShareMigrationRan = false;
+async function runFolderShareMigration(): Promise<void> {
+  if (folderShareMigrationRan) return;
+  if (!syncStore.driveFileId) return;
+  folderShareMigrationRan = true;
+  try {
+    const token = await getValidToken();
+    const folderId = await resolveCanonicalFolderId(token);
+    if (!folderId) return;
+    const existingPerms = await listFilePermissions(token, folderId);
+    const alreadyShared = new Set(
+      existingPerms.map((p) => p.emailAddress?.toLowerCase()).filter((e): e is string => !!e)
+    );
+    const memberEmails = familyStore.members
+      .map((m) => m.email?.trim().toLowerCase())
+      .filter((e): e is string => !!e);
+    for (const email of memberEmails) {
+      if (!alreadyShared.has(email)) {
+        await shareFileWithEmail(token, folderId, email, 'writer').catch((e) => {
+          console.warn('[FamilyPage] Migration folder share failed for', email, e);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('[FamilyPage] Folder share migration failed', e);
   }
 }
 
@@ -276,6 +347,19 @@ watch(
   }
 );
 onMounted(handleFamilyQueryParam);
+
+// Run the one-time folder-share migration once the .beanpod file ID is
+// available (i.e. sync has settled). Defers until after the initial load
+// so we don't compete with the sign-in path's API calls.
+watch(
+  () => syncStore.driveFileId,
+  (id, prev) => {
+    if (id && !prev) {
+      void runFolderShareMigration();
+    }
+  },
+  { immediate: true }
+);
 
 async function handleMemberSave(
   data: CreateFamilyMemberInput | { id: string; data: UpdateFamilyMemberInput }
