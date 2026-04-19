@@ -2,7 +2,34 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
 import * as repo from '@/services/automerge/repositories/medicationRepository';
+import { toDateInputValue } from '@/utils/date';
 import type { Medication } from '@/types/models';
+
+/**
+ * "Today" in the user's LOCAL timezone as a YYYY-MM-DD string.
+ * Medication startDate/endDate are saved as local-date strings from
+ * `<input type="date">`, so comparing against UTC would misclassify
+ * medications near the timezone boundary (a med starting "today"
+ * local reads as "future" in UTC east of the line, flipping the
+ * active chip to Ended). Always compare local-to-local.
+ */
+function localToday(): string {
+  return toDateInputValue(new Date());
+}
+
+/**
+ * A medication is "active" when it's either ongoing or today is
+ * within [startDate, endDate]. Undated medications are treated as
+ * active. Exported so MedicationCard / BeanMedicationsTab share one
+ * implementation — previously three drift-prone copies existed.
+ */
+export function isMedicationActive(m: Medication): boolean {
+  if (m.ongoing) return true;
+  const today = localToday();
+  if (m.endDate && m.endDate < today) return false;
+  if (m.startDate && m.startDate > today) return false;
+  return true;
+}
 
 type CreateInput = Omit<Medication, 'id' | 'createdAt' | 'updatedAt'>;
 type UpdateInput = Partial<CreateInput>;
@@ -16,19 +43,8 @@ export const useMedicationsStore = defineStore('medications', () => {
     return computed(() => medications.value.filter((m) => m.memberId === memberId));
   }
 
-  /**
-   * A medication is "active" when it's either ongoing or today is within
-   * [startDate, endDate]. Undated medications are treated as active.
-   */
-  const active = computed(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return medications.value.filter((m) => {
-      if (m.ongoing) return true;
-      if (m.endDate && m.endDate < today) return false;
-      if (m.startDate && m.startDate > today) return false;
-      return true;
-    });
-  });
+  /** Active medications (see isMedicationActive for the rule). */
+  const active = computed(() => medications.value.filter(isMedicationActive));
 
   async function loadMedications() {
     await wrapAsync(isLoading, error, async () => {

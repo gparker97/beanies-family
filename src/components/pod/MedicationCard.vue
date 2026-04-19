@@ -11,6 +11,7 @@
 import { computed } from 'vue';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
+import { isMedicationActive } from '@/stores/medicationsStore';
 import type { Medication } from '@/types/models';
 
 const props = defineProps<{ medication: Medication }>();
@@ -19,14 +20,7 @@ defineEmits<{ click: [] }>();
 const { t } = useTranslation();
 const { url: photoUrl } = useAvatarPhotoUrl(() => props.medication.photoIds?.[0]);
 
-const isActive = computed(() => {
-  const m = props.medication;
-  if (m.ongoing) return true;
-  const today = new Date().toISOString().slice(0, 10);
-  if (m.endDate && m.endDate < today) return false;
-  if (m.startDate && m.startDate > today) return false;
-  return true;
-});
+const isActive = computed(() => isMedicationActive(props.medication));
 
 const scheduleLabel = computed(() => {
   const m = props.medication;
