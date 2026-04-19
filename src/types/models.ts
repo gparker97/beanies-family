@@ -670,6 +670,22 @@ export type UpdateFamilyVacationInput = Partial<
   Omit<FamilyVacation, 'id' | 'createdAt' | 'updatedAt'>
 >;
 
+// Photo attachment — metadata only; bytes live in the user's Google Drive app folder.
+// The driveFileId is the canonical reference; thumbnailLink is looked up on demand
+// via driveService.getFileMetadata and never persisted (signed URLs expire in hours).
+export interface PhotoAttachment {
+  id: UUID;
+  driveFileId: string;
+  mime: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+  deletedAt?: ISODateString; // tombstone for GC sweep
+}
+
 // Exchange rate for currency conversion
 export interface ExchangeRate {
   from: CurrencyCode;
