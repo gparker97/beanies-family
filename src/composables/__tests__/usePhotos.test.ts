@@ -176,7 +176,10 @@ describe('usePhotos', () => {
     expect(canAdd.value).toBe(false);
     const ids = await add([makeFile()]);
     expect(ids).toHaveLength(0);
-    expect(toastCalls.some((c) => c.title === 'photos.maxReached')).toBe(true);
+    // Max-reached toast uses the pluralized copy for N > 1. Titles go
+    // through the test's `t()` stub as-is (key + interpolation), so we
+    // match by prefix to stay tolerant of the {n} substitution.
+    expect(toastCalls.some((c) => c.title.startsWith('photos.maxReached'))).toBe(true);
   });
 
   it('stops adding once remaining slots are filled', async () => {
