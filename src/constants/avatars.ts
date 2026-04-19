@@ -15,6 +15,7 @@ export type AvatarVariant =
   | 'child-male'
   | 'child-female'
   | 'child-other'
+  | 'pet-dog'
   | 'family-group'
   | 'family-filtered';
 
@@ -28,6 +29,7 @@ const AVATAR_IMAGE_PATHS: Record<AvatarVariant, string> = {
   'child-male': '/brand/beanies_baby_boy_icon_transparent_300x300.png',
   'child-female': '/brand/beanies_baby_girl_icon_transparent_300x300.png',
   'child-other': '/brand/beanies_neutral_icon_transparent_350x350.png',
+  'pet-dog': '/brand/beanies_pet_dog_icon_transparent_350x350.png',
   'family-group': '/brand/beanies_family_icon_transparent_384x384.png',
   'family-filtered': '/brand/beanies_neutral_icon_transparent_350x350.png',
 };
