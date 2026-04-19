@@ -2413,6 +2413,10 @@ const STRING_DEFS = {
     en: 'I picked the wrong week to quit counting beans.',
     beanie: 'i picked the wrong week to quit counting beans.',
   },
+  'nook.motto37': {
+    en: "There's more to life than being really, really, ridiculously beanie looking.",
+    beanie: "there's more to life than being really, really, ridiculously beanie looking.",
+  },
   'nook.statusSummary': {
     en: '{activities} activities planned today \u00B7 {tasks} tasks coming up',
     beanie: '{activities} activities today \u00B7 {tasks} tasks coming up!',

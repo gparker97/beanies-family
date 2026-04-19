@@ -79,6 +79,7 @@ const motivationalKeys = [
   'nook.motto34',
   'nook.motto35',
   'nook.motto36',
+  'nook.motto37',
 ] as const;
 
 const title = computed(() => {

@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 1954
+    "translationCount": 1955
   },
   "translations": {
     "app.name": {
@@ -9774,6 +9774,11 @@
     "photos.viewer.of": {
       "translation": "关",
       "hash": "2qf",
+      "lastUpdated": "2026-04-19"
+    },
+    "nook.motto37": {
+      "translation": "生活不仅仅是真的，真的，荒谬地看着豆豆。",
+      "hash": "2m81wf",
       "lastUpdated": "2026-04-19"
     }
   }
