@@ -136,7 +136,7 @@ function onRecipeDeleted(): void {
 
       <!-- Hero -->
       <section
-        class="mb-6 grid gap-6 rounded-[var(--sq)] border border-[rgb(230_126_34_/_12%)] bg-[#fbf3e3] p-6 lg:grid-cols-[1.1fr_1fr]"
+        class="mb-6 grid gap-5 rounded-[var(--sq)] border border-[rgb(230_126_34_/_12%)] bg-[#fbf3e3] p-4 sm:gap-6 sm:p-6 lg:grid-cols-[1.1fr_1fr]"
       >
         <PolaroidImage
           :src="heroUrl"
@@ -144,7 +144,9 @@ function onRecipeDeleted(): void {
           aspect-ratio="4 / 3"
         />
         <div class="flex flex-col">
-          <h1 class="font-outfit text-secondary-500 text-3xl leading-tight font-extrabold">
+          <h1
+            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl"
+          >
             {{ recipe.name }}
           </h1>
           <p v-if="recipe.subtitle" class="font-caveat mt-1 text-xl text-[#E67E22]">

@@ -95,10 +95,10 @@ function emailFor(c: EmergencyContact, e: Event): void {
   <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
     <!-- Hero -->
     <header
-      class="relative mb-6 flex items-start gap-5 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-6 py-6 dark:bg-slate-800"
+      class="relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6 dark:bg-slate-800"
     >
       <div
-        class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-3xl shadow-[var(--card-shadow)]"
+        class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-white text-2xl shadow-[var(--card-shadow)] sm:h-14 sm:w-14 sm:text-3xl"
         aria-hidden="true"
       >
         🏥
@@ -112,7 +112,9 @@ function emailFor(c: EmergencyContact, e: Event): void {
           <BeanieIcon name="chevron-left" size="xs" />
           <span>{{ t('bean.backToPod') }}</span>
         </button>
-        <h1 class="font-outfit text-secondary-500 text-2xl font-extrabold dark:text-gray-100">
+        <h1
+          class="font-outfit text-secondary-500 text-xl leading-tight font-extrabold sm:text-2xl dark:text-gray-100"
+        >
           {{ t('contacts.title') }}
         </h1>
         <p class="text-secondary-500/75 mt-1 text-sm">
@@ -121,10 +123,10 @@ function emailFor(c: EmergencyContact, e: Event): void {
           {{ t('contacts.subtitle') }}
         </p>
       </div>
-      <div v-if="canManagePod" class="flex flex-shrink-0 items-center gap-2">
+      <div v-if="canManagePod" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
         <button
           type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:w-auto"
           @click="openAdd"
         >
           <span aria-hidden="true">＋</span>

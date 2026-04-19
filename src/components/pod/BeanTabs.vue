@@ -79,7 +79,7 @@ function labelFor(id: BeanTabId): string {
       v-for="tab in tabs"
       :key="tab.id"
       type="button"
-      class="font-outfit flex flex-shrink-0 items-center gap-2 px-4 py-3 text-sm font-semibold transition-colors"
+      class="font-outfit flex flex-shrink-0 items-center gap-1.5 px-3 py-3 text-sm font-semibold transition-colors sm:gap-2 sm:px-4"
       :class="
         tab.id === active
           ? 'text-primary-500 border-primary-500 border-b-2'
@@ -89,7 +89,7 @@ function labelFor(id: BeanTabId): string {
       @click="$emit('select', tab.id)"
     >
       <span aria-hidden="true">{{ tab.emoji }}</span>
-      <span>{{ tab.label }}</span>
+      <span :class="tab.id === active ? 'inline' : 'hidden sm:inline'">{{ tab.label }}</span>
       <span
         v-if="tab.badge > 0"
         class="font-outfit inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[var(--tint-slate-5)] px-1.5 py-0.5 text-[10px] font-semibold"
