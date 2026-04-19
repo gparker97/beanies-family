@@ -36,6 +36,7 @@ const memberOptions = computed(() =>
     color: member.color || '#3b82f6',
     gender: member.gender,
     ageGroup: member.ageGroup,
+    isPet: member.isPet,
   }))
 );
 
@@ -83,6 +84,7 @@ watch(
                 getMemberAvatarVariant({
                   gender: singleSelectedMember.gender,
                   ageGroup: singleSelectedMember.ageGroup,
+                  isPet: singleSelectedMember.isPet,
                 })
               "
               :color="singleSelectedMember.color"
@@ -108,6 +110,7 @@ watch(
             getMemberAvatarVariant({
               gender: option.gender as Gender | undefined,
               ageGroup: option.ageGroup as AgeGroup | undefined,
+              isPet: option.isPet as boolean | undefined,
             })
           "
           :color="option.color as string"
