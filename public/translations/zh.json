@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2189
+    "translationCount": 2191
   },
   "translations": {
     "app.name": {
@@ -10949,6 +10949,16 @@
     "cookLog.photos.saveFirst": {
       "translation": "添加评分以附上照片",
       "hash": "dmm3i0",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.maxReached.one": {
+      "translation": "每件商品一张照片",
+      "hash": "s9ibnm",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.maxReached.n": {
+      "translation": "每件商品最多{n}张照片",
+      "hash": "wjb935",
       "lastUpdated": "2026-04-19"
     }
   }

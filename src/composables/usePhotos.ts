@@ -101,7 +101,13 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     }
     const remainingSlots = max.value - totalCount.value;
     if (remainingSlots <= 0) {
-      showToast('info', t('photos.maxReached'));
+      // Match the inline hint's copy — singular for max=1, interpolated
+      // "up to N" otherwise. Same strings as PhotoAttachments.
+      const msg =
+        max.value === 1
+          ? t('photos.maxReached.one')
+          : t('photos.maxReached.n').replace('{n}', String(max.value));
+      showToast('info', msg);
       return [];
     }
 
