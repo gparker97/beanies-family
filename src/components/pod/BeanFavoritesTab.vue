@@ -8,6 +8,7 @@ import { computed, ref } from 'vue';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import FavoriteFormModal from '@/components/pod/FavoriteFormModal.vue';
+import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import type { FavoriteCategory, FavoriteItem, UUID } from '@/types/models';
@@ -23,6 +24,7 @@ const favorites = computed(() => favoritesStore.byMember(props.memberId).value);
 
 const modalOpen = ref(false);
 const editing = ref<FavoriteItem | null>(null);
+useAutoOpenOnQuery(modalOpen);
 
 const CATEGORY_EMOJI: Record<FavoriteCategory, string> = {
   food: '\u{1F35C}',
