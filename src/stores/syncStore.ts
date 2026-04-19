@@ -14,6 +14,8 @@ import { useBudgetStore } from './budgetStore';
 import { useFavoritesStore } from './favoritesStore';
 import { useSayingsStore } from './sayingsStore';
 import { useMemberNotesStore } from './memberNotesStore';
+import { useAllergiesStore } from './allergiesStore';
+import { useMedicationsStore } from './medicationsStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useAuthStore } from './authStore';
@@ -1072,6 +1074,8 @@ export const useSyncStore = defineStore('sync', () => {
       const favoritesStoreInst = useFavoritesStore();
       const sayingsStoreInst = useSayingsStore();
       const memberNotesStoreInst = useMemberNotesStore();
+      const allergiesStoreInst = useAllergiesStore();
+      const medicationsStoreInst = useMedicationsStore();
 
       // Snapshot permission state before reload for diagnostics
       const prevMember = familyStoreInst.currentMember;
@@ -1092,6 +1096,8 @@ export const useSyncStore = defineStore('sync', () => {
         favoritesStoreInst.loadFavorites(),
         sayingsStoreInst.loadSayings(),
         memberNotesStoreInst.loadMemberNotes(),
+        allergiesStoreInst.loadAllergies(),
+        medicationsStoreInst.loadMedications(),
       ]);
 
       // Diagnostic: detect permission changes after reload

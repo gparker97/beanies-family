@@ -19,6 +19,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
+import { useAllergiesStore } from '@/stores/allergiesStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
 import type { FamilyMember } from '@/types/models';
 
 const props = defineProps<{
@@ -30,10 +32,20 @@ const { t } = useTranslation();
 const favoritesStore = useFavoritesStore();
 const sayingsStore = useSayingsStore();
 const memberNotesStore = useMemberNotesStore();
+const allergiesStore = useAllergiesStore();
+const medicationsStore = useMedicationsStore();
 
 const favorites = computed(() => favoritesStore.byMember(props.member.id).value);
 const sayings = computed(() => sayingsStore.byMember(props.member.id).value);
 const notes = computed(() => memberNotesStore.byMember(props.member.id).value);
+const allergies = computed(() => allergiesStore.byMember(props.member.id).value);
+const medications = computed(() => medicationsStore.byMember(props.member.id).value);
+// Severe-first highlights for the overview pill — users care most about
+// severe first, then moderate, then mild.
+const topAllergies = computed(() => {
+  const order = { severe: 0, moderate: 1, mild: 2 } as const;
+  return [...allergies.value].sort((a, b) => order[a.severity] - order[b.severity]).slice(0, 3);
+});
 
 const ageValue = computed(() => {
   const dob = props.member.dateOfBirth;
@@ -124,14 +136,55 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
         <EmptyState v-else emoji="💬" :message="t('bean.overview.sayings.empty')" />
       </OverviewModule>
 
-      <!-- Allergies (P3) -->
-      <OverviewModule :title="t('bean.tab.allergies')" emoji="⚠️" :count="0">
-        <EmptyState emoji="⚠️" :message="t('bean.overview.allergies.empty')" />
+      <!-- Allergies -->
+      <OverviewModule
+        :title="t('bean.tab.allergies')"
+        emoji="⚠️"
+        :count="allergies.length"
+        :view-all-label="allergies.length ? viewAllLabel : ''"
+        @view-all="go('allergies')"
+      >
+        <ul v-if="topAllergies.length" class="space-y-1">
+          <li
+            v-for="a in topAllergies"
+            :key="a.id"
+            class="font-outfit text-secondary-500/80 flex items-center gap-2 text-sm dark:text-gray-300"
+          >
+            <span
+              class="inline-block h-1.5 w-1.5 rounded-full"
+              :class="
+                a.severity === 'severe'
+                  ? 'bg-red-500'
+                  : a.severity === 'moderate'
+                    ? 'bg-amber-500'
+                    : 'bg-green-500'
+              "
+              aria-hidden="true"
+            />
+            {{ a.name }}
+          </li>
+        </ul>
+        <EmptyState v-else emoji="⚠️" :message="t('bean.overview.allergies.empty')" />
       </OverviewModule>
 
-      <!-- Medications (P3) -->
-      <OverviewModule :title="t('bean.tab.medications')" emoji="💊" :count="0">
-        <EmptyState emoji="💊" :message="t('bean.overview.medications.empty')" />
+      <!-- Medications -->
+      <OverviewModule
+        :title="t('bean.tab.medications')"
+        emoji="💊"
+        :count="medications.length"
+        :view-all-label="medications.length ? viewAllLabel : ''"
+        @view-all="go('medications')"
+      >
+        <ul v-if="medications.length" class="space-y-1">
+          <li
+            v-for="m in medications.slice(0, 3)"
+            :key="m.id"
+            class="font-outfit text-secondary-500/80 text-sm dark:text-gray-300"
+          >
+            · {{ m.name }} <span class="text-secondary-500/50">· {{ m.dose }}</span>
+          </li>
+        </ul>
+        <EmptyState v-else emoji="💊" :message="t('bean.overview.medications.empty')" />
       </OverviewModule>
 
       <!-- Notes -->

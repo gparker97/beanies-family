@@ -2,19 +2,11 @@ import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
 import { wrapAsync } from '@/composables/useStoreActions';
-import { __internals as photoStoreInternals } from '@/stores/photoStore';
 import type {
   FamilyMember,
   CreateFamilyMemberInput,
   UpdateFamilyMemberInput,
 } from '@/types/models';
-
-/**
- * Register familyMembers with the photo GC so orphan avatars (photos
- * whose member has been deleted) get cleaned up on the next sweep.
- * Module-level side effect — runs once when the store is imported.
- */
-photoStoreInternals.registerPhotoCollection('familyMembers');
 
 export const useFamilyStore = defineStore('family', () => {
   // State
