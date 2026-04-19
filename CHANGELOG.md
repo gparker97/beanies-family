@@ -10,8 +10,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Added
+
+- **Clickable Bean Overview modules.** Each of the five overview modules (Allergies, Favorites, Sayings, Medications, Notes) on the Bean Detail Overview tab is now a keyboard-reachable button card — click anywhere, or press Enter/Space when focused, to jump to the matching tab. Previously only the small "View all →" link was actionable.
+
+### Fixed
+
+- **Medication active-state timezone bug.** Medications with a `startDate` of "today" could flip to **Ended** for users east of UTC — the `isActive()` check compared form dates (local) against `new Date().toISOString().slice(0,10)` (UTC). Consolidated three drift-prone copies (medicationsStore / MedicationCard / BeanMedicationsTab) into a single `isMedicationActive()` helper that uses local-today via `toDateInputValue`.
+- **Sidebar "The Pod" expand/collapse on mobile.** The mobile hamburger menu's flat item mapper dropped `NavItemDef.children` entirely, so Pod's 5 sub-items (Meet the Beans / Scrapbook / Cookbook / Care & Safety / Emergency Contacts) were unreachable from phone. Rebuilt to mirror desktop's nested rendering via `useSidebarAccordion`; expand/collapse state now syncs across viewports via localStorage.
+- **Pet avatar + role not rendering.** Five `getMemberAvatarVariant()` callers (BeanCard, BeanHero, FamilyBeanRow, MemberFilterDropdown, NookYourBeans) were cherry-picking `{ gender, ageGroup }` from member and dropping the new `isPet` flag — pets rendered as humans. Also hid the Member/Admin `MemberRoleManager` dropdown for pets on BeanCard (they have `role: 'member'` internally but no real access levels).
+- **Care & Safety sidebar caps raised 5 → 6** with a "View all {N} →" overflow link to `/pod/safety` on the Heads-up / Today's Care cards, so medications beyond the fifth no longer disappear.
+- **Invite modal skipped for pet saves.** The auto-open Invite modal after creating a family member now only fires for humans — pets can't receive invites.
+- **Mobile responsiveness (two full passes).**
+  - Round 1: 7 Pod hero headers (padding `px-8 py-7` → `px-4 py-5 sm:px-8 sm:py-7`), title `text-3xl` → `text-2xl sm:text-3xl` with leading-tight + break-words, inline buttons stack full-width at mobile.
+  - BeanTabs — at mobile only the active tab shows its label; inactive tabs are emoji-only so all 6 fit without horizontal scroll.
+  - Sayings rail cards `w-56` → `w-48` on mobile; StatStrip forces 2-col at mobile; BeanCard action icons bumped from 28 px → 36 px touch targets.
+  - Round 2: 7 form modals' side-by-side grids `grid-cols-2` → `grid-cols-1 sm:grid-cols-2` so date / dose / phone-email pairs stack on 375 px; birthday picker uses weighted columns (`2fr_1fr_1.2fr`) so full month names fit; MedicationCard photo anchor `w-24 sm:w-28`.
+- **E2E `invite-join` spec updated** for `/family` → `/pod` redirect and "Add a Beanie" → "Add Beanie" rename. Logged a webkit-only onboarding flake in `docs/E2E_HEALTH.md`.
+- **Security lint unblock** — silenced a false-positive `security/detect-possible-timing-attacks` on `useFileDrop.ts`'s MIME-type equality check. This had been blocking the Security Scanning workflow (and therefore prod deploys) for ~15 pushes; deploys now green.
+- **Pod overview sidebar card sizing + overflow** already noted above.
+
 ### Changed
 
+- **Meet the Beans redesigned to the Pod overview mockup.** Unified header with kicker "The Pod · Family Scrapbook" + editable family name + one-line stats summary + inline **Invite Beanie** / **Add Beanie** buttons. Body switches to a pod layout (main column + 320 px right sidebar): bean cards sit in a 2-col responsive grid and read highlights directly from the content stores; Recent family sayings rail shows up-to-8 tilted pastel sticky notes; kraft-paper **Secret Family Recipes** strip surfaces up to 4 recipe thumbs + "Add a recipe" tile. Right sidebar replaces Family Stats / Events with **Heads up — Allergies** (severity-chipped list) + **Today's Care** (active meds) + compact Events-this-week.
+- **About ribbon on Bean Overview** — moved from white card tiles with shadow to a single flat tinted ribbon (silk→slate gradient, thin vertical dividers, small 🫘 ABOUT kicker). Visually distinguishes informational facts from the clickable dashboard modules below.
+- **Copy consistency** — "Add Bean" → **"Add Beanie"**, "Invite Bean" → **"Invite Beanie"**, pet role chip "🐾 Pet" → **"🐾 Pet Beanie"**, BeanCard heads-up label "Heads up" → **"Heads up — Allergies"**.
+- **MedicationCard active-state colour** swapped from off-brand emerald to on-brand Sky Silk (#AED6F1).
 - **Pets hidden from human-only surfaces across the app (#171).** Pets appear wherever they belong (Meet the Beans roster, scrapbook feed, member avatars, home Family Row, global search, milestones/birthdays, photo galleries) and are now filtered out of every surface where they'd be semantically wrong:
   - **Assignee pickers** — todos, activities, account/asset/goal owners, vacation travelers, onboarding activities. Fixed globally by filtering pets out inside `FamilyChipPicker` (used by every owner/assignee picker) and in the direct `memberOptions` map in `OnboardingFamily.vue`.
   - **Filter chips** — activity/todo/planner filter strips. Fixed globally by filtering pets out inside `MemberChipFilter`.
