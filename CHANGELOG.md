@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-19
+
+### Added
+
+- **Photo attachments (foundation)** — reusable capability for attaching photos to entities. Ships the plumbing (photoStore, usePhotos composable, PhotoThumbnail / PhotoViewer / PhotoAttachments components, client-side JPEG compression, offline upload queue, Drive-folder sharing on invite, one-time folder-share migration for existing families) without wiring it into any specific entity yet. Integration for activities, family avatars, etc. ships in follow-up plans. See [ADR-021](docs/adr/021-photo-storage.md).
+- **`useFileDrop` composable** — drag-drop handler extracted from `JoinPodView.vue`; reusable by the new photo UI and any future drop-zone.
+- **`useFilePicker` composable** — programmatic `<input type="file">` wrapper with accept filter, multi-file support, cancel handling, and `value` reset so re-picking the same file still fires `change`.
+
+### Changed
+
+- **`driveService.createFile`** now accepts `string | Blob | Uint8Array` with an optional `contentMimeType` (default `application/json` preserves existing `.beanpod` behavior). Required for binary photo uploads.
+- **Invite flow** now shares the `beanies.family` Drive folder alongside the `.beanpod` file so photos uploaded by any member are accessible to everyone.
+
 ## 2026-04-18
 
 ### Added
