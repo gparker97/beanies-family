@@ -127,20 +127,28 @@ Vue's reactivity system means views subscribe to state directly — there is no 
 
 All family data lives in a single Automerge CRDT document per family. Collections use `Record<string, Entity>` maps (not arrays) for clean CRDT merge semantics:
 
-| Collection     | Entity Type     | Notes                                                         |
-| -------------- | --------------- | ------------------------------------------------------------- |
-| familyMembers  | FamilyMember    | Keyed by member UUID                                          |
-| accounts       | Account         | Keyed by account UUID                                         |
-| transactions   | Transaction     | Keyed by transaction UUID                                     |
-| assets         | Asset           | Keyed by asset UUID                                           |
-| goals          | Goal            | Keyed by goal UUID                                            |
-| budgets        | Budget          | Keyed by budget UUID                                          |
-| recurringItems | RecurringItem   | Keyed by item UUID                                            |
-| todos          | TodoItem        | Keyed by todo UUID                                            |
-| activities     | FamilyActivity  | Keyed by activity UUID                                        |
-| vacations      | FamilyVacation  | Keyed by vacation UUID                                        |
-| photos         | PhotoAttachment | Metadata only — bytes live in Drive (see Photo Storage below) |
-| settings       | Settings        | Singleton (direct property)                                   |
+| Collection        | Entity Type      | Notes                                                         |
+| ----------------- | ---------------- | ------------------------------------------------------------- |
+| familyMembers     | FamilyMember     | Keyed by member UUID                                          |
+| accounts          | Account          | Keyed by account UUID                                         |
+| transactions      | Transaction      | Keyed by transaction UUID                                     |
+| assets            | Asset            | Keyed by asset UUID                                           |
+| goals             | Goal             | Keyed by goal UUID                                            |
+| budgets           | Budget           | Keyed by budget UUID                                          |
+| recurringItems    | RecurringItem    | Keyed by item UUID                                            |
+| todos             | TodoItem         | Keyed by todo UUID                                            |
+| activities        | FamilyActivity   | Keyed by activity UUID                                        |
+| vacations         | FamilyVacation   | Keyed by vacation UUID                                        |
+| photos            | PhotoAttachment  | Metadata only — bytes live in Drive (see Photo Storage below) |
+| favorites         | Favorite         | Per-member content (The Pod — see below)                      |
+| sayings           | Saying           | Per-member content (The Pod)                                  |
+| memberNotes       | MemberNote       | Per-member content (The Pod)                                  |
+| allergies         | Allergy          | Per-member, severity-sorted (The Pod)                         |
+| medications       | Medication       | Per-member, optional bottle photos (The Pod)                  |
+| recipes           | Recipe           | Family-wide, 1–4 photos each (The Pod)                        |
+| cookLogs          | CookLog          | Family-wide, `recipeId` ref, 5-star rating (The Pod)          |
+| emergencyContacts | EmergencyContact | Family-wide phonebook (The Pod)                               |
+| settings          | Settings         | Singleton (direct property)                                   |
 
 ### Automerge Persistence Cache
 
@@ -171,6 +179,34 @@ Photo bytes live in the user's Google Drive inside the **shared** `beanies.famil
 - **Missing-photo handling.** 404/403 from Drive flips a runtime `unresolved` flag on the photo. The UI shows a broken-image tile and the viewer surfaces Replace (swap `driveFileId`, keep UUID) / Remove (tombstone) actions. The flag is not persisted.
 
 `src/stores/photoStore.ts` is the orchestrator (MVO-style) that coordinates compress → upload → Automerge write → entity.photoIds. Integration plans (activities, family avatars, todos) register their collection name via `registerPhotoCollection(name)` so the zero-reference GC sweep can cascade.
+
+### The Pod (Family hub)
+
+**The Pod** replaces the old Family page with a six-capability hub backed by 8 per-type Automerge collections, all routed under `/pod/*`:
+
+| Route                     | Page                    | Surface                                                                      |
+| ------------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `/pod`                    | `MeetTheBeansPage`      | Member roster with live highlights + sayings / cookbook rails + sidebar      |
+| `/pod/:memberId/:tab?`    | `BeanDetailPage`        | Per-member: Overview / Favorites / Sayings / Allergies / Medications / Notes |
+| `/pod/safety`             | `CareSafetyPage`        | Cross-family allergies + active medications + 3 key contacts preview         |
+| `/pod/cookbook`           | `FamilyCookbookPage`    | Recipe grid + cookbook-wide stats                                            |
+| `/pod/cookbook/:recipeId` | `RecipeDetailPage`      | Recipe with ingredients / steps / notes / cook log + "I cooked this"         |
+| `/pod/contacts`           | `EmergencyContactsPage` | Family phonebook — sitters, grandparents, doctors, custom categories         |
+| `/pod/scrapbook`          | `FamilyScrapbookPage`   | Merged feed of favorites + sayings + notes across every bean                 |
+
+**Per-type collections over a discriminated union.** Each of the 8 Pod entities (Favorite, Saying, MemberNote, Allergy, Medication, Recipe, CookLog, EmergencyContact) has its own top-level collection + its own `useXxxStore` + its own repository via the `createAutomergeRepository` factory. See [ADR-022](adr/022-pod-architecture.md#1-per-type-automerge-collections-not-one-unified-scrapbookitems-map).
+
+**Photo integrations** reuse ADR-021 end-to-end. Recipes (up to 4 photos), medications (bottle photo, max 1), cook logs (dish photo, max 1), and family-member avatars (1, optional) each call `registerPhotoCollection(name)` so `photoStore.gcOrphans` cascades.
+
+**Pet Beans** are `FamilyMember` records with `isPet: true` — same shape as humans, no email / permissions / invite UI surfaced, auto-pick the `pet-dog` avatar variant via `getMemberAvatarVariant({ ..., isPet })`. Counted in the roster but excluded from invitable-member counts and the Drive folder-share migration.
+
+**Sidebar** uses a shared `AppSidebarSubNav` component with two-level nesting (section → parent-item → child-items). Expand/collapse state is module-scoped in `useSidebarAccordion` and persisted to `localStorage`, so desktop `AppSidebar` and mobile `MobileHamburgerMenu` stay in sync.
+
+**Accent font.** Caveat (handwritten) joins Outfit + Inter as a third brand-sanctioned typeface — saying quotes, polaroid captions, recipe notes only. Never UI chrome. See [ADR-022 §3](adr/022-pod-architecture.md#3-caveat-font-as-a-third-brand-sanctioned-accent).
+
+**Page composition.** Every Pod aggregator page (MeetTheBeans right sidebar, BeanOverview tab) imports `familyStore` only — each sub-module (`OverviewAllergiesModule`, `HeadsUpAllergies`, etc.) imports its own domain store. Prevents god-pages that fan-in 5+ stores.
+
+See [ADR-022](adr/022-pod-architecture.md) for the full decision record covering Pod architecture.
 
 ## Entity Relationships
 
