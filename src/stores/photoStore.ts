@@ -296,6 +296,19 @@ export const usePhotoStore = defineStore('photos', () => {
   }
 
   /**
+   * Drop this photo's cached thumbnail URL so the next `getImageUrl` call
+   * re-fetches fresh metadata from Drive. Useful when an `<img>` element
+   * fires `error` on a previously-valid URL — Drive's CDN tokens can
+   * rotate within the 30-min TTL, and a re-fetch often yields a URL that
+   * works. Safe to call even if the photo has no cached URL.
+   */
+  function invalidateThumbCache(photoId: UUID): void {
+    const photo = photos.value[photoId];
+    if (!photo) return;
+    thumbUrlCache.delete(photo.driveFileId);
+  }
+
+  /**
    * `thumbnailLink` URLs look like `https://lh3.googleusercontent.com/.../=s220`.
    * Replace the trailing size suffix to request a larger render, or append
    * a `sz=w{N}` query param as a fallback for URLs without the trailing form.
@@ -546,6 +559,7 @@ export const usePhotoStore = defineStore('photos', () => {
     addAvatarPhoto,
     getImageUrl,
     isUnresolved,
+    invalidateThumbCache,
     replacePhotoFile,
     markDeleted,
     gcOrphans,

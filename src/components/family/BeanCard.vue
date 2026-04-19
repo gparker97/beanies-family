@@ -31,7 +31,9 @@ function avatarVariant() {
   });
 }
 
-const avatarPhotoUrl = useAvatarPhotoUrl(() => props.member.avatarPhotoId);
+const { url: avatarPhotoUrl, refresh: refreshAvatar } = useAvatarPhotoUrl(
+  () => props.member.avatarPhotoId
+);
 </script>
 
 <template>
@@ -48,6 +50,7 @@ const avatarPhotoUrl = useAvatarPhotoUrl(() => props.member.avatarPhotoId);
         size="lg"
         class="flex-shrink-0"
         :aria-label="member.name"
+        @photo-error="refreshAvatar"
       />
 
       <!-- Info + highlights -->

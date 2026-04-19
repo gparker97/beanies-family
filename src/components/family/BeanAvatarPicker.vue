@@ -45,7 +45,7 @@ const { showToast } = useToast();
 const photoStore = usePhotoStore();
 
 const uploading = ref(false);
-const photoUrl = useAvatarPhotoUrl(() => props.modelValue);
+const { url: photoUrl, refresh: refreshPhotoUrl } = useAvatarPhotoUrl(() => props.modelValue);
 const photosEnabled = computed(() => photoStore.photosEnabled);
 
 const picker = useFilePicker({
@@ -94,6 +94,7 @@ function remove() {
         :photo-url="photoUrl"
         size="xl"
         :class="{ 'opacity-40 transition-opacity': uploading }"
+        @photo-error="refreshPhotoUrl"
       />
       <div
         v-if="uploading"
