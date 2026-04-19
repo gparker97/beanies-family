@@ -3,31 +3,31 @@ import { ref, watch, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useRegisterSW } from 'virtual:pwa-register/vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useSyncStore } from '@/stores/syncStore';
+import { hasOpenOverlays } from '@/utils/overlayStack';
 
 const { t } = useTranslation();
 const router = useRouter();
+const syncStore = useSyncStore();
 
-// Grace period before auto-updating on next navigation (ms)
-const AUTO_UPDATE_GRACE_MS = 60_000; // 1 minute
 // SW update polling interval (ms)
 const POLL_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
 let swRegistration: ServiceWorkerRegistration | undefined;
-const readyToAutoUpdate = ref(false);
-let graceTimer: ReturnType<typeof setTimeout> | null = null;
 let removeRouteGuard: (() => void) | null = null;
+// Banner visibility is separate from needRefresh so dismissing doesn't tear
+// down the route guard — the update still applies on the next quiet nav.
+const bannerHidden = ref(false);
 
 const { needRefresh, updateServiceWorker } = useRegisterSW({
   onRegisteredSW(_swUrl: string, registration: ServiceWorkerRegistration | undefined) {
     swRegistration = registration;
     if (registration) {
-      // Poll for updates every 5 minutes
       setInterval(() => registration.update(), POLL_INTERVAL_MS);
     }
   },
 });
 
-// Check for updates when the tab becomes visible
 function handleVisibilityChange() {
   if (document.visibilityState === 'visible' && swRegistration) {
     swRegistration.update();
@@ -35,43 +35,38 @@ function handleVisibilityChange() {
 }
 document.addEventListener('visibilitychange', handleVisibilityChange);
 
-// When an update is detected, start the grace timer → auto-update on next navigation
 watch(needRefresh, (ready) => {
   if (ready) {
-    startGraceTimer();
+    bannerHidden.value = false;
+    installRouteGuard();
   } else {
-    clearGraceTimer();
+    uninstallRouteGuard();
   }
 });
 
-function startGraceTimer() {
-  clearGraceTimer();
-  graceTimer = setTimeout(() => {
-    readyToAutoUpdate.value = true;
-    // Install a route guard that triggers the update on next navigation
-    removeRouteGuard = router.beforeEach((to, _from, next) => {
-      // Persist the user's intended destination so App.vue can resume there
-      // after the hard reload — otherwise the reload returns the user to the
-      // page they were already on and the click appears to do nothing.
-      try {
-        sessionStorage.setItem('pwa-post-update-route', to.fullPath);
-      } catch {
-        /* sessionStorage unavailable (private mode) — degrade gracefully */
-      }
-      // Trigger update — the page will reload
-      performUpdate();
-      // Don't call next() — the reload will handle navigation
-      next(false);
-    });
-  }, AUTO_UPDATE_GRACE_MS);
+function installRouteGuard() {
+  if (removeRouteGuard) return;
+  removeRouteGuard = router.beforeEach((to, _from, next) => {
+    // Defer the reload while the user is mid-edit or a save is in flight —
+    // the guard stays armed and will fire on the next clean navigation.
+    if (hasOpenOverlays() || syncStore.isSyncing) {
+      next();
+      return;
+    }
+    // Persist the intended destination so App.vue can resume there after the
+    // hard reload — otherwise the reload returns the user to the page they
+    // were already on and the click appears to do nothing.
+    try {
+      sessionStorage.setItem('pwa-post-update-route', to.fullPath);
+    } catch {
+      /* sessionStorage unavailable (private mode) — degrade gracefully */
+    }
+    performUpdate();
+    next(false);
+  });
 }
 
-function clearGraceTimer() {
-  if (graceTimer) {
-    clearTimeout(graceTimer);
-    graceTimer = null;
-  }
-  readyToAutoUpdate.value = false;
+function uninstallRouteGuard() {
   if (removeRouteGuard) {
     removeRouteGuard();
     removeRouteGuard = null;
@@ -88,19 +83,19 @@ async function performUpdate() {
 }
 
 function handleUpdate() {
-  clearGraceTimer();
   performUpdate();
 }
 
 function handleDismiss() {
-  // Dismiss the banner but keep the grace timer running —
-  // the update will still apply on the next navigation after the grace period
-  needRefresh.value = false;
+  // Hide the banner but keep the guard armed — the update still applies on
+  // the next quiet navigation. Flipping `needRefresh` here would tear down
+  // the guard via the watcher and strand the user on the stale version.
+  bannerHidden.value = true;
 }
 
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange);
-  clearGraceTimer();
+  uninstallRouteGuard();
 });
 </script>
 
@@ -114,7 +109,7 @@ onUnmounted(() => {
     leave-to-class="translate-y-4 opacity-0"
   >
     <div
-      v-if="needRefresh"
+      v-if="needRefresh && !bannerHidden"
       class="bg-secondary-500 flex items-center gap-3 rounded-lg px-4 py-3 text-sm text-white shadow-lg"
       role="alert"
     >

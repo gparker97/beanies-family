@@ -130,8 +130,9 @@ const STRING_DEFS = {
   'modal.savePet': { en: 'Save Pet', beanie: 'save pet' },
   'modal.addPetToPod': { en: 'Add to Family', beanie: 'add to pod' },
   'modal.petHint': {
-    en: "Pets are part of the pod but can't sign in, get invites, or manage anything.",
-    beanie: "pets are part of the pod but can't sign in, get invites, or manage anything.",
+    en: "Pets are part of your pod, but don't ask them to sign in — they're notoriously bad at using computers.",
+    beanie:
+      "pets are part of your pod, but don't ask them to sign in — they're notoriously bad at using computers.",
   },
   'modal.addToPod': { en: 'Add to Family', beanie: 'add to pod' },
   'modal.welcomeToPod': { en: 'Welcome to the family!', beanie: 'welcome to the pod!' },

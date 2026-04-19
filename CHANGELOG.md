@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Fixed
+
+- **PWA update-on-nav reliably fires after an overnight tab sleep.** The prior implementation installed the route guard only after a 60-second grace timer — which reset every time `needRefresh` flipped true. When a tab sat overnight and the new version was detected on wake (via the `visibilitychange` handler), the grace clock started fresh, so the user's first click slipped through before the guard armed and the update never applied. The grace timer is now gone: the guard arms the instant an update is detected and defers the reload only while a modal/drawer is open or a Drive save is in flight, so clicking nav never interrupts a mid-edit or an in-flight save. Also fixed a pre-existing bug where dismissing the update banner tore down the guard — dismiss now only hides the UI.
+
+### Changed
+
+- **Friendlier copy on the pet hint** in the Add/Edit Beanie drawer: "Pets are part of your pod, but don't ask them to sign in — they're notoriously bad at using computers." (Replaces the prior matter-of-fact "Pets are part of the pod but can't sign in, get invites, or manage anything.")
+
 ### Added
 
 - **Clickable Bean Overview modules.** Each of the five overview modules (Allergies, Favorites, Sayings, Medications, Notes) on the Bean Detail Overview tab is now a keyboard-reachable button card — click anywhere, or press Enter/Space when focused, to jump to the matching tab. Previously only the small "View all →" link was actionable.
