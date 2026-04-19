@@ -1,7 +1,9 @@
 # Project Status
 
-> **Last updated:** 2026-04-19
-> **Updated by:** Claude (session covered: photo attachment foundation — full reusable capability across services, store, composables, UI components, invite-flow migration, ADR, and docs. 10 commits pushed; 1060 unit tests green.)
+> **Last updated:** 2026-04-19 (The Pod P1)
+> **Updated by:** Claude (session covered: The Pod — Phase 1 foundation. Plan: `docs/plans/2026-04-19-the-pod-scrapbook-cookbook.md`. Five sub-commits (P1-A through P1-E): 8 new Automerge collections + entity types, 7 stubbed stores wired through `wrapAsync` + `automergeRepository`, photo-foundation extensions (`maxDimension`, `max` prop, `photoUrl` on BeanieAvatar, Caveat font), sidebar two-level nesting (`AppSidebarSubNav`) with The Pod parent + 5 children under Treehouse, `/family` → `/pod` redirect, FamilyPage → MeetTheBeansPage + FamilyMemberCard → BeanCard renames, end-to-end avatar photo upload (`photoStore.addAvatarPhoto` + `collectReferencedPhotoIds` avatarPhotoId-scalar support + `BeanAvatarPicker` component + orphan-on-cancel tombstoning + `useAvatarPhotoUrl` composable), BeanCard renders uploaded avatars, "Meet the Beans" page title. 1062 unit tests green.)
+>
+> **Previous update (2026-04-19, photos):** Claude (session covered: photo attachment foundation — full reusable capability across services, store, composables, UI components, invite-flow migration, ADR, and docs. 10 commits pushed; 1060 unit tests green.)
 >
 > **Previous update (2026-04-17):** Claude (session covered: blog publishing, content authoring, infrastructure cleanup, architecture documentation, E2E fixes)
 >
@@ -17,7 +19,7 @@
 **Photo attachments — integrations (follow-ups):**
 
 - **Activity photos** — first integration surface per the plan. Add `photoIds?: UUID[]` to `FamilyActivity`, drop `<PhotoAttachments>` into `ActivityViewEditModal.vue`, wire `updatePhotoIds` through `activityStore.update`, call `registerPhotoCollection('activities')` on app init. Low effort — all the plumbing is already in `src/stores/photoStore.ts` + `src/composables/usePhotos.ts` + `src/components/media/`.
-- **Family-member avatar photos** — second integration. Single-photo variant of `<PhotoAttachments>` (max: 1) on `FamilyMemberCard` / `FamilyMemberModal`. Swaps out the beanie PNG when a user-uploaded photo is present.
+- **~~Family-member avatar photos~~** — **shipped 2026-04-19 with The Pod P1-D.** `photoStore.addAvatarPhoto` + `BeanAvatarPicker` component wired into FamilyMemberModal. BeanCard renders uploaded avatars via `useAvatarPhotoUrl` composable. GC cascade covers avatar scalar refs (`collectReferencedPhotoIds` scans both `photoIds[]` and `avatarPhotoId`).
 - **E2E for photo flow** — deferred in this plan. Needs Drive mocking; tracks against the 25-test budget when added.
 - **`gcOrphanedDriveFiles` Drive-side sweep** — noted as follow-up in ADR-021. Only needed if synchronous rollback ever fails silently; low priority.
 - **Manual verification in dev** — run `npm run dev` and attach a photo to an activity once the activity integration ships. Confirm Drive `thumbnailLink?sz=w2048` works at full res; if capped, flip to the `alt=media` Blob fallback described in the plan.
