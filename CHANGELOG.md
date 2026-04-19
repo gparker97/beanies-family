@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-19
 
+### Added
+
+- **Pet Beans.** Add your dog, cat, or other furry family member to the pod. The Add / Edit Bean drawer now has a third role pill — 🐾 **Pet Bean** — alongside Parent Bean and Little Bean. When Pet is selected, email and permissions fields disappear (pets never receive invites, sign in, or manage anything) and the avatar swaps to a cute beanie dog in the Heritage-Orange palette. Pets count toward the family total in stats and roster views, can have favorites / allergies / medications / sayings / notes like any other bean, and never show the amber "waiting to join" badge or the share-invite button. Uses a new `isPet` flag on `FamilyMember` (additive, non-breaking) plus a new `'pet-dog'` avatar variant backed by `public/brand/beanies_pet_dog_icon_transparent_350x350.png`.
+
 ### Changed
 
 - **Meet the Beans — Pod overview redesign.** Page now matches the approved mockup: unified header with kicker ("The Pod · Family Scrapbook"), family name (editable), and one-line stats summary ("5 beans · 12 favorites · 9 sayings · 4 recipes · 2 active meds · 3 allergies"), plus inline **Invite Bean** + **Add Bean** buttons on the same row. Body switches to a pod layout (main column + 320px right sidebar): bean cards sit in a 2-col responsive grid and read their highlights directly from the content stores; a **Recent family sayings** rail shows up-to-8 tilted pastel sticky notes; a kraft-paper **Secret Family Recipes** strip surfaces up to 4 recipe thumbs + an "Add a recipe" tile. The sidebar replaces the old Family Stats / Events panel with a **Heads up — allergies** card (severity-chipped list across all beans) and a **Today's care** card (active meds across the family), with a compact Events-this-week list below.

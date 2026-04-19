@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2273
+    "translationCount": 2280
   },
   "translations": {
     "app.name": {
@@ -11369,6 +11369,41 @@
     "family.card.view": {
       "translation": "查看 %{name}",
       "hash": "u52ag4",
+      "lastUpdated": "2026-04-19"
+    },
+    "modal.petBean": {
+      "translation": "宠物豆",
+      "hash": "81zhw1",
+      "lastUpdated": "2026-04-19"
+    },
+    "modal.addPet": {
+      "translation": "添加宠物",
+      "hash": "8ibh0g",
+      "lastUpdated": "2026-04-19"
+    },
+    "modal.editPet": {
+      "translation": "编辑宠物",
+      "hash": "rjd0cp",
+      "lastUpdated": "2026-04-19"
+    },
+    "modal.savePet": {
+      "translation": "保存宠物",
+      "hash": "x8fd38",
+      "lastUpdated": "2026-04-19"
+    },
+    "modal.addPetToPod": {
+      "translation": "新增至家庭",
+      "hash": "t8xc7q",
+      "lastUpdated": "2026-04-19"
+    },
+    "modal.petHint": {
+      "translation": "宠物是吊舱的一部分，但不能登录、获得邀请或管理任何东西。",
+      "hash": "vijvh2",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.role.pet": {
+      "translation": "PET",
+      "hash": "8h1slc",
       "lastUpdated": "2026-04-19"
     }
   }

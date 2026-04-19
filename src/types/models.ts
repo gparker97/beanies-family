@@ -95,6 +95,12 @@ export interface FamilyMember {
   passwordHash?: string; // PBKDF2 hash in "salt:hash" format
   requiresPassword: boolean; // true when member needs to set a password
   lastLoginAt?: ISODateString;
+  /**
+   * True when this member is a pet. Pets count in the family roster and
+   * can have favorites, allergies, and medications, but never receive an
+   * invite, own permissions, or need a password. Added 2026-04.
+   */
+  isPet?: boolean;
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }

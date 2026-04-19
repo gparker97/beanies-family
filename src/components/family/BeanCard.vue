@@ -192,6 +192,7 @@ const ageLabel = computed(() => {
 });
 
 const roleLabel = computed(() => {
+  if (props.member.isPet) return t('family.role.pet');
   if (props.member.role === 'owner') return t('family.role.owner');
   return props.member.ageGroup === 'child' ? t('bean.hero.role.child') : t('bean.hero.role.parent');
 });
@@ -261,7 +262,7 @@ const severeAllergyCount = computed(
                 <BeanieIcon name="edit" size="sm" />
               </button>
               <button
-                v-if="member.requiresPassword && canManage"
+                v-if="member.requiresPassword && !member.isPet && canManage"
                 class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
                 :title="t('family.copyInviteLinkHint')"
                 @click.stop="emit('share-invite')"
@@ -287,7 +288,7 @@ const severeAllergyCount = computed(
             </span>
             <span v-if="ageLabel !== null">· age {{ ageLabel }}</span>
             <span
-              v-if="member.requiresPassword"
+              v-if="member.requiresPassword && !member.isPet"
               class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
             >
               <span class="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />

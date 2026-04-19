@@ -7,15 +7,16 @@ import {
 } from '@/constants/avatars';
 
 describe('AVATAR_IMAGE_PATHS', () => {
-  it('has all 8 expected variants', () => {
+  it('has all 9 expected variants', () => {
     const variants = getAllAvatarVariants();
-    expect(variants).toHaveLength(8);
+    expect(variants).toHaveLength(9);
     expect(variants).toContain('adult-male');
     expect(variants).toContain('adult-female');
     expect(variants).toContain('adult-other');
     expect(variants).toContain('child-male');
     expect(variants).toContain('child-female');
     expect(variants).toContain('child-other');
+    expect(variants).toContain('pet-dog');
     expect(variants).toContain('family-group');
     expect(variants).toContain('family-filtered');
   });

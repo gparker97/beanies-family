@@ -136,9 +136,9 @@ const upcomingThisWeek = computed(() => {
   return activityStore.upcomingActivities.filter((e) => e.date >= today && e.date <= weekFromNow);
 });
 
-/** True when there are non-owner members who could receive an invite link. */
+/** True when there are non-owner, non-pet members who could receive an invite link. */
 const hasInvitableMembers = computed(
-  () => familyStore.members.filter((m) => m.role !== 'owner').length > 0
+  () => familyStore.members.filter((m) => m.role !== 'owner' && !m.isPet).length > 0
 );
 
 const showAddModal = ref(false);
@@ -349,6 +349,7 @@ async function runFolderShareMigration(): Promise<void> {
       existingPerms.map((p) => p.emailAddress?.toLowerCase()).filter((e): e is string => !!e)
     );
     const memberEmails = familyStore.members
+      .filter((m) => !m.isPet)
       .map((m) => m.email?.trim().toLowerCase())
       .filter((e): e is string => !!e)
       .filter((e) => !isUnshareableEmail(e));
@@ -677,9 +678,7 @@ function cancelEditFamilyName() {
         <!-- Heads up — allergies -->
         <section
           class="rounded-[var(--sq)] p-4 shadow-[var(--card-shadow)]"
-          style="
-            background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(230 126 34 / 4%));
-          "
+          style="background: linear-gradient(135deg, rgb(241 93 34 / 8%), rgb(230 126 34 / 4%))"
         >
           <div class="nook-section-label mb-3 flex items-center gap-1.5 text-[#F15D22]">
             <span aria-hidden="true">⚠️</span>
@@ -719,13 +718,7 @@ function cancelEditFamilyName() {
         <!-- Today's care -->
         <section
           class="rounded-[var(--sq)] p-4 shadow-[var(--card-shadow)]"
-          style="
-            background: linear-gradient(
-              135deg,
-              rgb(174 214 241 / 30%),
-              rgb(174 214 241 / 8%)
-            );
-          "
+          style="background: linear-gradient(135deg, rgb(174 214 241 / 30%), rgb(174 214 241 / 8%))"
         >
           <div class="nook-section-label mb-3 flex items-center gap-1.5 text-[#1E5A85]">
             <span aria-hidden="true">💊</span>

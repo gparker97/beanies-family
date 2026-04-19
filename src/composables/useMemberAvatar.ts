@@ -11,10 +11,12 @@ export function getAvatarVariant(gender: Gender, ageGroup: AgeGroup): AvatarVari
 
 /**
  * Get avatar variant for a family member, with defaults for missing fields.
+ * Pets always resolve to the pet-dog icon regardless of gender/ageGroup.
  */
 export function getMemberAvatarVariant(
-  member: Partial<Pick<FamilyMember, 'gender' | 'ageGroup'>>
+  member: Partial<Pick<FamilyMember, 'gender' | 'ageGroup' | 'isPet'>>
 ): AvatarVariant {
+  if (member.isPet) return 'pet-dog';
   const gender: Gender = member.gender ?? 'other';
   const ageGroup: AgeGroup = member.ageGroup ?? 'adult';
   return getAvatarVariant(gender, ageGroup);

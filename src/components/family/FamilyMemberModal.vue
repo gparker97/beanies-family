@@ -12,7 +12,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { confirm } from '@/composables/useConfirm';
 import { isTemporaryEmail } from '@/utils/email';
-import { getAvatarVariant } from '@/composables/useMemberAvatar';
+import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { usePhotoStore } from '@/stores/photoStore';
 import type {
   FamilyMember,
@@ -48,10 +48,12 @@ const MEMBER_COLORS = [
   { value: '#ec4899', gradient: 'linear-gradient(135deg, #ec4899, #f472b6)' },
 ];
 
-// Role chips — parent and child only (admin/permissions handled later)
+// Role chips — parent / child / pet. Pets are part of the pod but never
+// invited, signed in, or granted permissions (see handleSave).
 const roleOptions = computed(() => [
   { value: 'parent', label: t('modal.parentBean'), icon: '🫘' },
   { value: 'child', label: t('modal.littleBean'), icon: '🌱' },
+  { value: 'pet', label: t('modal.petBean'), icon: '🐾' },
 ]);
 
 const genderChipOptions = computed(() => [
@@ -138,11 +140,18 @@ const isDirty = computed(
   () => initialSnapshot.value !== '' && takeSnapshot() !== initialSnapshot.value
 );
 
-// Derived ageGroup from beanRole
+// True when the active role is pet — toggles pet-specific UI + data path.
+const isPet = computed(() => beanRole.value === 'pet');
+
+// Derived ageGroup from beanRole. Pets pin to 'adult' as a harmless default —
+// the avatar + roster UI always branch on isPet, so age buckets don't leak.
 const ageGroup = computed<AgeGroup>(() => (beanRole.value === 'child' ? 'child' : 'adult'));
 
-// Avatar variant derived from gender + ageGroup
-const avatarVariant = computed(() => getAvatarVariant(gender.value, ageGroup.value));
+// Avatar variant: pets always show the pet-dog icon; everyone else uses
+// gender + age group.
+const avatarVariant = computed(() =>
+  getMemberAvatarVariant({ gender: gender.value, ageGroup: ageGroup.value, isPet: isPet.value })
+);
 
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
@@ -153,7 +162,7 @@ const { isEditing, isSubmitting } = useFormModal(
       name.value = member.name;
       email.value = isTemporaryEmail(member.email) ? '' : member.email;
       gender.value = member.gender || 'other';
-      beanRole.value = member.ageGroup === 'child' ? 'child' : 'parent';
+      beanRole.value = member.isPet ? 'pet' : member.ageGroup === 'child' ? 'child' : 'parent';
       color.value = member.color;
       dobMonth.value = member.dateOfBirth?.month?.toString() ?? '1';
       dobDay.value = member.dateOfBirth?.day?.toString() ?? '1';
@@ -243,28 +252,43 @@ const isOwnerMember = computed(() => props.member?.role === 'owner');
 
 const canSave = computed(() => name.value.trim().length > 0);
 
-const modalTitle = computed(() =>
-  isEditing.value ? t('family.editMember') : t('modal.addMember')
-);
+const modalTitle = computed(() => {
+  if (isPet.value) {
+    return isEditing.value ? t('modal.editPet') : t('modal.addPet');
+  }
+  return isEditing.value ? t('family.editMember') : t('modal.addMember');
+});
 
-const saveLabel = computed(() => (isEditing.value ? t('modal.saveMember') : t('modal.addToPod')));
+const modalIcon = computed(() => (isPet.value ? '🐾' : '🫘'));
+
+const saveLabel = computed(() => {
+  if (isPet.value) {
+    return isEditing.value ? t('modal.savePet') : t('modal.addPetToPod');
+  }
+  return isEditing.value ? t('modal.saveMember') : t('modal.addToPod');
+});
 
 function handleSave() {
   if (!canSave.value) return;
   isSubmitting.value = true;
 
   try {
+    // Pets never receive an invite, login, or permission flags — force
+    // everything off on the data path regardless of any stale form state.
     const data: Record<string, unknown> = {
       name: name.value.trim(),
-      email: email.value.trim() || `${Date.now()}@temp.beanies.family`,
+      email: isPet.value
+        ? `${Date.now()}@temp.beanies.family`
+        : email.value.trim() || `${Date.now()}@temp.beanies.family`,
       gender: gender.value,
       ageGroup: ageGroup.value,
       role: 'member' as const,
       color: color.value,
-      requiresPassword: true,
-      canViewFinances: canViewFinances.value,
-      canEditActivities: canEditActivities.value,
-      canManagePod: canManagePod.value,
+      requiresPassword: !isPet.value,
+      canViewFinances: isPet.value ? false : canViewFinances.value,
+      canEditActivities: isPet.value ? false : canEditActivities.value,
+      canManagePod: isPet.value ? false : canManagePod.value,
+      isPet: isPet.value,
     };
 
     // Attach date of birth
@@ -322,7 +346,7 @@ function handleDelete() {
     variant="drawer"
     :open="open"
     :title="modalTitle"
-    icon="🫘"
+    :icon="modalIcon"
     icon-bg="var(--tint-orange-8)"
     size="narrow"
     :save-label="readOnly ? t('action.close') : saveLabel"
@@ -363,9 +387,15 @@ function handleDelete() {
       </div>
     </FormFieldGroup>
 
-    <!-- 4. Role chips (parent/child only) -->
+    <!-- 4. Role chips (parent / child / pet) -->
     <FormFieldGroup :label="t('modal.role')">
       <FrequencyChips v-model="beanRole" :options="roleOptions" :disabled="readOnly" />
+      <p
+        v-if="isPet"
+        class="font-inter mt-2 text-xs text-[var(--color-text-muted)] dark:text-gray-400"
+      >
+        {{ t('modal.petHint') }}
+      </p>
     </FormFieldGroup>
 
     <!-- 5. Gender chips -->
@@ -373,8 +403,8 @@ function handleDelete() {
       <FrequencyChips v-model="gender" :options="genderChipOptions" :disabled="readOnly" />
     </FormFieldGroup>
 
-    <!-- 6. Email -->
-    <FormFieldGroup :label="t('family.email')" optional>
+    <!-- 6. Email — humans only (pets never receive an invite) -->
+    <FormFieldGroup v-if="!isPet" :label="t('family.email')" optional>
       <BaseInput v-model="email" type="email" placeholder="bean@example.com" :disabled="readOnly" />
     </FormFieldGroup>
 
@@ -387,8 +417,8 @@ function handleDelete() {
       </div>
     </FormFieldGroup>
 
-    <!-- 8. Permissions (collapsible, hidden in readOnly mode) -->
-    <div v-if="!readOnly">
+    <!-- 8. Permissions (collapsible) — humans only, hidden in readOnly mode -->
+    <div v-if="!readOnly && !isPet">
       <button
         type="button"
         class="font-outfit text-primary-500 text-sm font-semibold transition-colors hover:underline"
