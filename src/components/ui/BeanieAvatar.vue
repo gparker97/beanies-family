@@ -28,6 +28,16 @@ const props = withDefaults(defineProps<Props>(), {
   photoUrl: null,
 });
 
+/**
+ * Emitted when the user-supplied `photoUrl` fails to load. Consumers that
+ * resolved the URL from Drive (see `useAvatarPhotoUrl`) listen for this
+ * to drop their thumb-URL cache and re-fetch once — the beanie variant
+ * stays visible in the meantime, so this is best-effort recovery.
+ */
+const emit = defineEmits<{
+  'photo-error': [];
+}>();
+
 const SIZE_CLASSES: Record<string, string> = {
   xs: 'h-6 w-6',
   sm: 'h-8 w-8',
@@ -57,6 +67,7 @@ function onPhotoError() {
   photoLoaded.value = false;
   if (props.photoUrl) {
     console.warn('[beanieAvatar] photo failed to load, falling back to beanie', props.photoUrl);
+    emit('photo-error');
   }
 }
 </script>
