@@ -1809,11 +1809,55 @@ const STRING_DEFS = {
 
   // Family Hub
   'family.hub.title': { en: 'Meet the Beans', beanie: 'meet the beans' },
+  'family.hub.kicker': { en: 'The Pod · Family Scrapbook', beanie: 'the pod · family scrapbook' },
+  'family.hub.stats.summary': {
+    en: '{beans} beans · {favorites} favorites · {sayings} sayings · {recipes} recipes · {meds} active meds · {allergies} allergies',
+    beanie:
+      '{beans} beans · {favorites} favorites · {sayings} sayings · {recipes} recipes · {meds} active meds · {allergies} allergies',
+  },
+  'family.hub.inviteBean': { en: 'Invite Bean', beanie: 'invite bean' },
+  'family.hub.addBean': { en: 'Add Bean', beanie: 'add bean' },
+  'family.hub.recentSayings': {
+    en: 'Recent family sayings 💬',
+    beanie: 'recent family sayings 💬',
+  },
+  'family.hub.recentSayings.viewAll': { en: 'See all →', beanie: 'see all →' },
+  'family.hub.recentSayings.empty': {
+    en: 'Capture a few sayings and they show up here.',
+    beanie: 'capture a few sayings and they show up here',
+  },
+  'family.hub.cookbook.title': { en: 'Secret Family Recipes', beanie: 'secret family recipes' },
+  'family.hub.cookbook.sub': {
+    en: "shhh… don't tell anyone 🤫",
+    beanie: "shhh… don't tell anyone 🤫",
+  },
+  'family.hub.cookbook.open': { en: 'Open cookbook →', beanie: 'open cookbook →' },
+  'family.hub.cookbook.add': { en: 'Add a recipe', beanie: 'add a recipe' },
+  'family.hub.cookbook.noPhoto': { en: 'no photo yet', beanie: 'no photo yet' },
+  'family.hub.sidebar.allergies': { en: 'Heads up — allergies', beanie: 'heads up — allergies' },
+  'family.hub.sidebar.todaysCare': { en: "Today's care", beanie: "today's care" },
+  'family.hub.sidebar.noAllergies': {
+    en: 'No allergies on file across the family.',
+    beanie: 'no allergies on file across the family',
+  },
+  'family.hub.sidebar.noMeds': {
+    en: 'No active medications across the family.',
+    beanie: 'no active meds across the family',
+  },
+  'family.card.fave': { en: 'Fave', beanie: 'fave' },
+  'family.card.latestSaying': { en: 'Latest saying', beanie: 'latest saying' },
+  'family.card.headsUp': { en: 'Heads up', beanie: 'heads up' },
+  'family.card.care': { en: 'Care', beanie: 'care' },
+  'family.card.noteLabel': { en: 'Notes', beanie: 'notes' },
+  'family.card.allergy': { en: 'allergy', beanie: 'allergy' },
+  'family.card.allergies': { en: 'allergies', beanie: 'allergies' },
+  'family.card.med': { en: 'med', beanie: 'med' },
+  'family.card.meds': { en: 'meds', beanie: 'meds' },
+  'family.card.view': { en: 'View {name} →', beanie: 'view {name} →' },
   'family.hub.subtitle': {
     en: '{count} Beans Growing Strong',
     beanie: '{count} beans growing strong',
   },
-  'family.hub.addBean': { en: '+ Add a Beanie', beanie: '+ add a beanie' },
   'family.hub.familyStats': { en: 'Family Stats', beanie: 'family stats' },
   'family.hub.members': { en: 'Members', beanie: 'beanies' },
   'family.hub.totalActivities': { en: 'Total Activities', beanie: 'total activities' },
