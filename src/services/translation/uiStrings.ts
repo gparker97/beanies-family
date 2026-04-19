@@ -1854,6 +1854,14 @@ const STRING_DEFS = {
     en: 'No active medications across the family.',
     beanie: 'no active meds across the family',
   },
+  'family.hub.sidebar.viewAllAllergies': {
+    en: 'View all {count} →',
+    beanie: 'view all {count} →',
+  },
+  'family.hub.sidebar.viewAllMeds': {
+    en: 'View all {count} →',
+    beanie: 'view all {count} →',
+  },
   'family.card.fave': { en: 'Fave', beanie: 'fave' },
   'family.card.latestSaying': { en: 'Latest saying', beanie: 'latest saying' },
   'family.card.headsUp': { en: 'Heads up', beanie: 'heads up' },

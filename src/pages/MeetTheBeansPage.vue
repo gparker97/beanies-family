@@ -106,16 +106,22 @@ function thumbForRecipe(recipeId: string): string | null {
   return recipeThumbCache.value[pid] ?? null;
 }
 
-// Sidebar: allergies across all members, severity-sorted, capped.
+// Sidebar: allergies across all members, severity-sorted. Cap at 6 so
+// the card stays scannable; overflow flows to /pod/safety via the
+// "View all N →" link that renders below when totals exceed the cap.
+const SIDEBAR_LIMIT = 6;
 const SEVERITY_ORDER = { severe: 0, moderate: 1, mild: 2 } as const;
-const sidebarAllergies = computed(() =>
-  [...allergiesStore.allergies]
-    .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
-    .slice(0, 5)
+const sortedAllergies = computed(() =>
+  [...allergiesStore.allergies].sort(
+    (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]
+  )
 );
+const sidebarAllergies = computed(() => sortedAllergies.value.slice(0, SIDEBAR_LIMIT));
+const totalAllergies = computed(() => allergiesStore.allergies.length);
 
 // Sidebar: today's active medications across the family.
-const sidebarMedications = computed(() => medicationsStore.active.slice(0, 5));
+const sidebarMedications = computed(() => medicationsStore.active.slice(0, SIDEBAR_LIMIT));
+const totalActiveMedications = computed(() => medicationsStore.active.length);
 
 function memberFor(id: string): FamilyMember | undefined {
   return familyStore.members.find((m) => m.id === id);
@@ -722,6 +728,15 @@ function cancelEditFamilyName() {
           <p v-else class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500">
             {{ t('family.hub.sidebar.noAllergies') }}
           </p>
+          <router-link
+            v-if="totalAllergies > sidebarAllergies.length"
+            to="/pod/safety"
+            class="font-outfit mt-3 inline-flex text-xs font-semibold text-[#F15D22] hover:underline"
+          >
+            {{
+              t('family.hub.sidebar.viewAllAllergies').replace('{count}', String(totalAllergies))
+            }}
+          </router-link>
         </section>
 
         <!-- Today's care -->
@@ -750,7 +765,21 @@ function cancelEditFamilyName() {
               </div>
             </li>
           </ul>
-          <p v-else class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500">
+          <router-link
+            v-if="
+              sidebarMedications.length > 0 && totalActiveMedications > sidebarMedications.length
+            "
+            to="/pod/safety"
+            class="font-outfit mt-3 inline-flex text-xs font-semibold text-[#1E5A85] hover:underline"
+          >
+            {{
+              t('family.hub.sidebar.viewAllMeds').replace('{count}', String(totalActiveMedications))
+            }}
+          </router-link>
+          <p
+            v-if="sidebarMedications.length === 0"
+            class="font-inter text-secondary-500/50 text-xs italic dark:text-gray-500"
+          >
             {{ t('family.hub.sidebar.noMeds') }}
           </p>
         </section>

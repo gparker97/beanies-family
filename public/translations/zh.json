@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2280
+    "translationCount": 2282
   },
   "translations": {
     "app.name": {
@@ -11404,6 +11404,16 @@
     "family.role.pet": {
       "translation": "PET",
       "hash": "8h1slc",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.sidebar.viewAllAllergies": {
+      "translation": "查看所有计数",
+      "hash": "gwdotd",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.hub.sidebar.viewAllMeds": {
+      "translation": "查看所有计数",
+      "hash": "gwdotd",
       "lastUpdated": "2026-04-19"
     }
   }
