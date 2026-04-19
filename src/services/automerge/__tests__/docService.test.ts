@@ -211,6 +211,14 @@ describe('docService', () => {
         activities: {},
         vacations: {},
         photos: {},
+        favorites: {},
+        sayings: {},
+        memberNotes: {},
+        allergies: {},
+        medications: {},
+        recipes: {},
+        cookLogs: {},
+        emergencyContacts: {},
         settings: null,
       };
       const newDoc = Automerge.from(
