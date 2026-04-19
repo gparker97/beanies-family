@@ -416,6 +416,14 @@ const STRING_DEFS = {
     en: 'The bottle photo will be cleaned up after 24 hours.',
     beanie: 'the bottle photo will be cleaned up after 24 hours',
   },
+  'family.discardChanges.title': {
+    en: 'Discard your changes?',
+    beanie: 'discard your changes?',
+  },
+  'family.discardChanges.body': {
+    en: "You've edited this bean but haven't saved. Close without saving?",
+    beanie: "you've edited this bean but haven't saved — close without saving?",
+  },
   // Care & Safety page
   'careSafety.title': { en: 'Care & Safety', beanie: 'care & safety' },
   'careSafety.subtitle': {

@@ -27,6 +27,9 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useSayingsStore } from '@/stores/sayingsStore';
+import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { getActivityCategoryColor } from '@/constants/activityCategories';
 import type {
   ActivityCategory,
@@ -42,6 +45,9 @@ const familyContextStore = useFamilyContextStore();
 const syncStore = useSyncStore();
 const activityStore = useActivityStore();
 const todoStore = useTodoStore();
+const favoritesStore = useFavoritesStore();
+const sayingsStore = useSayingsStore();
+const memberNotesStore = useMemberNotesStore();
 const { t } = useTranslation();
 const { canManagePod } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
@@ -102,6 +108,47 @@ const memberHighlights = computed(() => {
           emoji: '📋',
           title: `📋 ${memberTodos.length} ${memberTodos.length === 1 ? 'task' : 'tasks'}`,
           subtitle: t('family.hub.highlight.thisWeek'),
+        });
+      }
+    }
+
+    // 4. Most-recent saying (backward-looking fallback when there's no
+    //    upcoming calendar activity for this bean).
+    if (items.length < 2) {
+      const sayings = sayingsStore.byMember(m.id).value;
+      const latest = sayings[sayings.length - 1];
+      if (latest) {
+        const clipped =
+          latest.words.length > 48 ? `${latest.words.slice(0, 45).trimEnd()}…` : latest.words;
+        items.push({
+          emoji: '💬',
+          title: `💬 "${clipped}"`,
+          subtitle: latest.saidOn ?? t('bean.tab.sayings'),
+        });
+      }
+    }
+
+    // 5. Favorites summary.
+    if (items.length < 2) {
+      const favorites = favoritesStore.byMember(m.id).value;
+      if (favorites.length > 0) {
+        items.push({
+          emoji: '💝',
+          title: `💝 ${favorites.length} ${t('bean.stats.favorites')}`,
+          subtitle: favorites[0]?.name ?? '',
+        });
+      }
+    }
+
+    // 6. Notes summary — last resort so the card surface stays populated
+    //    for beans with no calendar data but some captured details.
+    if (items.length < 2) {
+      const notes = memberNotesStore.byMember(m.id).value;
+      if (notes.length > 0) {
+        items.push({
+          emoji: '📝',
+          title: `📝 ${notes.length} ${t('bean.stats.notes')}`,
+          subtitle: notes[0]?.title ?? '',
         });
       }
     }
