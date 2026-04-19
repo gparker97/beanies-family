@@ -10,6 +10,14 @@ import type {
   FamilyActivity,
   FamilyVacation,
   PhotoAttachment,
+  FavoriteItem,
+  SayingItem,
+  MemberNote,
+  Allergy,
+  Medication,
+  Recipe,
+  CookLogEntry,
+  EmergencyContact,
   Settings,
 } from './models';
 
@@ -30,6 +38,15 @@ export interface FamilyDocument {
   activities: Record<string, FamilyActivity>;
   vacations: Record<string, FamilyVacation>;
   photos: Record<string, PhotoAttachment>;
+  // The Pod (2026-04)
+  favorites: Record<string, FavoriteItem>;
+  sayings: Record<string, SayingItem>;
+  memberNotes: Record<string, MemberNote>;
+  allergies: Record<string, Allergy>;
+  medications: Record<string, Medication>;
+  recipes: Record<string, Recipe>;
+  cookLogs: Record<string, CookLogEntry>;
+  emergencyContacts: Record<string, EmergencyContact>;
   settings: Settings | null;
 }
 

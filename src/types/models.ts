@@ -78,6 +78,12 @@ export interface FamilyMember {
   name: string;
   email: string;
   avatar?: string;
+  /**
+   * Optional user-uploaded avatar photo — takes precedence over `avatar`
+   * (beanie variant) when set. Beanie variant remains the always-available
+   * fallback path (missing / loading / unresolved). Added 2026-04 with The Pod.
+   */
+  avatarPhotoId?: UUID;
   gender: Gender;
   ageGroup: AgeGroup;
   dateOfBirth?: DateOfBirth;
@@ -684,6 +690,176 @@ export interface PhotoAttachment {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   deletedAt?: ISODateString; // tombstone for GC sweep
+}
+
+// ──────────────────────────────────────────────────────────────────
+// The Pod — family scrapbook, cookbook, care & safety, contacts.
+// See docs/plans/2026-04-19-the-pod-scrapbook-cookbook.md.
+// ──────────────────────────────────────────────────────────────────
+
+export type FavoriteCategory = 'food' | 'place' | 'book' | 'song' | 'toy' | 'other';
+
+/**
+ * A favorite thing about a family member — foods, places, books, etc.
+ * Food favorites may optionally link to a family cookbook recipe via
+ * `recipeId`. For non-food entries (or ad-hoc food entries like
+ * "McDonald's Happy Meal") the `name` field stands alone.
+ */
+export interface FavoriteItem {
+  id: UUID;
+  memberId: UUID;
+  category: FavoriteCategory;
+  name: string;
+  description?: string;
+  /** Only meaningful when category === 'food'. */
+  recipeId?: UUID;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
+ * A memorable quote or saying.
+ * `memberId` is who said it; `aboutMemberId` (optional) lets us capture
+ * things said ABOUT a member ("Sophia about Alice").
+ */
+export interface SayingItem {
+  id: UUID;
+  memberId: UUID;
+  aboutMemberId?: UUID;
+  words: string;
+  /** When it was said (user-supplied date; may differ from createdAt). */
+  saidOn?: ISODateString;
+  place?: string;
+  context?: string;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
+ * Free-form note about a family member — "shoe size", "calms down with…",
+ * "allergies in backpack", etc.
+ */
+export interface MemberNote {
+  id: UUID;
+  memberId: UUID;
+  title: string;
+  body: string;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type AllergyType = 'food' | 'medication' | 'environmental' | 'contact' | 'insect';
+export type AllergySeverity = 'severe' | 'moderate' | 'mild';
+
+/**
+ * An allergy — safety-critical. Captured with enough structure to be
+ * shareable with sitters / grandparents.
+ */
+export interface Allergy {
+  id: UUID;
+  memberId: UUID;
+  name: string;
+  allergyType: AllergyType;
+  severity: AllergySeverity;
+  avoidList?: string;
+  reaction?: string;
+  emergencyResponse?: string;
+  diagnosedBy?: string;
+  reviewedOn?: ISODateString;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
+ * A medication a family member is taking. v1: structured info only —
+ * scheduled reminders land in a follow-up plan.
+ */
+export interface Medication {
+  id: UUID;
+  memberId: UUID;
+  name: string;
+  dose: string;
+  frequency: string;
+  startDate?: ISODateString;
+  endDate?: ISODateString;
+  ongoing?: boolean;
+  notes?: string;
+  photoIds?: UUID[];
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/**
+ * A family recipe — "secret family recipe" in the Family Cookbook.
+ * Family-wide; any member can link a `FavoriteItem` to it.
+ */
+export interface Recipe {
+  id: UUID;
+  name: string;
+  subtitle?: string;
+  prepTime?: string;
+  servings?: string;
+  ingredients: string[];
+  steps: string[];
+  notes?: string;
+  photoIds?: UUID[];
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CookLogRating = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * A log entry for a time a recipe was cooked. Family-wide; references
+ * its recipe via `recipeId`. Deleting a recipe cascades its cook logs.
+ */
+export interface CookLogEntry {
+  id: UUID;
+  recipeId: UUID;
+  cookedOn: ISODateString;
+  cookedBy?: UUID;
+  rating: CookLogRating;
+  wentWell?: string;
+  toImprove?: string;
+  servings?: string;
+  photoIds?: UUID[];
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type EmergencyContactCategory =
+  | 'doctor'
+  | 'dentist'
+  | 'nurse'
+  | 'teacher'
+  | 'school'
+  | 'other';
+
+/**
+ * An emergency / key contact — pediatrician, school, poison control,
+ * backup pickup, etc. Family-wide. When `category === 'other'`, the
+ * optional `customCategory` label gives the contact a meaningful tag.
+ */
+export interface EmergencyContact {
+  id: UUID;
+  category: EmergencyContactCategory;
+  customCategory?: string;
+  name: string;
+  role?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
 }
 
 // Exchange rate for currency conversion
