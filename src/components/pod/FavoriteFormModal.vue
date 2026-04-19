@@ -13,9 +13,11 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useRecipesStore } from '@/stores/recipesStore';
 import { confirm } from '@/composables/useConfirm';
 import type { FavoriteCategory, FavoriteItem, UUID } from '@/types/models';
 
@@ -31,10 +33,20 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const favoritesStore = useFavoritesStore();
+const recipesStore = useRecipesStore();
 
 const name = ref('');
 const description = ref('');
 const category = ref<FavoriteCategory>('food');
+const recipeId = ref<string>('');
+
+const recipeOptions = computed(() => [
+  { value: '', label: t('favorites.recipe.none') },
+  ...recipesStore.recipes
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((r) => ({ value: r.id, label: r.name })),
+]);
 
 const categoryOptions = computed(() => [
   { value: 'food', label: t('favorites.category.food'), icon: '\u{1F35C}' },
@@ -53,11 +65,13 @@ const { isEditing, isSubmitting } = useFormModal(
       name.value = f.name;
       description.value = f.description ?? '';
       category.value = f.category;
+      recipeId.value = f.recipeId ?? '';
     },
     onNew: () => {
       name.value = '';
       description.value = '';
       category.value = 'food';
+      recipeId.value = '';
     },
   }
 );
@@ -77,6 +91,10 @@ async function handleSave(): Promise<void> {
       category: category.value,
       name: name.value.trim(),
       ...(description.value.trim() ? { description: description.value.trim() } : {}),
+      // `recipeId` only meaningful when category is food. If the user
+      // switches categories after linking we explicitly clear the
+      // reference via `undefined` so the repo drops the key.
+      recipeId: category.value === 'food' && recipeId.value ? recipeId.value : undefined,
     };
     if (isEditing.value && props.favorite) {
       await favoritesStore.updateFavorite(props.favorite.id, payload);
@@ -127,6 +145,16 @@ async function handleDelete(): Promise<void> {
 
     <FormFieldGroup :label="t('favorites.field.name')" required>
       <BaseInput v-model="name" :placeholder="t('favorites.placeholder.name')" />
+    </FormFieldGroup>
+
+    <!-- Recipe picker — only meaningful for food favorites. Renders
+         only when a recipe exists, otherwise there's nothing to link. -->
+    <FormFieldGroup
+      v-if="category === 'food' && recipesStore.recipes.length > 0"
+      :label="t('favorites.field.recipe')"
+      optional
+    >
+      <BaseSelect v-model="recipeId" :options="recipeOptions" />
     </FormFieldGroup>
 
     <FormFieldGroup :label="t('favorites.field.description')" optional>
