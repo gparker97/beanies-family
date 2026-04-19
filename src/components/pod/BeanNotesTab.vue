@@ -7,6 +7,7 @@ import { computed, ref } from 'vue';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import MemberNoteFormModal from '@/components/pod/MemberNoteFormModal.vue';
+import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import type { MemberNote, UUID } from '@/types/models';
@@ -22,6 +23,7 @@ const notes = computed(() => notesStore.byMember(props.memberId).value);
 
 const modalOpen = ref(false);
 const editing = ref<MemberNote | null>(null);
+useAutoOpenOnQuery(modalOpen);
 
 function openAdd(): void {
   editing.value = null;

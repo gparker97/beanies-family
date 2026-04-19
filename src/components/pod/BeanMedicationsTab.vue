@@ -8,6 +8,7 @@ import { computed, ref } from 'vue';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
+import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import type { Medication, UUID } from '@/types/models';
@@ -40,6 +41,7 @@ const medications = computed(() => {
 
 const modalOpen = ref(false);
 const editing = ref<Medication | null>(null);
+useAutoOpenOnQuery(modalOpen);
 
 function openAdd(): void {
   editing.value = null;

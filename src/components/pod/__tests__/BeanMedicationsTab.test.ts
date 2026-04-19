@@ -13,6 +13,10 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+vi.mock('@/composables/useAutoOpenOnQuery', () => ({
+  useAutoOpenOnQuery: () => undefined,
+}));
+
 const MEMBER_ID = 'bean-neil';
 
 function makeMed(overrides: Partial<Medication> = {}): Medication {

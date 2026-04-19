@@ -17,6 +17,13 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// Stub the query-driven auto-open so the tab tests don't need a router
+// — the composable's contract (flip the ref when ?add=1) is covered
+// separately once we have integration coverage for the hero menu.
+vi.mock('@/composables/useAutoOpenOnQuery', () => ({
+  useAutoOpenOnQuery: () => undefined,
+}));
+
 const MEMBER_ID = 'bean-neil';
 
 function makeFav(overrides: Partial<FavoriteItem> = {}): FavoriteItem {
