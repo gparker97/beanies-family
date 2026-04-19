@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2034
+    "translationCount": 2095
   },
   "translations": {
     "app.name": {
@@ -10174,6 +10174,311 @@
     "memberNotes.deleteConfirm.body": {
       "translation": "该操作无法撤销。",
       "hash": "nhacw5",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.addTitle": {
+      "translation": "添加过敏原",
+      "hash": "uvdac4",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.editTitle": {
+      "translation": "编辑过敏",
+      "hash": "fzkn12",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.addTile": {
+      "translation": "添加过敏",
+      "hash": "5qst9b",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.name": {
+      "translation": "他们对什么过敏",
+      "hash": "kyxrr4",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.type": {
+      "translation": "类型",
+      "hash": "1k7dm",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.severity": {
+      "translation": "严重性",
+      "hash": "pimnml",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.avoidList": {
+      "translation": "应避免的事项",
+      "hash": "ehw651",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.reaction": {
+      "translation": "反应",
+      "hash": "da071z",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.emergencyResponse": {
+      "translation": "应急响应",
+      "hash": "87jsi8",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.diagnosedBy": {
+      "translation": "诊断者",
+      "hash": "lxzt73",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.field.reviewedOn": {
+      "translation": "最后审核时间",
+      "hash": "g196u7",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.placeholder.name": {
+      "translation": "例如：花生",
+      "hash": "4zocf2",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.placeholder.avoidList": {
+      "translation": "特定食品、配料等",
+      "hash": "xxgid1",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.placeholder.reaction": {
+      "translation": "例如：荨麻疹、肿胀",
+      "hash": "pzi5l4",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.placeholder.emergencyResponse": {
+      "translation": "例如：使用EpiPen ，拨打911",
+      "hash": "i2ipqp",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.placeholder.diagnosedBy": {
+      "translation": "例如：儿科医生陈医生",
+      "hash": "jiez9l",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.type.food": {
+      "translation": "食物",
+      "hash": "1b24e",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.type.medication": {
+      "translation": "藥品",
+      "hash": "504f0x",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.type.environmental": {
+      "translation": "环境",
+      "hash": "2i1o6a",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.type.contact": {
+      "translation": "联系方式",
+      "hash": "rri8sg",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.type.insect": {
+      "translation": "昆虫类",
+      "hash": "yq8p2w",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.severity.severe": {
+      "translation": "重度",
+      "hash": "u4op64",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.severity.moderate": {
+      "translation": "一般",
+      "hash": "95ypjx",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.severity.mild": {
+      "translation": "轻度",
+      "hash": "1feic",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.empty": {
+      "translation": "此豆类没有过敏记录",
+      "hash": "543lex",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.emptyCTA": {
+      "translation": "已是第一张",
+      "hash": "v605ns",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.deleteConfirm.title": {
+      "translation": "要删除此过敏原吗？",
+      "hash": "jur3vw",
+      "lastUpdated": "2026-04-19"
+    },
+    "allergies.deleteConfirm.body": {
+      "translation": "安全信息—删除此信息也会将其从“护理与安全”页面中删除。",
+      "hash": "88tdh1",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.addTitle": {
+      "translation": "添加药物",
+      "hash": "8zdrcj",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.editTitle": {
+      "translation": "编辑药物",
+      "hash": "lisejp",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.addTile": {
+      "translation": "添加药物",
+      "hash": "sem6gi",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.name": {
+      "translation": "姓名",
+      "hash": "1fvl7",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.dose": {
+      "translation": "剂次",
+      "hash": "19s8t",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.frequency": {
+      "translation": "频率",
+      "hash": "vzf4u4",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.startDate": {
+      "translation": "起始日期",
+      "hash": "5zbhl8",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.endDate": {
+      "translation": "结束日期",
+      "hash": "smwovn",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.ongoing": {
+      "translation": "进行中",
+      "hash": "5q1umz",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.field.photo": {
+      "translation": "瓶装照片",
+      "hash": "ozdym0",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.placeholder.name": {
+      "translation": "例如：阿莫西林",
+      "hash": "12m9hr",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.placeholder.dose": {
+      "translation": "例如5毫升， 1片",
+      "hash": "b7310j",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.placeholder.frequency": {
+      "translation": "例如：每天3次",
+      "hash": "uwlidi",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.placeholder.notes": {
+      "translation": "与食物等一起服用。",
+      "hash": "2msrcj",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.empty": {
+      "translation": "此豆类没有存档的药物",
+      "hash": "8rcz25",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.emptyCTA": {
+      "translation": "已是第一张",
+      "hash": "v605ns",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.active": {
+      "translation": "状态",
+      "hash": "wchdly",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.ended": {
+      "translation": "勇者之战已结束",
+      "hash": "13y656",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.deleteConfirm.title": {
+      "translation": "删除此药物？",
+      "hash": "e6x2tf",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.deleteConfirm.body": {
+      "translation": "瓶子照片将在24小时后清理干净。",
+      "hash": "uavn9o",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.title": {
+      "translation": "保养与安全",
+      "hash": "bgwyt7",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.subtitle": {
+      "translation": "过敏、活性药物和关键接触者—一目了然",
+      "hash": "j6qsm7",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.section.allergies": {
+      "translation": "过敏",
+      "hash": "yhqnsu",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.section.medications": {
+      "translation": "活性药物",
+      "hash": "bcxylm",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.section.keyContacts": {
+      "translation": "主要联系人",
+      "hash": "8pxt58",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.keyContacts.cta": {
+      "translation": "打开完整的紧急联系人 →",
+      "hash": "nz9cdr",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.empty.allergies": {
+      "translation": "全家没有过敏记录",
+      "hash": "3n2w1c",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.empty.medications": {
+      "translation": "全家没有活性药物",
+      "hash": "tpy40t",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.empty.keyContacts": {
+      "translation": "紧急联络人在稍后阶段着陆",
+      "hash": "rqganw",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.stats.allergies": {
+      "translation": "allergies",
+      "hash": "1cmo7y",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.stats.severe": {
+      "translation": "adj.严厉 ,严重",
+      "hash": "ez8sjw",
+      "lastUpdated": "2026-04-19"
+    },
+    "careSafety.stats.activeMeds": {
+      "translation": "有效药物",
+      "hash": "icp7nj",
       "lastUpdated": "2026-04-19"
     }
   }

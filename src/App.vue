@@ -40,6 +40,8 @@ import { useBudgetStore } from '@/stores/budgetStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
+import { useAllergiesStore } from '@/stores/allergiesStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -48,6 +50,18 @@ import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { saveNow, hasFamilyKey, setFamilyKey } from '@/services/sync/syncService';
+import { __internals as photoStoreInternals } from '@/stores/photoStore';
+
+/**
+ * Register every collection that owns photo references so the photoStore
+ * GC sweep finds orphans across all of them. Lives at the app-init
+ * boundary (rather than inside each store) to avoid the top-level import
+ * cycle family/medications → photoStore → syncStore → family/medications
+ * that broke test loading in P3 dev. Safe to call multiple times —
+ * registerPhotoCollection is idempotent (backed by a Set).
+ */
+photoStoreInternals.registerPhotoCollection('familyMembers');
+photoStoreInternals.registerPhotoCollection('medications');
 
 const route = useRoute();
 const router = useRouter();
@@ -64,6 +78,8 @@ const budgetStore = useBudgetStore();
 const favoritesStore = useFavoritesStore();
 const sayingsStore = useSayingsStore();
 const memberNotesStore = useMemberNotesStore();
+const allergiesStore = useAllergiesStore();
+const medicationsStore = useMedicationsStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
@@ -353,6 +369,8 @@ async function loadFamilyData() {
         favoritesStore.loadFavorites(),
         sayingsStore.loadSayings(),
         memberNotesStore.loadMemberNotes(),
+        allergiesStore.loadAllergies(),
+        medicationsStore.loadMedications(),
       ]);
 
       const result = await processRecurringItems();

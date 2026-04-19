@@ -127,7 +127,9 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/pod/safety',
-    redirect: '/pod',
+    name: 'CareSafety',
+    component: () => import('@/pages/CareSafetyPage.vue'),
+    meta: { titleKey: 'careSafety.title', requiresAuth: true },
   },
   {
     path: '/pod/contacts',
