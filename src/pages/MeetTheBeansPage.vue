@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { BaseButton, BaseInput, BaseModal } from '@/components/ui';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
-import FamilyMemberCard from '@/components/family/FamilyMemberCard.vue';
+import BeanCard from '@/components/family/BeanCard.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
 import ShareInviteModal from '@/components/family/ShareInviteModal.vue';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
@@ -243,7 +243,7 @@ async function handleShareWithEmail() {
       await shareFileWithEmail(token, folderId, shareEmail.value, 'writer').catch((e) => {
         // Folder share failures aren't fatal for a first-time invite — the
         // .beanpod share already succeeded. Log so we notice in dev.
-        console.warn('[FamilyPage] Folder share failed (non-fatal)', e);
+        console.warn('[meetTheBeans] Folder share failed (non-fatal)', e);
       });
     }
     shareResult.value = 'success';
@@ -274,7 +274,7 @@ async function resolveCanonicalFolderId(token: string): Promise<string | null> {
     cachedAppFolderId = parents?.[0] ?? null;
     return cachedAppFolderId;
   } catch (e) {
-    console.warn('[FamilyPage] Could not resolve canonical folder', e);
+    console.warn('[meetTheBeans] Could not resolve canonical folder', e);
     return null;
   }
 }
@@ -304,12 +304,12 @@ async function runFolderShareMigration(): Promise<void> {
     for (const email of memberEmails) {
       if (!alreadyShared.has(email)) {
         await shareFileWithEmail(token, folderId, email, 'writer').catch((e) => {
-          console.warn('[FamilyPage] Migration folder share failed for', email, e);
+          console.warn('[meetTheBeans] Migration folder share failed for', email, e);
         });
       }
     }
   } catch (e) {
-    console.warn('[FamilyPage] Folder share migration failed', e);
+    console.warn('[meetTheBeans] Folder share migration failed', e);
   }
 }
 
@@ -522,7 +522,7 @@ function cancelEditFamilyName() {
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <!-- Member cards (2/3 width on desktop) -->
       <div class="space-y-4 lg:col-span-2">
-        <FamilyMemberCard
+        <BeanCard
           v-for="member in familyStore.members"
           :key="member.id"
           :member="member"

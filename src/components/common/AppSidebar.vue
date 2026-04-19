@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
+import AppSidebarSubNav from '@/components/common/AppSidebarSubNav.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
 import { useSidebarAccordion } from '@/composables/useSidebarAccordion';
 import { useTranslation } from '@/composables/useTranslation';
@@ -13,6 +14,7 @@ import {
   PIGGY_BANK_ITEMS,
   PINNED_ITEMS,
   type NavItemDef,
+  type NavSubItemDef,
 } from '@/constants/navigation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -25,7 +27,7 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const goalsStore = useGoalsStore();
 const syncStore = useSyncStore();
-const { isOpen, toggle } = useSidebarAccordion();
+const { isOpen, toggle, isItemExpanded, toggleItem } = useSidebarAccordion();
 const { canViewFinances } = usePermissions();
 
 const badges = computed<Record<string, number>>(() => ({
@@ -41,6 +43,7 @@ function mapItems(items: NavItemDef[]) {
     badge: item.badgeKey ? (badges.value[item.badgeKey] ?? 0) : 0,
     external: item.external ?? false,
     externalUrl: item.externalUrl,
+    children: item.children,
   }));
 }
 
@@ -57,12 +60,43 @@ function isActive(path: string): boolean {
   return route.path === path;
 }
 
+/**
+ * Parent-item active state: highlighted when the current route is any
+ * descendant of the parent path (e.g. /pod/cookbook keeps "The Pod" active).
+ */
+function isParentActive(item: MappedNavItem): boolean {
+  if (!item.children) return isActive(item.path);
+  if (route.path === item.path) return true;
+  return route.path.startsWith(`${item.path}/`);
+}
+
 function navigateTo(item: MappedNavItem) {
   if (item.external && item.externalUrl) {
     window.open(item.externalUrl, '_blank', 'noopener,noreferrer');
     return;
   }
   router.push(item.path);
+}
+
+function navigateSub(path: string) {
+  router.push(path);
+}
+
+function onParentClick(item: MappedNavItem) {
+  if (item.children) {
+    // Parent with children: navigate to parent path AND ensure expanded
+    if (!isItemExpanded(item.path)) {
+      toggleItem(item.path);
+    }
+    if (route.path !== item.path) router.push(item.path);
+    return;
+  }
+  navigateTo(item);
+}
+
+function onParentChevronClick(item: MappedNavItem, event: Event) {
+  event.stopPropagation();
+  toggleItem(item.path);
 }
 
 const encryptionTitle = computed(() => {
@@ -86,6 +120,10 @@ const sections = computed(() =>
     })
   )
 );
+
+function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
+  return item.children ?? [];
+}
 </script>
 
 <template>
@@ -130,39 +168,60 @@ const sections = computed(() =>
 
         <!-- Section Items -->
         <div v-show="isOpen(section.id as 'treehouse' | 'piggyBank')" class="space-y-0.5">
-          <button
-            v-for="item in section.items"
-            :key="item.path"
-            class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-lg font-medium transition-all duration-150"
-            :class="[
-              isActive(item.path)
-                ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
-                : 'border-l-4 border-transparent hover:bg-white/[0.05]',
-              item.comingSoon && !isActive(item.path)
-                ? 'text-white/25'
-                : !isActive(item.path)
-                  ? 'text-white/40 hover:text-white/70'
-                  : '',
-            ]"
-            @click="navigateTo(item)"
-          >
-            <span class="w-6 text-center text-base">{{ item.emoji }}</span>
-            <span class="flex-1">{{ item.label }}</span>
-            <!-- Badge (e.g. active goals count) -->
-            <span
-              v-if="item.badge > 0"
-              class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
+          <template v-for="item in section.items" :key="item.path">
+            <button
+              class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-lg font-medium transition-all duration-150"
+              :class="[
+                isParentActive(item)
+                  ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                  : 'border-l-4 border-transparent hover:bg-white/[0.05]',
+                item.comingSoon && !isParentActive(item)
+                  ? 'text-white/25'
+                  : !isParentActive(item)
+                    ? 'text-white/40 hover:text-white/70'
+                    : '',
+              ]"
+              @click="onParentClick(item)"
             >
-              {{ item.badge }}
-            </span>
-            <!-- Coming soon indicator -->
-            <span
-              v-if="item.comingSoon"
-              class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
-            >
-              {{ t('nav.comingSoon') }}
-            </span>
-          </button>
+              <span class="w-6 text-center text-base">{{ item.emoji }}</span>
+              <span class="flex-1">{{ item.label }}</span>
+              <!-- Badge (e.g. active goals count) -->
+              <span
+                v-if="item.badge > 0"
+                class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
+              >
+                {{ item.badge }}
+              </span>
+              <!-- Coming soon indicator -->
+              <span
+                v-if="item.comingSoon"
+                class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
+              >
+                {{ t('nav.comingSoon') }}
+              </span>
+              <!-- Expander chevron for parents with children -->
+              <span
+                v-if="item.children"
+                class="-mr-1 flex h-6 w-6 items-center justify-center rounded-lg text-white/30 hover:text-white/70"
+                role="button"
+                :aria-label="isItemExpanded(item.path) ? t('action.close') : t('action.confirm')"
+                @click="onParentChevronClick(item, $event)"
+              >
+                <BeanieIcon
+                  name="chevron-down"
+                  size="xs"
+                  class="transition-transform duration-200"
+                  :class="{ 'rotate-180': !isItemExpanded(item.path) }"
+                />
+              </span>
+            </button>
+            <AppSidebarSubNav
+              v-if="item.children && isItemExpanded(item.path)"
+              :items="subItemsOf(item)"
+              :active-path="route.path"
+              @navigate="navigateSub"
+            />
+          </template>
         </div>
       </div>
 

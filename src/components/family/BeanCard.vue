@@ -6,7 +6,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { timeAgo } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup } from '@/types/models';
-import type { MemberHighlight } from '@/pages/FamilyPage.vue';
+import type { MemberHighlight } from '@/pages/MeetTheBeansPage.vue';
 
 const props = defineProps<{
   member: FamilyMember;

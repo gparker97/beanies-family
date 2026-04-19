@@ -97,11 +97,36 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/ForecastPage.vue'),
     meta: { titleKey: 'nav.forecast', requiresAuth: true, requiresFinance: true },
   },
+  // The Pod — landing + sub-nav destinations. Sub-pages for scrapbook,
+  // cookbook, care & safety, and emergency contacts ship in later phases
+  // (see docs/plans/2026-04-19-the-pod-scrapbook-cookbook.md); those
+  // routes redirect to /pod for now so the sidebar stays navigable.
+  {
+    path: '/pod',
+    name: 'Pod',
+    component: () => import('@/pages/MeetTheBeansPage.vue'),
+    meta: { titleKey: 'nav.pod', requiresAuth: true },
+  },
+  {
+    path: '/pod/scrapbook',
+    redirect: '/pod',
+  },
+  {
+    path: '/pod/cookbook',
+    redirect: '/pod',
+  },
+  {
+    path: '/pod/safety',
+    redirect: '/pod',
+  },
+  {
+    path: '/pod/contacts',
+    redirect: '/pod',
+  },
+  // Legacy /family URL preserved for bookmarks + external links.
   {
     path: '/family',
-    name: 'Family',
-    component: () => import('@/pages/FamilyPage.vue'),
-    meta: { titleKey: 'nav.family', requiresAuth: true },
+    redirect: '/pod',
   },
   {
     path: '/nook',
