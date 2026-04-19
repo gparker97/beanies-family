@@ -141,7 +141,9 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/pod/contacts',
-    redirect: '/pod',
+    name: 'EmergencyContacts',
+    component: () => import('@/pages/EmergencyContactsPage.vue'),
+    meta: { titleKey: 'contacts.title', requiresAuth: true },
   },
   // Legacy /family URL preserved for bookmarks + external links.
   {

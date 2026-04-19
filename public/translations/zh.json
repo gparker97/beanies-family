@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2191
+    "translationCount": 2226
   },
   "translations": {
     "app.name": {
@@ -10462,8 +10462,8 @@
       "lastUpdated": "2026-04-19"
     },
     "careSafety.empty.keyContacts": {
-      "translation": "紧急联络人在稍后阶段着陆",
-      "hash": "rqganw",
+      "translation": "还没有紧急联系人—添加一些，以便保姆和祖父母始终手边有一本电话簿。",
+      "hash": "yey5vh",
       "lastUpdated": "2026-04-19"
     },
     "careSafety.stats.allergies": {
@@ -10959,6 +10959,181 @@
     "photos.maxReached.n": {
       "translation": "每件商品最多{n}张照片",
       "hash": "wjb935",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.title": {
+      "translation": "紧急联系人",
+      "hash": "5it6wy",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.subtitleLead": {
+      "translation": "把这个放在每个人都能找到的地方。",
+      "hash": "igoehr",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.subtitle": {
+      "translation": "家庭电话簿—医生、牙医、老师、保姆以及您希望保姆或祖父母在紧要关头接触到的任何人。",
+      "hash": "o8a4qa",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.addContact": {
+      "translation": "加入通訊錄",
+      "hash": "p2hfnl",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.searchPlaceholder": {
+      "translation": "按姓名、角色或电话搜索……",
+      "hash": "hcq5k5",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.filter.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.empty": {
+      "translation": "还没有联系人—添加第一个联系人，以便保姆和祖父母始终手边有一本电话簿。",
+      "hash": "ic7cv7",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.emptyCTA": {
+      "translation": "添加第一个联系人",
+      "hash": "5v5082",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.noResults": {
+      "translation": "没有与该搜索匹配的联系人。",
+      "hash": "imq5hm",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.addTitle": {
+      "translation": "新增連絡人...",
+      "hash": "2jsmzm",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.editTitle": {
+      "translation": "编辑联系人",
+      "hash": "etplvu",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.category": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.customCategory": {
+      "translation": "自定义标签（可选）",
+      "hash": "l6patg",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.name": {
+      "translation": "姓名",
+      "hash": "1fvl7",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.role": {
+      "translation": "角色或关系",
+      "hash": "rf1xdh",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.phone": {
+      "translation": "手机",
+      "hash": "19wb4e",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.email": {
+      "translation": "电子邮箱",
+      "hash": "13xh18",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.address": {
+      "translation": "通讯地址",
+      "hash": "8js9uc",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.field.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.placeholder.name": {
+      "translation": "例如： Rachel Kim博士",
+      "hash": "nezspy",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.placeholder.role": {
+      "translation": "例如： Neil的儿科过敏专家·",
+      "hash": "gpjkey",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.placeholder.phone": {
+      "translation": "(415) 555-0182",
+      "hash": "yccrt2",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.placeholder.email": {
+      "translation": "名称@example.com",
+      "hash": "ked35k",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.placeholder.customCategory": {
+      "translation": "例如：紧急接载、热线电话",
+      "hash": "2v85xq",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.placeholder.notes": {
+      "translation": "最佳通话时间、怪癖、保险……",
+      "hash": "p384ru",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.category.doctor": {
+      "translation": "医生",
+      "hash": "xxx54v",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.category.dentist": {
+      "translation": "牙科医生",
+      "hash": "htk071",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.category.nurse": {
+      "translation": "护士",
+      "hash": "19133x",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.category.teacher": {
+      "translation": "授课人",
+      "hash": "3q05vm",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.category.school": {
+      "translation": "学院",
+      "hash": "u610to",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.category.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.deleteConfirm.title": {
+      "translation": "删除此联系人？",
+      "hash": "jczzg4",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.deleteConfirm.body": {
+      "translation": "您可以稍后随时重新添加。",
+      "hash": "msa2sn",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.action.call": {
+      "translation": "电话",
+      "hash": "18upq",
+      "lastUpdated": "2026-04-19"
+    },
+    "contacts.action.email": {
+      "translation": "电子邮箱",
+      "hash": "13xh18",
       "lastUpdated": "2026-04-19"
     }
   }
