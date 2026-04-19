@@ -40,6 +40,8 @@ const driveMocks = vi.hoisted(() => {
   return {
     createFile: vi.fn(),
     deleteFile: vi.fn(),
+    downloadFileBlob: vi.fn(),
+    findOrCreateFolder: vi.fn(),
     getFileMetadata: vi.fn(),
     DriveFileNotFoundError,
   };
@@ -48,6 +50,8 @@ const driveMocks = vi.hoisted(() => {
 vi.mock('@/services/google/driveService', () => ({
   createFile: driveMocks.createFile,
   deleteFile: driveMocks.deleteFile,
+  downloadFileBlob: driveMocks.downloadFileBlob,
+  findOrCreateFolder: driveMocks.findOrCreateFolder,
   getFileMetadata: driveMocks.getFileMetadata,
   DriveFileNotFoundError: driveMocks.DriveFileNotFoundError,
 }));
@@ -64,6 +68,10 @@ vi.mock('@/services/photos/photoCompression', () => ({
 
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({ driveFileId: 'beanpod-file-1' }),
+}));
+
+vi.mock('@/stores/familyContextStore', () => ({
+  useFamilyContextStore: () => ({ activeFamilyId: 'fam-usephotos-test' }),
 }));
 
 // useToast / useTranslation return trivial stubs so we can count calls.
@@ -107,6 +115,8 @@ describe('usePhotos', () => {
 
     driveMocks.createFile.mockReset().mockResolvedValue({ fileId: 'drive-1', name: 'x' });
     driveMocks.deleteFile.mockReset().mockResolvedValue(undefined);
+    driveMocks.downloadFileBlob.mockReset().mockResolvedValue(new Blob());
+    driveMocks.findOrCreateFolder.mockReset().mockResolvedValue('folder-nested');
     driveMocks.getFileMetadata.mockReset().mockResolvedValue({ parents: ['folder-1'] });
 
     // Seed an activity that will own the photos.

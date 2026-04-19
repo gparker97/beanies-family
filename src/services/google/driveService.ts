@@ -316,6 +316,44 @@ function cacheFolderId(id: string): string {
 }
 
 /** Search for all beanies.family folders on Drive. */
+/**
+ * Find (or create) a subfolder by name under a given parent folder.
+ *
+ * Idempotent: returns the first existing match rather than creating a
+ * second folder if the name is already there. Used for the `data/`
+ * hierarchy under the app root — e.g. `data/<familyId>/photos/`.
+ *
+ * NOTE: this trusts caller-supplied names. Callers must never embed
+ * raw user input without sanitizing for single-quotes (Drive query
+ * syntax) or slashes (Drive treats names as opaque, but slashes in
+ * the UI are confusing).
+ */
+export async function findOrCreateFolder(
+  token: string,
+  name: string,
+  parentId: string
+): Promise<string> {
+  const escaped = name.replace(/'/g, "\\'");
+  const query = `name='${escaped}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`;
+  const searchUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)&pageSize=1`;
+  const searchRes = await driveRequest(token, searchUrl);
+  const searchData = await searchRes.json();
+  const existing = searchData.files?.[0];
+  if (existing?.id) return existing.id;
+
+  const createRes = await driveRequest(token, `${DRIVE_API}/files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentId],
+    }),
+  });
+  const createData = await createRes.json();
+  return createData.id;
+}
+
 async function searchAppFolders(token: string): Promise<Array<{ id: string; name: string }>> {
   const query = `name='${APP_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   const searchUrl = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`;

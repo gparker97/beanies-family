@@ -16,6 +16,7 @@ import {
   createFile,
   deleteFile,
   downloadFileBlob,
+  findOrCreateFolder,
   getFileMetadata,
   DriveFileNotFoundError,
 } from '@/services/google/driveService';
@@ -33,6 +34,7 @@ import {
 } from '@/services/sync/photoUploadQueue';
 import { changeDoc, getDoc, docVersion } from '@/services/automerge/docService';
 import { useSyncStore } from '@/stores/syncStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import type { FamilyDocument } from '@/types/automerge';
 import type { PhotoAttachment, UUID } from '@/types/models';
 
@@ -62,10 +64,17 @@ export function registerPhotoCollection(name: string): void {
 
 export const usePhotoStore = defineStore('photos', () => {
   const syncStore = useSyncStore();
+  const familyContextStore = useFamilyContextStore();
 
   // Reactive state
   const unresolvedIds = ref<Set<string>>(new Set());
   const canonicalFolderId = ref<string | null>(null);
+  /**
+   * Cached id for this family's `data/<familyId>/photos/` subfolder (the
+   * actual upload destination). Keyed by familyId so switching families
+   * doesn't serve a stale id. Populated lazily on first upload.
+   */
+  const photosFolderIdByFamily = new Map<string, string>();
   /**
    * Pending uploads cached in memory so UI can reactively observe what's
    * queued for each entity. `shallowRef` because the array identity changes
@@ -110,6 +119,7 @@ export const usePhotoStore = defineStore('photos', () => {
     clearQueueFamily();
     unresolvedIds.value = new Set();
     canonicalFolderId.value = null;
+    photosFolderIdByFamily.clear();
     thumbUrlCache.clear();
     for (const url of blobUrlCache.values()) URL.revokeObjectURL(url);
     blobUrlCache.clear();
@@ -118,6 +128,12 @@ export const usePhotoStore = defineStore('photos', () => {
 
   // --- Canonical folder resolution -------------------------------------
 
+  /**
+   * Root `beanies.family/` folder — parent of the active `.beanpod`.
+   * We still return this for future callers (e.g. a top-level Drive
+   * picker), but photo uploads route through `resolvePhotosFolderId()`
+   * so they don't clutter the root.
+   */
   async function resolveCanonicalFolderId(): Promise<string> {
     if (canonicalFolderId.value) return canonicalFolderId.value;
     const beanpodFileId = syncStore.driveFileId;
@@ -133,6 +149,38 @@ export const usePhotoStore = defineStore('photos', () => {
     }
     canonicalFolderId.value = folderId;
     return folderId;
+  }
+
+  /**
+   * Resolve the destination folder for photo uploads:
+   *   `<beanies.family>/data/<familyId>/photos/`
+   *
+   * Keeps photos out of the shared-folder root so families testing
+   * against the same `beanies.family/` folder (or the rare multi-family
+   * case) don't pile up one undifferentiated blob of images. `familyId`
+   * is taken from `familyContextStore.activeFamilyId` — a stable UUID
+   * that already exists in the registry.
+   *
+   * Each segment is found-or-created and the leaf id is cached per
+   * family for the store's lifetime. Pre-existing photos at the root
+   * are left in place; photoStore resolves by `driveFileId` so path
+   * doesn't matter for display or GC.
+   */
+  async function resolvePhotosFolderId(): Promise<string> {
+    const familyId = familyContextStore.activeFamilyId;
+    if (!familyId) {
+      throw new Error('photoStore: cannot resolve photos folder without an active family.');
+    }
+    const cached = photosFolderIdByFamily.get(familyId);
+    if (cached) return cached;
+
+    const rootId = await resolveCanonicalFolderId();
+    const token = await requestAccessToken();
+    const dataId = await findOrCreateFolder(token, 'data', rootId);
+    const familyFolderId = await findOrCreateFolder(token, familyId, dataId);
+    const photosId = await findOrCreateFolder(token, 'photos', familyFolderId);
+    photosFolderIdByFamily.set(familyId, photosId);
+    return photosId;
   }
 
   // --- Upload ----------------------------------------------------------
@@ -203,7 +251,7 @@ export const usePhotoStore = defineStore('photos', () => {
   async function finalizeUpload(
     payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt'>
   ): Promise<void> {
-    const folderId = await resolveCanonicalFolderId();
+    const folderId = await resolvePhotosFolderId();
     const token = await requestAccessToken();
     const { fileId } = await createFile(
       token,
@@ -402,7 +450,7 @@ export const usePhotoStore = defineStore('photos', () => {
     const photoId = crypto.randomUUID();
     const filename = `beanies-avatar-${photoId}.jpg`;
 
-    const folderId = await resolveCanonicalFolderId();
+    const folderId = await resolvePhotosFolderId();
     const token = await requestAccessToken();
     const { fileId } = await createFile(
       token,
@@ -452,7 +500,7 @@ export const usePhotoStore = defineStore('photos', () => {
     }
 
     const compressed = await compress(newFile);
-    const folderId = await resolveCanonicalFolderId();
+    const folderId = await resolvePhotosFolderId();
     const token = await requestAccessToken();
     const filename = `beanies-photo-${photoId}.jpg`;
     const { fileId: newDriveFileId } = await createFile(
