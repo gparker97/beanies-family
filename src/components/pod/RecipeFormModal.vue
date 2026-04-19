@@ -11,11 +11,12 @@
  * photo, the orphan photo is tombstone-GC'd after 24h; the recipe
  * itself stays until explicitly deleted.
  */
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -112,6 +113,8 @@ function buildPayload() {
   };
 }
 
+const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
+
 async function ensureRecipeId(): Promise<UUID | null> {
   if (recipeId.value) return recipeId.value;
   if (!canSave.value) return null;
@@ -119,6 +122,19 @@ async function ensureRecipeId(): Promise<UUID | null> {
   if (!created) return null;
   recipeId.value = created.id;
   return created.id;
+}
+
+/**
+ * Pre-save "Add Photo" handler — creates the recipe record if needed,
+ * then opens the file picker in the freshly-mounted PhotoAttachments.
+ * Single-click flow for users who want to attach a photo right away
+ * rather than clicking "Add Photo" and then hunting for the picker.
+ */
+async function handleAddFirstPhoto(): Promise<void> {
+  const id = await ensureRecipeId();
+  if (!id) return;
+  await nextTick();
+  photoAttachmentsRef.value?.openPicker();
 }
 
 function updatePhotoIds(ids: UUID[]): void {
@@ -243,22 +259,26 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
     <FormFieldGroup :label="t('recipes.field.photos')" optional>
       <div v-if="recipeId || recipe">
         <PhotoAttachments
+          ref="photoAttachmentsRef"
           collection="recipes"
           :entity-id="(recipeId ?? recipe?.id) as UUID"
           :photo-ids="photoIds"
           :current-member-id="currentMemberId"
           :max="4"
-          :update-photo-ids="updatePhotoIds"
+          @update:photo-ids="updatePhotoIds"
         />
       </div>
       <button
         v-else
         type="button"
-        class="font-outfit text-primary-500 text-xs font-semibold transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+        class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!canSave"
-        @click="ensureRecipeId"
+        @click="handleAddFirstPhoto"
       >
-        {{ canSave ? t('photos.addPhoto') : t('action.save') }}
+        <BeanieIcon name="camera" size="md" />
+        <span class="font-outfit text-xs font-semibold">
+          {{ canSave ? t('photos.addPhoto') : t('recipes.photos.saveFirst') }}
+        </span>
       </button>
     </FormFieldGroup>
   </BeanieFormModal>

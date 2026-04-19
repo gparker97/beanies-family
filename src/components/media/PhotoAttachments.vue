@@ -25,9 +25,20 @@ interface Props {
    * Medication bottles and cook-log dish snaps pass `:max="1"`.
    */
   max?: number;
+  /**
+   * Background this is rendered against. `dark` = the original
+   * attached-to-activities surface (white text/borders); `light` =
+   * drawer forms (slate borders + muted grey text). Defaults to
+   * light since that's where every current caller lives.
+   */
+  tone?: 'light' | 'dark';
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  tone: 'light',
+  max: undefined,
+  currentMemberId: undefined,
+});
 const emit = defineEmits<{ 'update:photoIds': [ids: UUID[]] }>();
 
 const { t } = useTranslation();
@@ -62,12 +73,27 @@ const { isDragging, bindings: dropBindings } = useFileDrop({
 // File picker — we keep the composable return object intact rather than
 // destructuring because vue-tsc doesn't track template `ref="..."`
 // references to destructured reactive refs.
+//
+// `accept="image/*"` (instead of an explicit MIME list) lets iOS Safari
+// show the "Take Photo / Photo Library / Choose File" action sheet so
+// the user can shoot directly from the camera on mobile. Chrome on
+// Android honors the same hint with its camera chooser.
 const picker = useFilePicker({
-  accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif',
+  accept: 'image/*',
   multiple: true,
   onPick: async (files) => {
     await add(files);
   },
+});
+
+/**
+ * Let parent components open the file picker programmatically — used by
+ * form modals that render a pre-save "Add Photo" button, eagerly
+ * create the parent entity, then want the picker to open in the same
+ * gesture so the user doesn't lose the click.
+ */
+defineExpose({
+  openPicker: () => picker.open(),
 });
 </script>
 
@@ -76,7 +102,11 @@ const picker = useFilePicker({
     v-bind="dropBindings"
     class="rounded-2xl border-2 border-dashed transition-colors"
     :class="[
-      isDragging ? 'border-primary-500 bg-primary-500/10' : 'border-white/10',
+      isDragging
+        ? 'border-primary-500 bg-primary-500/10'
+        : tone === 'dark'
+          ? 'border-white/10'
+          : 'border-[var(--tint-slate-10)]',
       canAdd ? '' : 'opacity-60',
     ]"
   >
@@ -95,7 +125,12 @@ const picker = useFilePicker({
       <button
         v-if="canAdd"
         type="button"
-        class="hover:border-primary-500/50 flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-white/20 text-white/70 hover:bg-white/5"
+        class="hover:border-primary-500/50 flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed transition-colors"
+        :class="
+          tone === 'dark'
+            ? 'border-white/20 text-white/70 hover:bg-white/5'
+            : 'hover:text-primary-500 border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
+        "
         @click="picker.open"
       >
         <BeanieIcon name="camera" size="md" />
@@ -106,11 +141,16 @@ const picker = useFilePicker({
     <!-- Empty hint / max-reached hint -->
     <p
       v-if="photos.length === 0 && pending.length === 0 && canAdd"
-      class="px-3 pb-2 text-xs text-white/50"
+      class="px-3 pb-2 text-xs"
+      :class="tone === 'dark' ? 'text-white/50' : 'text-[var(--color-text-muted)]'"
     >
       {{ t('photos.dropToAdd') }}
     </p>
-    <p v-else-if="atCap" class="px-3 pb-2 text-xs text-white/50">
+    <p
+      v-else-if="atCap"
+      class="px-3 pb-2 text-xs"
+      :class="tone === 'dark' ? 'text-white/50' : 'text-[var(--color-text-muted)]'"
+    >
       {{ t('photos.maxReached') }}
     </p>
 
