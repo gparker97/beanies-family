@@ -32,6 +32,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   deleted: [id: UUID];
+  /** Emitted with the recipe id after a successful create OR update.
+   *  Callers (e.g. FavoriteFormModal's "+ Add a new recipe" flow)
+   *  listen for this to auto-link the new recipe to whatever workflow
+   *  opened the form. */
+  saved: [id: UUID];
 }>();
 
 const { t } = useTranslation();
@@ -153,13 +158,18 @@ async function handleSave(): Promise<void> {
   isSubmitting.value = true;
   try {
     const payload = buildPayload();
+    let savedId: UUID | null = null;
     if (isEditing.value && props.recipe) {
       await recipesStore.updateRecipe(props.recipe.id, payload);
+      savedId = props.recipe.id;
     } else if (recipeId.value) {
       await recipesStore.updateRecipe(recipeId.value, payload);
+      savedId = recipeId.value;
     } else {
-      await recipesStore.createRecipe(payload);
+      const created = await recipesStore.createRecipe(payload);
+      savedId = created?.id ?? null;
     }
+    if (savedId) emit('saved', savedId);
     emit('close');
   } finally {
     isSubmitting.value = false;
