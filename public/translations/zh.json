@@ -3527,9 +3527,9 @@
       "lastUpdated": "2026-03-03"
     },
     "nook.addBean": {
-      "translation": "添加Bean",
-      "hash": "kctipd",
-      "lastUpdated": "2026-03-03"
+      "translation": "添加Beanie",
+      "hash": "sq1579",
+      "lastUpdated": "2026-04-19"
     },
     "nook.todaySchedule": {
       "translation": "今天的日程安排",
@@ -6712,8 +6712,8 @@
       "lastUpdated": "2026-03-08"
     },
     "family.hub.addBean": {
-      "translation": "添加Bean",
-      "hash": "kctipd",
+      "translation": "添加Beanie",
+      "hash": "sq1579",
       "lastUpdated": "2026-04-19"
     },
     "family.hub.familyStats": {
@@ -11257,8 +11257,8 @@
       "lastUpdated": "2026-04-19"
     },
     "family.hub.inviteBean": {
-      "translation": "邀请Bean",
-      "hash": "1q8cbr",
+      "translation": "邀请Beanie",
+      "hash": "rj3utf",
       "lastUpdated": "2026-04-19"
     },
     "family.hub.recentSayings": {
@@ -11332,8 +11332,8 @@
       "lastUpdated": "2026-04-19"
     },
     "family.card.headsUp": {
-      "translation": "单挑",
-      "hash": "hdb254",
+      "translation": "注意—过敏",
+      "hash": "qxpbye",
       "lastUpdated": "2026-04-19"
     },
     "family.card.care": {
@@ -11402,8 +11402,8 @@
       "lastUpdated": "2026-04-19"
     },
     "family.role.pet": {
-      "translation": "PET",
-      "hash": "8h1slc",
+      "translation": "🐾 宠物便帽",
+      "hash": "z2zapg",
       "lastUpdated": "2026-04-19"
     },
     "family.hub.sidebar.viewAllAllergies": {
