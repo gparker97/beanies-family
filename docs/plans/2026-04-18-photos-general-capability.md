@@ -52,11 +52,14 @@ greg wants a general, reusable photo capability — birthday invitations on acti
 
 ### Refactored NOW (extract-to-generic)
 
-| Refactor                                                                                                                      | Rationale                                                                                                                 |
-| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Extract drag-drop from `JoinPodView.vue` into `useFileDrop.ts` composable                                                     | `PhotoAttachments` needs identical drag-drop behavior. Extract once, reuse twice.                                         |
-| Add `useFilePicker.ts` composable wrapping `<input type="file">`                                                              | Consistent mime filtering + multi-file + error handling. Used by `PhotoAttachments` and the Replace action in the viewer. |
-| Extend `driveService.ts` with `getFileMetadata(token, fileId, fields)` + `DriveFileNotFoundError` subclass of `DriveApiError` | Needed to resolve `thumbnailLink` and `parents`. No parallel Drive HTTP module.                                           |
+| Refactor                                                                                                                                                                                                                                                                                                                                                               | Rationale                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extract drag-drop from `JoinPodView.vue` into `useFileDrop.ts` composable                                                                                                                                                                                                                                                                                              | `PhotoAttachments` needs identical drag-drop behavior. Extract once, reuse twice.                                                                   |
+| Add `useFilePicker.ts` composable wrapping `<input type="file">`                                                                                                                                                                                                                                                                                                       | Consistent mime filtering + multi-file + error handling. Used by `PhotoAttachments` and the Replace action in the viewer.                           |
+| **Generalize `driveService.createFile` to accept binary content.** Current signature is `content: string` with hardcoded `Content-Type: application/json`. Extend to `content: string \| Blob \| Uint8Array`, add optional `mimeType` param (default `'application/json'` to preserve existing `.beanpod` caller behavior). Branch the multipart body on content type. | Photos are binary; current signature can't upload them without this change. Parallel `createBinaryFile` would duplicate the multipart + auth logic. |
+| Add `getFileMetadata(token, fileId, fields)` to `driveService.ts` — thin wrapper around `GET /files/{fileId}?fields=...` returning parsed JSON.                                                                                                                                                                                                                        | Needed to resolve `parents` (canonical folder) and `thumbnailLink`.                                                                                 |
+| Add `DriveFileNotFoundError` subclass of `DriveApiError` in `driveService.ts`.                                                                                                                                                                                                                                                                                         | Cleaner 404/403 catch in `photoStore` than checking `.status` numerically.                                                                          |
+| Add `listFilePermissions(token, fileId)` to `driveService.ts` — wraps `GET /files/{fileId}/permissions`.                                                                                                                                                                                                                                                               | Needed for the one-time family migration sweep (detect which members don't yet have folder access).                                                 |
 
 ### Genuinely new
 
@@ -102,11 +105,11 @@ Entities that want attachments add `photoIds?: UUID[]`.
 
 ## Store API (`photoStore.ts`)
 
-- `resolveCanonicalFolderId() → string` — lazy-init. Calls `driveService.getFileMetadata(beanpodFileId, 'parents')` once per session; caches in memory. This is the shared folder every member uploads to.
+- `resolveCanonicalFolderId() → string` — lazy-init. Calls `driveService.getFileMetadata(token, syncStore.driveFileId, 'parents')` once per session; caches in memory. (Verified: `syncStore.driveFileId` from `src/stores/syncStore.ts:100` is the `.beanpod` file ID; `parents` resolves to the shared app folder.) This is the shared folder every member uploads to.
 - `addPhoto(file, createdBy?) → UUID`:
   1. Compress via `photoCompression.compress`.
   2. Resolve canonical folder.
-  3. `driveService.createFile(token, canonicalFolderId, 'beanies-photo-{uuid}.jpg', bytes)`.
+  3. `driveService.createFile(token, canonicalFolderId, 'beanies-photo-{uuid}.jpg', blob, 'image/jpeg')` (uses generalized binary-capable `createFile`).
   4. `changeDoc` to write `PhotoAttachment`. On write failure, call `driveService.deleteFile` to roll back the upload. If delete also fails, log — gc sweep will clean up.
   5. Offline at step 3: enqueue to `photoUploadQueue`; Automerge metadata is written after the queue drains successfully on reconnect.
 - `getImageUrl(photoId, size: 'thumb' | 'full') → string | null` — resolves photo → `driveService.getFileMetadata(..., 'thumbnailLink')` (TTL-cached ~30min) → returns URL transformed to `?sz=w{400|2048}`. Returns `null` + flags unresolved on `DriveFileNotFoundError`. On 403 URL-expired, refresh once.
@@ -175,12 +178,12 @@ On app start, after sync settles, run a one-time check: for each existing `Famil
 
 - `src/types/models.ts` — add `PhotoAttachment`
 - `src/types/automerge.ts` — add `photos` to `FamilyDocument`
-- `src/services/automerge/docService.ts` — init `photos: {}`
-- `src/services/google/driveService.ts` — add `getFileMetadata`, `listFilePermissions`, `DriveFileNotFoundError`
+- `src/services/automerge/docService.ts` — add `'photos'` to `ALL_COLLECTIONS` array (line ~65) AND init `photos: {}` in `initDoc()`
+- `src/services/google/driveService.ts` — generalize `createFile` for binary, add `getFileMetadata`, `listFilePermissions`, `DriveFileNotFoundError`
 - `src/components/login/JoinPodView.vue` — refactor drag-drop to `useFileDrop`
 - `src/pages/FamilyPage.vue` — extend invite to share app folder + one-time migration sweep
 - `src/stores/index.ts` — export `photoStore`
-- `src/constants/icons.ts` (or wherever icons live) — add `camera`, `image`, `image-broken` defs
+- `src/constants/icons.ts` — add `camera`, `image`, `image-broken` `BeanieIconDef` entries (confirmed path; `BeanieIcon` is at `src/components/ui/BeanieIcon.vue`)
 - `src/services/translation/uiStrings.ts` — `photos.*` strings (en + beanie); run `npm run translate`
 - `docs/ARCHITECTURE.md` — photo storage section (documents unencrypted + app-folder-share decisions)
 - `docs/adr/` — new ADR: photo storage architecture
@@ -203,21 +206,29 @@ On app start, after sync settles, run a one-time check: for each existing `Famil
 - **User leaves a family**: no automatic folder unshare yet. Follow-up plan should add this to the remove-member flow.
 - **Export/import of `.beanpod`** unchanged. Photos stay bound to Drive; portability is a follow-up concern.
 
-## Assumptions (verify on first touch)
+## Assumptions (verified 2026-04-19 fresh-eyes pass)
 
-1. `driveService.createFile` accepts arbitrary binary + filenames (architecture map suggests yes).
-2. `drive.file` scope grants all needed operations (create, read, update, delete, metadata, permissions) on files/folders the app created. No re-consent required.
-3. Drive `thumbnailLink` returns a URL that accepts `?sz=w{N}` up to 2048px for JPEG/PNG uploads. **Verify before finalizing the viewer — fallback plan noted above.**
-4. `shareFileWithEmail` works identically for folders (it uses the permissions API which is file-agnostic).
-5. Activities are first integration surface; family avatars second.
-6. `useConfirm` + `useToast` + `BaseModal` + `BeanieSpinner` work unmodified inside the new components.
+1. ~~`driveService.createFile` accepts arbitrary binary~~ — **DRIFT found.** Current signature is `content: string` with hardcoded `application/json`. Addressed by the `createFile` generalization refactor (see above).
+2. `drive.file` scope grants create/read/update/delete/metadata/permissions on app-created files and folders. No re-consent. ✓ verified.
+3. Drive `thumbnailLink?sz=w{N}` works up to 2048px for JPEG/PNG. **Still to verify empirically during implementation; fallback to authenticated `alt=media` if capped.**
+4. `shareFileWithEmail` uses the generic permissions endpoint — works identically for folders. ✓ verified (`src/services/google/driveService.ts:222–233`).
+5. Activities first, family avatars second.
+6. `useConfirm` + `useToast` + `BaseModal` (size `3xl` + `fullscreenMobile`) + `BeanieSpinner` all verified unchanged and suitable.
+7. `syncStore.driveFileId` is the `.beanpod` file ID and is reactive — suitable for `resolveCanonicalFolderId()`. ✓ verified.
+8. No existing `thumbnailLink`, image upload, or photo-gallery code in the repo — clean slate. ✓ verified.
+9. CSP is currently commented out (`index.html:51`); no `img-src` restriction applies today. If CSP is re-enabled later, add `*.googleusercontent.com` and `lh3.googleusercontent.com` to `img-src`.
+10. `offlineQueue.ts` retains single-slot `.beanpod` semantics — separate `photoUploadQueue` is the correct approach (not a generalize-and-reuse).
 
 ## Verification / testing plan
 
 ### Unit (Vitest, mocked)
 
 - `photoCompression.test.ts` — 4000×3000 → ≤ 2048 long edge; aspect preserved; size cap hit; early-return for small JPEGs.
-- `driveService.test.ts` (extend) — `getFileMetadata` passes `fields` param; 404 → `DriveFileNotFoundError`; 403 behavior; `listFilePermissions` parses response correctly.
+- `driveService.test.ts` (extend):
+  - `createFile` with string content → existing `.beanpod` behavior unchanged (backward compat guard).
+  - `createFile` with Blob + `image/jpeg` → sends binary body with correct mime.
+  - `getFileMetadata` passes `fields` param; 404 → `DriveFileNotFoundError`; 403 behavior.
+  - `listFilePermissions` parses response correctly.
 - `photoUploadQueue.test.ts` — enqueue persists to IDB; reconnect flushes in FIFO order; failed flush retries; soft cap at 20 triggers warning.
 - `photoStore.test.ts`:
   - `addPhoto` happy path (mocked drive).
