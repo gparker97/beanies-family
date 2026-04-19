@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2095
+    "translationCount": 2097
   },
   "translations": {
     "app.name": {
@@ -10479,6 +10479,16 @@
     "careSafety.stats.activeMeds": {
       "translation": "有效药物",
       "hash": "icp7nj",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.discardChanges.title": {
+      "translation": "接受或放弃您的更改",
+      "hash": "8xboc9",
+      "lastUpdated": "2026-04-19"
+    },
+    "family.discardChanges.body": {
+      "translation": "您已编辑此Bean ，但尚未保存。是否关闭而不保存？",
+      "hash": "5ycjbg",
       "lastUpdated": "2026-04-19"
     }
   }
