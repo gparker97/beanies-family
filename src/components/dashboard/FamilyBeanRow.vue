@@ -41,6 +41,7 @@ function getRoleLabel(member: { role: string; ageGroup?: string }): string {
               getMemberAvatarVariant({
                 gender: member.gender as Gender | undefined,
                 ageGroup: member.ageGroup as AgeGroup | undefined,
+                isPet: member.isPet,
               })
             "
             :color="member.color || '#3b82f6'"

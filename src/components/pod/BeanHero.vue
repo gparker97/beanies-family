@@ -35,6 +35,7 @@ const variant = computed(() =>
   getMemberAvatarVariant({
     gender: props.member.gender as Gender | undefined,
     ageGroup: props.member.ageGroup as AgeGroup | undefined,
+    isPet: props.member.isPet,
   })
 );
 

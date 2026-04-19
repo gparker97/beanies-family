@@ -62,6 +62,7 @@ const variant = computed(() =>
   getMemberAvatarVariant({
     gender: props.member.gender as Gender | undefined,
     ageGroup: props.member.ageGroup as AgeGroup | undefined,
+    isPet: props.member.isPet,
   })
 );
 
@@ -243,7 +244,7 @@ const severeAllergyCount = computed(
               >
                 {{ member.name }}
               </h3>
-              <span @click.stop>
+              <span v-if="!member.isPet" @click.stop>
                 <MemberRoleManager
                   :current-role="member.role"
                   :member-id="member.id"
