@@ -255,7 +255,7 @@ const severeAllergyCount = computed(
             <div class="flex flex-shrink-0 gap-1">
               <button
                 v-if="canManage"
-                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
+                class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
                 :title="t('action.edit')"
                 @click.stop="emit('edit')"
               >
@@ -263,7 +263,7 @@ const severeAllergyCount = computed(
               </button>
               <button
                 v-if="member.requiresPassword && !member.isPet && canManage"
-                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
+                class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
                 :title="t('family.copyInviteLinkHint')"
                 @click.stop="emit('share-invite')"
               >
@@ -271,7 +271,7 @@ const severeAllergyCount = computed(
               </button>
               <button
                 v-if="member.role !== 'owner' && canManage"
-                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
+                class="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-red-600 dark:hover:bg-slate-700"
                 @click.stop="emit('delete')"
               >
                 <BeanieIcon name="trash" size="sm" />

@@ -38,21 +38,22 @@ const ACCENT_CLASS: Record<NonNullable<Stat['accent']>, string> = {
 
 <template>
   <div
-    class="grid gap-3"
+    class="stat-strip grid gap-2 sm:gap-3"
     :style="{
-      gridTemplateColumns: `repeat(${columns || Math.min(stats.length, 4)}, minmax(0, 1fr))`,
+      '--desktop-cols': columns || Math.min(stats.length, 4),
+      '--mobile-cols': Math.min(stats.length, 2),
     }"
   >
     <div
       v-for="(stat, i) in stats"
       :key="i"
-      class="flex flex-col items-center gap-0.5 rounded-2xl bg-[var(--tint-slate-5)] px-4 py-3 text-center dark:bg-slate-700/40"
+      class="flex flex-col items-center gap-0.5 rounded-2xl bg-[var(--tint-slate-5)] px-3 py-3 text-center sm:px-4 dark:bg-slate-700/40"
     >
       <span v-if="stat.emoji" class="text-lg leading-none" aria-hidden="true">{{
         stat.emoji
       }}</span>
       <span
-        class="font-outfit text-xl leading-tight font-bold"
+        class="font-outfit text-lg leading-tight font-bold sm:text-xl"
         :class="ACCENT_CLASS[stat.accent ?? 'primary']"
       >
         {{ stat.value }}
@@ -65,3 +66,16 @@ const ACCENT_CLASS: Record<NonNullable<Stat['accent']>, string> = {
     </div>
   </div>
 </template>
+
+<style scoped>
+.stat-strip {
+  /* 2 cols on phones so cards stay readable; full N cols at sm+ */
+  grid-template-columns: repeat(var(--mobile-cols), minmax(0, 1fr));
+}
+
+@media (width >= 640px) {
+  .stat-strip {
+    grid-template-columns: repeat(var(--desktop-cols), minmax(0, 1fr));
+  }
+}
+</style>

@@ -10,6 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-19
 
+### Fixed
+
+- **Mobile responsiveness across The Pod.** Full pass over every new Pod surface at the 375px baseline:
+  - **Sidebar mobile nav** — "The Pod" is now expandable/collapsible on mobile (previously its 5 sub-items — Meet the Beans / Scrapbook / Cookbook / Care & Safety / Emergency Contacts — were simply dropped by the hamburger menu's flat item mapper). The mobile menu now mirrors desktop: tapping the chevron toggles the nested sub-nav, and `useSidebarAccordion` (module-scoped + localStorage-backed) keeps the expand/collapse state in sync across mobile and desktop.
+  - **Hero headers** (Meet the Beans, Bean Detail, Cookbook, Scrapbook, Care & Safety, Emergency Contacts, Recipe Detail) — all dropped from `px-8 py-7` / `px-9 py-8` to `px-4 py-5 sm:px-8 sm:py-7` so they breathe at mobile instead of eating the viewport. Page titles shrink from `text-3xl` to `text-2xl` on mobile with `leading-tight` + `break-words` so long family names don't overflow.
+  - **Header action buttons** (Invite Bean / Add Bean / Edit / "I cooked this" / Add Recipe) — stack full-width below the title on mobile and return to an inline row from `sm:` up.
+  - **Bean Detail tabs (6-tab strip)** — at mobile, only the active tab shows its label; inactive tabs are emoji-only so all 6 fit without horizontal scrolling. Labels return from `sm:` up.
+  - **Meet the Beans sayings rail** — sticky notes drop from `w-56` to `w-48` on mobile so two cards are visible at a glance on a 375px viewport.
+  - **StatStrip** — forced to 2 columns on mobile (was 4 — stats were ~70px wide each), back to N columns at `sm:`.
+  - **BeanCard action buttons** — bumped from `p-1.5` (~28px) to `h-9 w-9` (36px) touch targets.
+
 ### Added
 
 - **Pet Beans.** Add your dog, cat, or other furry family member to the pod. The Add / Edit Bean drawer now has a third role pill — 🐾 **Pet Bean** — alongside Parent Bean and Little Bean. When Pet is selected, email and permissions fields disappear (pets never receive invites, sign in, or manage anything) and the avatar swaps to a cute beanie dog in the Heritage-Orange palette. Pets count toward the family total in stats and roster views, can have favorites / allergies / medications / sayings / notes like any other bean, and never show the amber "waiting to join" badge or the share-invite button. Uses a new `isPet` flag on `FamilyMember` (additive, non-breaking) plus a new `'pet-dog'` avatar variant backed by `public/brand/beanies_pet_dog_icon_transparent_350x350.png`.

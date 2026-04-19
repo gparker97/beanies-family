@@ -100,9 +100,11 @@ function openMedication(m: Medication): void {
 <template>
   <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
     <header
-      class="mb-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-8 py-7"
+      class="mb-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-5 py-5 sm:px-8 sm:py-7"
     >
-      <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
+      <h1
+        class="font-outfit text-secondary-500 text-2xl leading-tight font-bold sm:text-3xl dark:text-gray-100"
+      >
         🩺 {{ t('careSafety.title') }}
       </h1>
       <p class="text-secondary-500/70 mt-1 text-sm">{{ t('careSafety.subtitle') }}</p>
