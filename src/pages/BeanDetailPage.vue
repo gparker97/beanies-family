@@ -16,6 +16,9 @@ import { useRoute, useRouter } from 'vue-router';
 import BeanHero from '@/components/pod/BeanHero.vue';
 import BeanTabs, { type BeanTabId } from '@/components/pod/BeanTabs.vue';
 import BeanOverviewTab from '@/components/pod/BeanOverviewTab.vue';
+import BeanFavoritesTab from '@/components/pod/BeanFavoritesTab.vue';
+import BeanSayingsTab from '@/components/pod/BeanSayingsTab.vue';
+import BeanNotesTab from '@/components/pod/BeanNotesTab.vue';
 import BeanTabPlaceholder from '@/components/pod/BeanTabPlaceholder.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
@@ -58,16 +61,9 @@ function selectTab(tab: BeanTabId): void {
       <BeanTabs :active="activeTab" :counts="counts" @select="selectTab" />
 
       <BeanOverviewTab v-if="activeTab === 'overview'" :member="member" />
-      <BeanTabPlaceholder
-        v-else-if="activeTab === 'favorites'"
-        emoji="\u{1F49D}"
-        :message="t('bean.overview.favorites.empty')"
-      />
-      <BeanTabPlaceholder
-        v-else-if="activeTab === 'sayings'"
-        emoji="\u{1F4AC}"
-        :message="t('bean.overview.sayings.empty')"
-      />
+      <BeanFavoritesTab v-else-if="activeTab === 'favorites'" :member-id="member.id" />
+      <BeanSayingsTab v-else-if="activeTab === 'sayings'" :member-id="member.id" />
+      <BeanNotesTab v-else-if="activeTab === 'notes'" :member-id="member.id" />
       <BeanTabPlaceholder
         v-else-if="activeTab === 'allergies'"
         emoji="\u26A0\uFE0F"
@@ -77,11 +73,6 @@ function selectTab(tab: BeanTabId): void {
         v-else-if="activeTab === 'medications'"
         emoji="\u{1F48A}"
         :message="t('bean.overview.medications.empty')"
-      />
-      <BeanTabPlaceholder
-        v-else-if="activeTab === 'notes'"
-        emoji="\u{1F4DD}"
-        :message="t('bean.overview.notes.empty')"
       />
     </template>
     <div
