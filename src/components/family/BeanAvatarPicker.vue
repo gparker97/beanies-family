@@ -16,6 +16,7 @@
 import { computed, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { useToast } from '@/composables/useToast';
@@ -85,7 +86,24 @@ function remove() {
       :ref="(el) => (picker.inputRef.value = el as HTMLInputElement)"
       v-bind="picker.bindings"
     />
-    <BeanieAvatar :variant="variant" :color="color" :photo-url="photoUrl" size="xl" />
+    <!-- Avatar + uploading overlay (non-blocking; modal stays interactive) -->
+    <div class="relative">
+      <BeanieAvatar
+        :variant="variant"
+        :color="color"
+        :photo-url="photoUrl"
+        size="xl"
+        :class="{ 'opacity-40 transition-opacity': uploading }"
+      />
+      <div
+        v-if="uploading"
+        class="pointer-events-none absolute inset-0 flex items-center justify-center"
+        role="status"
+        :aria-label="t('photos.avatar.uploading')"
+      >
+        <BeanieSpinner size="md" />
+      </div>
+    </div>
     <div v-if="!disabled && photosEnabled" class="flex items-center gap-2 text-xs">
       <button
         type="button"
@@ -93,7 +111,8 @@ function remove() {
         :disabled="uploading"
         @click="picker.open()"
       >
-        <BeanieIcon name="camera" size="xs" />
+        <BeanieSpinner v-if="uploading" size="xs" />
+        <BeanieIcon v-else name="camera" size="xs" />
         <span>
           {{
             uploading
