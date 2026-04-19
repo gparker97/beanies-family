@@ -14,7 +14,7 @@
  *     photoIds: computed(() => props.activity.photoIds ?? []),
  *   });
  */
-import { computed, type ComputedRef, type Ref, unref } from 'vue';
+import { computed, ref, type ComputedRef, type Ref, unref } from 'vue';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
@@ -57,6 +57,12 @@ export interface UsePhotosReturn {
   canAdd: ComputedRef<boolean>;
   /** True when the set is full (helps the UI disable the add control). */
   atCap: ComputedRef<boolean>;
+  /**
+   * Number of in-flight online uploads from this composable instance.
+   * UI surfaces render a spinner tile per in-flight upload so the user
+   * sees feedback during the compress + Drive round-trip (2–5s).
+   */
+  uploading: Ref<number>;
   /** Attach one or more files (files come from useFilePicker / useFileDrop). */
   add: (files: File[]) => Promise<UUID[]>;
   /** Mark a photo deleted (tombstone) and drop its reference from this entity. */
@@ -79,6 +85,7 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
   });
 
   const max = computed(() => options.max ?? MAX_PHOTOS_PER_SET);
+  const uploading = ref(0);
 
   // Use the raw photoIds length (not resolved photo count) so the cap
   // logic counts "slots the user has filled" consistently — even for IDs
@@ -115,6 +122,10 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     const entityId = unref(options.entityId);
     const wasOffline = !navigator.onLine;
     const ids: UUID[] = [];
+    // Bump the in-flight counter once per accepted file BEFORE any
+    // awaits so the UI spinner tiles render immediately. Decrement
+    // happens per file in the loop below regardless of success.
+    uploading.value += accepted.length;
     for (const file of accepted) {
       try {
         const id = await store.addPhoto(file, options.collection, entityId, createdBy);
@@ -122,6 +133,8 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
       } catch (e) {
         console.warn('[usePhotos] addPhoto failed', e);
         showToast('error', t('photos.uploadFailed'));
+      } finally {
+        uploading.value = Math.max(0, uploading.value - 1);
       }
     }
 
@@ -150,5 +163,5 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     options.updatePhotoIds(currentIds.filter((id) => id !== photoId));
   }
 
-  return { photos, pending, canAdd, atCap, add, remove };
+  return { photos, pending, canAdd, atCap, uploading, add, remove };
 }
