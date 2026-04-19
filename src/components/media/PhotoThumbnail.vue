@@ -82,13 +82,16 @@ watch(
     :class="showBroken ? 'cursor-pointer' : 'hover:opacity-90'"
     @click="photoId && $emit('open', photoId)"
   >
-    <!-- Pending (queued offline) state -->
+    <!-- Pending state — queued offline upload OR in-flight online
+         upload. Brand-tinted so it reads on both light drawer
+         surfaces and dark activity panels; the spinner is sm (24px)
+         so the motion is unmistakable at 80px tile size. -->
     <div
       v-if="isPending"
-      class="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-800/60 text-white/80"
+      class="border-primary-500/40 bg-primary-500/10 text-primary-600 dark:text-primary-300 flex h-full w-full animate-pulse flex-col items-center justify-center gap-1 border-2 border-dashed"
     >
-      <BeanieSpinner size="xs" />
-      <span class="text-[10px]">{{ pendingLabel }}</span>
+      <BeanieSpinner size="sm" />
+      <span class="font-outfit text-[9px] leading-tight font-semibold">{{ pendingLabel }}</span>
     </div>
 
     <!-- Broken / missing state -->
