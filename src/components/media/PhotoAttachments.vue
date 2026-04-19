@@ -43,6 +43,17 @@ const emit = defineEmits<{ 'update:photoIds': [ids: UUID[]] }>();
 
 const { t } = useTranslation();
 
+const MAX_PHOTOS_DEFAULT = 4;
+
+// Localized hint for the "you've hit the cap" state. Renders the
+// singular copy for single-photo surfaces (medication bottle, cook-log
+// dish snap) and the interpolated "up to N" for multi-photo surfaces.
+const maxReachedLabel = computed(() => {
+  const n = props.max ?? MAX_PHOTOS_DEFAULT;
+  if (n === 1) return t('photos.maxReached.one');
+  return t('photos.maxReached.n').replace('{n}', String(n));
+});
+
 const { photos, pending, canAdd, atCap, uploading, add, remove } = usePhotos({
   collection: props.collection,
   entityId: computed(() => props.entityId),
@@ -158,7 +169,7 @@ defineExpose({
       class="px-3 pb-2 text-xs"
       :class="tone === 'dark' ? 'text-white/50' : 'text-[var(--color-text-muted)]'"
     >
-      {{ t('photos.maxReached') }}
+      {{ maxReachedLabel }}
     </p>
 
     <input

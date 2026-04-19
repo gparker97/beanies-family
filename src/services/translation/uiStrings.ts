@@ -4387,6 +4387,8 @@ const STRING_DEFS = {
     beanie: "this browser can't read heic photos. try a jpeg or png.",
   },
   'photos.maxReached': { en: 'Up to 4 photos per item', beanie: 'up to 4 photos per item' },
+  'photos.maxReached.one': { en: 'One photo per item', beanie: 'one photo per item' },
+  'photos.maxReached.n': { en: 'Up to {n} photos per item', beanie: 'up to {n} photos per item' },
   'photos.invalidType': {
     en: 'Only JPEG, PNG, and HEIC photos are supported.',
     beanie: 'only jpeg, png, and heic photos are supported.',
