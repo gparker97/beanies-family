@@ -97,7 +97,11 @@ export const useSyncStore = defineStore('sync', () => {
   const storageProviderType = ref<StorageProviderType | null>(null);
   const providerAccountEmail = ref<string | null>(null);
   const isGoogleDriveConnected = computed(() => storageProviderType.value === 'google_drive');
-  const driveFileId = computed(() => syncService.getProvider()?.getFileId() ?? null);
+  // Must be a ref, not a computed over `syncService.getProvider()` — that
+  // function is a plain singleton read with no reactive deps, so any
+  // computed built on it would stick at its first value and never update.
+  // Kept in sync via `onStateChange` below.
+  const driveFileId = ref<string | null>(null);
   const driveFolderId = computed(() => getAppFolderId());
   const showGoogleReconnect = ref(false);
   const driveFileNotFound = ref(false);
@@ -133,6 +137,7 @@ export const useSyncStore = defineStore('sync', () => {
     isSyncing.value = state.isSyncing;
     storageProviderType.value = syncService.getProviderType();
     providerAccountEmail.value = syncService.getProvider()?.getAccountEmail() ?? null;
+    driveFileId.value = syncService.getProvider()?.getFileId() ?? null;
     error.value = state.lastError;
   });
 

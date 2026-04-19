@@ -81,7 +81,10 @@ function remove() {
 
 <template>
   <div class="flex flex-col items-center gap-2">
-    <input ref="picker.inputRef" v-bind="picker.bindings" />
+    <input
+      :ref="(el) => (picker.inputRef.value = el as HTMLInputElement)"
+      v-bind="picker.bindings"
+    />
     <BeanieAvatar :variant="variant" :color="color" :photo-url="photoUrl" size="xl" />
     <div v-if="!disabled && photosEnabled" class="flex items-center gap-2 text-xs">
       <button
