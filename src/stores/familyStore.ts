@@ -89,11 +89,66 @@ export const useFamilyStore = defineStore('family', () => {
     }
   });
 
+  /**
+   * Diagnostic: log duplicate members so we can catch the "member listed
+   * twice" class of bug. Distinct-id collisions shouldn't be possible
+   * (UUIDs), but matching email OR matching name+dateOfBirth suggests
+   * either a double-create from a UX race or a CRDT merge weirdness.
+   * Purely informational — we don't silently dedupe because we can't
+   * know which record is the "right" one to keep.
+   */
+  function logDuplicateMembers(list: FamilyMember[]): void {
+    const byId = new Map<string, number>();
+    const byEmail = new Map<string, FamilyMember[]>();
+    const byKey = new Map<string, FamilyMember[]>();
+    for (const m of list) {
+      byId.set(m.id, (byId.get(m.id) ?? 0) + 1);
+      if (m.email && !m.email.endsWith('@temp.beanies.family')) {
+        const arr = byEmail.get(m.email.toLowerCase()) ?? [];
+        arr.push(m);
+        byEmail.set(m.email.toLowerCase(), arr);
+      }
+      const dob = m.dateOfBirth
+        ? `${m.dateOfBirth.year ?? ''}-${m.dateOfBirth.month}-${m.dateOfBirth.day}`
+        : '';
+      const key = `${m.name.trim().toLowerCase()}|${m.ageGroup}|${dob}`;
+      const arr = byKey.get(key) ?? [];
+      arr.push(m);
+      byKey.set(key, arr);
+    }
+    for (const [id, count] of byId) {
+      if (count > 1) {
+        console.warn('[familyStore] duplicate member id detected:', id, 'count:', count);
+      }
+    }
+    for (const [email, arr] of byEmail) {
+      if (arr.length > 1) {
+        console.warn(
+          '[familyStore] duplicate email across members:',
+          email,
+          'ids:',
+          arr.map((m) => m.id)
+        );
+      }
+    }
+    for (const [key, arr] of byKey) {
+      if (arr.length > 1) {
+        console.warn(
+          '[familyStore] likely-duplicate member (same name/age/dob):',
+          key,
+          'ids:',
+          arr.map((m) => m.id)
+        );
+      }
+    }
+  }
+
   // Actions
   async function loadMembers() {
     await wrapAsync(isLoading, error, async () => {
       const prevMemberId = currentMemberId.value;
       members.value = await familyRepo.getAllFamilyMembers();
+      logDuplicateMembers(members.value);
 
       // Restore currentMemberId: prefer authStore session, then previous value, then owner
       if (!currentMemberId.value) {
