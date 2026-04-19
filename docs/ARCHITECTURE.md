@@ -127,18 +127,20 @@ Vue's reactivity system means views subscribe to state directly — there is no 
 
 All family data lives in a single Automerge CRDT document per family. Collections use `Record<string, Entity>` maps (not arrays) for clean CRDT merge semantics:
 
-| Collection     | Entity Type    | Notes                       |
-| -------------- | -------------- | --------------------------- |
-| familyMembers  | FamilyMember   | Keyed by member UUID        |
-| accounts       | Account        | Keyed by account UUID       |
-| transactions   | Transaction    | Keyed by transaction UUID   |
-| assets         | Asset          | Keyed by asset UUID         |
-| goals          | Goal           | Keyed by goal UUID          |
-| budgets        | Budget         | Keyed by budget UUID        |
-| recurringItems | RecurringItem  | Keyed by item UUID          |
-| todos          | TodoItem       | Keyed by todo UUID          |
-| activities     | FamilyActivity | Keyed by activity UUID      |
-| settings       | Settings       | Singleton (direct property) |
+| Collection     | Entity Type     | Notes                                                         |
+| -------------- | --------------- | ------------------------------------------------------------- |
+| familyMembers  | FamilyMember    | Keyed by member UUID                                          |
+| accounts       | Account         | Keyed by account UUID                                         |
+| transactions   | Transaction     | Keyed by transaction UUID                                     |
+| assets         | Asset           | Keyed by asset UUID                                           |
+| goals          | Goal            | Keyed by goal UUID                                            |
+| budgets        | Budget          | Keyed by budget UUID                                          |
+| recurringItems | RecurringItem   | Keyed by item UUID                                            |
+| todos          | TodoItem        | Keyed by todo UUID                                            |
+| activities     | FamilyActivity  | Keyed by activity UUID                                        |
+| vacations      | FamilyVacation  | Keyed by vacation UUID                                        |
+| photos         | PhotoAttachment | Metadata only — bytes live in Drive (see Photo Storage below) |
+| settings       | Settings        | Singleton (direct property)                                   |
 
 ### Automerge Persistence Cache
 
@@ -158,6 +160,17 @@ A shared `beanies-registry` database stores cross-family metadata:
 ### File Handle Database
 
 `beanies-file-handles` (version 1) stores File System Access API handles per family using `syncFile-{familyId}` keys. Also stores Google OAuth refresh tokens (`googleRefreshToken-{familyId}`) and provider config (`providerConfig-{familyId}`).
+
+### Photo Storage
+
+Photo bytes live in the user's Google Drive inside the **shared** `beanies.family` app folder — the same folder the `.beanpod` lives in. The Automerge document holds only `PhotoAttachment` metadata (`driveFileId`, dimensions, mime, timestamps, optional `createdBy`, optional `deletedAt` tombstone). Thumbnails and full-size renders are served directly from Drive's `thumbnailLink` CDN (`=s400` and `=s2048` respectively) — no client-side thumbnail generation, no IndexedDB blob cache.
+
+- **Not encrypted.** `.beanpod` is AES-GCM encrypted because it holds structured sensitive data; photos are different and live in the user's own Drive, which the user already trusts for every other Drive-stored file. See [ADR-021](adr/021-photo-storage.md).
+- **Multi-member access via folder sharing.** The invite flow shares the `.beanpod`'s parent folder with each invitee. A one-time migration sweep (triggered when `syncStore.driveFileId` becomes available) back-fills folder shares for existing families.
+- **Offline queue.** `beanies-photo-queue-{familyId}` IndexedDB holds compressed blobs that were staged for upload while offline. The queue self-drains on the `online` event and is dropped on sign-out alongside other family caches.
+- **Missing-photo handling.** 404/403 from Drive flips a runtime `unresolved` flag on the photo. The UI shows a broken-image tile and the viewer surfaces Replace (swap `driveFileId`, keep UUID) / Remove (tombstone) actions. The flag is not persisted.
+
+`src/stores/photoStore.ts` is the orchestrator (MVO-style) that coordinates compress → upload → Automerge write → entity.photoIds. Integration plans (activities, family avatars, todos) register their collection name via `registerPhotoCollection(name)` so the zero-reference GC sweep can cascade.
 
 ## Entity Relationships
 
