@@ -200,7 +200,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       </div>
     </FormFieldGroup>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('cookLog.field.cookedOn')" required>
         <BaseInput v-model="cookedOn" type="date" />
       </FormFieldGroup>
