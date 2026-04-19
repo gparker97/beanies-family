@@ -14,7 +14,7 @@ const { state, handleConfirm, handleCancel } = useConfirm();
     :title="t(state.title)"
     size="sm"
     :closable="state.showCancel"
-    layer="overlay"
+    layer="top"
     @close="handleCancel"
   >
     <!-- Body -->
