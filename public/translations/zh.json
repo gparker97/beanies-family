@@ -11397,8 +11397,8 @@
       "lastUpdated": "2026-04-19"
     },
     "modal.petHint": {
-      "translation": "宠物是吊舱的一部分，但不能登录、获得邀请或管理任何东西。",
-      "hash": "vijvh2",
+      "translation": "宠物是您的宠物舱的一部分，但不要让他们登录，因为他们非常不擅长使用电脑。",
+      "hash": "89ahfm",
       "lastUpdated": "2026-04-19"
     },
     "family.role.pet": {

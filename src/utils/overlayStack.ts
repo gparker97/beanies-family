@@ -22,6 +22,11 @@ export function unlockBodyScroll() {
   }
 }
 
+/** True when any modal or drawer is open — used to defer destructive actions like a PWA reload while the user is mid-edit. */
+export function hasOpenOverlays(): boolean {
+  return overlayCount > 0;
+}
+
 /** Reset counter — for test isolation only. */
 export function resetOverlayStack() {
   overlayCount = 0;
