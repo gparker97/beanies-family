@@ -20,6 +20,11 @@ interface Props {
   entityId: UUID;
   photoIds: UUID[];
   currentMemberId?: UUID;
+  /**
+   * Per-entity cap override. Defaults to 4 (MAX_PHOTOS_PER_SET).
+   * Medication bottles and cook-log dish snaps pass `:max="1"`.
+   */
+  max?: number;
 }
 
 const props = defineProps<Props>();
@@ -33,6 +38,7 @@ const { photos, pending, canAdd, atCap, add, remove } = usePhotos({
   photoIds: computed(() => props.photoIds),
   currentMemberId: computed(() => props.currentMemberId),
   updatePhotoIds: (ids) => emit('update:photoIds', ids),
+  max: props.max,
 });
 
 const viewerOpen = ref(false);
