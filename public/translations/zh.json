@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 1955
+    "translationCount": 1961
   },
   "translations": {
     "app.name": {
@@ -9779,6 +9779,36 @@
     "nook.motto37": {
       "translation": "生活不仅仅是真的，真的，荒谬地看着豆豆。",
       "hash": "2m81wf",
+      "lastUpdated": "2026-04-19"
+    },
+    "nav.pod": {
+      "translation": "The Pod",
+      "hash": "564xqu",
+      "lastUpdated": "2026-04-19"
+    },
+    "nav.pod.meetBeans": {
+      "translation": "The Beans",
+      "hash": "vcamv9",
+      "lastUpdated": "2026-04-19"
+    },
+    "nav.pod.scrapbook": {
+      "translation": "家庭剪贴簿",
+      "hash": "ozrrsu",
+      "lastUpdated": "2026-04-19"
+    },
+    "nav.pod.cookbook": {
+      "translation": "家庭食谱",
+      "hash": "v5yt1v",
+      "lastUpdated": "2026-04-19"
+    },
+    "nav.pod.safety": {
+      "translation": "保养与安全",
+      "hash": "bgwyt7",
+      "lastUpdated": "2026-04-19"
+    },
+    "nav.pod.contacts": {
+      "translation": "紧急联系人",
+      "hash": "5it6wy",
       "lastUpdated": "2026-04-19"
     }
   }

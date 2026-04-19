@@ -18,6 +18,19 @@ export interface NavItemDef {
   badgeKey?: string;
   external?: boolean;
   externalUrl?: string;
+  /**
+   * Optional nested sub-items. When present, the parent renders as an
+   * expandable group in the sidebar — clicking the parent navigates to its
+   * own `path` and reveals the children. Children are rendered via
+   * AppSidebarSubNav at an indented scale.
+   */
+  children?: NavSubItemDef[];
+}
+
+export interface NavSubItemDef {
+  labelKey: UIStringKey;
+  path: string;
+  emoji: string;
 }
 
 export const NAV_SECTIONS: NavSectionDef[] = [
@@ -47,10 +60,21 @@ export const NAV_ITEMS: NavItemDef[] = [
   },
   { labelKey: 'nav.todo', path: '/todo', emoji: '\u2705', section: 'treehouse' },
   {
-    labelKey: 'nav.family',
-    path: '/family',
-    emoji: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+    labelKey: 'nav.pod',
+    path: '/pod',
+    emoji: '\u{1F331}',
     section: 'treehouse',
+    children: [
+      {
+        labelKey: 'nav.pod.meetBeans',
+        path: '/pod',
+        emoji: '\u{1F9D1}\u200D\u{1F91D}\u200D\u{1F9D1}',
+      },
+      { labelKey: 'nav.pod.scrapbook', path: '/pod/scrapbook', emoji: '\u{1F4D6}' },
+      { labelKey: 'nav.pod.cookbook', path: '/pod/cookbook', emoji: '\u{1F35C}' },
+      { labelKey: 'nav.pod.safety', path: '/pod/safety', emoji: '\u{1FA7A}' },
+      { labelKey: 'nav.pod.contacts', path: '/pod/contacts', emoji: '\u{1F198}' },
+    ],
   },
   // The Piggy Bank
   { labelKey: 'nav.overview', path: '/dashboard', emoji: '\u{1F3E0}', section: 'piggyBank' },
@@ -98,5 +122,5 @@ export const MOBILE_TAB_ITEMS: MobileTabDef[] = [
   { labelKey: 'mobile.activities', path: '/activities', emoji: '\u{1F4C5}' },
   { labelKey: 'mobile.travel', path: '/travel', emoji: '\u2708\uFE0F' },
   { labelKey: 'mobile.piggyBank', path: '/dashboard', emoji: '\u{1F437}' },
-  { labelKey: 'mobile.pod', path: '/family', emoji: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}' },
+  { labelKey: 'mobile.pod', path: '/pod', emoji: '\u{1F331}' },
 ];
