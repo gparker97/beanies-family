@@ -210,6 +210,7 @@ describe('docService', () => {
         todos: {},
         activities: {},
         vacations: {},
+        photos: {},
         settings: null,
       };
       const newDoc = Automerge.from(

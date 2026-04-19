@@ -9,6 +9,7 @@ import type {
   TodoItem,
   FamilyActivity,
   FamilyVacation,
+  PhotoAttachment,
   Settings,
 } from './models';
 
@@ -28,6 +29,7 @@ export interface FamilyDocument {
   todos: Record<string, TodoItem>;
   activities: Record<string, FamilyActivity>;
   vacations: Record<string, FamilyVacation>;
+  photos: Record<string, PhotoAttachment>;
   settings: Settings | null;
 }
 
