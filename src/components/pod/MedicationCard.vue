@@ -54,7 +54,7 @@ const scheduleLabel = computed(() => {
 
     <!-- Visual anchor: photo OR apothecary fallback -->
     <div
-      class="relative aspect-square w-28 flex-shrink-0 overflow-hidden"
+      class="relative aspect-square w-24 flex-shrink-0 overflow-hidden sm:w-28"
       :class="photoUrl ? 'bg-slate-100 dark:bg-slate-900' : ''"
     >
       <img

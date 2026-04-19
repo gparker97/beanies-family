@@ -203,7 +203,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <BaseInput v-model="name" :placeholder="t('medications.placeholder.name')" />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('medications.field.dose')" required>
         <BaseInput v-model="dose" :placeholder="t('medications.placeholder.dose')" />
       </FormFieldGroup>
@@ -212,7 +212,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       </FormFieldGroup>
     </div>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('medications.field.startDate')" optional>
         <BaseInput v-model="startDate" type="date" />
       </FormFieldGroup>

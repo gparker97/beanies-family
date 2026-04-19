@@ -408,9 +408,9 @@ function handleDelete() {
       <BaseInput v-model="email" type="email" placeholder="bean@example.com" :disabled="readOnly" />
     </FormFieldGroup>
 
-    <!-- 7. Birthday -->
+    <!-- 7. Birthday — month gets double width for full month names -->
     <FormFieldGroup :label="t('modal.birthday')" optional>
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-[2fr_1fr_1.2fr] gap-2">
         <BaseSelect v-model="dobMonth" :options="monthOptions" :disabled="readOnly" />
         <BaseSelect v-model="dobDay" :options="dayOptions" :disabled="readOnly" />
         <BaseInput v-model="dobYear" type="number" placeholder="Year" :disabled="readOnly" />

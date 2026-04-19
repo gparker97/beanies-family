@@ -230,7 +230,7 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
       <BaseInput v-model="subtitle" :placeholder="t('recipes.placeholder.subtitle')" />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('recipes.field.prepTime')" optional>
         <BaseInput v-model="prepTime" :placeholder="t('recipes.placeholder.prepTime')" />
       </FormFieldGroup>
