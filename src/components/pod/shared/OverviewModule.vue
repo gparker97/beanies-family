@@ -9,36 +9,54 @@
  * each module supplies its own data from its own store, so this
  * component stays free of domain imports.
  */
-defineProps<{
-  title: string;
-  emoji: string;
-  /** Count chip shown next to the title. Omit for modules without a count. */
-  count?: number | null;
-  /** When set, renders a "View all →" action that the parent handles. */
-  viewAllLabel?: string;
-  /**
-   * Visual tone. `safety` tints the card orange + orange title — used
-   * on the Allergies tile so safety info stands out from the rest of
-   * the grid (matches the mockup's `.dash-module.safety` rule).
-   */
-  tone?: 'default' | 'safety';
-  /** Optional inline chip shown next to the title (e.g. "1 severe"). */
-  headerChip?: { label: string; variant?: 'danger' | 'success' } | null;
-}>();
+withDefaults(
+  defineProps<{
+    title: string;
+    emoji: string;
+    /** Count chip shown next to the title. Omit for modules without a count. */
+    count?: number | null;
+    /** When set, renders a "View all →" action that the parent handles. */
+    viewAllLabel?: string;
+    /**
+     * Visual tone. `safety` tints the card orange + orange title — used
+     * on the Allergies tile so safety info stands out from the rest of
+     * the grid (matches the mockup's `.dash-module.safety` rule).
+     */
+    tone?: 'default' | 'safety';
+    /** Optional inline chip shown next to the title (e.g. "1 severe"). */
+    headerChip?: { label: string; variant?: 'danger' | 'success' } | null;
+    /**
+     * When true (default), the whole card is a keyboard-reachable button
+     * that emits `activate` on click/Enter/Space. Parents wire this to
+     * route to the related tab.
+     */
+    clickable?: boolean;
+  }>(),
+  { clickable: true }
+);
 
 defineEmits<{
   'view-all': [];
+  activate: [];
 }>();
 </script>
 
 <template>
   <section
-    class="flex flex-col rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)]"
-    :class="
+    class="flex flex-col rounded-[var(--sq)] p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 focus:outline-none"
+    :class="[
       tone === 'safety'
         ? 'border border-[rgb(241_93_34_/_15%)] bg-[rgb(241_93_34_/_4%)]'
-        : 'bg-white dark:bg-slate-800'
-    "
+        : 'bg-white dark:bg-slate-800',
+      clickable
+        ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] focus-visible:ring-2 focus-visible:ring-[#F15D22] focus-visible:ring-offset-2'
+        : '',
+    ]"
+    :role="clickable ? 'button' : undefined"
+    :tabindex="clickable ? 0 : undefined"
+    @click="clickable && $emit('activate')"
+    @keydown.enter.prevent="clickable && $emit('activate')"
+    @keydown.space.prevent="clickable && $emit('activate')"
   >
     <header class="flex items-center justify-between gap-3">
       <div class="flex min-w-0 items-center gap-2">
@@ -71,7 +89,7 @@ defineEmits<{
         v-if="viewAllLabel"
         type="button"
         class="font-outfit text-primary-500 text-xs font-semibold transition-opacity hover:opacity-80"
-        @click="$emit('view-all')"
+        @click.stop="$emit('view-all')"
       >
         {{ viewAllLabel }}
       </button>
