@@ -12,6 +12,7 @@
  */
 
 import { clearCache, closeCacheDB } from '@/services/automerge/persistenceService';
+import { deletePhotoQueueDatabase } from '@/services/sync/photoUploadQueue';
 
 const DB_NAME_PREFIX = 'beanies-data-';
 const AUTOMERGE_DB_PREFIX = 'beanies-automerge-';
@@ -66,6 +67,9 @@ export async function deleteFamilyDatabase(familyId: string): Promise<void> {
   // Delete legacy per-family IndexedDB (if it still exists from before migration)
   const legacyDbName = getFamilyDatabaseName(familyId);
   await deleteDB(legacyDbName);
+
+  // Delete any pending offline photo uploads for this family.
+  await deletePhotoQueueDatabase(familyId);
 
   if (currentFamilyId === familyId) {
     currentFamilyId = null;
