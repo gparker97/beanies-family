@@ -13,6 +13,26 @@
 /* Use class-based dark mode (.dark on <html>) instead of prefers-color-scheme */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Global pointer cursor for interactive elements. Tailwind 4 ships
+ * buttons with `cursor: default` per platform conventions, which makes
+ * every `<button>` feel unresponsive on hover. We restore the pointer
+ * across the app so every clickable affordance reads as clickable
+ * without every author remembering the `cursor-pointer` utility.
+ * Disabled controls still show the not-allowed cursor so the disabled
+ * visual cue is preserved. */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+}
+
 /* ─── CSS custom properties (used in non-Tailwind contexts) ─────────────── */
 :root {
   color-scheme: light;
