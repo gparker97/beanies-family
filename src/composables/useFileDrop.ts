@@ -146,6 +146,7 @@ export function matchesAccept(file: File, accept: string[]): boolean {
     } else if (token.endsWith('/*')) {
       const prefix = token.slice(0, -1); // "image/"
       if (type.startsWith(prefix)) return true;
+      // eslint-disable-next-line security/detect-possible-timing-attacks -- MIME-type equality for <input accept="..."> matching. No secrets involved; timing uniformity isn't a concern for a UI filter.
     } else if (type === token) {
       return true;
     }
