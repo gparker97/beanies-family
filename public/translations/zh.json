@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 1961
+    "translationCount": 1966
   },
   "translations": {
     "app.name": {
@@ -9809,6 +9809,31 @@
     "nav.pod.contacts": {
       "translation": "紧急联系人",
       "hash": "5it6wy",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.avatar.upload": {
+      "translation": "上传照片",
+      "hash": "l4n7tf",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.avatar.replace": {
+      "translation": "更換相片",
+      "hash": "nidl4u",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.avatar.remove": {
+      "translation": "删除照片",
+      "hash": "yxkn86",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.avatar.uploading": {
+      "translation": "正在上传照片\\ u2026",
+      "hash": "ohbham",
+      "lastUpdated": "2026-04-19"
+    },
+    "photos.avatar.uploadFailed": {
+      "translation": "无法上传照片。请检查您的网络连接，然后重试。",
+      "hash": "pyus18",
       "lastUpdated": "2026-04-19"
     }
   }

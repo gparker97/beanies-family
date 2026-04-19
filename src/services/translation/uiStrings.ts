@@ -3942,6 +3942,14 @@ const STRING_DEFS = {
 
   // Photo attachments — reusable across activities, family members, todos, etc.
   'photos.addPhoto': { en: 'Add Photo', beanie: 'add photo' },
+  'photos.avatar.upload': { en: 'Upload Photo', beanie: 'upload photo' },
+  'photos.avatar.replace': { en: 'Change Photo', beanie: 'change photo' },
+  'photos.avatar.remove': { en: 'Remove Photo', beanie: 'remove photo' },
+  'photos.avatar.uploading': { en: 'Uploading photo\u2026', beanie: 'counting beans\u2026' },
+  'photos.avatar.uploadFailed': {
+    en: "Couldn't upload photo. Check your connection and try again.",
+    beanie: "couldn't upload photo — try again",
+  },
   'photos.addPhotos': { en: 'Add Photos', beanie: 'add photos' },
   'photos.noPhotos': { en: 'No photos yet', beanie: 'no photos yet' },
   'photos.uploading': { en: 'Uploading…', beanie: 'counting beans\u2026' },
