@@ -123,7 +123,15 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/pod/cookbook',
-    redirect: '/pod',
+    name: 'FamilyCookbook',
+    component: () => import('@/pages/FamilyCookbookPage.vue'),
+    meta: { titleKey: 'cookbook.title', requiresAuth: true },
+  },
+  {
+    path: '/pod/cookbook/:recipeId([0-9a-f-]{36})',
+    name: 'RecipeDetail',
+    component: () => import('@/pages/RecipeDetailPage.vue'),
+    meta: { titleKey: 'cookbook.title', requiresAuth: true },
   },
   {
     path: '/pod/safety',

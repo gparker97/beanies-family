@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2116
+    "translationCount": 2186
   },
   "translations": {
     "app.name": {
@@ -10584,6 +10584,356 @@
     "bean.about.joinedAgo.years": {
       "translation": "{n}年前",
       "hash": "2cpwh5",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.title": {
+      "translation": "家庭食谱",
+      "hash": "v5yt1v",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.subtitle": {
+      "translation": "嘘……别告诉任何人 🤫",
+      "hash": "f3prq5",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.addRecipe": {
+      "translation": "添加新食谱",
+      "hash": "j37ly9",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.empty": {
+      "translation": "家庭烹饪书中还没有食谱",
+      "hash": "f3a83p",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.emptyCTA": {
+      "translation": "写下第一个",
+      "hash": "5mocd6",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.stats.recipes": {
+      "translation": "食谱",
+      "hash": "plktiz",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.stats.cooked": {
+      "translation": "烹饪次数",
+      "hash": "4l8y75",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.stats.avgRating": {
+      "translation": "平均评级",
+      "hash": "vg72np",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.card.noPhoto": {
+      "translation": "无照片",
+      "hash": "efsswr",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookbook.card.ingredients": {
+      "translation": "成分",
+      "hash": "ysi0ji",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.addTitle": {
+      "translation": "添加新食谱",
+      "hash": "rcdi44",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.editTitle": {
+      "translation": "编辑食谱",
+      "hash": "qy4b6k",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.name": {
+      "translation": "食谱名称",
+      "hash": "bcn0hv",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.subtitle": {
+      "translation": "字幕内容",
+      "hash": "x0a2mg",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.prepTime": {
+      "translation": "预备时间",
+      "hash": "ff8hc0",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.servings": {
+      "translation": "份量",
+      "hash": "nvn0nb",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.ingredients": {
+      "translation": "食材",
+      "hash": "77hsv2",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.steps": {
+      "translation": "准备步骤",
+      "hash": "odyoxu",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.notes": {
+      "translation": "家庭备注",
+      "hash": "t7b7s5",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.field.photos": {
+      "translation": "照片",
+      "hash": "viacf3",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.name": {
+      "translation": "例如：奶奶的博洛尼亚奶酪",
+      "hash": "i3mfyc",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.subtitle": {
+      "translation": "例如，从玛丽那里传下来， ~ 1972年",
+      "hash": "1tww6e",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.prepTime": {
+      "translation": "例如： 4小时",
+      "hash": "e690qs",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.servings": {
+      "translation": "例如： 6人份",
+      "hash": "9vevfu",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.ingredients": {
+      "translation": "每行一个— 500克碎牛肉\\ n3根胡萝卜\\ n……",
+      "hash": "s95iib",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.steps": {
+      "translation": "每行一步—将肉变成棕色\\ n品尝泥浆\\ n……",
+      "hash": "idpkid",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.placeholder.notes": {
+      "translation": "例如， Neil每周日都会要求这样做。用大勺子吃。",
+      "hash": "iahfs4",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.deleteConfirm.title": {
+      "translation": "是否删除此配方？",
+      "hash": "9wzqvw",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.deleteConfirm.body": {
+      "translation": "这也将删除{count}个烹饪日志{label} —此操作无法撤消。",
+      "hash": "nqy5po",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.deleteConfirm.bodyNoLogs": {
+      "translation": "您可以稍后随时重新添加。",
+      "hash": "gq2evc",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.cookLogs.entries": {
+      "translation": "报名",
+      "hash": "qbkxv4",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.cookLogs.entry": {
+      "translation": "条目",
+      "hash": "1ljxbm",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.backToCookbook": {
+      "translation": "← 返回烹饪手册",
+      "hash": "kxvx24",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.ingredients": {
+      "translation": "食材",
+      "hash": "77hsv2",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.steps": {
+      "translation": "制作方法",
+      "hash": "kjx2i0",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.notes": {
+      "translation": "家庭备注",
+      "hash": "t7b7s5",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.cookLog": {
+      "translation": "烹饪日志",
+      "hash": "80fez8",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.iCooked": {
+      "translation": "我今天做的",
+      "hash": "bka6tb",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.noIngredients": {
+      "translation": "未列出任何成分",
+      "hash": "rffce2",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.noSteps": {
+      "translation": "未列出任何步骤",
+      "hash": "mgong5",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.notFound.title": {
+      "translation": "我们找不到此配方",
+      "hash": "571isi",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.detail.notFound.body": {
+      "translation": "它可能已从烹饪书中删除。",
+      "hash": "3oq918",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.addTitle": {
+      "translation": "记录厨师",
+      "hash": "92flct",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.editTitle": {
+      "translation": "编辑烹饪日志",
+      "hash": "wmu4de",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.cookedOn": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.cookedBy": {
+      "translation": "谁烹饪",
+      "hash": "t0l1lj",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.rating": {
+      "translation": "情况如何？",
+      "hash": "2ha2pf",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.servings": {
+      "translation": "份量",
+      "hash": "nvn0nb",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.wentWell": {
+      "translation": "哪里进展顺利？",
+      "hash": "rq38i",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.toImprove": {
+      "translation": "下次要尝试什么",
+      "hash": "vsigdw",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.field.photo": {
+      "translation": "菜照片",
+      "hash": "6pyhxo",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.placeholder.wentWell": {
+      "translation": "例如，钉钉酱汁减量",
+      "hash": "n5etym",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.placeholder.toImprove": {
+      "translation": "例如，更多的盐，更长的炖煮时间",
+      "hash": "37245n",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.empty": {
+      "translation": "尚无烹饪日志",
+      "hash": "brg2c0",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.emptyCTA": {
+      "translation": "记录第一次烹饪",
+      "hash": "b7iceb",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.deleteConfirm.title": {
+      "translation": "删除此烹饪日志？",
+      "hash": "miocsa",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.deleteConfirm.body": {
+      "translation": "入口和所有菜肴照片都将被删除。",
+      "hash": "cav08n",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.times": {
+      "translation": "烹饪次数",
+      "hash": "1vezup",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.avg": {
+      "translation": "平均评级",
+      "hash": "6m23zf",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.lastCooked": {
+      "translation": "上次烹饪时间",
+      "hash": "oq4hbl",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.daysSince": {
+      "translation": "${n} 天前",
+      "hash": "44sxuy",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.never": {
+      "translation": "从未煮熟",
+      "hash": "l5zrb9",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.today": {
+      "translation": "今天",
+      "hash": "1tt4xt",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.stats.yesterday": {
+      "translation": "昨天",
+      "hash": "qtonlq",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.byline.cookedBy": {
+      "translation": "烹饪者",
+      "hash": "3odu0g",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.byline.someone": {
+      "translation": "人",
+      "hash": "xke8lq",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.fromCookbook": {
+      "translation": "🥘 来自家庭烹饪书 →",
+      "hash": "ji9hy8",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.field.recipe": {
+      "translation": "家庭食谱（选填）",
+      "hash": "9lemg9",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.recipe.none": {
+      "translation": "—未链接到配方—",
+      "hash": "c4ayq0",
+      "lastUpdated": "2026-04-19"
+    },
+    "celebration.recipe5Star": {
+      "translation": "5星级餐点！整个豆荚都批准了。",
+      "hash": "sbibr1",
       "lastUpdated": "2026-04-19"
     }
   }

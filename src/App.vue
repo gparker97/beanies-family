@@ -42,6 +42,7 @@ import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useRecipesStore } from '@/stores/recipesStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -62,6 +63,8 @@ import { __internals as photoStoreInternals } from '@/stores/photoStore';
  */
 photoStoreInternals.registerPhotoCollection('familyMembers');
 photoStoreInternals.registerPhotoCollection('medications');
+photoStoreInternals.registerPhotoCollection('recipes');
+photoStoreInternals.registerPhotoCollection('cookLogs');
 
 const route = useRoute();
 const router = useRouter();
@@ -80,6 +83,7 @@ const sayingsStore = useSayingsStore();
 const memberNotesStore = useMemberNotesStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
+const recipesStore = useRecipesStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
@@ -371,6 +375,7 @@ async function loadFamilyData() {
         memberNotesStore.loadMemberNotes(),
         allergiesStore.loadAllergies(),
         medicationsStore.loadMedications(),
+        recipesStore.loadRecipes(),
       ]);
 
       const result = await processRecurringItems();

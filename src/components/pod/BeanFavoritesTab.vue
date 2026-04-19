@@ -8,9 +8,11 @@ import { computed, ref } from 'vue';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import FavoriteFormModal from '@/components/pod/FavoriteFormModal.vue';
+import { useRouter } from 'vue-router';
 import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useRecipesStore } from '@/stores/recipesStore';
 import type { FavoriteCategory, FavoriteItem, UUID } from '@/types/models';
 
 const props = defineProps<{
@@ -18,9 +20,22 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslation();
+const router = useRouter();
 const favoritesStore = useFavoritesStore();
+const recipesStore = useRecipesStore();
 
 const favorites = computed(() => favoritesStore.byMember(props.memberId).value);
+
+function recipeExists(id: string): boolean {
+  return recipesStore.recipes.some((r) => r.id === id);
+}
+
+function openRecipe(id: string, e: Event): void {
+  // Stop propagation so clicking the recipe link doesn't also open the
+  // favorite edit modal. The link-through is a secondary affordance.
+  e.stopPropagation();
+  router.push(`/pod/cookbook/${id}`);
+}
 
 const modalOpen = ref(false);
 const editing = ref<FavoriteItem | null>(null);
@@ -72,9 +87,17 @@ function closeModal(): void {
           {{ f.description }}
         </p>
         <span
-          class="font-outfit text-secondary-500/50 mt-auto text-[11px] font-semibold tracking-wide uppercase"
+          class="font-outfit text-secondary-500/50 text-[11px] font-semibold tracking-wide uppercase"
         >
           {{ t(`favorites.category.${f.category}`) }}
+        </span>
+        <span
+          v-if="f.recipeId && recipeExists(f.recipeId)"
+          class="font-outfit text-primary-500 mt-auto text-[11px] font-semibold hover:underline"
+          role="link"
+          @click="(e: Event) => openRecipe(f.recipeId!, e)"
+        >
+          {{ t('favorites.fromCookbook') }}
         </span>
       </button>
       <AddTile :label="t('favorites.addTile')" @click="openAdd" />

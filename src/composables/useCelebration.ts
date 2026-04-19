@@ -11,7 +11,8 @@ export type CelebrationTrigger =
   | 'first-transaction'
   | 'goal-reached'
   | 'first-save'
-  | 'debt-free';
+  | 'debt-free'
+  | 'recipe-5star';
 
 interface Celebration {
   id: number;
@@ -60,6 +61,11 @@ const configs: Record<
     type: 'modal',
     messageKey: 'celebration.debtFree',
     asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
+  },
+  'recipe-5star': {
+    type: 'toast',
+    messageKey: 'celebration.recipe5Star',
+    asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
 };
 
