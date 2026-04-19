@@ -1,0 +1,4266 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Pod — Family Scrapbook &amp; Cookbook — Mockup v2</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --deep-slate: #2c3e50;
+        --deep-slate-dark: #1a252f;
+        --deep-slate-light: #34495e;
+        --heritage-orange: #f15d22;
+        --sky-silk: #aed6f1;
+        --terracotta: #e67e22;
+        --cloud-white: #f8f9fa;
+        --success-green: #27ae60;
+        --todo-purple: #9b59b6;
+
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-10: rgba(174, 214, 241, 0.1);
+        --tint-silk-20: rgba(174, 214, 241, 0.2);
+        --tint-silk-35: rgba(174, 214, 241, 0.35);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --tint-slate-10: rgba(44, 62, 80, 0.1);
+        --tint-success-10: rgba(39, 174, 96, 0.1);
+        --tint-success-20: rgba(39, 174, 96, 0.2);
+        --tint-terracotta-12: rgba(230, 126, 34, 0.12);
+        --tint-purple-12: rgba(155, 89, 182, 0.12);
+
+        --card-shadow: 0 4px 20px rgba(44, 62, 80, 0.05);
+        --card-hover-shadow: 0 8px 32px rgba(44, 62, 80, 0.1);
+        --soft-shadow: 0 8px 40px rgba(44, 62, 80, 0.08);
+
+        --kraft-warm: #faf4ed;
+
+        --sq: 24px;
+        --color-text: #2c3e50;
+        --color-text-muted: #6b7b8d;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--deep-slate-dark);
+        color: var(--color-text);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .font-outfit {
+        font-family: 'Outfit', sans-serif;
+      }
+      .font-caveat {
+        font-family: 'Caveat', cursive;
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         Screen switcher (review tool — sits above the app shell)
+         ────────────────────────────────────────────────────────────── */
+      .screen-switcher {
+        position: fixed;
+        inset: 0 0 auto 0;
+        z-index: 1000;
+        background: var(--deep-slate);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 0;
+        padding: 0 24px;
+        height: 44px;
+        overflow-x: auto;
+      }
+      .screen-switcher .label {
+        font-family: 'Outfit', sans-serif;
+        color: rgba(255, 255, 255, 0.4);
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-right: 16px;
+        white-space: nowrap;
+      }
+      .screen-btn {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.55);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 12px 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      .screen-btn:hover {
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .screen-btn.active {
+        color: var(--heritage-orange);
+        border-bottom-color: var(--heritage-orange);
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         App shell — sidebar + topbar + main. The shell wraps every
+         screen so the review is a faithful preview of the real app.
+         ────────────────────────────────────────────────────────────── */
+      .app-shell {
+        position: fixed;
+        inset: 44px 0 0 0;
+        display: grid;
+        grid-template-columns: 240px 1fr;
+        grid-template-rows: 60px 1fr;
+        grid-template-areas:
+          'sidebar topbar'
+          'sidebar main';
+        background: var(--cloud-white);
+        overflow: hidden;
+      }
+
+      /* Sidebar */
+      .sidebar {
+        grid-area: sidebar;
+        background: var(--deep-slate);
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        padding: 18px 14px;
+        overflow-y: auto;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        margin-bottom: 12px;
+      }
+      .brand-mark {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+      }
+      .brand-name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+      }
+      .brand-name span {
+        color: var(--heritage-orange);
+      }
+      .brand-tag {
+        font-family: 'Caveat', cursive;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: -3px;
+      }
+      .nav-section-label {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255, 255, 255, 0.3);
+        padding: 14px 12px 6px;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 500;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.75);
+        cursor: pointer;
+        transition: all 0.15s;
+        position: relative;
+      }
+      .nav-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+      }
+      .nav-item.active {
+        background: linear-gradient(
+          90deg,
+          rgba(241, 93, 34, 0.25),
+          rgba(230, 126, 34, 0.1) 80%,
+          transparent
+        );
+        color: #fff;
+      }
+      .nav-item.active::before {
+        content: '';
+        position: absolute;
+        left: -14px;
+        top: 8px;
+        bottom: 8px;
+        width: 4px;
+        background: var(--heritage-orange);
+        border-radius: 0 4px 4px 0;
+      }
+      .nav-item .chev {
+        margin-left: auto;
+        font-size: 10px;
+        opacity: 0.5;
+      }
+      .nav-sub {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        margin: 2px 0 6px 28px;
+        padding-left: 10px;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .nav-sub-item {
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.55);
+        cursor: pointer;
+      }
+      .nav-sub-item:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .nav-sub-item.active {
+        color: var(--heritage-orange);
+      }
+
+      .sidebar-footer {
+        margin-top: auto;
+        padding: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sidebar-footer .me {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background: var(--tint-silk-35);
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+      }
+      .sidebar-footer .who {
+        flex: 1;
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        color: rgba(255, 255, 255, 0.9);
+      }
+      .sidebar-footer .who small {
+        display: block;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+      }
+
+      /* Topbar */
+      .topbar {
+        grid-area: topbar;
+        background: #fff;
+        border-bottom: 1px solid var(--tint-slate-5);
+        padding: 0 28px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .topbar-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--deep-slate);
+      }
+      .topbar-breadcrumb {
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: var(--color-text-muted);
+      }
+      .topbar-search {
+        margin-left: auto;
+        width: 280px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: var(--cloud-white);
+        border: 1px solid var(--tint-slate-5);
+        border-radius: 12px;
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        color: var(--color-text-muted);
+      }
+      .topbar-icon-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        background: var(--cloud-white);
+        border: 1px solid var(--tint-slate-5);
+        cursor: pointer;
+        font-size: 15px;
+      }
+
+      /* Main scroll area */
+      .main-content {
+        grid-area: main;
+        overflow-y: auto;
+        background: var(--cloud-white);
+      }
+      .page-inner {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 28px 32px 80px;
+      }
+
+      .page-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 28px;
+      }
+      .page-title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+        color: var(--deep-slate);
+        line-height: 1.1;
+      }
+      .page-kicker {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        opacity: 0.75;
+        margin-bottom: 6px;
+      }
+      .page-sub {
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+
+      /* Shared screen show/hide */
+      .screen {
+        display: none;
+      }
+      .screen.active {
+        display: block;
+      }
+
+      /* Buttons, chips, cards — shared */
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: var(--heritage-orange);
+        color: #fff;
+        border: none;
+        border-radius: 16px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.15s, transform 0.15s;
+      }
+      .btn-primary:hover {
+        background: #d14d1a;
+        transform: translateY(-1px);
+      }
+      .btn-ghost {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: transparent;
+        color: var(--deep-slate);
+        border: 1px solid var(--tint-slate-10);
+        border-radius: 16px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .btn-ghost:hover {
+        background: var(--tint-slate-5);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 11px;
+        letter-spacing: 0.02em;
+      }
+      .chip-orange { background: var(--tint-orange-15); color: var(--heritage-orange); }
+      .chip-silk { background: var(--tint-silk-35); color: var(--deep-slate); }
+      .chip-success { background: var(--tint-success-20); color: var(--success-green); }
+      .chip-slate { background: var(--tint-slate-10); color: var(--deep-slate); }
+      .chip-terracotta { background: var(--tint-terracotta-12); color: var(--terracotta); }
+      .chip-purple { background: var(--tint-purple-12); color: var(--todo-purple); }
+      .chip-danger { background: rgba(241, 93, 34, 0.15); color: var(--heritage-orange); }
+
+      .card {
+        background: #fff;
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 22px;
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         SCREEN 1 — Pod overview
+         ────────────────────────────────────────────────────────────── */
+      .pod-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 28px;
+        align-items: start;
+      }
+
+      .member-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+
+      .member-card {
+        background: #fff;
+        border-radius: var(--sq);
+        box-shadow: var(--card-shadow);
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        position: relative;
+        overflow: hidden;
+      }
+      .member-card::before {
+        content: '';
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        background: linear-gradient(
+          90deg,
+          var(--deep-slate),
+          var(--terracotta),
+          var(--heritage-orange),
+          var(--sky-silk)
+        );
+        opacity: 0.6;
+      }
+      .member-top { display: flex; align-items: center; gap: 14px; }
+      .member-avatar {
+        width: 56px; height: 56px; border-radius: 20px;
+        display: grid; place-items: center; font-size: 30px; flex-shrink: 0;
+      }
+      .member-avatar.bg-slate { background: var(--tint-slate-10); }
+      .member-avatar.bg-silk { background: var(--tint-silk-35); }
+      .member-avatar.bg-orange { background: var(--tint-orange-15); }
+      .member-avatar.bg-terracotta { background: var(--tint-terracotta-12); }
+      .member-name {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 18px;
+        color: var(--deep-slate);
+      }
+      .member-meta {
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted);
+        margin-top: 2px; display: flex; gap: 6px; align-items: center;
+      }
+      .highlights {
+        display: flex; flex-direction: column; gap: 10px;
+        border-top: 1px solid var(--tint-slate-5); padding-top: 14px;
+      }
+      .highlight-row {
+        display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: baseline;
+      }
+      .highlight-emoji { font-size: 18px; line-height: 1; }
+      .highlight-body {
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate); line-height: 1.4;
+      }
+      .highlight-body .label {
+        font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted);
+        opacity: 0.75; margin-right: 6px;
+      }
+      .highlight-body .q {
+        font-family: 'Caveat', cursive; font-size: 17px; color: var(--deep-slate); line-height: 1.2;
+      }
+      .member-footer {
+        display: flex; align-items: center; justify-content: space-between;
+        border-top: 1px solid var(--tint-slate-5); padding-top: 14px;
+      }
+      .link-arrow {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px;
+        color: var(--heritage-orange); cursor: pointer;
+      }
+      .link-arrow:hover { color: #d14d1a; }
+      .count-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+      .side { display: flex; flex-direction: column; gap: 20px; position: sticky; top: 0; }
+      .side-card {
+        background: #fff; border-radius: var(--sq); box-shadow: var(--card-shadow); padding: 20px;
+      }
+      .side-card h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 15px;
+        color: var(--deep-slate); margin-bottom: 14px;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .event-row {
+        display: flex; gap: 12px; padding: 10px 0; border-top: 1px dashed var(--tint-slate-10);
+      }
+      .event-row:first-of-type { border-top: 0; padding-top: 0; }
+      .event-date {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 12px;
+        text-transform: uppercase; letter-spacing: 0.06em; color: var(--heritage-orange);
+        min-width: 44px;
+      }
+      .event-body { font-size: 13px; color: var(--deep-slate); line-height: 1.3; }
+      .event-body small {
+        display: block; color: var(--color-text-muted); font-size: 11px; margin-top: 2px;
+      }
+
+      /* Allergies quick-view on sidebar (safety info surfaced on home) */
+      .allergy-side {
+        background: rgba(241, 93, 34, 0.04);
+        border: 1px solid rgba(241, 93, 34, 0.15);
+      }
+      .allergy-side h3 { color: var(--heritage-orange); }
+      .allergy-row {
+        display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 8px 0;
+        border-top: 1px dashed rgba(241, 93, 34, 0.2);
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--deep-slate);
+      }
+      .allergy-row:first-of-type { border-top: 0; }
+      .allergy-row strong { font-family: 'Outfit', sans-serif; color: var(--deep-slate); }
+      .allergy-row .sev {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 10px;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        padding: 2px 8px; border-radius: 10px; align-self: start;
+      }
+      .sev.severe { background: rgba(241, 93, 34, 0.15); color: var(--heritage-orange); }
+      .sev.moderate { background: var(--tint-terracotta-12); color: var(--terracotta); }
+      .sev.mild { background: var(--tint-silk-35); color: var(--deep-slate); }
+
+      /* Cookbook strip */
+      .cookbook-strip {
+        margin-top: 28px;
+        background: var(--kraft-warm);
+        border-radius: var(--sq); padding: 24px;
+        border: 1px solid rgba(230, 126, 34, 0.12);
+        position: relative; overflow: hidden;
+      }
+      .cookbook-strip::before {
+        content: '🤫'; position: absolute; right: 20px; top: 10px; font-size: 80px;
+        opacity: 0.08; transform: rotate(15deg);
+      }
+      .cookbook-strip-header {
+        display: flex; align-items: flex-end; justify-content: space-between;
+        margin-bottom: 16px; position: relative;
+      }
+      .cookbook-strip-header h2 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 20px;
+        color: var(--deep-slate); margin-bottom: 2px;
+      }
+      .cookbook-strip-header p {
+        font-family: 'Caveat', cursive; font-size: 18px; color: var(--terracotta);
+      }
+      .recipe-rail {
+        display: flex; gap: 16px; overflow-x: auto; padding-bottom: 4px; margin: 0 -4px;
+      }
+      .recipe-card {
+        flex: 0 0 240px; background: #fff; border-radius: 20px; overflow: hidden;
+        box-shadow: var(--card-shadow); cursor: pointer;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      .recipe-card:hover { transform: translateY(-3px); box-shadow: var(--card-hover-shadow); }
+      .recipe-card .recipe-photo {
+        width: 100%; aspect-ratio: 4 / 3;
+        background-size: cover; background-position: center;
+        background-color: var(--tint-terracotta-12);
+      }
+      .recipe-card .recipe-body { padding: 14px 16px 16px; }
+      .recipe-card .recipe-title {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px; color: var(--deep-slate);
+      }
+      .recipe-card .recipe-meta {
+        display: flex; gap: 10px; margin-top: 6px; color: var(--color-text-muted);
+        font-size: 11px; font-family: 'Inter', sans-serif;
+      }
+      .recipe-card .recipe-meta strong { color: var(--deep-slate); }
+
+      .add-recipe-card {
+        flex: 0 0 180px; border: 2px dashed rgba(230, 126, 34, 0.3); background: transparent;
+        border-radius: 20px; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 8px; padding: 18px; cursor: pointer;
+      }
+      .add-recipe-card:hover {
+        background: rgba(230, 126, 34, 0.04); border-color: rgba(230, 126, 34, 0.5);
+      }
+      .add-recipe-card .plus {
+        width: 36px; height: 36px; border-radius: 12px;
+        background: var(--tint-orange-15); color: var(--heritage-orange);
+        font-family: 'Outfit', sans-serif; font-size: 22px; font-weight: 600;
+        display: grid; place-items: center;
+      }
+      .add-recipe-card span {
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px; color: var(--deep-slate);
+      }
+
+      .sayings-strip {
+        margin-top: 28px; background: #fff; border-radius: var(--sq);
+        box-shadow: var(--card-shadow); padding: 22px;
+      }
+      .sayings-strip-header {
+        display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+      }
+      .sayings-strip-header h2 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 16px; color: var(--deep-slate);
+      }
+      .sayings-rail { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 4px; }
+      .sticky {
+        flex: 0 0 220px; background: #fff7c8; padding: 14px 16px 16px; border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(44, 62, 80, 0.06), 0 6px 20px rgba(44, 62, 80, 0.08);
+        position: relative; transform: rotate(-1.2deg);
+      }
+      .sticky:nth-child(2n) { background: #d4f1f4; transform: rotate(1deg); }
+      .sticky:nth-child(3n) { background: #ffe4d6; transform: rotate(-0.5deg); }
+      .sticky .q {
+        font-family: 'Caveat', cursive; font-weight: 500; font-size: 17px;
+        color: var(--deep-slate); line-height: 1.25;
+      }
+      .sticky .meta {
+        margin-top: 10px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.06em; color: var(--deep-slate); opacity: 0.6;
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         SCREEN 2 — Bean detail
+         ────────────────────────────────────────────────────────────── */
+      .bean-hero {
+        background: linear-gradient(
+          135deg,
+          rgba(174, 214, 241, 0.35) 0%,
+          rgba(241, 93, 34, 0.08) 100%
+        );
+        border-radius: var(--sq); padding: 28px 32px;
+        display: flex; gap: 24px; align-items: center; margin-bottom: 24px;
+        position: relative; overflow: hidden;
+      }
+      .bean-hero .avatar-lg {
+        width: 88px; height: 88px; border-radius: 26px; background: #fff;
+        display: grid; place-items: center; font-size: 46px; flex-shrink: 0;
+        box-shadow: var(--soft-shadow);
+      }
+      .bean-hero .bean-info h1 {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 28px;
+        color: var(--deep-slate); line-height: 1;
+      }
+      .bean-hero .bean-info .bean-sub {
+        font-family: 'Outfit', sans-serif; font-weight: 500; font-size: 13px;
+        color: var(--color-text-muted); margin-top: 6px;
+        display: flex; align-items: center; gap: 10px;
+      }
+
+      .tab-rail {
+        display: flex; gap: 4px; background: #fff; border-radius: 20px; padding: 6px;
+        box-shadow: var(--card-shadow); margin-bottom: 22px;
+        width: fit-content; max-width: 100%; overflow-x: auto;
+      }
+      .tab {
+        padding: 10px 16px; border-radius: 14px; font-family: 'Outfit', sans-serif;
+        font-weight: 600; font-size: 13px; color: var(--color-text-muted); cursor: pointer;
+        display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s;
+        white-space: nowrap; border: none; background: transparent;
+      }
+      .tab:hover { color: var(--deep-slate); background: var(--tint-slate-5); }
+      .tab.active { background: var(--tint-orange-15); color: var(--heritage-orange); }
+      .tab .count {
+        font-size: 11px; padding: 1px 7px; background: rgba(44, 62, 80, 0.08); border-radius: 10px;
+      }
+      .tab.active .count { background: rgba(241, 93, 34, 0.2); }
+      .tab.warning .count {
+        background: rgba(241, 93, 34, 0.15); color: var(--heritage-orange);
+      }
+
+      .pane { display: none; }
+      .pane.active { display: block; }
+      .pane-header {
+        display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
+      }
+      .pane-header h2 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 18px; color: var(--deep-slate);
+      }
+
+      /* FAVORITES grid */
+      .fav-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;
+      }
+      .fav-card {
+        background: #fff; border-radius: 20px; padding: 16px; box-shadow: var(--card-shadow);
+        display: flex; gap: 14px; align-items: flex-start; cursor: pointer;
+      }
+      .fav-card:hover { transform: translateY(-2px); box-shadow: var(--card-hover-shadow); }
+      .fav-emoji {
+        width: 44px; height: 44px; border-radius: 14px; background: var(--tint-orange-15);
+        display: grid; place-items: center; font-size: 22px; flex-shrink: 0;
+      }
+      .fav-emoji.food { background: var(--tint-orange-15); }
+      .fav-emoji.place { background: var(--tint-silk-35); }
+      .fav-emoji.book { background: var(--tint-purple-12); }
+      .fav-emoji.toy { background: var(--tint-terracotta-12); }
+      .fav-emoji.song { background: var(--tint-success-20); }
+      .fav-title {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px; color: var(--deep-slate);
+      }
+      .fav-sub {
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted);
+        margin-top: 3px; line-height: 1.35;
+      }
+      .fav-link {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        color: var(--terracotta); margin-top: 8px;
+      }
+
+      .add-tile {
+        background: #fff; border: 2px dashed var(--tint-slate-10); border-radius: 20px;
+        padding: 20px; display: flex; flex-direction: column; align-items: center;
+        justify-content: center; gap: 8px; cursor: pointer; min-height: 100px;
+      }
+      .add-tile:hover { border-color: var(--heritage-orange); background: var(--tint-orange-8); }
+      .add-tile .plus-lg {
+        width: 38px; height: 38px; border-radius: 14px;
+        background: var(--tint-orange-15); color: var(--heritage-orange);
+        font-size: 22px; font-weight: 600; display: grid; place-items: center;
+        font-family: 'Outfit', sans-serif;
+      }
+      .add-tile span {
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 13px; color: var(--deep-slate);
+      }
+
+      /* SAYINGS timeline */
+      .sayings-timeline {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 24px; padding: 8px;
+      }
+      .saying-card {
+        background: #fff7c8; padding: 22px 22px 20px; border-radius: 8px;
+        box-shadow: 0 1px 2px rgba(44, 62, 80, 0.07), 0 10px 30px rgba(44, 62, 80, 0.1);
+        transform: rotate(-1.5deg); position: relative;
+      }
+      .saying-card:nth-child(4n + 2) { background: #d4f1f4; transform: rotate(1.2deg); }
+      .saying-card:nth-child(4n + 3) { background: #ffe4d6; transform: rotate(-0.6deg); }
+      .saying-card:nth-child(4n + 4) { background: #e8f5e8; transform: rotate(1deg); }
+      .saying-card::after {
+        content: ''; position: absolute; top: -8px; left: 50%; width: 60px; height: 16px;
+        background: rgba(255, 255, 255, 0.55); transform: translateX(-50%) rotate(-3deg);
+        box-shadow: 0 1px 2px rgba(44, 62, 80, 0.08); border-radius: 2px;
+      }
+      .saying-q {
+        font-family: 'Caveat', cursive; font-weight: 500; font-size: 21px;
+        line-height: 1.2; color: var(--deep-slate);
+      }
+      .saying-meta {
+        margin-top: 14px; font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--deep-slate); opacity: 0.6;
+        display: flex; flex-wrap: wrap; gap: 10px;
+      }
+      .saying-context {
+        margin-top: 10px; font-family: 'Inter', sans-serif; font-size: 12px;
+        line-height: 1.4; color: var(--deep-slate); opacity: 0.75;
+      }
+
+      /* MEDS */
+      .med-subtabs { display: flex; gap: 6px; margin-bottom: 18px; }
+      .med-subtab {
+        padding: 7px 14px; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 600;
+        color: var(--color-text-muted); background: transparent;
+        border: 1px solid var(--tint-slate-10); border-radius: 12px; cursor: pointer;
+      }
+      .med-subtab.active {
+        color: var(--success-green); background: var(--tint-success-10);
+        border-color: rgba(39, 174, 96, 0.25);
+      }
+
+      .med-card {
+        background: #fff; border-radius: 20px; padding: 18px; box-shadow: var(--card-shadow);
+        display: grid; grid-template-columns: 88px 1fr auto; gap: 18px; align-items: center;
+        margin-bottom: 12px; position: relative;
+      }
+      .med-card::before {
+        content: ''; position: absolute; left: 0; top: 16px; bottom: 16px;
+        width: 4px; background: var(--success-green); border-radius: 0 4px 4px 0; opacity: 0.6;
+      }
+      .med-card.past::before { background: var(--color-text-muted); opacity: 0.3; }
+      .med-bottle {
+        aspect-ratio: 1; border-radius: 16px; background-size: cover; background-position: center;
+        background-color: var(--tint-silk-35); position: relative;
+      }
+      .med-bottle.no-photo {
+        display: grid; place-items: center; font-size: 34px; color: var(--deep-slate); opacity: 0.6;
+      }
+      .med-name {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 16px; color: var(--deep-slate);
+      }
+      .med-dose { display: flex; gap: 14px; margin-top: 6px; flex-wrap: wrap; }
+      .med-dose .d { display: inline-flex; flex-direction: column; }
+      .med-dose .d small {
+        font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-muted);
+      }
+      .med-dose .d strong {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 13px;
+        color: var(--deep-slate); margin-top: 1px;
+      }
+      .med-note {
+        margin-top: 8px; font-family: 'Inter', sans-serif; font-size: 12px;
+        color: var(--color-text-muted); line-height: 1.4;
+      }
+      .med-next { text-align: right; }
+      .med-next .num {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 22px;
+        color: var(--heritage-orange); line-height: 1;
+      }
+      .med-next small {
+        display: block; margin-top: 3px; font-family: 'Outfit', sans-serif; font-size: 11px;
+        font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--color-text-muted);
+      }
+
+      /* ALLERGIES — standalone tab */
+      .allergy-intro {
+        background: rgba(241, 93, 34, 0.04);
+        border: 1px solid rgba(241, 93, 34, 0.15);
+        border-radius: 20px; padding: 16px 20px; margin-bottom: 18px;
+        display: flex; align-items: center; gap: 14px;
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate);
+      }
+      .allergy-intro .icon {
+        width: 40px; height: 40px; border-radius: 14px;
+        background: var(--heritage-orange); color: #fff;
+        display: grid; place-items: center; font-size: 20px;
+        box-shadow: 0 4px 14px rgba(241, 93, 34, 0.3);
+      }
+      .allergy-card {
+        background: #fff; border-radius: 20px; padding: 22px;
+        box-shadow: var(--card-shadow); margin-bottom: 14px;
+        border-left: 4px solid var(--heritage-orange);
+      }
+      .allergy-card.moderate { border-left-color: var(--terracotta); }
+      .allergy-card.mild { border-left-color: var(--sky-silk); }
+
+      .allergy-head {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 14px; margin-bottom: 14px;
+      }
+      .allergy-head h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 17px; color: var(--deep-slate);
+      }
+      .allergy-head .allergy-type {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted);
+        margin-top: 2px;
+      }
+      .allergy-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px 20px;
+      }
+      .allergy-field .label {
+        font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase;
+        color: var(--color-text-muted); margin-bottom: 4px;
+      }
+      .allergy-field .value {
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate);
+        line-height: 1.45;
+      }
+      .allergy-field .value strong {
+        font-family: 'Outfit', sans-serif; font-weight: 600;
+      }
+      .allergy-avoid {
+        background: var(--tint-orange-8); border-radius: 12px; padding: 10px 14px;
+        margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;
+      }
+      .allergy-response {
+        background: rgba(174, 214, 241, 0.22); border-radius: 12px; padding: 12px 16px;
+        margin-top: 12px; display: flex; gap: 10px; align-items: flex-start;
+      }
+      .allergy-response .rkey {
+        font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700;
+        letter-spacing: 0.08em; text-transform: uppercase; color: var(--deep-slate);
+        opacity: 0.7; min-width: 90px; padding-top: 2px;
+      }
+      .allergy-response .rval {
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate); line-height: 1.4;
+      }
+
+      /* NOTES */
+      .notes-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px;
+      }
+      .note-card {
+        background: #fff; border-radius: 20px; padding: 18px;
+        box-shadow: var(--card-shadow); border-left: 3px solid var(--sky-silk);
+      }
+      .note-card.accent-orange { border-left-color: var(--heritage-orange); }
+      .note-card.accent-terracotta { border-left-color: var(--terracotta); }
+      .note-card h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px;
+        color: var(--deep-slate); margin-bottom: 6px;
+      }
+      .note-card p {
+        font-size: 13px; color: var(--deep-slate); line-height: 1.4; opacity: 0.85;
+      }
+      .note-card .date {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--color-text-muted); margin-top: 10px;
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         BEAN DASHBOARD (About tab — redesigned as overview)
+         ────────────────────────────────────────────────────────────── */
+      .about-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+      }
+      .about-stat {
+        background: #fff;
+        border-radius: 18px;
+        padding: 14px 18px;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .about-stat .k {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+      }
+      .about-stat .v {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--deep-slate);
+      }
+      .about-stat .sub {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        color: var(--color-text-muted);
+      }
+
+      .dash-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .dash-module {
+        background: #fff;
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: var(--card-shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .dash-module.safety {
+        background: rgba(241, 93, 34, 0.04);
+        border: 1px solid rgba(241, 93, 34, 0.15);
+      }
+      .dash-module-head {
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .dash-module-head h3 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--deep-slate);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .dash-module.safety .dash-module-head h3 { color: var(--heritage-orange); }
+      .dash-module-head .mini-link {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--heritage-orange);
+        cursor: pointer;
+      }
+      .dash-module-head .mini-link:hover { color: #d14d1a; }
+
+      .dash-list {
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      .dash-item {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 8px 10px;
+        border-radius: 12px;
+        background: var(--cloud-white);
+      }
+      .dash-item .ico {
+        width: 28px; height: 28px; border-radius: 10px;
+        background: var(--tint-orange-15);
+        display: grid; place-items: center; font-size: 14px;
+      }
+      .dash-item .ico.fav { background: var(--tint-orange-15); }
+      .dash-item .ico.place { background: var(--tint-silk-35); }
+      .dash-item .ico.book { background: var(--tint-purple-12); }
+      .dash-item .ico.toy { background: var(--tint-terracotta-12); }
+      .dash-item .ico.med { background: var(--tint-success-20); }
+      .dash-item .ico.note { background: var(--tint-silk-20); }
+      .dash-item .ico.allergy { background: var(--heritage-orange); color: #fff; }
+      .dash-item .t {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--deep-slate);
+        line-height: 1.3;
+      }
+      .dash-item .t small {
+        display: block;
+        font-family: 'Inter', sans-serif;
+        font-weight: 400;
+        font-size: 11px;
+        color: var(--color-text-muted);
+        margin-top: 2px;
+      }
+
+      .dash-saying {
+        font-family: 'Caveat', cursive;
+        font-size: 17px;
+        color: var(--deep-slate);
+        line-height: 1.25;
+        padding: 10px 12px;
+        background: #fff7c8;
+        border-radius: 10px;
+        transform: rotate(-0.8deg);
+      }
+      .dash-saying:nth-child(2n) {
+        background: #d4f1f4;
+        transform: rotate(0.6deg);
+      }
+      .dash-saying small {
+        display: block;
+        margin-top: 6px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--deep-slate);
+        opacity: 0.6;
+      }
+
+      .dash-empty {
+        font-family: 'Inter', sans-serif;
+        font-size: 12px;
+        color: var(--color-text-muted);
+        padding: 10px 12px;
+        background: var(--cloud-white);
+        border-radius: 10px;
+        font-style: italic;
+      }
+
+      @media (max-width: 1100px) {
+        .dash-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      @media (max-width: 720px) {
+        .dash-grid { grid-template-columns: 1fr; }
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         FAMILY SCRAPBOOK — mixed cross-family feed
+         ────────────────────────────────────────────────────────────── */
+      .scrapbook-hero {
+        background: linear-gradient(
+          135deg,
+          #fff7c8 0%,
+          #ffe4d6 40%,
+          #d4f1f4 80%,
+          #e8f5e8 100%
+        );
+        border-radius: var(--sq);
+        padding: 28px 32px;
+        margin-bottom: 22px;
+        position: relative;
+        overflow: hidden;
+      }
+      .scrapbook-hero::before {
+        content: '📖';
+        position: absolute;
+        right: 28px;
+        top: 12px;
+        font-size: 130px;
+        opacity: 0.1;
+        transform: rotate(-8deg);
+      }
+      .scrapbook-hero h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 28px;
+        color: var(--deep-slate);
+        line-height: 1.05;
+      }
+      .scrapbook-hero p.sub {
+        font-family: 'Caveat', cursive;
+        font-size: 20px;
+        color: var(--terracotta);
+        margin-top: 4px;
+      }
+
+      .filter-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 22px;
+        padding: 14px 18px;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: var(--card-shadow);
+      }
+      .filter-row .group-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+      }
+      .filter-chips {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .filter-chip {
+        padding: 6px 12px;
+        border-radius: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+        background: var(--cloud-white);
+        border: 1px solid var(--tint-slate-10);
+        color: var(--deep-slate);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .filter-chip.active {
+        background: var(--heritage-orange);
+        color: #fff;
+        border-color: transparent;
+      }
+      .filter-chip .avatar-dot {
+        width: 18px;
+        height: 18px;
+        border-radius: 6px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+      }
+      .filter-divider {
+        width: 1px;
+        height: 22px;
+        background: var(--tint-slate-10);
+      }
+
+      /* Masonry-style scrapbook feed using CSS columns */
+      .scrapbook-feed {
+        column-count: 3;
+        column-gap: 18px;
+      }
+      @media (max-width: 980px) {
+        .scrapbook-feed { column-count: 2; }
+      }
+      @media (max-width: 640px) {
+        .scrapbook-feed { column-count: 1; }
+      }
+      .scrap {
+        break-inside: avoid;
+        margin-bottom: 18px;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+      }
+      .scrap-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px 0;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+      }
+      .scrap-head .avatar-dot {
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+      }
+      .scrap-head .type {
+        margin-left: auto;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        opacity: 0.7;
+      }
+      .scrap-body { padding: 8px 16px 16px; }
+      .scrap-date {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        opacity: 0.7;
+        padding: 0 16px 12px;
+      }
+
+      /* Type-specific variations within the feed */
+      .scrap-saying {
+        padding: 16px;
+      }
+      .scrap-saying .q {
+        font-family: 'Caveat', cursive;
+        font-size: 22px;
+        line-height: 1.25;
+        color: var(--deep-slate);
+      }
+      .scrap-saying.paper-yellow { background: #fff7c8; }
+      .scrap-saying.paper-silk { background: #d4f1f4; }
+      .scrap-saying.paper-peach { background: #ffe4d6; }
+      .scrap-saying.paper-mint { background: #e8f5e8; }
+
+      .scrap-fav-body {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+      .scrap-fav-body .emoji {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+      .scrap-fav-body .t {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--deep-slate);
+      }
+      .scrap-fav-body small {
+        display: block;
+        font-family: 'Inter', sans-serif;
+        font-weight: 400;
+        font-size: 12px;
+        color: var(--color-text-muted);
+        margin-top: 3px;
+        line-height: 1.4;
+      }
+
+      .scrap-photo {
+        background: #fff;
+        padding: 8px 8px 0;
+      }
+      .scrap-photo .polaroid {
+        background: #fff;
+        padding: 8px 8px 28px;
+        position: relative;
+        box-shadow: inset 0 0 0 1px rgba(44, 62, 80, 0.05);
+      }
+      .scrap-photo .polaroid .img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        background-size: cover;
+        background-position: center;
+      }
+      .scrap-photo .polaroid .caption {
+        position: absolute;
+        left: 0; right: 0; bottom: 4px;
+        text-align: center;
+        font-family: 'Caveat', cursive;
+        font-size: 16px;
+        color: var(--deep-slate);
+      }
+
+      .scrap-note { padding: 14px 16px; }
+      .scrap-note h4 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--deep-slate);
+      }
+      .scrap-note p {
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        color: var(--deep-slate);
+        opacity: 0.8;
+        margin-top: 6px;
+        line-height: 1.4;
+      }
+      .scrap-note.accent-orange { border-left: 3px solid var(--heritage-orange); padding-left: 13px; }
+      .scrap-note.accent-silk { border-left: 3px solid var(--sky-silk); padding-left: 13px; }
+      .scrap-note.accent-terracotta { border-left: 3px solid var(--terracotta); padding-left: 13px; }
+
+      /* ──────────────────────────────────────────────────────────────
+         CARE & SAFETY — cross-family health board
+         ────────────────────────────────────────────────────────────── */
+      .safety-hero {
+        background: rgba(241, 93, 34, 0.04);
+        border: 1px solid rgba(241, 93, 34, 0.15);
+        border-radius: var(--sq);
+        padding: 24px 28px;
+        margin-bottom: 22px;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+      }
+      .safety-hero .icon-box {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        background: var(--heritage-orange);
+        color: #fff;
+        display: grid;
+        place-items: center;
+        font-size: 28px;
+        box-shadow: 0 8px 20px rgba(241, 93, 34, 0.25);
+        flex-shrink: 0;
+      }
+      .safety-hero h1 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 26px;
+        color: var(--deep-slate);
+        line-height: 1.05;
+      }
+      .safety-hero p {
+        font-family: 'Inter', sans-serif;
+        font-size: 13px;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+        line-height: 1.4;
+      }
+      .safety-stats {
+        display: flex;
+        gap: 22px;
+        margin-left: auto;
+        padding-left: 20px;
+        border-left: 1px solid rgba(241, 93, 34, 0.15);
+      }
+      .safety-stats .stat strong {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 22px;
+        color: var(--heritage-orange);
+        line-height: 1;
+      }
+      .safety-stats .stat small {
+        display: block;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        margin-top: 4px;
+      }
+
+      .safety-section { margin-bottom: 30px; }
+      .safety-section-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .safety-section-head h2 {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--deep-slate);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .safety-section-head .count-chip {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+      }
+
+      .safety-row {
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: var(--card-shadow);
+        padding: 16px 20px;
+        margin-bottom: 10px;
+        display: grid;
+        grid-template-columns: 44px 1fr auto auto;
+        gap: 16px;
+        align-items: center;
+      }
+      .safety-row.severe { border-left: 4px solid var(--heritage-orange); padding-left: 16px; }
+      .safety-row.moderate { border-left: 4px solid var(--terracotta); padding-left: 16px; }
+      .safety-row.mild { border-left: 4px solid var(--sky-silk); padding-left: 16px; }
+      .safety-row .avatar-dot {
+        width: 44px; height: 44px; border-radius: 14px;
+        display: grid; place-items: center; font-size: 22px;
+      }
+      .safety-row .info {
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      .safety-row .who {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px;
+        color: var(--deep-slate);
+      }
+      .safety-row .who .allergen {
+        font-weight: 500; color: var(--color-text-muted);
+        margin-left: 4px;
+      }
+      .safety-row .summary {
+        font-family: 'Inter', sans-serif; font-size: 12px;
+        color: var(--color-text-muted); line-height: 1.4;
+      }
+      .safety-row .summary strong { color: var(--deep-slate); }
+      .safety-row .go {
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 12px;
+        color: var(--heritage-orange); cursor: pointer;
+      }
+
+      .med-countdown {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+        font-size: 18px;
+        color: var(--heritage-orange);
+        line-height: 1;
+      }
+      .med-countdown small {
+        display: block;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+        margin-top: 3px;
+      }
+      .med-given {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 6px 12px;
+        border-radius: 12px;
+        background: var(--tint-success-20);
+        color: var(--success-green);
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      /* Emergency contact card */
+      .contact-card {
+        background: #fff; border-radius: 18px; box-shadow: var(--card-shadow);
+        padding: 16px 18px; margin-bottom: 10px;
+        display: grid; grid-template-columns: 48px 1fr auto; gap: 16px; align-items: center;
+      }
+      .contact-cat-icon {
+        width: 48px; height: 48px; border-radius: 16px;
+        display: grid; place-items: center; font-size: 22px;
+      }
+      .contact-cat-icon.doctor { background: var(--tint-success-20); color: var(--success-green); }
+      .contact-cat-icon.dentist { background: var(--tint-silk-35); color: var(--deep-slate); }
+      .contact-cat-icon.nurse { background: var(--tint-purple-12); color: var(--todo-purple); }
+      .contact-cat-icon.teacher { background: var(--tint-terracotta-12); color: var(--terracotta); }
+      .contact-cat-icon.other { background: var(--tint-orange-15); color: var(--heritage-orange); }
+      .contact-info .name {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 15px;
+        color: var(--deep-slate); display: flex; align-items: center; gap: 8px;
+      }
+      .contact-info .role {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--color-text-muted); margin-top: 2px;
+      }
+      .contact-info .details {
+        display: flex; gap: 16px; margin-top: 8px; flex-wrap: wrap;
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--deep-slate);
+      }
+      .contact-info .details .row {
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .contact-info .details .row .icon { opacity: 0.6; }
+      .contact-info .notes {
+        margin-top: 6px; font-family: 'Inter', sans-serif; font-size: 12px;
+        color: var(--color-text-muted); line-height: 1.4; font-style: italic;
+      }
+      .contact-actions { display: flex; gap: 8px; }
+      .contact-action {
+        width: 36px; height: 36px; border-radius: 12px;
+        background: var(--cloud-white); border: 1px solid var(--tint-slate-10);
+        display: grid; place-items: center; font-size: 16px; cursor: pointer;
+        color: var(--deep-slate);
+      }
+      .contact-action.primary {
+        background: var(--heritage-orange); color: #fff; border-color: transparent;
+      }
+      .contact-action:hover { background: var(--tint-slate-5); }
+      .contact-action.primary:hover { background: #d14d1a; }
+
+      .contact-category-head {
+        display: flex; align-items: center; gap: 10px; margin: 18px 0 10px;
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted);
+      }
+      .contact-category-head::after {
+        content: ''; flex: 1; height: 1px; background: var(--tint-slate-10);
+      }
+
+      /* Emergency Contacts standalone page */
+      .contacts-hero {
+        background: linear-gradient(135deg, #fff 0%, rgba(174, 214, 241, 0.2) 100%);
+        border: 1px solid var(--tint-slate-5);
+        border-radius: var(--sq);
+        padding: 24px 28px;
+        margin-bottom: 20px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 22px;
+        align-items: center;
+      }
+      .contacts-hero .icon-box {
+        width: 56px; height: 56px; border-radius: 18px;
+        background: var(--success-green); color: #fff;
+        display: grid; place-items: center; font-size: 28px;
+        box-shadow: 0 8px 20px rgba(39, 174, 96, 0.2);
+      }
+      .contacts-hero h1 {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 26px;
+        color: var(--deep-slate); line-height: 1.05;
+      }
+      .contacts-hero p {
+        font-family: 'Inter', sans-serif; font-size: 13px;
+        color: var(--color-text-muted); margin-top: 4px; line-height: 1.4;
+      }
+      .contacts-hero p .caveat {
+        font-family: 'Caveat', cursive; font-size: 16px; color: var(--terracotta);
+      }
+
+      .contacts-toolbar {
+        display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+        margin-bottom: 20px;
+      }
+      .contacts-search {
+        flex: 1 1 320px; min-width: 240px;
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px 18px;
+        background: #fff; border: 1px solid var(--tint-slate-10);
+        border-radius: 16px; box-shadow: var(--card-shadow);
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--color-text-muted);
+      }
+      .contacts-search input {
+        flex: 1; border: none; outline: none; background: transparent;
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate);
+      }
+      .contacts-filter-chips {
+        display: flex; gap: 6px; flex-wrap: wrap;
+      }
+
+      .share-banner {
+        background: var(--tint-silk-20);
+        border-radius: 18px; padding: 16px 20px;
+        display: flex; align-items: center; gap: 14px;
+        margin-top: 28px;
+      }
+      .share-banner .icon-sm {
+        width: 42px; height: 42px; border-radius: 14px;
+        background: #fff; display: grid; place-items: center; font-size: 20px;
+        flex-shrink: 0;
+      }
+      .share-banner .body {
+        flex: 1;
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate);
+        line-height: 1.4;
+      }
+      .share-banner .body strong { font-family: 'Outfit', sans-serif; }
+
+      /* ──────────────────────────────────────────────────────────────
+         SCREEN 3 — Family Cookbook
+         ────────────────────────────────────────────────────────────── */
+      .cookbook-hero {
+        background: var(--kraft-warm); border-radius: var(--sq); padding: 32px 36px;
+        position: relative; overflow: hidden;
+        border: 1px solid rgba(230, 126, 34, 0.15); margin-bottom: 24px;
+      }
+      .cookbook-hero::before {
+        content: '🤫'; position: absolute; right: 30px; top: 10px; font-size: 150px;
+        opacity: 0.07; transform: rotate(12deg);
+      }
+      .cookbook-hero h1 {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 30px;
+        color: var(--deep-slate); line-height: 1.05;
+      }
+      .cookbook-hero p.sub {
+        font-family: 'Caveat', cursive; font-size: 22px; color: var(--terracotta); margin-top: 4px;
+      }
+      .cookbook-hero .stats {
+        display: flex; gap: 22px; margin-top: 18px;
+      }
+      .cookbook-hero .stats .stat { display: flex; flex-direction: column; }
+      .cookbook-hero .stats .stat strong {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 22px;
+        color: var(--heritage-orange); line-height: 1;
+      }
+      .cookbook-hero .stats .stat small {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--color-text-muted); margin-top: 4px;
+      }
+
+      .recipe-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px;
+      }
+      .recipe-card-lg {
+        background: #fff; border-radius: 22px; overflow: hidden;
+        box-shadow: var(--card-shadow); cursor: pointer;
+      }
+      .recipe-card-lg:hover { transform: translateY(-3px); box-shadow: var(--card-hover-shadow); }
+      .recipe-card-lg .photo {
+        width: 100%; aspect-ratio: 16 / 10;
+        background-size: cover; background-position: center; position: relative;
+      }
+      .recipe-card-lg .photo .fave-overlay {
+        position: absolute; left: 14px; bottom: 14px; display: flex; gap: 6px;
+      }
+      .recipe-card-lg .photo .fave-overlay .fave-pill {
+        display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.92); color: var(--deep-slate);
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 11px;
+        border-radius: 14px;
+      }
+      .recipe-card-lg .body { padding: 16px 18px 18px; }
+      .recipe-card-lg h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 16px; color: var(--deep-slate);
+      }
+      .recipe-card-lg .sub {
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted); margin-top: 4px;
+      }
+      .recipe-card-lg .meta-row {
+        display: flex; gap: 16px; margin-top: 12px;
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted);
+      }
+      .recipe-card-lg .meta-row strong {
+        color: var(--deep-slate); font-family: 'Outfit', sans-serif; font-weight: 600;
+      }
+
+      /* Placeholder illustration for recipes with no photo uploaded */
+      .recipe-illo {
+        aspect-ratio: 16 / 10; position: relative; overflow: hidden;
+        background: linear-gradient(135deg, #f9e4c8 0%, #f5c99a 100%);
+        display: grid; place-items: center;
+      }
+      .recipe-illo::before {
+        /* Faint gingham-paper pattern */
+        content: '';
+        position: absolute; inset: 0;
+        background-image:
+          linear-gradient(rgba(230, 126, 34, 0.08) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(230, 126, 34, 0.08) 1px, transparent 1px);
+        background-size: 16px 16px;
+      }
+      .recipe-illo svg {
+        width: 80px; height: 80px; color: var(--terracotta); position: relative; z-index: 1;
+      }
+      .recipe-illo .illo-label {
+        position: absolute; bottom: 14px; left: 14px; z-index: 1;
+        font-family: 'Caveat', cursive; font-size: 18px; color: var(--terracotta); opacity: 0.75;
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         SCREEN 4 — Recipe detail
+         ────────────────────────────────────────────────────────────── */
+      .recipe-detail {
+        background: var(--kraft-warm); border-radius: var(--sq); padding: 30px;
+        border: 1px solid rgba(230, 126, 34, 0.12);
+      }
+      .recipe-detail-head {
+        display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px;
+        align-items: stretch; margin-bottom: 28px;
+      }
+      .recipe-hero-photo {
+        aspect-ratio: 4 / 3; border-radius: 22px;
+        background-size: cover; background-position: center;
+        box-shadow: var(--soft-shadow); position: relative;
+      }
+      .recipe-hero-photo .polaroid-tag {
+        position: absolute; left: -14px; top: -14px; background: #fff;
+        padding: 10px 14px 8px; border-radius: 4px; box-shadow: var(--soft-shadow);
+        transform: rotate(-4deg); font-family: 'Caveat', cursive; font-size: 18px;
+        color: var(--deep-slate);
+      }
+      .recipe-title-block h1 {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 32px;
+        color: var(--deep-slate); line-height: 1.05;
+      }
+      .recipe-title-block .byline {
+        font-family: 'Caveat', cursive; font-size: 20px; color: var(--terracotta); margin-top: 6px;
+      }
+      .recipe-title-block .meta-chips {
+        display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;
+      }
+      .recipe-title-block .linked-beans {
+        margin-top: 18px; display: flex; flex-direction: column; gap: 6px;
+      }
+      .recipe-title-block .linked-beans .label {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted);
+      }
+      .recipe-title-block .linked-beans .row { display: flex; gap: 6px; flex-wrap: wrap; }
+      .recipe-title-block .actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+
+      .recipe-body-grid {
+        display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 28px; align-items: flex-start;
+      }
+      .recipe-section {
+        background: #fff; border-radius: 20px; padding: 22px; box-shadow: var(--card-shadow);
+      }
+      .recipe-section h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 15px;
+        color: var(--deep-slate); margin-bottom: 14px;
+        display: flex; align-items: center; gap: 8px;
+      }
+
+      .ingredients li {
+        list-style: none; padding: 8px 0; border-bottom: 1px dashed var(--tint-slate-10);
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate);
+        display: grid; grid-template-columns: 16px 1fr auto; gap: 10px; align-items: center;
+      }
+      .ingredients li:last-child { border-bottom: 0; }
+      .ingredients li::before {
+        content: ''; width: 8px; height: 8px; border-radius: 50%;
+        background: var(--terracotta); justify-self: center;
+      }
+      .ingredients li .qty {
+        font-family: 'Outfit', sans-serif; font-weight: 600;
+        color: var(--color-text-muted); font-size: 12px;
+      }
+
+      .steps li {
+        list-style: none; padding: 14px 0; border-top: 1px dashed var(--tint-slate-10);
+        display: grid; grid-template-columns: 32px 1fr; gap: 14px; align-items: flex-start;
+      }
+      .steps li:first-child { padding-top: 0; border-top: 0; }
+      .steps li .n {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: var(--terracotta); color: #fff;
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 13px;
+        display: grid; place-items: center;
+      }
+      .steps li p {
+        font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.5; color: var(--deep-slate);
+      }
+
+      .recipe-notes {
+        margin-top: 24px; background: #fff; border-radius: 20px; padding: 22px;
+        box-shadow: var(--card-shadow); border-left: 4px solid var(--sky-silk);
+      }
+      .recipe-notes h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 14px;
+        margin-bottom: 8px; color: var(--deep-slate);
+      }
+      .recipe-notes p {
+        font-family: 'Caveat', cursive; font-size: 18px; color: var(--deep-slate); line-height: 1.35;
+      }
+
+      /* Cook log */
+      .cook-log {
+        margin-top: 24px; background: #fff; border-radius: 20px; padding: 24px;
+        box-shadow: var(--card-shadow);
+      }
+      .cook-log-head {
+        display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px;
+      }
+      .cook-log-head h3 {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 15px; color: var(--deep-slate);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .cook-log-head .count {
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted);
+      }
+      .cook-log-stats {
+        display: flex; gap: 16px; margin-bottom: 18px; padding: 12px 16px;
+        background: var(--kraft-warm); border-radius: 14px;
+      }
+      .cook-log-stats .stat {
+        display: flex; flex-direction: column; gap: 2px;
+      }
+      .cook-log-stats .stat strong {
+        font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 18px; color: var(--terracotta);
+      }
+      .cook-log-stats .stat small {
+        font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted);
+      }
+
+      .cook-entry {
+        display: grid; grid-template-columns: 60px 1fr; gap: 16px;
+        padding: 14px 0; border-top: 1px dashed var(--tint-slate-10);
+      }
+      .cook-entry:first-of-type { border-top: 0; }
+      .cook-entry .date-col {
+        font-family: 'Outfit', sans-serif; text-align: center;
+      }
+      .cook-entry .date-col .d {
+        font-weight: 800; font-size: 20px; color: var(--deep-slate); line-height: 1;
+      }
+      .cook-entry .date-col .m {
+        font-weight: 600; font-size: 10px; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--color-text-muted); margin-top: 2px;
+      }
+      .cook-entry .content .stars {
+        font-size: 14px; letter-spacing: 2px; color: var(--heritage-orange);
+      }
+      .cook-entry .content .note {
+        margin-top: 6px; font-family: 'Inter', sans-serif; font-size: 13px;
+        color: var(--deep-slate); line-height: 1.4;
+      }
+      .cook-entry .content .byline {
+        margin-top: 6px; font-family: 'Outfit', sans-serif; font-size: 11px;
+        font-weight: 600; color: var(--color-text-muted);
+        letter-spacing: 0.04em;
+      }
+
+      /* ──────────────────────────────────────────────────────────────
+         SCREEN 5 — Modals
+         ────────────────────────────────────────────────────────────── */
+      .modal-grid {
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px;
+      }
+      .modal-preview {
+        background: #fff; border-radius: 22px; box-shadow: var(--soft-shadow);
+        overflow: hidden; display: flex; flex-direction: column;
+      }
+      .modal-head {
+        display: flex; gap: 14px; align-items: center; padding: 18px 22px;
+        border-bottom: 1px solid var(--tint-slate-5);
+      }
+      .modal-icon {
+        width: 44px; height: 44px; border-radius: 14px;
+        display: grid; place-items: center; font-size: 22px;
+      }
+      .modal-icon.fav { background: var(--tint-orange-15); }
+      .modal-icon.say { background: var(--tint-silk-35); }
+      .modal-icon.med { background: var(--tint-success-20); }
+      .modal-icon.rec { background: var(--tint-terracotta-12); }
+      .modal-icon.cook { background: var(--tint-orange-15); }
+      .modal-icon.allergy {
+        background: var(--heritage-orange); color: #fff;
+        box-shadow: 0 4px 14px rgba(241, 93, 34, 0.3);
+      }
+      .modal-title {
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 15px; color: var(--deep-slate);
+      }
+      .modal-sub {
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted);
+      }
+      .modal-body {
+        padding: 18px 22px 22px; background: var(--cloud-white);
+        display: flex; flex-direction: column; gap: 14px; flex: 1;
+      }
+      .form-label {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.08em;
+        color: var(--color-text-muted); margin-bottom: 6px;
+      }
+      .form-input, .form-select, .form-textarea {
+        width: 100%; padding: 10px 14px; border-radius: 12px; background: #fff;
+        border: 1px solid var(--tint-slate-10);
+        font-family: 'Inter', sans-serif; font-size: 13px; color: var(--deep-slate);
+      }
+      .form-textarea {
+        min-height: 60px; resize: vertical;
+        font-family: 'Caveat', cursive; font-size: 16px;
+      }
+      .form-textarea.prose { font-family: 'Inter', sans-serif; font-size: 13px; }
+      .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+      .cat-chip {
+        padding: 6px 12px; border-radius: 14px;
+        font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 12px;
+        border: 1px solid var(--tint-slate-10); background: #fff;
+        cursor: pointer; color: var(--deep-slate);
+      }
+      .cat-chip.active {
+        background: var(--tint-orange-15); color: var(--heritage-orange); border-color: transparent;
+      }
+
+      /* Conditional block — shown only when Food is selected */
+      .fav-food-block {
+        background: var(--tint-orange-8);
+        border: 1px solid var(--tint-orange-15);
+        border-radius: 14px; padding: 14px;
+        display: flex; flex-direction: column; gap: 10px;
+      }
+      .fav-food-block .sub-label {
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.06em; text-transform: uppercase;
+        color: var(--terracotta);
+      }
+      .fav-food-block .hint {
+        font-family: 'Caveat', cursive; font-size: 14px; color: var(--terracotta);
+      }
+      .fav-food-block .or-row {
+        display: flex; align-items: center; gap: 10px; margin: 2px 0;
+        font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 600;
+        letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted);
+      }
+      .fav-food-block .or-row::before,
+      .fav-food-block .or-row::after {
+        content: ''; flex: 1; height: 1px; background: var(--tint-slate-10);
+      }
+
+      .photo-dropzone {
+        border: 2px dashed var(--tint-slate-10); border-radius: 16px;
+        padding: 18px; display: flex; align-items: center; gap: 12px;
+        background: #fff; cursor: pointer;
+      }
+      .photo-dropzone:hover { border-color: var(--heritage-orange); background: var(--tint-orange-8); }
+      .photo-dropzone .icon {
+        width: 38px; height: 38px; border-radius: 12px;
+        background: var(--tint-orange-15); color: var(--heritage-orange);
+        display: grid; place-items: center; font-size: 18px;
+      }
+      .photo-dropzone .copy {
+        font-family: 'Inter', sans-serif; font-size: 12px; color: var(--color-text-muted); line-height: 1.4;
+      }
+
+      .modal-foot {
+        padding: 14px 22px; display: flex; gap: 10px; justify-content: flex-end;
+        background: var(--cloud-white); border-top: 1px solid var(--tint-slate-5);
+      }
+      .modal-save {
+        flex: 1; padding: 12px 18px;
+        background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+        color: #fff; border: none; border-radius: 14px;
+        font-family: 'Outfit', sans-serif; font-weight: 700; font-size: 13px; cursor: pointer;
+      }
+
+      /* Rating chooser (cook log modal) */
+      .rating-row {
+        display: flex; gap: 6px;
+      }
+      .rating-star {
+        width: 40px; height: 40px; border-radius: 12px;
+        display: grid; place-items: center; cursor: pointer;
+        background: #fff; border: 1px solid var(--tint-slate-10);
+        font-size: 18px; color: var(--color-text-muted);
+      }
+      .rating-star.filled { color: var(--heritage-orange); background: var(--tint-orange-8); border-color: var(--tint-orange-15); }
+
+      /* Image placeholders (CSS gradient fakes, same as v1) */
+      .img-bolognese {
+        background-image:
+          radial-gradient(circle at 30% 30%, #f5b783 0%, transparent 50%),
+          linear-gradient(135deg, #c24a24 0%, #8b2a0e 100%);
+      }
+      .img-dumplings {
+        background-image:
+          radial-gradient(circle at 40% 60%, #fff1d1 0%, transparent 55%),
+          linear-gradient(135deg, #d4a574 0%, #8b6a43 100%);
+      }
+      .img-rice {
+        background-image:
+          radial-gradient(circle at 50% 50%, #fff8e6 0%, transparent 55%),
+          linear-gradient(135deg, #e8d097 0%, #a8823d 100%);
+      }
+      .img-cookies {
+        background-image:
+          radial-gradient(circle at 40% 40%, #e8c185 0%, transparent 60%),
+          linear-gradient(135deg, #c88c4f 0%, #6b3f1a 100%);
+      }
+
+      @media (max-width: 1100px) {
+        .pod-layout { grid-template-columns: 1fr; }
+        .side { position: static; }
+        .recipe-detail-head { grid-template-columns: 1fr; }
+        .recipe-body-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 720px) {
+        .member-grid { grid-template-columns: 1fr; }
+        .app-shell { grid-template-columns: 64px 1fr; }
+        .sidebar { padding: 12px 8px; }
+        .brand-name, .nav-item span.label, .nav-section-label, .sidebar-footer .who { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Review screen switcher -->
+    <nav class="screen-switcher">
+      <span class="label">Review · The Pod</span>
+      <button class="screen-btn active" onclick="showScreen('pod', event)">Pod overview</button>
+      <button class="screen-btn" onclick="showScreen('bean', event)">Bean · Neil</button>
+      <button class="screen-btn" onclick="showScreen('cookbook', event)">Family Cookbook</button>
+      <button class="screen-btn" onclick="showScreen('recipe', event)">Recipe · Bolognese</button>
+      <button class="screen-btn" onclick="showScreen('scrapbook', event)">Family Scrapbook</button>
+      <button class="screen-btn" onclick="showScreen('safety', event)">Care &amp; Safety</button>
+      <button class="screen-btn" onclick="showScreen('contacts', event)">Emergency Contacts</button>
+      <button class="screen-btn" onclick="showScreen('modals', event)">Add modals</button>
+    </nav>
+
+    <!-- App shell — shared across every screen -->
+    <div class="app-shell">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">🫛</div>
+          <div>
+            <div class="brand-name">beanies<span>.family</span></div>
+            <div class="brand-tag">every bean counts</div>
+          </div>
+        </div>
+
+        <div class="nav-section-label">Home</div>
+        <div class="nav-item">
+          <span>🏡</span>
+          <span class="label">Family Nook</span>
+        </div>
+
+        <div class="nav-section-label">Piggy Bank</div>
+        <div class="nav-item">
+          <span>💰</span>
+          <span class="label">Dashboard</span>
+          <span class="chev">▸</span>
+        </div>
+        <div class="nav-item">
+          <span>💳</span>
+          <span class="label">Accounts</span>
+        </div>
+        <div class="nav-item">
+          <span>📒</span>
+          <span class="label">Transactions</span>
+        </div>
+        <div class="nav-item">
+          <span>🎯</span>
+          <span class="label">Goals</span>
+        </div>
+
+        <div class="nav-section-label">Treehouse</div>
+        <div class="nav-item">
+          <span>📅</span>
+          <span class="label">Family Planner</span>
+        </div>
+        <div class="nav-item">
+          <span>✅</span>
+          <span class="label">Family To-Do</span>
+        </div>
+        <div class="nav-item">
+          <span>✈️</span>
+          <span class="label">Travel Plans</span>
+        </div>
+        <!-- The Pod now nests under Treehouse. When active it reveals its
+             own sub-nav (two-level accordion). -->
+        <div class="nav-item active">
+          <span>🫛</span>
+          <span class="label">The Pod</span>
+          <span class="chev" style="transform: rotate(90deg)">▸</span>
+        </div>
+        <div class="nav-sub" id="pod-sub-nav">
+          <div class="nav-sub-item active">👋 Meet the Beans</div>
+          <div class="nav-sub-item">📖 Family Scrapbook</div>
+          <div class="nav-sub-item">🍳 Family Cookbook</div>
+          <div class="nav-sub-item">⚠️ Care &amp; Safety</div>
+          <div class="nav-sub-item">🏥 Emergency Contacts</div>
+        </div>
+
+        <div class="nav-item" style="margin-top: auto">
+          <span>⚙️</span>
+          <span class="label">Settings</span>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="me">👨🏻</div>
+          <div class="who">
+            Greg
+            <small>Parker Family · owner</small>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Topbar -->
+      <header class="topbar">
+        <div>
+          <div class="topbar-title" id="topbar-title">The Pod</div>
+          <div class="topbar-breadcrumb" id="topbar-breadcrumb">
+            The Parker Family · 4 beans
+          </div>
+        </div>
+        <div class="topbar-search">
+          <span>🔍</span>
+          <span>Search across The Pod…</span>
+        </div>
+        <div class="topbar-icon-btn" title="Privacy mode">👀</div>
+        <div class="topbar-icon-btn" title="Notifications">🔔</div>
+      </header>
+
+      <!-- Main content switches per screen -->
+      <main class="main-content">
+        <!-- ═══════════════════════════════════════════════════════
+             Screen 1 — Pod overview
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-pod" class="screen active">
+          <div class="page-inner">
+            <header class="page-header">
+              <div>
+                <div class="page-kicker">The Pod · Family Scrapbook</div>
+                <h1 class="page-title">The Parker Family</h1>
+                <p class="page-sub">4 beans · 12 favorites · 23 sayings · 5 recipes · 3 active meds · 4 allergies</p>
+              </div>
+              <div style="display: flex; gap: 10px">
+                <button class="btn-ghost">✉️ Invite Bean</button>
+                <button class="btn-primary">＋ Add Bean</button>
+              </div>
+            </header>
+
+            <div class="pod-layout">
+              <div>
+                <!-- Member grid -->
+                <div class="member-grid">
+                  <!-- Neil -->
+                  <article class="member-card">
+                    <div class="member-top">
+                      <div class="member-avatar bg-silk">🧒🏼</div>
+                      <div>
+                        <div class="member-name">Neil</div>
+                        <div class="member-meta">
+                          <span class="chip chip-silk">Little Bean</span>
+                          <span>· age 10</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="highlights">
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">⭐</span>
+                        <div class="highlight-body">
+                          <span class="label">Fave</span>
+                          Grandma's Bolognese
+                          <span class="chip chip-terracotta" style="margin-left: 6px">🍝 food</span>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">💬</span>
+                        <div class="highlight-body">
+                          <span class="label">Latest saying</span>
+                          <div class="q">"daddy, I wanna see the in-kam-sen"</div>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">⚠️</span>
+                        <div class="highlight-body">
+                          <span class="label">Heads up</span>
+                          Tree-nut allergy · EpiPen in backpack
+                        </div>
+                      </div>
+                    </div>
+                    <div class="member-footer">
+                      <div class="count-chips">
+                        <span class="chip chip-slate">4 faves</span>
+                        <span class="chip chip-slate">6 sayings</span>
+                        <span class="chip chip-danger">1 allergy</span>
+                      </div>
+                      <span class="link-arrow">View Neil →</span>
+                    </div>
+                  </article>
+
+                  <!-- Alice -->
+                  <article class="member-card">
+                    <div class="member-top">
+                      <div class="member-avatar bg-orange">👧🏻</div>
+                      <div>
+                        <div class="member-name">Alice</div>
+                        <div class="member-meta">
+                          <span class="chip chip-silk">Little Bean</span>
+                          <span>· age 6</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="highlights">
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">⭐</span>
+                        <div class="highlight-body">
+                          <span class="label">Fave</span>
+                          McDonald's Happy Meal
+                          <span class="chip chip-terracotta" style="margin-left: 6px">🍔 food</span>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">💬</span>
+                        <div class="highlight-body">
+                          <span class="label">Latest saying</span>
+                          <div class="q">"mommy, the moon is following me home"</div>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">💊</span>
+                        <div class="highlight-body">
+                          <span class="label">Care</span>
+                          2 active meds · next dose 8pm
+                        </div>
+                      </div>
+                    </div>
+                    <div class="member-footer">
+                      <div class="count-chips">
+                        <span class="chip chip-slate">7 faves</span>
+                        <span class="chip chip-slate">11 sayings</span>
+                        <span class="chip chip-success">2 meds</span>
+                      </div>
+                      <span class="link-arrow">View Alice →</span>
+                    </div>
+                  </article>
+
+                  <!-- Greg -->
+                  <article class="member-card">
+                    <div class="member-top">
+                      <div class="member-avatar bg-slate">👨🏻</div>
+                      <div>
+                        <div class="member-name">Greg</div>
+                        <div class="member-meta">
+                          <span class="chip chip-slate">Parent Bean</span>
+                          <span>· owner</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="highlights">
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">⭐</span>
+                        <div class="highlight-body">
+                          <span class="label">Fave</span>
+                          Kyoto, Japan
+                          <span class="chip chip-silk" style="margin-left: 6px">📍 place</span>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">💬</span>
+                        <div class="highlight-body">
+                          <span class="label">Latest saying</span>
+                          <div class="q">"put the app away and just be there"</div>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">📝</span>
+                        <div class="highlight-body">
+                          <span class="label">Notes</span>
+                          Coffee: oat milk, no sugar
+                        </div>
+                      </div>
+                    </div>
+                    <div class="member-footer">
+                      <div class="count-chips">
+                        <span class="chip chip-slate">5 faves</span>
+                        <span class="chip chip-slate">3 sayings</span>
+                        <span class="chip chip-slate">8 notes</span>
+                      </div>
+                      <span class="link-arrow">View Greg →</span>
+                    </div>
+                  </article>
+
+                  <!-- Sophia -->
+                  <article class="member-card">
+                    <div class="member-top">
+                      <div class="member-avatar bg-terracotta">👩🏻</div>
+                      <div>
+                        <div class="member-name">Sophia</div>
+                        <div class="member-meta">
+                          <span class="chip chip-slate">Parent Bean</span>
+                          <span>· admin</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="highlights">
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">⭐</span>
+                        <div class="highlight-body">
+                          <span class="label">Fave</span>
+                          Dumplings (Ma's recipe)
+                          <span class="chip chip-terracotta" style="margin-left: 6px">🥟 food</span>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">💬</span>
+                        <div class="highlight-body">
+                          <span class="label">Latest saying</span>
+                          <div class="q">"she sneezes like a kitten"</div>
+                        </div>
+                      </div>
+                      <div class="highlight-row">
+                        <span class="highlight-emoji">⚠️</span>
+                        <div class="highlight-body">
+                          <span class="label">Heads up</span>
+                          Shellfish allergy
+                        </div>
+                      </div>
+                    </div>
+                    <div class="member-footer">
+                      <div class="count-chips">
+                        <span class="chip chip-slate">6 faves</span>
+                        <span class="chip chip-slate">4 sayings</span>
+                        <span class="chip chip-danger">1 allergy</span>
+                      </div>
+                      <span class="link-arrow">View Sophia →</span>
+                    </div>
+                  </article>
+                </div>
+
+                <!-- Sayings strip -->
+                <section class="sayings-strip">
+                  <div class="sayings-strip-header">
+                    <h2>Recent family sayings 💬</h2>
+                    <span class="link-arrow">See all 23 →</span>
+                  </div>
+                  <div class="sayings-rail">
+                    <div class="sticky">
+                      <p class="q">"daddy, I wanna see the in-kam-sen"</p>
+                      <div class="meta">Neil · age 3 · 2019</div>
+                    </div>
+                    <div class="sticky">
+                      <p class="q">"mommy, the moon is following me home"</p>
+                      <div class="meta">Alice · Mar 2026 · car ride</div>
+                    </div>
+                    <div class="sticky">
+                      <p class="q">"she sneezes like a kitten"</p>
+                      <div class="meta">Sophia about Alice · Apr 2026</div>
+                    </div>
+                    <div class="sticky">
+                      <p class="q">"I'm going to eat all the beans!"</p>
+                      <div class="meta">Alice · Feb 2026 · dinner</div>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- Cookbook strip -->
+                <section class="cookbook-strip">
+                  <div class="cookbook-strip-header">
+                    <div>
+                      <h2>Secret Family Recipes</h2>
+                      <p>shhh… don't tell anyone 🤫</p>
+                    </div>
+                    <span class="link-arrow">Open cookbook →</span>
+                  </div>
+                  <div class="recipe-rail">
+                    <article class="recipe-card">
+                      <div class="recipe-photo img-bolognese"></div>
+                      <div class="recipe-body">
+                        <div class="recipe-title">Grandma's Bolognese</div>
+                        <div class="recipe-meta">
+                          <span>🕐 <strong>4h</strong></span>
+                          <span>🍽️ serves 6</span>
+                        </div>
+                      </div>
+                    </article>
+                    <article class="recipe-card">
+                      <div class="recipe-photo img-dumplings"></div>
+                      <div class="recipe-body">
+                        <div class="recipe-title">Ma's Dumplings</div>
+                        <div class="recipe-meta">
+                          <span>🕐 <strong>2h</strong></span>
+                          <span>🍽️ makes 40</span>
+                        </div>
+                      </div>
+                    </article>
+                    <article class="recipe-card">
+                      <div class="recipe-photo img-rice"></div>
+                      <div class="recipe-body">
+                        <div class="recipe-title">Dad's Friday Fried Rice</div>
+                        <div class="recipe-meta">
+                          <span>🕐 <strong>25m</strong></span>
+                          <span>🍽️ serves 4</span>
+                        </div>
+                      </div>
+                    </article>
+                    <!-- Placeholder-illustration recipe (no photo uploaded) -->
+                    <article class="recipe-card">
+                      <div class="recipe-illo">
+                        <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 30h36a2 2 0 0 1 2 2v2a18 18 0 0 1-18 18h-4a18 18 0 0 1-18-18v-2a2 2 0 0 1 2-2z" />
+                          <path d="M24 22c0-2 2-3 4-3s4 1 4 3" />
+                          <path d="M32 18c0-2 2-3 4-3s4 1 4 3" />
+                          <path d="M40 14c0-2 2-3 4-3" />
+                          <path d="M10 54h44" stroke-width="1.5" stroke-dasharray="2 2" />
+                        </svg>
+                        <span class="illo-label">no photo yet</span>
+                      </div>
+                      <div class="recipe-body">
+                        <div class="recipe-title">Nana's Oat Cookies</div>
+                        <div class="recipe-meta">
+                          <span>🕐 <strong>45m</strong></span>
+                          <span>🍽️ makes 24</span>
+                        </div>
+                      </div>
+                    </article>
+                    <div class="add-recipe-card">
+                      <div class="plus">＋</div>
+                      <span>Add a recipe</span>
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <!-- Right side -->
+              <aside class="side">
+                <div class="side-card">
+                  <h3>📅 This week</h3>
+                  <div class="event-row">
+                    <div class="event-date">TUE<br />22</div>
+                    <div class="event-body">
+                      <strong>Neil:</strong> piano lesson
+                      <small>3:45pm · Mrs. Chen</small>
+                    </div>
+                  </div>
+                  <div class="event-row">
+                    <div class="event-date">WED<br />23</div>
+                    <div class="event-body">
+                      <strong>Alice:</strong> ballet recital 🎀
+                      <small>6:30pm · community hall</small>
+                    </div>
+                  </div>
+                  <div class="event-row">
+                    <div class="event-date">FRI<br />25</div>
+                    <div class="event-body">
+                      <strong>Family:</strong> movie night
+                      <small>7:00pm · pizza + popcorn</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="side-card allergy-side">
+                  <h3>⚠️ Heads up — allergies</h3>
+                  <div class="allergy-row">
+                    <span class="sev severe">Severe</span>
+                    <span><strong>Neil</strong> — Tree nuts · EpiPen in backpack</span>
+                  </div>
+                  <div class="allergy-row">
+                    <span class="sev moderate">Moderate</span>
+                    <span><strong>Sophia</strong> — Shellfish (all forms)</span>
+                  </div>
+                  <div class="allergy-row">
+                    <span class="sev mild">Mild</span>
+                    <span><strong>Alice</strong> — Pollen (seasonal, spring)</span>
+                  </div>
+                </div>
+
+                <div class="side-card" style="background: var(--tint-silk-20)">
+                  <h3>💊 Today's care</h3>
+                  <div style="display: flex; flex-direction: column; gap: 10px">
+                    <div style="font-family: 'Inter'; font-size: 13px; color: var(--deep-slate)">
+                      <strong style="font-family: 'Outfit'">Alice</strong> — Zyrtec at 8am ·
+                      <em>given ✓</em>
+                    </div>
+                    <div style="font-family: 'Inter'; font-size: 13px; color: var(--deep-slate)">
+                      <strong style="font-family: 'Outfit'">Alice</strong> — eye drops at 8pm
+                    </div>
+                    <div style="font-family: 'Inter'; font-size: 13px; color: var(--deep-slate)">
+                      <strong style="font-family: 'Outfit'">Neil</strong> — vitamin D with dinner
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Screen 2 — Bean detail (Neil)
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-bean" class="screen">
+          <div class="page-inner">
+            <header class="bean-hero">
+              <div class="avatar-lg">🧒🏼</div>
+              <div class="bean-info">
+                <h1 class="font-outfit">Neil</h1>
+                <div class="bean-sub">
+                  <span class="chip chip-silk">Little Bean</span>
+                  <span>10 years old · loves trains</span>
+                </div>
+              </div>
+              <div style="margin-left: auto; display: flex; gap: 10px">
+                <button class="btn-ghost">✏️ Edit</button>
+                <button class="btn-primary">＋ Add Something</button>
+              </div>
+            </header>
+
+            <div class="tab-rail">
+              <button class="tab active" onclick="showBeanTab('about', this)">
+                <span>Overview</span>
+              </button>
+              <button class="tab" onclick="showBeanTab('fav', this)">
+                <span>Favorites</span>
+                <span class="count">4</span>
+              </button>
+              <button class="tab" onclick="showBeanTab('say', this)">
+                <span>Sayings</span>
+                <span class="count">6</span>
+              </button>
+              <button class="tab warning" onclick="showBeanTab('allergy', this)">
+                <span>⚠️ Allergies</span>
+                <span class="count">1</span>
+              </button>
+              <button class="tab" onclick="showBeanTab('med', this)">
+                <span>Medications</span>
+                <span class="count">1</span>
+              </button>
+              <button class="tab" onclick="showBeanTab('notes', this)">
+                <span>Notes</span>
+                <span class="count">3</span>
+              </button>
+            </div>
+
+            <!-- Favorites -->
+            <div id="pane-fav" class="pane">
+              <div class="pane-header">
+                <h2>Neil's favorite things ⭐</h2>
+                <button class="btn-ghost">＋ Add favorite</button>
+              </div>
+              <div class="fav-grid">
+                <article class="fav-card">
+                  <div class="fav-emoji food">🍝</div>
+                  <div>
+                    <div class="fav-title">Grandma's Bolognese</div>
+                    <div class="fav-sub">
+                      4-hour sauce. asks for it every Sunday. eats it with a big spoon.
+                    </div>
+                    <span class="fav-link">🥘 From the Family Cookbook →</span>
+                  </div>
+                </article>
+                <article class="fav-card">
+                  <div class="fav-emoji place">🚅</div>
+                  <div>
+                    <div class="fav-title">Shinkansen trains</div>
+                    <div class="fav-sub">
+                      Obsessed since age 3. Took him to Japan in 2026. Nozomi is his favorite.
+                    </div>
+                  </div>
+                </article>
+                <article class="fav-card">
+                  <div class="fav-emoji book">📘</div>
+                  <div>
+                    <div class="fav-title">Dog Man (all of them)</div>
+                    <div class="fav-sub">
+                      Can quote the whole series. Favorite: Grime and Punishment.
+                    </div>
+                  </div>
+                </article>
+                <article class="fav-card">
+                  <div class="fav-emoji toy">🦖</div>
+                  <div>
+                    <div class="fav-title">T-Rex plushie ("Rexy")</div>
+                    <div class="fav-sub">Sleeps with it every night. Still. At 10.</div>
+                  </div>
+                </article>
+                <div class="add-tile">
+                  <div class="plus-lg">＋</div>
+                  <span>Add a favorite</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sayings -->
+            <div id="pane-say" class="pane">
+              <div class="pane-header">
+                <h2>Things Neil said 💬</h2>
+                <button class="btn-ghost">＋ Capture a saying</button>
+              </div>
+              <div class="sayings-timeline">
+                <article class="saying-card">
+                  <p class="saying-q">"daddy, I wanna see the in-kam-sen"</p>
+                  <p class="saying-context">
+                    Very serious, age 3. He meant shinkansen. This one turned into a whole trip to
+                    Japan seven years later.
+                  </p>
+                  <div class="saying-meta">
+                    <span>📅 Jun 2019</span><span>📍 living room</span><span>· age 3</span>
+                  </div>
+                </article>
+                <article class="saying-card">
+                  <p class="saying-q">"dad, if you eat too fast your face turns into soup"</p>
+                  <p class="saying-context">Delivered at dinner with absolute conviction.</p>
+                  <div class="saying-meta">
+                    <span>📅 Oct 2024</span><span>📍 kitchen table</span><span>· age 8</span>
+                  </div>
+                </article>
+                <article class="saying-card">
+                  <p class="saying-q">"mom, can I be a train when I grow up?"</p>
+                  <p class="saying-context">Said with the full understanding that he was a person.</p>
+                  <div class="saying-meta">
+                    <span>📅 Feb 2020</span><span>📍 bath</span><span>· age 4</span>
+                  </div>
+                </article>
+                <article class="saying-card">
+                  <p class="saying-q">"this pizza slaps so hard my teeth are jealous"</p>
+                  <p class="saying-context">We have no idea where he picks these up.</p>
+                  <div class="saying-meta"><span>📅 Mar 2026</span><span>· age 10</span></div>
+                </article>
+              </div>
+            </div>
+
+            <!-- Allergies (NEW — standalone tab) -->
+            <div id="pane-allergy" class="pane">
+              <div class="pane-header">
+                <h2>Neil's allergies ⚠️</h2>
+                <button class="btn-ghost">＋ Add allergy</button>
+              </div>
+
+              <div class="allergy-intro">
+                <div class="icon">⚠️</div>
+                <div>
+                  <strong style="font-family: 'Outfit'">Allergy info is a safety record.</strong>
+                  Anyone viewing Neil's pod can see this — it's surfaced on the pod overview so
+                  babysitters and grandparents don't have to hunt for it.
+                </div>
+              </div>
+
+              <article class="allergy-card">
+                <div class="allergy-head">
+                  <div>
+                    <h3>Tree nuts</h3>
+                    <div class="allergy-type">Food allergy · diagnosed 2021</div>
+                  </div>
+                  <span class="chip chip-danger">⚠️ Severe · anaphylaxis risk</span>
+                </div>
+                <div class="allergy-grid">
+                  <div class="allergy-field">
+                    <div class="label">Foods to avoid</div>
+                    <div class="value">Walnuts, almonds, cashews, pecans, pistachios, hazelnuts, brazil nuts. Peanuts are a legume and are <strong>OK</strong>.</div>
+                  </div>
+                  <div class="allergy-field">
+                    <div class="label">Reaction symptoms</div>
+                    <div class="value">Hives within minutes, throat tightness, wheezing, vomiting. Has had anaphylaxis once (2022).</div>
+                  </div>
+                  <div class="allergy-field">
+                    <div class="label">Diagnosed by</div>
+                    <div class="value">Dr. Rachel Kim, pediatric allergist · last reviewed Mar 2026</div>
+                  </div>
+                  <div class="allergy-field">
+                    <div class="label">Be careful with</div>
+                    <div class="value">Anything "made in a facility that also processes tree nuts." Always check labels. Baked goods from bakeries — ask.</div>
+                  </div>
+                </div>
+                <div class="allergy-avoid">
+                  <span class="chip chip-danger">🥥 coconut? (still checking)</span>
+                  <span class="chip chip-danger">🍫 hazelnut spreads</span>
+                  <span class="chip chip-danger">🥐 pastries w/ almond</span>
+                  <span class="chip chip-danger">🥗 pesto</span>
+                </div>
+                <div class="allergy-response">
+                  <div class="rkey">Emergency response</div>
+                  <div class="rval">
+                    <strong>1.</strong> EpiPen Jr. (0.15mg) in front pocket of backpack and in the kitchen drawer.
+                    <strong>2.</strong> Call 911 immediately after administering.
+                    <strong>3.</strong> Benadryl (12.5mg) for mild cross-contact only.
+                  </div>
+                </div>
+              </article>
+
+              <article class="allergy-card mild">
+                <div class="allergy-head">
+                  <div>
+                    <h3>Bee stings</h3>
+                    <div class="allergy-type">Environmental · never tested</div>
+                  </div>
+                  <span class="chip chip-silk">Mild · watching</span>
+                </div>
+                <div class="allergy-grid">
+                  <div class="allergy-field">
+                    <div class="label">Reaction so far</div>
+                    <div class="value">Localized swelling (golf-ball sized). No airway symptoms. Once, summer 2024.</div>
+                  </div>
+                  <div class="allergy-field">
+                    <div class="label">Notes</div>
+                    <div class="value">Pediatrician said to watch for escalation on future stings. Benadryl on hand.</div>
+                  </div>
+                </div>
+              </article>
+            </div>
+
+            <!-- Medications -->
+            <div id="pane-med" class="pane">
+              <div class="pane-header">
+                <h2>Neil's medications 💊</h2>
+                <button class="btn-ghost">＋ Add medication</button>
+              </div>
+              <div class="med-subtabs">
+                <button class="med-subtab active">Active · 1</button>
+                <button class="med-subtab">Past · 4</button>
+              </div>
+
+              <article class="med-card">
+                <div class="med-bottle no-photo">💊</div>
+                <div>
+                  <div class="med-name">Vitamin D drops</div>
+                  <div class="med-dose">
+                    <span class="d"><small>Dose</small><strong>2 drops</strong></span>
+                    <span class="d"><small>How often</small><strong>1× daily · with dinner</strong></span>
+                    <span class="d"><small>Until</small><strong>Ongoing</strong></span>
+                  </div>
+                  <p class="med-note">Winter supplement. Pediatrician recommended.</p>
+                </div>
+                <div class="med-next">
+                  <div class="num">6h</div>
+                  <small>Until next dose</small>
+                </div>
+              </article>
+            </div>
+
+            <!-- Notes -->
+            <div id="pane-notes" class="pane">
+              <div class="pane-header">
+                <h2>Notes about Neil 📝</h2>
+                <button class="btn-ghost">＋ Add note</button>
+              </div>
+              <div class="notes-grid">
+                <article class="note-card">
+                  <h3>Shoe size</h3>
+                  <p>US 5 kids (growing fast). Prefers Velcro, laces still a struggle.</p>
+                  <div class="date">Updated Mar 2026</div>
+                </article>
+                <article class="note-card accent-terracotta">
+                  <h3>Calms down with</h3>
+                  <p>Train videos on YouTube · a warm blanket · Rexy · quiet time in his room.</p>
+                  <div class="date">Updated Feb 2026</div>
+                </article>
+                <article class="note-card">
+                  <h3>School info</h3>
+                  <p>Mrs. Chen, Room 12 · drop-off 8:10am · pickup at the back gate.</p>
+                  <div class="date">Updated Sep 2025</div>
+                </article>
+                <div class="add-tile">
+                  <div class="plus-lg">＋</div>
+                  <span>Add a note</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Overview (About) — now a member dashboard, default tab -->
+            <div id="pane-about" class="pane active">
+              <div class="pane-header">
+                <h2>About Neil</h2>
+                <div style="display: flex; gap: 8px">
+                  <button class="btn-ghost">✏️ Edit profile</button>
+                  <button class="btn-primary">＋ Add something</button>
+                </div>
+              </div>
+
+              <!-- Compact stat strip -->
+              <div class="about-stats">
+                <div class="about-stat">
+                  <span class="k">Role</span>
+                  <span class="v">Little Bean</span>
+                  <span class="sub">view-only on finances</span>
+                </div>
+                <div class="about-stat">
+                  <span class="k">Birthday</span>
+                  <span class="v">March 14 · age 10</span>
+                  <span class="sub">next in 328 days 🎂</span>
+                </div>
+                <div class="about-stat">
+                  <span class="k">Pronouns</span>
+                  <span class="v">he / him</span>
+                </div>
+                <div class="about-stat">
+                  <span class="k">Joined The Pod</span>
+                  <span class="v">Feb 2026</span>
+                  <span class="sub">10 weeks ago</span>
+                </div>
+              </div>
+
+              <!-- Dashboard grid: 2×3 of module cards -->
+              <div class="dash-grid">
+                <!-- Allergies — safety prominence -->
+                <div class="dash-module safety">
+                  <div class="dash-module-head">
+                    <h3>⚠️ Allergies <span class="chip chip-danger" style="margin-left: 4px">1 severe</span></h3>
+                    <span class="mini-link" onclick="showBeanTab('allergy', document.querySelector('.tab.warning'))">View all →</span>
+                  </div>
+                  <div class="dash-list">
+                    <div class="dash-item">
+                      <div class="ico allergy">⚠</div>
+                      <div class="t">
+                        Tree nuts
+                        <small>Severe · EpiPen in backpack · last reviewed Mar 2026</small>
+                      </div>
+                    </div>
+                    <div class="dash-item">
+                      <div class="ico allergy" style="background: var(--sky-silk); color: var(--deep-slate)">·</div>
+                      <div class="t">
+                        Bee stings
+                        <small>Mild · local swelling only so far</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Favorites -->
+                <div class="dash-module">
+                  <div class="dash-module-head">
+                    <h3>⭐ Favorites</h3>
+                    <span class="mini-link" onclick="showBeanTab('fav', document.querySelectorAll('.tab')[1])">View all 4 →</span>
+                  </div>
+                  <div class="dash-list">
+                    <div class="dash-item">
+                      <div class="ico fav">🍝</div>
+                      <div class="t">
+                        Grandma's Bolognese
+                        <small>food · from the Family Cookbook</small>
+                      </div>
+                    </div>
+                    <div class="dash-item">
+                      <div class="ico place">🚅</div>
+                      <div class="t">
+                        Shinkansen trains
+                        <small>place · obsessed since age 3</small>
+                      </div>
+                    </div>
+                    <div class="dash-item">
+                      <div class="ico book">📘</div>
+                      <div class="t">
+                        Dog Man (all of them)
+                        <small>book · quotes the whole series</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Recent sayings -->
+                <div class="dash-module">
+                  <div class="dash-module-head">
+                    <h3>💬 Recent sayings</h3>
+                    <span class="mini-link" onclick="showBeanTab('say', document.querySelectorAll('.tab')[2])">View all 6 →</span>
+                  </div>
+                  <div class="dash-list">
+                    <div class="dash-saying">
+                      "this pizza slaps so hard my teeth are jealous"
+                      <small>Mar 2026 · age 10</small>
+                    </div>
+                    <div class="dash-saying">
+                      "dad, if you eat too fast your face turns into soup"
+                      <small>Oct 2024 · kitchen table</small>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Medications -->
+                <div class="dash-module">
+                  <div class="dash-module-head">
+                    <h3>💊 Medications <span class="chip chip-success" style="margin-left: 4px">1 active</span></h3>
+                    <span class="mini-link" onclick="showBeanTab('med', document.querySelectorAll('.tab')[4])">View all →</span>
+                  </div>
+                  <div class="dash-list">
+                    <div class="dash-item">
+                      <div class="ico med">💊</div>
+                      <div class="t">
+                        Vitamin D drops
+                        <small>2 drops · 1× daily · with dinner</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="dash-module">
+                  <div class="dash-module-head">
+                    <h3>📝 Notes</h3>
+                    <span class="mini-link" onclick="showBeanTab('notes', document.querySelectorAll('.tab')[5])">View all 3 →</span>
+                  </div>
+                  <div class="dash-list">
+                    <div class="dash-item">
+                      <div class="ico note">👟</div>
+                      <div class="t">
+                        Shoe size — US 5 kids
+                        <small>Prefers Velcro, laces still a struggle</small>
+                      </div>
+                    </div>
+                    <div class="dash-item">
+                      <div class="ico note">🫂</div>
+                      <div class="t">
+                        Calms down with
+                        <small>Train videos · warm blanket · Rexy · quiet time</small>
+                      </div>
+                    </div>
+                    <div class="dash-item">
+                      <div class="ico note">🏫</div>
+                      <div class="t">
+                        School info
+                        <small>Mrs. Chen · Room 12 · back-gate pickup</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Photos — quick browse -->
+                <div class="dash-module">
+                  <div class="dash-module-head">
+                    <h3>📸 Photos</h3>
+                    <span class="mini-link">View all 8 →</span>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px">
+                    <div style="aspect-ratio: 1; border-radius: 10px; background: linear-gradient(135deg, #f5b783, #c24a24)"></div>
+                    <div style="aspect-ratio: 1; border-radius: 10px; background: linear-gradient(135deg, #aed6f1, #6b9dc2)"></div>
+                    <div style="aspect-ratio: 1; border-radius: 10px; background: linear-gradient(135deg, #e8d097, #a8823d)"></div>
+                    <div style="aspect-ratio: 1; border-radius: 10px; background: linear-gradient(135deg, #d4f1f4, #7fb2b8)"></div>
+                    <div style="aspect-ratio: 1; border-radius: 10px; background: linear-gradient(135deg, #ffe4d6, #c88c4f)"></div>
+                    <div style="aspect-ratio: 1; border-radius: 10px; background: rgba(44, 62, 80, 0.08); display: grid; place-items: center; font-family: 'Outfit'; font-size: 11px; color: var(--color-text-muted)">+3</div>
+                  </div>
+                  <div style="font-family: 'Inter'; font-size: 11px; color: var(--color-text-muted); padding: 0 4px">
+                    From favorites, sayings, and notes
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Screen 3 — Family Cookbook
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-cookbook" class="screen">
+          <div class="page-inner">
+            <header class="cookbook-hero">
+              <h1>Secret Family Recipes</h1>
+              <p class="sub">shhh… don't tell anyone 🤫</p>
+              <div class="stats">
+                <div class="stat"><strong>5</strong><small>Recipes</small></div>
+                <div class="stat"><strong>3</strong><small>Loved by Alice</small></div>
+                <div class="stat"><strong>2</strong><small>Loved by Neil</small></div>
+                <div class="stat"><strong>Since</strong><small>Grandma Mary · 1972</small></div>
+              </div>
+              <div style="position: absolute; right: 32px; bottom: 28px">
+                <button class="btn-primary">＋ Add a recipe</button>
+              </div>
+            </header>
+
+            <div class="recipe-grid">
+              <article class="recipe-card-lg">
+                <div class="photo img-bolognese">
+                  <div class="fave-overlay">
+                    <span class="fave-pill">🧒🏼 Neil's fave</span>
+                  </div>
+                </div>
+                <div class="body">
+                  <h3>Grandma's Bolognese</h3>
+                  <div class="sub">passed down from Mary, ~1972</div>
+                  <div class="meta-row">
+                    <span>🕐 <strong>4h</strong></span>
+                    <span>🍽️ <strong>serves 6</strong></span>
+                    <span>🌿 <strong>12 ingredients</strong></span>
+                  </div>
+                </div>
+              </article>
+              <article class="recipe-card-lg">
+                <div class="photo img-dumplings">
+                  <div class="fave-overlay">
+                    <span class="fave-pill">👩🏻 Sophia's fave</span>
+                  </div>
+                </div>
+                <div class="body">
+                  <h3>Ma's Dumplings</h3>
+                  <div class="sub">Sophia's mom · Taipei, 1990s</div>
+                  <div class="meta-row">
+                    <span>🕐 <strong>2h</strong></span>
+                    <span>🍽️ <strong>makes 40</strong></span>
+                    <span>🌿 <strong>8 ingredients</strong></span>
+                  </div>
+                </div>
+              </article>
+              <article class="recipe-card-lg">
+                <div class="photo img-rice">
+                  <div class="fave-overlay">
+                    <span class="fave-pill">👨🏻 Greg's fave</span>
+                  </div>
+                </div>
+                <div class="body">
+                  <h3>Dad's Friday Fried Rice</h3>
+                  <div class="sub">what greg makes on friday when it's his turn</div>
+                  <div class="meta-row">
+                    <span>🕐 <strong>25m</strong></span>
+                    <span>🍽️ <strong>serves 4</strong></span>
+                    <span>🌿 <strong>9 ingredients</strong></span>
+                  </div>
+                </div>
+              </article>
+
+              <!-- RECIPE WITH PLACEHOLDER ILLUSTRATION (no photo uploaded) -->
+              <article class="recipe-card-lg">
+                <div class="recipe-illo">
+                  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 30h36a2 2 0 0 1 2 2v2a18 18 0 0 1-18 18h-4a18 18 0 0 1-18-18v-2a2 2 0 0 1 2-2z" />
+                    <path d="M24 22c0-2 2-3 4-3s4 1 4 3" />
+                    <path d="M32 18c0-2 2-3 4-3s4 1 4 3" />
+                    <path d="M40 14c0-2 2-3 4-3" />
+                    <path d="M10 54h44" stroke-width="1.5" stroke-dasharray="2 2" />
+                  </svg>
+                  <span class="illo-label">no photo yet</span>
+                </div>
+                <div class="body">
+                  <h3>Nana's Oat Cookies</h3>
+                  <div class="sub">sophia's grandma · chewy, not crunchy</div>
+                  <div class="meta-row">
+                    <span>🕐 <strong>45m</strong></span>
+                    <span>🍽️ <strong>makes 24</strong></span>
+                    <span>🌿 <strong>7 ingredients</strong></span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="recipe-card-lg">
+                <div class="recipe-illo">
+                  <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="32" cy="34" r="18" />
+                    <path d="M24 30c2-3 6-3 8 0" />
+                    <path d="M22 22c3-5 15-5 20 0" />
+                    <path d="M32 52v6" />
+                  </svg>
+                  <span class="illo-label">no photo yet</span>
+                </div>
+                <div class="body">
+                  <h3>Cold-day Chicken Soup</h3>
+                  <div class="sub">when someone's sneezing — always works</div>
+                  <div class="meta-row">
+                    <span>🕐 <strong>1.5h</strong></span>
+                    <span>🍽️ <strong>serves 6</strong></span>
+                    <span>🌿 <strong>10 ingredients</strong></span>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Screen 4 — Recipe detail with Cook Log
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-recipe" class="screen">
+          <div class="page-inner">
+            <div class="recipe-detail">
+              <div class="recipe-detail-head">
+                <div class="recipe-hero-photo img-bolognese">
+                  <div class="polaroid-tag">grandma's kitchen, 1972</div>
+                </div>
+                <div class="recipe-title-block">
+                  <h1>Grandma's Bolognese</h1>
+                  <p class="byline">the sauce that started it all 🍝</p>
+                  <div class="meta-chips">
+                    <span class="chip chip-terracotta">🕐 4h total</span>
+                    <span class="chip chip-terracotta">🍽️ serves 6</span>
+                    <span class="chip chip-slate">🌿 12 ingredients</span>
+                    <span class="chip chip-slate">⭐ 9 steps</span>
+                    <span class="chip chip-success">🍳 cooked 14 times · ★★★★★ avg</span>
+                  </div>
+                  <div class="linked-beans">
+                    <span class="label">Loved by</span>
+                    <div class="row">
+                      <span class="chip chip-silk">🧒🏼 Neil</span>
+                      <span class="chip chip-silk">👨🏻 Greg</span>
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn-primary">🍳 I cooked this today</button>
+                    <button class="btn-ghost">✏️ Edit</button>
+                    <button class="btn-ghost">📤 Share</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="recipe-body-grid">
+                <div class="recipe-section">
+                  <h3>🌿 Ingredients</h3>
+                  <ul class="ingredients">
+                    <li><span></span><span>ground beef (80/20)</span><span class="qty">500g</span></li>
+                    <li><span></span><span>pancetta, diced</span><span class="qty">100g</span></li>
+                    <li><span></span><span>onion, finely chopped</span><span class="qty">1 large</span></li>
+                    <li><span></span><span>carrot, grated</span><span class="qty">1 medium</span></li>
+                    <li><span></span><span>celery, diced</span><span class="qty">1 stalk</span></li>
+                    <li><span></span><span>garlic, minced</span><span class="qty">3 cloves</span></li>
+                    <li><span></span><span>tomato passata</span><span class="qty">700ml</span></li>
+                    <li><span></span><span>whole milk</span><span class="qty">250ml</span></li>
+                    <li><span></span><span>dry red wine</span><span class="qty">250ml</span></li>
+                    <li><span></span><span>bay leaf</span><span class="qty">2</span></li>
+                    <li><span></span><span>salt + pepper</span><span class="qty">to taste</span></li>
+                    <li><span></span><span>pappardelle</span><span class="qty">500g</span></li>
+                  </ul>
+                </div>
+
+                <div class="recipe-section">
+                  <h3>📝 Steps</h3>
+                  <ol class="steps">
+                    <li>
+                      <div class="n">1</div>
+                      <p>
+                        In a heavy pot over low heat, render the pancetta until golden. Don't rush
+                        this — the fat is the foundation.
+                      </p>
+                    </li>
+                    <li>
+                      <div class="n">2</div>
+                      <p>Add onion, carrot, celery. Sweat for 10 minutes until softened and translucent.</p>
+                    </li>
+                    <li>
+                      <div class="n">3</div>
+                      <p>Add garlic. Cook 1 minute more.</p>
+                    </li>
+                    <li>
+                      <div class="n">4</div>
+                      <p>Push vegetables to the side. Brown the ground beef in the middle.</p>
+                    </li>
+                    <li>
+                      <div class="n">5</div>
+                      <p>Pour in the milk. Simmer until absorbed, ~15 minutes. This is the secret.</p>
+                    </li>
+                    <li>
+                      <div class="n">6</div>
+                      <p>Add the wine. Simmer until evaporated, ~20 minutes.</p>
+                    </li>
+                    <li>
+                      <div class="n">7</div>
+                      <p>Add passata, bay leaves, salt and pepper. Bring to a simmer.</p>
+                    </li>
+                    <li>
+                      <div class="n">8</div>
+                      <p>Simmer uncovered for 2.5–3 hours, stirring every 20 minutes.</p>
+                    </li>
+                    <li>
+                      <div class="n">9</div>
+                      <p>Serve over pappardelle with a generous grating of parmigiano reggiano.</p>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="recipe-notes">
+                <h3>Grandma's notes</h3>
+                <p>
+                  "never use a big pot for a little sauce. if it's too thick, add a splash of pasta
+                  water. if the kids complain, tell them to eat it anyway."
+                </p>
+              </div>
+
+              <!-- COOK LOG — NEW -->
+              <div class="cook-log">
+                <div class="cook-log-head">
+                  <h3>🍳 Cook log <span class="count">· 14 cooks since 2024</span></h3>
+                  <button class="btn-primary">＋ I cooked this today</button>
+                </div>
+                <div class="cook-log-stats">
+                  <div class="stat"><strong>★ 4.7</strong><small>Average rating</small></div>
+                  <div class="stat"><strong>14</strong><small>Times cooked</small></div>
+                  <div class="stat"><strong>Sat</strong><small>Most cooked day</small></div>
+                  <div class="stat"><strong>3 days ago</strong><small>Last cooked</small></div>
+                </div>
+
+                <div class="cook-entry">
+                  <div class="date-col">
+                    <div class="d">16</div>
+                    <div class="m">Apr</div>
+                  </div>
+                  <div class="content">
+                    <div class="stars">★★★★★</div>
+                    <p class="note">Stretched the sauce with a splash of pasta water at the end. Kids had seconds. The pancetta was especially good this time — got it from the new deli.</p>
+                    <div class="byline">cooked by Greg · served 5</div>
+                  </div>
+                </div>
+                <div class="cook-entry">
+                  <div class="date-col">
+                    <div class="d">22</div>
+                    <div class="m">Mar</div>
+                  </div>
+                  <div class="content">
+                    <div class="stars">★★★★☆</div>
+                    <p class="note">Good, but I scorched the bottom. <em>Next time:</em> use the cast-iron pot, not the stainless one.</p>
+                    <div class="byline">cooked by Greg · served 4</div>
+                  </div>
+                </div>
+                <div class="cook-entry">
+                  <div class="date-col">
+                    <div class="d">8</div>
+                    <div class="m">Feb</div>
+                  </div>
+                  <div class="content">
+                    <div class="stars">★★★★★</div>
+                    <p class="note">Neil asked for a third bowl. Five-star day. Sophia said the passata from Eataly makes a real difference.</p>
+                    <div class="byline">cooked by Sophia · served 6</div>
+                  </div>
+                </div>
+                <div class="cook-entry">
+                  <div class="date-col">
+                    <div class="d">21</div>
+                    <div class="m">Jan</div>
+                  </div>
+                  <div class="content">
+                    <div class="stars">★★★☆☆</div>
+                    <p class="note">Rushed the sofrito — veg wasn't fully sweated. Sauce tasted thin. Don't rush the base.</p>
+                    <div class="byline">cooked by Greg · served 4</div>
+                  </div>
+                </div>
+                <div style="text-align: center; padding-top: 12px">
+                  <span class="link-arrow">See all 14 cooks →</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Family Scrapbook — cross-family memory feed
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-scrapbook" class="screen">
+          <div class="page-inner">
+            <header class="scrapbook-hero">
+              <h1>Family Scrapbook</h1>
+              <p class="sub">sayings, favorites, notes, polaroids — the good stuff 📖</p>
+            </header>
+
+            <!-- Filter row: content type + member -->
+            <div class="filter-row">
+              <span class="group-label">Show</span>
+              <div class="filter-chips">
+                <span class="filter-chip active">Everything · 42</span>
+                <span class="filter-chip">💬 Sayings · 23</span>
+                <span class="filter-chip">⭐ Favorites · 12</span>
+                <span class="filter-chip">📝 Notes · 7</span>
+                <span class="filter-chip">📸 Photos · 14</span>
+              </div>
+              <div class="filter-divider"></div>
+              <span class="group-label">Bean</span>
+              <div class="filter-chips">
+                <span class="filter-chip active"><span class="avatar-dot" style="background: var(--tint-slate-10)">👨‍👩‍👧‍👦</span> Everyone</span>
+                <span class="filter-chip"><span class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</span> Neil</span>
+                <span class="filter-chip"><span class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</span> Alice</span>
+                <span class="filter-chip"><span class="avatar-dot" style="background: var(--tint-slate-10)">👨🏻</span> Greg</span>
+                <span class="filter-chip"><span class="avatar-dot" style="background: var(--tint-terracotta-12)">👩🏻</span> Sophia</span>
+              </div>
+            </div>
+
+            <!-- Mixed feed (masonry via CSS columns) -->
+            <div class="scrapbook-feed">
+              <!-- Saying · Neil -->
+              <div class="scrap scrap-saying paper-yellow">
+                <div class="scrap-head" style="padding-bottom: 8px">
+                  <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                  <span>Neil</span>
+                  <span class="type">💬 Saying</span>
+                </div>
+                <p class="q">"this pizza slaps so hard my teeth are jealous"</p>
+                <div class="scrap-date" style="padding-top: 10px">Mar 2026 · age 10</div>
+              </div>
+
+              <!-- Favorite · Alice -->
+              <div class="scrap">
+                <div class="scrap-head">
+                  <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                  <span>Alice</span>
+                  <span class="type">⭐ Fave</span>
+                </div>
+                <div class="scrap-body scrap-fav-body">
+                  <div class="emoji" style="background: var(--tint-orange-15)">🍔</div>
+                  <div>
+                    <div class="t">McDonald's Happy Meal</div>
+                    <small>Always asks for the girl toy. Eats fries first.</small>
+                  </div>
+                </div>
+                <div class="scrap-date">Added Apr 2026</div>
+              </div>
+
+              <!-- Photo polaroid · Neil -->
+              <div class="scrap scrap-photo">
+                <div class="polaroid">
+                  <div class="img img-bolognese"></div>
+                  <div class="caption">neil's first bolognese 🍝</div>
+                </div>
+                <div class="scrap-head" style="padding-top: 10px">
+                  <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                  <span>Neil</span>
+                  <span class="type">📸 Photo</span>
+                </div>
+                <div class="scrap-date">Feb 2026</div>
+              </div>
+
+              <!-- Saying · Alice -->
+              <div class="scrap scrap-saying paper-silk">
+                <div class="scrap-head" style="padding-bottom: 8px">
+                  <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                  <span>Alice</span>
+                  <span class="type">💬 Saying</span>
+                </div>
+                <p class="q">"mommy, the moon is following me home"</p>
+                <div class="scrap-date" style="padding-top: 10px">Mar 2026 · car ride · age 6</div>
+              </div>
+
+              <!-- Note · Neil -->
+              <div class="scrap">
+                <div class="scrap-head">
+                  <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                  <span>Neil</span>
+                  <span class="type">📝 Note</span>
+                </div>
+                <div class="scrap-body scrap-note accent-terracotta">
+                  <h4>Calms down with</h4>
+                  <p>Train videos on YouTube · a warm blanket · Rexy · quiet time in his room.</p>
+                </div>
+                <div class="scrap-date">Updated Feb 2026</div>
+              </div>
+
+              <!-- Favorite · Greg -->
+              <div class="scrap">
+                <div class="scrap-head">
+                  <div class="avatar-dot" style="background: var(--tint-slate-10)">👨🏻</div>
+                  <span>Greg</span>
+                  <span class="type">⭐ Fave</span>
+                </div>
+                <div class="scrap-body scrap-fav-body">
+                  <div class="emoji" style="background: var(--tint-silk-35)">🗼</div>
+                  <div>
+                    <div class="t">Kyoto, Japan</div>
+                    <small>Went with Neil during cherry-blossom season 2026. Seeing him with the shinkansen was a core memory.</small>
+                  </div>
+                </div>
+                <div class="scrap-date">Added Apr 2026</div>
+              </div>
+
+              <!-- Saying · Sophia -->
+              <div class="scrap scrap-saying paper-peach">
+                <div class="scrap-head" style="padding-bottom: 8px">
+                  <div class="avatar-dot" style="background: var(--tint-terracotta-12)">👩🏻</div>
+                  <span>Sophia · about Alice</span>
+                  <span class="type">💬 Saying</span>
+                </div>
+                <p class="q">"she sneezes like a kitten"</p>
+                <div class="scrap-date" style="padding-top: 10px">Apr 2026</div>
+              </div>
+
+              <!-- Photo · Alice -->
+              <div class="scrap scrap-photo">
+                <div class="polaroid">
+                  <div class="img" style="background-image: linear-gradient(135deg, #ffc7a8 0%, #d9705c 100%), radial-gradient(circle at 40% 40%, #ffe4d6, transparent 50%);"></div>
+                  <div class="caption">ballet recital 🎀</div>
+                </div>
+                <div class="scrap-head" style="padding-top: 10px">
+                  <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                  <span>Alice</span>
+                  <span class="type">📸 Photo</span>
+                </div>
+                <div class="scrap-date">Apr 2026 · community hall</div>
+              </div>
+
+              <!-- Favorite · Neil · recipe-linked -->
+              <div class="scrap">
+                <div class="scrap-head">
+                  <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                  <span>Neil</span>
+                  <span class="type">⭐ Fave</span>
+                </div>
+                <div class="scrap-body scrap-fav-body">
+                  <div class="emoji" style="background: var(--tint-orange-15)">🍝</div>
+                  <div>
+                    <div class="t">Grandma's Bolognese</div>
+                    <small>4-hour sauce. Asks for it every Sunday.</small>
+                    <span class="fav-link" style="display: inline-block; margin-top: 6px">🥘 From the Family Cookbook →</span>
+                  </div>
+                </div>
+                <div class="scrap-date">Added Mar 2026</div>
+              </div>
+
+              <!-- Saying · Neil (older, cherished) -->
+              <div class="scrap scrap-saying paper-mint">
+                <div class="scrap-head" style="padding-bottom: 8px">
+                  <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                  <span>Neil</span>
+                  <span class="type">💬 Saying</span>
+                </div>
+                <p class="q">"daddy, I wanna see the in-kam-sen"</p>
+                <div class="scrap-date" style="padding-top: 10px">Jun 2019 · living room · age 3</div>
+              </div>
+
+              <!-- Note · Sophia -->
+              <div class="scrap">
+                <div class="scrap-head">
+                  <div class="avatar-dot" style="background: var(--tint-terracotta-12)">👩🏻</div>
+                  <span>Sophia</span>
+                  <span class="type">📝 Note</span>
+                </div>
+                <div class="scrap-body scrap-note accent-silk">
+                  <h4>Coffee order</h4>
+                  <p>Oat flat white, single shot. Decaf after 2pm or she won't sleep.</p>
+                </div>
+                <div class="scrap-date">Updated Mar 2026</div>
+              </div>
+
+              <!-- Favorite · Alice -->
+              <div class="scrap">
+                <div class="scrap-head">
+                  <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                  <span>Alice</span>
+                  <span class="type">⭐ Fave</span>
+                </div>
+                <div class="scrap-body scrap-fav-body">
+                  <div class="emoji" style="background: var(--tint-purple-12)">🎀</div>
+                  <div>
+                    <div class="t">Ballet class</div>
+                    <small>Miss Julia's studio · Saturdays · she's into pirouettes.</small>
+                  </div>
+                </div>
+                <div class="scrap-date">Added Feb 2026</div>
+              </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 24px">
+              <button class="btn-ghost">Load more memories ↓</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Care & Safety — cross-family health board
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-safety" class="screen">
+          <div class="page-inner">
+            <header class="safety-hero">
+              <div class="icon-box">⚠️</div>
+              <div>
+                <h1>Care &amp; Safety</h1>
+                <p>
+                  Household health at a glance. Share this with babysitters, grandparents, or
+                  anyone looking after the kids.
+                </p>
+              </div>
+              <div class="safety-stats">
+                <div class="stat"><strong>4</strong><small>Allergies</small></div>
+                <div class="stat"><strong>3</strong><small>Active meds</small></div>
+                <div class="stat"><strong>1</strong><small>Severe</small></div>
+              </div>
+            </header>
+
+            <!-- Allergies section -->
+            <section class="safety-section">
+              <div class="safety-section-head">
+                <h2>⚠️ Allergies across the family</h2>
+                <span class="count-chip">4 total · sorted by severity</span>
+              </div>
+
+              <div class="safety-row severe">
+                <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                <div class="info">
+                  <div class="who">Neil <span class="allergen">— Tree nuts</span></div>
+                  <div class="summary">
+                    <strong>EpiPen Jr.</strong> in backpack + kitchen drawer · call 911 after. Food allergy, diagnosed 2021 by Dr. Kim.
+                  </div>
+                </div>
+                <span class="chip chip-danger">Severe</span>
+                <span class="go">Full details →</span>
+              </div>
+
+              <div class="safety-row moderate">
+                <div class="avatar-dot" style="background: var(--tint-terracotta-12)">👩🏻</div>
+                <div class="info">
+                  <div class="who">Sophia <span class="allergen">— Shellfish (all forms)</span></div>
+                  <div class="summary">
+                    Severe hives + GI reaction. Carries Benadryl. No anaphylaxis history. Last reviewed Feb 2026.
+                  </div>
+                </div>
+                <span class="chip chip-terracotta">Moderate</span>
+                <span class="go">Full details →</span>
+              </div>
+
+              <div class="safety-row mild">
+                <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                <div class="info">
+                  <div class="who">Alice <span class="allergen">— Pollen (seasonal)</span></div>
+                  <div class="summary">
+                    Spring flare-up. Zyrtec daily Mar–May. Rarely needs more.
+                  </div>
+                </div>
+                <span class="chip chip-silk">Mild</span>
+                <span class="go">Full details →</span>
+              </div>
+
+              <div class="safety-row mild">
+                <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                <div class="info">
+                  <div class="who">Neil <span class="allergen">— Bee stings</span></div>
+                  <div class="summary">
+                    Localized swelling (golf-ball sized) after one sting, 2024. Pediatrician watching for escalation.
+                  </div>
+                </div>
+                <span class="chip chip-silk">Mild</span>
+                <span class="go">Full details →</span>
+              </div>
+            </section>
+
+            <!-- Medications section -->
+            <section class="safety-section">
+              <div class="safety-section-head">
+                <h2>💊 Active medications</h2>
+                <span class="count-chip">3 active · 0 given today · next in 4h</span>
+              </div>
+
+              <div class="safety-row">
+                <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                <div class="info">
+                  <div class="who">Alice <span class="allergen">— Zyrtec (cetirizine)</span></div>
+                  <div class="summary">
+                    <strong>5mg</strong> · 1 tablet · <strong>1× daily, morning</strong> · ongoing. Pink bottle — not the blue one.
+                  </div>
+                </div>
+                <span class="med-given">✓ Given 8am</span>
+                <span class="go">Full details →</span>
+              </div>
+
+              <div class="safety-row">
+                <div class="avatar-dot" style="background: var(--tint-orange-15)">👧🏻</div>
+                <div class="info">
+                  <div class="who">Alice <span class="allergen">— Olopatadine eye drops</span></div>
+                  <div class="summary">
+                    <strong>1 drop each eye</strong> · <strong>2× daily</strong> · until May 15. Allergic conjunctivitis.
+                  </div>
+                </div>
+                <span class="med-countdown">4h<small>until next</small></span>
+                <span class="go">Full details →</span>
+              </div>
+
+              <div class="safety-row">
+                <div class="avatar-dot" style="background: var(--tint-silk-35)">🧒🏼</div>
+                <div class="info">
+                  <div class="who">Neil <span class="allergen">— Vitamin D drops</span></div>
+                  <div class="summary">
+                    <strong>2 drops</strong> · <strong>1× daily, with dinner</strong> · ongoing. Winter supplement.
+                  </div>
+                </div>
+                <span class="med-countdown">6h<small>until next</small></span>
+                <span class="go">Full details →</span>
+              </div>
+
+            </section>
+
+            <!-- Key contacts (preview — full list is the standalone Emergency Contacts page) -->
+            <section class="safety-section">
+              <div class="safety-section-head">
+                <h2>🏥 Key contacts</h2>
+                <span class="count-chip">3 shown · 7 total</span>
+              </div>
+
+              <article class="contact-card">
+                <div class="contact-cat-icon doctor">🩺</div>
+                <div class="contact-info">
+                  <div class="name">
+                    Dr. Michael Lee
+                    <span class="chip chip-slate">Pediatrician</span>
+                  </div>
+                  <div class="role">Family doctor · all kids</div>
+                  <div class="details">
+                    <span class="row"><span class="icon">📞</span> (415) 555-0044</span>
+                  </div>
+                </div>
+                <div class="contact-actions">
+                  <div class="contact-action primary" title="Call">📞</div>
+                </div>
+              </article>
+
+              <article class="contact-card">
+                <div class="contact-cat-icon other">☎️</div>
+                <div class="contact-info">
+                  <div class="name">
+                    Poison Control
+                    <span class="chip chip-danger">Emergency</span>
+                  </div>
+                  <div class="role">24/7 hotline</div>
+                  <div class="details">
+                    <span class="row"><span class="icon">📞</span> 1-800-222-1222</span>
+                  </div>
+                </div>
+                <div class="contact-actions">
+                  <div class="contact-action primary" title="Call">📞</div>
+                </div>
+              </article>
+
+              <article class="contact-card">
+                <div class="contact-cat-icon other">👵🏻</div>
+                <div class="contact-info">
+                  <div class="name">Grandma Mary</div>
+                  <div class="role">Emergency pickup · 2 miles away</div>
+                  <div class="details">
+                    <span class="row"><span class="icon">📞</span> (415) 555-0077</span>
+                  </div>
+                </div>
+                <div class="contact-actions">
+                  <div class="contact-action primary" title="Call">📞</div>
+                </div>
+              </article>
+
+              <div style="text-align: center; padding-top: 8px">
+                <span class="link-arrow" onclick="showScreen('contacts', {currentTarget: document.querySelectorAll('.screen-btn')[6]})">
+                  Open full Emergency Contacts →
+                </span>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Emergency Contacts — standalone page
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-contacts" class="screen">
+          <div class="page-inner">
+            <header class="contacts-hero">
+              <div class="icon-box">🏥</div>
+              <div>
+                <h1>Emergency Contacts</h1>
+                <p>
+                  <span class="caveat">keep this where everyone can find it.</span>
+                  Family phonebook — doctors, dentists, teachers, sitters, and anyone you'd want
+                  a babysitter or grandparent to reach in a pinch.
+                </p>
+              </div>
+              <div style="display: flex; gap: 10px">
+                <button class="btn-ghost">📤 Share with sitter</button>
+                <button class="btn-primary">＋ Add contact</button>
+              </div>
+            </header>
+
+            <!-- Search + filter row -->
+            <div class="contacts-toolbar">
+              <div class="contacts-search">
+                <span>🔍</span>
+                <input type="text" placeholder="Search by name, role, or phone…" />
+              </div>
+              <div class="contacts-filter-chips">
+                <span class="filter-chip active">All · 7</span>
+                <span class="filter-chip">🩺 Doctors · 2</span>
+                <span class="filter-chip">🦷 Dentists · 1</span>
+                <span class="filter-chip">👩‍🏫 Teachers · 2</span>
+                <span class="filter-chip">✨ Other · 2</span>
+              </div>
+            </div>
+
+            <!-- Full list — grouped by category -->
+            <div class="contact-category-head">🩺 Doctors</div>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon doctor">🩺</div>
+              <div class="contact-info">
+                <div class="name">
+                  Dr. Rachel Kim
+                  <span class="chip chip-success">Pediatric allergist</span>
+                </div>
+                <div class="role">For Neil · tree-nut allergy</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> (415) 555-0182</span>
+                  <span class="row"><span class="icon">📍</span> 1240 Divisadero St, SF</span>
+                </div>
+                <div class="notes">Best to call between 9–11am. Accepts our insurance.</div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon doctor">🩺</div>
+              <div class="contact-info">
+                <div class="name">
+                  Dr. Michael Lee
+                  <span class="chip chip-slate">Pediatrician</span>
+                </div>
+                <div class="role">Family doctor · all kids</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> (415) 555-0044</span>
+                  <span class="row"><span class="icon">📍</span> Mission Pediatrics · 2310 Mission St</span>
+                </div>
+                <div class="notes">After-hours nurse line: (415) 555-0099. Portal: mymissionpeds.com</div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <div class="contact-category-head">🦷 Dentists</div>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon dentist">🦷</div>
+              <div class="contact-info">
+                <div class="name">
+                  Dr. Jamie Nakagawa
+                  <span class="chip chip-silk">Family dentist</span>
+                </div>
+                <div class="role">Twice-yearly cleanings · everyone</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> (415) 555-0901</span>
+                  <span class="row"><span class="icon">📍</span> Noe Valley Smiles</span>
+                </div>
+                <div class="notes">Alice gets anxious — ask for Dr. N by name, she's great with kids.</div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <div class="contact-category-head">👩‍🏫 Teachers &amp; school</div>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon teacher">👩‍🏫</div>
+              <div class="contact-info">
+                <div class="name">Mrs. Chen</div>
+                <div class="role">Neil's teacher · Room 12</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> (415) 555-1212 ext. 12</span>
+                  <span class="row"><span class="icon">✉️</span> chen@bayviewelementary.edu</span>
+                </div>
+                <div class="notes">Prefers email. Office hours Tue/Thu 3:30–4pm.</div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon teacher">🏫</div>
+              <div class="contact-info">
+                <div class="name">Bayview Elementary · front office</div>
+                <div class="role">School main line</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> (415) 555-1212</span>
+                  <span class="row"><span class="icon">📍</span> 850 Newcomb Ave</span>
+                </div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <div class="contact-category-head">✨ Other</div>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon other">☎️</div>
+              <div class="contact-info">
+                <div class="name">
+                  Poison Control
+                  <span class="chip chip-danger">Emergency</span>
+                </div>
+                <div class="role">Custom category · 24/7 hotline</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> 1-800-222-1222</span>
+                </div>
+                <div class="notes">Free · English + Spanish. Save this one.</div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <article class="contact-card">
+              <div class="contact-cat-icon other">👵🏻</div>
+              <div class="contact-info">
+                <div class="name">Grandma Mary</div>
+                <div class="role">Custom · emergency pickup</div>
+                <div class="details">
+                  <span class="row"><span class="icon">📞</span> (415) 555-0077</span>
+                  <span class="row"><span class="icon">📍</span> 2 miles away · can pick up kids</span>
+                </div>
+                <div class="notes">Authorized for school pickup. On emergency contact list at Bayview.</div>
+              </div>
+              <div class="contact-actions">
+                <div class="contact-action primary" title="Call">📞</div>
+                <div class="contact-action" title="Edit">✏️</div>
+              </div>
+            </article>
+
+            <!-- Share-with-babysitter banner -->
+            <div class="share-banner">
+              <div class="icon-sm">📤</div>
+              <div class="body">
+                <strong>Going out for the evening?</strong>
+                Share this list as a simple, printable sheet — or send a one-tap link that
+                opens the contacts without signing in. Great for sitters, grandparents, or
+                anyone minding the kids.
+              </div>
+              <button class="btn-ghost">Share list</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════
+             Screen 5 — Add modals
+             ═══════════════════════════════════════════════════════ -->
+        <section id="screen-modals" class="screen">
+          <div class="page-inner">
+            <header class="page-header">
+              <div>
+                <div class="page-kicker">Add modals</div>
+                <h1 class="page-title">Capture something about a bean</h1>
+                <p class="page-sub">
+                  Six modal variants. Each uses BeanieFormModal (tier 2) with an icon-box tint
+                  matching the content type.
+                </p>
+              </div>
+            </header>
+
+            <div class="modal-grid">
+              <!-- Add Favorite — UPDATED with conditional recipe dropdown -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon fav">⭐</div>
+                  <div>
+                    <div class="modal-title">Add a favorite for Neil</div>
+                    <div class="modal-sub">foods, places, books, toys — anything he loves</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div>
+                    <div class="form-label">Category</div>
+                    <div class="cat-chips">
+                      <span class="cat-chip active">🍝 Food</span>
+                      <span class="cat-chip">📍 Place</span>
+                      <span class="cat-chip">📘 Book</span>
+                      <span class="cat-chip">🎵 Song</span>
+                      <span class="cat-chip">🎮 Toy</span>
+                      <span class="cat-chip">✨ Other</span>
+                    </div>
+                  </div>
+
+                  <!-- Food-only block (shows only when Food selected) -->
+                  <div class="fav-food-block">
+                    <div class="sub-label">Food details</div>
+                    <div class="hint">pick a family recipe, or just type one in 🍝</div>
+                    <div>
+                      <div class="form-label">Family recipe</div>
+                      <select class="form-select">
+                        <option>🥘 Grandma's Bolognese</option>
+                        <option>🥟 Ma's Dumplings</option>
+                        <option>🍚 Dad's Friday Fried Rice</option>
+                        <option>🍪 Nana's Oat Cookies</option>
+                        <option>🍲 Cold-day Chicken Soup</option>
+                        <option>— not from our cookbook —</option>
+                      </select>
+                    </div>
+                    <div class="or-row">or</div>
+                    <div>
+                      <div class="form-label">Type it in</div>
+                      <input class="form-input" placeholder="e.g. McDonald's Happy Meal, Gelato di Rome…" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="form-label">Why it's his favorite</div>
+                    <textarea class="form-textarea prose">
+asks for it every Sunday. eats it with a big spoon.</textarea>
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save favorite</button></div>
+              </div>
+
+              <!-- Add Saying -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon say">💬</div>
+                  <div>
+                    <div class="modal-title">Capture a saying</div>
+                    <div class="modal-sub">a quote you never want to forget</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div>
+                    <div class="form-label">Who said it</div>
+                    <select class="form-select">
+                      <option>Alice · age 6</option>
+                      <option>Neil · age 10</option>
+                      <option>Sophia</option>
+                      <option>Greg</option>
+                    </select>
+                  </div>
+                  <div>
+                    <div class="form-label">Their words</div>
+                    <textarea class="form-textarea">
+mommy, the moon is following me home</textarea>
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">When</div>
+                      <input class="form-input" type="date" value="2026-03-21" />
+                    </div>
+                    <div>
+                      <div class="form-label">Where</div>
+                      <input class="form-input" value="car ride home from school" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Context (optional)</div>
+                    <input class="form-input" value="looked out the back window, totally serious" />
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save saying</button></div>
+              </div>
+
+              <!-- Add Allergy — NEW -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon allergy">⚠️</div>
+                  <div>
+                    <div class="modal-title">Add an allergy for Neil</div>
+                    <div class="modal-sub">safety info — surfaces on the pod overview</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div>
+                    <div class="form-label">Allergy name</div>
+                    <input class="form-input" value="Tree nuts" />
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">Type</div>
+                      <select class="form-select">
+                        <option>Food</option>
+                        <option>Medication</option>
+                        <option>Environmental</option>
+                        <option>Contact (skin)</option>
+                        <option>Insect sting</option>
+                      </select>
+                    </div>
+                    <div>
+                      <div class="form-label">Severity</div>
+                      <select class="form-select">
+                        <option>⚠️ Severe · anaphylaxis</option>
+                        <option>Moderate</option>
+                        <option>Mild</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Foods / things to avoid</div>
+                    <textarea class="form-textarea prose">
+Walnuts, almonds, cashews, pecans, pistachios, hazelnuts, brazil nuts.
+Peanuts are a legume and are OK.</textarea>
+                  </div>
+                  <div>
+                    <div class="form-label">Reaction / what to watch for</div>
+                    <textarea class="form-textarea prose">
+Hives within minutes, throat tightness, wheezing, vomiting.</textarea>
+                  </div>
+                  <div>
+                    <div class="form-label">Emergency response</div>
+                    <textarea class="form-textarea prose">
+EpiPen Jr. (0.15mg) in backpack + kitchen drawer. Call 911 after administering.</textarea>
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">Diagnosed by</div>
+                      <input class="form-input" value="Dr. Rachel Kim" />
+                    </div>
+                    <div>
+                      <div class="form-label">Last reviewed</div>
+                      <input class="form-input" type="date" value="2026-03-15" />
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save allergy</button></div>
+              </div>
+
+              <!-- Add Medication -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon med">💊</div>
+                  <div>
+                    <div class="modal-title">Add medication for Alice</div>
+                    <div class="modal-sub">dosage, timing, and notes</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div>
+                    <div class="form-label">Medication name</div>
+                    <input class="form-input" value="Zyrtec (cetirizine)" />
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">Dose</div>
+                      <input class="form-input" value="5 mg · 1 tablet" />
+                    </div>
+                    <div>
+                      <div class="form-label">How often</div>
+                      <input class="form-input" value="1× daily · morning" />
+                    </div>
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">Start</div>
+                      <input class="form-input" type="date" value="2026-04-01" />
+                    </div>
+                    <div>
+                      <div class="form-label">Until</div>
+                      <input class="form-input" value="Ongoing" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Photo of the bottle (so you use the right one)</div>
+                    <div class="photo-dropzone">
+                      <div class="icon">📸</div>
+                      <div class="copy">
+                        Drop a photo here, or click to upload.<br />Max 1 photo · up to ~1 MB after compression.
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Notes</div>
+                    <textarea class="form-textarea prose">
+Dr. Lee's prescription. Give with breakfast. Pink bottle — not the blue one.</textarea>
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save medication</button></div>
+              </div>
+
+              <!-- Add Recipe — UPDATED with notes field -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon rec">🥘</div>
+                  <div>
+                    <div class="modal-title">Add a family recipe</div>
+                    <div class="modal-sub">goes in the Family Cookbook · shh…</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div>
+                    <div class="form-label">Recipe name</div>
+                    <input class="form-input" value="Grandma's Bolognese" />
+                  </div>
+                  <div>
+                    <div class="form-label">Short story (optional)</div>
+                    <input class="form-input" value="the sauce that started it all" />
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">Prep + cook</div>
+                      <input class="form-input" value="4h" />
+                    </div>
+                    <div>
+                      <div class="form-label">Serves</div>
+                      <input class="form-input" value="6" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Hero photo · optional</div>
+                    <div class="photo-dropzone">
+                      <div class="icon">📸</div>
+                      <div class="copy">
+                        Up to 4 photos. If none, we'll use a cute illustration until you add one.
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Ingredients (one per line)</div>
+                    <textarea class="form-textarea prose" style="min-height: 90px">
+500g ground beef
+100g pancetta
+1 large onion
+…</textarea>
+                  </div>
+                  <div>
+                    <div class="form-label">Steps (one per line)</div>
+                    <textarea class="form-textarea prose" style="min-height: 90px">
+1. Render the pancetta over low heat
+2. Add onion, carrot, celery
+…</textarea>
+                  </div>
+                  <div>
+                    <div class="form-label">Notes &amp; tips (grandma's notes)</div>
+                    <textarea class="form-textarea">
+never use a big pot for a little sauce. if it's too thick, add a splash of pasta water.</textarea>
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save recipe</button></div>
+              </div>
+
+              <!-- I cooked this today — NEW cook-log modal -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon cook">🍳</div>
+                  <div>
+                    <div class="modal-title">I cooked this today</div>
+                    <div class="modal-sub">Grandma's Bolognese · log the cook</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">When</div>
+                      <input class="form-input" type="date" value="2026-04-19" />
+                    </div>
+                    <div>
+                      <div class="form-label">Served</div>
+                      <input class="form-input" value="5 people" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">How did it turn out?</div>
+                    <div class="rating-row">
+                      <div class="rating-star filled">★</div>
+                      <div class="rating-star filled">★</div>
+                      <div class="rating-star filled">★</div>
+                      <div class="rating-star filled">★</div>
+                      <div class="rating-star filled">★</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">What went well</div>
+                    <textarea class="form-textarea prose">
+Stretched the sauce with pasta water — kids had seconds.</textarea>
+                  </div>
+                  <div>
+                    <div class="form-label">What to try next time</div>
+                    <textarea class="form-textarea prose">
+Double the pancetta. Let it rest 10 minutes before serving.</textarea>
+                  </div>
+                  <div>
+                    <div class="form-label">Snap of tonight's dinner (optional)</div>
+                    <div class="photo-dropzone">
+                      <div class="icon">📸</div>
+                      <div class="copy">Add a photo to this log entry — great for the memory.</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save cook</button></div>
+              </div>
+
+              <!-- Add Emergency Contact -->
+              <div class="modal-preview">
+                <div class="modal-head">
+                  <div class="modal-icon allergy" style="background: var(--success-green); box-shadow: 0 4px 14px rgba(39, 174, 96, 0.3)">🏥</div>
+                  <div>
+                    <div class="modal-title">Add emergency contact</div>
+                    <div class="modal-sub">lives on the Care &amp; Safety page</div>
+                  </div>
+                </div>
+                <div class="modal-body">
+                  <div>
+                    <div class="form-label">Category</div>
+                    <div class="cat-chips">
+                      <span class="cat-chip active">🩺 Doctor</span>
+                      <span class="cat-chip">🦷 Dentist</span>
+                      <span class="cat-chip">👩‍⚕️ Nurse</span>
+                      <span class="cat-chip">👩‍🏫 Teacher</span>
+                      <span class="cat-chip">🏫 School</span>
+                      <span class="cat-chip">✨ Custom…</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Name</div>
+                    <input class="form-input" value="Dr. Rachel Kim" />
+                  </div>
+                  <div>
+                    <div class="form-label">Role / note (optional)</div>
+                    <input class="form-input" value="Pediatric allergist · for Neil" />
+                  </div>
+                  <div class="form-row">
+                    <div>
+                      <div class="form-label">Phone</div>
+                      <input class="form-input" value="(415) 555-0182" />
+                    </div>
+                    <div>
+                      <div class="form-label">Email (optional)</div>
+                      <input class="form-input" placeholder="kim@example.com" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="form-label">Address (optional)</div>
+                    <input class="form-input" value="1240 Divisadero St, SF" />
+                  </div>
+                  <div>
+                    <div class="form-label">Notes</div>
+                    <textarea class="form-textarea prose">
+Best to call between 9–11am. Accepts our insurance.</textarea>
+                  </div>
+                </div>
+                <div class="modal-foot"><button class="modal-save">Save contact</button></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const TOPBAR = {
+        pod: { title: 'The Pod', crumb: 'The Parker Family · 4 beans' },
+        bean: { title: 'Neil', crumb: 'The Pod · Neil' },
+        scrapbook: { title: 'Family Scrapbook', crumb: 'The Pod · Family Scrapbook' },
+        cookbook: { title: 'Family Cookbook', crumb: 'The Pod · Family Cookbook' },
+        recipe: { title: "Grandma's Bolognese", crumb: 'The Pod · Family Cookbook · Bolognese' },
+        safety: { title: 'Care & Safety', crumb: 'The Pod · Care & Safety' },
+        contacts: { title: 'Emergency Contacts', crumb: 'The Pod · Emergency Contacts' },
+        modals: { title: 'Add modals (review)', crumb: 'The Pod · modal previews' },
+      };
+
+      function showScreen(name, evt) {
+        document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+        document.querySelectorAll('.screen-btn').forEach((b) => b.classList.remove('active'));
+        document.getElementById('screen-' + name).classList.add('active');
+        if (evt && evt.currentTarget) evt.currentTarget.classList.add('active');
+        const tb = TOPBAR[name];
+        if (tb) {
+          document.getElementById('topbar-title').textContent = tb.title;
+          document.getElementById('topbar-breadcrumb').textContent = tb.crumb;
+        }
+        document.querySelector('.main-content').scrollTop = 0;
+      }
+
+      function showBeanTab(name, btn) {
+        document.querySelectorAll('#screen-bean .pane').forEach((p) => p.classList.remove('active'));
+        document.querySelectorAll('#screen-bean .tab').forEach((b) => b.classList.remove('active'));
+        document.getElementById('pane-' + name).classList.add('active');
+        btn.classList.add('active');
+      }
+    </script>
+  </body>
+</html>
