@@ -1,26 +1,28 @@
 /**
- * Reactively resolve a `FamilyMember.avatarPhotoId` to a Drive thumbnail URL.
+ * Reactively resolve a `FamilyMember.avatarPhotoId` to a displayable URL.
  *
- * Returns `null` when there's no avatar, during resolution, or on error —
- * callers pass the result straight to `<BeanieAvatar :photo-url="url" />`,
- * which falls back to the beanie variant.
+ * Uses `photoStore.getBlobUrl` — authorized `alt=media` download turned
+ * into a `blob:` URL via `URL.createObjectURL`. That path was picked
+ * over the Drive `thumbnailLink` approach after repeated "photo fails
+ * to load after a reload" reports: `lh3.googleusercontent.com` URLs
+ * embed short-lived tokens that rotate well inside our cache TTL and
+ * don't survive fresh `<img>` mounts. Blob URLs live in-process and
+ * don't rotate, which is what we want for the small-number-of-photos
+ * avatar surface.
  *
- * Also exposes `refresh()`: invalidates the photoStore thumb-URL cache and
- * re-resolves. Intended for the `@photo-error` event flow — Drive CDN
- * tokens can rotate within our 30-min cache TTL, and a fresh fetch often
- * yields a working URL. We retry at most once per mount to avoid loops.
+ * Tradeoff: full-size image download (no CDN-side resize), but avatar
+ * files are compressed to 1024px at q=0.92 so they're typically <100KB.
  *
- * Used by BeanCard (grid), BeanAvatarPicker (modal preview), and any
- * future surface that displays member avatars.
+ * Returns `{ url, refresh }`. `refresh()` is wired to BeanieAvatar's
+ * `@photo-error` — drops the cache + retries once. Most of the time
+ * it's a no-op (blob URLs don't go bad) but it's there for the rare
+ * case where Drive replaced the underlying file.
  */
 import { computed, ref, watchEffect, unref, type MaybeRefOrGetter } from 'vue';
 import { usePhotoStore } from '@/stores/photoStore';
 import type { UUID } from '@/types/models';
 
-export function useAvatarPhotoUrl(
-  avatarPhotoId: MaybeRefOrGetter<UUID | undefined>,
-  size: 'thumb' | 'full' = 'thumb'
-) {
+export function useAvatarPhotoUrl(avatarPhotoId: MaybeRefOrGetter<UUID | undefined>) {
   const photoStore = usePhotoStore();
   const url = ref<string | null>(null);
   let retriedForId: UUID | null = null;
@@ -32,7 +34,7 @@ export function useAvatarPhotoUrl(
 
   async function resolve(id: UUID): Promise<void> {
     try {
-      url.value = await photoStore.getImageUrl(id, size);
+      url.value = await photoStore.getBlobUrl(id);
     } catch (e) {
       console.warn('[avatarPhotoUrl] resolve failed', e);
       url.value = null;
@@ -46,16 +48,10 @@ export function useAvatarPhotoUrl(
       retriedForId = null;
       return;
     }
-    // Reset retry budget when the id changes.
     if (retriedForId && retriedForId !== id) retriedForId = null;
     await resolve(id);
   });
 
-  /**
-   * Call when an `<img>` error fires on the current URL — drops the cache
-   * for this driveFileId and re-resolves. No-op after one retry (so an
-   * actually-broken photo doesn't loop).
-   */
   async function refresh(): Promise<void> {
     const id = resolvedId.value;
     if (!id) return;

@@ -15,6 +15,7 @@ import { computed, ref, shallowRef, triggerRef } from 'vue';
 import {
   createFile,
   deleteFile,
+  downloadFileBlob,
   getFileMetadata,
   DriveFileNotFoundError,
 } from '@/services/google/driveService';
@@ -73,6 +74,14 @@ export const usePhotoStore = defineStore('photos', () => {
   const pendingUploads = shallowRef<QueuedPhotoUpload[]>([]);
   /** thumbnailLink URL cache, keyed by driveFileId. */
   const thumbUrlCache = new Map<string, { url: string; fetchedAt: number }>();
+  /**
+   * Blob URL cache for the `alt=media` download path, keyed by driveFileId.
+   * Blob URLs live in-process (no token, no CDN handoff) so they never
+   * rotate — perfect for avatars where Drive's `thumbnailLink` tokens
+   * have proven unreliable across page reloads. Entries are revoked on
+   * deactivate() and on explicit invalidation.
+   */
+  const blobUrlCache = new Map<string, string>();
 
   // Reactive projection of `photos` collection — re-reads on every docVersion bump.
   const photos = computed<Record<UUID, PhotoAttachment>>(() => {
@@ -102,6 +111,8 @@ export const usePhotoStore = defineStore('photos', () => {
     unresolvedIds.value = new Set();
     canonicalFolderId.value = null;
     thumbUrlCache.clear();
+    for (const url of blobUrlCache.values()) URL.revokeObjectURL(url);
+    blobUrlCache.clear();
     pendingUploads.value = [];
   }
 
@@ -255,6 +266,43 @@ export const usePhotoStore = defineStore('photos', () => {
   }
 
   /**
+   * Reliable image URL via authorized `alt=media` + `URL.createObjectURL`.
+   *
+   * Preferred over `getImageUrl` for surfaces that display a small number
+   * of photos (avatars, single hero images) — the fetch is a full image
+   * download (no Drive CDN resizing) but the resulting `blob:` URL lives
+   * in-process and never rotates, so it doesn't suffer the
+   * "thumbnailLink token expired on reload" class of failures.
+   *
+   * Cached by driveFileId for the store's lifetime; revoked on
+   * deactivate() or explicit invalidation. Still honors the tombstone +
+   * unresolved guards for cascading deletes.
+   */
+  async function getBlobUrl(photoId: UUID): Promise<string | null> {
+    const photo = photos.value[photoId];
+    if (!photo || photo.deletedAt) return null;
+
+    const cached = blobUrlCache.get(photo.driveFileId);
+    if (cached) return cached;
+
+    try {
+      const token = await requestAccessToken();
+      const blob = await downloadFileBlob(token, photo.driveFileId);
+      const url = URL.createObjectURL(blob);
+      blobUrlCache.set(photo.driveFileId, url);
+      unresolvedIds.value.delete(photoId);
+      return url;
+    } catch (e) {
+      if (e instanceof DriveFileNotFoundError) {
+        markUnresolved(photoId);
+        return null;
+      }
+      console.warn('[photoStore] getBlobUrl download failed', photoId, e);
+      return null;
+    }
+  }
+
+  /**
    * Reactive runtime flag. Set when a Drive fetch returns 404/403; cleared
    * when a replace or fresh lookup succeeds.
    */
@@ -296,16 +344,21 @@ export const usePhotoStore = defineStore('photos', () => {
   }
 
   /**
-   * Drop this photo's cached thumbnail URL so the next `getImageUrl` call
-   * re-fetches fresh metadata from Drive. Useful when an `<img>` element
-   * fires `error` on a previously-valid URL — Drive's CDN tokens can
-   * rotate within the 30-min TTL, and a re-fetch often yields a URL that
-   * works. Safe to call even if the photo has no cached URL.
+   * Drop this photo's cached image URLs (both thumbnailLink and blob)
+   * so the next `getImageUrl` / `getBlobUrl` call re-fetches. Useful
+   * when an `<img>` fires `error` on a previously-valid URL — Drive
+   * CDN tokens rotate, blob URLs can go bad if the backing file was
+   * replaced. Safe to call even with no cached entry.
    */
   function invalidateThumbCache(photoId: UUID): void {
     const photo = photos.value[photoId];
     if (!photo) return;
     thumbUrlCache.delete(photo.driveFileId);
+    const cachedBlob = blobUrlCache.get(photo.driveFileId);
+    if (cachedBlob) {
+      URL.revokeObjectURL(cachedBlob);
+      blobUrlCache.delete(photo.driveFileId);
+    }
   }
 
   /**
@@ -558,6 +611,7 @@ export const usePhotoStore = defineStore('photos', () => {
     addPhoto,
     addAvatarPhoto,
     getImageUrl,
+    getBlobUrl,
     isUnresolved,
     invalidateThumbCache,
     replacePhotoFile,
