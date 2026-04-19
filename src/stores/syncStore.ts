@@ -11,6 +11,9 @@ import { useTodoStore } from './todoStore';
 import { useActivityStore } from './activityStore';
 import { useVacationStore } from './vacationStore';
 import { useBudgetStore } from './budgetStore';
+import { useFavoritesStore } from './favoritesStore';
+import { useSayingsStore } from './sayingsStore';
+import { useMemberNotesStore } from './memberNotesStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
 import { useAuthStore } from './authStore';
@@ -1066,6 +1069,9 @@ export const useSyncStore = defineStore('sync', () => {
       const activityStore = useActivityStore();
       const vacationStore = useVacationStore();
       const budgetStore = useBudgetStore();
+      const favoritesStoreInst = useFavoritesStore();
+      const sayingsStoreInst = useSayingsStore();
+      const memberNotesStoreInst = useMemberNotesStore();
 
       // Snapshot permission state before reload for diagnostics
       const prevMember = familyStoreInst.currentMember;
@@ -1083,6 +1089,9 @@ export const useSyncStore = defineStore('sync', () => {
         activityStore.loadActivities(),
         vacationStore.loadVacations(),
         budgetStore.loadBudgets(),
+        favoritesStoreInst.loadFavorites(),
+        sayingsStoreInst.loadSayings(),
+        memberNotesStoreInst.loadMemberNotes(),
       ]);
 
       // Diagnostic: detect permission changes after reload

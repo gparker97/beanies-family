@@ -37,6 +37,9 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useBudgetStore } from '@/stores/budgetStore';
+import { useFavoritesStore } from '@/stores/favoritesStore';
+import { useSayingsStore } from '@/stores/sayingsStore';
+import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -58,6 +61,9 @@ const todoStore = useTodoStore();
 const activityStore = useActivityStore();
 const vacationStore = useVacationStore();
 const budgetStore = useBudgetStore();
+const favoritesStore = useFavoritesStore();
+const sayingsStore = useSayingsStore();
+const memberNotesStore = useMemberNotesStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
@@ -344,6 +350,9 @@ async function loadFamilyData() {
         activityStore.loadActivities(),
         vacationStore.loadVacations(),
         budgetStore.loadBudgets(),
+        favoritesStore.loadFavorites(),
+        sayingsStore.loadSayings(),
+        memberNotesStore.loadMemberNotes(),
       ]);
 
       const result = await processRecurringItems();
