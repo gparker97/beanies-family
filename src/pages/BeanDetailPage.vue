@@ -19,11 +19,14 @@ import BeanOverviewTab from '@/components/pod/BeanOverviewTab.vue';
 import BeanFavoritesTab from '@/components/pod/BeanFavoritesTab.vue';
 import BeanSayingsTab from '@/components/pod/BeanSayingsTab.vue';
 import BeanNotesTab from '@/components/pod/BeanNotesTab.vue';
-import BeanTabPlaceholder from '@/components/pod/BeanTabPlaceholder.vue';
+import BeanAllergiesTab from '@/components/pod/BeanAllergiesTab.vue';
+import BeanMedicationsTab from '@/components/pod/BeanMedicationsTab.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
+import { useAllergiesStore } from '@/stores/allergiesStore';
+import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useTranslation } from '@/composables/useTranslation';
 
 const route = useRoute();
@@ -34,6 +37,8 @@ const familyStore = useFamilyStore();
 const favoritesStore = useFavoritesStore();
 const sayingsStore = useSayingsStore();
 const memberNotesStore = useMemberNotesStore();
+const allergiesStore = useAllergiesStore();
+const medicationsStore = useMedicationsStore();
 
 const memberId = computed(() => (route.params.memberId as string) ?? '');
 const activeTab = computed<BeanTabId>(() => (route.params.tab as BeanTabId) ?? 'overview');
@@ -44,8 +49,8 @@ const counts = computed(() => ({
   favorites: favoritesStore.byMember(memberId.value).value.length,
   sayings: sayingsStore.byMember(memberId.value).value.length,
   notes: memberNotesStore.byMember(memberId.value).value.length,
-  allergies: 0,
-  medications: 0,
+  allergies: allergiesStore.byMember(memberId.value).value.length,
+  medications: medicationsStore.byMember(memberId.value).value.length,
 }));
 
 function selectTab(tab: BeanTabId): void {
@@ -63,17 +68,9 @@ function selectTab(tab: BeanTabId): void {
       <BeanOverviewTab v-if="activeTab === 'overview'" :member="member" />
       <BeanFavoritesTab v-else-if="activeTab === 'favorites'" :member-id="member.id" />
       <BeanSayingsTab v-else-if="activeTab === 'sayings'" :member-id="member.id" />
+      <BeanAllergiesTab v-else-if="activeTab === 'allergies'" :member-id="member.id" />
+      <BeanMedicationsTab v-else-if="activeTab === 'medications'" :member-id="member.id" />
       <BeanNotesTab v-else-if="activeTab === 'notes'" :member-id="member.id" />
-      <BeanTabPlaceholder
-        v-else-if="activeTab === 'allergies'"
-        emoji="\u26A0\uFE0F"
-        :message="t('bean.overview.allergies.empty')"
-      />
-      <BeanTabPlaceholder
-        v-else-if="activeTab === 'medications'"
-        emoji="\u{1F48A}"
-        :message="t('bean.overview.medications.empty')"
-      />
     </template>
     <div
       v-else
