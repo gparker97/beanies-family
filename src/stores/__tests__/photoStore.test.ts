@@ -47,6 +47,8 @@ const driveMocks = vi.hoisted(() => {
   return {
     createFile: vi.fn(),
     deleteFile: vi.fn(),
+    downloadFileBlob: vi.fn(),
+    findOrCreateFolder: vi.fn(),
     getFileMetadata: vi.fn(),
     DriveFileNotFoundError,
   };
@@ -57,6 +59,8 @@ const { DriveFileNotFoundError } = driveMocks;
 vi.mock('@/services/google/driveService', () => ({
   createFile: driveMocks.createFile,
   deleteFile: driveMocks.deleteFile,
+  downloadFileBlob: driveMocks.downloadFileBlob,
+  findOrCreateFolder: driveMocks.findOrCreateFolder,
   getFileMetadata: driveMocks.getFileMetadata,
   DriveFileNotFoundError: driveMocks.DriveFileNotFoundError,
 }));
@@ -80,6 +84,10 @@ vi.mock('@/services/photos/photoCompression', async () => {
 // canonical folder. Stub with a trivial Pinia-compatible store factory.
 vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({ driveFileId: 'beanpod-file-1' }),
+}));
+
+vi.mock('@/stores/familyContextStore', () => ({
+  useFamilyContextStore: () => ({ activeFamilyId: 'fam-photostore-test' }),
 }));
 
 // --- Imports (after mocks are set up) --------------------------------
@@ -125,6 +133,8 @@ describe('photoStore', () => {
     // Reset mocks
     driveMocks.createFile.mockReset().mockResolvedValue({ fileId: 'drive-file-1', name: 'x' });
     driveMocks.deleteFile.mockReset().mockResolvedValue(undefined);
+    driveMocks.downloadFileBlob.mockReset().mockResolvedValue(new Blob());
+    driveMocks.findOrCreateFolder.mockReset().mockResolvedValue('folder-nested');
     driveMocks.getFileMetadata.mockReset().mockResolvedValue({ parents: ['folder-1'] });
 
     // Clear the registered integration collections between tests.
@@ -149,7 +159,8 @@ describe('photoStore', () => {
     expect(photoId).toBeTruthy();
     expect(driveMocks.createFile).toHaveBeenCalledTimes(1);
     const [, folderId, filename, blob, mime] = driveMocks.createFile.mock.calls[0]!;
-    expect(folderId).toBe('folder-1');
+    // Uploads land in the resolved photos subfolder, not the bean-pod root.
+    expect(folderId).toBe('folder-nested');
     expect(filename).toBe(`beanies-photo-${photoId}.jpg`);
     expect(blob).toBeInstanceOf(Blob);
     expect(mime).toBe('image/jpeg');
