@@ -10,6 +10,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import { confirm } from '@/composables/useConfirm';
 import { isTemporaryEmail } from '@/utils/email';
 import { getAvatarVariant } from '@/composables/useMemberAvatar';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -109,6 +110,34 @@ const avatarPhotoId = ref<UUID | undefined>(undefined);
 const initialAvatarPhotoId = ref<UUID | undefined>(undefined);
 const uploadedButNotSaved = ref<UUID[]>([]);
 
+/**
+ * Snapshot of form values at open time — compared against current values
+ * to detect "dirty" state, so closing an edited drawer prompts for
+ * confirmation. JSON-stringified for cheap structural equality.
+ */
+const initialSnapshot = ref<string>('');
+
+function takeSnapshot(): string {
+  return JSON.stringify({
+    name: name.value,
+    email: email.value,
+    gender: gender.value,
+    beanRole: beanRole.value,
+    color: color.value,
+    dobMonth: dobMonth.value,
+    dobDay: dobDay.value,
+    dobYear: dobYear.value,
+    canViewFinances: canViewFinances.value,
+    canEditActivities: canEditActivities.value,
+    canManagePod: canManagePod.value,
+    avatarPhotoId: avatarPhotoId.value ?? null,
+  });
+}
+
+const isDirty = computed(
+  () => initialSnapshot.value !== '' && takeSnapshot() !== initialSnapshot.value
+);
+
 // Derived ageGroup from beanRole
 const ageGroup = computed<AgeGroup>(() => (beanRole.value === 'child' ? 'child' : 'adult'));
 
@@ -135,6 +164,7 @@ const { isEditing, isSubmitting } = useFormModal(
       avatarPhotoId.value = member.avatarPhotoId;
       initialAvatarPhotoId.value = member.avatarPhotoId;
       uploadedButNotSaved.value = [];
+      initialSnapshot.value = takeSnapshot();
     },
     onNew: () => {
       const randomColor =
@@ -154,6 +184,7 @@ const { isEditing, isSubmitting } = useFormModal(
       avatarPhotoId.value = undefined;
       initialAvatarPhotoId.value = undefined;
       uploadedButNotSaved.value = [];
+      initialSnapshot.value = takeSnapshot();
     },
   }
 );
@@ -186,11 +217,25 @@ function onAvatarRemoved(photoId: UUID) {
  *   - Tombstone every photo uploaded in this session (they're orphans).
  *   - Leave the member's original avatarPhotoId untouched.
  */
-function handleClose() {
+async function handleClose(): Promise<void> {
+  // Unlike the Family Nook / activity / todo surfaces (which auto-save
+  // on each change), this drawer uses explicit save — it carries admin
+  // toggles (permissions, role) plus a Delete action where silent save
+  // would be risky. To bridge the UX gap we guard close-while-dirty
+  // with a confirm prompt so edits aren't lost by accident.
+  if (isDirty.value && !props.readOnly) {
+    const ok = await confirm({
+      title: 'family.discardChanges.title',
+      message: 'family.discardChanges.body',
+      variant: 'danger',
+    });
+    if (!ok) return;
+  }
   for (const id of uploadedButNotSaved.value) {
     photoStore.markDeleted(id);
   }
   uploadedButNotSaved.value = [];
+  initialSnapshot.value = '';
   emit('close');
 }
 

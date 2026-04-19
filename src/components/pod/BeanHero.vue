@@ -15,6 +15,12 @@ import type { AgeGroup, FamilyMember, Gender } from '@/types/models';
 
 const props = defineProps<{
   member: FamilyMember;
+  /** Hide the edit-pencil affordance when the viewer can't manage the pod. */
+  canManage?: boolean;
+}>();
+
+const emit = defineEmits<{
+  edit: [];
 }>();
 
 const router = useRouter();
@@ -78,9 +84,21 @@ const roleLabel = computed(() =>
         <BeanieIcon name="chevron-left" size="xs" />
         <span>{{ t('bean.backToPod') }}</span>
       </button>
-      <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
-        {{ member.name }}
-      </h1>
+      <div class="flex items-center gap-3">
+        <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
+          {{ member.name }}
+        </h1>
+        <button
+          v-if="canManage"
+          type="button"
+          class="text-secondary-500/40 hover:text-primary-500 hover:bg-primary-500/10 rounded-lg p-1.5 transition-colors"
+          :title="t('action.edit')"
+          :aria-label="t('action.edit')"
+          @click="emit('edit')"
+        >
+          <BeanieIcon name="edit" size="sm" />
+        </button>
+      </div>
       <div class="text-secondary-500/70 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
         <span>{{ roleLabel }}</span>
         <span v-if="birthdayLabel" aria-hidden="true" class="opacity-40">·</span>
