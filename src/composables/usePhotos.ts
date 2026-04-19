@@ -138,11 +138,25 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
       }
     }
 
-    // Online uploads already appended to entity.photoIds via photoStore's
-    // `attachPhotoToEntity`. Offline uploads skip that step (no Automerge
-    // record is written until flush), so the entity doesn't need to change
-    // for the tile to appear — the UI renders the queue entry via `pending`.
-    // No updatePhotoIds call needed on add.
+    // Online uploads are appended to entity.photoIds inside photoStore
+    // via `attachPhotoToEntity`, which keeps the Automerge doc itself
+    // correct. But the form modals that host this composable keep their
+    // own local `photoIds` ref (so the Save handler knows what to
+    // persist), and that ref needs to see the new id too — otherwise
+    // the just-uploaded photo doesn't render in the drawer until the
+    // user closes and reopens it. Emit the refreshed ids back to the
+    // caller whenever at least one online upload succeeded. Offline
+    // uploads skip this (no Automerge record yet — queue entry renders
+    // via `pending` instead).
+    if (!wasOffline && ids.length > 0) {
+      const currentIds = unref(options.photoIds) ?? [];
+      // De-dupe in case a caller round-trips this back to the doc.
+      const merged = [...currentIds];
+      for (const id of ids) {
+        if (!merged.includes(id)) merged.push(id);
+      }
+      options.updatePhotoIds(merged);
+    }
 
     if (wasOffline && ids.length > 0) {
       showToast('info', t('photos.queuedOffline'));
