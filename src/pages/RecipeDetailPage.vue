@@ -237,7 +237,7 @@ function onRecipeDeleted(): void {
       <section
         v-if="recipe.notes"
         class="font-caveat text-secondary-500 mb-6 rounded-[20px] bg-[#fff7c8] p-6 text-lg leading-snug"
-        style=" box-shadow: var(--card-shadow);transform: rotate(-0.4deg)"
+        style="box-shadow: var(--card-shadow); transform: rotate(-0.4deg)"
       >
         📝 {{ recipe.notes }}
       </section>

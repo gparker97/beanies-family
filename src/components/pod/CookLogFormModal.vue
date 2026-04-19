@@ -8,12 +8,13 @@
  * table — most cooks that get logged were good cooks, so one-click
  * happy path for the common case.
  */
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFormModal } from '@/composables/useFormModal';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -97,6 +98,8 @@ function buildPayload(): Omit<CookLogEntry, 'id' | 'createdAt' | 'updatedAt'> {
   };
 }
 
+const photoAttachmentsRef = ref<{ openPicker: () => void } | null>(null);
+
 async function ensureEntryId(): Promise<UUID | null> {
   if (entryId.value) return entryId.value;
   if (!canSave.value) return null;
@@ -104,6 +107,13 @@ async function ensureEntryId(): Promise<UUID | null> {
   if (!created) return null;
   entryId.value = created.id;
   return created.id;
+}
+
+async function handleAddFirstPhoto(): Promise<void> {
+  const id = await ensureEntryId();
+  if (!id) return;
+  await nextTick();
+  photoAttachmentsRef.value?.openPicker();
 }
 
 function updatePhotoIds(ids: UUID[]): void {
@@ -214,22 +224,26 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
     <FormFieldGroup :label="t('cookLog.field.photo')" optional>
       <div v-if="entryId || entry">
         <PhotoAttachments
+          ref="photoAttachmentsRef"
           collection="cookLogs"
           :entity-id="(entryId ?? entry?.id) as UUID"
           :photo-ids="photoIds"
           :current-member-id="currentMemberId"
           :max="1"
-          :update-photo-ids="updatePhotoIds"
+          @update:photo-ids="updatePhotoIds"
         />
       </div>
       <button
         v-else
         type="button"
-        class="font-outfit text-primary-500 text-xs font-semibold transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40"
+        class="hover:border-primary-500 hover:text-primary-500 flex w-full flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-[var(--tint-slate-10)] py-5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-orange-4)] disabled:cursor-not-allowed disabled:opacity-40"
         :disabled="!canSave"
-        @click="ensureEntryId"
+        @click="handleAddFirstPhoto"
       >
-        {{ canSave ? t('photos.addPhoto') : t('action.save') }}
+        <BeanieIcon name="camera" size="md" />
+        <span class="font-outfit text-xs font-semibold">
+          {{ canSave ? t('photos.addPhoto') : t('cookLog.photos.saveFirst') }}
+        </span>
       </button>
     </FormFieldGroup>
   </BeanieFormModal>

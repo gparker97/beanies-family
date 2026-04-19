@@ -88,11 +88,11 @@ function closeModal(): void {
       class="relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-9 py-8"
     >
       <span
-        class="pointer-events-none absolute top-2.5 right-8 text-[150px] opacity-[0.07]"
-        style="transform: rotate(12deg)"
+        class="pointer-events-none absolute top-2.5 right-8 text-[150px] opacity-[0.09]"
+        style="transform: rotate(-8deg)"
         aria-hidden="true"
       >
-        🤫
+        🍳
       </span>
       <button
         type="button"

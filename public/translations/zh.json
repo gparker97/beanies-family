@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2186
+    "translationCount": 2189
   },
   "translations": {
     "app.name": {
@@ -10587,8 +10587,8 @@
       "lastUpdated": "2026-04-19"
     },
     "cookbook.title": {
-      "translation": "家庭食谱",
-      "hash": "v5yt1v",
+      "translation": "秘密家庭食谱",
+      "hash": "3jo9x5",
       "lastUpdated": "2026-04-19"
     },
     "cookbook.subtitle": {
@@ -10598,7 +10598,7 @@
     },
     "cookbook.addRecipe": {
       "translation": "添加新食谱",
-      "hash": "j37ly9",
+      "hash": "c6xlhw",
       "lastUpdated": "2026-04-19"
     },
     "cookbook.empty": {
@@ -10934,6 +10934,21 @@
     "celebration.recipe5Star": {
       "translation": "5星级餐点！整个豆荚都批准了。",
       "hash": "sbibr1",
+      "lastUpdated": "2026-04-19"
+    },
+    "recipes.photos.saveFirst": {
+      "translation": "在上方添加配方名称以附加照片",
+      "hash": "ons3f",
+      "lastUpdated": "2026-04-19"
+    },
+    "medications.photos.saveFirst": {
+      "translation": "填写姓名、剂量和频率以附上照片",
+      "hash": "26dvc2",
+      "lastUpdated": "2026-04-19"
+    },
+    "cookLog.photos.saveFirst": {
+      "translation": "添加评分以附上照片",
+      "hash": "dmm3i0",
       "lastUpdated": "2026-04-19"
     }
   }

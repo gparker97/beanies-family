@@ -472,9 +472,9 @@ const STRING_DEFS = {
   'careSafety.stats.severe': { en: 'severe', beanie: 'severe' },
   'careSafety.stats.activeMeds': { en: 'active meds', beanie: 'active meds' },
   // Cookbook page
-  'cookbook.title': { en: 'Family Cookbook', beanie: 'family cookbook' },
+  'cookbook.title': { en: 'Secret Family Recipes', beanie: 'secret family recipes' },
   'cookbook.subtitle': { en: "shhh… don't tell anyone 🤫", beanie: "shhh… don't tell anyone 🤫" },
-  'cookbook.addRecipe': { en: '＋ Add a recipe', beanie: '＋ add a recipe' },
+  'cookbook.addRecipe': { en: 'Add a recipe', beanie: 'add a recipe' },
   'cookbook.empty': { en: 'No recipes in the family cookbook yet', beanie: 'no recipes yet' },
   'cookbook.emptyCTA': { en: 'Write the first one', beanie: 'write the first one' },
   'cookbook.stats.recipes': { en: 'Recipes', beanie: 'recipes' },
@@ -493,6 +493,18 @@ const STRING_DEFS = {
   'recipes.field.steps': { en: 'Preparation steps', beanie: 'preparation steps' },
   'recipes.field.notes': { en: 'Family notes', beanie: 'family notes' },
   'recipes.field.photos': { en: 'Photos', beanie: 'photos' },
+  'recipes.photos.saveFirst': {
+    en: 'Add a recipe name above to attach photos',
+    beanie: 'add a recipe name above to attach photos',
+  },
+  'medications.photos.saveFirst': {
+    en: 'Fill in name, dose, and frequency to attach a photo',
+    beanie: 'fill in name, dose, and frequency to attach a photo',
+  },
+  'cookLog.photos.saveFirst': {
+    en: 'Add a rating to attach a photo',
+    beanie: 'add a rating to attach a photo',
+  },
   'recipes.placeholder.name': {
     en: "e.g. Grandma's Bolognese",
     beanie: "e.g. grandma's bolognese",
