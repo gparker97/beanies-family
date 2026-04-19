@@ -10,14 +10,15 @@ test.describe('Magic Link Invite System', () => {
     await page.goto('/');
     await bypassLoginIfNeeded(page);
 
-    // Navigate to Family page
-    await page.goto('/family');
-    await page.waitForURL('/family');
+    // Navigate to The Pod (/family auto-redirects to /pod as of 2026-04).
+    await page.goto('/pod');
+    await page.waitForURL(/\/pod(\/|$)/);
 
     // --- Part 1: Auto-open invite modal after adding a member ---
 
-    // Click "+ Add a Beanie"
-    const addButton = page.getByRole('button', { name: /add a beanie/i });
+    // Click "Add Bean" (formerly "+ Add a Beanie"; regex covers both forms
+    // in case older translations load during the test).
+    const addButton = page.getByRole('button', { name: /add (bean|a beanie)/i });
     await addButton.click();
 
     // Fill out form — find name input in the dialog
