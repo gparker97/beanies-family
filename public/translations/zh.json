@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 1991
+    "translationCount": 2034
   },
   "translations": {
     "app.name": {
@@ -9959,6 +9959,221 @@
     "bean.stats.age": {
       "translation": "岁",
       "hash": "7o7spv",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.addTitle": {
+      "translation": "添加收藏夹",
+      "hash": "ys0a6y",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.editTitle": {
+      "translation": "编辑收藏夹",
+      "hash": "av9zwu",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.addTile": {
+      "translation": "加入最愛",
+      "hash": "mk8f2z",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.field.category": {
+      "translation": "类型",
+      "hash": "1wk6ce",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.field.name": {
+      "translation": "姓名",
+      "hash": "1fvl7",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.field.description": {
+      "translation": "这个委员会为什么重要",
+      "hash": "wwhnx1",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.placeholder.name": {
+      "translation": "例如： Spaghetti carbonara",
+      "hash": "d6fhk4",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.placeholder.description": {
+      "translation": "简短说明—可选",
+      "hash": "5tibft",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.category.food": {
+      "translation": "食物",
+      "hash": "1b24e",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.category.place": {
+      "translation": "地 点",
+      "hash": "19ykfb",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.category.book": {
+      "translation": "书籍",
+      "hash": "18i6h",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.category.song": {
+      "translation": "Song",
+      "hash": "1jcxh",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.category.toy": {
+      "translation": "玩具",
+      "hash": "1t1a",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.category.other": {
+      "translation": "其他",
+      "hash": "19k0z4",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.empty": {
+      "translation": "此Bean尚无收藏夹",
+      "hash": "j2t1ln",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.emptyCTA": {
+      "translation": "已是第一张",
+      "hash": "v605ns",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.deleteConfirm.title": {
+      "translation": "删除此收藏夹？",
+      "hash": "gcx2c6",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.deleteConfirm.body": {
+      "translation": "您可以稍后随时重新添加。",
+      "hash": "gq2evc",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.addTitle": {
+      "translation": "添加谚语",
+      "hash": "qx50ff",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.editTitle": {
+      "translation": "编辑说法",
+      "hash": "qivthv",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.addTile": {
+      "translation": "添加谚语",
+      "hash": "5klm5m",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.field.words": {
+      "translation": "他们说的话",
+      "hash": "pe1qor",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.field.saidOn": {
+      "translation": "更改日期",
+      "hash": "19hvy",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.field.place": {
+      "translation": "地 点",
+      "hash": "19ykfb",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.field.context": {
+      "translation": "上下文",
+      "hash": "rri5bl",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.placeholder.words": {
+      "translation": "例如： “我现在是队长了”",
+      "hash": "hwje6e",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.placeholder.place": {
+      "translation": "例如：厨房",
+      "hash": "wp7q98",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.placeholder.context": {
+      "translation": "导致这种情况的原因（选填）",
+      "hash": "o04cls",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.empty": {
+      "translation": "尚未为此Bean保存任何谚语",
+      "hash": "a0bc2h",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.emptyCTA": {
+      "translation": "已是第一张",
+      "hash": "v605ns",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.deleteConfirm.title": {
+      "translation": "要删除这句话吗？",
+      "hash": "37bhdn",
+      "lastUpdated": "2026-04-19"
+    },
+    "sayings.deleteConfirm.body": {
+      "translation": "此操作无法撤消，报价将被删除。",
+      "hash": "aqjnah",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.addTitle": {
+      "translation": "加入筆記",
+      "hash": "f3wro0",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.editTitle": {
+      "translation": "编辑信息",
+      "hash": "1atkqw",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.addTile": {
+      "translation": "订单备注",
+      "hash": "kc17f3",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.field.title": {
+      "translation": "<g id=\"Bold\">课程名称</g>",
+      "hash": "1c4854",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.field.body": {
+      "translation": "附註",
+      "hash": "1g64y",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.placeholder.title": {
+      "translation": "例如：就寝常规",
+      "hash": "4b2y2m",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.placeholder.body": {
+      "translation": "任何值得记住的事情",
+      "hash": "ctji5h",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.empty": {
+      "translation": "此Bean尚无备注",
+      "hash": "mc0ugr",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.emptyCTA": {
+      "translation": "已是第一张",
+      "hash": "v605ns",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.deleteConfirm.title": {
+      "translation": "删除此笔记？",
+      "hash": "li1hc0",
+      "lastUpdated": "2026-04-19"
+    },
+    "memberNotes.deleteConfirm.body": {
+      "translation": "该操作无法撤销。",
+      "hash": "nhacw5",
       "lastUpdated": "2026-04-19"
     }
   }

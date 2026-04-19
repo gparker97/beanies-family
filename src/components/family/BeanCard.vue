@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
@@ -23,6 +24,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const router = useRouter();
+
+function openDetail(): void {
+  router.push(`/pod/${props.member.id}`);
+}
 
 function avatarVariant() {
   return getMemberAvatarVariant({
@@ -39,7 +45,7 @@ const { url: avatarPhotoUrl, refresh: refreshAvatar } = useAvatarPhotoUrl(
 <template>
   <div
     class="cursor-pointer rounded-[var(--sq)] bg-white p-6 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-    @click="emit('edit')"
+    @click="openDetail"
   >
     <div class="flex items-center gap-4">
       <!-- Avatar (vertically centered) -->
@@ -74,7 +80,15 @@ const { url: avatarPhotoUrl, refresh: refreshAvatar } = useAvatarPhotoUrl(
           </div>
 
           <!-- Action buttons (always reserve space for uniform width) -->
-          <div class="flex w-16 flex-shrink-0 justify-end gap-1">
+          <div class="flex w-24 flex-shrink-0 justify-end gap-1">
+            <button
+              v-if="canManage"
+              class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
+              :title="t('action.edit')"
+              @click.stop="emit('edit')"
+            >
+              <BeanieIcon name="edit" size="md" />
+            </button>
             <button
               v-if="member.requiresPassword && canManage"
               class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-slate-700"
