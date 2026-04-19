@@ -115,7 +115,7 @@ async function handleDelete(): Promise<void> {
       />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('sayings.field.saidOn')" optional>
         <BaseInput v-model="saidOn" type="date" />
       </FormFieldGroup>

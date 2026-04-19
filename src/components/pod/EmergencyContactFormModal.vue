@@ -157,7 +157,7 @@ async function handleDelete(): Promise<void> {
       <BaseInput v-model="role" :placeholder="t('contacts.placeholder.role')" />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('contacts.field.phone')" optional>
         <BaseInput v-model="phone" type="tel" :placeholder="t('contacts.placeholder.phone')" />
       </FormFieldGroup>

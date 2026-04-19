@@ -12,7 +12,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
-- **Mobile responsiveness across The Pod.** Full pass over every new Pod surface at the 375px baseline:
+- **Mobile responsiveness — form modals + MedicationCard (round 2).**
+  - 7 form modals (Saying, Allergy, Medication ×2 grids, CookLog, Recipe, EmergencyContact) had side-by-side field pairs using `grid-cols-2` at all breakpoints. On a 375px phone these fields shrink to ~140px each — dates and emails no longer fit. Switched to `grid-cols-1 sm:grid-cols-2` so paired fields stack on mobile and sit side-by-side from `sm:` up.
+  - **Birthday picker** (FamilyMemberModal) was `grid-cols-3` with equal thirds — full month names ("September") clipped at mobile. Changed to `grid-cols-[2fr_1fr_1.2fr]` so month gets double width, day and year stay compact. Universal improvement — reads better at every viewport.
+  - **MedicationCard** photo anchor narrowed from `w-28` to `w-24 sm:w-28` so the info column gets breathing room at 375px.
+  - Verified: all 8 Pod form modals use `variant="drawer"` → BaseSidePanel → full-width on mobile already. FrequencyChips already uses `flex-wrap`. BeanOverview / Favorites / Sayings / Notes / Allergies / Medications tab grids all collapse to 1 column at mobile via `md:grid-cols-2` responsive modifier.
+- **Mobile responsiveness across The Pod (round 1).** Full pass over every new Pod surface at the 375px baseline:
   - **Sidebar mobile nav** — "The Pod" is now expandable/collapsible on mobile (previously its 5 sub-items — Meet the Beans / Scrapbook / Cookbook / Care & Safety / Emergency Contacts — were simply dropped by the hamburger menu's flat item mapper). The mobile menu now mirrors desktop: tapping the chevron toggles the nested sub-nav, and `useSidebarAccordion` (module-scoped + localStorage-backed) keeps the expand/collapse state in sync across mobile and desktop.
   - **Hero headers** (Meet the Beans, Bean Detail, Cookbook, Scrapbook, Care & Safety, Emergency Contacts, Recipe Detail) — all dropped from `px-8 py-7` / `px-9 py-8` to `px-4 py-5 sm:px-8 sm:py-7` so they breathe at mobile instead of eating the viewport. Page titles shrink from `text-3xl` to `text-2xl` on mobile with `leading-tight` + `break-words` so long family names don't overflow.
   - **Header action buttons** (Invite Bean / Add Bean / Edit / "I cooked this" / Add Recipe) — stack full-width below the title on mobile and return to an inline row from `sm:` up.

@@ -181,7 +181,7 @@ async function handleDelete(): Promise<void> {
       />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('allergies.field.diagnosedBy')" optional>
         <BaseInput v-model="diagnosedBy" :placeholder="t('allergies.placeholder.diagnosedBy')" />
       </FormFieldGroup>
