@@ -421,15 +421,19 @@ async function handleMemberSave(
     closeEditModal();
   } else {
     const memberName = data.name;
+    const isPet = data.isPet === true;
     await familyStore.createMember(data);
     showAddModal.value = false;
 
     // Wait for drawer close transition before opening invite modal
     await nextTick();
 
-    // Show success toast and auto-open invite modal
+    // Show success toast; skip the invite modal for pets (they can't
+    // receive invites, sign in, or have access levels).
     showToast('success', t('family.memberAdded'), memberName);
-    await openInviteModal();
+    if (!isPet) {
+      await openInviteModal();
+    }
   }
 }
 
