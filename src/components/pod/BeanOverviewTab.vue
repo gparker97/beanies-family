@@ -226,6 +226,7 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
         :header-chip="allergyChip"
         :view-all-label="allergies.length ? viewAllLabel : ''"
         @view-all="go('allergies')"
+        @activate="go('allergies')"
       >
         <div v-if="sortedAllergies.length" class="flex flex-col gap-2">
           <DashItem
@@ -248,6 +249,7 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
         :count="favorites.length"
         :view-all-label="favorites.length ? viewAllLabel : ''"
         @view-all="go('favorites')"
+        @activate="go('favorites')"
       >
         <div v-if="favorites.length" class="flex flex-col gap-2">
           <DashItem
@@ -270,6 +272,7 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
         :count="sayings.length"
         :view-all-label="sayings.length ? viewAllLabel : ''"
         @view-all="go('sayings')"
+        @activate="go('sayings')"
       >
         <div v-if="sayings.length" class="flex flex-col gap-2">
           <StickyNote
@@ -292,6 +295,7 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
         :header-chip="medicationChip"
         :view-all-label="medications.length ? viewAllLabel : ''"
         @view-all="go('medications')"
+        @activate="go('medications')"
       >
         <div v-if="medications.length" class="flex flex-col gap-2">
           <DashItem
@@ -314,6 +318,7 @@ const viewAllLabel = computed(() => t('bean.overview.viewAll'));
         :count="notes.length"
         :view-all-label="notes.length ? viewAllLabel : ''"
         @view-all="go('notes')"
+        @activate="go('notes')"
       >
         <div v-if="notes.length" class="flex flex-col gap-2">
           <DashItem
