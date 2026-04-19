@@ -119,7 +119,9 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/pod/scrapbook',
-    redirect: '/pod',
+    name: 'FamilyScrapbook',
+    component: () => import('@/pages/FamilyScrapbookPage.vue'),
+    meta: { titleKey: 'scrapbook.title', requiresAuth: true },
   },
   {
     path: '/pod/cookbook',
