@@ -311,6 +311,71 @@ export const usePhotoStore = defineStore('photos', () => {
     return `${url}${sep}sz=w${size}`;
   }
 
+  // --- Avatar photos ---------------------------------------------------
+
+  /**
+   * Upload a family-member avatar photo. Avatars use a tighter compression
+   * profile (1024px max, q=0.92) and are NOT attached to any entity's
+   * `photoIds` array — instead, the caller (e.g. familyStore) sets the
+   * returned photoId on `FamilyMember.avatarPhotoId`. The `familyMembers`
+   * collection is registered with the GC so orphan avatars get cleaned up.
+   */
+  async function addAvatarPhoto(file: File, createdBy?: UUID): Promise<UUID> {
+    if (!photosEnabled.value) {
+      throw new Error('photoStore: cloud sync is required to upload avatars.');
+    }
+
+    let compressed;
+    try {
+      compressed = await compress(file, { maxDimension: 1024, quality: 0.92 });
+    } catch (e) {
+      if (e instanceof CompressionError) throw e;
+      throw new CompressionError('Failed to compress avatar', e);
+    }
+
+    const photoId = crypto.randomUUID();
+    const filename = `beanies-avatar-${photoId}.jpg`;
+
+    const folderId = await resolveCanonicalFolderId();
+    const token = await requestAccessToken();
+    const { fileId } = await createFile(
+      token,
+      folderId,
+      filename,
+      compressed.blob,
+      compressed.mime
+    );
+
+    try {
+      const now = new Date().toISOString();
+      changeDoc((doc: FamilyDocument) => {
+        const record: PhotoAttachment = {
+          id: photoId,
+          driveFileId: fileId,
+          mime: compressed.mime,
+          width: compressed.width,
+          height: compressed.height,
+          sizeBytes: compressed.blob.size,
+          createdAt: now,
+          updatedAt: now,
+        };
+        if (createdBy) record.createdBy = createdBy;
+        doc.photos[photoId] = record;
+      }, `photos: add avatar ${photoId}`);
+    } catch (writeErr) {
+      try {
+        await deleteFile(token, fileId);
+      } catch (deleteErr) {
+        console.warn('[photoStore] Avatar rollback delete failed', deleteErr);
+      }
+      throw writeErr;
+    }
+
+    thumbUrlCache.delete(fileId);
+    unresolvedIds.value.delete(photoId);
+    return photoId;
+  }
+
   // --- Replace / delete ------------------------------------------------
 
   async function replacePhotoFile(photoId: UUID, newFile: File): Promise<void> {
@@ -418,12 +483,21 @@ export const usePhotoStore = defineStore('photos', () => {
   function collectReferencedPhotoIds(doc: FamilyDocument): Set<UUID> {
     const ids = new Set<UUID>();
     for (const collection of photoReferringCollections) {
-      const entities = (doc as unknown as Record<string, Record<string, { photoIds?: UUID[] }>>)[
-        collection
-      ];
+      // Scan both shapes in one pass:
+      //   - `photoIds?: UUID[]` (e.g. activities, recipes, medications)
+      //   - `avatarPhotoId?: UUID` scalar (family-member avatars)
+      // Entities that only have one field are fine — the missing field is
+      // undefined and contributes nothing.
+      const entities = (
+        doc as unknown as Record<
+          string,
+          Record<string, { photoIds?: UUID[]; avatarPhotoId?: UUID }>
+        >
+      )[collection];
       if (!entities) continue;
       for (const entity of Object.values(entities)) {
         for (const pid of entity?.photoIds ?? []) ids.add(pid);
+        if (entity?.avatarPhotoId) ids.add(entity.avatarPhotoId);
       }
     }
     return ids;
@@ -469,6 +543,7 @@ export const usePhotoStore = defineStore('photos', () => {
     deactivate,
     // actions
     addPhoto,
+    addAvatarPhoto,
     getImageUrl,
     isUnresolved,
     replacePhotoFile,
