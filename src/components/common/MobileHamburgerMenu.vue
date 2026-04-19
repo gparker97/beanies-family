@@ -49,7 +49,7 @@ const syncStore = useSyncStore();
 const translationStore = useTranslationStore();
 const { isUnlocked, toggle: togglePrivacy } = usePrivacyMode();
 const { playBlink } = useSounds();
-const { isOpen, toggle: toggleSection } = useSidebarAccordion();
+const { isOpen, toggle: toggleSection, isItemExpanded, toggleItem } = useSidebarAccordion();
 const { canViewFinances } = usePermissions();
 
 const ownerRef = computed(() => familyStore.owner ?? null);
@@ -59,15 +59,34 @@ const badges = computed<Record<string, number>>(() => ({
   activeGoals: goalsStore.activeGoals.length,
 }));
 
+function isParentActive(item: NavItemDef): boolean {
+  if (route.path === item.path) return true;
+  if (item.children && route.path.startsWith(`${item.path}/`)) return true;
+  return false;
+}
+
 function mapItems(items: NavItemDef[]) {
   return items.map((item) => ({
     label: t(item.labelKey),
     path: item.path,
     emoji: item.emoji,
-    active: route.path === item.path,
+    active: isParentActive(item),
     comingSoon: item.comingSoon ?? false,
     badge: item.badgeKey ? (badges.value[item.badgeKey] ?? 0) : 0,
+    children: item.children
+      ? item.children.map((child) => ({
+          label: t(child.labelKey),
+          path: child.path,
+          emoji: child.emoji,
+          active: route.path === child.path,
+        }))
+      : undefined,
   }));
+}
+
+function toggleItemExpanded(path: string, event: Event) {
+  event.stopPropagation();
+  toggleItem(path);
 }
 
 const SECTION_COLORS: Record<string, string> = {
@@ -397,38 +416,76 @@ const encryptionLabel = computed(() => {
 
                 <!-- Section Items -->
                 <div v-show="isOpen(section.id as 'treehouse' | 'piggyBank')" class="space-y-0.5">
-                  <button
-                    v-for="item in section.items"
-                    :key="item.path"
-                    type="button"
-                    class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-base font-medium transition-all duration-150"
-                    :class="[
-                      item.active
-                        ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
-                        : 'border-l-4 border-transparent hover:bg-white/[0.05]',
-                      item.comingSoon && !item.active
-                        ? 'text-white/25'
-                        : !item.active
-                          ? 'text-white/40 hover:text-white/70'
-                          : '',
-                    ]"
-                    @click="navigateTo(item.path)"
-                  >
-                    <span class="w-6 text-center text-base">{{ item.emoji }}</span>
-                    <span class="flex-1">{{ item.label }}</span>
-                    <span
-                      v-if="item.badge > 0"
-                      class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
+                  <template v-for="item in section.items" :key="item.path">
+                    <button
+                      type="button"
+                      class="font-outfit flex w-full cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-base font-medium transition-all duration-150"
+                      :class="[
+                        item.active
+                          ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
+                          : 'border-l-4 border-transparent hover:bg-white/[0.05]',
+                        item.comingSoon && !item.active
+                          ? 'text-white/25'
+                          : !item.active
+                            ? 'text-white/40 hover:text-white/70'
+                            : '',
+                      ]"
+                      @click="navigateTo(item.path)"
                     >
-                      {{ item.badge }}
-                    </span>
-                    <span
-                      v-if="item.comingSoon"
-                      class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
+                      <span class="w-6 text-center text-base">{{ item.emoji }}</span>
+                      <span class="flex-1">{{ item.label }}</span>
+                      <span
+                        v-if="item.badge > 0"
+                        class="bg-primary-500 min-w-[1.2rem] rounded-full px-1.5 text-center text-xs font-semibold text-white"
+                      >
+                        {{ item.badge }}
+                      </span>
+                      <span
+                        v-if="item.comingSoon"
+                        class="text-[0.5rem] font-normal tracking-wide text-white/20 uppercase"
+                      >
+                        {{ t('nav.comingSoon') }}
+                      </span>
+                      <!-- Expander for items with children (e.g. The Pod) -->
+                      <span
+                        v-if="item.children"
+                        class="-mr-1 flex h-10 w-10 items-center justify-center rounded-lg text-white/40 hover:text-white/80"
+                        role="button"
+                        :aria-label="
+                          isItemExpanded(item.path) ? t('action.close') : t('action.confirm')
+                        "
+                        @click="toggleItemExpanded(item.path, $event)"
+                      >
+                        <BeanieIcon
+                          name="chevron-down"
+                          size="xs"
+                          class="transition-transform duration-200"
+                          :class="{ 'rotate-180': !isItemExpanded(item.path) }"
+                        />
+                      </span>
+                    </button>
+                    <!-- Nested children (e.g. Pod sub-nav) -->
+                    <div
+                      v-if="item.children && isItemExpanded(item.path)"
+                      class="mt-0.5 ml-7 space-y-0.5 border-l border-white/10 pl-3"
                     >
-                      {{ t('nav.comingSoon') }}
-                    </span>
-                  </button>
+                      <button
+                        v-for="child in item.children"
+                        :key="child.path"
+                        type="button"
+                        class="font-outfit flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-medium transition-all duration-150"
+                        :class="
+                          child.active
+                            ? 'border-primary-500 border-l-2 bg-gradient-to-r from-[rgba(241,93,34,0.18)] to-[rgba(230,126,34,0.08)] pl-2 font-semibold text-white'
+                            : 'border-l-2 border-transparent text-white/40 hover:bg-white/[0.05] hover:text-white/70'
+                        "
+                        @click="navigateTo(child.path)"
+                      >
+                        <span class="w-5 text-center text-sm">{{ child.emoji }}</span>
+                        <span class="flex-1 truncate">{{ child.label }}</span>
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </div>
 

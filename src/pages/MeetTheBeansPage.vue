@@ -484,14 +484,16 @@ function cancelEditFamilyName() {
           {{ t('family.hub.kicker') }}
         </div>
         <div class="mt-1 flex flex-wrap items-center gap-2">
-          <h1 class="font-outfit text-secondary-500 text-3xl font-extrabold dark:text-gray-100">
+          <h1
+            class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl dark:text-gray-100"
+          >
             {{ familyContextStore.activeFamilyName || t('family.title') }}
           </h1>
-          <div v-if="isEditingFamilyName" class="flex items-center gap-2">
+          <div v-if="isEditingFamilyName" class="flex w-full items-center gap-2 sm:w-auto">
             <input
               v-model="editFamilyName"
               type="text"
-              class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 w-48 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none dark:border-slate-600 dark:bg-slate-800"
+              class="font-outfit text-primary-500 focus:border-primary-500 focus:ring-primary-500 w-full min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1 text-lg font-bold focus:ring-1 focus:outline-none sm:w-48 sm:flex-initial dark:border-slate-600 dark:bg-slate-800"
               @keyup.enter="saveFamilyName"
               @keyup.escape="cancelEditFamilyName"
             />
@@ -521,11 +523,14 @@ function cancelEditFamilyName() {
           {{ headerStats }}
         </p>
       </div>
-      <div v-if="canManagePod" class="flex flex-shrink-0 flex-wrap items-center gap-2">
+      <div
+        v-if="canManagePod"
+        class="flex w-full flex-shrink-0 flex-wrap items-center gap-2 sm:w-auto"
+      >
         <button
           v-if="familyContextStore.activeFamilyId && hasInvitableMembers"
           type="button"
-          class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+          class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
           @click="openInviteModal"
         >
           <span aria-hidden="true">💌</span>
@@ -533,7 +538,7 @@ function cancelEditFamilyName() {
         </button>
         <button
           type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:flex-initial"
           @click="openAddModal"
         >
           <span aria-hidden="true">＋</span>
@@ -583,7 +588,7 @@ function cancelEditFamilyName() {
               v-for="(saying, i) in recentSayings"
               :key="saying.id"
               type="button"
-              class="group font-caveat flex w-56 flex-shrink-0 snap-start flex-col justify-between rounded-[18px] px-4 py-4 text-left shadow-[var(--card-shadow)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)]"
+              class="group font-caveat flex w-48 flex-shrink-0 snap-start flex-col justify-between rounded-[18px] px-4 py-4 text-left shadow-[var(--card-shadow)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] sm:w-56"
               :style="{
                 backgroundColor: stickyColorFor(i),
                 transform: `rotate(${i % 2 === 0 ? '-1.5deg' : '1.2deg'})`,

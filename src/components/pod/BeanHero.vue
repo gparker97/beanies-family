@@ -130,7 +130,7 @@ function onAddButtonClick(): void {
 
 <template>
   <header
-    class="mb-6 flex items-center gap-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-8 py-7"
+    class="mb-6 flex flex-wrap items-center gap-4 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-4 py-5 sm:gap-6 sm:px-8 sm:py-7"
   >
     <BeanieAvatar
       :variant="variant"
@@ -150,7 +150,9 @@ function onAddButtonClick(): void {
         <BeanieIcon name="chevron-left" size="xs" />
         <span>{{ t('bean.backToPod') }}</span>
       </button>
-      <h1 class="font-outfit text-secondary-500 text-3xl font-bold dark:text-gray-100">
+      <h1
+        class="font-outfit text-secondary-500 text-2xl leading-tight font-bold break-words sm:text-3xl dark:text-gray-100"
+      >
         {{ member.name }}
       </h1>
       <div class="text-secondary-500/70 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
@@ -163,20 +165,20 @@ function onAddButtonClick(): void {
       </div>
     </div>
 
-    <div v-if="canManage" class="flex flex-shrink-0 items-center gap-2">
+    <div v-if="canManage" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
       <button
         type="button"
-        class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+        class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
         @click="emit('edit')"
       >
         <BeanieIcon name="edit" size="xs" />
         <span>{{ t('bean.hero.edit') }}</span>
       </button>
 
-      <div class="relative" data-add-menu-root>
+      <div class="relative flex-1 sm:flex-initial" data-add-menu-root>
         <button
           type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
           :aria-expanded="addMenuOpen"
           aria-haspopup="menu"
           @click="onAddButtonClick"

@@ -180,7 +180,7 @@ function asNote(entry: ScrapbookEntry): MemberNote {
     <!-- Hero — multi-color pastel gradient that echoes the sticky
          notes in the feed, with a faded 📖 watermark on the right. -->
     <header
-      class="relative mb-5 overflow-hidden rounded-[var(--sq)] px-8 py-7"
+      class="relative mb-5 overflow-hidden rounded-[var(--sq)] px-5 py-5 sm:px-8 sm:py-7"
       style="
         background: linear-gradient(135deg, #fff7c8 0%, #ffe4d6 40%, #d4f1f4 80%, #e8f5e8 100%);
       "
@@ -201,7 +201,7 @@ function asNote(entry: ScrapbookEntry): MemberNote {
         <span>{{ t('bean.backToPod') }}</span>
       </button>
       <h1
-        class="font-outfit text-secondary-500 text-3xl leading-none font-extrabold dark:text-gray-100"
+        class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
       >
         {{ t('scrapbook.title') }}
       </h1>

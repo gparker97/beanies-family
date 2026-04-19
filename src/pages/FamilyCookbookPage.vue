@@ -85,7 +85,7 @@ function closeModal(): void {
 <template>
   <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
     <header
-      class="relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-9 py-8"
+      class="relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-5 py-6 sm:px-9 sm:py-8"
     >
       <span
         class="pointer-events-none absolute top-2.5 right-8 text-[150px] opacity-[0.09]"
@@ -103,13 +103,13 @@ function closeModal(): void {
         <span>{{ t('bean.backToPod') }}</span>
       </button>
       <h1
-        class="font-outfit text-secondary-500 text-3xl leading-none font-extrabold dark:text-gray-100"
+        class="font-outfit text-secondary-500 text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none dark:text-gray-100"
       >
         {{ t('cookbook.title') }}
       </h1>
       <p class="font-caveat mt-1 text-xl text-[#E67E22]">{{ t('cookbook.subtitle') }}</p>
 
-      <div class="relative mt-4 flex flex-wrap items-end gap-6">
+      <div class="relative mt-4 flex flex-wrap items-end gap-4 sm:gap-6">
         <div class="flex flex-col">
           <span class="text-primary-500 font-outfit text-2xl leading-none font-extrabold">
             {{ recipes.length }}
@@ -144,7 +144,7 @@ function closeModal(): void {
         <button
           v-if="canManagePod"
           type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 ml-auto inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+          class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:ml-auto sm:w-auto"
           @click="openAdd"
         >
           <span aria-hidden="true">＋</span>
