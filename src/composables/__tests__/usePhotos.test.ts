@@ -150,14 +150,16 @@ describe('usePhotos', () => {
     const ids = await add([makeFile('a.jpg'), makeFile('b.jpg')]);
 
     expect(ids).toHaveLength(2);
-    // photoStore.attachPhotoToEntity mutates Automerge directly, which
-    // updates the entity — the photoIds ref tracked by the caller doesn't
-    // observe that mutation unless it re-reads the doc. For this test
-    // (which reads photoIds from the caller's ref), simulate by reading
-    // the activity back out:
+    // Both the Automerge doc AND the caller's photoIds ref should now
+    // contain the new ids. Previously the composable only mutated
+    // Automerge on add and left callers to re-read from the doc, but
+    // form modals hold a local photoIds ref (so Save knows what to
+    // persist) and that ref needs to sync — otherwise a just-uploaded
+    // photo doesn't render until the drawer is closed + reopened.
     const actual = usePhotoStore().photos;
     expect(Object.keys(actual)).toHaveLength(2);
-    expect(photos.value).toHaveLength(0); // caller ref hasn't been updated
+    expect(photoIds.value).toEqual(ids);
+    expect(photos.value).toHaveLength(2);
   });
 
   it('enforces the 4-photo cap', async () => {
