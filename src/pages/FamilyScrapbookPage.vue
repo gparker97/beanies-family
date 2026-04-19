@@ -13,7 +13,6 @@
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import StickyNote from '@/components/pod/shared/StickyNote.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -151,10 +150,15 @@ function openEntry(entry: ScrapbookEntry): void {
   router.push(`/pod/${entry.memberId}/${tab}`);
 }
 
-// Deterministic sticky-note tint by index within the current visible
-// window — keeps scatter consistent on re-render.
-function stickyIndex(entry: ScrapbookEntry): number {
-  return visibleEntries.value.findIndex((e) => e.id === entry.id);
+// Pastel paper palette for saying entries — whole card gets the tint
+// so the feed reads as a scatter of sticky notes (matches the mockup's
+// `.scrap-saying.paper-*` classes). Cycled deterministically by index
+// in the visible window so re-renders don't re-shuffle.
+const PAPER_COLORS = ['#fff7c8', '#d4f1f4', '#ffe4d6', '#e8f5e8'] as const;
+
+function sayingPaperColor(entry: ScrapbookEntry): string {
+  const idx = visibleEntries.value.findIndex((e) => e.id === entry.id);
+  return PAPER_COLORS[idx % PAPER_COLORS.length] ?? PAPER_COLORS[0]!;
 }
 
 // Typed accessors for the template (v-if narrowing across our union
@@ -279,13 +283,19 @@ function asNote(entry: ScrapbookEntry): MemberNote {
       <article
         v-for="entry in visibleEntries"
         :key="`${entry.type}-${entry.id}`"
-        class="mb-4 cursor-pointer overflow-hidden rounded-2xl bg-white shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-        style="break-inside: avoid"
+        class="mb-4 cursor-pointer overflow-hidden rounded-2xl shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)]"
+        :class="entry.type === 'saying' ? '' : 'bg-white dark:bg-slate-800'"
+        :style="
+          entry.type === 'saying'
+            ? { background: sayingPaperColor(entry), breakInside: 'avoid' }
+            : { breakInside: 'avoid' }
+        "
         @click="openEntry(entry)"
       >
         <!-- Header: bean color dot + name + type label -->
         <header
-          class="font-outfit text-secondary-500/70 flex items-center gap-2 px-4 pt-3 text-[11px] font-semibold dark:text-gray-400"
+          class="font-outfit text-secondary-500/70 flex items-center gap-2 px-4 pt-3 text-[11px] font-semibold"
+          :class="entry.type === 'saying' ? '' : 'dark:text-gray-400'"
         >
           <span
             class="inline-block h-4 w-4 flex-shrink-0 rounded-md"
@@ -299,14 +309,11 @@ function asNote(entry: ScrapbookEntry): MemberNote {
         </header>
 
         <!-- Body — type-specific -->
-        <!-- Saying → sticky note inside the card -->
-        <div v-if="entry.type === 'saying'" class="px-3 pt-3 pb-3">
-          <StickyNote
-            :text="asSaying(entry).words"
-            :index="stickyIndex(entry)"
-            :footer-text="asSaying(entry).saidOn ?? ''"
-            size="md"
-          />
+        <!-- Saying → Caveat quote on the colored card (no nested note) -->
+        <div v-if="entry.type === 'saying'" class="px-4 pt-2 pb-3">
+          <p class="font-caveat text-secondary-500 text-2xl leading-snug font-medium">
+            {{ asSaying(entry).words }}
+          </p>
         </div>
 
         <!-- Favorite → big category emoji + name + optional description -->
