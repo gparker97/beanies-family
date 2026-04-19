@@ -11,7 +11,7 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm, alert as showAlert } from '@/composables/useConfirm';
-import { isValidEmail } from '@/utils/email';
+import { isValidEmail, isTemporaryEmail } from '@/utils/email';
 import { toDateInputValue } from '@/utils/date';
 import { normalizeAssignees } from '@/utils/assignees';
 import { generateInviteQR } from '@/utils/qrCode';
@@ -280,16 +280,48 @@ async function resolveCanonicalFolderId(token: string): Promise<string | null> {
 }
 
 /**
+ * Skip share attempts for emails that can never succeed:
+ *   - Temporary placeholders (`@setup.local`, `@temp.beanies.family`)
+ *     that the app itself generates for members without real emails.
+ *   - Non-routable TLDs (`.local`, `.test`, `.invalid`, `.example`)
+ *     reserved by RFC 2606 for internal/dev use.
+ * Drive responds 403 "not a Google account" for all of these — each
+ * attempt is a pointless round-trip and a noisy console error. The
+ * migration still runs the share call for real-looking emails; Drive
+ * remains the source of truth for whether the target account exists.
+ */
+function isUnshareableEmail(email: string): boolean {
+  if (isTemporaryEmail(email)) return true;
+  const domain = email.split('@')[1]?.toLowerCase() ?? '';
+  return (
+    domain.endsWith('.local') ||
+    domain.endsWith('.test') ||
+    domain.endsWith('.invalid') ||
+    domain.endsWith('.example') ||
+    domain === 'example.com' ||
+    domain === 'example.org'
+  );
+}
+
+/**
  * One-time migration for existing families: ensure the app folder is
  * shared with every existing family-member email. Idempotent — we call
  * listFilePermissions first and only share with emails that aren't
- * already writers. Runs once per session after sync settles.
+ * already writers.
+ *
+ * Session-scoped guard lives in `sessionStorage` (not a script-setup
+ * variable) so repeat page mounts during the same browser session
+ * don't re-run the migration. The key includes the driveFileId so a
+ * different family loaded in the same session still gets its turn.
  */
-let folderShareMigrationRan = false;
+const MIGRATION_STORAGE_PREFIX = 'beanies:folderShareMigration:';
 async function runFolderShareMigration(): Promise<void> {
-  if (folderShareMigrationRan) return;
-  if (!syncStore.driveFileId) return;
-  folderShareMigrationRan = true;
+  const driveFileId = syncStore.driveFileId;
+  if (!driveFileId) return;
+  const storageKey = `${MIGRATION_STORAGE_PREFIX}${driveFileId}`;
+  if (sessionStorage.getItem(storageKey)) return;
+  sessionStorage.setItem(storageKey, '1');
+
   try {
     const token = await getValidToken();
     const folderId = await resolveCanonicalFolderId(token);
@@ -300,7 +332,8 @@ async function runFolderShareMigration(): Promise<void> {
     );
     const memberEmails = familyStore.members
       .map((m) => m.email?.trim().toLowerCase())
-      .filter((e): e is string => !!e);
+      .filter((e): e is string => !!e)
+      .filter((e) => !isUnshareableEmail(e));
     for (const email of memberEmails) {
       if (!alreadyShared.has(email)) {
         await shareFileWithEmail(token, folderId, email, 'writer').catch((e) => {
