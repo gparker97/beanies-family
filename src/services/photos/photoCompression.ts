@@ -10,8 +10,8 @@
  * should catch CompressionError and surface a friendly message.
  */
 
-const MAX_DIMENSION = 2048;
-const JPEG_QUALITY = 0.85;
+const DEFAULT_MAX_DIMENSION = 2048;
+const DEFAULT_JPEG_QUALITY = 0.85;
 /** Below this size AND already a small JPEG, skip recompression. */
 const SMALL_BYTES_THRESHOLD = 256 * 1024;
 
@@ -20,6 +20,13 @@ export interface CompressedImage {
   width: number;
   height: number;
   mime: string;
+}
+
+export interface CompressOptions {
+  /** Long-edge pixel cap. Defaults to 2048. Avatars typically pass 1024. */
+  maxDimension?: number;
+  /** JPEG quality, 0–1. Defaults to 0.85. Avatars typically pass 0.92 (faces). */
+  quality?: number;
 }
 
 export class CompressionError extends Error {
@@ -34,8 +41,18 @@ export class CompressionError extends Error {
 /**
  * Compress a user-selected image File.
  * Returns a JPEG Blob with dimensions and mime.
+ *
+ * Options let callers tune the long-edge cap and JPEG quality — e.g. avatar
+ * uploads pass `{ maxDimension: 1024, quality: 0.92 }` because faces benefit
+ * from a tighter resolution + higher quality than general photos.
  */
-export async function compress(file: File): Promise<CompressedImage> {
+export async function compress(
+  file: File,
+  options: CompressOptions = {}
+): Promise<CompressedImage> {
+  const maxDimension = options.maxDimension ?? DEFAULT_MAX_DIMENSION;
+  const quality = options.quality ?? DEFAULT_JPEG_QUALITY;
+
   const bitmap = await loadBitmap(file);
   try {
     const { width, height } = bitmap;
@@ -44,11 +61,11 @@ export async function compress(file: File): Promise<CompressedImage> {
 
     // Early return: small JPEGs that are already within the dimension cap
     // don't need recompression — we'd just re-encode for no benefit.
-    if (isJpeg && file.size <= SMALL_BYTES_THRESHOLD && longEdge <= MAX_DIMENSION) {
+    if (isJpeg && file.size <= SMALL_BYTES_THRESHOLD && longEdge <= maxDimension) {
       return { blob: file, width, height, mime: 'image/jpeg' };
     }
 
-    const scale = longEdge > MAX_DIMENSION ? MAX_DIMENSION / longEdge : 1;
+    const scale = longEdge > maxDimension ? maxDimension / longEdge : 1;
     const targetWidth = Math.round(width * scale);
     const targetHeight = Math.round(height * scale);
 
@@ -59,7 +76,7 @@ export async function compress(file: File): Promise<CompressedImage> {
     if (!ctx) throw new CompressionError('Canvas 2D context unavailable');
 
     ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
-    const blob = await canvasToBlob(canvas, 'image/jpeg', JPEG_QUALITY);
+    const blob = await canvasToBlob(canvas, 'image/jpeg', quality);
 
     return { blob, width: targetWidth, height: targetHeight, mime: 'image/jpeg' };
   } finally {

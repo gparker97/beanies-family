@@ -39,6 +39,13 @@ export interface UsePhotosOptions {
    * update function here, e.g. `(ids) => activityStore.update(entity.id, { photoIds: ids })`.
    */
   updatePhotoIds: (ids: UUID[]) => void;
+  /**
+   * Per-entity cap override. Defaults to MAX_PHOTOS_PER_SET (4).
+   * Medication bottles and cook-log dish snaps pass `max: 1`.
+   * Avatar uploads bypass this composable entirely via a dedicated
+   * `photoStore.addAvatarPhoto` path (different compression profile).
+   */
+  max?: number;
 }
 
 export interface UsePhotosReturn {
@@ -71,11 +78,13 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     return store.pendingUploadsFor(options.collection, unref(options.entityId));
   });
 
+  const max = computed(() => options.max ?? MAX_PHOTOS_PER_SET);
+
   // Use the raw photoIds length (not resolved photo count) so the cap
   // logic counts "slots the user has filled" consistently — even for IDs
   // whose Automerge record hasn't synced yet.
   const totalCount = computed(() => (unref(options.photoIds) ?? []).length + pending.value.length);
-  const atCap = computed(() => totalCount.value >= MAX_PHOTOS_PER_SET);
+  const atCap = computed(() => totalCount.value >= max.value);
   const canAdd = computed(() => store.photosEnabled && !atCap.value);
 
   async function add(files: File[]): Promise<UUID[]> {
@@ -83,7 +92,7 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
       showToast('warning', t('photos.cloudRequired'));
       return [];
     }
-    const remainingSlots = MAX_PHOTOS_PER_SET - totalCount.value;
+    const remainingSlots = max.value - totalCount.value;
     if (remainingSlots <= 0) {
       showToast('info', t('photos.maxReached'));
       return [];

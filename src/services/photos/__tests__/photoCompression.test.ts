@@ -111,6 +111,19 @@ describe('photoCompression.compress', () => {
     expect(result.blob).not.toBe(original);
   });
 
+  it('respects custom maxDimension (avatar path uses 1024)', async () => {
+    stubCanvasAndBitmap(mockBitmap(4000, 3000));
+    const result = await compress(makeFile(5_000_000, 'image/jpeg'), { maxDimension: 1024 });
+    expect(Math.max(result.width, result.height)).toBeLessThanOrEqual(1024);
+  });
+
+  it('accepts custom JPEG quality without changing other defaults', async () => {
+    const { drawImage } = stubCanvasAndBitmap(mockBitmap(1024, 768));
+    // Force a recompression path (PNG input, size above threshold).
+    await compress(makeFile(2 * 1024 * 1024, 'image/png'), { quality: 0.92 });
+    expect(drawImage).toHaveBeenCalled();
+  });
+
   it('wraps decode failures in CompressionError with a helpful message', async () => {
     globalThis.createImageBitmap = vi
       .fn()

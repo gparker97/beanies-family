@@ -95,8 +95,34 @@ These specific elements may use custom sizes for decorative purposes:
 ### Font Loading
 
 ```html
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 ```
+
+### Caveat — third, accent-only font
+
+**Caveat** is a handwritten cursive used sparingly for specific content types. Added to the CIG as of 2026-04 with The Pod feature (family scrapbook, cookbook).
+
+**Allowed uses** (handwritten accents only):
+- Saying quotes on sticky-note cards
+- Polaroid photo captions
+- Recipe "grandma's notes" callouts
+- Informal taglines like the "shhh…" on the Family Cookbook page
+- Hand-written hint text inside form modals (e.g. "pick a family recipe or type one in 🍝")
+
+**Forbidden uses** (never):
+- UI labels, form field labels, navigation, section headers
+- Body text, descriptions, help text
+- Financial amounts, data values, any figure
+- Button text, link text, any interactive affordance
+- Any page chrome (header, sidebar, toast text)
+
+**Sizes:** 14–24px range. Weight 500 or 700.
+
+**Usage discipline:** Caveat loses its personality if overexposed. If you're reaching for it more than once per screen (excluding repeating card patterns like a saying feed), you're probably using it wrong.
+
+**Fallback:** `font-family: 'Caveat', 'Outfit', cursive` — FOUT acceptable, no JS handling needed. Latin-only subset; Chinese text falls back to Outfit.
+
+**Bundle cost:** ~14kB gzipped for latin subset — cacheable.
 
 ### Financial Value Styling
 
