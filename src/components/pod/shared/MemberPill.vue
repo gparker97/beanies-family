@@ -30,6 +30,7 @@ const VARIANT_EMOJI: Record<AvatarVariant, string> = {
   'child-male': '\u{1F9D2}',
   'child-female': '\u{1F467}',
   'child-other': '\u{1F9D2}',
+  'pet-dog': '\u{1F436}',
   'family-group': '\u{1F46A}',
   'family-filtered': '\u{1F46A}',
 };
