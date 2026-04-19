@@ -600,8 +600,31 @@ const STRING_DEFS = {
     en: '🥘 From the Family Cookbook →',
     beanie: '🥘 from the family cookbook →',
   },
-  'favorites.field.recipe': { en: 'Family recipe (optional)', beanie: 'family recipe (optional)' },
-  'favorites.recipe.none': { en: '— Not linked to a recipe —', beanie: 'not linked to a recipe' },
+  'favorites.field.recipe': { en: 'Family recipe', beanie: 'family recipe' },
+  'favorites.recipe.none': {
+    en: '— Not from our cookbook —',
+    beanie: 'not from our cookbook',
+  },
+  'favorites.recipe.addNew': {
+    en: '＋ Add a new recipe…',
+    beanie: '＋ add a new recipe…',
+  },
+  'favorites.food.detailsLabel': { en: 'Food details', beanie: 'food details' },
+  'favorites.food.hint': {
+    en: 'pick a family recipe, or just type one in 🍝',
+    beanie: 'pick a family recipe, or just type one in 🍝',
+  },
+  'favorites.food.or': { en: 'or', beanie: 'or' },
+  'favorites.field.typeItIn': { en: 'Type it in', beanie: 'type it in' },
+  'favorites.placeholder.typeItIn': {
+    en: "e.g. McDonald's Happy Meal, gelato di Rome…",
+    beanie: "e.g. mcdonald's happy meal, gelato di rome…",
+  },
+  'favorites.field.why': { en: "Why it's a favorite", beanie: "why it's a favorite" },
+  'favorites.placeholder.why': {
+    en: 'e.g. asks for it every Sunday. eats it with a big spoon.',
+    beanie: 'e.g. asks for it every sunday. eats it with a big spoon.',
+  },
   // Emergency contacts
   'contacts.title': { en: 'Emergency Contacts', beanie: 'emergency contacts' },
   'contacts.subtitleLead': {

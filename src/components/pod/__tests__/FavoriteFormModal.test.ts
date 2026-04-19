@@ -80,8 +80,12 @@ describe('FavoriteFormModal', () => {
       updatedAt: '2026-03-01T00:00:00Z',
     };
     const { wrapper } = await mountModal(fav);
-    const inputs = wrapper.findAll('input[type="text"]');
-    expect((inputs[0]!.element as HTMLInputElement).value).toBe('Pizza');
-    expect((inputs[1]!.element as HTMLInputElement).value).toBe('Friday tradition');
+    // Name lives in the food details block as a text input; description
+    // is a textarea (Caveat-styled, matches the mockup's "why it's a
+    // favorite" prose field).
+    const nameInput = wrapper.find('input[type="text"]').element as HTMLInputElement;
+    const whyTextarea = wrapper.find('textarea').element as HTMLTextAreaElement;
+    expect(nameInput.value).toBe('Pizza');
+    expect(whyTextarea.value).toBe('Friday tradition');
   });
 });
