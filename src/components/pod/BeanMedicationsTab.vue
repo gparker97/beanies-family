@@ -7,6 +7,7 @@
 import { computed, ref } from 'vue';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
+import MedicationCard from '@/components/pod/MedicationCard.vue';
 import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
 import { useTranslation } from '@/composables/useTranslation';
@@ -57,61 +58,12 @@ function closeModal(): void {
   modalOpen.value = false;
   editing.value = null;
 }
-
-function scheduleLabel(m: Medication): string {
-  if (m.ongoing) return t('medications.active');
-  const parts: string[] = [];
-  if (m.startDate) parts.push(m.startDate);
-  if (m.endDate) parts.push(`→ ${m.endDate}`);
-  return parts.join(' ');
-}
 </script>
 
 <template>
   <div>
     <div v-if="medications.length" class="grid gap-3 md:grid-cols-2">
-      <button
-        v-for="m in medications"
-        :key="m.id"
-        type="button"
-        class="flex flex-col items-start gap-2 rounded-[var(--sq)] bg-white p-4 text-left shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
-        :class="{ 'opacity-60': !isActive(m) }"
-        @click="openEdit(m)"
-      >
-        <div class="flex w-full items-start justify-between gap-3">
-          <div class="flex min-w-0 items-center gap-2">
-            <span class="text-xl" aria-hidden="true">💊</span>
-            <h4 class="font-outfit text-secondary-500 text-base font-bold dark:text-gray-100">
-              {{ m.name }}
-            </h4>
-          </div>
-          <span
-            class="font-outfit inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase"
-            :class="
-              isActive(m)
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400'
-            "
-          >
-            {{ isActive(m) ? t('medications.active') : t('medications.ended') }}
-          </span>
-        </div>
-        <p class="font-outfit text-secondary-500/70 text-sm dark:text-gray-400">
-          {{ m.dose }} · {{ m.frequency }}
-        </p>
-        <p
-          v-if="!m.ongoing && (m.startDate || m.endDate)"
-          class="font-outfit text-secondary-500/50 text-[11px] tracking-wide uppercase"
-        >
-          {{ scheduleLabel(m) }}
-        </p>
-        <p
-          v-if="m.notes"
-          class="font-outfit text-secondary-500/70 line-clamp-2 text-xs dark:text-gray-400"
-        >
-          {{ m.notes }}
-        </p>
-      </button>
+      <MedicationCard v-for="m in medications" :key="m.id" :medication="m" @click="openEdit(m)" />
       <AddTile :label="t('medications.addTile')" @click="openAdd" />
     </div>
     <div
