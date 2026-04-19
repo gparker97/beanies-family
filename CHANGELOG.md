@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **The Pod — family scrapbook plan + mockup.** Approved implementation plan for turning the Family area into a six-capability hub (Meet the Beans, Family Scrapbook, Family Cookbook, Care & Safety, Emergency Contacts, Family Scrapbook feed). Six-phase rollout, 8 new Automerge collections, photo integrations, Caveat accent font, first integration of the photos foundation. Full plan: `docs/plans/2026-04-19-the-pod-scrapbook-cookbook.md`; mockup: `docs/mockups/family-pod-scrapbook.html`
 - **Photo attachments (foundation)** — reusable capability for attaching photos to entities. Ships the plumbing (photoStore, usePhotos composable, PhotoThumbnail / PhotoViewer / PhotoAttachments components, client-side JPEG compression, offline upload queue, Drive-folder sharing on invite, one-time folder-share migration for existing families) without wiring it into any specific entity yet. Integration for activities, family avatars, etc. ships in follow-up plans. See [ADR-021](docs/adr/021-photo-storage.md).
 - **`useFileDrop` composable** — drag-drop handler extracted from `JoinPodView.vue`; reusable by the new photo UI and any future drop-zone.
 - **`useFilePicker` composable** — programmatic `<input type="file">` wrapper with accept filter, multi-file support, cancel handling, and `value` reset so re-picking the same file still fires `change`.
