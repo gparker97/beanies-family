@@ -14,6 +14,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
+import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
+import { CATEGORY_EMOJI } from '@/constants/emergencyContacts';
 import type { Allergy, AllergySeverity, FamilyMember, Medication } from '@/types/models';
 
 const router = useRouter();
@@ -21,6 +23,18 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
+const contactsStore = useEmergencyContactsStore();
+
+// "Key contacts" preview on the Care & Safety surface — the first
+// three contacts, sorted to lead with Other/custom entries (poison
+// control, emergency pickup) since those are the most safety-critical.
+// Full list lives at /pod/contacts.
+const previewContacts = computed(() => {
+  const list = [...contactsStore.contacts];
+  const OTHER_FIRST = { other: 0, doctor: 1, dentist: 2, nurse: 3, teacher: 4, school: 5 } as const;
+  list.sort((a, b) => OTHER_FIRST[a.category] - OTHER_FIRST[b.category]);
+  return list.slice(0, 3);
+});
 
 const SEVERITY_ORDER: Record<AllergySeverity, number> = { severe: 0, moderate: 1, mild: 2 };
 
@@ -179,7 +193,32 @@ function openMedication(m: Medication): void {
           {{ t('careSafety.keyContacts.cta') }}
         </button>
       </div>
-      <EmptyState emoji="🆘" :message="t('careSafety.empty.keyContacts')" />
+      <ul v-if="previewContacts.length" class="grid gap-2 md:grid-cols-3">
+        <li
+          v-for="c in previewContacts"
+          :key="c.id"
+          class="flex cursor-pointer items-start gap-3 rounded-xl bg-[var(--tint-slate-5)] px-3 py-2.5 transition-colors hover:bg-[var(--tint-orange-4)] dark:bg-slate-700/40"
+          @click="router.push('/pod/contacts')"
+        >
+          <div
+            class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-white text-base dark:bg-slate-800"
+            aria-hidden="true"
+          >
+            {{ CATEGORY_EMOJI[c.category] }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <h3
+              class="font-outfit text-secondary-500 truncate text-sm font-bold dark:text-gray-100"
+            >
+              {{ c.name }}
+            </h3>
+            <p v-if="c.phone" class="font-inter text-secondary-500/70 text-xs dark:text-gray-400">
+              📞 {{ c.phone }}
+            </p>
+          </div>
+        </li>
+      </ul>
+      <EmptyState v-else emoji="🆘" :message="t('careSafety.empty.keyContacts')" />
     </section>
   </main>
 </template>

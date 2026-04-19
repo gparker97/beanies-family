@@ -43,6 +43,7 @@ import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useRecipesStore } from '@/stores/recipesStore';
+import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useTranslationStore } from '@/stores/translationStore';
@@ -84,6 +85,7 @@ const memberNotesStore = useMemberNotesStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
 const recipesStore = useRecipesStore();
+const emergencyContactsStore = useEmergencyContactsStore();
 const settingsStore = useSettingsStore();
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
@@ -376,6 +378,7 @@ async function loadFamilyData() {
         allergiesStore.loadAllergies(),
         medicationsStore.loadMedications(),
         recipesStore.loadRecipes(),
+        emergencyContactsStore.loadEmergencyContacts(),
       ]);
 
       const result = await processRecurringItems();
