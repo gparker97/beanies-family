@@ -1,6 +1,15 @@
 @import url('tailwindcss');
 @import url('@beanies/brand/theme.css');
 
+/* Caveat accent font — handwritten content only (sticky-note quotes,
+ * polaroid captions, recipe notes). Registered as a Tailwind 4 theme
+ * variable so `font-caveat` utility is available. Falls back through
+ * Outfit → cursive so the FOUT doesn't jar. See
+ * `.claude/skills/beanies-theme/SKILL.md` for usage rules. */
+@theme {
+  --font-caveat: 'Caveat', 'Outfit', cursive;
+}
+
 /* Use class-based dark mode (.dark on <html>) instead of prefers-color-scheme */
 @custom-variant dark (&:where(.dark, .dark *));
 
