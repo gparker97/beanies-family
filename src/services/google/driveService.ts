@@ -149,6 +149,19 @@ export async function readFile(token: string, fileId: string): Promise<string | 
 }
 
 /**
+ * Download a file's binary content as a Blob. Used by the photo layer
+ * when we need a reliable local URL for `<img>` — Drive's public
+ * `thumbnailLink` URLs carry short-lived tokens that rotate within
+ * minutes, so a bearer-authorized GET + `URL.createObjectURL` avoids
+ * that whole class of "photo vanishes on reload" bugs. Throws
+ * `DriveFileNotFoundError` on 404/403 via the shared `driveRequest` path.
+ */
+export async function downloadFileBlob(token: string, fileId: string): Promise<Blob> {
+  const res = await driveRequest(token, `${DRIVE_API}/files/${fileId}?alt=media`);
+  return await res.blob();
+}
+
+/**
  * Get a file's modified time (lightweight metadata-only call for polling).
  */
 export async function getFileModifiedTime(token: string, fileId: string): Promise<string | null> {
