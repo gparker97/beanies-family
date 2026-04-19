@@ -37,33 +37,40 @@ vi.mock('@/stores/accountsStore', () => ({
   }),
 }));
 
-vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: vi.fn(() => ({
-    currentMemberId: 'member-1',
-    members: [
-      {
-        id: 'member-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        gender: 'other',
-        ageGroup: 'adult',
-        role: 'owner',
-        color: '#3b82f6',
-        requiresPassword: false,
-      },
-      {
-        id: 'member-2',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        gender: 'other',
-        ageGroup: 'adult',
-        role: 'member',
-        color: '#10b981',
-        requiresPassword: false,
-      },
-    ],
-  })),
-}));
+vi.mock('@/stores/familyStore', () => {
+  const members = [
+    {
+      id: 'member-1',
+      name: 'John Doe',
+      email: 'john@example.com',
+      gender: 'other',
+      ageGroup: 'adult',
+      role: 'owner',
+      color: '#3b82f6',
+      requiresPassword: false,
+    },
+    {
+      id: 'member-2',
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      gender: 'other',
+      ageGroup: 'adult',
+      role: 'member',
+      color: '#10b981',
+      requiresPassword: false,
+    },
+  ];
+  return {
+    useFamilyStore: vi.fn(() => ({
+      currentMemberId: 'member-1',
+      members,
+      humans: members,
+      sortedMembers: members,
+      sortedHumans: members,
+      hasPets: false,
+    })),
+  };
+});
 
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: vi.fn(() => ({

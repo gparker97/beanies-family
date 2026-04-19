@@ -8,6 +8,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-20
+
+### Changed
+
+- **Pets hidden from human-only surfaces across the app (#171).** Pets appear wherever they belong (Meet the Beans roster, scrapbook feed, member avatars, home Family Row, global search, milestones/birthdays, photo galleries) and are now filtered out of every surface where they'd be semantically wrong:
+  - **Assignee pickers** — todos, activities, account/asset/goal owners, vacation travelers, onboarding activities. Fixed globally by filtering pets out inside `FamilyChipPicker` (used by every owner/assignee picker) and in the direct `memberOptions` map in `OnboardingFamily.vue`.
+  - **Filter chips** — activity/todo/planner filter strips. Fixed globally by filtering pets out inside `MemberChipFilter`.
+  - **Global member filter dropdown** (top of finance pages) — filtered at the `MemberFilterDropdown` options source.
+  - **Finance member grouping** — AccountsPage "Group by member" sections, GoalsPage per-member sections, subtitle counts (Accounts / Goals). Pets never owned accounts/goals anyway; now they don't appear as empty sections either.
+  - **Reports** — Financial reports member-filter dropdown now humans-only.
+  - **Planner columns + member chips** — daily/weekly calendar views + FamilyPlannerPage filter panel.
+  - **Todo page member chips** — FamilyTodoPage member filter strip.
+  - **Cook log "who cooked this"** — CookLogFormModal dropdown humans-only.
+  - **Login** — PickBeanView avatar grid (pets can't sign in). JoinPodView "unclaimed members" list filters pets explicitly (belt-and-suspenders; pets have `requiresPassword: false` so they were already excluded).
+  - **Vote counts** — VacationIdeaCard's "everyone!" pill compares vote count to human count, not total members.
+  - **Global filter store** (`memberFilterStore`) — scoped to humans only so `isAllSelected` doesn't flip off when a pet is added.
+
+  Foundation: added `familyStore.humans` / `sortedHumans` / `hasPets` computed getters so every call site uses one consistent filter instead of hand-rolling `!m.isPet` checks.
+
 ## 2026-04-19
 
 ### Fixed

@@ -86,7 +86,7 @@ function toggleMember(id: string) {
 }
 
 const activeMemberNames = computed(() =>
-  familyStore.members
+  familyStore.humans
     .filter((m) => memberFilterStore.isMemberSelected(m.id) && !memberFilterStore.isAllSelected)
     .map((m) => m.name)
 );
@@ -413,7 +413,7 @@ function handleActivitySwapped(newId: string) {
                 {{ t('filter.allMembers') }}
               </button>
               <button
-                v-for="member in familyStore.members"
+                v-for="member in familyStore.humans"
                 :key="member.id"
                 type="button"
                 class="font-outfit flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"

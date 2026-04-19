@@ -50,8 +50,9 @@ interface AddedActivity {
 }
 const addedActivities = ref<AddedActivity[]>([]);
 
+// Onboarding activity assignee — humans only. Pets can't be activity owners.
 const memberOptions = computed(() =>
-  familyStore.members.map((m) => ({
+  familyStore.humans.map((m) => ({
     value: m.id,
     label: m.name,
   }))

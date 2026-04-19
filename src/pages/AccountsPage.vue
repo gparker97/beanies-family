@@ -114,10 +114,10 @@ const baseCurrency = computed(() => settingsStore.baseCurrency);
 const totalAssets = computed(() => accountsStore.filteredTotalAssets);
 const totalLiabilities = computed(() => accountsStore.filteredTotalLiabilities);
 
-// Subtitle counts
+// Subtitle counts — humans only (pets don't own accounts).
 const subtitleText = computed(() =>
   t('accounts.subtitleCounts')
-    .replace('{members}', String(familyStore.members.length))
+    .replace('{members}', String(familyStore.humans.length))
     .replace('{accounts}', String(accounts.value.length))
 );
 
@@ -172,7 +172,9 @@ interface AccountSection {
 
 const sections = computed<AccountSection[]>(() => {
   if (groupBy.value === 'member') {
-    return familyStore.members
+    // Humans only — pets can't own accounts. The .some() filter would
+    // hide pets anyway (no pet has accounts), but explicit is clearer.
+    return familyStore.humans
       .filter((m) => accounts.value.some((a) => a.memberId === m.id))
       .map((m) => ({
         key: m.id,

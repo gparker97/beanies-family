@@ -92,10 +92,10 @@ const groupByOptions = computed(() => [
   { value: 'priority', label: t('goals.groupByPriority') },
 ]);
 
-// Subtitle text
+// Subtitle text — humans only (pets don't own savings goals).
 const subtitleText = computed(() =>
   t('goals.subtitle')
-    .replace('{members}', String(familyStore.members.length))
+    .replace('{members}', String(familyStore.humans.length))
     .replace('{goals}', String(goalsStore.filteredActiveGoals.length))
 );
 
@@ -174,8 +174,8 @@ const sections = computed<GoalSection[]>(() => {
       });
     }
 
-    // Individual members
-    for (const m of familyStore.members) {
+    // Individual members — humans only. Pets can't own goals.
+    for (const m of familyStore.humans) {
       const memberGoals = activeGoals
         .filter((g) => g.memberId === m.id)
         .sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority]);

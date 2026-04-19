@@ -45,8 +45,9 @@ const selectedMobileMemberId = ref<string | null>(null);
 
 // ── Members (sorted, filtered) ─────────────────────────────────────────────
 
+// Planner columns — humans only (pets aren't activity assignees).
 const visibleMembers = computed<FamilyMember[]>(() =>
-  familyStore.sortedMembers.filter(
+  familyStore.sortedHumans.filter(
     (m) => memberFilterStore.isAllSelected || memberFilterStore.isMemberSelected(m.id)
   )
 );
