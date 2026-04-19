@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2226
+    "translationCount": 2234
   },
   "translations": {
     "app.name": {
@@ -10922,13 +10922,13 @@
       "lastUpdated": "2026-04-19"
     },
     "favorites.field.recipe": {
-      "translation": "家庭食谱（选填）",
-      "hash": "9lemg9",
+      "translation": "家庭食谱",
+      "hash": "gdf8ly",
       "lastUpdated": "2026-04-19"
     },
     "favorites.recipe.none": {
-      "translation": "—未链接到配方—",
-      "hash": "c4ayq0",
+      "translation": "—不是我们的烹饪书—",
+      "hash": "h2dqq2",
       "lastUpdated": "2026-04-19"
     },
     "celebration.recipe5Star": {
@@ -11134,6 +11134,46 @@
     "contacts.action.email": {
       "translation": "电子邮箱",
       "hash": "13xh18",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.recipe.addNew": {
+      "translation": "＋添加新食谱……",
+      "hash": "6xas9n",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.food.detailsLabel": {
+      "translation": "食品详情",
+      "hash": "aqhmqo",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.food.hint": {
+      "translation": "选择一个家庭食谱，或者只是输入一个 🍝",
+      "hash": "621pcj",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.food.or": {
+      "translation": "或者",
+      "hash": "2qr",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.field.typeItIn": {
+      "translation": "请输入",
+      "hash": "evjmks",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.placeholder.typeItIn": {
+      "translation": "例如：麦当劳快乐餐、罗马冰淇淋……",
+      "hash": "58wwiv",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.field.why": {
+      "translation": "为什么它最受欢迎",
+      "hash": "19esrw",
+      "lastUpdated": "2026-04-19"
+    },
+    "favorites.placeholder.why": {
+      "translation": "例如，每周日都要。用大勺子吃。",
+      "hash": "ez2srt",
       "lastUpdated": "2026-04-19"
     }
   }
