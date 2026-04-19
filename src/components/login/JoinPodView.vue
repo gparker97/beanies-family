@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* global FileSystemFileHandle, FileSystemHandle */
+/* global FileSystemFileHandle */
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -9,6 +9,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { useFileDrop } from '@/composables/useFileDrop';
 import { isTemporaryEmail } from '@/utils/email';
 import { pickBeanpodFile } from '@/services/google/drivePicker';
 import {
@@ -61,8 +62,6 @@ const isLoadingFile = ref(false);
 const isPickerLoading = ref(false);
 const showDecryptModal = ref(false);
 const decryptPassword = ref('');
-const isDragging = ref(false);
-let dragCounter = 0;
 
 // Step 2: Pick member
 const selectedMember = ref<FamilyMember | null>(null);
@@ -320,61 +319,20 @@ async function handleLoadFile() {
   }
 }
 
-function handleDragEnter(e: DragEvent) {
-  e.preventDefault();
-  dragCounter++;
-  isDragging.value = true;
-}
-
-function handleDragLeave() {
-  dragCounter--;
-  if (dragCounter <= 0) {
-    dragCounter = 0;
-    isDragging.value = false;
-  }
-}
-
-function handleDragOver(e: DragEvent) {
-  e.preventDefault();
-  if (e.dataTransfer) {
-    e.dataTransfer.dropEffect = 'copy';
-  }
-}
-
-async function handleDrop(e: DragEvent) {
-  e.preventDefault();
-  dragCounter = 0;
-  isDragging.value = false;
-  formError.value = null;
-
-  const items = e.dataTransfer?.items;
-  if (!items || items.length === 0) return;
-
-  const item = items[0];
-  if (!item || item.kind !== 'file') return;
-
-  const file = item.getAsFile();
-  if (!file) return;
-
-  let fileHandle: FileSystemFileHandle | undefined;
-  if ('getAsFileSystemHandle' in item) {
-    try {
-      const handle = await (
-        item as DataTransferItem & { getAsFileSystemHandle(): Promise<FileSystemHandle> }
-      ).getAsFileSystemHandle();
-      if (handle?.kind === 'file') {
-        fileHandle = handle as FileSystemFileHandle;
-      }
-    } catch {
-      // Fall back to File-only path
-    }
-  }
-
-  if (!file.name.endsWith('.beanpod') && !file.name.endsWith('.json')) {
+const { isDragging, bindings: dropZoneBindings } = useFileDrop({
+  accept: ['.beanpod', '.json'],
+  multiple: false,
+  onReject: () => {
     formError.value = t('auth.fileLoadFailed');
-    return;
-  }
+  },
+  onDrop: async ([dropped]) => {
+    if (!dropped) return;
+    formError.value = null;
+    await handleDroppedFile(dropped.file, dropped.handle);
+  },
+});
 
+async function handleDroppedFile(file: File, fileHandle?: FileSystemFileHandle) {
   isLoadingFile.value = true;
   try {
     const result = await syncStore.loadFromDroppedFile(file, fileHandle);
@@ -710,12 +668,9 @@ function handleBack() {
                     ? 'border-primary-500 bg-primary-500/10'
                     : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
                 "
+                v-bind="dropZoneBindings"
                 @click="handleLoadFile"
                 @keydown.enter="handleLoadFile"
-                @dragenter="handleDragEnter"
-                @dragleave="handleDragLeave"
-                @dragover="handleDragOver"
-                @drop="handleDrop"
               >
                 <div v-if="isLoadingFile" class="py-2">
                   <BeanieSpinner size="sm" class="mx-auto mb-2" />
@@ -772,12 +727,9 @@ function handleBack() {
                 ? 'border-primary-500 bg-primary-500/10'
                 : 'hover:border-primary-500/50 border-white/20 hover:bg-white/5'
             "
+            v-bind="dropZoneBindings"
             @click="handleLoadFile"
             @keydown.enter="handleLoadFile"
-            @dragenter="handleDragEnter"
-            @dragleave="handleDragLeave"
-            @dragover="handleDragOver"
-            @drop="handleDrop"
           >
             <div v-if="isLoadingFile" class="py-2">
               <div
