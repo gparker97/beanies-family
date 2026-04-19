@@ -1,7 +1,9 @@
 # Project Status
 
-> **Last updated:** 2026-04-17
-> **Updated by:** Claude (session covered: blog publishing, content authoring, infrastructure cleanup, architecture documentation, E2E fixes)
+> **Last updated:** 2026-04-19
+> **Updated by:** Claude (session covered: photo attachment foundation — full reusable capability across services, store, composables, UI components, invite-flow migration, ADR, and docs. 10 commits pushed; 1060 unit tests green.)
+>
+> **Previous update (2026-04-17):** Claude (session covered: blog publishing, content authoring, infrastructure cleanup, architecture documentation, E2E fixes)
 >
 > **Previous update (2026-04-16):** Claude (Four PRs:
 >
@@ -11,6 +13,14 @@
 > **Previous update (2026-04-15):** Claude (Phase C cutover confirmed live at apex; legacy Vue-deploy secrets CLOUDFRONT*DISTRIBUTION_ID + S3_BUCKET migrated to APP*\_ repo variables matching WEB\_\_/APEX\_\* naming; draft glossary + FAQ pages scaffolded with DefinedTermSet + FAQPage JSON-LD, hidden in prod via DraftPlaceholder — #167)
 
 ## Pending / Next Session
+
+**Photo attachments — integrations (follow-ups):**
+
+- **Activity photos** — first integration surface per the plan. Add `photoIds?: UUID[]` to `FamilyActivity`, drop `<PhotoAttachments>` into `ActivityViewEditModal.vue`, wire `updatePhotoIds` through `activityStore.update`, call `registerPhotoCollection('activities')` on app init. Low effort — all the plumbing is already in `src/stores/photoStore.ts` + `src/composables/usePhotos.ts` + `src/components/media/`.
+- **Family-member avatar photos** — second integration. Single-photo variant of `<PhotoAttachments>` (max: 1) on `FamilyMemberCard` / `FamilyMemberModal`. Swaps out the beanie PNG when a user-uploaded photo is present.
+- **E2E for photo flow** — deferred in this plan. Needs Drive mocking; tracks against the 25-test budget when added.
+- **`gcOrphanedDriveFiles` Drive-side sweep** — noted as follow-up in ADR-021. Only needed if synchronous rollback ever fails silently; low priority.
+- **Manual verification in dev** — run `npm run dev` and attach a photo to an activity once the activity integration ships. Confirm Drive `thumbnailLink?sz=w2048` works at full res; if capped, flip to the `alt=media` Blob fallback described in the plan.
 
 **Content authoring (greg is driving, Notion is source of truth):**
 
@@ -77,6 +87,20 @@
 
 - Base component library: BaseButton, BaseCard, BaseCombobox, BaseInput, BaseModal, BaseSelect
 - AppHeader, AppSidebar layout components
+
+### Photo Attachments — Foundation Shipped (2026-04-19)
+
+General-purpose reusable capability for attaching photos to any beanies entity. Delivers the plumbing only; integration into activities, family avatars, and other entities happens in follow-up plans. See `docs/plans/2026-04-18-photos-general-capability.md` and [ADR-021](adr/021-photo-storage.md).
+
+- **Storage model:** photo bytes in the user's Google Drive inside the shared `beanies.family` app folder; only metadata in Automerge (new `photos: Record<UUID, PhotoAttachment>` collection). Not encrypted — matches the existing trust the user already places in Drive for every other file.
+- **Multi-member access:** invite flow now shares the app folder alongside `.beanpod`. One-time migration sweep back-fills folder shares for existing families when `syncStore.driveFileId` becomes available.
+- **Rendering:** Drive's native `thumbnailLink?sz=w{N}` CDN serves both thumbnails (`=s400`) and full-size (`=s2048`) directly as `<img src>`. No IndexedDB full-size cache; no client-side thumbnail generation.
+- **Offline:** IndexedDB `beanies-photo-queue-{familyId}` queues compressed uploads; drains on the `online` event; cleared on sign-out alongside the Automerge cache.
+- **Missing-photo UX:** 404/403 from Drive flips a runtime `unresolved` flag; thumbnail shows a broken-image tile; viewer surfaces Replace (swap `driveFileId`, keep UUID stable so entity references survive) / Remove (tombstone) actions.
+- **Deletion:** tombstones + 24h-grace GC sweep. Zero-reference cascade gated on integration plans registering their collection via `registerPhotoCollection(name)` so the foundation doesn't auto-delete photos before any entity points to them.
+- **DRY refactors shipped alongside:** `driveService.createFile` generalized to accept `string | Blob | Uint8Array` with optional mime (default preserves existing `.beanpod` behavior); drag-drop extracted from `JoinPodView.vue` into a reusable `useFileDrop` composable; `useFilePicker` composable wraps the `<input type="file">` pattern; new `DriveFileNotFoundError` subclass cleanly distinguishes 404/403 from other Drive errors.
+- **New modules:** `src/services/photos/photoCompression.ts`, `src/services/sync/photoUploadQueue.ts`, `src/stores/photoStore.ts`, `src/composables/{useFileDrop,useFilePicker,usePhotos}.ts`, `src/components/media/{PhotoThumbnail,PhotoViewer,PhotoAttachments}.vue`.
+- **Tests:** 74 new unit tests (compression, queue, store, composables) — all 1060 existing + new tests green.
 
 ### Pages / Features
 
