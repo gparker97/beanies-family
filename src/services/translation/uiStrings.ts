@@ -1285,7 +1285,7 @@ const STRING_DEFS = {
   },
 
   // Family Hub
-  'family.hub.title': { en: 'The Bean Pod', beanie: 'the bean pod' },
+  'family.hub.title': { en: 'Meet the Beans', beanie: 'meet the beans' },
   'family.hub.subtitle': {
     en: '{count} Beans Growing Strong',
     beanie: '{count} beans growing strong',

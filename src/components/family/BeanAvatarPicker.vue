@@ -13,9 +13,10 @@
  * component can do the right tombstones. On close-without-save, the
  * parent calls `onClose()` to clean up session-uploaded orphans.
  */
-import { computed, ref, watchEffect } from 'vue';
+import { computed, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
@@ -43,22 +44,8 @@ const { showToast } = useToast();
 const photoStore = usePhotoStore();
 
 const uploading = ref(false);
-const photoUrl = ref<string | null>(null);
+const photoUrl = useAvatarPhotoUrl(() => props.modelValue);
 const photosEnabled = computed(() => photoStore.photosEnabled);
-
-watchEffect(async () => {
-  const id = props.modelValue;
-  if (!id) {
-    photoUrl.value = null;
-    return;
-  }
-  try {
-    photoUrl.value = await photoStore.getImageUrl(id, 'thumb');
-  } catch (e) {
-    console.warn('[beanAvatarPicker] URL resolve failed', e);
-    photoUrl.value = null;
-  }
-});
 
 const picker = useFilePicker({
   accept: 'image/jpeg,image/png,image/webp,image/heic,image/heif',

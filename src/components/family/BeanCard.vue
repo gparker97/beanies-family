@@ -3,6 +3,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import MemberRoleManager from '@/components/family/MemberRoleManager.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
 import { timeAgo } from '@/utils/date';
 import type { FamilyMember, Gender, AgeGroup } from '@/types/models';
@@ -29,6 +30,8 @@ function avatarVariant() {
     ageGroup: props.member.ageGroup as AgeGroup | undefined,
   });
 }
+
+const avatarPhotoUrl = useAvatarPhotoUrl(() => props.member.avatarPhotoId);
 </script>
 
 <template>
@@ -41,6 +44,7 @@ function avatarVariant() {
       <BeanieAvatar
         :variant="avatarVariant()"
         :color="member.color"
+        :photo-url="avatarPhotoUrl"
         size="lg"
         class="flex-shrink-0"
         :aria-label="member.name"
