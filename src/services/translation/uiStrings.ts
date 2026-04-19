@@ -625,6 +625,30 @@ const STRING_DEFS = {
     en: 'e.g. asks for it every Sunday. eats it with a big spoon.',
     beanie: 'e.g. asks for it every sunday. eats it with a big spoon.',
   },
+  // Family Scrapbook
+  'scrapbook.title': { en: 'Family Scrapbook', beanie: 'family scrapbook' },
+  'scrapbook.subtitle': {
+    en: 'everything about your beans, in one place',
+    beanie: 'everything about your beans, in one place',
+  },
+  'scrapbook.filter.types': { en: 'Show', beanie: 'show' },
+  'scrapbook.filter.members': { en: 'Beans', beanie: 'beans' },
+  'scrapbook.filter.all': { en: 'All', beanie: 'all' },
+  'scrapbook.filter.favorites': { en: 'Favorites', beanie: 'favorites' },
+  'scrapbook.filter.sayings': { en: 'Sayings', beanie: 'sayings' },
+  'scrapbook.filter.notes': { en: 'Notes', beanie: 'notes' },
+  'scrapbook.type.favorite': { en: 'Favorite', beanie: 'favorite' },
+  'scrapbook.type.saying': { en: 'Saying', beanie: 'saying' },
+  'scrapbook.type.note': { en: 'Note', beanie: 'note' },
+  'scrapbook.empty': {
+    en: 'Nothing in the scrapbook yet — add some favorites, sayings, or notes to see them here.',
+    beanie: 'nothing in the scrapbook yet',
+  },
+  'scrapbook.noResults': {
+    en: 'Nothing matches these filters. Try showing more types or beans.',
+    beanie: 'nothing matches these filters',
+  },
+  'scrapbook.loadMore': { en: 'Load more', beanie: 'load more' },
   // Emergency contacts
   'contacts.title': { en: 'Emergency Contacts', beanie: 'emergency contacts' },
   'contacts.subtitleLead': {

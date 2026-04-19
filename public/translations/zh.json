@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-19",
-    "translationCount": 2234
+    "translationCount": 2248
   },
   "translations": {
     "app.name": {
@@ -11174,6 +11174,76 @@
     "favorites.placeholder.why": {
       "translation": "例如，每周日都要。用大勺子吃。",
       "hash": "ez2srt",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.title": {
+      "translation": "家庭剪贴簿",
+      "hash": "ozrrsu",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.subtitle": {
+      "translation": "关于你的豆子的一切，在一个地方",
+      "hash": "twdpp8",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.filter.types": {
+      "translation": "顯示",
+      "hash": "1j7rx",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.filter.members": {
+      "translation": "豆荚",
+      "hash": "124zhf",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.filter.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.filter.favorites": {
+      "translation": "收藏",
+      "hash": "3m84dz",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.filter.sayings": {
+      "translation": "语录（sayings）",
+      "hash": "ch9l9g",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.filter.notes": {
+      "translation": "注意",
+      "hash": "18xach",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.type.favorite": {
+      "translation": "我的最愛",
+      "hash": "ig3mpo",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.type.saying": {
+      "translation": "金句",
+      "hash": "u6tvpl",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.type.note": {
+      "translation": "附註",
+      "hash": "1g64y",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.empty": {
+      "translation": "剪贴簿中没有任何内容—添加一些收藏夹、谚语或备注，以便在此处查看。",
+      "hash": "fbnwn5",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.noResults": {
+      "translation": "没有符合这些筛选条件的内容。请尝试显示更多类型或豆类。",
+      "hash": "nj826e",
+      "lastUpdated": "2026-04-19"
+    },
+    "scrapbook.loadMore": {
+      "translation": "加载更多",
+      "hash": "fvfsnl",
       "lastUpdated": "2026-04-19"
     }
   }
