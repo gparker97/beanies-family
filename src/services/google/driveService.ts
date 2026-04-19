@@ -79,29 +79,37 @@ export async function getOrCreateAppFolder(token: string): Promise<string> {
 
 /**
  * Create a new file in the app folder.
+ *
+ * Accepts string, Blob, or Uint8Array content. For binary content
+ * (photos), pass the blob + its MIME type (e.g. 'image/jpeg'). Default
+ * MIME is 'application/json' to preserve existing .beanpod callers.
  */
 export async function createFile(
   token: string,
   folderId: string,
   fileName: string,
-  content: string
+  content: string | Blob | Uint8Array,
+  contentMimeType: string = 'application/json'
 ): Promise<{ fileId: string; name: string }> {
   const metadata = {
     name: fileName,
     parents: [folderId],
-    mimeType: 'application/json',
+    mimeType: contentMimeType,
   };
 
-  // Use multipart upload for metadata + content in one request
+  // Use multipart upload for metadata + content in one request.
+  // Build a Blob so binary content passes through unmangled.
   const boundary = '---beanies-upload-boundary';
-  const body =
+  const metadataPart =
     `--${boundary}\r\n` +
     `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
     `${JSON.stringify(metadata)}\r\n` +
     `--${boundary}\r\n` +
-    `Content-Type: application/json\r\n\r\n` +
-    `${content}\r\n` +
-    `--${boundary}--`;
+    `Content-Type: ${contentMimeType}\r\n\r\n`;
+  const trailer = `\r\n--${boundary}--`;
+  // Cast content to BlobPart — TS's Uint8Array generic (ArrayBufferLike vs ArrayBuffer)
+  // is stricter than the runtime Blob constructor actually requires.
+  const body = new Blob([metadataPart, content as BlobPart, trailer]);
 
   const res = await driveRequest(
     token,
@@ -147,6 +155,36 @@ export async function getFileModifiedTime(token: string, fileId: string): Promis
   const res = await driveRequest(token, `${DRIVE_API}/files/${fileId}?fields=modifiedTime`);
   const data = await res.json();
   return data.modifiedTime ?? null;
+}
+
+/**
+ * Fetch arbitrary file metadata fields.
+ * Pass a comma-separated `fields` string, e.g. 'thumbnailLink' or 'parents,name'.
+ * Throws DriveFileNotFoundError on 404/403 so callers can flag missing files cleanly.
+ */
+export async function getFileMetadata(
+  token: string,
+  fileId: string,
+  fields: string
+): Promise<Record<string, unknown>> {
+  const url = `${DRIVE_API}/files/${fileId}?fields=${encodeURIComponent(fields)}`;
+  const res = await driveRequest(token, url);
+  return (await res.json()) as Record<string, unknown>;
+}
+
+/**
+ * List a file's permissions (who it's shared with).
+ * Used by the app-folder migration sweep to detect which family members
+ * don't yet have folder access.
+ */
+export async function listFilePermissions(
+  token: string,
+  fileId: string
+): Promise<Array<{ id: string; type: string; role: string; emailAddress?: string }>> {
+  const url = `${DRIVE_API}/files/${fileId}/permissions?fields=permissions(id,type,role,emailAddress)`;
+  const res = await driveRequest(token, url);
+  const data = await res.json();
+  return data.permissions ?? [];
 }
 
 /**
@@ -356,6 +394,11 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     } catch {
       message = `Drive API error ${status}`;
     }
+    // 404 Not Found or 403 Forbidden both mean "the file isn't accessible to this
+    // caller" — photoStore treats these identically (flags the photo as unresolved).
+    if (status === 404 || status === 403) {
+      throw new DriveFileNotFoundError(message, status);
+    }
     throw new DriveApiError(message, status);
   }
 
@@ -372,5 +415,18 @@ export class DriveApiError extends Error {
     super(message);
     this.name = 'DriveApiError';
     this.status = status;
+  }
+}
+
+/**
+ * Thrown when a Drive file can't be found or accessed (404/403).
+ * Callers can use `instanceof DriveFileNotFoundError` to handle missing
+ * files distinctly from other Drive API errors (e.g. mark a photo as
+ * unresolved and show Replace/Remove UI).
+ */
+export class DriveFileNotFoundError extends DriveApiError {
+  constructor(message: string, status: number) {
+    super(message, status);
+    this.name = 'DriveFileNotFoundError';
   }
 }

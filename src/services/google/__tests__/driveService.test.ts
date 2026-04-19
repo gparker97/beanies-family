@@ -5,11 +5,14 @@ import {
   updateFile,
   readFile,
   getFileModifiedTime,
+  getFileMetadata,
+  listFilePermissions,
   listBeanpodFiles,
   deleteFile,
   shareFileWithEmail,
   clearFolderCache,
   DriveApiError,
+  DriveFileNotFoundError,
 } from '../driveService';
 
 const mockToken = 'mock-access-token';
@@ -145,7 +148,7 @@ describe('driveService', () => {
   });
 
   describe('createFile', () => {
-    it('sends multipart upload with metadata and content', async () => {
+    it('sends multipart upload with metadata and string content (default json mime)', async () => {
       globalThis.fetch = mockFetch({ id: 'file-new', name: 'test.beanpod' });
 
       const result = await createFile(mockToken, 'folder-1', 'test.beanpod', '{"data":"test"}');
@@ -154,8 +157,94 @@ describe('driveService', () => {
       const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
       expect(call[0]).toContain('uploadType=multipart');
       expect(call[1]?.method).toBe('POST');
-      expect(call[1]?.body).toContain('test.beanpod');
-      expect(call[1]?.body).toContain('{"data":"test"}');
+      const body = await (call[1]?.body as Blob).text();
+      expect(body).toContain('test.beanpod');
+      expect(body).toContain('{"data":"test"}');
+      // Default mime type used in metadata + part header
+      expect(body).toContain('"mimeType":"application/json"');
+    });
+
+    it('sends multipart upload with Blob content and explicit mime', async () => {
+      globalThis.fetch = mockFetch({ id: 'file-photo', name: 'beanies-photo-abc.jpg' });
+
+      const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]); // JPEG SOI header
+      const blob = new Blob([bytes], { type: 'image/jpeg' });
+      const result = await createFile(
+        mockToken,
+        'folder-1',
+        'beanies-photo-abc.jpg',
+        blob,
+        'image/jpeg'
+      );
+      expect(result).toEqual({ fileId: 'file-photo', name: 'beanies-photo-abc.jpg' });
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      // Body is a Blob containing the binary content sandwiched between the metadata and trailer parts.
+      const bodyBlob = call[1]?.body as Blob;
+      const bodyText = await bodyBlob.text();
+      expect(bodyText).toContain('beanies-photo-abc.jpg');
+      expect(bodyText).toContain('"mimeType":"image/jpeg"');
+      expect(bodyText).toContain('Content-Type: image/jpeg');
+    });
+  });
+
+  describe('getFileMetadata', () => {
+    it('fetches requested fields', async () => {
+      globalThis.fetch = mockFetch({ thumbnailLink: 'https://lh3.googleusercontent.com/abc=s220' });
+
+      const meta = await getFileMetadata(mockToken, 'file-1', 'thumbnailLink');
+      expect(meta.thumbnailLink).toBe('https://lh3.googleusercontent.com/abc=s220');
+
+      const call = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      expect(call[0]).toContain('file-1');
+      expect(call[0]).toContain('fields=thumbnailLink');
+    });
+
+    it('throws DriveFileNotFoundError on 404', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: 'Not found' } }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      await expect(getFileMetadata(mockToken, 'missing', 'parents')).rejects.toThrow(
+        DriveFileNotFoundError
+      );
+    });
+
+    it('throws DriveFileNotFoundError on 403 (permission)', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: 'Permission denied' } }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      await expect(getFileMetadata(mockToken, 'forbidden', 'parents')).rejects.toThrow(
+        DriveFileNotFoundError
+      );
+    });
+  });
+
+  describe('listFilePermissions', () => {
+    it('returns the permissions array', async () => {
+      globalThis.fetch = mockFetch({
+        permissions: [
+          { id: 'p1', type: 'user', role: 'writer', emailAddress: 'alice@example.com' },
+          { id: 'p2', type: 'user', role: 'writer', emailAddress: 'bob@example.com' },
+        ],
+      });
+
+      const perms = await listFilePermissions(mockToken, 'folder-1');
+      expect(perms).toHaveLength(2);
+      expect(perms[0]?.emailAddress).toBe('alice@example.com');
+    });
+
+    it('returns [] when permissions are missing in response', async () => {
+      globalThis.fetch = mockFetch({});
+      const perms = await listFilePermissions(mockToken, 'folder-1');
+      expect(perms).toEqual([]);
     });
   });
 
