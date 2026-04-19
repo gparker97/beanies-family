@@ -5,6 +5,11 @@
  * callers pass the result straight to `<BeanieAvatar :photo-url="url" />`,
  * which falls back to the beanie variant.
  *
+ * Also exposes `refresh()`: invalidates the photoStore thumb-URL cache and
+ * re-resolves. Intended for the `@photo-error` event flow — Drive CDN
+ * tokens can rotate within our 30-min cache TTL, and a fresh fetch often
+ * yields a working URL. We retry at most once per mount to avoid loops.
+ *
  * Used by BeanCard (grid), BeanAvatarPicker (modal preview), and any
  * future surface that displays member avatars.
  */
@@ -18,25 +23,47 @@ export function useAvatarPhotoUrl(
 ) {
   const photoStore = usePhotoStore();
   const url = ref<string | null>(null);
+  let retriedForId: UUID | null = null;
 
   const resolvedId = computed<UUID | undefined>(() => {
     const v = avatarPhotoId;
     return typeof v === 'function' ? v() : unref(v);
   });
 
-  watchEffect(async () => {
-    const id = resolvedId.value;
-    if (!id) {
-      url.value = null;
-      return;
-    }
+  async function resolve(id: UUID): Promise<void> {
     try {
       url.value = await photoStore.getImageUrl(id, size);
     } catch (e) {
       console.warn('[avatarPhotoUrl] resolve failed', e);
       url.value = null;
     }
+  }
+
+  watchEffect(async () => {
+    const id = resolvedId.value;
+    if (!id) {
+      url.value = null;
+      retriedForId = null;
+      return;
+    }
+    // Reset retry budget when the id changes.
+    if (retriedForId && retriedForId !== id) retriedForId = null;
+    await resolve(id);
   });
 
-  return url;
+  /**
+   * Call when an `<img>` error fires on the current URL — drops the cache
+   * for this driveFileId and re-resolves. No-op after one retry (so an
+   * actually-broken photo doesn't loop).
+   */
+  async function refresh(): Promise<void> {
+    const id = resolvedId.value;
+    if (!id) return;
+    if (retriedForId === id) return;
+    retriedForId = id;
+    photoStore.invalidateThumbCache(id);
+    await resolve(id);
+  }
+
+  return { url, refresh };
 }
