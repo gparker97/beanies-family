@@ -31,38 +31,40 @@ const isPending = computed(() => !!props.pendingLabel);
 const photoIsMissing = computed(() => !!props.photoId && store.isUnresolved(props.photoId));
 const showBroken = computed(() => photoIsMissing.value || (!loading.value && imgError.value));
 
-async function resolve(): Promise<void> {
-  if (!props.photoId || isPending.value) return;
-  loading.value = true;
-  imgError.value = false;
-  try {
-    // Authorized blob download (same reliability fix used for avatars
-    // in `useAvatarPhotoUrl`). Drive's `thumbnailLink` tokens rotate
-    // within our cache TTL and fail after an <img> re-mount; blob URLs
-    // live in-process and survive.
-    url.value = await store.getBlobUrl(props.photoId);
-  } catch (e) {
-    console.warn('[PhotoThumbnail] getBlobUrl failed', e);
+function resolve(): void {
+  if (!props.photoId || isPending.value) {
     url.value = null;
-  } finally {
     loading.value = false;
-    loadedOnce.value = true;
-  }
-}
-
-// A single retry after an <img> onerror — blob URLs generally don't
-// go bad, but the retry clears the store's cached blob so a
-// transient 404 on the underlying Drive file still gets one more
-// chance before we flip to the broken state.
-let retriedOnce = false;
-async function handleImgError(): Promise<void> {
-  if (retriedOnce) {
-    imgError.value = true;
     return;
   }
-  retriedOnce = true;
-  if (props.photoId) store.invalidateThumbCache(props.photoId);
-  await resolve();
+  // Public Drive CDN URL — no OAuth, no fetch, no cache. The URL is
+  // deterministic from driveFileId; if the underlying file was deleted
+  // or revoked, `<img onerror>` flips us to the broken state.
+  url.value = store.getPublicUrl(props.photoId, 'thumb');
+  loading.value = !!url.value;
+  imgError.value = false;
+  loadedOnce.value = true;
+}
+
+// When `<img>` signals load error, mark the photo unresolved so
+// `getPublicUrl` returns null next time (and other surfaces — viewer,
+// avatar — pick up the same "broken" state). Single retry guards
+// against transient Drive hiccups on the very first render.
+let retriedOnce = false;
+function handleImgLoaded(): void {
+  loading.value = false;
+}
+function handleImgError(): void {
+  loading.value = false;
+  if (!retriedOnce) {
+    retriedOnce = true;
+    // Re-read the URL — cheap enough that we don't need to dedupe.
+    if (props.photoId) url.value = store.getPublicUrl(props.photoId, 'thumb');
+    return;
+  }
+  imgError.value = true;
+  if (props.photoId) store.markUnresolved(props.photoId);
+  console.warn('[PhotoThumbnail] image failed to load', props.photoId);
 }
 
 onMounted(resolve);
@@ -70,7 +72,7 @@ watch(
   () => props.photoId,
   () => {
     retriedOnce = false;
-    void resolve();
+    resolve();
   }
 );
 </script>
@@ -114,6 +116,7 @@ watch(
       :alt="''"
       class="h-full w-full object-cover"
       loading="lazy"
+      @load="handleImgLoaded"
       @error="handleImgError"
     />
   </button>

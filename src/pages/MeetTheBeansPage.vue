@@ -87,23 +87,12 @@ const railRecipes = computed(() =>
   [...recipesStore.recipes].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 4)
 );
 
-// Recipe thumbnails resolved lazily, cached by photoId so re-renders
-// don't re-fetch. Matches the pattern in FamilyCookbookPage.
-const recipeThumbCache = ref<Record<string, string | null>>({});
+// Public Drive URL (ADR-021) — sync, no fetch, no cache.
 function thumbForRecipe(recipeId: string): string | null {
   const recipe = recipesStore.recipes.find((r) => r.id === recipeId);
   const pid = recipe?.photoIds?.[0];
   if (!pid) return null;
-  if (recipeThumbCache.value[pid] === undefined) {
-    recipeThumbCache.value = { ...recipeThumbCache.value, [pid]: null };
-    photoStore
-      .getBlobUrl(pid)
-      .then((url) => {
-        recipeThumbCache.value = { ...recipeThumbCache.value, [pid]: url };
-      })
-      .catch((e) => console.warn('[meetTheBeans] recipe thumb resolve failed', e));
-  }
-  return recipeThumbCache.value[pid] ?? null;
+  return photoStore.getPublicUrl(pid, 'thumb');
 }
 
 // Sidebar: allergies across all members, severity-sorted. Cap at 6 so

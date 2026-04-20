@@ -18,7 +18,7 @@ import WhatsNewModal from '@/components/common/WhatsNewModal.vue';
 import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
-import PhotoAccessRecoveryBanner from '@/components/common/PhotoAccessRecoveryBanner.vue';
+import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
@@ -95,6 +95,12 @@ const memberFilterStore = useMemberFilterStore();
 const authStore = useAuthStore();
 const { t } = useTranslation();
 const { isMobile, isDesktop } = useBreakpoint();
+
+// Watch for the active .beanpod file ID — once it resolves, fire a
+// one-time sweep to set anyone-with-link read permission on every
+// photo this user owns. Makes family-member photo rendering work
+// without requiring drive.file scope coverage (ADR-021).
+useEnsurePhotosPublic();
 
 const isInitializing = ref(true);
 const isLoadingData = ref(true);
@@ -902,10 +908,6 @@ watch(
       :file-not-found="syncStore.driveFileNotFound"
       @reconnected="handleGoogleReconnected"
     />
-
-    <!-- Photo-access recovery banner — fires when photoStore has any unresolved
-         photos (typically the drive.file scope-mismatch case from ADR-021). -->
-    <PhotoAccessRecoveryBanner />
 
     <!-- Bottom-right toast stack -->
     <div

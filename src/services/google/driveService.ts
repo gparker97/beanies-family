@@ -284,6 +284,24 @@ export async function shareFileWithEmail(
 }
 
 /**
+ * Mark a Drive file as anyone-with-link readable. Used by photo upload
+ * paths (photoStore) so family members whose `drive.file` scope doesn't
+ * cover the file can still fetch bytes via direct CDN URL — see
+ * ADR-021 "public-link access" section for the privacy analysis.
+ *
+ * Idempotent: Drive returns 200 if the `anyone`/`reader` grant is
+ * already present. Callers should treat 403 as "not the file's owner,
+ * skip" (some other member will run this on their own files).
+ */
+export async function setPublicLinkPermission(token: string, fileId: string): Promise<void> {
+  await driveRequest(token, `${DRIVE_API}/files/${fileId}/permissions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'anyone', role: 'reader' }),
+  });
+}
+
+/**
  * Get the cached app folder ID (null if not yet resolved).
  */
 export function getAppFolderId(): string | null {
