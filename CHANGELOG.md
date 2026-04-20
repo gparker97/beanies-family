@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Changed
+
+- **Renamed session-bracket skills.** `/start-of-day` → `/start-session`, `/end-of-day` → `/end-session`. Triggers broadened to cover switching machines and clearing context, not just day boundaries. `/good-morning` still works as the morning alias (symlink preserved).
+
 ### Fixed
 
 - **Avatar photos now render on every surface that shows a member.** Seven call sites (Nook row, dashboard row, app header trigger + 3 dropdown slots, member filter dropdown trigger + option rows, login picker grid + selected card, settings profile header, accounts page section + row, goals page section) were passing `:variant` and `:color` to `<BeanieAvatar>` but skipping `:photo-url`, so the SVG fallback rendered even when the member had a real avatar. All wired up to a new shared helper.
