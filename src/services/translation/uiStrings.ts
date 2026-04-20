@@ -3325,6 +3325,7 @@ const STRING_DEFS = {
     beanie: 'add your first family activity to get started!',
   },
   'planner.today': { en: 'Today', beanie: 'today' },
+  'planner.openAgenda': { en: 'Open agenda view', beanie: 'open agenda view' },
   'planner.upcoming': { en: 'Upcoming Activities', beanie: 'upcoming activities' },
   'planner.noUpcoming': { en: 'No upcoming activities', beanie: 'no upcoming activities' },
   'planner.todoPreview': { en: 'Family To-Do', beanie: 'family to-do' },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
@@ -20,12 +20,23 @@ import { extractDatePart, formatTime12 } from '@/utils/date';
 import { tripTypeEmoji } from '@/utils/vacation';
 import type { FamilyActivity, FamilyMember, TodoItem } from '@/types/models';
 
+/**
+ * `selectedDate` lets the parent jump the daily view to a specific day —
+ * used when the user clicks a cell in the monthly/weekly grid and we
+ * switch views. Watched (not just used on mount) so repeat clicks from
+ * the same parent re-navigate correctly. Prev/next/today buttons still
+ * drive the internal `referenceDate`; the prop only fires when the
+ * parent deliberately sets it.
+ */
+const props = defineProps<{ selectedDate?: string }>();
+
 const emit = defineEmits<{
   'select-date': [date: string];
   'add-activity': [date: string, time?: string, memberId?: string];
   'view-activity': [id: string, date: string];
   'view-todo': [todo: TodoItem];
   'vacation-click': [vacationId: string];
+  'open-agenda': [date: string];
 }>();
 
 const { t } = useTranslation();
@@ -36,8 +47,20 @@ const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 
-const referenceDate = ref(new Date());
+const referenceDate = ref(
+  props.selectedDate ? new Date(props.selectedDate + 'T00:00:00') : new Date()
+);
 const { currentDay, dayLabel, prevDay, nextDay, goToToday } = useDayNavigation(referenceDate);
+
+// Parent-driven date changes (e.g. user clicked a day in the monthly grid
+// while we were already on day view). `immediate: false` — initial state
+// is handled above.
+watch(
+  () => props.selectedDate,
+  (newDate) => {
+    if (newDate) referenceDate.value = new Date(newDate + 'T00:00:00');
+  }
+);
 
 // ── Members (sorted, filtered) ─────────────────────────────────────────────
 
@@ -180,7 +203,29 @@ defineExpose({ dayLabel, activityCount });
 
 <template>
   <div class="rounded-3xl bg-white p-5 shadow-[0_4px_20px_rgba(44,62,80,0.05)] dark:bg-slate-800">
-    <CalendarNavBar :label="dayLabel" @prev="prevDay" @next="nextDay" @today="goToToday" />
+    <CalendarNavBar :label="dayLabel" @prev="prevDay" @next="nextDay" @today="goToToday">
+      <template #actions>
+        <button
+          type="button"
+          class="text-secondary-500/70 hover:text-primary-500 font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-700"
+          :title="t('planner.openAgenda')"
+          :aria-label="t('planner.openAgenda')"
+          @click="emit('open-agenda', currentDay.dateStr)"
+        >
+          <svg
+            class="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <span class="hidden sm:inline">{{ t('planner.agenda') }}</span>
+        </button>
+      </template>
+    </CalendarNavBar>
 
     <!-- ── Desktop: Member Column Grid ──────────────────────────────────── -->
     <template v-if="!isMobile">
