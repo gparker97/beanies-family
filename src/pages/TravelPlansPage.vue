@@ -32,6 +32,7 @@ import {
   tripDurationDays,
 } from '@/utils/vacation';
 import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
+import ExpandableText from '@/components/ui/ExpandableText.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
@@ -1015,27 +1016,13 @@ function addQuickIdea() {
                             </span>
                           </div>
 
-                          <!-- Inline-editable text field with pencil hint -->
-                          <div v-else-if="row.field" class="group/field relative min-w-0 shrink">
-                            <input
-                              :type="row.inputType ?? 'text'"
-                              :value="row.value"
-                              :size="Math.max(String(row.value).length, 8)"
-                              class="font-outfit w-auto border-0 border-b border-dashed border-transparent bg-transparent pr-5 text-sm font-medium text-gray-900 transition-colors outline-none hover:border-gray-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
-                              @change="
-                                saveInlineField(
-                                  item,
-                                  row.field!,
-                                  ($event.target as HTMLInputElement).value
-                                )
-                              "
-                            />
-                            <span
-                              class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
-                            >
-                              ✏️
-                            </span>
-                          </div>
+                          <!-- Text / prose field — display-only with expand-to-read-more;
+                               edit via the ✏️ button on the card header -->
+                          <ExpandableText
+                            v-else-if="row.field"
+                            :text="String(row.value ?? '')"
+                            text-class="font-outfit text-sm font-medium text-gray-900 dark:text-gray-100"
+                          />
 
                           <!-- Map link (entire row clickable) -->
                           <a

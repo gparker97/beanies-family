@@ -4505,6 +4505,8 @@ const STRING_DEFS = {
   'vacation.bookingDetails': { en: 'Booking details', beanie: 'booking details' },
   'vacation.tripShape': { en: 'Trip shape', beanie: 'trip shape' },
   'vacation.essentials': { en: 'Essentials', beanie: 'essentials' },
+  'action.showMore': { en: 'Show more', beanie: 'show more' },
+  'action.showLess': { en: 'Show less', beanie: 'show less' },
   'travel.today.label': { en: 'Today', beanie: 'today' },
   'travel.today.dayPrefix': { en: 'Day', beanie: 'day' },
   'travel.today.of': { en: 'of', beanie: 'of' },
