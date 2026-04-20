@@ -98,6 +98,11 @@ const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const editingOccurrenceDate = ref<string | undefined>(undefined);
 const selectedDate = ref<string | undefined>(undefined);
+// Highlighted day on the monthly/weekly grid + the day the daily view
+// jumps to when the user clicks a cell. Separate from `sidebarDate`
+// (which drives the agenda drawer) so the two affordances don't
+// share state.
+const focusedDate = ref<string | null>(null);
 const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
 
@@ -162,6 +167,14 @@ function openAddModal(date?: string, time?: string, memberId?: string) {
 }
 
 function handleCalendarDateClick(date: string) {
+  // Clicking a day in the monthly/weekly grid drills into that day's
+  // timeline instead of popping the agenda drawer — the agenda stays
+  // reachable via the button in the daily nav bar (see handleOpenAgenda).
+  focusedDate.value = date;
+  activeView.value = 'day';
+}
+
+function handleOpenAgenda(date: string) {
   sidebarDate.value = date;
 }
 
@@ -485,7 +498,7 @@ function handleActivitySwapped(newId: string) {
     <CalendarGrid
       v-if="activeView === 'month'"
       ref="calendarGridRef"
-      :selected-date="sidebarDate ?? undefined"
+      :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
       @vacation-click="handleVacationClick"
     />
@@ -493,7 +506,7 @@ function handleActivitySwapped(newId: string) {
     <WeeklyCalendarView
       v-else-if="activeView === 'week'"
       ref="weeklyViewRef"
-      :selected-date="sidebarDate ?? undefined"
+      :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
       @add-activity="(date: string, time?: string) => openAddModal(date, time)"
       @view-activity="(id: string, date: string) => openViewModal(id, date)"
@@ -504,7 +517,9 @@ function handleActivitySwapped(newId: string) {
     <DailyCalendarView
       v-else-if="activeView === 'day'"
       ref="dailyViewRef"
+      :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
+      @open-agenda="handleOpenAgenda"
       @add-activity="
         (date: string, time?: string, memberId?: string) => openAddModal(date, time, memberId)
       "

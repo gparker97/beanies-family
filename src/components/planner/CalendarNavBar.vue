@@ -37,12 +37,15 @@ const { t } = useTranslation();
       </button>
     </div>
 
-    <button
-      type="button"
-      class="font-outfit text-primary-500 hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
-      @click="$emit('today')"
-    >
-      {{ t('planner.today') }}
-    </button>
+    <div class="flex items-center gap-1">
+      <slot name="actions" />
+      <button
+        type="button"
+        class="font-outfit text-primary-500 hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
+        @click="$emit('today')"
+      >
+        {{ t('planner.today') }}
+      </button>
+    </div>
   </div>
 </template>
