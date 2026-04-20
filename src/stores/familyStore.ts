@@ -24,13 +24,27 @@ export const useFamilyStore = defineStore('family', () => {
 
   const isSetupComplete = computed(() => hasOwner.value || members.value.length > 0);
 
-  /** Members sorted: adults first (oldest→youngest), then children, alphabetical fallback */
+  /**
+   * Members sorted in roster order: adults (oldest → youngest) → children
+   * (oldest → youngest) → pets (alphabetical). Pets always land last so
+   * human-first surfaces like Meet the Beans, scrapbook cards, and
+   * calendar member rails keep the family front-and-centre; humans still
+   * sort by age within each tier and fall back to name.
+   */
   const sortedMembers = computed(() =>
     [...members.value].sort((a, b) => {
+      // Tier 1: pets always after humans.
+      const aIsPet = !!a.isPet;
+      const bIsPet = !!b.isPet;
+      if (aIsPet !== bIsPet) return aIsPet ? 1 : -1;
+      // Tier 2: adults before children (only meaningful between humans —
+      // pets are already isolated in their own tier above).
       if (a.ageGroup !== b.ageGroup) return a.ageGroup === 'adult' ? -1 : 1;
+      // Tier 3: oldest first within the same tier.
       const yearA = a.dateOfBirth?.year ?? Infinity;
       const yearB = b.dateOfBirth?.year ?? Infinity;
       if (yearA !== yearB) return yearA - yearB;
+      // Tier 4: name for stability.
       return a.name.localeCompare(b.name);
     })
   );
