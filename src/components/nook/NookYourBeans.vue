@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { getMemberRoleLabel } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import type { Gender, AgeGroup } from '@/types/models';
@@ -12,13 +13,6 @@ const emit = defineEmits<{
   'add-member': [];
   'select-member': [memberId: string];
 }>();
-
-function getRoleLabel(member: { role: string; ageGroup?: string }): string {
-  if (member.role === 'owner' || member.ageGroup === 'adult') {
-    return t('dashboard.roleParent');
-  }
-  return t('dashboard.roleLittleBean');
-}
 </script>
 
 <template>
@@ -27,9 +21,9 @@ function getRoleLabel(member: { role: string; ageGroup?: string }): string {
       {{ t('nook.yourBeans') }}
     </div>
     <div class="flex gap-4 overflow-x-auto py-5">
-      <!-- Family members -->
+      <!-- Family members — ordered adults -> children -> pets via sortedMembers. -->
       <button
-        v-for="member in familyStore.members"
+        v-for="member in familyStore.sortedMembers"
         :key="member.id"
         type="button"
         class="flex flex-col items-center gap-1 transition-transform duration-200 hover:-translate-y-1"
@@ -56,7 +50,7 @@ function getRoleLabel(member: { role: string; ageGroup?: string }): string {
           {{ member.name }}
         </div>
         <div class="text-secondary-500/35 text-xs dark:text-gray-500">
-          {{ getRoleLabel(member) }}
+          {{ getMemberRoleLabel(member, t) }}
         </div>
       </button>
 

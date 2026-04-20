@@ -550,10 +550,10 @@ function cancelEditFamilyName() {
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
       <!-- Main column -->
       <div class="space-y-6">
-        <!-- Member cards grid -->
+        <!-- Member cards grid — ordered adults -> children -> pets via sortedMembers. -->
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <BeanCard
-            v-for="member in familyStore.members"
+            v-for="member in familyStore.sortedMembers"
             :key="member.id"
             :member="member"
             :can-manage="canManagePod"

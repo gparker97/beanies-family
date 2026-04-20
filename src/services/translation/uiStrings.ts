@@ -1617,6 +1617,7 @@ const STRING_DEFS = {
   'dashboard.noRecurringItems': { en: 'No recurring items yet', beanie: 'no recurring beans yet' },
   'dashboard.roleParent': { en: 'Parent', beanie: 'big bean' },
   'dashboard.roleLittleBean': { en: 'Little Beanie', beanie: 'little beanie' },
+  'dashboard.rolePet': { en: 'Pet Beanie', beanie: 'pet beanie' },
   'dashboard.chartHidden': { en: 'Chart hidden', beanie: 'chart hidden' },
   'dashboard.noDataYet': { en: 'No data yet', beanie: 'no beans to chart yet' },
   'dashboard.comingUp': { en: 'Coming Up', beanie: 'coming up' },
