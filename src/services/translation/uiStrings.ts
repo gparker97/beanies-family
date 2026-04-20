@@ -4505,6 +4505,14 @@ const STRING_DEFS = {
   'vacation.bookingDetails': { en: 'Booking details', beanie: 'booking details' },
   'vacation.tripShape': { en: 'Trip shape', beanie: 'trip shape' },
   'vacation.essentials': { en: 'Essentials', beanie: 'essentials' },
+  'travel.today.label': { en: 'Today', beanie: 'today' },
+  'travel.today.dayPrefix': { en: 'Day', beanie: 'day' },
+  'travel.today.of': { en: 'of', beanie: 'of' },
+  'travel.today.freeDay': { en: 'free and easy', beanie: 'free and easy — go frolic' },
+  'travel.today.tripEnded': {
+    en: 'This trip has wrapped up',
+    beanie: 'this trip has wrapped up — welcome home',
+  },
 
   // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
   'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },

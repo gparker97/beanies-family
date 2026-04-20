@@ -19,7 +19,7 @@ import { useClipboard } from '@/composables/useClipboard';
 import { confirm } from '@/composables/useConfirm';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
-import { formatDateShort, formatNookDate } from '@/utils/date';
+import { formatDateShort, formatNookDate, toDateInputValue, extractDatePart } from '@/utils/date';
 import {
   tripTypeEmoji,
   bookingProgress,
@@ -27,7 +27,11 @@ import {
   tripCountdownKey,
   computeAccommodationGaps,
   computeTimelineHints,
+  classifyTripDay,
+  tripDayNumber,
+  tripDurationDays,
 } from '@/utils/vacation';
+import TodayTimelineMarker from '@/components/travel/TodayTimelineMarker.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
@@ -89,10 +93,17 @@ const selectedVacation = computed(() =>
 
 const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(selectedVacation);
 
-/** Merged timeline: interleave date groups with gap warnings at correct positions */
+/** Merged timeline: interleave date groups with gap warnings + today marker */
 type TimelineEntry =
   | { type: 'group'; data: (typeof groupedByDate)['value'][number] }
-  | { type: 'gap'; date: string; label: string };
+  | { type: 'gap'; date: string; label: string }
+  | {
+      type: 'today-marker';
+      date: string;
+      dayNumber: number;
+      totalDays: number;
+      isFreeDay: boolean;
+    };
 
 /** Split ideas into unplanned and planned */
 const unplannedIdeas = computed(
@@ -129,6 +140,17 @@ function scrollToOutOfRange(): void {
 
 /** Which hint tooltip is currently expanded */
 
+const todayISO = computed(() => toDateInputValue(new Date()));
+
+/** True when today falls inside `[tripStart, tripEnd]` inclusive. */
+const isMidTrip = computed(() => {
+  const v = selectedVacation.value;
+  if (!v?.startDate || !v?.endDate) return false;
+  const start = extractDatePart(v.startDate);
+  const end = extractDatePart(v.endDate);
+  return todayISO.value >= start && todayISO.value <= end;
+});
+
 const mergedTimeline = computed<TimelineEntry[]>(() => {
   const entries: TimelineEntry[] = [];
   for (const g of groupedByDate.value) {
@@ -137,11 +159,31 @@ const mergedTimeline = computed<TimelineEntry[]>(() => {
   for (const gapDate of accommodationGaps.value) {
     entries.push({ type: 'gap', date: gapDate, label: formatNookDate(gapDate) });
   }
+
+  // Inject the "you are here" marker when today sits inside the trip window.
+  const v = selectedVacation.value;
+  if (isMidTrip.value && v?.startDate && v?.endDate) {
+    const dayNumber = tripDayNumber(todayISO.value, v.startDate) ?? 0;
+    const totalDays = tripDurationDays(v.startDate, v.endDate);
+    const hasSegmentsToday = entries.some(
+      (e) => e.type === 'group' && e.data.date === todayISO.value
+    );
+    entries.push({
+      type: 'today-marker',
+      date: todayISO.value,
+      dayNumber,
+      totalDays,
+      isFreeDay: !hasSegmentsToday,
+    });
+  }
+
   entries.sort((a, b) => {
     const dateA = a.type === 'group' ? a.data.date : a.date;
     const dateB = b.type === 'group' ? b.data.date : b.date;
     if (dateA !== dateB) return dateA.localeCompare(dateB);
-    return a.type === 'group' ? -1 : 1;
+    // Same-date tiebreak: today-marker first (above), then group, then gap.
+    const prio = (e: TimelineEntry) => (e.type === 'today-marker' ? 0 : e.type === 'group' ? 1 : 2);
+    return prio(a) - prio(b);
   });
   return entries;
 });
@@ -821,182 +863,217 @@ function addQuickIdea() {
                 </div>
               </template>
 
+              <!-- ── Today marker (rail punch-in) ── -->
+              <template v-else-if="entry.type === 'today-marker'">
+                <TodayTimelineMarker
+                  :date="entry.date"
+                  :day-number="entry.dayNumber"
+                  :total-days="entry.totalDays"
+                  :is-free-day="entry.isFreeDay"
+                />
+              </template>
+
               <!-- ── Date group with segment cards ── -->
               <template v-else>
-                <!-- Date node -->
-                <div class="relative flex items-center pt-3 pb-1">
-                  <div
-                    class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-[#00B4D8] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
-                  >
-                    📅
-                  </div>
-                  <span class="font-outfit text-[13px] font-bold text-gray-900 dark:text-gray-100">
-                    {{ entry.data.label }}
-                  </span>
-                </div>
-
-                <!-- Segment cards within this date -->
-                <div v-for="item in entry.data.items" :key="item.id" class="relative mb-2">
-                  <!-- Connector dot -->
-                  <div
-                    class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[#00B4D8] opacity-25"
-                  />
-                  <div
-                    class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px] bg-[rgba(0,180,216,0.12)]"
-                  />
-
-                  <VacationSegmentCard
-                    :icon="item.icon"
-                    :title="item.title"
-                    :status="item.status"
-                    :data-segment-id="item.id"
-                    :key-value="
-                      item.keyValue +
-                      (hintMap.get(item.id)?.nightFlight === 'early-morning'
-                        ? ' · 🌙 early morning'
-                        : hintMap.get(item.id)?.nightFlight === 'late-night'
-                          ? ' · 🌙 late night'
-                          : '')
-                    "
-                    :collapsed="isCollapsed(item.id)"
-                    :read-only="false"
-                    show-edit
-                    deletable
-                    :hint="hintMap.get(item.id)?.message"
-                    @update:title="saveInlineField(item, 'title', $event)"
-                    @update:collapsed="setCollapsed(item.id, $event)"
-                    @edit="openEditModal(item)"
-                    @delete="deleteTimelineItem(item)"
-                  >
-                    <!-- Detail rows — divided, compact, inline-editable with pencil -->
-                    <div class="divide-y divide-gray-100 dark:divide-slate-700/40">
-                      <div
-                        v-for="row in item.detailRows"
-                        :key="row.label"
-                        class="flex items-center gap-3 py-1 first:pt-0 last:pb-0"
+                <!-- Classification drives past-day muting + today emphasis -->
+                <div
+                  :class="{
+                    'opacity-55 saturate-50': classifyTripDay(entry.data.date) === 'past',
+                  }"
+                >
+                  <!-- Date node -->
+                  <div class="relative flex items-center pt-3 pb-1">
+                    <div
+                      class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
+                      :class="
+                        classifyTripDay(entry.data.date) === 'today'
+                          ? 'border-[var(--heritage-orange)]'
+                          : 'border-[#00B4D8]'
+                      "
+                    >
+                      📅
+                    </div>
+                    <span
+                      class="font-outfit flex items-baseline gap-1.5 text-[13px] font-bold text-gray-900 dark:text-gray-100"
+                    >
+                      <span
+                        v-if="
+                          selectedVacation.startDate &&
+                          tripDayNumber(entry.data.date, selectedVacation.startDate) !== null
+                        "
+                        class="font-outfit text-[10px] font-semibold tracking-[0.14em] text-[var(--color-text-muted)] uppercase"
                       >
-                        <!-- Label -->
-                        <span
-                          class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
-                        >
-                          {{ row.label }}
-                        </span>
+                        {{ t('travel.today.dayPrefix') }}
+                        {{ tripDayNumber(entry.data.date, selectedVacation.startDate) }}
+                        ·
+                      </span>
+                      {{ entry.data.label }}
+                    </span>
+                  </div>
 
-                        <!-- Copyable value (booking ref only) -->
-                        <button
-                          v-if="row.copyable"
-                          class="font-outfit inline-flex items-center gap-1.5 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2.5 py-0.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
-                          @click="copy(row.value)"
-                        >
-                          {{ row.value }}
-                          <span class="text-xs opacity-30">📋</span>
-                        </button>
+                  <!-- Segment cards within this date -->
+                  <div v-for="item in entry.data.items" :key="item.id" class="relative mb-2">
+                    <!-- Connector dot -->
+                    <div
+                      class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[#00B4D8] opacity-25"
+                    />
+                    <div
+                      class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px] bg-[rgba(0,180,216,0.12)]"
+                    />
 
-                        <!-- Inline-editable date/time: show formatted text with hidden native picker -->
+                    <VacationSegmentCard
+                      :icon="item.icon"
+                      :title="item.title"
+                      :status="item.status"
+                      :data-segment-id="item.id"
+                      :key-value="
+                        item.keyValue +
+                        (hintMap.get(item.id)?.nightFlight === 'early-morning'
+                          ? ' · 🌙 early morning'
+                          : hintMap.get(item.id)?.nightFlight === 'late-night'
+                            ? ' · 🌙 late night'
+                            : '')
+                      "
+                      :collapsed="isCollapsed(item.id)"
+                      :read-only="false"
+                      show-edit
+                      deletable
+                      :hint="hintMap.get(item.id)?.message"
+                      @update:title="saveInlineField(item, 'title', $event)"
+                      @update:collapsed="setCollapsed(item.id, $event)"
+                      @edit="openEditModal(item)"
+                      @delete="deleteTimelineItem(item)"
+                    >
+                      <!-- Detail rows — divided, compact, inline-editable with pencil -->
+                      <div class="divide-y divide-gray-100 dark:divide-slate-700/40">
                         <div
-                          v-else-if="
-                            row.field && (row.inputType === 'date' || row.inputType === 'time')
-                          "
-                          class="group/field relative min-w-0 shrink"
+                          v-for="row in item.detailRows"
+                          :key="row.label"
+                          class="flex items-center gap-3 py-1 first:pt-0 last:pb-0"
                         >
+                          <!-- Label -->
                           <span
-                            class="font-outfit cursor-pointer border-b border-dashed border-transparent pr-6 text-sm font-medium text-gray-900 transition-colors hover:border-gray-300 dark:text-gray-100"
-                            @click="
-                              (
-                                $refs[`input-${row.field}`] as HTMLInputElement[]
-                              )?.[0]?.showPicker?.()
-                            "
+                            class="font-outfit w-20 shrink-0 text-xs font-semibold text-gray-400 uppercase dark:text-gray-500"
                           >
-                            {{ row.displayValue || row.value
-                            }}{{
-                              row.inputType === 'date' &&
-                              hintMap.get(item.id)?.nightFlight === 'early-morning'
-                                ? ' 🌙 early morning'
-                                : row.inputType === 'date' &&
-                                    hintMap.get(item.id)?.nightFlight === 'late-night'
-                                  ? ' 🌙 late night'
-                                  : ''
-                            }}
+                            {{ row.label }}
                           </span>
-                          <input
-                            :ref="`input-${row.field}`"
-                            :type="row.inputType"
-                            :value="row.value"
-                            class="pointer-events-none absolute inset-0 opacity-0"
-                            tabindex="-1"
-                            @change="
-                              saveInlineField(
-                                item,
-                                row.field!,
-                                ($event.target as HTMLInputElement).value
-                              )
-                            "
-                          />
-                          <span
-                            class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
-                          >
-                            ✏️
-                          </span>
-                        </div>
 
-                        <!-- Inline-editable text field with pencil hint -->
-                        <div v-else-if="row.field" class="group/field relative min-w-0 shrink">
-                          <input
-                            :type="row.inputType ?? 'text'"
-                            :value="row.value"
-                            :size="Math.max(String(row.value).length, 8)"
-                            class="font-outfit w-auto border-0 border-b border-dashed border-transparent bg-transparent pr-5 text-sm font-medium text-gray-900 transition-colors outline-none hover:border-gray-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
-                            @change="
-                              saveInlineField(
-                                item,
-                                row.field!,
-                                ($event.target as HTMLInputElement).value
-                              )
-                            "
-                          />
-                          <span
-                            class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
+                          <!-- Copyable value (booking ref only) -->
+                          <button
+                            v-if="row.copyable"
+                            class="font-outfit inline-flex items-center gap-1.5 rounded-lg border border-[var(--tint-slate-10)] bg-white px-2.5 py-0.5 text-sm font-semibold text-[var(--color-text)] transition-colors hover:border-[#00B4D8] hover:bg-[rgba(0,180,216,0.08)] dark:bg-slate-700 dark:text-white"
+                            @click="copy(row.value)"
                           >
-                            ✏️
-                          </span>
-                        </div>
-
-                        <!-- Map link (entire row clickable) -->
-                        <a
-                          v-else-if="row.mapLink"
-                          :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="flex min-w-0 items-center gap-1.5"
-                        >
-                          <span class="truncate text-sm text-[#00B4D8] hover:underline">
                             {{ row.value }}
-                          </span>
-                          <span class="shrink-0 text-xs opacity-40">📍</span>
-                        </a>
+                            <span class="text-xs opacity-30">📋</span>
+                          </button>
 
-                        <!-- Clickable link -->
-                        <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">
-                          <a
-                            :href="
-                              row.value.startsWith('http') ? row.value : `https://${row.value}`
+                          <!-- Inline-editable date/time: show formatted text with hidden native picker -->
+                          <div
+                            v-else-if="
+                              row.field && (row.inputType === 'date' || row.inputType === 'time')
                             "
+                            class="group/field relative min-w-0 shrink"
+                          >
+                            <span
+                              class="font-outfit cursor-pointer border-b border-dashed border-transparent pr-6 text-sm font-medium text-gray-900 transition-colors hover:border-gray-300 dark:text-gray-100"
+                              @click="
+                                (
+                                  $refs[`input-${row.field}`] as HTMLInputElement[]
+                                )?.[0]?.showPicker?.()
+                              "
+                            >
+                              {{ row.displayValue || row.value
+                              }}{{
+                                row.inputType === 'date' &&
+                                hintMap.get(item.id)?.nightFlight === 'early-morning'
+                                  ? ' 🌙 early morning'
+                                  : row.inputType === 'date' &&
+                                      hintMap.get(item.id)?.nightFlight === 'late-night'
+                                    ? ' 🌙 late night'
+                                    : ''
+                              }}
+                            </span>
+                            <input
+                              :ref="`input-${row.field}`"
+                              :type="row.inputType"
+                              :value="row.value"
+                              class="pointer-events-none absolute inset-0 opacity-0"
+                              tabindex="-1"
+                              @change="
+                                saveInlineField(
+                                  item,
+                                  row.field!,
+                                  ($event.target as HTMLInputElement).value
+                                )
+                              "
+                            />
+                            <span
+                              class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
+                            >
+                              ✏️
+                            </span>
+                          </div>
+
+                          <!-- Inline-editable text field with pencil hint -->
+                          <div v-else-if="row.field" class="group/field relative min-w-0 shrink">
+                            <input
+                              :type="row.inputType ?? 'text'"
+                              :value="row.value"
+                              :size="Math.max(String(row.value).length, 8)"
+                              class="font-outfit w-auto border-0 border-b border-dashed border-transparent bg-transparent pr-5 text-sm font-medium text-gray-900 transition-colors outline-none hover:border-gray-300 focus:border-[var(--vacation-teal)] dark:text-gray-100 dark:hover:border-slate-500"
+                              @change="
+                                saveInlineField(
+                                  item,
+                                  row.field!,
+                                  ($event.target as HTMLInputElement).value
+                                )
+                              "
+                            />
+                            <span
+                              class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
+                            >
+                              ✏️
+                            </span>
+                          </div>
+
+                          <!-- Map link (entire row clickable) -->
+                          <a
+                            v-else-if="row.mapLink"
+                            :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.value)}`"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="truncate text-sm text-[#00B4D8] hover:underline"
+                            class="flex min-w-0 items-center gap-1.5"
                           >
-                            {{ row.value.replace(/^https?:\/\//, '') }}
+                            <span class="truncate text-sm text-[#00B4D8] hover:underline">
+                              {{ row.value }}
+                            </span>
+                            <span class="shrink-0 text-xs opacity-40">📍</span>
                           </a>
-                          <span class="shrink-0 text-xs opacity-40">🔗</span>
-                        </div>
 
-                        <!-- Plain read-only value -->
-                        <span v-else class="text-sm text-gray-900 dark:text-gray-100">
-                          {{ row.value }}
-                        </span>
+                          <!-- Clickable link -->
+                          <div v-else-if="row.isLink" class="flex min-w-0 items-center gap-1.5">
+                            <a
+                              :href="
+                                row.value.startsWith('http') ? row.value : `https://${row.value}`
+                              "
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="truncate text-sm text-[#00B4D8] hover:underline"
+                            >
+                              {{ row.value.replace(/^https?:\/\//, '') }}
+                            </a>
+                            <span class="shrink-0 text-xs opacity-40">🔗</span>
+                          </div>
+
+                          <!-- Plain read-only value -->
+                          <span v-else class="text-sm text-gray-900 dark:text-gray-100">
+                            {{ row.value }}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </VacationSegmentCard>
+                    </VacationSegmentCard>
+                  </div>
                 </div>
               </template>
             </template>
