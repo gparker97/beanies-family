@@ -61,24 +61,12 @@ function openEditCookLog(e: CookLogEntry): void {
   cookLogOpen.value = true;
 }
 
-// Hero photo — blob URL resolved from the first photoId.
-const heroUrl = ref<string | null>(null);
-async function resolveHero(): Promise<void> {
+// Hero photo — public Drive URL (ADR-021). Sync, no fetch.
+const heroUrl = computed<string | null>(() => {
   const pid = recipe.value?.photoIds?.[0];
-  if (!pid) {
-    heroUrl.value = null;
-    return;
-  }
-  try {
-    heroUrl.value = await photoStore.getBlobUrl(pid);
-  } catch (e) {
-    console.warn('[recipeDetail] hero photo resolve failed', e);
-    heroUrl.value = null;
-  }
-}
-// Resolve once per route param change.
-import { watch } from 'vue';
-watch(() => recipe.value?.photoIds?.[0], resolveHero, { immediate: true });
+  if (!pid) return null;
+  return photoStore.getPublicUrl(pid, 'full');
+});
 
 const statStrip = computed(() => {
   if (!recipe.value) return [];

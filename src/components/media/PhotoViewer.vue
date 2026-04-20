@@ -52,28 +52,39 @@ watch(
   (open) => {
     if (open) {
       currentIndex.value = props.initialIndex;
-      void resolve();
+      resolve();
     }
   }
 );
 
 watch(currentPhotoId, () => {
-  if (props.open) void resolve();
+  if (props.open) resolve();
 });
 
-async function resolve(): Promise<void> {
-  if (!currentPhotoId.value) return;
-  loading.value = true;
-  fullUrl.value = null;
-  try {
-    // Blob-download path — see PhotoThumbnail for why we're off
-    // thumbnailLink for avatars / bottle photos / recipe photos.
-    fullUrl.value = await store.getBlobUrl(currentPhotoId.value);
-  } catch (e) {
-    console.warn('[PhotoViewer] getBlobUrl failed', e);
-  } finally {
+function resolve(): void {
+  if (!currentPhotoId.value) {
+    fullUrl.value = null;
     loading.value = false;
+    return;
   }
+  // Public Drive CDN URL (ADR-021). No fetch, no OAuth — the `<img>`
+  // downloads directly from Drive using the anyone-with-link grant
+  // attached to the file at upload time.
+  fullUrl.value = store.getPublicUrl(currentPhotoId.value, 'full');
+  loading.value = !!fullUrl.value;
+}
+
+function handleImgLoaded(): void {
+  loading.value = false;
+}
+
+function handleImgError(): void {
+  loading.value = false;
+  if (currentPhotoId.value) {
+    store.markUnresolved(currentPhotoId.value);
+    console.warn('[PhotoViewer] image failed to load', currentPhotoId.value);
+  }
+  fullUrl.value = null;
 }
 
 function goPrev(): void {
@@ -123,7 +134,7 @@ const replacePicker = useFilePicker({
     if (!file) return;
     try {
       await store.replacePhotoFile(currentPhotoId.value, file);
-      await resolve();
+      resolve();
     } catch (e) {
       console.warn('[PhotoViewer] replace failed', e);
     }
@@ -188,6 +199,8 @@ async function handleRemoveMissing(): Promise<void> {
         :src="fullUrl"
         :alt="''"
         class="max-h-[80vh] max-w-full object-contain"
+        @load="handleImgLoaded"
+        @error="handleImgError"
       />
     </div>
 

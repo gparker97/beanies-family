@@ -13,6 +13,7 @@ import {
   clearFolderCache,
   findBeanpodInFolder,
   NoBeanpodInFolderError,
+  setPublicLinkPermission,
   DriveApiError,
   DriveFileNotFoundError,
 } from '../driveService';
@@ -435,6 +436,26 @@ describe('driveService', () => {
     it('surfaces 403 as DriveFileNotFoundError (not silenced)', async () => {
       globalThis.fetch = mockFetch({ error: { message: 'forbidden' } }, 403);
       await expect(findBeanpodInFolder(mockToken, 'folder-denied')).rejects.toBeInstanceOf(
+        DriveFileNotFoundError
+      );
+    });
+  });
+
+  describe('setPublicLinkPermission', () => {
+    it('POSTs type=anyone, role=reader to the file permissions endpoint', async () => {
+      globalThis.fetch = mockFetch({ id: 'perm-123' });
+      await setPublicLinkPermission(mockToken, 'file-xyz');
+
+      const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+      expect(url).toContain('/files/file-xyz/permissions');
+      expect(init?.method).toBe('POST');
+      const body = JSON.parse(init?.body as string);
+      expect(body).toEqual({ type: 'anyone', role: 'reader' });
+    });
+
+    it('surfaces 403 as DriveFileNotFoundError for callers to branch on', async () => {
+      globalThis.fetch = mockFetch({ error: { message: 'forbidden' } }, 403);
+      await expect(setPublicLinkPermission(mockToken, 'file-denied')).rejects.toBeInstanceOf(
         DriveFileNotFoundError
       );
     });

@@ -1,22 +1,14 @@
 /**
  * Reactively resolve a `FamilyMember.avatarPhotoId` to a displayable URL.
  *
- * Uses `photoStore.getBlobUrl` — authorized `alt=media` download turned
- * into a `blob:` URL via `URL.createObjectURL`. That path was picked
- * over the Drive `thumbnailLink` approach after repeated "photo fails
- * to load after a reload" reports: `lh3.googleusercontent.com` URLs
- * embed short-lived tokens that rotate well inside our cache TTL and
- * don't survive fresh `<img>` mounts. Blob URLs live in-process and
- * don't rotate, which is what we want for the small-number-of-photos
- * avatar surface.
- *
- * Tradeoff: full-size image download (no CDN-side resize), but avatar
- * files are compressed to 1024px at q=0.92 so they're typically <100KB.
+ * Uses `photoStore.getPublicUrl` — direct Drive CDN URL backed by the
+ * anyone-with-link grant every photo upload installs (ADR-021). No
+ * OAuth fetch, no blob caching, no token rotation to worry about.
  *
  * Returns `{ url, refresh }`. `refresh()` is wired to BeanieAvatar's
- * `@photo-error` — drops the cache + retries once. Most of the time
- * it's a no-op (blob URLs don't go bad) but it's there for the rare
- * case where Drive replaced the underlying file.
+ * `@photo-error` — if the `<img>` fires onerror (usually a genuinely
+ * deleted Drive file), we mark the photo unresolved so future resolves
+ * return null and downstream UI can show a fallback.
  */
 import { computed, ref, watchEffect, unref, type MaybeRefOrGetter } from 'vue';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -32,16 +24,7 @@ export function useAvatarPhotoUrl(avatarPhotoId: MaybeRefOrGetter<UUID | undefin
     return typeof v === 'function' ? v() : unref(v);
   });
 
-  async function resolve(id: UUID): Promise<void> {
-    try {
-      url.value = await photoStore.getBlobUrl(id);
-    } catch (e) {
-      console.warn('[avatarPhotoUrl] resolve failed', e);
-      url.value = null;
-    }
-  }
-
-  watchEffect(async () => {
+  watchEffect(() => {
     const id = resolvedId.value;
     if (!id) {
       url.value = null;
@@ -49,16 +32,24 @@ export function useAvatarPhotoUrl(avatarPhotoId: MaybeRefOrGetter<UUID | undefin
       return;
     }
     if (retriedForId && retriedForId !== id) retriedForId = null;
-    await resolve(id);
+    url.value = photoStore.getPublicUrl(id, 'thumb');
   });
 
-  async function refresh(): Promise<void> {
+  function refresh(): void {
     const id = resolvedId.value;
     if (!id) return;
-    if (retriedForId === id) return;
+    if (retriedForId === id) {
+      // Second failure — flag as genuinely broken so future callers
+      // see the null-URL state.
+      photoStore.markUnresolved(id);
+      url.value = null;
+      console.warn('[avatarPhotoUrl] image failed twice — marking unresolved', id);
+      return;
+    }
     retriedForId = id;
-    photoStore.invalidateThumbCache(id);
-    await resolve(id);
+    // Re-read the same URL; `<img>` may have hit a transient Drive
+    // hiccup on first paint.
+    url.value = photoStore.getPublicUrl(id, 'thumb');
   }
 
   return { url, refresh };

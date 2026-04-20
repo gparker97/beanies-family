@@ -19,7 +19,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePhotoStore } from '@/stores/photoStore';
-import type { Recipe, UUID } from '@/types/models';
+import type { Recipe } from '@/types/models';
 
 const router = useRouter();
 const { t } = useTranslation();
@@ -42,29 +42,14 @@ const avgRating = computed(() => {
   return Math.round((sum / recipesStore.cookLogs.length) * 10) / 10;
 });
 
-// Per-recipe hero thumbnail. Returns null while resolving or when the
-// recipe has no photos; PolaroidImage renders its placeholder in that
-// case. Cached per recipe id so repeat card renders don't re-fetch.
-const thumbCache = ref<Record<UUID, string | null>>({});
-
-async function getRecipeThumb(recipe: Recipe): Promise<void> {
-  if (!recipe.photoIds?.length) return;
-  const first = recipe.photoIds[0]!;
-  if (thumbCache.value[first] !== undefined) return;
-  thumbCache.value = { ...thumbCache.value, [first]: null };
-  try {
-    const url = await photoStore.getBlobUrl(first);
-    thumbCache.value = { ...thumbCache.value, [first]: url };
-  } catch (e) {
-    console.warn('[cookbookPage] recipe thumb resolve failed', e);
-  }
-}
-
+// Per-recipe hero thumbnail — resolved synchronously via
+// `photoStore.getPublicUrl` (ADR-021 public-link rendering). Returns
+// null when the recipe has no photos or the first photo is tombstoned
+// / unresolved; PolaroidImage renders its placeholder in that case.
 function thumbFor(recipe: Recipe): string | null {
   const id = recipe.photoIds?.[0];
   if (!id) return null;
-  if (thumbCache.value[id] === undefined) void getRecipeThumb(recipe);
-  return thumbCache.value[id] ?? null;
+  return photoStore.getPublicUrl(id, 'thumb');
 }
 
 function openAdd(): void {
