@@ -17,6 +17,7 @@ import { computed, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
+import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useFilePicker } from '@/composables/useFilePicker';
 import { useToast } from '@/composables/useToast';
@@ -78,6 +79,19 @@ function remove() {
   emit('removed', current);
   emit('update:modelValue', undefined);
 }
+
+// Lightbox — opens when the user taps the avatar (only when a photo is
+// set AND we're not in the uploading transition). Read-only viewer so
+// Replace / Remove stay on the picker below where the user expects
+// them; duplicating them inside the viewer would be noise.
+const viewerOpen = ref(false);
+const viewerPhotoIds = computed<UUID[]>(() => (props.modelValue ? [props.modelValue] : []));
+
+function openViewer(): void {
+  if (props.disabled) return;
+  if (!props.modelValue || uploading.value) return;
+  viewerOpen.value = true;
+}
 </script>
 
 <template>
@@ -86,16 +100,31 @@ function remove() {
       :ref="(el) => (picker.inputRef.value = el as HTMLInputElement)"
       v-bind="picker.bindings"
     />
-    <!-- Avatar + uploading overlay (non-blocking; modal stays interactive) -->
+    <!-- Avatar + uploading overlay (non-blocking; modal stays interactive).
+         Wrapped in a button so tap/click (when a photo is set) opens the
+         lightbox. The wrapper is a real <button> for keyboard + screen-
+         reader affordance, but it only acts as an opener — the inner
+         avatar still renders in exactly the same place. -->
     <div class="relative">
-      <BeanieAvatar
-        :variant="variant"
-        :color="color"
-        :photo-url="photoUrl"
-        size="xl"
-        :class="{ 'opacity-40 transition-opacity': uploading }"
-        @photo-error="refreshPhotoUrl"
-      />
+      <button
+        type="button"
+        class="focus:ring-primary-500 rounded-full focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-slate-800"
+        :class="[
+          modelValue && !uploading && !disabled ? 'cursor-zoom-in focus:ring-2' : 'cursor-default',
+        ]"
+        :disabled="!modelValue || uploading || disabled"
+        :aria-label="modelValue ? t('photos.avatar.viewLarger') : undefined"
+        @click="openViewer"
+      >
+        <BeanieAvatar
+          :variant="variant"
+          :color="color"
+          :photo-url="photoUrl"
+          size="xl"
+          :class="{ 'opacity-40 transition-opacity': uploading }"
+          @photo-error="refreshPhotoUrl"
+        />
+      </button>
       <div
         v-if="uploading"
         class="pointer-events-none absolute inset-0 flex items-center justify-center"
@@ -127,7 +156,7 @@ function remove() {
       <button
         v-if="modelValue"
         type="button"
-        class="font-outfit inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-slate-5)] hover:text-red-500"
+        class="font-outfit inline-flex items-center gap-1 rounded-lg border border-red-300 px-2 py-1 font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
         :disabled="uploading"
         @click="remove"
       >
@@ -138,5 +167,15 @@ function remove() {
     <p v-else-if="!disabled && !photosEnabled" class="text-xs text-[var(--color-text-muted)]">
       {{ t('photos.cloudRequired') }}
     </p>
+
+    <!-- Read-only lightbox — surfaces the full-size photo. Replace / Remove
+         intentionally live on the picker below, not inside the viewer, so
+         the user has a single obvious place to edit. -->
+    <PhotoViewer
+      :open="viewerOpen"
+      :photo-ids="viewerPhotoIds"
+      read-only
+      @close="viewerOpen = false"
+    />
   </div>
 </template>

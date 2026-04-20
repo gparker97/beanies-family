@@ -20,9 +20,16 @@ interface Props {
   photoIds: UUID[];
   /** Which photo in `photoIds` is currently shown (defaults to 0). */
   initialIndex?: number;
+  /**
+   * Read-only mode: the footer Replace / Remove / Download actions are
+   * hidden, leaving a pure lightbox. Used by surfaces that own their own
+   * edit controls (e.g. the avatar picker exposes Replace/Remove below
+   * the thumbnail — duplicating them inside the viewer would be noise).
+   */
+  readOnly?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), { initialIndex: 0 });
+const props = withDefaults(defineProps<Props>(), { initialIndex: 0, readOnly: false });
 const emit = defineEmits<{
   close: [];
   remove: [photoId: UUID];
@@ -204,7 +211,7 @@ async function handleRemoveMissing(): Promise<void> {
       />
     </div>
 
-    <template #footer>
+    <template v-if="!readOnly" #footer>
       <div class="flex items-center justify-between gap-2">
         <div class="text-xs text-gray-500 dark:text-white/60">{{ positionLabel }}</div>
         <div class="flex items-center gap-2">

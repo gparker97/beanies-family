@@ -4557,6 +4557,7 @@ const STRING_DEFS = {
   'photos.avatar.upload': { en: 'Upload Photo', beanie: 'upload photo' },
   'photos.avatar.replace': { en: 'Change Photo', beanie: 'change photo' },
   'photos.avatar.remove': { en: 'Remove Photo', beanie: 'remove photo' },
+  'photos.avatar.viewLarger': { en: 'View larger', beanie: 'view larger' },
   'photos.avatar.uploading': { en: 'Uploading photo\u2026', beanie: 'counting beans\u2026' },
   'photos.avatar.uploadFailed': {
     en: "Couldn't upload photo. Check your connection and try again.",
