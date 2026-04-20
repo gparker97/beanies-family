@@ -11,6 +11,7 @@ import {
   addDays,
   toDateInputValue,
   detectNightFlight,
+  daysBetween,
 } from '@/utils/date';
 import { AIRLINES } from '@/constants/airlines';
 import { AIRPORTS } from '@/constants/airports';
@@ -291,6 +292,39 @@ export function prefillTransportationDates<T extends VacationTransportation>(
       return trans;
     }
   }
+}
+
+// ── "You are here" classification (mid-trip timeline markers) ────────────────
+
+/**
+ * Classify a trip date relative to today's local calendar day.
+ * Used by `TravelPlansPage` to mute past days and place the
+ * `<TodayTimelineMarker>` at the right rail position.
+ *
+ * The `today` argument is injectable so tests can stub it; in app code
+ * it defaults to the device's current local date (no UTC surprises).
+ */
+export function classifyTripDay(
+  isoDate: string,
+  today: string = toDateInputValue(new Date())
+): 'past' | 'today' | 'future' {
+  const date = extractDatePart(isoDate);
+  if (date < today) return 'past';
+  if (date > today) return 'future';
+  return 'today';
+}
+
+/**
+ * 1-indexed day number of `isoDate` within the trip that starts on
+ * `tripStart`. Returns `null` if either date is missing/invalid or
+ * if `isoDate` falls before the trip started.
+ */
+export function tripDayNumber(isoDate: string, tripStart: string | undefined): number | null {
+  if (!tripStart || !isValidISODate(isoDate) || !isValidISODate(tripStart)) return null;
+  const date = extractDatePart(isoDate);
+  const start = extractDatePart(tripStart);
+  if (date < start) return null;
+  return daysBetween(start, date) + 1;
 }
 
 /**

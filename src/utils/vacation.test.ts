@@ -12,6 +12,8 @@ import {
   prefillTransportationDates,
   isValidISODate,
   computeTimelineHints,
+  classifyTripDay,
+  tripDayNumber,
 } from './vacation';
 import { daysBetween } from './date';
 import type {
@@ -615,5 +617,55 @@ describe('computeTimelineHints — detectOutOfRange', () => {
     });
     const hints = computeTimelineHints(v);
     expect(hints.get('s-dateless')).toBeUndefined();
+  });
+});
+
+// ── classifyTripDay ──
+
+describe('classifyTripDay', () => {
+  it('returns "past" for a date before today', () => {
+    expect(classifyTripDay('2026-06-01', '2026-06-05')).toBe('past');
+  });
+
+  it('returns "today" for the same date', () => {
+    expect(classifyTripDay('2026-06-05', '2026-06-05')).toBe('today');
+  });
+
+  it('returns "future" for a date after today', () => {
+    expect(classifyTripDay('2026-06-10', '2026-06-05')).toBe('future');
+  });
+
+  it('uses the device local date as default for today', () => {
+    expect(classifyTripDay('1999-01-01')).toBe('past');
+    expect(classifyTripDay('2099-12-31')).toBe('future');
+  });
+});
+
+// ── tripDayNumber ──
+
+describe('tripDayNumber', () => {
+  it('returns 1 for the trip start date', () => {
+    expect(tripDayNumber('2026-06-01', '2026-06-01')).toBe(1);
+  });
+
+  it('returns the correct 1-indexed day for a mid-trip date', () => {
+    expect(tripDayNumber('2026-06-05', '2026-06-01')).toBe(5);
+  });
+
+  it('returns null when the date is before the trip starts', () => {
+    expect(tripDayNumber('2026-05-31', '2026-06-01')).toBeNull();
+  });
+
+  it('returns null when tripStart is missing', () => {
+    expect(tripDayNumber('2026-06-05', undefined)).toBeNull();
+  });
+
+  it('returns null for malformed date strings', () => {
+    expect(tripDayNumber('not-a-date', '2026-06-01')).toBeNull();
+    expect(tripDayNumber('2026-06-05', '06/01/2026')).toBeNull();
+  });
+
+  it('handles dates that span a month boundary', () => {
+    expect(tripDayNumber('2026-07-03', '2026-06-29')).toBe(5);
   });
 });
