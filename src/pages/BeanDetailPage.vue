@@ -22,6 +22,7 @@ import BeanNotesTab from '@/components/pod/BeanNotesTab.vue';
 import BeanAllergiesTab from '@/components/pod/BeanAllergiesTab.vue';
 import BeanMedicationsTab from '@/components/pod/BeanMedicationsTab.vue';
 import FamilyMemberModal from '@/components/family/FamilyMemberModal.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
@@ -128,9 +129,10 @@ function selectTab(tab: BeanTabId): void {
       <p class="text-secondary-500/60 text-sm">{{ t('bean.notFound.body') }}</p>
       <button
         type="button"
-        class="font-outfit text-primary-500 text-sm font-semibold hover:underline"
+        class="font-outfit text-primary-500 inline-flex items-center gap-1 text-sm font-semibold hover:underline"
         @click="router.push('/pod')"
       >
+        <BeanieIcon name="chevron-left" size="xs" />
         {{ t('bean.backToPod') }}
       </button>
     </div>
