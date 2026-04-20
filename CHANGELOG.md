@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-21
 
+### Fixed
+
+- **Editing one travel segment's date no longer overwrites a different segment.** Inline-editing a date on any travel-segment card (flight, train, activity, car) was corrupting another segment's date — typically the earliest travel segment in the trip. Root cause was a Vue template-ref collision: every travel-segment type uses `departureDate` as its date field name, so the hidden-picker refs all piled into the same array and the "open picker" helper always opened the first one. User's intended edit would then fire on the wrong input, saving the new date onto the wrong segment. Refs are now scoped per segment (`input-<segmentId>-<field>`) so each card owns its own picker. If you had a date go sideways on a recent inline edit, you'll want to check the affected segment and restore it.
+
 ### Changed
 
 - **The "today" marker on the trip timeline is now the date header itself.** Previously, on days when you had travel segments scheduled, the pulsing orange "TODAY · Wed Jun 5 · DAY 4 OF 10" banner sat above a second, duplicate `DAY 4 · Wed Jun 5` row with a calendar-icon circle — two rows saying the same thing. The banner now stands in for both: it replaces the calendar-icon circle and the date header for today's group, so you get one clear focal point on the rail regardless of whether today has segments or is a free day. Past and future days keep their usual calendar-icon circles.
