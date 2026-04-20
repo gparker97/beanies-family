@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Changed
+
+- **Pets sort last in every member list.** The family-member sort is now a three-tier order: adults (oldest → youngest) → children (oldest → youngest) → pets (oldest → youngest, then alphabetical). Applied at the single source of truth (`familyStore.sortedMembers`), so every surface that lists members — Meet the Beans grid, Family Nook row, Scrapbook feed, member chip filters, calendar columns, etc. — picks up the new order automatically.
+
 ### Fixed
 
 - **PhotoViewer lightbox layout + always-visible close button.** On mobile the read-only lightbox left a white gap below the photo (body's padding was visible + the black container maxed at `min-h-60vh`), and with no header + no footer there was no close affordance — only tapping the backdrop dismissed it. Added a `flushBody` prop to `BaseModal` that drops the body's default `overflow-y-auto p-6` for edge-to-edge media content, and an `overflow-hidden` on the modal wrapper so flush content clips to the rounded corners. PhotoViewer now passes `flush-body`, fills the body with `h-full bg-black/95`, and renders a floating X close button in the top-right of the black container that's always visible regardless of mode (read-only avatar lightbox or editable medication/recipe viewer).
