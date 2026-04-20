@@ -12,6 +12,7 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -32,6 +33,7 @@ const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
+const memberFilterStore = useMemberFilterStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 
@@ -278,8 +280,16 @@ function handleEmptySlotClick(dateStr: string, hour: number) {
   emit('add-activity', dateStr, `${String(hour).padStart(2, '0')}:00`);
 }
 
-// Mobile: activities for selected day (all, unsorted — DayTimeline handles positioning)
-const mobileDayActivities = computed(() => weekActivities.value.get(selectedMobileDay.value) ?? []);
+// Mobile: activities for selected day, filtered by the page-level member
+// filter (so the mobile timeline matches what the filter chips show and
+// density dots below reflect what's actually rendered).
+const mobileDayActivities = computed(() => {
+  const occs = weekActivities.value.get(selectedMobileDay.value) ?? [];
+  if (memberFilterStore.isAllSelected) return occs;
+  return occs.filter((o) =>
+    normalizeAssignees(o.activity).some((id) => memberFilterStore.isMemberSelected(id))
+  );
+});
 
 // Mobile: vacations active on the selected day (for DayTimeline)
 const mobileDayVacations = computed(() =>
@@ -310,11 +320,21 @@ const dayDensities = computed(() => {
   const byDate = new Map<string, DayDensity>();
   for (const day of weekDays.value) {
     const occs = weekActivities.value.get(day.dateStr) ?? [];
-    // Collect distinct member colors for timed + untimed events on this day.
+    // Collect distinct member colors for timed + untimed events on this day,
+    // honoring the page-level member filter so the dots reflect what the user
+    // will see when they tap into the day.
     const seen = new Set<string>();
     const colors: string[] = [];
     for (const occ of occs) {
-      for (const memberId of normalizeAssignees(occ.activity)) {
+      const assignees = normalizeAssignees(occ.activity);
+      const inScope =
+        memberFilterStore.isAllSelected ||
+        assignees.some((id) => memberFilterStore.isMemberSelected(id));
+      if (!inScope) continue;
+      for (const memberId of assignees) {
+        if (!memberFilterStore.isAllSelected && !memberFilterStore.isMemberSelected(memberId)) {
+          continue;
+        }
         const color = memberColorById.value.get(memberId);
         if (!color || seen.has(color)) continue;
         seen.add(color);
