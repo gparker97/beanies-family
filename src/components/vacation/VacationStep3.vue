@@ -13,6 +13,7 @@ import { prefillAccommodationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -206,9 +207,10 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
 
         <FormFieldGroup :label="t('vacation.field.address')">
           <div class="relative">
-            <BaseInput
+            <BaseTextarea
               :model-value="item.address ?? ''"
               class="vacation-teal-input"
+              :rows="2"
               @update:model-value="updateItem(index, 'address', String($event))"
             />
             <a
@@ -216,7 +218,7 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
               :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.address)}`"
               target="_blank"
               rel="noopener noreferrer"
-              class="absolute top-1/2 right-2 -translate-y-1/2 text-sm opacity-40 transition-opacity hover:opacity-80"
+              class="absolute top-2 right-2 text-sm opacity-40 transition-opacity hover:opacity-80"
               :title="t('vacation.field.openInMaps')"
               @click.stop
             >
@@ -265,9 +267,10 @@ function showsConfirmationNumber(type: VacationAccommodationType): boolean {
         </FormFieldGroup>
 
         <FormFieldGroup :label="t('vacation.field.notes')">
-          <BaseInput
+          <BaseTextarea
             :model-value="item.notes ?? ''"
             class="vacation-teal-input"
+            :rows="3"
             @update:model-value="updateItem(index, 'notes', String($event))"
           />
         </FormFieldGroup>

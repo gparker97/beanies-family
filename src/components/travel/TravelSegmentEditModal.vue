@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -731,11 +732,7 @@ async function handleSave() {
       <template v-if="isActivity">
         <!-- Description -->
         <FormFieldGroup :label="t('vacation.field.description')">
-          <textarea
-            v-model="description"
-            rows="2"
-            class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-          />
+          <BaseTextarea v-model="description" :rows="3" />
         </FormFieldGroup>
 
         <!-- Date + Time + Duration -->
@@ -887,7 +884,11 @@ async function handleSave() {
 
       <!-- Notes (common) -->
       <FormFieldGroup :label="t('vacation.field.notes')">
-        <BaseInput v-model="notes" :placeholder="t('vacation.field.notesPlaceholder')" />
+        <BaseTextarea
+          v-model="notes"
+          :placeholder="t('vacation.field.notesPlaceholder')"
+          :rows="3"
+        />
       </FormFieldGroup>
     </div>
   </BeanieFormModal>
