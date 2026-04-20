@@ -57,7 +57,6 @@ const showHalo = computed(() => props.halo ?? props.label);
   <div class="beanie-spinner" :class="{ 'bs-atmospheric': showHalo }">
     <div class="bs-core" :class="sizeClasses">
       <span v-if="showHalo" class="bs-halo" aria-hidden="true" />
-      <span v-if="showHalo" class="bs-orbit" aria-hidden="true" />
       <div class="bs-breath">
         <img
           src="/brand/beanies_spinner_transparent_192x192.png"
@@ -126,34 +125,23 @@ const showHalo = computed(() => props.halo ?? props.label);
     beanie-spinner-glow 3.2s ease-in-out infinite;
 }
 
-/* Soft radial atmosphere behind the beans. Sits at -18% inset so it
-   spills past the image bounds for a "lit from within" feel. */
+/* Soft radial atmosphere behind the beans. Wide inset (-40%) gives the
+   gradient plenty of room to fade all the way to transparent at the
+   edges — no hard disc boundary, just warmth dissipating into the page. */
 .bs-halo {
   animation: beanie-spinner-halo 3.2s ease-in-out infinite;
   background: radial-gradient(
     circle at 50% 50%,
-    rgb(241 93 34 / 30%) 0%,
-    rgb(230 126 34 / 18%) 38%,
-    transparent 68%
+    rgb(241 93 34 / 28%) 0%,
+    rgb(241 93 34 / 10%) 35%,
+    transparent 85%
   );
   border-radius: 9999px;
-  filter: blur(8px);
-  inset: -18%;
+  filter: blur(10px);
+  inset: -40%;
   pointer-events: none;
   position: absolute;
   will-change: transform, opacity;
-}
-
-/* Counter-rotating dashed orbit ring. 1.5px looks crisper than 2px at
-   xs/sm — at xl it's a fine art-line that frames the spin. */
-.bs-orbit {
-  animation: beanie-spinner-orbit 3.6s linear infinite;
-  border: 1.5px dashed rgb(241 93 34 / 35%);
-  border-radius: 9999px;
-  inset: -8%;
-  pointer-events: none;
-  position: absolute;
-  will-change: transform;
 }
 
 /* ── Label ────────────────────────────────────────────────────────────── */
@@ -254,16 +242,6 @@ const showHalo = computed(() => props.halo ?? props.label);
   }
 }
 
-@keyframes beanie-spinner-orbit {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(-360deg);
-  }
-}
-
 @keyframes beanie-spinner-halo {
   0%,
   100% {
@@ -327,7 +305,6 @@ const showHalo = computed(() => props.halo ?? props.label);
 
 @media (prefers-reduced-motion: reduce) {
   .bs-breath,
-  .bs-orbit,
   .bs-halo {
     animation: none;
   }
