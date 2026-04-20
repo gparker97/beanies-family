@@ -11,7 +11,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { isTemporaryEmail } from '@/utils/email';
-import { pickBeanpodFile } from '@/services/google/drivePicker';
+import { pickBeanpodFolder } from '@/services/google/drivePicker';
+import { findBeanpodInFolder, NoBeanpodInFolderError } from '@/services/google/driveService';
 import {
   requestAccessToken,
   startRedirectAuth,
@@ -247,11 +248,33 @@ async function handlePickFromDriveWithToken(token: string) {
   formError.value = null;
   needsManualFileLoad.value = true; // ensure the Picker UI is visible
   try {
-    const result = await pickBeanpodFile(token);
-    if (!result) return; // User cancelled
+    const picked = await pickBeanpodFolder(token);
+    if (!picked) return; // User cancelled — valid no-op, not an error
 
-    console.warn('[JoinPodView] Picker selected file:', result.fileId, result.fileName);
-    targetDriveFileId.value = result.fileId;
+    console.warn('[JoinPodView] Picker selected folder:', picked.folderId, picked.folderName);
+
+    // Pick grants drive.file scope to the folder + every descendant —
+    // including every photo — in one shot. Now walk the folder to find
+    // the .beanpod so we can continue the join with the same file-ID
+    // semantics as the legacy file-pick path.
+    let beanpod: { fileId: string; name: string };
+    try {
+      beanpod = await findBeanpodInFolder(token, picked.folderId);
+    } catch (findErr) {
+      if (findErr instanceof NoBeanpodInFolderError) {
+        console.warn(
+          '[JoinPodView] picked folder has no .beanpod',
+          picked.folderId,
+          picked.folderName
+        );
+        formError.value = t('join.pickerPrompt.noBeanpodInFolder');
+        showManualFallback.value = true;
+        return;
+      }
+      throw findErr;
+    }
+
+    targetDriveFileId.value = beanpod.fileId;
     cloudLoadFailed.value = false;
     needsManualFileLoad.value = false;
     await attemptFileLoad();

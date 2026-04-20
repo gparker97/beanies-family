@@ -39,6 +39,16 @@ Skipping encryption is a meaningful simplification:
 
 The trust model matches `.beanpod`: every member is a writer, so any member could in principle delete any photo. This is a deliberate tradeoff — finer-grained permissions (reader folder + per-file writer from the uploader) would require per-file API calls on every upload and every member-change, which we judged not worth the complexity for a product whose trust model is "your family."
 
+#### `drive.file` scope implications — why folder sharing alone isn't enough
+
+The app uses the `drive.file` OAuth scope (per-file authorization), not the broader `drive` scope. Two consequences that drove the Drive Picker flow:
+
+1. **Folder sharing at the Drive permissions level does NOT grant the joining member's app API access to sibling files.** Sharing the `beanies.family` folder with `user@example.com` makes the folder + its contents visible at drive.google.com and downloadable via that UI, but Drive API calls authenticated with the joining member's OAuth token still 404 on those sibling files. `drive.file` only exposes files the app created **in that user's Drive** or files the user explicitly authorized via Drive Picker or "Open with."
+
+2. **The join flow must Picker-pick the folder, not the `.beanpod` file.** Picker-picking a folder grants `drive.file` to the folder AND all descendants — the `.beanpod` file plus every current and future photo — in a single user gesture. Picker-picking the file alone grants access only to that one file; photos remain unreachable. The join UI in `JoinPodView.vue` picks the folder and calls `findBeanpodInFolder` (driveService) to resolve the `.beanpod` inside — all subsequent code paths continue with the same file-ID semantics as before.
+
+3. **Recovery path for members who joined before the folder-pick flow.** `PhotoAccessRecoveryBanner` watches `photoStore.hasBrokenPhotos` (any Drive 404/403 during photo resolution) and offers a "Reconnect" action that opens the same folder Picker. `useRecoverPhotoAccess` validates the picked folder contains this pod's `.beanpod` (prevents accidentally granting access to a different family's folder), clears photoStore's unresolved/URL caches, and lets the next render resolve fresh under the newly-granted folder-wide scope.
+
 ### 3. No IndexedDB photo cache
 
 Drive's `thumbnailLink` returns a signed `lh3.googleusercontent.com` URL. The same URL accepts a `=s{N}` suffix (or appended `?sz=w{N}`) to request a resized rendering — up to the source resolution. We use the same mechanism for thumbnails (`=s400`) and for full-size viewer images (`=s2048`), binding them directly to `<img src>`.

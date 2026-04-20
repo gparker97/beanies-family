@@ -481,3 +481,43 @@ export class DriveFileNotFoundError extends DriveApiError {
     this.name = 'DriveFileNotFoundError';
   }
 }
+
+/**
+ * Thrown by `findBeanpodInFolder` when a caller picks a folder that
+ * doesn't contain any `.beanpod` file. Distinct from 404/403 so the
+ * recovery/join flow can surface a specific "this folder isn't a
+ * beanies.family pod — pick a different one" message instead of a
+ * generic Drive error.
+ */
+export class NoBeanpodInFolderError extends Error {
+  readonly folderId: string;
+  constructor(folderId: string) {
+    super(`No .beanpod file found in folder ${folderId}`);
+    this.name = 'NoBeanpodInFolderError';
+    this.folderId = folderId;
+  }
+}
+
+/**
+ * Strict in-folder lookup for a `.beanpod` file. Unlike `listBeanpodFiles`
+ * this does NOT fall back to a Drive-wide search — callers (Picker-driven
+ * join + recovery flows) must reject folders that don't actually contain
+ * this family's pod.
+ *
+ * Returns the most-recently-modified `.beanpod` in the folder. Throws
+ * `NoBeanpodInFolderError` if none are found; any Drive API failure
+ * surfaces as `DriveApiError` / `DriveFileNotFoundError` from the shared
+ * `driveRequest` path.
+ */
+export async function findBeanpodInFolder(
+  token: string,
+  folderId: string
+): Promise<{ fileId: string; name: string; modifiedTime: string }> {
+  const query = `'${folderId}' in parents and name contains '.beanpod' and trashed=false`;
+  const url = `${DRIVE_API}/files?q=${encodeURIComponent(query)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&pageSize=10`;
+  const res = await driveRequest(token, url);
+  const data = await res.json();
+  const files = mapFileResults(data.files).filter((f) => f.name.endsWith('.beanpod'));
+  if (files.length === 0) throw new NoBeanpodInFolderError(folderId);
+  return files[0];
+}

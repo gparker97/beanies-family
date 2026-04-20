@@ -18,6 +18,7 @@ import WhatsNewModal from '@/components/common/WhatsNewModal.vue';
 import PwaReinstallModal from '@/components/common/PwaReinstallModal.vue';
 import GoogleReconnectToast from '@/components/google/GoogleReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
+import PhotoAccessRecoveryBanner from '@/components/common/PhotoAccessRecoveryBanner.vue';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
 import ContentSkeleton from '@/components/ui/ContentSkeleton.vue';
 import BackgroundSyncBar from '@/components/common/BackgroundSyncBar.vue';
@@ -901,6 +902,10 @@ watch(
       :file-not-found="syncStore.driveFileNotFound"
       @reconnected="handleGoogleReconnected"
     />
+
+    <!-- Photo-access recovery banner — fires when photoStore has any unresolved
+         photos (typically the drive.file scope-mismatch case from ADR-021). -->
+    <PhotoAccessRecoveryBanner />
 
     <!-- Bottom-right toast stack -->
     <div

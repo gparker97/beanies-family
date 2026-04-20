@@ -11,6 +11,8 @@ import {
   deleteFile,
   shareFileWithEmail,
   clearFolderCache,
+  findBeanpodInFolder,
+  NoBeanpodInFolderError,
   DriveApiError,
   DriveFileNotFoundError,
 } from '../driveService';
@@ -392,6 +394,49 @@ describe('driveService', () => {
       const result = await listBeanpodFiles(mockToken, 'wrong-folder');
       expect(result).toHaveLength(1);
       expect(result[0]!.fileId).toBe('f1');
+    });
+  });
+
+  describe('findBeanpodInFolder', () => {
+    it('returns the most-recently-modified .beanpod in the folder', async () => {
+      globalThis.fetch = mockFetch({
+        files: [
+          { id: 'beanpod-new', name: 'Family.beanpod', modifiedTime: '2026-04-20T10:00:00Z' },
+          { id: 'beanpod-old', name: 'Old.beanpod', modifiedTime: '2026-04-01T10:00:00Z' },
+        ],
+      });
+      const result = await findBeanpodInFolder(mockToken, 'folder-abc');
+      expect(result.fileId).toBe('beanpod-new');
+      expect(result.name).toBe('Family.beanpod');
+
+      const callUrl = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
+      expect(callUrl).toContain(encodeURIComponent("'folder-abc' in parents"));
+      expect(callUrl).toContain(encodeURIComponent("name contains '.beanpod'"));
+    });
+
+    it('throws NoBeanpodInFolderError when the folder has no matching files', async () => {
+      globalThis.fetch = mockFetch({ files: [] });
+      await expect(findBeanpodInFolder(mockToken, 'folder-empty')).rejects.toBeInstanceOf(
+        NoBeanpodInFolderError
+      );
+    });
+
+    it('filters out non-.beanpod results the server may slip in via "name contains"', async () => {
+      // Drive's `name contains '.beanpod'` can match a file like "beanpod.txt".
+      // Our post-filter rejects anything not ending in `.beanpod`.
+      globalThis.fetch = mockFetch({
+        files: [{ id: 'decoy', name: 'beanpod.txt', modifiedTime: '2026-04-20T10:00:00Z' }],
+      });
+      await expect(findBeanpodInFolder(mockToken, 'folder-decoy')).rejects.toBeInstanceOf(
+        NoBeanpodInFolderError
+      );
+    });
+
+    it('surfaces 403 as DriveFileNotFoundError (not silenced)', async () => {
+      globalThis.fetch = mockFetch({ error: { message: 'forbidden' } }, 403);
+      await expect(findBeanpodInFolder(mockToken, 'folder-denied')).rejects.toBeInstanceOf(
+        DriveFileNotFoundError
+      );
     });
   });
 

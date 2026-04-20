@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Fixed
+
+- **Family members can see photos uploaded by others.** Joined members were 404ing on every photo their family uploaded. Root cause: the app uses the `drive.file` OAuth scope (per-file authorization), and the join flow picked the `.beanpod` file — which grants API access to that one file only, not to sibling photos in the same folder. Drive-level folder sharing gives drive.google.com UI visibility but not API access under `drive.file`. Fix has two parts: (1) the join flow now picks the `beanies.family` **folder** via Drive Picker, which grants `drive.file` scope to the folder and every descendant (`.beanpod` + all photos) in a single pick; (2) for family members who joined before this change, a new amber **"Some photos aren't loading"** banner appears when photoStore detects any broken photo, with a **Reconnect** action that opens the same folder picker and validates the selection against the current pod before clearing caches. Both paths share new `findBeanpodInFolder` helper + `useRecoverPhotoAccess` composable, and feed into a new shared `<ErrorBanner>` component that both `SaveFailureBanner` and the new recovery banner now use. Full scope discussion added to [ADR-021](docs/adr/021-photo-storage.md).
+
 ### Added
 
 - **Take-photo button on mobile photo attachments.** On phones and tablets, the Add Photo affordance is now two side-by-side tiles — **Take Photo** (opens the rear camera directly via `capture="environment"`) and **From Library** (opens the gallery). Desktop unchanged (single **Add Photo** tile → gallery). Prior behavior suppressed the OS camera option on Android Chrome because `multiple` was hardcoded on, which forces gallery-only. The change applies to every photo surface in the app — medication bottles, cook-log dish snaps, recipe photos, and future integrations. Detection uses `matchMedia('(pointer: coarse)')` so laptops with touchscreens (where the trackpad is still the primary pointer) get the desktop UX, not the mobile one.

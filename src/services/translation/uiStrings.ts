@@ -2539,6 +2539,10 @@ const STRING_DEFS = {
     en: "Couldn't open file picker. Try loading the file manually.",
     beanie: "couldn't open the picker. try loading the file yourself",
   },
+  'join.pickerPrompt.noBeanpodInFolder': {
+    en: "That folder doesn't contain a beanies.family pod. Pick the folder your family member shared with you — it should be named 'beanies.family'.",
+    beanie: "that folder doesn't have a pod inside. pick the beanies.family folder shared with you",
+  },
 
   // Invite modal — stepped flow
   'invite.step1.title': {
@@ -3215,6 +3219,22 @@ const STRING_DEFS = {
     beanie: 'reconnect to google drive',
   },
   'googleDrive.downloadBackup': { en: 'Download backup', beanie: 'download backup' },
+  'googleDrive.downloadBackupUnavailableTitle': {
+    en: "Can't prepare a backup right now",
+    beanie: "can't prepare a backup right now",
+  },
+  'googleDrive.downloadBackupUnavailableBody': {
+    en: 'Your session key or pod envelope is missing. Reconnect to Google Drive and try again.',
+    beanie: 'your session key or pod envelope is missing. reconnect to google drive and try again.',
+  },
+  'googleDrive.downloadBackupFailedTitle': {
+    en: 'Backup download failed',
+    beanie: 'backup download failed',
+  },
+  'googleDrive.downloadBackupFailedBody': {
+    en: "We couldn't prepare your backup file. Check your connection and try again.",
+    beanie: "we couldn't prepare your backup. check your connection and try again.",
+  },
   'googleDrive.saveRetrying': {
     en: 'Save failed — retrying...',
     beanie: 'save failed — retrying...',
@@ -4574,6 +4594,85 @@ const STRING_DEFS = {
   },
   'photos.dropToAdd': { en: 'Drop photo to add', beanie: 'drop photo to add' },
   'photos.missing.tile': { en: 'Photo missing', beanie: 'photo missing' },
+
+  // Photo access recovery — banner + reconnect flow strings (ADR-021).
+  'recoverPhotos.bannerTitle': {
+    en: "Some photos aren't loading",
+    beanie: "some photos aren't loading",
+  },
+  'recoverPhotos.bannerBody': {
+    en: 'Reconnect your beanies.family folder to see photos uploaded by other family members.',
+    beanie: 'reconnect your beanies.family folder to see photos from your pod.',
+  },
+  'recoverPhotos.reconnect': { en: 'Reconnect', beanie: 'reconnect' },
+  'recoverPhotos.dismiss': { en: 'Not Now', beanie: 'not now' },
+  'recoverPhotos.successTitle': {
+    en: 'Photo folder reconnected',
+    beanie: 'photo folder reconnected',
+  },
+  'recoverPhotos.successBody': {
+    en: 'You should see the missing photos now. If any are still blank, they may have been deleted.',
+    beanie:
+      'you should see the missing photos now. if any are still blank, they may have been deleted.',
+  },
+  'recoverPhotos.notConnectedTitle': {
+    en: "You're not connected to Google Drive yet",
+    beanie: "you're not connected to google drive yet",
+  },
+  'recoverPhotos.notConnectedBody': {
+    en: 'Finish setting up Google Drive first, then come back to reconnect your photos.',
+    beanie: 'finish setting up google drive first, then come back to reconnect your photos.',
+  },
+  'recoverPhotos.tokenFailedTitle': {
+    en: "Couldn't reach Google",
+    beanie: "couldn't reach google",
+  },
+  'recoverPhotos.tokenFailedBody': {
+    en: 'Your sign-in needs refreshing. Sign out and back in, then try reconnecting.',
+    beanie: 'your sign-in needs refreshing. sign out and back in, then try reconnecting.',
+  },
+  'recoverPhotos.pickerFailedTitle': {
+    en: "Couldn't open Google Drive",
+    beanie: "couldn't open google drive",
+  },
+  'recoverPhotos.pickerFailedBody': {
+    en: 'Check your connection and try again.',
+    beanie: 'check your connection and try again.',
+  },
+  'recoverPhotos.noBeanpodTitle': {
+    en: "That folder isn't a beanies.family pod",
+    beanie: "that folder isn't a beanies.family pod",
+  },
+  'recoverPhotos.noBeanpodBody': {
+    en: "We couldn't find a pod file inside that folder. Pick the folder named 'beanies.family' that was shared with you.",
+    beanie:
+      "couldn't find a pod file inside that folder. pick the 'beanies.family' folder shared with you.",
+  },
+  'recoverPhotos.wrongFolderTitle': {
+    en: "That's a different family's pod",
+    beanie: "that's a different family's pod",
+  },
+  'recoverPhotos.wrongFolderBody': {
+    en: "Pick the beanies.family folder for {familyName} to reconnect this pod's photos.",
+    beanie: "pick the beanies.family folder for {familyName} to reconnect this pod's photos.",
+  },
+  'recoverPhotos.folderInaccessibleTitle': {
+    en: "Couldn't access that folder",
+    beanie: "couldn't access that folder",
+  },
+  'recoverPhotos.folderInaccessibleBody': {
+    en: 'Google Drive refused access. Make sure the folder was shared with the account you signed in with.',
+    beanie:
+      'google drive refused access. make sure the folder was shared with the account you signed in with.',
+  },
+  'recoverPhotos.genericFailureTitle': {
+    en: "Couldn't reconnect your photos",
+    beanie: "couldn't reconnect your photos",
+  },
+  'recoverPhotos.genericFailureBody': {
+    en: 'Something went wrong. Check the browser console for details and try again.',
+    beanie: 'something went wrong. check the console for details and try again.',
+  },
   'photos.missing.title': { en: "We Can't Find This Photo", beanie: "we can't find this photo" },
   'photos.missing.body': {
     en: "It may have been moved, deleted, or you don't have access anymore.",
