@@ -41,15 +41,16 @@ LAST_WEB_SHA=$(gh run list --workflow=deploy-web.yml --status=success --limit=1 
 VUE_CHANGES=$( { [ -n "$LAST_VUE_SHA" ] && git diff --name-only "$LAST_VUE_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
 WEB_CHANGES=$( { [ -n "$LAST_WEB_SHA" ] && git diff --name-only "$LAST_WEB_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
 
-NEEDS_WEB=$(echo "$WEB_CHANGES" | grep -E '^(web/|packages/|content/blog/)' || true)
-NEEDS_VUE=$(echo "$VUE_CHANGES" | grep -Ev '^(web/|content/blog/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
+NEEDS_WEB=$(echo "$WEB_CHANGES" | grep -E '^(web/|packages/|content/blog/|src/content/help/)' || true)
+NEEDS_VUE=$(echo "$VUE_CHANGES" | grep -Ev '^(web/|content/blog/|src/content/help/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
 ```
 
 Path rules (applied to each workflow's own change set):
 
 - `web/**` or `content/blog/**` → Astro deploy
+- `src/content/help/**` → Astro deploy **only** (per the 2026-04-16 consolidation, help articles are rendered exclusively by the Astro site; the Vue PWA's in-app help links open `beanies.family/help` in a new tab and never import the content modules)
 - `packages/**` → BOTH (shared brand tokens consumed by both apps)
-- `src/**`, `public/**`, build configs, root files → Vue deploy
+- `src/**`, `public/**`, build configs, root files → Vue deploy (except `src/content/help/**` — see above)
 - Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip that workflow
 
 If both empty, report "no runtime changes since last deploy — nothing to ship" and stop.
