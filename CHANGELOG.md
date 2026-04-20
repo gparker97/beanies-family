@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-21
+
+### Changed
+
+- **The "today" marker on the trip timeline is now the date header itself.** Previously, on days when you had travel segments scheduled, the pulsing orange "TODAY · Wed Jun 5 · DAY 4 OF 10" banner sat above a second, duplicate `DAY 4 · Wed Jun 5` row with a calendar-icon circle — two rows saying the same thing. The banner now stands in for both: it replaces the calendar-icon circle and the date header for today's group, so you get one clear focal point on the rail regardless of whether today has segments or is a free day. Past and future days keep their usual calendar-icon circles.
+- **Today's segment connector dots now echo the banner's Heritage Orange.** The tiny dot + short horizontal line that tether each segment card to the timeline rail used to be teal on every day; today's segments now render them in Heritage Orange (at slightly higher opacity so they actually register). Attention flows down the rail from the prominent pulsing banner, through the quieter orange connectors, into the neutral card content — a small nudge that ties today's segments visually back to the banner.
+
+---
+
 ## 2026-04-20
 
 ### Added

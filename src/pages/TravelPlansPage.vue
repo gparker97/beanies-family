@@ -161,7 +161,10 @@ const mergedTimeline = computed<TimelineEntry[]>(() => {
     entries.push({ type: 'gap', date: gapDate, label: formatNookDate(gapDate) });
   }
 
-  // Inject the "you are here" marker when today sits inside the trip window.
+  // Inject the "you are here" marker whenever today sits inside the trip
+  // window. The banner stands in for today's date-node (circle + header)
+  // regardless of whether today has segments — one consistent pulsing rail
+  // anchor for the current day. See 2026-04-21 design decision.
   const v = selectedVacation.value;
   if (isMidTrip.value && v?.startDate && v?.endDate) {
     const dayNumber = tripDayNumber(todayISO.value, v.startDate) ?? 0;
@@ -882,15 +885,14 @@ function addQuickIdea() {
                     'opacity-55 saturate-50': classifyTripDay(entry.data.date) === 'past',
                   }"
                 >
-                  <!-- Date node -->
-                  <div class="relative flex items-center pt-3 pb-1">
+                  <!-- Date node — suppressed for today; the TodayTimelineMarker
+                       banner renders above and stands in for the circle + header. -->
+                  <div
+                    v-if="classifyTripDay(entry.data.date) !== 'today'"
+                    class="relative flex items-center pt-3 pb-1"
+                  >
                     <div
-                      class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
-                      :class="
-                        classifyTripDay(entry.data.date) === 'today'
-                          ? 'border-[var(--heritage-orange)]'
-                          : 'border-[#00B4D8]'
-                      "
+                      class="absolute -left-10 z-[2] flex h-8 w-8 items-center justify-center rounded-full border-[2.5px] border-[#00B4D8] bg-white text-xs shadow-[0_2px_8px_rgba(0,180,216,0.12)] dark:bg-slate-800"
                     >
                       📅
                     </div>
@@ -914,12 +916,23 @@ function addQuickIdea() {
 
                   <!-- Segment cards within this date -->
                   <div v-for="item in entry.data.items" :key="item.id" class="relative mb-2">
-                    <!-- Connector dot -->
+                    <!-- Connector dot — Heritage Orange on today's segments
+                         to echo the banner, teal otherwise. -->
                     <div
-                      class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full bg-[#00B4D8] opacity-25"
+                      class="absolute top-4 -left-[33px] z-[2] h-2 w-2 rounded-full"
+                      :class="
+                        classifyTripDay(entry.data.date) === 'today'
+                          ? 'bg-[rgba(241,93,34,0.45)]'
+                          : 'bg-[#00B4D8] opacity-25'
+                      "
                     />
                     <div
-                      class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px] bg-[rgba(0,180,216,0.12)]"
+                      class="absolute top-[18px] -left-[25px] z-[1] h-0.5 w-[18px]"
+                      :class="
+                        classifyTripDay(entry.data.date) === 'today'
+                          ? 'bg-[rgba(241,93,34,0.20)]'
+                          : 'bg-[rgba(0,180,216,0.12)]'
+                      "
                     />
 
                     <VacationSegmentCard
