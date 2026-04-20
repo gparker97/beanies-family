@@ -54,7 +54,7 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1030.0",
+    "@aws-sdk/client-dynamodb": "^3.1032.0",
     "@aws-sdk/util-dynamodb": "^3.996.2",
     "@eslint/js": "^9.39.2",
     "@heroicons/vue": "^2.2.0",
@@ -79,8 +79,8 @@
     "happy-dom": "^20.9.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "postcss": "^8.5.9",
-    "prettier": "^3.8.2",
+    "postcss": "^8.5.10",
+    "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "stylelint": "^16.26.1",
     "stylelint-config-recommended-vue": "^1.6.1",
@@ -95,7 +95,7 @@
     "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.1.4",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^3.2.6"
+    "vue-tsc": "^3.2.7"
   },
   "overrides": {
     "serialize-javascript": "^7.0.3"
