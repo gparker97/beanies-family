@@ -384,7 +384,7 @@ function removeSegment(index: number) {
             {{ t('vacation.bookingDetails') }}
           </div>
           <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
               <BaseCombobox
                 :model-value="seg.airline ?? ''"
                 :options="airlineOptions"
@@ -404,7 +404,7 @@ function removeSegment(index: number) {
                 <BaseInput
                   :model-value="seg.flightNumber ?? ''"
                   :placeholder="'e.g. 1842'"
-                  class="vacation-teal-input sm:!w-24"
+                  class="vacation-teal-input"
                   @update:model-value="updateSegment(idx, 'flightNumber', String($event))"
                 />
               </FormFieldGroup>
