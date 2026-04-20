@@ -284,7 +284,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On iOS and iPadOS, you install through the <strong>Share</strong> menu in Safari. This is the only browser on iPhone that can install a PWA \u2014 if you\u2019re using Chrome or Firefox on iPhone, switch to Safari first.',
+          'On iPhone and iPad, you install through the <strong>Share</strong> menu in <strong>Safari</strong>. This is the only browser on iOS that can install a PWA \u2014 if you\u2019re using Chrome or Firefox, switch to Safari first.',
       },
       {
         type: 'steps',
@@ -308,15 +308,75 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           '<img src="/help/pwa-install/install-app-iphone-addtohome.webp" alt="The iOS share sheet with Add to Home Screen highlighted" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
       },
       {
+        type: 'infoBox',
+        content:
+          'Once the icon is on your home screen, skip ahead to <a href="#sign-in-after">After installing</a> to sign in.',
+        title: 'Next step',
+        icon: '\u{1F449}',
+      },
+      {
         type: 'heading',
-        content: 'Android (Chrome)',
+        content: '\u{1F916} Android',
         level: 2,
         id: 'install-android',
       },
       {
         type: 'paragraph',
         content:
-          'On Android, Chrome handles the install. If you didn\u2019t see the automatic prompt:',
+          'On Android (Chrome, Edge, Brave, Samsung Internet, and most other browsers), you have <strong>three ways</strong> to install \u2014 pick whichever shows up for you first.',
+      },
+      {
+        type: 'heading',
+        content: 'Option 1 \u2014 Accept the automatic install prompt',
+        level: 3,
+        id: 'install-android-prompt',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'After using beanies.family for a minute or two, your browser may show a small pop-up asking if you want to install the app. If you see it, tap <strong>Install</strong> (or <strong>Add</strong>) and you\u2019re done \u2014 skip to <a href="#sign-in-after">After installing</a>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/install-app-android-prompt.webp" alt="The install prompt that appears in Chrome on Android, with an Install button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'heading',
+        content: 'Option 2 \u2014 Install from inside the app (Settings)',
+        level: 3,
+        id: 'install-android-settings',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you\u2019re already signed in and using beanies.family in a browser tab, there\u2019s a shortcut right inside the app:',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Tap the <strong>Settings</strong> link in the sidebar (or the menu on mobile)',
+          'Scroll down to the <strong>Install App</strong> section',
+          'Tap the <strong>Install beanies.family</strong> button',
+          'Confirm in the browser pop-up \u2014 the app icon is added to your home screen',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<img src="/help/pwa-install/install-app-android-addtohome-settings.webp" alt="The Install App section in beanies.family Settings with the Install beanies.family button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
+      },
+      {
+        type: 'heading',
+        content: 'Option 3 \u2014 Install from the browser menu',
+        level: 3,
+        id: 'install-android-manual',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If the prompt didn\u2019t appear and you don\u2019t see the Install App section in Settings, you can always install manually from the browser:',
       },
       {
         type: 'steps',
@@ -324,9 +384,9 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         items: [
           'Open <strong>https://app.beanies.family</strong> in <strong>Chrome</strong>',
           'Tap the <strong>three-dot menu</strong> (\u22EE) in the top-right corner',
-          'Tap <strong>Install app</strong> or <strong>Add to Home screen</strong> (exact label depends on your Android version)',
+          'Tap <strong>Install app</strong> or <strong>Add to Home screen</strong> (the exact label depends on your Android version)',
           'Tap <strong>Install</strong> in the pop-up to confirm',
-          'The beanies icon appears on your home screen. Tap it to launch the app.',
+          'The beanies icon appears on your home screen \u2014 tap it to launch the app',
         ],
       },
       {
@@ -337,20 +397,38 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Other Android browsers (Edge, Samsung Internet, Firefox) can also install PWAs \u2014 the steps are similar: open the browser menu and look for "Install app" or "Add to Home screen".',
-        title: 'Using a different browser?',
+          'Edge, Samsung Internet, and Firefox work too \u2014 the steps are the same: open the browser menu and look for "Install app" or "Add to Home screen".',
+        title: 'Using a different Android browser?',
         icon: '\u2139\uFE0F',
       },
       {
+        type: 'infoBox',
+        content:
+          'Installed the app? Skip ahead to <a href="#sign-in-after">After installing</a> to sign in.',
+        title: 'Next step',
+        icon: '\u{1F449}',
+      },
+      {
         type: 'heading',
-        content: 'Desktop (Chrome, Edge, Brave)',
+        content: '\u{1F4BB} Desktop (Mac, Windows, Linux)',
         level: 2,
         id: 'install-desktop',
       },
       {
         type: 'paragraph',
         content:
-          'On your computer, Chrome-based browsers (Chrome, Edge, Brave, Arc, and others) all support PWA install. Look for the <strong>install icon</strong> at the right edge of the URL bar \u2014 it looks like a small monitor with a down-arrow.',
+          'On your computer, Chrome-based browsers \u2014 Chrome, Edge, Brave, Arc, and others \u2014 all support PWA install. You have <strong>two ways</strong> to do it.',
+      },
+      {
+        type: 'heading',
+        content: 'Option 1 \u2014 Click the install icon in the URL bar',
+        level: 3,
+        id: 'install-desktop-urlbar',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Look for the <strong>install icon</strong> at the right edge of the URL bar \u2014 it looks like a small monitor with a down-arrow.',
       },
       {
         type: 'steps',
@@ -364,11 +442,22 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         ],
       },
       {
+        type: 'heading',
+        content: 'Option 2 \u2014 Install from inside the app (Settings)',
+        level: 3,
+        id: 'install-desktop-settings',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Already signed in? Click <strong>Settings</strong> in the sidebar, scroll to the <strong>Install App</strong> section, and click <strong>Install beanies.family</strong>. Confirm in the pop-up and the app is added to your machine.',
+      },
+      {
         type: 'infoBox',
         content:
-          'Safari on macOS can also install PWAs as of Sonoma (14.0+). Open app.beanies.family in Safari, then from the menu bar choose <strong>File \u2192 Add to Dock</strong>.',
+          'Safari on macOS can install PWAs as of Sonoma (14.0+). Open <strong>app.beanies.family</strong> in Safari, then from the menu bar choose <strong>File \u2192 Add to Dock</strong>.',
         title: 'Safari on macOS',
-        icon: '\u{1F4BB}',
+        icon: '\u{1F34E}',
       },
       {
         type: 'heading',
