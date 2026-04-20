@@ -26,6 +26,13 @@ export interface UseFilePickerOptions {
   accept?: string;
   /** Allow multiple files. Default false. */
   multiple?: boolean;
+  /**
+   * Request direct camera capture on mobile (ignored on desktop).
+   * `'environment'` = rear camera, `'user'` = selfie camera. When set,
+   * the OS opens the camera app instead of the gallery, and `multiple`
+   * is effectively forced off (camera captures one frame at a time).
+   */
+  capture?: 'user' | 'environment';
   /** Called with the selected files (never with an empty array). */
   onPick: (files: File[]) => void | Promise<void>;
 }
@@ -34,6 +41,7 @@ export interface UseFilePickerBindings {
   type: 'file';
   accept?: string;
   multiple: boolean;
+  capture?: 'user' | 'environment';
   style: string;
   onChange: (e: Event) => void;
 }
@@ -72,6 +80,7 @@ export function useFilePicker(options: UseFilePickerOptions): UseFilePickerRetur
       type: 'file',
       accept: options.accept,
       multiple: options.multiple ?? false,
+      ...(options.capture ? { capture: options.capture } : {}),
       style: 'position:absolute;left:-9999px;width:1px;height:1px;opacity:0;',
       onChange,
     },
