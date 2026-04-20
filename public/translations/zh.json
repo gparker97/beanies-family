@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-20",
-    "translationCount": 2284
+    "translationCount": 2309
   },
   "translations": {
     "app.name": {
@@ -11424,6 +11424,131 @@
     "photos.fromLibrary": {
       "translation": "来自资源库",
       "hash": "98vx6j",
+      "lastUpdated": "2026-04-20"
+    },
+    "join.pickerPrompt.noBeanpodInFolder": {
+      "translation": "该文件夹不包含beanies.family pod。选择您的家庭成员与您共享的文件夹—它应该名为“beanies.family”。",
+      "hash": "h706c8",
+      "lastUpdated": "2026-04-20"
+    },
+    "googleDrive.downloadBackupUnavailableTitle": {
+      "translation": "目前无法准备备份",
+      "hash": "z5ngkv",
+      "lastUpdated": "2026-04-20"
+    },
+    "googleDrive.downloadBackupUnavailableBody": {
+      "translation": "您的会话密钥或Pod信封丢失。请重新连接到Google云端硬盘，然后重试。",
+      "hash": "qabze7",
+      "lastUpdated": "2026-04-20"
+    },
+    "googleDrive.downloadBackupFailedTitle": {
+      "translation": "备份下载失败",
+      "hash": "nwk2af",
+      "lastUpdated": "2026-04-20"
+    },
+    "googleDrive.downloadBackupFailedBody": {
+      "translation": "我们无法准备您的备份文件。请检查您的网络连接，然后重试。",
+      "hash": "rwttgr",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.bannerTitle": {
+      "translation": "部分照片无法加载",
+      "hash": "2adezu",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.bannerBody": {
+      "translation": "重新连接您的beanies.family文件夹，查看其他家庭成员上传的照片。",
+      "hash": "5ho6gm",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.reconnect": {
+      "translation": "重新连接",
+      "hash": "lihjux",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.dismiss": {
+      "translation": "现在不行",
+      "hash": "8bkhfb",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.successTitle": {
+      "translation": "照片文件夹已重新连接",
+      "hash": "wye79u",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.successBody": {
+      "translation": "您现在应该会看到丢失的照片。如果仍有空白，则可能已被删除。",
+      "hash": "cri1sc",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.notConnectedTitle": {
+      "translation": "您尚未连接到Google云端硬盘",
+      "hash": "c28huv",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.notConnectedBody": {
+      "translation": "请先完成Google云端硬盘设置，然后再回来重新连接您的照片。",
+      "hash": "86admr",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.tokenFailedTitle": {
+      "translation": "无法联系Google",
+      "hash": "mk5h64",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.tokenFailedBody": {
+      "translation": "您的登录信息需要刷新。退出并重新登录，然后尝试重新连接。",
+      "hash": "vy8v7n",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.pickerFailedTitle": {
+      "translation": "无法打开Google云端硬盘",
+      "hash": "wkwxmb",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.pickerFailedBody": {
+      "translation": "检查您的网络连接并重试。",
+      "hash": "5pwfuf",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.noBeanpodTitle": {
+      "translation": "该文件夹不是beanies.family pod",
+      "hash": "ev5won",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.noBeanpodBody": {
+      "translation": "在该文件夹中找不到pod文件。选择与您共享的名为“beanies.family”的文件夹。",
+      "hash": "1ehzvu",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.wrongFolderTitle": {
+      "translation": "那是另一个家庭的吊舱",
+      "hash": "ptzm08",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.wrongFolderBody": {
+      "translation": "为{familyName}选择beanies.family文件夹以重新连接此Pod的照片。",
+      "hash": "y9ogn5",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.folderInaccessibleTitle": {
+      "translation": "无法访问该文件夹",
+      "hash": "7j97bl",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.folderInaccessibleBody": {
+      "translation": "Google云端硬盘拒绝访问。请确保文件夹已与您登录的帐户共享。",
+      "hash": "b5cg9d",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.genericFailureTitle": {
+      "translation": "无法重新连接您的照片",
+      "hash": "v6ark1",
+      "lastUpdated": "2026-04-20"
+    },
+    "recoverPhotos.genericFailureBody": {
+      "translation": "出错了。请检查浏览器控制台了解详细信息，然后重试。",
+      "hash": "ylroia",
       "lastUpdated": "2026-04-20"
     }
   }

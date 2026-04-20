@@ -253,6 +253,26 @@ describe('photoStore', () => {
     expect(store.isUnresolved(photoId)).toBe(true);
   });
 
+  it('hasBrokenPhotos flips true once any photo is flagged unresolved and back to false after clearUnresolved', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    ensureEntity('activities', 'act-broken');
+    const store = usePhotoStore();
+    expect(store.hasBrokenPhotos).toBe(false);
+
+    driveMocks.getFileMetadata
+      .mockResolvedValueOnce({ parents: ['folder-1'] })
+      .mockRejectedValueOnce(new DriveFileNotFoundError('not found', 404));
+    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-broken');
+    await store.getImageUrl(photoId, 'thumb');
+
+    expect(store.hasBrokenPhotos).toBe(true);
+    expect(store.isUnresolved(photoId)).toBe(true);
+
+    store.clearUnresolved();
+    expect(store.hasBrokenPhotos).toBe(false);
+    expect(store.isUnresolved(photoId)).toBe(false);
+  });
+
   it('replacePhotoFile swaps driveFileId and preserves UUID + createdAt', async () => {
     storeInternals.registerPhotoCollection('activities');
     ensureEntity('activities', 'act-1');
