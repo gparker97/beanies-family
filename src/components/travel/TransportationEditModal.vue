@@ -6,9 +6,21 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import {
+  useBookingValidation,
+  type BookingValidationRules,
+} from '@/composables/useBookingValidation';
 import { useVacationStore } from '@/stores/vacationStore';
 import { buildTransportationTitle } from '@/utils/vacation';
 import type { VacationTransportation, VacationSegmentStatus } from '@/types/models';
+
+type TransportationField =
+  | 'agencyName'
+  | 'pickupDate'
+  | 'pickupTime'
+  | 'returnDate'
+  | 'departureDate'
+  | 'departureTime';
 
 interface Props {
   open: boolean;
@@ -47,6 +59,7 @@ const { isEditing, isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit(trans) {
+      validation.reset();
       title.value = trans.title ?? '';
       status.value = trans.status ?? 'pending';
       bookingReference.value = trans.bookingReference ?? '';
@@ -66,6 +79,7 @@ const { isEditing, isSubmitting } = useFormModal(
       notes.value = trans.notes ?? '';
     },
     onNew() {
+      validation.reset();
       title.value = '';
       status.value = 'pending';
       bookingReference.value = '';
@@ -108,61 +122,80 @@ const autoTitle = computed(() =>
   })
 );
 
-/** Fields missing for "booked" status */
-const bookedErrors = computed<Set<string>>(() => {
-  if (status.value !== 'booked') return new Set();
-  const missing = new Set<string>();
+/**
+ * Transportation has no "always required" fields at the modal level —
+ * the type is fixed when the entry is created, and everything else is
+ * booking detail. Per-type rules switch on rental vs bus vs shuttle.
+ */
+const rules = computed<BookingValidationRules<TransportationField>>(() => {
   if (isRentalCar.value) {
-    if (!agencyName.value) missing.add('agencyName');
-    if (!pickupDate.value) missing.add('pickupDate');
-    if (!returnDate.value) missing.add('returnDate');
-  } else if (isBus.value) {
-    if (!departureDate.value) missing.add('departureDate');
-    if (!departureTime.value) missing.add('departureTime');
-  } else if (isShuttleOrTaxi.value) {
-    if (!pickupDate.value) missing.add('pickupDate');
-    if (!pickupTime.value) missing.add('pickupTime');
+    return {
+      alwaysRequired: {},
+      requiredWhenBooked: {
+        agencyName: () => !!agencyName.value,
+        pickupDate: () => !!pickupDate.value,
+        returnDate: () => !!returnDate.value,
+      },
+    };
   }
-  return missing;
+  if (isBus.value) {
+    return {
+      alwaysRequired: {},
+      requiredWhenBooked: {
+        departureDate: () => !!departureDate.value,
+        departureTime: () => !!departureTime.value,
+      },
+    };
+  }
+  if (isShuttleOrTaxi.value) {
+    return {
+      alwaysRequired: {},
+      requiredWhenBooked: {
+        pickupDate: () => !!pickupDate.value,
+        pickupTime: () => !!pickupTime.value,
+      },
+    };
+  }
+  return { alwaysRequired: {}, requiredWhenBooked: {} };
 });
 
-const canSave = computed(() => {
-  if (bookedErrors.value.size > 0) return false;
-  return true;
-});
+const validation = useBookingValidation<TransportationField>(status, rules);
+const canSave = validation.canSave;
 
 async function handleSave() {
-  if (!canSave.value || !props.vacationId || props.transportationIndex < 0) return;
-  isSubmitting.value = true;
-  try {
-    const vacation = vacationStore.getVacationById(props.vacationId);
-    if (!vacation) return;
-    const transportation = [...vacation.transportation];
-    transportation[props.transportationIndex] = {
-      ...transportation[props.transportationIndex]!,
-      title: autoTitle.value,
-      status: status.value,
-      bookingReference: bookingReference.value,
-      pickupDate: pickupDate.value,
-      pickupTime: pickupTime.value,
-      returnDate: returnDate.value,
-      returnTime: returnTime.value,
-      agencyName: agencyName.value,
-      agencyAddress: agencyAddress.value,
-      operator: operator.value,
-      route: route.value,
-      departureStation: departureStation.value,
-      arrivalStation: arrivalStation.value,
-      departureDate: departureDate.value,
-      departureTime: departureTime.value,
-      link: link.value || undefined,
-      notes: notes.value,
-    };
-    await vacationStore.updateVacation(props.vacationId, { transportation });
-    emit('close');
-  } finally {
-    isSubmitting.value = false;
-  }
+  if (!props.vacationId || props.transportationIndex < 0) return;
+  await validation.attemptSave(async () => {
+    isSubmitting.value = true;
+    try {
+      const vacation = vacationStore.getVacationById(props.vacationId);
+      if (!vacation) return;
+      const transportation = [...vacation.transportation];
+      transportation[props.transportationIndex] = {
+        ...transportation[props.transportationIndex]!,
+        title: autoTitle.value,
+        status: status.value,
+        bookingReference: bookingReference.value,
+        pickupDate: pickupDate.value,
+        pickupTime: pickupTime.value,
+        returnDate: returnDate.value,
+        returnTime: returnTime.value,
+        agencyName: agencyName.value,
+        agencyAddress: agencyAddress.value,
+        operator: operator.value,
+        route: route.value,
+        departureStation: departureStation.value,
+        arrivalStation: arrivalStation.value,
+        departureDate: departureDate.value,
+        departureTime: departureTime.value,
+        link: link.value || undefined,
+        notes: notes.value,
+      };
+      await vacationStore.updateVacation(props.vacationId, { transportation });
+      emit('close');
+    } finally {
+      isSubmitting.value = false;
+    }
+  });
 }
 </script>
 
@@ -209,13 +242,15 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.departureDate')"
-            :error="bookedErrors.has('departureDate')"
+            :required="validation.isRequired('departureDate')"
+            :error="validation.showError('departureDate')"
           >
             <BaseInput v-model="departureDate" type="date" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.departureTime')"
-            :error="bookedErrors.has('departureTime')"
+            :required="validation.isRequired('departureTime')"
+            :error="validation.showError('departureTime')"
           >
             <BaseInput v-model="departureTime" type="time" />
           </FormFieldGroup>
@@ -226,7 +261,8 @@ async function handleSave() {
       <template v-if="isRentalCar">
         <FormFieldGroup
           :label="t('vacation.field.agencyName')"
-          :error="bookedErrors.has('agencyName')"
+          :required="validation.isRequired('agencyName')"
+          :error="validation.showError('agencyName')"
         >
           <BaseInput v-model="agencyName" :placeholder="t('vacation.field.agencyName')" />
         </FormFieldGroup>
@@ -236,7 +272,8 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.pickupDate')"
-            :error="bookedErrors.has('pickupDate')"
+            :required="validation.isRequired('pickupDate')"
+            :error="validation.showError('pickupDate')"
           >
             <BaseInput v-model="pickupDate" type="date" />
           </FormFieldGroup>
@@ -247,7 +284,8 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.returnDate')"
-            :error="bookedErrors.has('returnDate')"
+            :required="validation.isRequired('returnDate')"
+            :error="validation.showError('returnDate')"
           >
             <BaseInput v-model="returnDate" type="date" />
           </FormFieldGroup>
@@ -262,13 +300,15 @@ async function handleSave() {
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.pickupDate')"
-            :error="bookedErrors.has('pickupDate')"
+            :required="validation.isRequired('pickupDate')"
+            :error="validation.showError('pickupDate')"
           >
             <BaseInput v-model="pickupDate" type="date" />
           </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.pickupTime')"
-            :error="bookedErrors.has('pickupTime')"
+            :required="validation.isRequired('pickupTime')"
+            :error="validation.showError('pickupTime')"
           >
             <BaseInput v-model="pickupTime" type="time" />
           </FormFieldGroup>

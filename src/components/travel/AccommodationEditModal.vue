@@ -6,9 +6,20 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
+import {
+  useBookingValidation,
+  type BookingValidationRules,
+} from '@/composables/useBookingValidation';
 import { useVacationStore } from '@/stores/vacationStore';
 import { buildAccommodationTitle } from '@/utils/vacation';
 import type { VacationAccommodation, VacationSegmentStatus } from '@/types/models';
+
+type AccommodationField =
+  | 'name'
+  | 'address'
+  | 'checkInDate'
+  | 'checkOutDate'
+  | 'confirmationNumber';
 
 interface Props {
   open: boolean;
@@ -42,6 +53,7 @@ const { isEditing, isSubmitting } = useFormModal(
   () => props.open,
   {
     onEdit(acc) {
+      validation.reset();
       title.value = acc.title ?? '';
       status.value = acc.status ?? 'pending';
       name.value = acc.name ?? '';
@@ -56,6 +68,7 @@ const { isEditing, isSubmitting } = useFormModal(
       notes.value = acc.notes ?? '';
     },
     onNew() {
+      validation.reset();
       title.value = '';
       status.value = 'pending';
       name.value = '';
@@ -92,50 +105,56 @@ const autoTitle = computed(() =>
 
 const isFamilyFriends = computed(() => props.accommodation?.type === 'family_friends');
 
-/** Fields missing for "booked" status */
-const bookedErrors = computed<Set<string>>(() => {
-  if (status.value !== 'booked') return new Set();
-  const missing = new Set<string>();
-  if (!checkInDate.value) missing.add('checkInDate');
-  if (!checkOutDate.value) missing.add('checkOutDate');
-  if (!address.value) missing.add('address');
-  if (!isFamilyFriends.value && !confirmationNumber.value) missing.add('confirmationNumber');
-  return missing;
-});
+/**
+ * `name` is always required (a nameless accommodation has no useful
+ * title). Check-in / check-out / address / confirmation number bite only
+ * when status is 'booked'. `confirmationNumber` is skipped for the
+ * family-friends type since those stays don't have booking codes.
+ */
+const rules = computed<BookingValidationRules<AccommodationField>>(() => ({
+  alwaysRequired: {
+    name: () => !!name.value.trim(),
+  },
+  requiredWhenBooked: {
+    address: () => !!address.value,
+    checkInDate: () => !!checkInDate.value,
+    checkOutDate: () => !!checkOutDate.value,
+    ...(isFamilyFriends.value ? {} : { confirmationNumber: () => !!confirmationNumber.value }),
+  },
+}));
 
-const canSave = computed(() => {
-  if (!name.value.trim()) return false;
-  if (bookedErrors.value.size > 0) return false;
-  return true;
-});
+const validation = useBookingValidation<AccommodationField>(status, rules);
+const canSave = validation.canSave;
 
 async function handleSave() {
-  if (!canSave.value || !props.vacationId || props.accommodationIndex < 0) return;
-  isSubmitting.value = true;
-  try {
-    const vacation = vacationStore.getVacationById(props.vacationId);
-    if (!vacation) return;
-    const accommodations = [...vacation.accommodations];
-    accommodations[props.accommodationIndex] = {
-      ...accommodations[props.accommodationIndex]!,
-      title: autoTitle.value,
-      status: status.value,
-      name: name.value,
-      address: address.value,
-      checkInDate: checkInDate.value,
-      checkOutDate: checkOutDate.value,
-      confirmationNumber: confirmationNumber.value,
-      roomType: roomType.value,
-      contactPhone: contactPhone.value,
-      breakfastIncluded: breakfastIncluded.value,
-      link: link.value || undefined,
-      notes: notes.value,
-    };
-    await vacationStore.updateVacation(props.vacationId, { accommodations });
-    emit('close');
-  } finally {
-    isSubmitting.value = false;
-  }
+  if (!props.vacationId || props.accommodationIndex < 0) return;
+  await validation.attemptSave(async () => {
+    isSubmitting.value = true;
+    try {
+      const vacation = vacationStore.getVacationById(props.vacationId);
+      if (!vacation) return;
+      const accommodations = [...vacation.accommodations];
+      accommodations[props.accommodationIndex] = {
+        ...accommodations[props.accommodationIndex]!,
+        title: autoTitle.value,
+        status: status.value,
+        name: name.value,
+        address: address.value,
+        checkInDate: checkInDate.value,
+        checkOutDate: checkOutDate.value,
+        confirmationNumber: confirmationNumber.value,
+        roomType: roomType.value,
+        contactPhone: contactPhone.value,
+        breakfastIncluded: breakfastIncluded.value,
+        link: link.value || undefined,
+        notes: notes.value,
+      };
+      await vacationStore.updateVacation(props.vacationId, { accommodations });
+      emit('close');
+    } finally {
+      isSubmitting.value = false;
+    }
+  });
 }
 </script>
 
@@ -170,12 +189,20 @@ async function handleSave() {
       </div>
 
       <!-- Name (type-specific label) -->
-      <FormFieldGroup :label="nameFieldLabel" required>
+      <FormFieldGroup
+        :label="nameFieldLabel"
+        :required="validation.isRequired('name')"
+        :error="validation.showError('name')"
+      >
         <BaseInput v-model="name" :placeholder="nameFieldLabel" />
       </FormFieldGroup>
 
       <!-- Address -->
-      <FormFieldGroup :label="t('vacation.field.address')" :error="bookedErrors.has('address')">
+      <FormFieldGroup
+        :label="t('vacation.field.address')"
+        :required="validation.isRequired('address')"
+        :error="validation.showError('address')"
+      >
         <BaseInput v-model="address" :placeholder="t('vacation.field.address')" />
       </FormFieldGroup>
 
@@ -183,13 +210,15 @@ async function handleSave() {
       <div class="grid grid-cols-2 gap-3">
         <FormFieldGroup
           :label="t('vacation.field.checkIn')"
-          :error="bookedErrors.has('checkInDate')"
+          :required="validation.isRequired('checkInDate')"
+          :error="validation.showError('checkInDate')"
         >
           <BaseInput v-model="checkInDate" type="date" />
         </FormFieldGroup>
         <FormFieldGroup
           :label="t('vacation.field.checkOut')"
-          :error="bookedErrors.has('checkOutDate')"
+          :required="validation.isRequired('checkOutDate')"
+          :error="validation.showError('checkOutDate')"
         >
           <BaseInput v-model="checkOutDate" type="date" />
         </FormFieldGroup>
@@ -199,7 +228,8 @@ async function handleSave() {
       <FormFieldGroup
         v-if="!isFamilyFriends"
         :label="t('vacation.field.confirmationNumber')"
-        :error="bookedErrors.has('confirmationNumber')"
+        :required="validation.isRequired('confirmationNumber')"
+        :error="validation.showError('confirmationNumber')"
       >
         <BaseInput
           v-model="confirmationNumber"

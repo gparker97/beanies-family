@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Fixed
+
+- **Travel plan segment modals no longer fire the "required" error state the moment you open them.** Opening a booked flight, cruise, or accommodation in the editor used to immediately paint empty booking-contingent fields (airline, ship name, confirmation number, etc.) with an orange error ring, even before you'd tried to save. The ring now only fires on a save attempt. In the meantime, an asterisk beside the label tells you which fields _will_ be required — so the same signal is there, just not shouting. Applies across the Flight/Cruise/Train/Ferry/Car/Activity segment editor, the Accommodation editor, and the Transportation editor.
+
 ### Changed
 
 - **Renamed session-bracket skills.** `/start-of-day` → `/start-session`, `/end-of-day` → `/end-session`. Triggers broadened to cover switching machines and clearing context, not just day boundaries. `/good-morning` still works as the morning alias (symlink preserved).
