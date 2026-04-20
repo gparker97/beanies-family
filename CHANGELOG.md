@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Avatar photos now render on every surface that shows a member.** Seven call sites (Nook row, dashboard row, app header trigger + 3 dropdown slots, member filter dropdown trigger + option rows, login picker grid + selected card, settings profile header, accounts page section + row, goals page section) were passing `:variant` and `:color` to `<BeanieAvatar>` but skipping `:photo-url`, so the SVG fallback rendered even when the member had a real avatar. All wired up to a new shared helper.
+
+### Changed
+
+- **Consolidated "Your Beans" row into one component.** NookYourBeans + FamilyBeanRow were 90% identical (same structure, events, avatars, role labels) — and had drifted in three separate bugs today (pet sort, pet role label, missing photo-url). Extracted to `BeanListStrip` with `labelKey` / `addLabelKey` / `density` props. FamilyNookPage and DashboardPage now mount the shared component; both deleted files.
+- **Shared `getMemberAvatarUrl` / `markMemberAvatarError` helpers** in `useMemberInfo`. Every avatar call site now uses the same two-liner — future rosters can't reintroduce the missing-photo bug by forgetting to wire the URL.
+- **Tapping a bean on the Nook row opens the Meet-This-Bean overview** (`/pod/<memberId>`) instead of the edit modal. Dashboard row unchanged (still goes to `/family`).
+
+### Fixed
+
 - **Pet role label on "Your Beans" rows.** The grey role label under each avatar on the Nook and dashboard Family Bean rows fell back to "Parent" / "Big Bean" for pets because the mapping only checked `role === 'owner' || ageGroup === 'adult'`. Now pets show **"Pet Beanie"** (English) / **"pet beanie"** (beanie mode) — matching the role pill in the Add/Edit Beanie drawer. Extracted the role-label helper into a single shared `getMemberRoleLabel()` in `useMemberInfo` so the two components (and any future rosters) stop duplicating the same 5-line switch.
 
 - **Pets now sort last everywhere, including on the Nook.** The earlier fix put pets last in `sortedMembers`, but five surfaces were iterating `familyStore.members` directly (unsorted) or `familyStore.humans` without sorting. Fixed NookYourBeans, FamilyBeanRow, MeetTheBeansPage, FamilyScrapbookPage member-filter chips, and PickBeanView login picker to use `sortedMembers` / `sortedHumans` consistently.

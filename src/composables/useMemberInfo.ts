@@ -1,10 +1,37 @@
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { usePhotoStore } from '@/stores/photoStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { UUID } from '@/types/models';
 
 const DEFAULT_COLOR = '#6b7280';
 
 type TranslateFn = (key: UIStringKey) => string;
+
+/**
+ * Public Drive CDN URL for a member's avatar photo, or `null` if the
+ * member has no photo or the photo has been flagged unresolved.
+ * Shared helper for the dozen-ish avatar call sites across the app —
+ * previously each site either skipped `photo-url` entirely (breaking
+ * rendering) or re-implemented the same 2-line lookup.
+ *
+ * Sync. Deterministic from `driveFileId` via `photoStore.getPublicUrl`.
+ */
+export function getMemberAvatarUrl(member: { avatarPhotoId?: UUID }): string | null {
+  if (!member.avatarPhotoId) return null;
+  return usePhotoStore().getPublicUrl(member.avatarPhotoId, 'thumb');
+}
+
+/**
+ * Flag a member's avatar photo as unresolved when the `<img>` load
+ * errors (typically a genuine Drive 404 for a deleted file). Call from
+ * the `@photo-error` handler on `<BeanieAvatar>`. No-op when the
+ * member has no photo set.
+ */
+export function markMemberAvatarError(member: { avatarPhotoId?: UUID }): void {
+  if (!member.avatarPhotoId) return;
+  usePhotoStore().markUnresolved(member.avatarPhotoId);
+}
 
 /**
  * Member role label for "Your Beans"-style roster surfaces (Nook + dashboard).

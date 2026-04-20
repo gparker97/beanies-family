@@ -6,6 +6,7 @@ import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { isTemporaryEmail } from '@/utils/email';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -176,7 +177,13 @@ async function handleSignIn() {
         @click="selectMember(member)"
       >
         <div class="relative">
-          <BeanieAvatar :variant="getMemberAvatarVariant(member)" :color="member.color" size="xl" />
+          <BeanieAvatar
+            :variant="getMemberAvatarVariant(member)"
+            :color="member.color"
+            :photo-url="getMemberAvatarUrl(member)"
+            size="xl"
+            @photo-error="markMemberAvatarError(member)"
+          />
           <!-- Status indicator -->
           <div
             v-if="member.passwordHash"
@@ -231,7 +238,9 @@ async function handleSignIn() {
         <BeanieAvatar
           :variant="getMemberAvatarVariant(selectedMember)"
           :color="selectedMember.color"
+          :photo-url="getMemberAvatarUrl(selectedMember)"
           size="lg"
+          @photo-error="markMemberAvatarError(selectedMember)"
         />
         <div class="flex-1">
           <p class="font-outfit font-semibold text-gray-900 dark:text-gray-100">

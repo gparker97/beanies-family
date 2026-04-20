@@ -14,7 +14,11 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
-import { useMemberInfo } from '@/composables/useMemberInfo';
+import {
+  useMemberInfo,
+  getMemberAvatarUrl,
+  markMemberAvatarError,
+} from '@/composables/useMemberInfo';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
@@ -406,7 +410,9 @@ async function deleteCompletedGoal(id: string) {
               v-if="getMemberForGoal(section.header.memberId)"
               :variant="getMemberAvatarVariant(getMemberForGoal(section.header.memberId)!)"
               :color="getMemberColor(section.header.memberId)"
+              :photo-url="getMemberAvatarUrl(getMemberForGoal(section.header.memberId)!)"
               size="sm"
+              @photo-error="markMemberAvatarError(getMemberForGoal(section.header.memberId)!)"
             />
           </template>
           <template v-else>

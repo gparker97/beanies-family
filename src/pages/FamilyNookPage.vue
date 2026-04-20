@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import NookGreeting from '@/components/nook/NookGreeting.vue';
 import FamilyStatusToast from '@/components/nook/FamilyStatusToast.vue';
-import NookYourBeans from '@/components/nook/NookYourBeans.vue';
+import BeanListStrip from '@/components/common/BeanListStrip.vue';
 import ScheduleCards from '@/components/nook/ScheduleCards.vue';
 import NookTodoWidget from '@/components/nook/NookTodoWidget.vue';
 import NookVacationCard from '@/components/nook/NookVacationCard.vue';
@@ -202,10 +202,14 @@ async function handleTransactionDelete(id: string) {
     <!-- Beanie tip of the day -->
     <BeanTipCard />
 
-    <!-- Your Beans row -->
-    <NookYourBeans
+    <!-- Your Beans row — tapping a bean now opens the Meet-This-Bean
+         overview page. Add Bean still routes to the Add drawer on
+         /family. -->
+    <BeanListStrip
+      label-key="nook.yourBeans"
+      add-label-key="nook.addBean"
       @add-member="router.push({ path: '/family', query: { add: 'true' } })"
-      @select-member="(id: string) => router.push({ path: '/family', query: { edit: id } })"
+      @select-member="(id: string) => router.push(`/pod/${id}`)"
     />
 
     <!-- Today's Schedule + This Week -->
