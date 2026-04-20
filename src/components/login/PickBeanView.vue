@@ -29,8 +29,10 @@ const confirmPassword = ref('');
 const selectedMember = ref<FamilyMember | null>(null);
 const formError = ref<string | null>(null);
 
-// Pets can't sign in, so exclude them from the login picker.
-const allMembers = computed(() => familyStore.humans);
+// Pets can't sign in, so exclude them from the login picker. Ordered
+// adults -> children via sortedHumans so the picker matches the roster
+// order the user sees everywhere else in the app.
+const allMembers = computed(() => familyStore.sortedHumans);
 const podName = computed(() => familyContextStore.activeFamilyName);
 
 const isCreatingPassword = computed(

@@ -244,7 +244,7 @@ function asNote(entry: ScrapbookEntry): MemberNote {
           {{ t('scrapbook.filter.members') }}
         </span>
         <button
-          v-for="m in familyStore.members"
+          v-for="m in familyStore.sortedMembers"
           :key="m.id"
           type="button"
           class="font-outfit inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors"
