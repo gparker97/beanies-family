@@ -206,19 +206,19 @@ async function handleRemoveMissing(): Promise<void> {
 
     <template #footer>
       <div class="flex items-center justify-between gap-2">
-        <div class="text-xs text-white/60">{{ positionLabel }}</div>
+        <div class="text-xs text-gray-500 dark:text-white/60">{{ positionLabel }}</div>
         <div class="flex items-center gap-2">
           <template v-if="isMissing">
             <button
               type="button"
-              class="bg-primary-500 hover:bg-primary-600 rounded-lg px-3 py-1.5 text-sm text-white"
+              class="bg-primary-500 hover:bg-primary-600 rounded-lg px-3 py-1.5 text-sm font-medium text-white"
               @click="replacePicker.open"
             >
               {{ t('photos.replace') }}
             </button>
             <button
               type="button"
-              class="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white/80 hover:bg-white/5"
+              class="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
               @click="handleRemoveMissing"
             >
               {{ t('photos.remove') }}
@@ -229,13 +229,13 @@ async function handleRemoveMissing(): Promise<void> {
               v-if="fullUrl"
               :href="fullUrl"
               download
-              class="rounded-lg border border-white/20 px-3 py-1.5 text-sm text-white/80 hover:bg-white/5"
+              class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-slate-600 dark:text-gray-300 dark:hover:bg-slate-700"
             >
               {{ t('photos.download') }}
             </a>
             <button
               type="button"
-              class="rounded-lg border border-red-500/40 px-3 py-1.5 text-sm text-red-300 hover:bg-red-500/10"
+              class="rounded-lg border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-500/10"
               @click="handleDelete"
             >
               {{ t('photos.remove') }}
