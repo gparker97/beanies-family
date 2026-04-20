@@ -1,1 +1,1 @@
-../start-of-day/SKILL.md
+../start-session/SKILL.md

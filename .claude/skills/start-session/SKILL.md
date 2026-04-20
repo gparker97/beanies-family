@@ -1,21 +1,21 @@
 ---
-name: start-of-day
-description: First-thing-in-the-morning ritual — sync the repo, surface project status, fetch top news + today's calendar, and lay out today's pending work so you start the day knowing exactly what's in front of you
+name: start-session
+description: Fresh-session ritual — sync the repo, surface project status, fetch top news + today's calendar, and lay out pending work so you start a new session knowing exactly what's in front of you. Run at the start of any new session (new day, new machine, after context clear), not just mornings.
 ---
 
-# start-of-day — Morning Ritual
+# start-session — Session Start Ritual
 
-Get the workspace synced and the brain warmed up. Run this on the **first login of every day** before any other work.
+Get the workspace synced and the brain warmed up whenever starting a fresh session — a new day, switching machines, or after clearing context. Run this before any other work on a new session.
 
-This skill is the bookend to `/end-of-day`: end-of-day captures yesterday's state into the repo and Notion; start-of-day pulls that state forward and turns it into today's actionable picture.
+This skill is the bookend to `/end-session`: end-session captures the previous session's state into the repo and Notion; start-session pulls that state forward and turns it into an actionable picture for the current session.
 
 ---
 
 ## When to Invoke
 
-- **Via slash command**: `/start-of-day` or `/good-morning` (both invoke this same skill — `good-morning` is a symlink wrapper)
-- **Proactively**: When the user says "good morning", "morning", "ready to start", "let's go", "what's on for today" or similar at the start of a session
-- Always recommend running it if it's a new calendar day since the last activity in the conversation
+- **Via slash command**: `/start-session` or `/good-morning` (both invoke this same skill — `good-morning` is a symlink wrapper kept for the common morning case)
+- **Proactively**: When the user says "good morning", "morning", "ready to start", "let's go", "what's on for today", "fresh session", "new context", "picking up where I left off" or similar at the start of a session
+- Always recommend running it when starting a new session — whether that's a new calendar day, a new machine, or a cleared context — since the last activity in the conversation
 
 ---
 
@@ -23,14 +23,14 @@ This skill is the bookend to `/end-of-day`: end-of-day captures yesterday's stat
 
 ### Step 1: Sync the repo (mandatory, no shortcuts)
 
-The repo MUST be fully synced before any work begins — overnight pushes from CI, dependabot, or another machine could otherwise cause merge headaches later.
+The repo MUST be fully synced before any work begins — pushes from CI, dependabot, or another machine could otherwise cause merge headaches later.
 
 1. `cd` to the repo root if not already there.
 2. Capture the current branch and confirm it's clean:
    ```bash
    git branch --show-current && git status --short
    ```
-3. If the working tree is dirty, **stop and ask the user** what to do (don't auto-stash, don't auto-commit — yesterday's `/end-of-day` should have left it clean; dirty state on a fresh morning is suspicious and worth a human eyeball).
+3. If the working tree is dirty, **stop and ask the user** what to do (don't auto-stash, don't auto-commit — the previous `/end-session` should have left it clean; dirty state on a fresh session is suspicious and worth a human eyeball).
 4. Fetch + show what's new on origin:
    ```bash
    git fetch --all --prune
@@ -45,18 +45,18 @@ The repo MUST be fully synced before any work begins — overnight pushes from C
 
 ### Step 2: Read project status
 
-Pull the day's context into the conversation. In parallel, read:
+Pull the session's context into the conversation. In parallel, read:
 
-1. `docs/STATUS.md` (top section + most recent dated session block) — what was shipped yesterday, current phase, pending items
-2. `CHANGELOG.md` (today's date if it exists, otherwise yesterday's most recent entry) — user-facing changes
+1. `docs/STATUS.md` (top section + most recent dated session block) — what was shipped in the most recent session(s), current phase, pending items
+2. `CHANGELOG.md` (today's date if it exists, otherwise the most recent entry) — user-facing changes
 3. `tasks/lessons.md` (top entry only) — recent corrections to keep front-of-mind
-4. **Skip Notion launch status** — `/launch-status` is its own skill the user can run if they want today's launch dashboard. Don't duplicate that work here.
+4. **Skip Notion launch status** — `/launch-status` is its own skill the user can run if they want the launch dashboard. Don't duplicate that work here.
 
 ### Step 3: Check for pending work
 
 Surface anything that's actively waiting:
 
-1. `git log --oneline -10` — what's been shipped recently (catch up on yesterday's late-day commits)
+1. `git log --oneline -10` — what's been shipped recently (catch up on late commits from the previous session)
 2. Open GitHub issues with `in-progress` label:
    ```bash
    gh issue list --label "in-progress" --state open --json number,title,updatedAt --jq '.[] | "#\(.number) \(.title) (updated \(.updatedAt | split("T")[0]))"'
@@ -91,23 +91,24 @@ For both: pass `startTime` and `endTime` as today's local-day window in `Asia/Si
 
 **Empty days:** if both calendars return zero events, write "calendar clear — no events today."
 
-### Step 6: Compose the morning report
+### Step 6: Compose the session-start report
 
 Deliver a single message that combines:
 
-#### a) Good morning greeting
+#### a) Greeting
 
-One direct, low-key line. Greg is reading this with their first cup of coffee — keep it brief and easy to parse. No silly language, no metaphors, no emoji-heavy openings, no absurdist humor. A simple "Good morning, Greg." is fine. Optionally add one short factual context phrase tied to the day (date, weather if known, what shipped yesterday) — but only if it adds real signal.
+One direct, low-key line. greg is reading this with their first cup of coffee (or mid-afternoon, or on a new machine — whatever the start of this session looks like). Keep it brief and easy to parse. No silly language, no metaphors, no emoji-heavy openings, no absurdist humor. Match the time of day: "Good morning, greg." on the morning start; "Hey greg" or "Picking up where you left off" on a fresh mid-day session. Optionally add one short factual context phrase tied to the session (date, what shipped last session) — but only if it adds real signal.
 
 Examples of the right tone:
 
-- "Good morning, Greg. Saturday, April 18."
+- "Good morning, greg. Saturday, April 18."
 - "Good morning. Repo synced, nothing in flight."
-- "Morning, Greg. Yesterday shipped the buy-fruit post and the staging teardown plan."
+- "Picking up on a fresh context. Yesterday's session shipped the buy-fruit post and the staging teardown plan."
+- "Hey greg — fresh session. Last commit was 20 minutes ago."
 
 Avoid: stacked metaphors, emoji clusters, "the beanies are stretching", "rise and shine", motivational-poster phrasing.
 
-#### b) Today's pending work — brief, actionable
+#### b) Pending work — brief, actionable
 
 A short bulleted list (3-7 items max) of what's actively in flight or scheduled for today/this week, drawn from STATUS.md, GitHub issues, and runbooks. Each item:
 
@@ -121,20 +122,20 @@ Prioritize:
 3. Pending items called out in `STATUS.md` "Next Session" / "Pending" sections
 4. Anything mentioned in a recent runbook as "next step"
 
-If there's genuinely nothing pending, say so clearly: "no pending items — wide open day. what would you like to work on?"
+If there's genuinely nothing pending, say so clearly: "no pending items — wide open session. what would you like to work on?"
 
 #### c) Quick state snapshot
 
 Two or three lines summarizing the world:
 
 - Working tree status
-- What changed overnight (if anything was pulled)
-- Anything notable from yesterday's STATUS update
+- What changed since the last local activity (if anything was pulled)
+- Anything notable from the most recent STATUS update
 
 Format example:
 
 ```
-**State:** Clean working tree on `main`. Pulled 2 commits from overnight (dependabot bumps). Yesterday's session shipped Phase B + authored Phase C cutover.
+**State:** Clean working tree on `main`. Pulled 2 commits from overnight (dependabot bumps). Previous session shipped Phase B + authored Phase C cutover.
 ```
 
 ---
@@ -172,9 +173,9 @@ Order matters: greeting → state → news → calendar → pending work. State 
 
 - **Always sync first.** No skipping `git fetch + pull`. Stale repos cause stale advice.
 - **Never auto-resolve unexpected git state.** Dirty working tree, diverged branches, conflicts — stop and ask.
-- **Greeting stays direct.** No silly metaphors, no emoji clusters, no absurdist humor. One short factual line. Reading-this-with-coffee tone, not stand-up-routine tone.
+- **Greeting stays direct.** No silly metaphors, no emoji clusters, no absurdist humor. One short factual line. Match the time of day: morning gets "good morning"; a fresh mid-day session gets a neutral pickup line.
 - **Keep pending work crisp.** No essays. The user should be able to pick the next action in under 10 seconds of reading.
-- **Don't moralize.** No "remember to take breaks" lectures. Greg is an adult.
-- **Skip the launch dashboard.** That's `/launch-status`'s job. Mention it as "run /launch-status if you want today's launch metrics" only if the most recent STATUS update is launch-relevant.
+- **Don't moralize.** No "remember to take breaks" lectures. greg is an adult.
+- **Skip the launch dashboard.** That's `/launch-status`'s job. Mention it as "run /launch-status if you want the launch metrics" only if the most recent STATUS update is launch-relevant.
 - **Be honest about empty sections.** If nothing's pending, say so. If calendar isn't connected, say so. No filler.
 - **News stays real.** 1-2 genuinely top stories from the last 24 hours. No clickbait, no padding. Skip the section if WebSearch returns nothing useful.

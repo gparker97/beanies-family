@@ -1,20 +1,20 @@
 ---
-name: end-of-day
-description: End-of-session wrap-up — commit, push, update STATUS.md, CHANGELOG.md, launch status in Notion, and clean up unfinished work
+name: end-session
+description: Session wrap-up — commit, push, update STATUS.md, CHANGELOG.md, launch status in Notion, and clean up unfinished work. Run whenever wrapping up a session (end of day, switching machines, about to clear context), not just at end of day.
 ---
 
-# end-of-day — Session Wrap-Up
+# end-session — Session Wrap-Up
 
-Close out the current session so the next developer (or future you) can pick up exactly where you left off. Ensures clean working tree, updated project status, and no orphaned work.
+Close out the current session so the next session (on any machine, with any context) can pick up exactly where you left off. Ensures clean working tree, updated project status, and no orphaned work.
 
-**This skill should be invoked proactively** when the session is winding down, or when the user says things like "wrapping up", "done for the day", "signing off", etc.
+**This skill should be invoked proactively** when the session is winding down — whether that's end of day, switching to a new machine, or about to clear context. The user might say things like "wrapping up", "done for the day", "signing off", "switching machines", "about to clear context", "let's close this session".
 
 ---
 
 ## When to Invoke
 
-- **Via slash command**: `/end-of-day`
-- When the user says "wrapping up", "done for today", "let's close out", "end of session"
+- **Via slash command**: `/end-session`
+- When the user says "wrapping up", "done for today", "let's close out", "end of session", "switching machines", "clearing context", "moving to a new machine"
 - **Proactively** if the conversation is ending and there are uncommitted changes or status files haven't been updated
 
 ---
@@ -92,7 +92,7 @@ If any launch-relevant work was done (new features, user-facing changes, metrics
 
 ## Status Report Format
 
-Present the final summary in this format:
+Present the final summary in this format (use the session date — or date + time if multiple sessions happen on the same day):
 
 ```
 ## Session Wrap-Up — [DATE]

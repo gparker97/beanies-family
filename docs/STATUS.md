@@ -229,7 +229,7 @@ The marketing surface moved off the Vue SPA (invisible to AI crawlers) onto a de
 - **Nav link rename**: "blog" → "beanstalk" across all nav links and footers (URL remains `/blog`).
 - **Plausible custom events**: Added analytics tracking for `signup`, `member_joined`, `family_deleted`, `login` (with method prop), `feature_used` (with feature prop). Uses `window.plausible?.()` (optional chaining for test safety). Type declaration at `src/types/plausible.d.ts`. Privacy Policy updated with disclosure.
 - **Substack auto-subscribe**: New families auto-subscribed to Beanstalk newsletter (gpbeanies.substack.com) during signup via pre-checked opt-out checkbox in `CreatePodView`. Fire-and-forget POST to Substack's `/api/v1/free` endpoint (`mode: 'no-cors'`).
-- **end-of-day skill** (`.claude/skills/end-of-day/SKILL.md`): Session wrap-up skill — cleans working tree, updates STATUS.md/CHANGELOG.md, Notion Launch HQ, checks for unfinished work.
+- **end-session skill** (`.claude/skills/end-session/SKILL.md`): Session wrap-up skill — cleans working tree, updates STATUS.md/CHANGELOG.md, Notion Launch HQ, checks for unfinished work. (Renamed from `end-of-day` on 2026-04-20 — now usable whenever wrapping a session, not just end of day.)
 - **Saved plan**: Server-side DynamoDB stats counters (`docs/plans/2026-04-09-server-side-stats-counters.md`) — not yet implemented, saved for later.
 
 ### Budget Currency Fixes, Setup Progress Modal, Blog & Substack (2026-04-08)
