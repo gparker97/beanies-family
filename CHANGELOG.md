@@ -10,6 +10,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Added
+
+- **Activity cards on the mobile timeline now show who it's for and where.** Small colored initial-circles (up to 3, matching each Beanie's color, stacked with a slight overlap) sit at the top-right of each card. Location appears inline after the time as `· 📍 <location>`. Works on both timed cards and the all-day row; hovering a circle shows the full name.
+- **Tapping a day on the monthly calendar now opens that day's full timeline** instead of the agenda sidebar. The agenda view is still reachable via a new **Agenda** button in the daily view's nav bar (next to Today). Weekly-view day clicks also drill in, for consistency.
+- **Richer loading spinner.** The "counting beans" loading state has been rebuilt: the beans breathe on their spin (subtle scale pulse), cast an animated color-cycling glow (orange → teal → terracotta), and sit in a soft orange halo that fades cleanly into the page. The label gained a gradient sweep through the brand palette, and the static ellipsis is now three bouncing dots — one per brand color — staggered around the baseline where a real ellipsis sits. All animations respect `prefers-reduced-motion`.
+
+### Fixed
+
+- **Pets now show "Pet Beanie" on the Bean detail page.** The role line under a Bean's name (and the "Role" row in their About ribbon) used to fall through to "Parent Bean" for pets because the logic only checked `ageGroup`. Both surfaces now check `isPet` first and match the label already used on the Family Nook row.
+- **Tablet (iPad / small-laptop) view of the activity calendar no longer overflows.** At 768–1023px, the member-name pills on activity cards used to wrap below the time label and spill past the bottom edge of short (30-min) cards. Cards are now a clean two-row layout (title / time · location · assignee dots) and the name pills swap for the same compact initial-circles used on mobile. Desktop above 1024px keeps the full name pills.
+- **Mobile daily view no longer duplicates the member filter.** The in-view Beanie pills inside the daily timeline were redundant with the page-level filter at the top of the planner, and looked cramped on phones. Removed the duplicate; the mobile timeline now follows whatever the page-level filter has set (same as desktop column-hiding).
+- **Help article links to `app.beanies.family` now render as actual links.** Four mentions in the Getting Started and PWA install articles rendered as plain text; they're now proper clickable anchors that open in a new tab.
+- **PWA install guide reminds you you don't need to sign in first.** A short note on step 1 of each device section so you don't sign in on the web page and then again inside the installed app.
+
+### Changed
+
+- **Spinner refinements based on feedback.** Scaled back the orange halo (wider, softer, no hard disc edge) and dropped the dashed orbit ring so the loading state reads as atmosphere rather than chrome. Dropped the ellipsis dots from mid-line to baseline so they sit where a typographic "…" would.
+
 ### Fixed
 
 - **Moving a flight no longer silently shrinks your trip.** Trip start/end dates are now user-owned rather than derived from segment dates on every save (see ADR-023). Changing an outbound or return flight within your trip window leaves the trip unchanged; changing one _past_ the window extends the window. The only way to shrink is a manual date edit on the trip summary page. This fixes the "orphaned accommodation" error greg hit when moving a flight later — the hotel was never orphaned, the trip had silently contracted around it.
