@@ -10,7 +10,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
     icon: '\u{1F331}',
     readTime: 3,
     popular: true,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-04-20',
     sections: [
       {
         type: 'heading',
@@ -33,7 +33,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open beanies.family and click <strong>Create a New Family</strong>',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> and click <strong>Create a New Family</strong>',
           'Enter your family name, your name, and your email address',
           'Choose a strong password \u2014 this encrypts your pod file',
           'Pick your base currency and preferred language',
@@ -290,7 +290,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>https://app.beanies.family</strong> in <strong>Safari</strong>',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in <strong>Safari</strong>',
           'Tap the <strong>Share</strong> button at the bottom of the screen (the square with an up-arrow)',
           'Scroll down in the share sheet and tap <strong>Add to Home Screen</strong>',
           'Edit the name if you want (or leave it as "beanies.family") and tap <strong>Add</strong> in the top-right',
@@ -382,7 +382,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>https://app.beanies.family</strong> in <strong>Chrome</strong>',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in <strong>Chrome</strong>',
           'Tap the <strong>three-dot menu</strong> (\u22EE) in the top-right corner',
           'Tap <strong>Install app</strong> or <strong>Add to Home screen</strong> (the exact label depends on your Android version)',
           'Tap <strong>Install</strong> in the pop-up to confirm',
@@ -434,7 +434,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>https://app.beanies.family</strong> in Chrome / Edge / Brave',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in Chrome / Edge / Brave',
           'Click the <strong>install icon</strong> in the URL bar (right side, near the bookmark star)',
           'If you don\u2019t see the icon, open the browser menu (\u22EE or \u2026) and look for <strong>Install beanies.family</strong> or <strong>Apps \u2192 Install this site as an app</strong>',
           'Click <strong>Install</strong> in the confirmation pop-up',
@@ -455,7 +455,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Safari on macOS can install PWAs as of Sonoma (14.0+). Open <strong>app.beanies.family</strong> in Safari, then from the menu bar choose <strong>File \u2192 Add to Dock</strong>.',
+          'Safari on macOS can install PWAs as of Sonoma (14.0+). Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in Safari, then from the menu bar choose <strong>File \u2192 Add to Dock</strong>.',
         title: 'Safari on macOS',
         icon: '\u{1F34E}',
       },
@@ -567,7 +567,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'That means the app wasn\u2019t installed directly from <strong>app.beanies.family</strong>. Uninstall the current icon (steps above), then visit <strong>https://app.beanies.family</strong> fresh and re-install using the steps for your device. The new install will launch in full-screen mode.',
+          'That means the app wasn\u2019t installed directly from <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a>. Uninstall the current icon (steps above), then visit <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> fresh and re-install using the steps for your device. The new install will launch in full-screen mode.',
       },
       {
         type: 'heading',
