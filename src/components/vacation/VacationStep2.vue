@@ -330,58 +330,61 @@ function removeSegment(index: number) {
         </FormFieldGroup>
       </div>
 
-      <!-- ═══ Flight fields — fieldset-grouped: Essentials (always) + Booking details ═══ -->
+      <!-- ═══ Flight fields — kicker + bordered container (no fieldset; sidesteps min-content bug) ═══ -->
       <template v-if="isFlightType(seg.type)">
-        <fieldset class="rounded-xl border border-[var(--vacation-teal)]/30 px-3 pt-1 pb-3">
-          <legend
-            class="font-outfit px-2 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+        <div>
+          <div
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
-            ✈️ {{ t('vacation.essentials') }}
-          </legend>
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
-            <FormFieldGroup :label="t('form.date')" required>
-              <BaseInput
-                type="date"
-                :model-value="seg.departureDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateSegment(idx, 'departureDate', String($event))"
-              />
-            </FormFieldGroup>
-            <BaseCombobox
-              :model-value="seg.departureAirport ?? ''"
-              :options="airportOptions"
-              :label="t('vacation.field.departureAirport')"
-              :placeholder="t('vacation.field.departureAirport')"
-              :search-placeholder="t('vacation.field.departureAirport')"
-              required
-              other-value="__other__"
-              :other-label="t('form.other' as any) || 'Other'"
-              :other-placeholder="t('vacation.field.departureAirport')"
-              @update:model-value="updateSegment(idx, 'departureAirport', String($event))"
-            />
-            <BaseCombobox
-              :model-value="seg.arrivalAirport ?? ''"
-              :options="airportOptions"
-              :label="t('vacation.field.arrivalAirport')"
-              :placeholder="t('vacation.field.arrivalAirport')"
-              :search-placeholder="t('vacation.field.arrivalAirport')"
-              required
-              other-value="__other__"
-              :other-label="t('form.other' as any) || 'Other'"
-              :other-placeholder="t('vacation.field.arrivalAirport')"
-              @update:model-value="updateSegment(idx, 'arrivalAirport', String($event))"
-            />
+            <span>✈️</span>
+            <span>{{ t('vacation.essentials') }}</span>
           </div>
-        </fieldset>
+          <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.3fr]">
+              <FormFieldGroup :label="t('form.date')" required>
+                <BaseInput
+                  type="date"
+                  :model-value="seg.departureDate ?? ''"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'departureDate', String($event))"
+                />
+              </FormFieldGroup>
+              <BaseCombobox
+                :model-value="seg.departureAirport ?? ''"
+                :options="airportOptions"
+                :label="t('vacation.field.departureAirport')"
+                :placeholder="t('vacation.field.departureAirport')"
+                :search-placeholder="t('vacation.field.departureAirport')"
+                required
+                other-value="__other__"
+                :other-label="t('form.other' as any) || 'Other'"
+                :other-placeholder="t('vacation.field.departureAirport')"
+                @update:model-value="updateSegment(idx, 'departureAirport', String($event))"
+              />
+              <BaseCombobox
+                :model-value="seg.arrivalAirport ?? ''"
+                :options="airportOptions"
+                :label="t('vacation.field.arrivalAirport')"
+                :placeholder="t('vacation.field.arrivalAirport')"
+                :search-placeholder="t('vacation.field.arrivalAirport')"
+                required
+                other-value="__other__"
+                :other-label="t('form.other' as any) || 'Other'"
+                :other-placeholder="t('vacation.field.arrivalAirport')"
+                @update:model-value="updateSegment(idx, 'arrivalAirport', String($event))"
+              />
+            </div>
+          </div>
+        </div>
 
-        <fieldset class="rounded-xl border border-gray-200 px-3 pt-1 pb-3 dark:border-slate-700">
-          <legend
-            class="font-outfit px-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+        <div>
+          <div
+            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
-          </legend>
-          <div class="space-y-3">
-            <div class="grid grid-cols-[1fr_auto] gap-3">
+          </div>
+          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
               <BaseCombobox
                 :model-value="seg.airline ?? ''"
                 :options="airlineOptions"
@@ -401,12 +404,12 @@ function removeSegment(index: number) {
                 <BaseInput
                   :model-value="seg.flightNumber ?? ''"
                   :placeholder="'e.g. 1842'"
-                  class="vacation-teal-input !w-24"
+                  class="vacation-teal-input sm:!w-24"
                   @update:model-value="updateSegment(idx, 'flightNumber', String($event))"
                 />
               </FormFieldGroup>
             </div>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1.3fr_1fr]">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.3fr_1fr]">
               <FormFieldGroup
                 :label="t('vacation.field.departureTime')"
                 :required="seg.status === 'booked'"
@@ -460,57 +463,60 @@ function removeSegment(index: number) {
               </FormFieldGroup>
             </div>
           </div>
-        </fieldset>
+        </div>
       </template>
 
-      <!-- ═══ Cruise fields — fieldset-grouped: Essentials + Booking details ═══ -->
+      <!-- ═══ Cruise fields — kicker + bordered container ═══ -->
       <template v-else-if="seg.type === 'cruise'">
-        <fieldset class="rounded-xl border border-[var(--vacation-teal)]/30 px-3 pt-1 pb-3">
-          <legend
-            class="font-outfit px-2 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+        <div>
+          <div
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
-            🚢 {{ t('vacation.essentials') }}
-          </legend>
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
-            <FormFieldGroup :label="t('vacation.field.embarkationDate')" required>
-              <BaseInput
-                type="date"
-                :model-value="seg.embarkationDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateSegment(idx, 'embarkationDate', String($event))"
-              />
-            </FormFieldGroup>
-            <FormFieldGroup :label="t('vacation.field.disembarkationDate')" required>
-              <BaseInput
-                type="date"
-                :model-value="seg.disembarkationDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateSegment(idx, 'disembarkationDate', String($event))"
-              />
-            </FormFieldGroup>
-            <BaseCombobox
-              :model-value="seg.departurePort ?? ''"
-              :options="cruisePortOptions"
-              :label="t('vacation.field.departurePort')"
-              :placeholder="t('vacation.field.departurePort')"
-              :search-placeholder="t('vacation.field.departurePort')"
-              required
-              other-value="__other__"
-              :other-label="t('form.other' as any) || 'Other'"
-              :other-placeholder="t('vacation.field.departurePort')"
-              @update:model-value="updateSegment(idx, 'departurePort', String($event))"
-            />
+            <span>🚢</span>
+            <span>{{ t('vacation.essentials') }}</span>
           </div>
-        </fieldset>
+          <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.3fr]">
+              <FormFieldGroup :label="t('vacation.field.embarkationDate')" required>
+                <BaseInput
+                  type="date"
+                  :model-value="seg.embarkationDate ?? ''"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'embarkationDate', String($event))"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('vacation.field.disembarkationDate')" required>
+                <BaseInput
+                  type="date"
+                  :model-value="seg.disembarkationDate ?? ''"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'disembarkationDate', String($event))"
+                />
+              </FormFieldGroup>
+              <BaseCombobox
+                :model-value="seg.departurePort ?? ''"
+                :options="cruisePortOptions"
+                :label="t('vacation.field.departurePort')"
+                :placeholder="t('vacation.field.departurePort')"
+                :search-placeholder="t('vacation.field.departurePort')"
+                required
+                other-value="__other__"
+                :other-label="t('form.other' as any) || 'Other'"
+                :other-placeholder="t('vacation.field.departurePort')"
+                @update:model-value="updateSegment(idx, 'departurePort', String($event))"
+              />
+            </div>
+          </div>
+        </div>
 
-        <fieldset class="rounded-xl border border-gray-200 px-3 pt-1 pb-3 dark:border-slate-700">
-          <legend
-            class="font-outfit px-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+        <div>
+          <div
+            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
-          </legend>
-          <div class="space-y-3">
-            <div class="grid grid-cols-2 gap-3">
+          </div>
+          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <BaseCombobox
                 :model-value="seg.cruiseLine ?? ''"
                 :options="cruiseLineOptions"
@@ -536,7 +542,7 @@ function removeSegment(index: number) {
                 @update:model-value="updateSegment(idx, 'shipName', String($event))"
               />
             </div>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <FormFieldGroup
                 :label="t('vacation.field.embarkationTime')"
                 :required="seg.status === 'booked'"
@@ -566,7 +572,7 @@ function removeSegment(index: number) {
               </FormFieldGroup>
             </div>
           </div>
-        </fieldset>
+        </div>
       </template>
 
       <!-- ═══ Car fields — date first, then booking details ═══ -->
@@ -607,50 +613,53 @@ function removeSegment(index: number) {
         </div>
       </template>
 
-      <!-- ═══ Train/Ferry fields — fieldset-grouped: Essentials + Booking details ═══ -->
+      <!-- ═══ Train/Ferry fields — kicker + bordered container ═══ -->
       <template v-else-if="isTrainOrFerry(seg.type)">
-        <fieldset class="rounded-xl border border-[var(--vacation-teal)]/30 px-3 pt-1 pb-3">
-          <legend
-            class="font-outfit px-2 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
+        <div>
+          <div
+            class="font-outfit mb-2 flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.14em] text-[var(--vacation-teal)] uppercase"
           >
-            {{ seg.type === 'train' ? '🚅' : '⛴️' }} {{ t('vacation.essentials') }}
-          </legend>
-          <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
-            <FormFieldGroup :label="t('vacation.field.departureDate')" required>
-              <BaseInput
-                type="date"
-                :model-value="seg.departureDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateSegment(idx, 'departureDate', String($event))"
-              />
-            </FormFieldGroup>
-            <FormFieldGroup :label="t('vacation.field.departureStation')" required>
-              <BaseInput
-                :model-value="seg.departureStation ?? ''"
-                :placeholder="t('vacation.field.departureStation')"
-                class="vacation-teal-input"
-                @update:model-value="updateSegment(idx, 'departureStation', String($event))"
-              />
-            </FormFieldGroup>
-            <FormFieldGroup :label="t('vacation.field.arrivalStation')" required>
-              <BaseInput
-                :model-value="seg.arrivalStation ?? ''"
-                :placeholder="t('vacation.field.arrivalStation')"
-                class="vacation-teal-input"
-                @update:model-value="updateSegment(idx, 'arrivalStation', String($event))"
-              />
-            </FormFieldGroup>
+            <span>{{ seg.type === 'train' ? '🚅' : '⛴️' }}</span>
+            <span>{{ t('vacation.essentials') }}</span>
           </div>
-        </fieldset>
+          <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.3fr]">
+              <FormFieldGroup :label="t('vacation.field.departureDate')" required>
+                <BaseInput
+                  type="date"
+                  :model-value="seg.departureDate ?? ''"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'departureDate', String($event))"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('vacation.field.departureStation')" required>
+                <BaseInput
+                  :model-value="seg.departureStation ?? ''"
+                  :placeholder="t('vacation.field.departureStation')"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'departureStation', String($event))"
+                />
+              </FormFieldGroup>
+              <FormFieldGroup :label="t('vacation.field.arrivalStation')" required>
+                <BaseInput
+                  :model-value="seg.arrivalStation ?? ''"
+                  :placeholder="t('vacation.field.arrivalStation')"
+                  class="vacation-teal-input"
+                  @update:model-value="updateSegment(idx, 'arrivalStation', String($event))"
+                />
+              </FormFieldGroup>
+            </div>
+          </div>
+        </div>
 
-        <fieldset class="rounded-xl border border-gray-200 px-3 pt-1 pb-3 dark:border-slate-700">
-          <legend
-            class="font-outfit px-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
+        <div>
+          <div
+            class="font-outfit mb-2 text-[10px] font-semibold tracking-[0.14em] text-gray-400 uppercase dark:text-gray-500"
           >
             {{ t('vacation.bookingDetails') }}
-          </legend>
-          <div class="space-y-3">
-            <div class="grid grid-cols-2 gap-3">
+          </div>
+          <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormFieldGroup
                 :label="
                   seg.type === 'train'
@@ -688,7 +697,7 @@ function removeSegment(index: number) {
                 />
               </FormFieldGroup>
             </div>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <FormFieldGroup
                 :label="t('vacation.field.departureTime')"
                 :required="seg.status === 'booked'"
@@ -718,7 +727,7 @@ function removeSegment(index: number) {
               />
             </FormFieldGroup>
           </div>
-        </fieldset>
+        </div>
       </template>
 
       <!-- Notes (all types) -->
