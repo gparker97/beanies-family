@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-20",
-    "translationCount": 2291
+    "translationCount": 2317
   },
   "translations": {
     "app.name": {
@@ -9843,8 +9843,8 @@
     },
     "bean.backToPod": {
       "translation": "返回Pod",
-      "hash": "4zjp1i",
-      "lastUpdated": "2026-04-19"
+      "hash": "wwwd1m",
+      "lastUpdated": "2026-04-20"
     },
     "bean.tab.overview": {
       "translation": "概述",
@@ -11459,6 +11459,136 @@
     "dashboard.rolePet": {
       "translation": "宠物便帽",
       "hash": "1cpcr7",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.startLabel": {
+      "translation": "开始日期",
+      "hash": "5yr20c",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.endLabel": {
+      "translation": "课程结束日期：",
+      "hash": "smc9ar",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.quickAdd": {
+      "translation": "快速设置：",
+      "hash": "b8w0ad",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.chip3days": {
+      "translation": "3天",
+      "hash": "gjrsi7",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.chip1week": {
+      "translation": "1个星期",
+      "hash": "fm0qy6",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.chip2weeks": {
+      "translation": "2个星期",
+      "hash": "1f93wm",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.dayLabelSingular": {
+      "translation": "天",
+      "hash": "24kc",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.dayLabelPlural": {
+      "translation": "天",
+      "hash": "1txlj",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.errorEndBeforeStart": {
+      "translation": "结束日期必须晚于开始日期",
+      "hash": "qu6e2p",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.errorMissing": {
+      "translation": "请设置开始和结束日期",
+      "hash": "joiirg",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.notSet": {
+      "translation": "未设置日期",
+      "hash": "e9eaqi",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.dates.edit": {
+      "translation": "编辑日期",
+      "hash": "udsnht",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.outOfRange.beforeStart": {
+      "translation": "已安排在行程开始前",
+      "hash": "n7365n",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.outOfRange.afterEnd": {
+      "translation": "已安排在行程结束后",
+      "hash": "7dq39z",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.outOfRange.bannerTitle": {
+      "translation": "部分商品不在您的行程日期内",
+      "hash": "gkw55w",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.outOfRange.bannerAction": {
+      "translation": "作品展示",
+      "hash": "9b8ubp",
+      "lastUpdated": "2026-04-20"
+    },
+    "vacation.bookingDetails": {
+      "translation": "预订详情",
+      "hash": "g6idgl",
+      "lastUpdated": "2026-04-20"
+    },
+    "vacation.tripShape": {
+      "translation": "行程形状",
+      "hash": "c5buh2",
+      "lastUpdated": "2026-04-20"
+    },
+    "vacation.essentials": {
+      "translation": "基本项目",
+      "hash": "id69yz",
+      "lastUpdated": "2026-04-20"
+    },
+    "action.showMore": {
+      "translation": "顯示更多",
+      "hash": "p5oxk",
+      "lastUpdated": "2026-04-20"
+    },
+    "action.showLess": {
+      "translation": "收起",
+      "hash": "p4ukc",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.today.label": {
+      "translation": "今天",
+      "hash": "1c7py9",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.today.dayPrefix": {
+      "translation": "白天",
+      "hash": "1gu4",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.today.of": {
+      "translation": "关",
+      "hash": "2qf",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.today.freeDay": {
+      "translation": "自由自在",
+      "hash": "8mk6jl",
+      "lastUpdated": "2026-04-20"
+    },
+    "travel.today.tripEnded": {
+      "translation": "此行程已结束",
+      "hash": "smr711",
       "lastUpdated": "2026-04-20"
     }
   }

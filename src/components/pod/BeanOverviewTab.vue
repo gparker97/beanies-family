@@ -131,8 +131,11 @@ const aboutStats = computed<AboutStat[]>(() => {
   const out: AboutStat[] = [];
   out.push({
     label: t('bean.about.role'),
-    value:
-      props.member.ageGroup === 'child' ? t('bean.hero.role.child') : t('bean.hero.role.parent'),
+    value: props.member.isPet
+      ? t('dashboard.rolePet')
+      : props.member.ageGroup === 'child'
+        ? t('bean.hero.role.child')
+        : t('bean.hero.role.parent'),
   });
   if (birthdayLabel.value) {
     out.push({
