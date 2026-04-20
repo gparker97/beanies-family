@@ -176,7 +176,7 @@ function asNote(entry: ScrapbookEntry): MemberNote {
 </script>
 
 <template>
-  <main class="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+  <div class="space-y-6">
     <!-- Hero — multi-color pastel gradient that echoes the sticky
          notes in the feed, with a faded 📖 watermark on the right. -->
     <header
@@ -387,7 +387,7 @@ function asNote(entry: ScrapbookEntry): MemberNote {
         :message="hasAnyFilter ? t('scrapbook.noResults') : t('scrapbook.empty')"
       />
     </div>
-  </main>
+  </div>
 </template>
 
 <style scoped>
