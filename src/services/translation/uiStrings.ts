@@ -4487,6 +4487,21 @@ const STRING_DEFS = {
     en: 'Please set both a start and end date',
     beanie: 'please set both a start and end date',
   },
+  'travel.dates.notSet': { en: 'Dates not set', beanie: 'dates not set' },
+  'travel.dates.edit': { en: 'Edit dates', beanie: 'edit dates' },
+  'travel.outOfRange.beforeStart': {
+    en: 'Scheduled before trip start',
+    beanie: 'scheduled before trip start',
+  },
+  'travel.outOfRange.afterEnd': {
+    en: 'Scheduled after trip end',
+    beanie: 'scheduled after trip end',
+  },
+  'travel.outOfRange.bannerTitle': {
+    en: 'Some items are outside your trip dates',
+    beanie: 'some items are outside your trip dates',
+  },
+  'travel.outOfRange.bannerAction': { en: 'Show me', beanie: 'show me' },
 
   // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
   'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },

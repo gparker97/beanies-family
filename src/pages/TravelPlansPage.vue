@@ -3,9 +3,11 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '@/components/common/PageHeader.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
+import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
 import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
 import AccommodationEditModal from '@/components/travel/AccommodationEditModal.vue';
 import TransportationEditModal from '@/components/travel/TransportationEditModal.vue';
@@ -102,6 +104,28 @@ const plannedIdeas = computed(() => selectedVacation.value?.ideas.filter((i) => 
 const hintMap = computed(() =>
   selectedVacation.value ? computeTimelineHints(selectedVacation.value) : new Map()
 );
+
+/**
+ * Item IDs whose dates fall outside the trip window. Pulled via the
+ * structured `outOfRange` flag on each hint so the banner stays
+ * consistent with `detectOutOfRange` even as message copy evolves.
+ */
+const outOfRangeHints = computed(() => {
+  const ids: string[] = [];
+  for (const [id, hint] of hintMap.value) {
+    if (hint.outOfRange) ids.push(id);
+  }
+  return ids;
+});
+
+function scrollToOutOfRange(): void {
+  const firstId = outOfRangeHints.value[0];
+  if (!firstId) return;
+  const el = document.querySelector(`[data-segment-id="${firstId}"]`);
+  if (el instanceof HTMLElement) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
 
 /** Which hint tooltip is currently expanded */
 
@@ -683,6 +707,33 @@ function addQuickIdea() {
       <div class="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_340px]">
         <!-- LEFT: Timeline -->
         <div class="min-w-0 pr-0 lg:pr-6">
+          <!-- Trip dates header (display + edit) -->
+          <TripDatesHeader :vacation="selectedVacation" />
+
+          <!-- Out-of-range warning banner -->
+          <ErrorBanner
+            :show="outOfRangeHints.length > 0"
+            severity="warning"
+            class="!static !z-auto mb-4 !rounded-2xl !shadow-none"
+          >
+            <template #title>
+              {{ t('travel.outOfRange.bannerTitle') }}
+            </template>
+            <template #message>
+              {{ outOfRangeHints.length }} ·
+              {{ vacationDateRange(selectedVacation) }}
+            </template>
+            <template #actions>
+              <button
+                type="button"
+                class="font-outfit rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-white/30"
+                @click="scrollToOutOfRange"
+              >
+                {{ t('travel.outOfRange.bannerAction') }}
+              </button>
+            </template>
+          </ErrorBanner>
+
           <!-- Progress banner -->
           <div
             v-if="vacationProgress(selectedVacation).total > 0"
@@ -798,6 +849,7 @@ function addQuickIdea() {
                     :icon="item.icon"
                     :title="item.title"
                     :status="item.status"
+                    :data-segment-id="item.id"
                     :key-value="
                       item.keyValue +
                       (hintMap.get(item.id)?.nightFlight === 'early-morning'
