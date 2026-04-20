@@ -4532,6 +4532,8 @@ const STRING_DEFS = {
 
   // Photo attachments — reusable across activities, family members, todos, etc.
   'photos.addPhoto': { en: 'Add Photo', beanie: 'add photo' },
+  'photos.takePhoto': { en: 'Take Photo', beanie: 'take photo' },
+  'photos.fromLibrary': { en: 'From Library', beanie: 'from library' },
   'photos.avatar.upload': { en: 'Upload Photo', beanie: 'upload photo' },
   'photos.avatar.replace': { en: 'Change Photo', beanie: 'change photo' },
   'photos.avatar.remove': { en: 'Remove Photo', beanie: 'remove photo' },
