@@ -358,6 +358,34 @@ export const usePhotoStore = defineStore('photos', () => {
     return unresolvedIds.value.has(photoId);
   }
 
+  /**
+   * Reactive flag — true when ANY photo is currently flagged unresolved.
+   * Consumed by PhotoAccessRecoveryBanner: one or more 404/403s from
+   * Drive almost always mean the viewer's `drive.file` scope doesn't
+   * cover photos uploaded by other members (the scope-mismatch case
+   * documented in ADR-021). Genuinely-deleted photos flip this too;
+   * the recovery flow is idempotent so the overlap is harmless.
+   */
+  const hasBrokenPhotos = computed(() => unresolvedIds.value.size > 0);
+
+  /**
+   * Clear every unresolved flag and dump both URL caches so the next
+   * `getBlobUrl` / `getImageUrl` retries fresh. Called by
+   * `useRecoverPhotoAccess` after the user regrants folder access —
+   * photos that were 404ing under the old (file-only) grant resolve
+   * cleanly under the new (folder-wide) grant on the very next render.
+   */
+  function clearUnresolved(): void {
+    if (unresolvedIds.value.size === 0 && thumbUrlCache.size === 0 && blobUrlCache.size === 0) {
+      return;
+    }
+    unresolvedIds.value = new Set();
+    thumbUrlCache.clear();
+    for (const url of blobUrlCache.values()) URL.revokeObjectURL(url);
+    blobUrlCache.clear();
+    triggerRef(unresolvedIds);
+  }
+
   async function fetchThumbnailBaseUrl(driveFileId: string, photoId: UUID): Promise<string | null> {
     const cached = thumbUrlCache.get(driveFileId);
     if (cached && Date.now() - cached.fetchedAt < THUMB_TTL_MS) {
@@ -661,6 +689,8 @@ export const usePhotoStore = defineStore('photos', () => {
     getImageUrl,
     getBlobUrl,
     isUnresolved,
+    hasBrokenPhotos,
+    clearUnresolved,
     invalidateThumbCache,
     replacePhotoFile,
     markDeleted,
