@@ -486,6 +486,13 @@ export interface TimelineHint {
   affectedIds: string[];
   /** Night-flight type, if applicable */
   nightFlight?: 'early-morning' | 'late-night';
+  /**
+   * Out-of-range classification, if applicable. Set by `detectOutOfRange`
+   * when a segment falls before `vacation.startDate` or after
+   * `vacation.endDate`. Consumers (banner count, per-card badges) should
+   * filter on this flag rather than string-matching the message.
+   */
+  outOfRange?: 'before-start' | 'after-end';
 }
 
 /** Date range helper */
@@ -622,8 +629,16 @@ function detectNightFlights(
  * by editing the segment date or the trip window. Never blocks.
  *
  * Skips vacations with no trip window set (no anchor to compare to).
+ *
+ * Tags each affected hint with `outOfRange: 'before-start' | 'after-end'`
+ * so downstream UI (banner count, per-card badges) can filter on a
+ * structured flag rather than string-matching the human-readable message.
  */
-function detectOutOfRange(v: FamilyVacation, addHint: AddHint): void {
+function detectOutOfRange(
+  v: FamilyVacation,
+  addHint: AddHint,
+  hintMap: Map<string, TimelineHint>
+): void {
   if (!v.startDate && !v.endDate) return;
 
   type Item = { id: string; date: string; title: string };
@@ -651,8 +666,10 @@ function detectOutOfRange(v: FamilyVacation, addHint: AddHint): void {
     const date = extractDatePart(item.date);
     if (v.startDate && date < extractDatePart(v.startDate)) {
       addHint(item.id, `Scheduled before trip start (${v.startDate})`, [item.id]);
+      hintMap.get(item.id)!.outOfRange = 'before-start';
     } else if (v.endDate && date > extractDatePart(v.endDate)) {
       addHint(item.id, `Scheduled after trip end (${v.endDate})`, [item.id]);
+      hintMap.get(item.id)!.outOfRange = 'after-end';
     }
   }
 }
@@ -685,7 +702,7 @@ export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHin
   detectAccommodationDuringCruise(v, addHint);
   detectFlightDuringCruise(v, addHint);
   detectNightFlights(v, addHint, hintMap);
-  detectOutOfRange(v, addHint);
+  detectOutOfRange(v, addHint, hintMap);
 
   return hintMap;
 }
