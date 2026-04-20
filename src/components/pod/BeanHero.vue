@@ -13,10 +13,11 @@ import { computed, ref, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
 import { useTranslation } from '@/composables/useTranslation';
-import type { AgeGroup, FamilyMember, Gender } from '@/types/models';
+import type { AgeGroup, FamilyMember, Gender, UUID } from '@/types/models';
 
 const props = defineProps<{
   member: FamilyMember;
@@ -42,6 +43,20 @@ const variant = computed(() =>
 const { url: photoUrl, refresh: refreshAvatar } = useAvatarPhotoUrl(
   () => props.member.avatarPhotoId
 );
+
+// Lightbox — opens only when the bean has an avatar photo (tapping the
+// default beanie SVG does nothing, matching BeanAvatarPicker). Read-only
+// viewer: edit controls live in the admin drawer behind the ✏️ Edit
+// button above, not duplicated inside the viewer.
+const viewerOpen = ref(false);
+const viewerPhotoIds = computed<UUID[]>(() =>
+  props.member.avatarPhotoId ? [props.member.avatarPhotoId] : []
+);
+
+function openAvatarViewer(): void {
+  if (!props.member.avatarPhotoId) return;
+  viewerOpen.value = true;
+}
 
 const ageLabel = computed(() => {
   const dob = props.member.dateOfBirth;
@@ -133,15 +148,23 @@ function onAddButtonClick(): void {
   <header
     class="mb-6 flex flex-wrap items-center gap-4 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-4 py-5 sm:gap-6 sm:px-8 sm:py-7"
   >
-    <BeanieAvatar
-      :variant="variant"
-      :color="member.color"
-      :photo-url="photoUrl"
-      size="xl"
-      class="flex-shrink-0"
-      :aria-label="member.name"
-      @photo-error="refreshAvatar"
-    />
+    <button
+      type="button"
+      class="focus:ring-primary-500 flex-shrink-0 rounded-full focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-slate-800"
+      :class="member.avatarPhotoId ? 'cursor-zoom-in focus:ring-2' : 'cursor-default'"
+      :disabled="!member.avatarPhotoId"
+      :aria-label="member.avatarPhotoId ? t('photos.avatar.viewLarger') : member.name"
+      @click="openAvatarViewer"
+    >
+      <BeanieAvatar
+        :variant="variant"
+        :color="member.color"
+        :photo-url="photoUrl"
+        size="xl"
+        :aria-label="member.name"
+        @photo-error="refreshAvatar"
+      />
+    </button>
     <div class="min-w-0 flex-1">
       <button
         type="button"
@@ -205,5 +228,13 @@ function onAddButtonClick(): void {
         </div>
       </div>
     </div>
+
+    <!-- Avatar lightbox — read-only, edits route through the ✏️ Edit drawer. -->
+    <PhotoViewer
+      :open="viewerOpen"
+      :photo-ids="viewerPhotoIds"
+      read-only
+      @close="viewerOpen = false"
+    />
   </header>
 </template>

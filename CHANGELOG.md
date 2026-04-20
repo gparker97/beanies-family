@@ -10,7 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Added
+
+- **Tap a family member's avatar to see it full-size.** On the Add/Edit Beanie drawer (next to the avatar picker) and on the Meet-This-Bean hero, tapping or clicking an avatar photo now opens it in a read-only lightbox — same component used for medication and recipe photos, same zoom-in cursor on hover. Tapping the default beanie SVG (no photo yet) is inert. Edit controls stay next to the picker and behind the ✏️ Edit button respectively so there's only one path to each edit action.
+
+### Changed
+
+- **Photo rendering switched to `lh3.googleusercontent.com`.** Freshly-uploaded photos (including brand-new avatars) were failing to load with the previous `drive.google.com/thumbnail?id=...` URL — Drive hasn't generated a thumbnail for a file yet at upload time, and `drive.google.com/*` URLs can also bounce anonymous loads to a sign-in interstitial even for anyone-with-link files. Switched every `getPublicUrl` call site to Google's image CDN (`lh3.googleusercontent.com/d/{id}=w{N}`): works immediately for fresh uploads (falls back to serving original bytes when a thumbnail isn't ready), no session sensitivity, same size-modifier support for server-side resizing.
+
 ### Fixed
+
+- **Family member avatar now has a visible Remove button.** The avatar picker's Remove action used muted-gray text on a light drawer background — technically visible, easily missed. Restyled to the destructive red treatment used elsewhere (`border-red-300 text-red-700`, dark-mode equivalent) so it reads at a glance as "remove this photo."
 
 - **PhotoViewer footer buttons are visible.** The Remove / Download / position-label elements in the full-screen photo viewer (opened from medication, recipe, and other photo surfaces) were styled for a dark image-overlay background — `text-white/80`, `text-red-300`, `text-white/60` — but the BaseModal footer they actually render inside is `bg-gray-50` (light mode) / `bg-slate-900` (dark mode), so those classes disappeared into it. Destructive Remove button now uses `border-red-300 text-red-700 hover:bg-red-50` with a dark-mode variant; Download stays neutral gray with proper contrast; position label reads clearly in both themes.
 

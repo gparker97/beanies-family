@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-20",
-    "translationCount": 2289
+    "translationCount": 2290
   },
   "translations": {
     "app.name": {
@@ -11449,6 +11449,11 @@
     "googleDrive.downloadBackupFailedBody": {
       "translation": "我们无法准备您的备份文件。请检查您的网络连接，然后重试。",
       "hash": "rwttgr",
+      "lastUpdated": "2026-04-20"
+    },
+    "photos.avatar.viewLarger": {
+      "translation": "查看大的",
+      "hash": "p1essy",
       "lastUpdated": "2026-04-20"
     }
   }
