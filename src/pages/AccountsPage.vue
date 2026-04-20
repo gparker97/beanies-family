@@ -12,7 +12,11 @@ import AccountModal from '@/components/accounts/AccountModal.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
-import { useMemberInfo } from '@/composables/useMemberInfo';
+import {
+  useMemberInfo,
+  getMemberAvatarUrl,
+  markMemberAvatarError,
+} from '@/composables/useMemberInfo';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
@@ -479,7 +483,9 @@ async function deleteAccount(id: string) {
               v-if="getMemberForAccount(section.header.memberId)"
               :variant="getMemberAvatarVariant(getMemberForAccount(section.header.memberId)!)"
               :color="getMemberColor(section.header.memberId)"
+              :photo-url="getMemberAvatarUrl(getMemberForAccount(section.header.memberId)!)"
               size="sm"
+              @photo-error="markMemberAvatarError(getMemberForAccount(section.header.memberId)!)"
             />
             <h2 class="font-outfit text-secondary-500 text-lg font-semibold dark:text-gray-100">
               {{ section.label }}
@@ -604,7 +610,9 @@ async function deleteAccount(id: string) {
                     v-if="getMemberForAccount(account.memberId)"
                     :variant="getMemberAvatarVariant(getMemberForAccount(account.memberId)!)"
                     :color="getMemberColor(account.memberId)"
+                    :photo-url="getMemberAvatarUrl(getMemberForAccount(account.memberId)!)"
                     size="xs"
+                    @photo-error="markMemberAvatarError(getMemberForAccount(account.memberId)!)"
                   />
                   <span class="text-sm text-gray-600 dark:text-gray-400">{{
                     getMemberName(account.memberId)

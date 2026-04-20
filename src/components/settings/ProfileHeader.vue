@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
+import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -29,7 +30,13 @@ function editProfile() {
       class="flex h-[72px] w-[72px] flex-shrink-0 items-center justify-center rounded-full shadow-[0_8px_24px_rgba(174,214,241,0.3)]"
       style="background: linear-gradient(135deg, var(--sky-silk), #7fb8e0)"
     >
-      <BeanieAvatar :variant="variant" :color="color" size="xl" />
+      <BeanieAvatar
+        :variant="variant"
+        :color="color"
+        :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
+        size="xl"
+        @photo-error="currentMember && markMemberAvatarError(currentMember)"
+      />
     </div>
 
     <!-- Info -->

@@ -5,7 +5,7 @@ import CategoryIcon from '@/components/common/CategoryIcon.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
 import ActivityItem from '@/components/dashboard/ActivityItem.vue';
 import BudgetSummaryCard from '@/components/dashboard/BudgetSummaryCard.vue';
-import FamilyBeanRow from '@/components/dashboard/FamilyBeanRow.vue';
+import BeanListStrip from '@/components/common/BeanListStrip.vue';
 import NetWorthBreakdownCard from '@/components/dashboard/NetWorthBreakdownCard.vue';
 import NetWorthHeroCard from '@/components/dashboard/NetWorthHeroCard.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
@@ -193,7 +193,13 @@ function isLiability(type: AccountType): boolean {
     </div>
 
     <!-- ── Your Beans (Family Row) ─────────────────────────────────────── -->
-    <FamilyBeanRow @add-member="router.push('/family')" @select-member="router.push('/family')" />
+    <BeanListStrip
+      label-key="dashboard.yourBeans"
+      add-label-key="dashboard.addBean"
+      density="sm"
+      @add-member="router.push('/family')"
+      @select-member="router.push('/family')"
+    />
 
     <!-- ── Row 1: Recent Transactions + Coming Up ────────────────────── -->
     <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">

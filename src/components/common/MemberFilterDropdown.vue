@@ -4,6 +4,7 @@ import BaseMultiSelect from '@/components/ui/BaseMultiSelect/index.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import type { Gender, AgeGroup } from '@/types/models';
@@ -43,6 +44,7 @@ const memberOptions = computed(() =>
     gender: member.gender,
     ageGroup: member.ageGroup,
     isPet: member.isPet,
+    avatarPhotoId: member.avatarPhotoId,
   }))
 );
 
@@ -94,7 +96,9 @@ watch(
                 })
               "
               :color="singleSelectedMember.color"
+              :photo-url="getMemberAvatarUrl(singleSelectedMember)"
               size="lg"
+              @photo-error="markMemberAvatarError(singleSelectedMember)"
             />
             <span class="text-sm text-gray-700 dark:text-gray-300">
               {{ singleSelectedMember.label }}
@@ -120,7 +124,13 @@ watch(
             })
           "
           :color="option.color as string"
+          :photo-url="
+            getMemberAvatarUrl({ avatarPhotoId: option.avatarPhotoId as string | undefined })
+          "
           size="xs"
+          @photo-error="
+            markMemberAvatarError({ avatarPhotoId: option.avatarPhotoId as string | undefined })
+          "
         />
         <span class="truncate text-sm text-gray-700 dark:text-gray-300">
           {{ option.label }}
