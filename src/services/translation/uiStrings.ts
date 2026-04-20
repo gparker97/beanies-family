@@ -203,7 +203,7 @@ const STRING_DEFS = {
   'nav.pod.safety': { en: 'Care & Safety', beanie: 'care & safety' },
   'nav.pod.contacts': { en: 'Emergency Contacts', beanie: 'emergency contacts' },
   'bean.detail.title': { en: 'Bean Detail', beanie: 'meet this bean' },
-  'bean.backToPod': { en: '← Back to the Pod', beanie: '← back to the pod' },
+  'bean.backToPod': { en: 'Back to the Pod', beanie: 'back to the pod' },
   'bean.tab.overview': { en: 'Overview', beanie: 'overview' },
   'bean.tab.favorites': { en: 'Favorites', beanie: 'favorites' },
   'bean.tab.sayings': { en: 'Sayings', beanie: 'sayings' },

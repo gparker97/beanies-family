@@ -146,85 +146,89 @@ function onAddButtonClick(): void {
 
 <template>
   <header
-    class="mb-6 flex flex-wrap items-center gap-4 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-4 py-5 sm:gap-6 sm:px-8 sm:py-7"
+    class="mb-6 flex flex-col gap-3 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-4 py-5 sm:px-8 sm:py-7"
   >
+    <!-- Top-left back link (breadcrumb-style; sits above the avatar + name row) -->
     <button
       type="button"
-      class="focus:ring-primary-500 flex-shrink-0 rounded-full focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-slate-800"
-      :class="member.avatarPhotoId ? 'cursor-zoom-in focus:ring-2' : 'cursor-default'"
-      :disabled="!member.avatarPhotoId"
-      :aria-label="member.avatarPhotoId ? t('photos.avatar.viewLarger') : member.name"
-      @click="openAvatarViewer"
+      class="font-outfit text-secondary-500/60 hover:text-primary-500 -ml-1 inline-flex w-fit items-center gap-1 text-xs font-semibold transition-colors"
+      @click="router.push('/pod')"
     >
-      <BeanieAvatar
-        :variant="variant"
-        :color="member.color"
-        :photo-url="photoUrl"
-        size="xl"
-        :aria-label="member.name"
-        @photo-error="refreshAvatar"
-      />
+      <BeanieIcon name="chevron-left" size="xs" />
+      <span>{{ t('bean.backToPod') }}</span>
     </button>
-    <div class="min-w-0 flex-1">
+
+    <div class="flex flex-wrap items-center gap-4 sm:gap-6">
       <button
         type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
-        @click="router.push('/pod')"
+        class="focus:ring-primary-500 flex-shrink-0 rounded-full focus:ring-offset-2 focus:outline-none dark:focus:ring-offset-slate-800"
+        :class="member.avatarPhotoId ? 'cursor-zoom-in focus:ring-2' : 'cursor-default'"
+        :disabled="!member.avatarPhotoId"
+        :aria-label="member.avatarPhotoId ? t('photos.avatar.viewLarger') : member.name"
+        @click="openAvatarViewer"
       >
-        <BeanieIcon name="chevron-left" size="xs" />
-        <span>{{ t('bean.backToPod') }}</span>
+        <BeanieAvatar
+          :variant="variant"
+          :color="member.color"
+          :photo-url="photoUrl"
+          size="xl"
+          :aria-label="member.name"
+          @photo-error="refreshAvatar"
+        />
       </button>
-      <h1
-        class="font-outfit text-secondary-500 text-2xl leading-tight font-bold break-words sm:text-3xl dark:text-gray-100"
-      >
-        {{ member.name }}
-      </h1>
-      <div class="text-secondary-500/70 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-        <span>{{ roleLabel }}</span>
-        <span v-if="birthdayLabel" aria-hidden="true" class="opacity-40">·</span>
-        <span v-if="birthdayLabel">
-          {{ t('bean.hero.birthday') }}: {{ birthdayLabel }}
-          <span v-if="ageLabel !== null"> ({{ ageLabel }} {{ t('bean.stats.age') }})</span>
-        </span>
+      <div class="min-w-0 flex-1">
+        <h1
+          class="font-outfit text-secondary-500 text-2xl leading-tight font-bold break-words sm:text-3xl dark:text-gray-100"
+        >
+          {{ member.name }}
+        </h1>
+        <div class="text-secondary-500/70 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+          <span>{{ roleLabel }}</span>
+          <span v-if="birthdayLabel" aria-hidden="true" class="opacity-40">·</span>
+          <span v-if="birthdayLabel">
+            {{ t('bean.hero.birthday') }}: {{ birthdayLabel }}
+            <span v-if="ageLabel !== null"> ({{ ageLabel }} {{ t('bean.stats.age') }})</span>
+          </span>
+        </div>
       </div>
-    </div>
 
-    <div v-if="canManage" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
-      <button
-        type="button"
-        class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
-        @click="emit('edit')"
-      >
-        <BeanieIcon name="edit" size="xs" />
-        <span>{{ t('bean.hero.edit') }}</span>
-      </button>
-
-      <div class="relative flex-1 sm:flex-initial" data-add-menu-root>
+      <div v-if="canManage" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
         <button
           type="button"
-          class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
-          :aria-expanded="addMenuOpen"
-          aria-haspopup="menu"
-          @click="onAddButtonClick"
+          class="font-outfit text-secondary-500 inline-flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/70 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white/90 sm:flex-initial dark:bg-slate-800/80 dark:text-gray-100 dark:hover:bg-slate-800"
+          @click="emit('edit')"
         >
-          <span aria-hidden="true">＋</span>
-          <span>{{ t('bean.hero.addSomething') }}</span>
+          <BeanieIcon name="edit" size="xs" />
+          <span>{{ t('bean.hero.edit') }}</span>
         </button>
-        <div
-          v-if="addMenuOpen"
-          class="absolute top-full right-0 z-10 mt-2 w-48 overflow-hidden rounded-2xl bg-white shadow-[var(--soft-shadow)] dark:bg-slate-800"
-          role="menu"
-        >
+
+        <div class="relative flex-1 sm:flex-initial" data-add-menu-root>
           <button
-            v-for="opt in addOptions"
-            :key="opt.type"
             type="button"
-            role="menuitem"
-            class="font-outfit text-secondary-500 hover:text-primary-500 block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[var(--tint-orange-4)] dark:text-gray-100 dark:hover:bg-slate-700"
-            @click="addFor(opt.type)"
+            class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)]"
+            :aria-expanded="addMenuOpen"
+            aria-haspopup="menu"
+            @click="onAddButtonClick"
           >
-            {{ opt.label }}
+            <span aria-hidden="true">＋</span>
+            <span>{{ t('bean.hero.addSomething') }}</span>
           </button>
+          <div
+            v-if="addMenuOpen"
+            class="absolute top-full right-0 z-10 mt-2 w-48 overflow-hidden rounded-2xl bg-white shadow-[var(--soft-shadow)] dark:bg-slate-800"
+            role="menu"
+          >
+            <button
+              v-for="opt in addOptions"
+              :key="opt.type"
+              type="button"
+              role="menuitem"
+              class="font-outfit text-secondary-500 hover:text-primary-500 block w-full px-4 py-2.5 text-left text-sm font-medium transition-colors hover:bg-[var(--tint-orange-4)] dark:text-gray-100 dark:hover:bg-slate-700"
+              @click="addFor(opt.type)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
