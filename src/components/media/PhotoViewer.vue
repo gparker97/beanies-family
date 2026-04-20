@@ -160,11 +160,26 @@ async function handleRemoveMissing(): Promise<void> {
     :open="open"
     size="3xl"
     fullscreen-mobile
+    flush-body
     layer="overlay"
     :title="positionLabel"
     @close="emit('close')"
   >
-    <div class="relative flex min-h-[60vh] items-center justify-center bg-black/80">
+    <div class="relative flex h-full min-h-[60vh] items-center justify-center bg-black/95">
+      <!-- Always-visible floating close button. BaseModal's built-in
+           X only renders when the header is shown, but the read-only
+           lightbox has no title and no footer, so we own our close
+           affordance here. Top-right so it reads as a chrome control
+           even with a fullscreen image behind it. -->
+      <button
+        type="button"
+        class="absolute top-4 right-4 z-10 rounded-full bg-black/50 p-2 text-white shadow-lg transition-colors hover:bg-black/70"
+        :aria-label="t('photos.close')"
+        @click="emit('close')"
+      >
+        <BeanieIcon name="close" size="md" />
+      </button>
+
       <!-- Prev / next chevrons -->
       <button
         v-if="canGoPrev"
@@ -200,12 +215,15 @@ async function handleRemoveMissing(): Promise<void> {
         <BeanieSpinner size="md" />
       </div>
 
-      <!-- Image -->
+      <!-- Image — fills the body's black container (edge-to-edge on mobile
+           thanks to BaseModal's flush-body). `object-contain` preserves
+           aspect ratio; max-h/max-w-full keeps it within the frame without
+           overflow. -->
       <img
         v-else-if="fullUrl"
         :src="fullUrl"
         :alt="''"
-        class="max-h-[80vh] max-w-full object-contain"
+        class="max-h-full max-w-full object-contain"
         @load="handleImgLoaded"
         @error="handleImgError"
       />

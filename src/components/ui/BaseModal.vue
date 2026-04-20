@@ -14,6 +14,13 @@ interface Props {
   layer?: 'base' | 'overlay' | 'top';
   /** When true, the header slot renders edge-to-edge without padding or border */
   customHeader?: boolean;
+  /**
+   * When true, the body slot renders edge-to-edge with no padding and no
+   * scroll — use for fullscreen media viewers that want the content to
+   * reach the modal's border box. The default `p-6 overflow-y-auto` is
+   * intended for form drawers; a photo lightbox wants neither.
+   */
+  flushBody?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -22,6 +29,7 @@ const props = withDefaults(defineProps<Props>(), {
   fullscreenMobile: false,
   layer: 'base',
   customHeader: false,
+  flushBody: false,
 });
 
 const layerClass = computed(() => {
@@ -110,7 +118,7 @@ onUnmounted(() => {
             v-if="open"
             role="dialog"
             aria-modal="true"
-            class="relative flex w-full flex-col bg-white shadow-xl dark:bg-slate-800"
+            class="relative flex w-full flex-col overflow-hidden bg-white shadow-xl dark:bg-slate-800"
             :class="
               isFullscreen
                 ? 'h-full max-h-full rounded-none'
@@ -145,7 +153,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Body -->
-            <div class="flex-1 overflow-y-auto p-6">
+            <div class="flex-1" :class="flushBody ? '' : 'overflow-y-auto p-6'">
               <slot />
             </div>
 
