@@ -147,7 +147,10 @@ const showHalo = computed(() => props.halo ?? props.label);
 /* ── Label ────────────────────────────────────────────────────────────── */
 
 .bs-label {
-  align-items: center;
+  /* baseline aligns the dots container's bottom edge with the text
+     baseline, so the dots sit where an ellipsis would instead of
+     floating at line-box center. */
+  align-items: baseline;
   display: inline-flex;
   font-family: Outfit, system-ui, sans-serif;
   font-weight: 600;
@@ -180,7 +183,10 @@ const showHalo = computed(() => props.halo ?? props.label);
   align-items: center;
   display: inline-flex;
   gap: 0.18em;
-  padding-bottom: 0.05em;
+
+  /* Lift off baseline slightly so dots float in the lower third of the
+     x-height, matching the optical position of a typographic ellipsis. */
+  transform: translateY(-0.15em);
 }
 
 .bs-dot {
