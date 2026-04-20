@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-20",
-    "translationCount": 2290
+    "translationCount": 2291
   },
   "translations": {
     "app.name": {
@@ -11454,6 +11454,11 @@
     "photos.avatar.viewLarger": {
       "translation": "查看大的",
       "hash": "p1essy",
+      "lastUpdated": "2026-04-20"
+    },
+    "dashboard.rolePet": {
+      "translation": "宠物便帽",
+      "hash": "1cpcr7",
       "lastUpdated": "2026-04-20"
     }
   }

@@ -1,7 +1,31 @@
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAccountsStore } from '@/stores/accountsStore';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const DEFAULT_COLOR = '#6b7280';
+
+type TranslateFn = (key: UIStringKey) => string;
+
+/**
+ * Member role label for "Your Beans"-style roster surfaces (Nook + dashboard).
+ * Returns the localized "Parent / Little Beanie / Pet Beanie" string. Pet
+ * takes precedence over adult/owner classification because an isPet flag
+ * overrides ageGroup/role — the pet role pill selected in the Add/Edit
+ * Beanie drawer is the source of truth.
+ *
+ * Exported standalone so components can call it without instantiating
+ * useMemberInfo's ID-lookup surface.
+ */
+export function getMemberRoleLabel(
+  member: { role: string; ageGroup?: string; isPet?: boolean },
+  t: TranslateFn
+): string {
+  if (member.isPet) return t('dashboard.rolePet');
+  if (member.role === 'owner' || member.ageGroup === 'adult') {
+    return t('dashboard.roleParent');
+  }
+  return t('dashboard.roleLittleBean');
+}
 
 /**
  * Composable for looking up family member name/color by ID.

@@ -10,6 +10,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Fixed
+
+- **Pet role label on "Your Beans" rows.** The grey role label under each avatar on the Nook and dashboard Family Bean rows fell back to "Parent" / "Big Bean" for pets because the mapping only checked `role === 'owner' || ageGroup === 'adult'`. Now pets show **"Pet Beanie"** (English) / **"pet beanie"** (beanie mode) — matching the role pill in the Add/Edit Beanie drawer. Extracted the role-label helper into a single shared `getMemberRoleLabel()` in `useMemberInfo` so the two components (and any future rosters) stop duplicating the same 5-line switch.
+
+- **Pets now sort last everywhere, including on the Nook.** The earlier fix put pets last in `sortedMembers`, but five surfaces were iterating `familyStore.members` directly (unsorted) or `familyStore.humans` without sorting. Fixed NookYourBeans, FamilyBeanRow, MeetTheBeansPage, FamilyScrapbookPage member-filter chips, and PickBeanView login picker to use `sortedMembers` / `sortedHumans` consistently.
+
 ### Changed
 
 - **Pets sort last in every member list.** The family-member sort is now a three-tier order: adults (oldest → youngest) → children (oldest → youngest) → pets (oldest → youngest, then alphabetical). Applied at the single source of truth (`familyStore.sortedMembers`), so every surface that lists members — Meet the Beans grid, Family Nook row, Scrapbook feed, member chip filters, calendar columns, etc. — picks up the new order automatically.
