@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-19",
-    "translationCount": 2282
+    "lastUpdated": "2026-04-20",
+    "translationCount": 2284
   },
   "translations": {
     "app.name": {
@@ -11415,6 +11415,16 @@
       "translation": "查看所有计数",
       "hash": "gwdotd",
       "lastUpdated": "2026-04-19"
+    },
+    "photos.takePhoto": {
+      "translation": "拍照",
+      "hash": "a7sskn",
+      "lastUpdated": "2026-04-20"
+    },
+    "photos.fromLibrary": {
+      "translation": "来自资源库",
+      "hash": "98vx6j",
+      "lastUpdated": "2026-04-20"
     }
   }
 }

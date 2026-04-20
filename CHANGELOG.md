@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-20
 
+### Added
+
+- **Take-photo button on mobile photo attachments.** On phones and tablets, the Add Photo affordance is now two side-by-side tiles — **Take Photo** (opens the rear camera directly via `capture="environment"`) and **From Library** (opens the gallery). Desktop unchanged (single **Add Photo** tile → gallery). Prior behavior suppressed the OS camera option on Android Chrome because `multiple` was hardcoded on, which forces gallery-only. The change applies to every photo surface in the app — medication bottles, cook-log dish snaps, recipe photos, and future integrations. Detection uses `matchMedia('(pointer: coarse)')` so laptops with touchscreens (where the trackpad is still the primary pointer) get the desktop UX, not the mobile one.
+
 ### Fixed
 
 - **PWA update-on-nav reliably fires after an overnight tab sleep.** The prior implementation installed the route guard only after a 60-second grace timer — which reset every time `needRefresh` flipped true. When a tab sat overnight and the new version was detected on wake (via the `visibilitychange` handler), the grace clock started fresh, so the user's first click slipped through before the guard armed and the update never applied. The grace timer is now gone: the guard arms the instant an update is detected and defers the reload only while a modal/drawer is open or a Drive save is in flight, so clicking nav never interrupts a mid-edit or an in-flight save. Also fixed a pre-existing bug where dismissing the update banner tore down the guard — dismiss now only hides the UI.

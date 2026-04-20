@@ -12,6 +12,7 @@ import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { usePhotos } from '@/composables/usePhotos';
 import { useFileDrop } from '@/composables/useFileDrop';
 import { useFilePicker } from '@/composables/useFilePicker';
+import { useIsTouchPrimary } from '@/composables/useIsTouchPrimary';
 import { useTranslation } from '@/composables/useTranslation';
 import type { UUID } from '@/types/models';
 
@@ -81,30 +82,47 @@ const { isDragging, bindings: dropBindings } = useFileDrop({
   },
 });
 
-// File picker — we keep the composable return object intact rather than
-// destructuring because vue-tsc doesn't track template `ref="..."`
-// references to destructured reactive refs.
+// Gallery picker — we keep the composable return object intact rather
+// than destructuring because vue-tsc doesn't track template
+// `ref="..."` references to destructured reactive refs.
 //
-// `accept="image/*"` (instead of an explicit MIME list) lets iOS Safari
-// show the "Take Photo / Photo Library / Choose File" action sheet so
-// the user can shoot directly from the camera on mobile. Chrome on
-// Android honors the same hint with its camera chooser.
-const picker = useFilePicker({
+// `multiple` is conditional on the entity cap. Forcing `multiple=false`
+// for single-photo surfaces (medication bottles, cook-log dish snaps)
+// lets Android Chrome offer the camera chooser for those surfaces when
+// touch-primary detection misses. On multi-photo surfaces the separate
+// "Take photo" tile (shown on touch-primary devices) covers the camera
+// path directly via `capture="environment"`.
+const galleryPicker = useFilePicker({
   accept: 'image/*',
-  multiple: true,
+  multiple: (props.max ?? MAX_PHOTOS_DEFAULT) > 1,
   onPick: async (files) => {
     await add(files);
   },
 });
 
+// Camera picker — only rendered on touch-primary devices (phones +
+// tablets). `capture="environment"` tells the OS to open the rear
+// camera app directly instead of a file chooser; camera capture is
+// inherently single-shot so `multiple` is off regardless of the cap.
+const cameraPicker = useFilePicker({
+  accept: 'image/*',
+  multiple: false,
+  capture: 'environment',
+  onPick: async (files) => {
+    await add(files);
+  },
+});
+
+const isTouchPrimary = useIsTouchPrimary();
+
 /**
- * Let parent components open the file picker programmatically — used by
- * form modals that render a pre-save "Add Photo" button, eagerly
- * create the parent entity, then want the picker to open in the same
- * gesture so the user doesn't lose the click.
+ * Let parent components open the gallery picker programmatically —
+ * used by form modals that render a pre-save "Add Photo" button,
+ * eagerly create the parent entity, then want the picker to open in
+ * the same gesture so the user doesn't lose the click.
  */
 defineExpose({
-  openPicker: () => picker.open(),
+  openPicker: () => galleryPicker.open(),
 });
 </script>
 
@@ -141,6 +159,20 @@ defineExpose({
         :pending-label="t('photos.uploading')"
       />
       <button
+        v-if="canAdd && isTouchPrimary"
+        type="button"
+        class="hover:border-primary-500/50 flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed transition-colors"
+        :class="
+          tone === 'dark'
+            ? 'border-white/20 text-white/70 hover:bg-white/5'
+            : 'hover:text-primary-500 border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
+        "
+        @click="cameraPicker.open"
+      >
+        <BeanieIcon name="camera" size="md" />
+        <span class="text-[10px]">{{ t('photos.takePhoto') }}</span>
+      </button>
+      <button
         v-if="canAdd"
         type="button"
         class="hover:border-primary-500/50 flex h-20 w-20 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed transition-colors"
@@ -149,10 +181,12 @@ defineExpose({
             ? 'border-white/20 text-white/70 hover:bg-white/5'
             : 'hover:text-primary-500 border-[var(--tint-slate-10)] text-[var(--color-text-muted)] hover:bg-[var(--tint-orange-4)]'
         "
-        @click="picker.open"
+        @click="galleryPicker.open"
       >
-        <BeanieIcon name="camera" size="md" />
-        <span class="text-[10px]">{{ t('photos.addPhoto') }}</span>
+        <BeanieIcon name="image" size="md" />
+        <span class="text-[10px]">{{
+          isTouchPrimary ? t('photos.fromLibrary') : t('photos.addPhoto')
+        }}</span>
       </button>
     </div>
 
@@ -173,8 +207,12 @@ defineExpose({
     </p>
 
     <input
-      :ref="(el) => (picker.inputRef.value = el as HTMLInputElement)"
-      v-bind="picker.bindings"
+      :ref="(el) => (galleryPicker.inputRef.value = el as HTMLInputElement)"
+      v-bind="galleryPicker.bindings"
+    />
+    <input
+      :ref="(el) => (cameraPicker.inputRef.value = el as HTMLInputElement)"
+      v-bind="cameraPicker.bindings"
     />
   </div>
 
