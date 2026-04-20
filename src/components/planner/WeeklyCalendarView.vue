@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
-import ActivityListCard from '@/components/planner/ActivityListCard.vue';
+import DayTimeline from '@/components/planner/DayTimeline.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import {
   useWeekNavigation,
@@ -11,6 +11,7 @@ import {
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore, getActivityColor } from '@/stores/activityStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -30,6 +31,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
+const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 const todoStore = useTodoStore();
 
@@ -276,12 +278,62 @@ function handleEmptySlotClick(dateStr: string, hour: number) {
   emit('add-activity', dateStr, `${String(hour).padStart(2, '0')}:00`);
 }
 
-// Mobile: activities for selected day
-const mobileDayActivities = computed(() =>
-  (weekActivities.value.get(selectedMobileDay.value) ?? []).sort((a, b) =>
-    (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? '')
-  )
+// Mobile: activities for selected day (all, unsorted — DayTimeline handles positioning)
+const mobileDayActivities = computed(() => weekActivities.value.get(selectedMobileDay.value) ?? []);
+
+// Mobile: vacations active on the selected day (for DayTimeline)
+const mobileDayVacations = computed(() =>
+  vacationStore.vacations.filter((v) => {
+    if (!v.startDate || !v.endDate) return false;
+    const start = extractDatePart(v.startDate);
+    const end = extractDatePart(v.endDate);
+    return selectedMobileDay.value >= start && selectedMobileDay.value <= end;
+  })
 );
+
+// Mobile: density data per day for the pill strip — unique member colors for
+// events on that day + whether any vacation span covers it. Drives the dots +
+// underline under each day pill so users see the shape of the week at a glance.
+interface DayDensity {
+  memberColors: string[]; // up to 3 distinct colors, deduped
+  moreCount: number; // 4+ → render a "+N" hint beside the dots
+  hasVacation: boolean;
+}
+
+const memberColorById = computed(() => {
+  const map = new Map<string, string>();
+  for (const m of familyStore.members) map.set(m.id, m.color);
+  return map;
+});
+
+const dayDensities = computed(() => {
+  const byDate = new Map<string, DayDensity>();
+  for (const day of weekDays.value) {
+    const occs = weekActivities.value.get(day.dateStr) ?? [];
+    // Collect distinct member colors for timed + untimed events on this day.
+    const seen = new Set<string>();
+    const colors: string[] = [];
+    for (const occ of occs) {
+      for (const memberId of normalizeAssignees(occ.activity)) {
+        const color = memberColorById.value.get(memberId);
+        if (!color || seen.has(color)) continue;
+        seen.add(color);
+        colors.push(color);
+      }
+    }
+    const hasVacation = vacationSpans.value.some(
+      (s) =>
+        day.dateStr >= weekDays.value[s.startCol]!.dateStr &&
+        day.dateStr <= weekDays.value[Math.min(s.startCol + s.span - 1, 6)]!.dateStr
+    );
+    byDate.set(day.dateStr, {
+      memberColors: colors.slice(0, 3),
+      moreCount: Math.max(0, colors.length - 3),
+      hasVacation,
+    });
+  }
+  return byDate;
+});
 
 defineExpose({ weekLabel, activityCount });
 </script>
@@ -497,14 +549,14 @@ defineExpose({ weekLabel, activityCount });
       </div>
     </template>
 
-    <!-- ── Mobile: Day Tab Strip + Card List ──────────────────────────── -->
+    <!-- ── Mobile: Enhanced Day Pills + Unified Timeline ─────────────────── -->
     <template v-else>
       <div class="mb-4 flex gap-1 overflow-x-auto pb-1">
         <button
           v-for="day in weekDays"
           :key="day.dateStr"
           type="button"
-          class="font-outfit flex shrink-0 flex-col items-center rounded-2xl px-3 py-2 text-xs font-semibold transition-all"
+          class="font-outfit relative flex shrink-0 flex-col items-center rounded-2xl px-3 py-2 text-xs font-semibold transition-all"
           :class="
             selectedMobileDay === day.dateStr
               ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_2px_8px_rgba(241,93,34,0.2)]'
@@ -516,71 +568,67 @@ defineExpose({ weekLabel, activityCount });
         >
           <span class="uppercase">{{ dayAbbrev(day.date) }}</span>
           <span class="mt-0.5 text-sm font-bold">{{ day.date.getDate() }}</span>
+
+          <!-- Density: up to 3 member-colored dots + "+N" overflow hint -->
+          <div
+            v-if="(dayDensities.get(day.dateStr)?.memberColors?.length ?? 0) > 0"
+            class="mt-1 flex h-1.5 items-center gap-[3px]"
+          >
+            <span
+              v-for="(color, i) in dayDensities.get(day.dateStr)?.memberColors ?? []"
+              :key="i"
+              class="h-1.5 w-1.5 rounded-full"
+              :style="{
+                backgroundColor: color,
+                opacity: selectedMobileDay === day.dateStr ? 1 : 0.85,
+              }"
+            />
+            <span
+              v-if="(dayDensities.get(day.dateStr)?.moreCount ?? 0) > 0"
+              class="text-[8px] leading-none font-semibold"
+              :class="
+                selectedMobileDay === day.dateStr
+                  ? 'text-white/90'
+                  : 'text-secondary-500/50 dark:text-gray-500'
+              "
+            >
+              +{{ dayDensities.get(day.dateStr)?.moreCount }}
+            </span>
+          </div>
+          <!-- Fallback placeholder to keep pill heights consistent -->
+          <div
+            v-else-if="!dayDensities.get(day.dateStr)?.hasVacation"
+            class="mt-1 h-1.5"
+            aria-hidden="true"
+          />
+
+          <!-- Vacation span underline -->
+          <div
+            v-if="dayDensities.get(day.dateStr)?.hasVacation"
+            class="absolute right-1.5 bottom-1 left-1.5 h-0.5 rounded-full"
+            :style="{
+              backgroundColor:
+                selectedMobileDay === day.dateStr
+                  ? 'rgba(255,255,255,0.9)'
+                  : 'var(--vacation-teal)',
+            }"
+            aria-hidden="true"
+          />
         </button>
       </div>
 
-      <div class="space-y-1.5">
-        <!-- Vacation bars for selected day -->
-        <div
-          v-for="vs in vacationSpans.filter(
-            (s) =>
-              weekDays[s.startCol]!.dateStr <= selectedMobileDay &&
-              weekDays[Math.min(s.startCol + s.span - 1, 6)]!.dateStr >= selectedMobileDay
-          )"
-          :key="'mob-vac-' + vs.vacationId"
-          class="cursor-pointer truncate rounded-2xl px-3 py-2.5 text-sm font-semibold text-white"
-          style="background: linear-gradient(to right, var(--vacation-teal), #0077b6)"
-          @click="emit('vacation-click', vs.vacationId)"
-        >
-          {{ vs.emoji }} {{ vs.name }}
-        </div>
-        <ActivityListCard
-          v-for="(occ, i) in mobileDayActivities"
-          :key="`${occ.activity.id}-${i}`"
-          :activity="occ.activity"
-          :date="occ.date"
-          @click="emit('view-activity', occ.activity.id, occ.date)"
-        />
-        <div
-          v-if="
-            mobileDayActivities.length === 0 &&
-            vacationSpans.filter(
-              (s) =>
-                weekDays[s.startCol]!.dateStr <= selectedMobileDay &&
-                weekDays[Math.min(s.startCol + s.span - 1, 6)]!.dateStr >= selectedMobileDay
-            ).length === 0 &&
-            (weekTodos.get(selectedMobileDay)?.length ?? 0) === 0
-          "
-          class="rounded-2xl bg-gray-50 py-8 text-center dark:bg-slate-700/50"
-        >
-          <p class="text-secondary-500/40 text-sm dark:text-gray-500">
-            {{ t('planner.noActivitiesForDay') }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Mobile todos -->
-      <div
-        v-if="(weekTodos.get(selectedMobileDay)?.length ?? 0) > 0"
-        class="mt-3 rounded-2xl border-l-4 p-3"
-        style="
-          background: linear-gradient(135deg, white 85%, rgb(155 89 182 / 6%));
-          border-left-color: #9b59b6;
-        "
-      >
-        <h4 class="font-outfit mb-2 text-sm font-semibold" style="color: #9b59b6">
-          ✅ {{ t('planner.tasksDue') }}
-        </h4>
-        <div
-          v-for="todo in weekTodos.get(selectedMobileDay)"
-          :key="todo.id"
-          class="cursor-pointer truncate rounded-md border-l-2 px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
-          style="background: rgb(155 89 182 / 8%); border-left-color: #9b59b6"
-          @click="emit('view-todo', todo)"
-        >
-          {{ todo.title }}
-        </div>
-      </div>
+      <DayTimeline
+        :date-str="selectedMobileDay"
+        :activities="mobileDayActivities"
+        :vacations="mobileDayVacations"
+        :todos="weekTodos.get(selectedMobileDay) ?? []"
+        :members="familyStore.sortedHumans"
+        :is-today="selectedMobileDay === toDateInputValue(new Date())"
+        @view-activity="(id, date) => emit('view-activity', id, date)"
+        @view-todo="(todo) => emit('view-todo', todo)"
+        @vacation-click="(vid) => emit('vacation-click', vid)"
+        @add-activity="(date, time) => emit('add-activity', date, time)"
+      />
     </template>
   </div>
 </template>

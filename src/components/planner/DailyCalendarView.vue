@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
-import ActivityListCard from '@/components/planner/ActivityListCard.vue';
+import DayTimeline from '@/components/planner/DayTimeline.vue';
 import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import {
@@ -169,15 +169,6 @@ function handleSlotClick(memberId: string, hour: number) {
 
 // Grid template columns (dynamic based on member count)
 const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr)`);
-
-// Mobile: filtered activities
-const mobileMemberActivities = computed(() => {
-  const all = [...dayActivities.value].sort((a, b) =>
-    (a.activity.startTime ?? '').localeCompare(b.activity.startTime ?? '')
-  );
-  if (!selectedMobileMemberId.value) return all;
-  return all.filter((o) => normalizeAssignees(o.activity).includes(selectedMobileMemberId.value!));
-});
 
 function toggleMobileMember(id: string) {
   selectedMobileMemberId.value = selectedMobileMemberId.value === id ? null : id;
@@ -386,7 +377,7 @@ defineExpose({ dayLabel, activityCount });
       </div>
     </template>
 
-    <!-- ── Mobile: Member Filter + Card List ────────────────────────────── -->
+    <!-- ── Mobile: Member Filter + Unified Timeline ─────────────────────── -->
     <template v-else>
       <MemberChipFilter
         :is-all-active="!selectedMobileMemberId"
@@ -396,34 +387,21 @@ defineExpose({ dayLabel, activityCount });
         @select-member="toggleMobileMember"
       />
 
-      <!-- Vacation bars -->
-      <div
-        v-for="v in activeVacations"
-        :key="'mob-vac-' + v.id"
-        class="mb-1.5 cursor-pointer truncate rounded-2xl px-3 py-2.5 text-sm font-semibold text-white"
-        style="background: linear-gradient(to right, var(--vacation-teal), #0077b6)"
-        @click="emit('vacation-click', v.id)"
-      >
-        {{ tripTypeEmoji(v.tripType) }} {{ v.name }}
-      </div>
-
-      <ActivityListCard
-        v-for="(occ, i) in mobileMemberActivities"
-        :key="`${occ.activity.id}-${i}`"
-        :activity="occ.activity"
-        :date="occ.date"
-        @click="emit('view-activity', occ.activity.id, occ.date)"
+      <DayTimeline
+        :date-str="currentDay.dateStr"
+        :activities="dayActivities"
+        :vacations="activeVacations"
+        :todos="dayTodos"
+        :members="visibleMembers"
+        :selected-member-id="selectedMobileMemberId"
+        :is-today="currentDay.isToday"
+        @view-activity="(id, date) => emit('view-activity', id, date)"
+        @view-todo="(todo) => emit('view-todo', todo)"
+        @vacation-click="(vid) => emit('vacation-click', vid)"
+        @add-activity="
+          (date, time) => emit('add-activity', date, time, selectedMobileMemberId ?? undefined)
+        "
       />
-
-      <div
-        v-if="mobileMemberActivities.length === 0 && activeVacations.length === 0"
-        class="py-10 text-center"
-      >
-        <div class="text-2xl opacity-30">📋</div>
-        <p class="font-outfit text-secondary-500/30 mt-1 text-sm dark:text-gray-500">
-          {{ t('planner.noActivities') }}
-        </p>
-      </div>
     </template>
   </div>
 </template>
