@@ -50,6 +50,7 @@ const driveMocks = vi.hoisted(() => {
     downloadFileBlob: vi.fn(),
     findOrCreateFolder: vi.fn(),
     getFileMetadata: vi.fn(),
+    setPublicLinkPermission: vi.fn(),
     DriveFileNotFoundError,
   };
 });
@@ -62,6 +63,7 @@ vi.mock('@/services/google/driveService', () => ({
   downloadFileBlob: driveMocks.downloadFileBlob,
   findOrCreateFolder: driveMocks.findOrCreateFolder,
   getFileMetadata: driveMocks.getFileMetadata,
+  setPublicLinkPermission: driveMocks.setPublicLinkPermission,
   DriveFileNotFoundError: driveMocks.DriveFileNotFoundError,
 }));
 
@@ -136,6 +138,7 @@ describe('photoStore', () => {
     driveMocks.downloadFileBlob.mockReset().mockResolvedValue(new Blob());
     driveMocks.findOrCreateFolder.mockReset().mockResolvedValue('folder-nested');
     driveMocks.getFileMetadata.mockReset().mockResolvedValue({ parents: ['folder-1'] });
+    driveMocks.setPublicLinkPermission.mockReset().mockResolvedValue(undefined);
 
     // Clear the registered integration collections between tests.
     storeInternals.photoReferringCollections.clear();
@@ -253,24 +256,51 @@ describe('photoStore', () => {
     expect(store.isUnresolved(photoId)).toBe(true);
   });
 
-  it('hasBrokenPhotos flips true once any photo is flagged unresolved and back to false after clearUnresolved', async () => {
+  it('getPublicUrl returns deterministic Drive CDN URLs and honors tombstone/unresolved guards', async () => {
     storeInternals.registerPhotoCollection('activities');
-    ensureEntity('activities', 'act-broken');
+    ensureEntity('activities', 'act-pub');
     const store = usePhotoStore();
-    expect(store.hasBrokenPhotos).toBe(false);
+    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-pub');
+    const photo = store.photos[photoId];
+    expect(photo).toBeDefined();
+    const driveFileId = photo!.driveFileId;
 
-    driveMocks.getFileMetadata
-      .mockResolvedValueOnce({ parents: ['folder-1'] })
-      .mockRejectedValueOnce(new DriveFileNotFoundError('not found', 404));
-    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-broken');
-    await store.getImageUrl(photoId, 'thumb');
+    const thumb = store.getPublicUrl(photoId, 'thumb');
+    expect(thumb).toBe(
+      `https://drive.google.com/thumbnail?id=${encodeURIComponent(driveFileId)}&sz=w400`
+    );
 
-    expect(store.hasBrokenPhotos).toBe(true);
-    expect(store.isUnresolved(photoId)).toBe(true);
+    const full = store.getPublicUrl(photoId, 'full');
+    expect(full).toBe(
+      `https://drive.google.com/uc?export=view&id=${encodeURIComponent(driveFileId)}`
+    );
 
-    store.clearUnresolved();
-    expect(store.hasBrokenPhotos).toBe(false);
-    expect(store.isUnresolved(photoId)).toBe(false);
+    store.markUnresolved(photoId);
+    expect(store.getPublicUrl(photoId)).toBeNull();
+  });
+
+  it('addPhoto sets anyone-with-link permission after creating the Drive file', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    ensureEntity('activities', 'act-perm');
+    const store = usePhotoStore();
+    await store.addPhoto(makeFile(), 'activities', 'act-perm');
+
+    expect(driveMocks.setPublicLinkPermission).toHaveBeenCalled();
+    const [token, fileId] = driveMocks.setPublicLinkPermission.mock.calls[0]!;
+    expect(token).toBeTruthy();
+    expect(typeof fileId).toBe('string');
+  });
+
+  it('addPhoto does NOT fail the upload when permission set throws', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    ensureEntity('activities', 'act-perm-fail');
+    driveMocks.setPublicLinkPermission.mockRejectedValueOnce(
+      new DriveFileNotFoundError('forbidden', 403)
+    );
+    const store = usePhotoStore();
+    // Should not throw — permission failure is non-fatal for upload.
+    const photoId = await store.addPhoto(makeFile(), 'activities', 'act-perm-fail');
+    expect(store.photos[photoId]).toBeDefined();
   });
 
   it('replacePhotoFile swaps driveFileId and preserves UUID + createdAt', async () => {

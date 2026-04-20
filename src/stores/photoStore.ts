@@ -18,6 +18,7 @@ import {
   downloadFileBlob,
   findOrCreateFolder,
   getFileMetadata,
+  setPublicLinkPermission,
   DriveFileNotFoundError,
 } from '@/services/google/driveService';
 import { requestAccessToken } from '@/services/google/googleAuth';
@@ -261,6 +262,20 @@ export const usePhotoStore = defineStore('photos', () => {
       payload.mime
     );
 
+    // Grant anyone-with-link read so family members whose `drive.file`
+    // scope doesn't cover this file can still fetch bytes by URL. The
+    // Automerge doc carrying these IDs is encrypted with the family
+    // key, so effective exposure is the same trust boundary as the doc
+    // itself. See ADR-021 "public-link access" section. Failure is
+    // non-fatal — the file is uploaded; the migration sweep will retry.
+    await setPublicLinkPermission(token, fileId).catch((e) => {
+      console.warn('[photoStore] public-link setup failed on upload', {
+        photoId: payload.photoId,
+        fileId,
+        error: e,
+      });
+    });
+
     try {
       const now = new Date().toISOString();
       changeDoc((doc: FamilyDocument) => {
@@ -316,15 +331,12 @@ export const usePhotoStore = defineStore('photos', () => {
   /**
    * Reliable image URL via authorized `alt=media` + `URL.createObjectURL`.
    *
-   * Preferred over `getImageUrl` for surfaces that display a small number
-   * of photos (avatars, single hero images) — the fetch is a full image
-   * download (no Drive CDN resizing) but the resulting `blob:` URL lives
-   * in-process and never rotates, so it doesn't suffer the
-   * "thumbnailLink token expired on reload" class of failures.
-   *
-   * Cached by driveFileId for the store's lifetime; revoked on
-   * deactivate() or explicit invalidation. Still honors the tombstone +
-   * unresolved guards for cascading deletes.
+   * @deprecated Use `getPublicUrl` instead. Public-link rendering (ADR-021)
+   * removes the OAuth dependency entirely — photos render without an
+   * access-token round-trip, which also means family members whose
+   * `drive.file` scope doesn't cover other-owned files can still see
+   * photos. This function is kept for the transition only and will be
+   * removed in a follow-up once every call site has migrated.
    */
   async function getBlobUrl(photoId: UUID): Promise<string | null> {
     const photo = photos.value[photoId];
@@ -359,31 +371,30 @@ export const usePhotoStore = defineStore('photos', () => {
   }
 
   /**
-   * Reactive flag — true when ANY photo is currently flagged unresolved.
-   * Consumed by PhotoAccessRecoveryBanner: one or more 404/403s from
-   * Drive almost always mean the viewer's `drive.file` scope doesn't
-   * cover photos uploaded by other members (the scope-mismatch case
-   * documented in ADR-021). Genuinely-deleted photos flip this too;
-   * the recovery flow is idempotent so the overlap is harmless.
+   * Public CDN URL for a photo — no OAuth required. Works because every
+   * photo upload sets `type: anyone, role: reader` permission on the
+   * Drive file. See ADR-021 "public-link access" section for the
+   * privacy analysis (URL lives in the encrypted Automerge doc so
+   * effective exposure is "anyone holding the family key" = members).
+   *
+   * Returns `null` when the photo isn't in the doc, is tombstoned, or
+   * has been flagged unresolved (usually a genuine Drive 404 from a
+   * deleted file — UI shows the broken-image tile for these).
+   *
+   * Sync. Deterministic. No caching needed.
    */
-  const hasBrokenPhotos = computed(() => unresolvedIds.value.size > 0);
-
-  /**
-   * Clear every unresolved flag and dump both URL caches so the next
-   * `getBlobUrl` / `getImageUrl` retries fresh. Called by
-   * `useRecoverPhotoAccess` after the user regrants folder access —
-   * photos that were 404ing under the old (file-only) grant resolve
-   * cleanly under the new (folder-wide) grant on the very next render.
-   */
-  function clearUnresolved(): void {
-    if (unresolvedIds.value.size === 0 && thumbUrlCache.size === 0 && blobUrlCache.size === 0) {
-      return;
+  function getPublicUrl(photoId: UUID, size: PhotoSize = 'thumb'): string | null {
+    const photo = photos.value[photoId];
+    if (!photo || photo.deletedAt) return null;
+    if (unresolvedIds.value.has(photoId)) return null;
+    const id = encodeURIComponent(photo.driveFileId);
+    if (size === 'full') {
+      return `https://drive.google.com/uc?export=view&id=${id}`;
     }
-    unresolvedIds.value = new Set();
-    thumbUrlCache.clear();
-    for (const url of blobUrlCache.values()) URL.revokeObjectURL(url);
-    blobUrlCache.clear();
-    triggerRef(unresolvedIds);
+    // Drive's thumbnail endpoint accepts `sz=wN` / `sz=hN` / `sz=sN`.
+    // wN fits the image inside width=N preserving aspect ratio, which
+    // matches the existing consumers (80px tiles, 2048px viewer).
+    return `https://drive.google.com/thumbnail?id=${id}&sz=w${DEFAULT_THUMB_SIZE}`;
   }
 
   async function fetchThumbnailBaseUrl(driveFileId: string, photoId: UUID): Promise<string | null> {
@@ -488,6 +499,15 @@ export const usePhotoStore = defineStore('photos', () => {
       compressed.mime
     );
 
+    // Public-link grant — see finalizeUpload for rationale.
+    await setPublicLinkPermission(token, fileId).catch((e) => {
+      console.warn('[photoStore] public-link setup failed on avatar upload', {
+        photoId,
+        fileId,
+        error: e,
+      });
+    });
+
     try {
       const now = new Date().toISOString();
       changeDoc((doc: FamilyDocument) => {
@@ -538,6 +558,15 @@ export const usePhotoStore = defineStore('photos', () => {
       compressed.blob,
       compressed.mime
     );
+
+    // Public-link grant — see finalizeUpload for rationale.
+    await setPublicLinkPermission(token, newDriveFileId).catch((e) => {
+      console.warn('[photoStore] public-link setup failed on replace', {
+        photoId,
+        fileId: newDriveFileId,
+        error: e,
+      });
+    });
 
     const previousDriveFileId = existing.driveFileId;
     changeDoc((doc: FamilyDocument) => {
@@ -689,8 +718,8 @@ export const usePhotoStore = defineStore('photos', () => {
     getImageUrl,
     getBlobUrl,
     isUnresolved,
-    hasBrokenPhotos,
-    clearUnresolved,
+    markUnresolved,
+    getPublicUrl,
     invalidateThumbCache,
     replacePhotoFile,
     markDeleted,

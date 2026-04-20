@@ -43,6 +43,7 @@ const driveMocks = vi.hoisted(() => {
     downloadFileBlob: vi.fn(),
     findOrCreateFolder: vi.fn(),
     getFileMetadata: vi.fn(),
+    setPublicLinkPermission: vi.fn(async () => undefined),
     DriveFileNotFoundError,
   };
 });
@@ -53,6 +54,7 @@ vi.mock('@/services/google/driveService', () => ({
   downloadFileBlob: driveMocks.downloadFileBlob,
   findOrCreateFolder: driveMocks.findOrCreateFolder,
   getFileMetadata: driveMocks.getFileMetadata,
+  setPublicLinkPermission: driveMocks.setPublicLinkPermission,
   DriveFileNotFoundError: driveMocks.DriveFileNotFoundError,
 }));
 
