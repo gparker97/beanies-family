@@ -241,7 +241,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4F1}',
     readTime: 3,
     popular: true,
-    updatedDate: '2026-04-15',
+    updatedDate: '2026-04-20',
     sections: [
       {
         type: 'heading',
@@ -266,64 +266,18 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
-        content: 'The easy way: use the install prompt',
+        content: 'Jump to the steps for your device',
         level: 2,
-        id: 'install-prompt',
+        id: 'pick-device',
       },
       {
         type: 'paragraph',
         content:
-          'After using beanies.family for a minute or two, your browser may show a small pop-up asking if you want to install the app. If you see it, tap <strong>Install</strong> (or <strong>Add</strong>) and you\u2019re done \u2014 skip to <a href="#sign-in-after">After installing</a>.',
-      },
-      {
-        type: 'paragraph',
-        content:
-          '<img src="/help/pwa-install/install-app-android-prompt.webp" alt="The install prompt that appears in the browser, with an Install button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
-      },
-      {
-        type: 'infoBox',
-        content:
-          'If no prompt appears, no problem \u2014 try the in-app option below, or jump to the manual steps for your device.',
-        title: 'Didn\u2019t see the prompt?',
-        icon: '\u{1F4A1}',
+          '<a href="#install-ios" style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0 0.5rem 0.5rem 0; padding: 0.875rem 1.25rem; background: #F15D22; color: #ffffff; border-radius: 12px; font-family: Outfit, sans-serif; font-weight: 600; text-decoration: none; min-width: 44px;">\u{1F4F1} iPhone / iPad</a><a href="#install-android" style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0 0.5rem 0.5rem 0; padding: 0.875rem 1.25rem; background: #F15D22; color: #ffffff; border-radius: 12px; font-family: Outfit, sans-serif; font-weight: 600; text-decoration: none; min-width: 44px;">\u{1F916} Android</a><a href="#install-desktop" style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0 0.5rem 0.5rem 0; padding: 0.875rem 1.25rem; background: #2C3E50; color: #ffffff; border-radius: 12px; font-family: Outfit, sans-serif; font-weight: 600; text-decoration: none; min-width: 44px;">\u{1F4BB} Desktop (Mac / Windows / Linux)</a>',
       },
       {
         type: 'heading',
-        content: 'Install from Settings (inside the app)',
-        level: 2,
-        id: 'install-from-settings',
-      },
-      {
-        type: 'paragraph',
-        content:
-          'When you\u2019re signed in and using beanies.family in a regular browser tab, there\u2019s a shortcut right inside the app:',
-      },
-      {
-        type: 'steps',
-        content: '',
-        items: [
-          'Open beanies.family in your browser and sign in as normal',
-          'Click the <strong>Settings</strong> link in the sidebar (or menu on mobile)',
-          'Scroll down to the <strong>Install App</strong> section',
-          'Click the <strong>Install beanies.family</strong> button',
-          'Confirm in the browser pop-up that appears \u2014 the app icon is added to your device',
-        ],
-      },
-      {
-        type: 'paragraph',
-        content:
-          '<img src="/help/pwa-install/install-app-android-addtohome-settings.webp" alt="The Install App section in beanies.family Settings with the Install beanies.family button" loading="lazy" style="max-width: 100%; border-radius: 12px; box-shadow: 0 4px 16px rgba(44,62,80,0.08);" />',
-      },
-      {
-        type: 'infoBox',
-        content:
-          'The Install App section only appears when the app isn\u2019t already installed and your browser supports PWA install. On iPhone/iPad (Safari), you won\u2019t see this button \u2014 use the Share-menu method below instead.',
-        title: 'Don\u2019t see the Install App section?',
-        icon: '\u{1F4A1}',
-      },
-      {
-        type: 'heading',
-        content: 'iPhone / iPad (Safari)',
+        content: '\u{1F4F1} iPhone / iPad',
         level: 2,
         id: 'install-ios',
       },
