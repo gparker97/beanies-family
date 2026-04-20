@@ -15,8 +15,10 @@
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
+import { normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
 import { tripTypeEmoji } from '@/utils/vacation';
 import type { FamilyActivity, FamilyMember, FamilyVacation, TodoItem } from '@/types/models';
@@ -51,6 +53,11 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+const { getMemberName, getMemberColor } = useMemberInfo();
+
+function memberInitial(memberId: string): string {
+  return getMemberName(memberId).charAt(0).toUpperCase();
+}
 
 // ── Time grid sizing — driven by timed activities on this day ──
 const timedRef = computed(() =>
@@ -197,14 +204,34 @@ function handleSlotClick(hour: number): void {
       <div
         v-for="occ in untimedActivities"
         :key="'untimed-' + occ.activity.id"
-        class="cursor-pointer truncate rounded-md border-l-[3px] px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+        class="flex cursor-pointer items-center gap-1.5 rounded-md border-l-[3px] px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
         :style="{
           borderLeftColor: getActivityColor(occ.activity),
           background: getActivityColor(occ.activity) + '15',
         }"
         @click="emit('view-activity', occ.activity.id, occ.date)"
       >
-        {{ occ.activity.title }}
+        <span class="min-w-0 flex-1 truncate">
+          {{ occ.activity.title
+          }}<span v-if="occ.activity.location" class="opacity-70">
+            · 📍 {{ occ.activity.location }}</span
+          >
+        </span>
+        <div
+          v-if="normalizeAssignees(occ.activity).length > 0"
+          class="flex flex-shrink-0 -space-x-1"
+          aria-label="Assigned to"
+        >
+          <span
+            v-for="mid in normalizeAssignees(occ.activity).slice(0, 3)"
+            :key="mid"
+            class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white ring-1 ring-white dark:ring-slate-800"
+            :style="{ backgroundColor: getMemberColor(mid) }"
+            :title="getMemberName(mid)"
+          >
+            {{ memberInitial(mid) }}
+          </span>
+        </div>
       </div>
 
       <!-- Todos due today -->
@@ -279,11 +306,35 @@ function handleSlotClick(hour: number): void {
           }"
           @click="emit('view-activity', ev.occurrence.activity.id, ev.occurrence.date)"
         >
-          <div class="font-outfit truncate text-xs font-semibold text-gray-900 dark:text-gray-100">
-            {{ ev.occurrence.activity.title }}
-          </div>
-          <div class="text-secondary-500/60 truncate text-[10px] dark:text-gray-400">
-            {{ eventTimeLabel(ev.occurrence.activity) }}
+          <div class="flex items-start gap-1">
+            <div class="min-w-0 flex-1">
+              <div
+                class="font-outfit truncate text-xs font-semibold text-gray-900 dark:text-gray-100"
+              >
+                {{ ev.occurrence.activity.title }}
+              </div>
+              <div class="text-secondary-500/60 truncate text-[10px] dark:text-gray-400">
+                {{ eventTimeLabel(ev.occurrence.activity)
+                }}<template v-if="ev.occurrence.activity.location">
+                  · 📍 {{ ev.occurrence.activity.location }}</template
+                >
+              </div>
+            </div>
+            <div
+              v-if="normalizeAssignees(ev.occurrence.activity).length > 0"
+              class="flex flex-shrink-0 -space-x-1"
+              aria-label="Assigned to"
+            >
+              <span
+                v-for="mid in normalizeAssignees(ev.occurrence.activity).slice(0, 3)"
+                :key="mid"
+                class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white ring-1 ring-white dark:ring-slate-800"
+                :style="{ backgroundColor: getMemberColor(mid) }"
+                :title="getMemberName(mid)"
+              >
+                {{ memberInitial(mid) }}
+              </span>
+            </div>
           </div>
         </button>
 
