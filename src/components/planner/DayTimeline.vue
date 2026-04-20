@@ -14,8 +14,8 @@
  * wrappers (prev/next arrows vs. day-pill strip).
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import MemberChip from '@/components/ui/MemberChip.vue';
 import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
-import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
 import { normalizeAssignees } from '@/utils/assignees';
@@ -53,11 +53,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const { getMemberName, getMemberColor } = useMemberInfo();
-
-function memberInitial(memberId: string): string {
-  return getMemberName(memberId).charAt(0).toUpperCase();
-}
 
 // ── Time grid sizing — driven by timed activities on this day ──
 const timedRef = computed(() =>
@@ -222,15 +217,12 @@ function handleSlotClick(hour: number): void {
           class="flex flex-shrink-0 -space-x-1"
           aria-label="Assigned to"
         >
-          <span
+          <MemberChip
             v-for="mid in normalizeAssignees(occ.activity).slice(0, 3)"
             :key="mid"
-            class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white ring-1 ring-white dark:ring-slate-800"
-            :style="{ backgroundColor: getMemberColor(mid) }"
-            :title="getMemberName(mid)"
-          >
-            {{ memberInitial(mid) }}
-          </span>
+            :member-id="mid"
+            size="dot"
+          />
         </div>
       </div>
 
@@ -325,15 +317,12 @@ function handleSlotClick(hour: number): void {
               class="flex flex-shrink-0 -space-x-1"
               aria-label="Assigned to"
             >
-              <span
+              <MemberChip
                 v-for="mid in normalizeAssignees(ev.occurrence.activity).slice(0, 3)"
                 :key="mid"
-                class="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white ring-1 ring-white dark:ring-slate-800"
-                :style="{ backgroundColor: getMemberColor(mid) }"
-                :title="getMemberName(mid)"
-              >
-                {{ memberInitial(mid) }}
-              </span>
+                :member-id="mid"
+                size="dot"
+              />
             </div>
           </div>
         </button>
