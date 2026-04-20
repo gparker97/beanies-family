@@ -431,6 +431,7 @@ async function handleSave() {
 <template>
   <BeanieFormModal
     variant="drawer"
+    size="full"
     :open="open"
     :title="isEditing ? t('travel.editSegment') : t('travel.editSegment')"
     icon="✈️"
@@ -538,7 +539,7 @@ async function handleSave() {
             {{ t('vacation.bookingDetails') }}
           </div>
           <div class="space-y-3 rounded-xl border border-gray-200 p-3 dark:border-slate-700">
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-[2fr_1fr]">
               <FormFieldGroup
                 :label="t('vacation.field.airline')"
                 :required="validation.isRequired('airline')"
@@ -555,7 +556,7 @@ async function handleSave() {
                 :required="validation.isRequired('flightNumber')"
                 :error="validation.showError('flightNumber')"
               >
-                <BaseInput v-model="flightNumber" placeholder="e.g. 1842" class="sm:!w-24" />
+                <BaseInput v-model="flightNumber" placeholder="e.g. 1842" />
               </FormFieldGroup>
             </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.3fr_1fr]">
