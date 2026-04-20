@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import CalendarNavBar from '@/components/planner/CalendarNavBar.vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
-import MemberChipFilter from '@/components/common/MemberChipFilter.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import {
   useDayNavigation,
@@ -40,9 +39,6 @@ const todoStore = useTodoStore();
 const referenceDate = ref(new Date());
 const { currentDay, dayLabel, prevDay, nextDay, goToToday } = useDayNavigation(referenceDate);
 
-// Mobile: selected member for filtering
-const selectedMobileMemberId = ref<string | null>(null);
-
 // ── Members (sorted, filtered) ─────────────────────────────────────────────
 
 // Planner columns — humans only (pets aren't activity assignees).
@@ -61,6 +57,15 @@ const dayActivities = computed<Occurrence[]>(() => {
   const d = currentDay.value.date;
   const occs = activityStore.monthActivities(d.getFullYear(), d.getMonth());
   return occs.filter((o) => o.date === dateStr && !o.activity.vacationId);
+});
+
+// Mobile timeline honors the page-level member filter (same semantics as
+// the desktop column hiding) so the in-view filter isn't duplicated.
+const mobileDayActivities = computed<Occurrence[]>(() => {
+  if (memberFilterStore.isAllSelected) return dayActivities.value;
+  return dayActivities.value.filter((o) =>
+    normalizeAssignees(o.activity).some((id) => memberFilterStore.isMemberSelected(id))
+  );
 });
 
 const activityCount = computed(() => dayActivities.value.length);
@@ -169,10 +174,6 @@ function handleSlotClick(memberId: string, hour: number) {
 
 // Grid template columns (dynamic based on member count)
 const gridCols = computed(() => `56px repeat(${visibleMembers.value.length}, 1fr)`);
-
-function toggleMobileMember(id: string) {
-  selectedMobileMemberId.value = selectedMobileMemberId.value === id ? null : id;
-}
 
 defineExpose({ dayLabel, activityCount });
 </script>
@@ -377,30 +378,19 @@ defineExpose({ dayLabel, activityCount });
       </div>
     </template>
 
-    <!-- ── Mobile: Member Filter + Unified Timeline ─────────────────────── -->
+    <!-- ── Mobile: Unified Timeline (page-level filter drives scope) ─────── -->
     <template v-else>
-      <MemberChipFilter
-        :is-all-active="!selectedMobileMemberId"
-        :is-member-active="(id: string) => selectedMobileMemberId === id"
-        class="mb-4"
-        @select-all="selectedMobileMemberId = null"
-        @select-member="toggleMobileMember"
-      />
-
       <DayTimeline
         :date-str="currentDay.dateStr"
-        :activities="dayActivities"
+        :activities="mobileDayActivities"
         :vacations="activeVacations"
         :todos="dayTodos"
         :members="visibleMembers"
-        :selected-member-id="selectedMobileMemberId"
         :is-today="currentDay.isToday"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"
         @vacation-click="(vid) => emit('vacation-click', vid)"
-        @add-activity="
-          (date, time) => emit('add-activity', date, time, selectedMobileMemberId ?? undefined)
-        "
+        @add-activity="(date, time) => emit('add-activity', date, time)"
       />
     </template>
   </div>

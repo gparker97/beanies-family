@@ -17,7 +17,6 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useTimeGrid, groupOverlapping } from '@/composables/useCalendarNavigation';
 import { useTranslation } from '@/composables/useTranslation';
 import { getActivityColor } from '@/stores/activityStore';
-import { normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
 import { tripTypeEmoji } from '@/utils/vacation';
 import type { FamilyActivity, FamilyMember, FamilyVacation, TodoItem } from '@/types/models';
@@ -27,7 +26,8 @@ type Occurrence = { activity: FamilyActivity; date: string };
 interface Props {
   /** ISO date `YYYY-MM-DD` this timeline represents. */
   dateStr: string;
-  /** Timed + untimed activity occurrences for this day (parent pre-filters). */
+  /** Timed + untimed activity occurrences for this day (parent pre-filters
+   *  by the page-level member filter — this component just renders). */
   activities: Occurrence[];
   /** Vacations active on this day. */
   vacations: FamilyVacation[];
@@ -35,14 +35,11 @@ interface Props {
   todos: TodoItem[];
   /** All members, used for color lookup on events. */
   members: FamilyMember[];
-  /** When set, events not matching this member render ghosted. */
-  selectedMemberId?: string | null;
   /** Show a "now" indicator line if the date matches today. */
   isToday?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  selectedMemberId: null,
   isToday: false,
 });
 
@@ -160,11 +157,6 @@ const showNowIndicator = computed(() => {
 });
 
 // ── Helpers ──
-function eventIsGhosted(occ: Occurrence): boolean {
-  if (!props.selectedMemberId) return false;
-  return !normalizeAssignees(occ.activity).includes(props.selectedMemberId);
-}
-
 function eventTimeLabel(act: FamilyActivity): string {
   if (!act.startTime) return '';
   const start = formatTime12(act.startTime);
@@ -206,7 +198,6 @@ function handleSlotClick(hour: number): void {
         v-for="occ in untimedActivities"
         :key="'untimed-' + occ.activity.id"
         class="cursor-pointer truncate rounded-md border-l-[3px] px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
-        :class="{ 'opacity-20': eventIsGhosted(occ) }"
         :style="{
           borderLeftColor: getActivityColor(occ.activity),
           background: getActivityColor(occ.activity) + '15',
@@ -278,16 +269,13 @@ function handleSlotClick(hour: number): void {
           :key="ev.occurrence.activity.id"
           type="button"
           class="absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md dark:bg-slate-800"
-          :class="{ 'opacity-20 hover:opacity-40': eventIsGhosted(ev.occurrence) }"
           :style="{
             top: ev.top,
             height: ev.height,
             left: `calc(${(ev.lane / ev.totalLanes) * 100}% + 2px)`,
             width: `calc(${(1 / ev.totalLanes) * 100}% - 4px)`,
             borderLeftColor: getActivityColor(ev.occurrence.activity),
-            background:
-              getActivityColor(ev.occurrence.activity) +
-              (eventIsGhosted(ev.occurrence) ? '08' : '12'),
+            background: getActivityColor(ev.occurrence.activity) + '12',
           }"
           @click="emit('view-activity', ev.occurrence.activity.id, ev.occurrence.date)"
         >
