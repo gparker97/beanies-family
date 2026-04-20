@@ -19,7 +19,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "astro": "^5.14.0",
     "astro-og-canvas": "^0.7.0",
-    "astro-seo": "^0.8.4",
+    "astro-seo": "^1.1.0",
     "canvaskit-wasm": "^0.39.1",
     "minisearch": "^7.1.2",
     "tailwindcss": "^4.1.18",
