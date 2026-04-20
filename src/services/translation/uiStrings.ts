@@ -4502,6 +4502,8 @@ const STRING_DEFS = {
     beanie: 'some items are outside your trip dates',
   },
   'travel.outOfRange.bannerAction': { en: 'Show me', beanie: 'show me' },
+  'vacation.bookingDetails': { en: 'Booking details', beanie: 'booking details' },
+  'vacation.tripShape': { en: 'Trip shape', beanie: 'trip shape' },
 
   // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
   'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },

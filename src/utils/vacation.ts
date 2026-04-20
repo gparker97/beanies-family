@@ -509,7 +509,12 @@ function rangesOverlap(
   return a.start < b.end && b.start < a.end;
 }
 
-type AddHint = (id: string, message: string, affectedIds: string[]) => void;
+type AddHint = (
+  id: string,
+  message: string,
+  affectedIds: string[],
+  extras?: Partial<TimelineHint>
+) => void;
 type DatedItem = { id: string; range: { start: string; end: string }; title: string };
 
 function buildAccommodationItems(v: FamilyVacation): DatedItem[] {
@@ -545,8 +550,7 @@ function buildFlightItems(v: FamilyVacation): DatedItem[] {
 }
 
 /** Two accommodations overlapping in date range → double-booked nights? */
-function detectAccommodationOverlaps(v: FamilyVacation, addHint: AddHint): void {
-  const accItems = buildAccommodationItems(v);
+function detectAccommodationOverlaps(accItems: DatedItem[], addHint: AddHint): void {
   for (let i = 0; i < accItems.length; i++) {
     for (let j = i + 1; j < accItems.length; j++) {
       const a = accItems[i]!;
@@ -560,9 +564,11 @@ function detectAccommodationOverlaps(v: FamilyVacation, addHint: AddHint): void 
 }
 
 /** Accommodation booked during a cruise window — cruise already includes it. */
-function detectAccommodationDuringCruise(v: FamilyVacation, addHint: AddHint): void {
-  const accItems = buildAccommodationItems(v);
-  const cruiseItems = buildCruiseItems(v);
+function detectAccommodationDuringCruise(
+  accItems: DatedItem[],
+  cruiseItems: DatedItem[],
+  addHint: AddHint
+): void {
   for (const acc of accItems) {
     for (const cruise of cruiseItems) {
       if (rangesOverlap(acc.range, cruise.range)) {
@@ -580,9 +586,11 @@ function detectAccommodationDuringCruise(v: FamilyVacation, addHint: AddHint): v
 }
 
 /** Flight scheduled during a cruise window — is this intentional? */
-function detectFlightDuringCruise(v: FamilyVacation, addHint: AddHint): void {
-  const flightItems = buildFlightItems(v);
-  const cruiseItems = buildCruiseItems(v);
+function detectFlightDuringCruise(
+  flightItems: DatedItem[],
+  cruiseItems: DatedItem[],
+  addHint: AddHint
+): void {
   for (const flight of flightItems) {
     for (const cruise of cruiseItems) {
       if (flight.range.start >= cruise.range.start && flight.range.start < cruise.range.end) {
@@ -597,11 +605,7 @@ function detectFlightDuringCruise(v: FamilyVacation, addHint: AddHint): void {
 }
 
 /** Departures close to midnight are a frequent source of off-by-one date bugs. */
-function detectNightFlights(
-  v: FamilyVacation,
-  addHint: AddHint,
-  hintMap: Map<string, TimelineHint>
-): void {
+function detectNightFlights(v: FamilyVacation, addHint: AddHint): void {
   for (const seg of v.travelSegments) {
     const depTime = seg.departureTime || seg.embarkationTime || seg.leavingTime || seg.startTime;
     const night = detectNightFlight(depTime);
@@ -609,16 +613,16 @@ function detectNightFlights(
       addHint(
         seg.id,
         `Departs at ${depTime} — just after midnight. Double-check the date to make sure you're travelling on the right day.`,
-        [seg.id]
+        [seg.id],
+        { nightFlight: 'early-morning' }
       );
-      hintMap.get(seg.id)!.nightFlight = 'early-morning';
     } else if (night === 'late-night') {
       addHint(
         seg.id,
         `Departs at ${depTime} — just before midnight. Make sure you have the correct departure date and allow extra time.`,
-        [seg.id]
+        [seg.id],
+        { nightFlight: 'late-night' }
       );
-      hintMap.get(seg.id)!.nightFlight = 'late-night';
     }
   }
 }
@@ -628,17 +632,11 @@ function detectNightFlights(
  * `v.endDate`. Amber hint surfaces the misalignment; the user can fix
  * by editing the segment date or the trip window. Never blocks.
  *
- * Skips vacations with no trip window set (no anchor to compare to).
- *
  * Tags each affected hint with `outOfRange: 'before-start' | 'after-end'`
- * so downstream UI (banner count, per-card badges) can filter on a
- * structured flag rather than string-matching the human-readable message.
+ * so downstream UI (banner count, per-card badges) filters on a
+ * structured flag rather than string-matching the message.
  */
-function detectOutOfRange(
-  v: FamilyVacation,
-  addHint: AddHint,
-  hintMap: Map<string, TimelineHint>
-): void {
+function detectOutOfRange(v: FamilyVacation, addHint: AddHint): void {
   if (!v.startDate && !v.endDate) return;
 
   type Item = { id: string; date: string; title: string };
@@ -665,11 +663,13 @@ function detectOutOfRange(
   for (const item of items) {
     const date = extractDatePart(item.date);
     if (v.startDate && date < extractDatePart(v.startDate)) {
-      addHint(item.id, `Scheduled before trip start (${v.startDate})`, [item.id]);
-      hintMap.get(item.id)!.outOfRange = 'before-start';
+      addHint(item.id, `Scheduled before trip start (${v.startDate})`, [item.id], {
+        outOfRange: 'before-start',
+      });
     } else if (v.endDate && date > extractDatePart(v.endDate)) {
-      addHint(item.id, `Scheduled after trip end (${v.endDate})`, [item.id]);
-      hintMap.get(item.id)!.outOfRange = 'after-end';
+      addHint(item.id, `Scheduled after trip end (${v.endDate})`, [item.id], {
+        outOfRange: 'after-end',
+      });
     }
   }
 }
@@ -686,23 +686,29 @@ function detectOutOfRange(
 export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHint> {
   const hintMap = new Map<string, TimelineHint>();
 
-  const addHint: AddHint = (id, message, affectedIds) => {
+  const addHint: AddHint = (id, message, affectedIds, extras) => {
     const existing = hintMap.get(id);
     if (existing) {
       existing.message += '; ' + message;
       for (const aid of affectedIds) {
         if (!existing.affectedIds.includes(aid)) existing.affectedIds.push(aid);
       }
+      if (extras) Object.assign(existing, extras);
     } else {
-      hintMap.set(id, { message, affectedIds: [...affectedIds] });
+      hintMap.set(id, { message, affectedIds: [...affectedIds], ...extras });
     }
   };
 
-  detectAccommodationOverlaps(v, addHint);
-  detectAccommodationDuringCruise(v, addHint);
-  detectFlightDuringCruise(v, addHint);
-  detectNightFlights(v, addHint, hintMap);
-  detectOutOfRange(v, addHint, hintMap);
+  // Build item-range projections once and share across the overlap detectors.
+  const accItems = buildAccommodationItems(v);
+  const cruiseItems = buildCruiseItems(v);
+  const flightItems = buildFlightItems(v);
+
+  detectAccommodationOverlaps(accItems, addHint);
+  detectAccommodationDuringCruise(accItems, cruiseItems, addHint);
+  detectFlightDuringCruise(flightItems, cruiseItems, addHint);
+  detectNightFlights(v, addHint);
+  detectOutOfRange(v, addHint);
 
   return hintMap;
 }
