@@ -12,6 +12,7 @@ import { prefillTransportationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 
 const props = withDefaults(
   defineProps<{
@@ -230,10 +231,11 @@ function isBus(type: VacationTransportationType): boolean {
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.agencyAddress')">
               <div class="relative">
-                <BaseInput
+                <BaseTextarea
                   :model-value="item.agencyAddress ?? ''"
                   :placeholder="t('vacation.field.agencyAddress')"
                   class="vacation-teal-input"
+                  :rows="2"
                   @update:model-value="updateItem(index, 'agencyAddress', String($event))"
                 />
                 <a
@@ -241,7 +243,7 @@ function isBus(type: VacationTransportationType): boolean {
                   :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.agencyAddress)}`"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="absolute top-1/2 right-2 -translate-y-1/2 text-sm opacity-40 transition-opacity hover:opacity-80"
+                  class="absolute top-2 right-2 text-sm opacity-40 transition-opacity hover:opacity-80"
                   :title="t('vacation.field.openInMaps')"
                   @click.stop
                 >

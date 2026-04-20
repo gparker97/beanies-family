@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -268,7 +269,11 @@ async function handleSave() {
           <BaseInput v-model="agencyName" :placeholder="t('vacation.field.agencyName')" />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.agencyAddress')">
-          <BaseInput v-model="agencyAddress" :placeholder="t('vacation.field.agencyAddress')" />
+          <BaseTextarea
+            v-model="agencyAddress"
+            :placeholder="t('vacation.field.agencyAddress')"
+            :rows="2"
+          />
         </FormFieldGroup>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
@@ -351,7 +356,11 @@ async function handleSave() {
 
       <!-- Notes -->
       <FormFieldGroup :label="t('vacation.field.notes')">
-        <BaseInput v-model="notes" :placeholder="t('vacation.field.notesPlaceholder')" />
+        <BaseTextarea
+          v-model="notes"
+          :placeholder="t('vacation.field.notesPlaceholder')"
+          :rows="3"
+        />
       </FormFieldGroup>
     </div>
   </BeanieFormModal>

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -200,11 +201,10 @@ function handleSave() {
 
       <!-- Description -->
       <FormFieldGroup :label="t('vacation.field.description')">
-        <textarea
+        <BaseTextarea
           v-model="description"
           :placeholder="t('vacation.ideas.descriptionPlaceholder')"
-          rows="2"
-          class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          :rows="3"
         />
       </FormFieldGroup>
 
@@ -384,11 +384,10 @@ function handleSave() {
 
       <!-- Notes -->
       <FormFieldGroup :label="t('vacation.field.notes')">
-        <textarea
+        <BaseTextarea
           v-model="notes"
           :placeholder="t('vacation.field.notesPlaceholder')"
-          rows="2"
-          class="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--vacation-teal)] dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          :rows="3"
         />
       </FormFieldGroup>
 

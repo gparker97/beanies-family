@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -204,7 +205,7 @@ async function handleSave() {
         :required="validation.isRequired('address')"
         :error="validation.showError('address')"
       >
-        <BaseInput v-model="address" :placeholder="t('vacation.field.address')" />
+        <BaseTextarea v-model="address" :placeholder="t('vacation.field.address')" :rows="2" />
       </FormFieldGroup>
 
       <!-- Check-in / Check-out dates -->
@@ -262,7 +263,11 @@ async function handleSave() {
 
       <!-- Notes -->
       <FormFieldGroup :label="t('vacation.field.notes')">
-        <BaseInput v-model="notes" :placeholder="t('vacation.field.notesPlaceholder')" />
+        <BaseTextarea
+          v-model="notes"
+          :placeholder="t('vacation.field.notesPlaceholder')"
+          :rows="3"
+        />
       </FormFieldGroup>
     </div>
   </BeanieFormModal>
