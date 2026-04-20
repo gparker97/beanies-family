@@ -377,6 +377,16 @@ export const usePhotoStore = defineStore('photos', () => {
    * privacy analysis (URL lives in the encrypted Automerge doc so
    * effective exposure is "anyone holding the family key" = members).
    *
+   * Uses `lh3.googleusercontent.com/d/{id}=wN` rather than
+   * `drive.google.com/thumbnail?id=...` or `drive.google.com/uc?...` —
+   * the `drive.google.com` URLs are session-sensitive (can bounce
+   * anonymous loads to a sign-in page even for anyone-with-link files)
+   * AND the `/thumbnail` endpoint only serves after Drive has
+   * generated a thumbnail, which doesn't happen instantly on upload.
+   * `lh3.googleusercontent.com` is Google's image CDN, works without a
+   * session for public files, supports size modifiers, and falls back
+   * to original bytes when a thumbnail isn't ready yet.
+   *
    * Returns `null` when the photo isn't in the doc, is tombstoned, or
    * has been flagged unresolved (usually a genuine Drive 404 from a
    * deleted file — UI shows the broken-image tile for these).
@@ -388,13 +398,8 @@ export const usePhotoStore = defineStore('photos', () => {
     if (!photo || photo.deletedAt) return null;
     if (unresolvedIds.value.has(photoId)) return null;
     const id = encodeURIComponent(photo.driveFileId);
-    if (size === 'full') {
-      return `https://drive.google.com/uc?export=view&id=${id}`;
-    }
-    // Drive's thumbnail endpoint accepts `sz=wN` / `sz=hN` / `sz=sN`.
-    // wN fits the image inside width=N preserving aspect ratio, which
-    // matches the existing consumers (80px tiles, 2048px viewer).
-    return `https://drive.google.com/thumbnail?id=${id}&sz=w${DEFAULT_THUMB_SIZE}`;
+    const px = size === 'full' ? DEFAULT_FULL_SIZE : DEFAULT_THUMB_SIZE;
+    return `https://lh3.googleusercontent.com/d/${id}=w${px}`;
   }
 
   async function fetchThumbnailBaseUrl(driveFileId: string, photoId: UUID): Promise<string | null> {
