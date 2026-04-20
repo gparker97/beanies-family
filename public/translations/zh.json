@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-20",
-    "translationCount": 2317
+    "translationCount": 2318
   },
   "translations": {
     "app.name": {
@@ -11589,6 +11589,11 @@
     "travel.today.tripEnded": {
       "translation": "此行程已结束",
       "hash": "smr711",
+      "lastUpdated": "2026-04-20"
+    },
+    "planner.openAgenda": {
+      "translation": "议程视图",
+      "hash": "pyusn1",
       "lastUpdated": "2026-04-20"
     }
   }
