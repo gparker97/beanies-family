@@ -340,7 +340,7 @@ function removeSegment(index: number) {
             <span>{{ t('vacation.essentials') }}</span>
           </div>
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.3fr]">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup :label="t('form.date')" required>
                 <BaseInput
                   type="date"
@@ -476,7 +476,7 @@ function removeSegment(index: number) {
             <span>{{ t('vacation.essentials') }}</span>
           </div>
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.3fr]">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup :label="t('vacation.field.embarkationDate')" required>
                 <BaseInput
                   type="date"
@@ -623,7 +623,7 @@ function removeSegment(index: number) {
             <span>{{ t('vacation.essentials') }}</span>
           </div>
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1.3fr]">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup :label="t('vacation.field.departureDate')" required>
                 <BaseInput
                   type="date"
