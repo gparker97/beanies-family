@@ -78,9 +78,10 @@ const birthdayLabel = computed(() => {
   return dob.year ? `${dob.year}-${month}-${day}` : `${month}-${day}`;
 });
 
-const roleLabel = computed(() =>
-  props.member.ageGroup === 'child' ? t('bean.hero.role.child') : t('bean.hero.role.parent')
-);
+const roleLabel = computed(() => {
+  if (props.member.isPet) return t('dashboard.rolePet');
+  return props.member.ageGroup === 'child' ? t('bean.hero.role.child') : t('bean.hero.role.parent');
+});
 
 // --- Add Something dropdown -------------------------------------------
 
