@@ -94,3 +94,17 @@ h6 {
     animation: none;
   }
 }
+
+/* Help article body anchors — readable, clickable link styling.
+   Inline `style="..."` (e.g. device-jump buttons) overrides these defaults. */
+.help-article-content a {
+  color: #f15d22;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+
+.help-article-content a:hover {
+  color: #e67e22;
+}
