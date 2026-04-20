@@ -668,7 +668,12 @@ export interface FamilyVacation {
   transportation: VacationTransportation[];
   ideas: VacationIdea[];
 
-  // Derived from segment dates (computed on create/update)
+  // User-owned trip window (ADR-023). Set at wizard Step 1, editable
+  // on the trip summary page. Extended — never auto-shrunk — when
+  // segments are added/edited with dates outside the window. Only
+  // manual edits shrink. See `vacationStore.updateVacation` for the
+  // auto-extend pipeline and `utils/vacation.ts::extendTripDates` for
+  // the pure helper.
   startDate?: ISODateString;
   endDate?: ISODateString;
 
