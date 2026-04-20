@@ -12,6 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- **Moving a flight no longer silently shrinks your trip.** Trip start/end dates are now user-owned rather than derived from segment dates on every save (see ADR-023). Changing an outbound or return flight within your trip window leaves the trip unchanged; changing one _past_ the window extends the window. The only way to shrink is a manual date edit on the trip summary page. This fixes the "orphaned accommodation" error greg hit when moving a flight later — the hotel was never orphaned, the trip had silently contracted around it.
+
+### Added
+
+- **Trip start/end dates as first-class wizard Step 1 fields.** Creating a new trip now asks for start + end dates upfront — required to advance past Step 1. Below the two date pickers, three quick-add chips ("+3 days", "+1 week", "+2 weeks") set end from start in one tap; both dates remain manually editable. Below the inputs a live summary reads "Jun 1 → Jun 10 · 10 days". Validation messages are wired for screen readers via `aria-describedby`.
+- **Segment dates auto-populate from the trip window on add.** Round-trip flight → outbound gets trip start, return gets trip end. Cruise → embarkation/disembarkation filled. Train/ferry/car → departure. First accommodation → check-in/out. Rental car / shuttle → pickup/return. Activities still pick their own day. Users can always override after prefill; existing dates on a segment are never overwritten.
+- **Out-of-range segments now raise a visible amber hint.** If any segment's date falls before the trip start or after the trip end, the per-segment hint banner explains which side it's on. Uses the existing `computeTimelineHints` surface — one rendering path for all "something's up with this segment" states.
+
+### Fixed
+
 - **Travel plan segment modals no longer fire the "required" error state the moment you open them.** Opening a booked flight, cruise, or accommodation in the editor used to immediately paint empty booking-contingent fields (airline, ship name, confirmation number, etc.) with an orange error ring, even before you'd tried to save. The ring now only fires on a save attempt. In the meantime, an asterisk beside the label tells you which fields _will_ be required — so the same signal is there, just not shouting. Applies across the Flight/Cruise/Train/Ferry/Car/Activity segment editor, the Accommodation editor, and the Transportation editor.
 
 ### Changed

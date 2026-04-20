@@ -14,6 +14,7 @@ import {
   buildCruiseLineOptions,
   buildCruiseShipOptions,
   buildCruisePortOptions,
+  prefillSegmentDates,
 } from '@/utils/vacation';
 import { buildTravelKeyValue } from '@/composables/useVacationTimeline';
 import type {
@@ -26,9 +27,14 @@ import type {
 interface Props {
   segments: VacationTravelSegment[];
   tripType: VacationTripType;
+  tripStartDate?: string;
+  tripEndDate?: string;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  tripStartDate: '',
+  tripEndDate: '',
+});
 
 const emit = defineEmits<{
   'update:segments': [value: VacationTravelSegment[]];
@@ -133,6 +139,12 @@ watch(
   { immediate: true }
 );
 
+/** Wrap `prefillSegmentDates` with the current wizard trip window. */
+function withPrefill<T extends VacationTravelSegment>(seg: T): T {
+  if (!props.tripStartDate && !props.tripEndDate) return seg;
+  return prefillSegmentDates(seg, props.tripStartDate || undefined, props.tripEndDate || undefined);
+}
+
 function addSegment(type: VacationTravelType) {
   // For flights, show the one-way/return choice first
   if (type === 'flight_outbound') {
@@ -141,12 +153,12 @@ function addSegment(type: VacationTravelType) {
   }
 
   const id = generateUUID();
-  const newSegment: VacationTravelSegment = {
+  const newSegment: VacationTravelSegment = withPrefill({
     id,
     type,
     title: defaultTitles[type],
     status: 'pending' as VacationSegmentStatus,
-  };
+  });
   collapsedMap.value[id] = false;
   emit('update:segments', [...props.segments, newSegment]);
 }
@@ -154,22 +166,22 @@ function addSegment(type: VacationTravelType) {
 function addFlightSegments(returnFlight: boolean) {
   showFlightTypeChoice.value = false;
   const outId = generateUUID();
-  const outbound: VacationTravelSegment = {
+  const outbound: VacationTravelSegment = withPrefill({
     id: outId,
     type: 'flight_outbound',
     title: defaultTitles['flight_outbound'],
     status: 'pending' as VacationSegmentStatus,
-  };
+  });
   collapsedMap.value[outId] = false;
 
   if (returnFlight) {
     const retId = generateUUID();
-    const ret: VacationTravelSegment = {
+    const ret: VacationTravelSegment = withPrefill({
       id: retId,
       type: 'flight_return',
       title: defaultTitles['flight_return'],
       status: 'pending' as VacationSegmentStatus,
-    };
+    });
     collapsedMap.value[retId] = false;
     emit('update:segments', [...props.segments, outbound, ret]);
   } else {

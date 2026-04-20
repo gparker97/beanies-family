@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
+import { showToast } from '@/composables/useToast';
 import * as vacationRepo from '@/services/automerge/repositories/vacationRepository';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
-import { computeVacationDates } from '@/utils/vacation';
+import { computeVacationDates, extendTripDates, collectSegmentDates } from '@/utils/vacation';
 import { toISODateString, extractDatePart } from '@/utils/date';
 import type {
   FamilyVacation,
@@ -48,14 +49,25 @@ export const useVacationStore = defineStore('vacations', () => {
 
   /**
    * Create a vacation and its linked FamilyActivity calendar entry.
-   * The activity serves as the all-day calendar span; the vacation holds the rich data.
+   * The activity serves as the all-day calendar span; the vacation holds
+   * the rich data.
+   *
+   * Trip dates are user-owned (ADR-023). Prefer `input.startDate` /
+   * `input.endDate` when provided by the caller (wizard Step 1). Fall
+   * back to deriving from segments only when the caller didn't supply
+   * dates — programmatic paths, tests, or CRDT-merge edge cases.
    */
   async function createVacation(
     input: Omit<CreateFamilyVacationInput, 'activityId'>
   ): Promise<FamilyVacation | null> {
     const result = await wrapAsync(isLoading, error, async () => {
-      // Derive dates from segments
-      const { startDate, endDate } = computeVacationDates(input);
+      let startDate = input.startDate;
+      let endDate = input.endDate;
+      if (!startDate && !endDate) {
+        const seed = computeVacationDates(input);
+        startDate = seed.startDate;
+        endDate = seed.endDate;
+      }
 
       // Create linked FamilyActivity (all-day calendar entry)
       const activityInput: CreateFamilyActivityInput = {
@@ -94,6 +106,17 @@ export const useVacationStore = defineStore('vacations', () => {
 
   /**
    * Update a vacation and sync its linked activity's date range.
+   *
+   * Trip-date handling (ADR-023):
+   *   1. If caller explicitly provides `startDate` or `endDate`, that's
+   *      a manual-edit path — accept as-is (this is how users shrink
+   *      the trip window from the summary page).
+   *   2. Otherwise, if the existing vacation has no dates set
+   *      (historical / pre-ADR-023 data), seed from all segments via
+   *      `computeVacationDates` so auto-extend has a baseline.
+   *   3. Then widen (never narrow) the window to include any date
+   *      candidates from this update's segment arrays. Within-range or
+   *      deleted segments don't shrink the trip.
    */
   async function updateVacation(
     id: string,
@@ -101,30 +124,77 @@ export const useVacationStore = defineStore('vacations', () => {
   ): Promise<FamilyVacation | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const existing = vacations.value.find((v) => v.id === id);
-      if (!existing) return null;
+      if (!existing) {
+        console.error(`[vacation] updateVacation: no vacation with id "${id}"`);
+        return null;
+      }
 
-      // Merge input with existing to compute dates from full segment arrays
-      const merged = {
-        travelSegments: input.travelSegments ?? existing.travelSegments,
-        accommodations: input.accommodations ?? existing.accommodations,
-        transportation: input.transportation ?? existing.transportation,
-      };
-      const { startDate, endDate } = computeVacationDates(merged);
+      let nextStart = existing.startDate;
+      let nextEnd = existing.endDate;
+
+      // (1) Manual-edit path: caller explicitly set a date → use it.
+      if (input.startDate !== undefined) nextStart = input.startDate;
+      if (input.endDate !== undefined) nextEnd = input.endDate;
+
+      // (2) Seed fallback for historical vacations without any dates.
+      //     Only runs when the caller DIDN'T explicitly set either
+      //     date, so we don't stomp a manual edit.
+      if (input.startDate === undefined && input.endDate === undefined) {
+        if (!existing.startDate && !existing.endDate) {
+          const merged = {
+            travelSegments: input.travelSegments ?? existing.travelSegments,
+            accommodations: input.accommodations ?? existing.accommodations,
+            transportation: input.transportation ?? existing.transportation,
+          };
+          const seed = computeVacationDates(merged);
+          nextStart = seed.startDate;
+          nextEnd = seed.endDate;
+        }
+      }
+
+      // (3) Auto-extend: widen the window to include any incoming
+      //     segment dates. Never narrows. Runs regardless of (1)/(2)
+      //     so even a manual date edit can still be extended by a
+      //     concurrently-added out-of-range segment.
+      const candidates = collectSegmentDates({
+        travelSegments: input.travelSegments,
+        accommodations: input.accommodations,
+        transportation: input.transportation,
+      });
+      if (candidates.length > 0) {
+        const extended = extendTripDates({ start: nextStart, end: nextEnd }, ...candidates);
+        nextStart = extended.start;
+        nextEnd = extended.end;
+      }
 
       const updated = await vacationRepo.updateVacation(id, {
         ...input,
-        startDate,
-        endDate,
+        startDate: nextStart,
+        endDate: nextEnd,
       });
       if (!updated) return null;
 
-      // Sync linked activity dates and title
-      await activityRepo.updateActivity(existing.activityId, {
-        title: input.name ?? existing.name,
-        date: startDate ?? extractDatePart(new Date().toISOString()),
-        endDate,
-        assigneeIds: input.assigneeIds ?? existing.assigneeIds,
-      });
+      // Sync linked activity. If this fails, the vacation itself is
+      // already persisted — rolling back would destroy user work.
+      // Surface a clear warning toast instead of silently drifting.
+      try {
+        await activityRepo.updateActivity(existing.activityId, {
+          title: input.name ?? existing.name,
+          date: nextStart ?? extractDatePart(new Date().toISOString()),
+          endDate: nextEnd,
+          assigneeIds: input.assigneeIds ?? existing.assigneeIds,
+        });
+      } catch (activityErr) {
+        console.error(
+          `[vacation] Vacation updated but linked activity "${existing.activityId}" did not sync:`,
+          activityErr
+        );
+        showToast(
+          'warning',
+          'Trip saved, but your calendar may be out of date',
+          'Try refreshing the page to re-sync.'
+        );
+      }
 
       vacations.value = vacations.value.map((v) => (v.id === id ? updated : v));
       return updated;

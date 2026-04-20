@@ -1,0 +1,184 @@
+import { mount } from '@vue/test-utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import TripDatesInput from '../TripDatesInput.vue';
+
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+  }),
+}));
+
+describe('TripDatesInput', () => {
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  function factory(startDate = '', endDate = '') {
+    return mount(TripDatesInput, {
+      props: { startDate, endDate },
+    });
+  }
+
+  describe('validity', () => {
+    it('emits isValid=false on mount when both dates are empty', () => {
+      const wrapper = factory();
+      expect(wrapper.emitted('update:isValid')?.at(-1)).toEqual([false]);
+    });
+
+    it('emits isValid=true when both dates are set and end ≥ start', async () => {
+      const wrapper = factory('2026-06-01', '2026-06-10');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:isValid')?.at(-1)).toEqual([true]);
+    });
+
+    it('emits isValid=true for a same-day trip (end = start)', async () => {
+      const wrapper = factory('2026-06-01', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:isValid')?.at(-1)).toEqual([true]);
+    });
+
+    it('emits isValid=false when end is before start', async () => {
+      const wrapper = factory('2026-06-10', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:isValid')?.at(-1)).toEqual([false]);
+    });
+
+    it('emits isValid=false when only one date is set', async () => {
+      const wrapper = factory('2026-06-10', '');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:isValid')?.at(-1)).toEqual([false]);
+    });
+  });
+
+  describe('error messages', () => {
+    it('emits null errorMessage on a completely empty form (no shouting)', async () => {
+      const wrapper = factory();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:errorMessage')?.at(-1)).toEqual([null]);
+    });
+
+    it('emits errorMissing when only one date is set', async () => {
+      const wrapper = factory('2026-06-10', '');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:errorMessage')?.at(-1)).toEqual(['travel.dates.errorMissing']);
+    });
+
+    it('emits errorEndBeforeStart when end < start', async () => {
+      const wrapper = factory('2026-06-10', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.emitted('update:errorMessage')?.at(-1)).toEqual([
+        'travel.dates.errorEndBeforeStart',
+      ]);
+    });
+
+    it('renders the error message inline with role="alert"', async () => {
+      const wrapper = factory('2026-06-10', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      const alert = wrapper.find('[role="alert"]');
+      expect(alert.exists()).toBe(true);
+      expect(alert.text()).toContain('travel.dates.errorEndBeforeStart');
+    });
+
+    it('links the error to both inputs via aria-describedby + aria-invalid', async () => {
+      const wrapper = factory('2026-06-10', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      const alert = wrapper.find('[role="alert"]');
+      expect(alert.attributes('id')).toMatch(/^trip-dates-error-/);
+      const inputs = wrapper.findAll('input[type="date"]');
+      for (const input of inputs) {
+        expect(input.attributes('aria-invalid')).toBe('true');
+        expect(input.attributes('aria-describedby')).toBe(alert.attributes('id'));
+      }
+    });
+  });
+
+  describe('quick-add chips', () => {
+    it('disables all chips when start is empty', () => {
+      const wrapper = factory();
+      const chips = wrapper.findAll('button[type="button"]');
+      for (const chip of chips) {
+        expect(chip.attributes('disabled')).toBeDefined();
+        expect(chip.attributes('aria-disabled')).toBe('true');
+      }
+    });
+
+    it('enables chips when a start date is set', async () => {
+      const wrapper = factory('2026-06-01', '');
+      await wrapper.vm.$nextTick();
+      const chips = wrapper.findAll('button[type="button"]');
+      for (const chip of chips) {
+        expect(chip.attributes('disabled')).toBeUndefined();
+      }
+    });
+
+    it('+3 days chip emits end = start + 3', async () => {
+      const wrapper = factory('2026-06-01', '');
+      await wrapper.vm.$nextTick();
+      const chips = wrapper.findAll('button[type="button"]');
+      await chips[0]!.trigger('click');
+      expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-04']);
+    });
+
+    it('+1 week chip emits end = start + 7', async () => {
+      const wrapper = factory('2026-06-01', '');
+      await wrapper.vm.$nextTick();
+      const chips = wrapper.findAll('button[type="button"]');
+      await chips[1]!.trigger('click');
+      expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-08']);
+    });
+
+    it('+2 weeks chip emits end = start + 14', async () => {
+      const wrapper = factory('2026-06-01', '');
+      await wrapper.vm.$nextTick();
+      const chips = wrapper.findAll('button[type="button"]');
+      await chips[2]!.trigger('click');
+      expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-15']);
+    });
+  });
+
+  describe('summary', () => {
+    it('renders the live summary once both dates are valid', async () => {
+      const wrapper = factory('2026-06-01', '2026-06-10');
+      await wrapper.vm.$nextTick();
+      const html = wrapper.html();
+      expect(html).toContain('2026-06-01');
+      expect(html).toContain('2026-06-10');
+      expect(html).toContain('10'); // duration
+      expect(html).toContain('travel.dates.dayLabelPlural');
+    });
+
+    it('uses singular day label for a 1-day trip', async () => {
+      const wrapper = factory('2026-06-01', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.html()).toContain('travel.dates.dayLabelSingular');
+    });
+
+    it('does not render summary while invalid', async () => {
+      const wrapper = factory('2026-06-10', '2026-06-01');
+      await wrapper.vm.$nextTick();
+      expect(wrapper.html()).not.toContain('dayLabel');
+    });
+  });
+
+  describe('two-way binding', () => {
+    it('emits update:startDate when the start input changes', async () => {
+      const wrapper = factory();
+      const inputs = wrapper.findAll('input[type="date"]');
+      await inputs[0]!.setValue('2026-06-15');
+      expect(wrapper.emitted('update:startDate')?.at(-1)).toEqual(['2026-06-15']);
+    });
+
+    it('emits update:endDate when the end input changes', async () => {
+      const wrapper = factory();
+      const inputs = wrapper.findAll('input[type="date"]');
+      await inputs[1]!.setValue('2026-06-20');
+      expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-20']);
+    });
+  });
+});
