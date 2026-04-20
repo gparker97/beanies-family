@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- **Long text on the trip timeline now expands cleanly instead of being jammed into a single-line input.** Notes, description, location, and address fields on each segment card used to render as a single-line inline-editable `<input>` — fine for a short street address, unreadable for a multi-line note or anything longer than the column. They're now display-only, line-clamped to 2 lines by default, with a **SHOW MORE ↓** toggle that appears only when the text actually overflows. URLs in the text autolink safely (escaped first, then wrapped in `target="_blank" rel="noopener noreferrer nofollow"`; trailing sentence punctuation stays outside the link). Editing still lives on the ✏️ button on the card header, which opens the full edit modal — one clean path for editing, one for reading.
 - **Flight and cruise segment editors now surface trip-shape fields first.** The flight edit modal starts with a single prominent row of Date | Departure airport | Arrival airport — the three fields every flight needs regardless of booking status — then a "Booking details" caption groups airline, flight number, times, and booking reference. Cruise gets the same treatment (embarkation + disembarkation dates + departure port on top). Field order now matches the mental model: "what shape is this leg?" first, "who did I book it with?" second. Wizard inline carries through the same asterisks-when-booked behavior from the prior fix.
 
 ### Added
