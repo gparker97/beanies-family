@@ -10,6 +10,7 @@ import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import GlobalSearch from '@/components/common/GlobalSearch.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
+import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { getCurrencyInfo } from '@/constants/currencies';
@@ -302,9 +303,11 @@ async function confirmSignOutAndClearData() {
             <BeanieAvatar
               :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
               :color="currentMember?.color || '#3b82f6'"
+              :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
               size="sm"
               :aria-label="currentMember?.name || 'Profile'"
               data-testid="header-avatar-mobile"
+              @photo-error="currentMember && markMemberAvatarError(currentMember)"
             />
           </button>
 
@@ -321,7 +324,9 @@ async function confirmSignOutAndClearData() {
                 <BeanieAvatar
                   :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
                   :color="currentMember?.color || '#3b82f6'"
+                  :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
                   size="md"
+                  @photo-error="currentMember && markMemberAvatarError(currentMember)"
                 />
                 <div class="min-w-0 flex-1">
                   <p class="font-outfit truncate text-sm font-semibold text-white">
@@ -669,9 +674,11 @@ async function confirmSignOutAndClearData() {
             <BeanieAvatar
               :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
               :color="currentMember?.color || '#3b82f6'"
+              :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
               size="sm"
               :aria-label="currentMember?.name || 'Profile'"
               data-testid="header-avatar"
+              @photo-error="currentMember && markMemberAvatarError(currentMember)"
             />
             <BeanieIcon name="chevron-down" size="xs" class="text-gray-400" />
           </button>
@@ -689,7 +696,9 @@ async function confirmSignOutAndClearData() {
                 <BeanieAvatar
                   :variant="currentMember ? getMemberAvatarVariant(currentMember) : 'adult-other'"
                   :color="currentMember?.color || '#3b82f6'"
+                  :photo-url="currentMember ? getMemberAvatarUrl(currentMember) : null"
                   size="md"
+                  @photo-error="currentMember && markMemberAvatarError(currentMember)"
                 />
                 <div class="min-w-0 flex-1">
                   <p class="font-outfit truncate text-sm font-semibold text-white">
