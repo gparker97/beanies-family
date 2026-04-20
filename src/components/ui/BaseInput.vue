@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+/**
+ * Forward every extra attribute (`aria-*`, `data-*`, `autocomplete`,
+ * etc.) to the underlying `<input>` element rather than the wrapper
+ * div. This makes labels, aria wiring, and test selectors behave as
+ * callers expect.
+ */
+defineOptions({ inheritAttrs: false });
+
 type InputType = 'text' | 'email' | 'password' | 'number' | 'date' | 'time' | 'tel' | 'url';
 
 interface Props {
@@ -69,6 +77,7 @@ function handleInput(event: Event) {
       :disabled="disabled"
       :required="required"
       :class="inputClasses"
+      v-bind="$attrs"
       @input="handleInput"
       @blur="emit('blur', $event)"
     />

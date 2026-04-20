@@ -50,6 +50,9 @@ const name = ref('');
 const tripType = ref<VacationTripType>('' as VacationTripType);
 const tripPurpose = ref<import('@/types/models').VacationTripPurpose>('vacation');
 const assigneeIds = ref<string[]>([]);
+const tripStartDate = ref('');
+const tripEndDate = ref('');
+const tripDatesValid = ref(false);
 const travelSegments = ref<VacationTravelSegment[]>([]);
 const accommodations = ref<VacationAccommodation[]>([]);
 const transportation = ref<VacationTransportation[]>([]);
@@ -114,7 +117,12 @@ const modalTitle = computed(() =>
 
 const canGoNext = computed(() => {
   if (currentStep.value === 1) {
-    return name.value.trim() && tripType.value && assigneeIds.value.length > 0;
+    return (
+      !!name.value.trim() &&
+      !!tripType.value &&
+      assigneeIds.value.length > 0 &&
+      tripDatesValid.value
+    );
   }
   return true; // Steps 2-5 have no required fields
 });
@@ -140,17 +148,24 @@ watch(
       tripType.value = props.vacation.tripType;
       tripPurpose.value = props.vacation.tripPurpose ?? 'vacation';
       assigneeIds.value = [...props.vacation.assigneeIds];
+      tripStartDate.value = props.vacation.startDate ?? '';
+      tripEndDate.value = props.vacation.endDate ?? '';
+      tripDatesValid.value = !!(props.vacation.startDate && props.vacation.endDate);
       travelSegments.value = JSON.parse(JSON.stringify(props.vacation.travelSegments));
       accommodations.value = JSON.parse(JSON.stringify(props.vacation.accommodations));
       transportation.value = JSON.parse(JSON.stringify(props.vacation.transportation));
       ideas.value = JSON.parse(JSON.stringify(props.vacation.ideas));
       currentStep.value = props.editStep ?? 1;
     } else {
-      // New mode
+      // New mode — always start fresh. Reset trip dates explicitly so
+      // state doesn't bleed across wizard sessions.
       name.value = '';
       tripType.value = '' as VacationTripType;
       tripPurpose.value = 'vacation';
       assigneeIds.value = props.defaultAssigneeIds ? [...props.defaultAssigneeIds] : [];
+      tripStartDate.value = '';
+      tripEndDate.value = '';
+      tripDatesValid.value = false;
       travelSegments.value = [];
       accommodations.value = [];
       transportation.value = [];
@@ -194,6 +209,8 @@ async function handleSave() {
         tripType: tripType.value,
         tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
         assigneeIds: [...assigneeIds.value],
+        startDate: tripStartDate.value || undefined,
+        endDate: tripEndDate.value || undefined,
         travelSegments: [...travelSegments.value],
         accommodations: [...accommodations.value],
         transportation: [...transportation.value],
@@ -205,6 +222,8 @@ async function handleSave() {
         tripType: tripType.value,
         tripPurpose: tripType.value === 'fly_and_stay' ? tripPurpose.value : undefined,
         assigneeIds: [...assigneeIds.value],
+        startDate: tripStartDate.value || undefined,
+        endDate: tripEndDate.value || undefined,
         travelSegments: [...travelSegments.value],
         accommodations: [...accommodations.value],
         transportation: [...transportation.value],
@@ -331,19 +350,31 @@ const saveLabel = computed(() => {
       v-model:trip-type="tripType"
       v-model:trip-purpose="tripPurpose"
       v-model:assignee-ids="assigneeIds"
+      v-model:trip-start-date="tripStartDate"
+      v-model:trip-end-date="tripEndDate"
+      v-model:trip-dates-valid="tripDatesValid"
       :show-errors="showErrors"
     />
     <VacationStep2
       v-if="currentStep === 2"
       v-model:segments="travelSegments"
       :trip-type="tripType"
+      :trip-start-date="tripStartDate"
+      :trip-end-date="tripEndDate"
     />
     <VacationStep3
       v-if="currentStep === 3"
       v-model:accommodations="accommodations"
       :travel-segments="travelSegments"
+      :trip-start-date="tripStartDate"
+      :trip-end-date="tripEndDate"
     />
-    <VacationStep4 v-if="currentStep === 4" v-model:transportation="transportation" />
+    <VacationStep4
+      v-if="currentStep === 4"
+      v-model:transportation="transportation"
+      :trip-start-date="tripStartDate"
+      :trip-end-date="tripEndDate"
+    />
     <VacationStep5
       v-if="currentStep === 5"
       v-model:ideas="ideas"

@@ -8,13 +8,22 @@ import type {
   VacationSegmentStatus,
 } from '@/types/models';
 import { generateUUID } from '@/utils/id';
+import { prefillTransportationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 
-const props = defineProps<{
-  transportation: VacationTransportation[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    transportation: VacationTransportation[];
+    tripStartDate?: string;
+    tripEndDate?: string;
+  }>(),
+  {
+    tripStartDate: '',
+    tripEndDate: '',
+  }
+);
 
 const emit = defineEmits<{
   'update:transportation': [value: VacationTransportation[]];
@@ -44,12 +53,20 @@ const emojiMap: Record<VacationTransportationType, string> = {
 };
 
 function addItem(type: VacationTransportationType) {
-  const item: VacationTransportation = {
+  const base: VacationTransportation = {
     id: generateUUID(),
     type,
     title: t(`vacation.transport.${type}` as any),
     status: 'pending',
   };
+  const item =
+    props.tripStartDate || props.tripEndDate
+      ? prefillTransportationDates(
+          base,
+          props.tripStartDate || undefined,
+          props.tripEndDate || undefined
+        )
+      : base;
   collapsedMap.value[item.id] = false;
   emit('update:transportation', [...props.transportation, item]);
 }

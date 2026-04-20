@@ -1,6 +1,12 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { useVacationStore } from './vacationStore';
+import { showToast } from '@/composables/useToast';
+
+vi.mock('@/composables/useToast', () => ({
+  showToast: vi.fn(),
+  useToast: () => ({ toasts: { value: [] }, showToast: vi.fn(), dismissToast: vi.fn() }),
+}));
 import type {
   FamilyVacation,
   FamilyActivity,
@@ -218,6 +224,263 @@ describe('vacationStore', () => {
           endDate: '2026-07-10',
         })
       );
+    });
+
+    // ── ADR-023: user-owned dates, extend-never-shrink ──
+
+    it('extends endDate when a new segment date is later than current end', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        startDate: '2026-07-01',
+        endDate: '2026-07-10',
+        travelSegments: [
+          {
+            id: 's-out',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'booked',
+            departureDate: '2026-07-01',
+          },
+          {
+            id: 's-ret',
+            type: 'flight_return',
+            title: 'Ret',
+            status: 'booked',
+            departureDate: '2026-07-10',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      // User moves the return flight to 2026-07-15 — trip end should extend.
+      await store.updateVacation('vac-1', {
+        travelSegments: [
+          { ...existing.travelSegments[0]! },
+          { ...existing.travelSegments[1]!, departureDate: '2026-07-15' },
+        ],
+      });
+
+      expect(vacationRepo.updateVacation).toHaveBeenCalledWith(
+        'vac-1',
+        expect.objectContaining({
+          startDate: '2026-07-01', // unchanged
+          endDate: '2026-07-15', // extended
+        })
+      );
+    });
+
+    it('extends startDate when a new segment date is earlier than current start', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        startDate: '2026-07-01',
+        endDate: '2026-07-10',
+        travelSegments: [
+          {
+            id: 's-out',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'booked',
+            departureDate: '2026-07-01',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      // Move outbound earlier — trip start extends backward.
+      await store.updateVacation('vac-1', {
+        travelSegments: [{ ...existing.travelSegments[0]!, departureDate: '2026-06-28' }],
+      });
+
+      expect(vacationRepo.updateVacation).toHaveBeenCalledWith(
+        'vac-1',
+        expect.objectContaining({
+          startDate: '2026-06-28',
+          endDate: '2026-07-10',
+        })
+      );
+    });
+
+    it('does not shrink when a segment date moves to within the current window', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        startDate: '2026-07-01',
+        endDate: '2026-07-10',
+        travelSegments: [
+          {
+            id: 's-out',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'booked',
+            departureDate: '2026-07-01',
+          },
+          {
+            id: 's-ret',
+            type: 'flight_return',
+            title: 'Ret',
+            status: 'booked',
+            departureDate: '2026-07-10',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      // User moves outbound to Jul 3 — within current window. Trip dates must not shrink.
+      await store.updateVacation('vac-1', {
+        travelSegments: [
+          { ...existing.travelSegments[0]!, departureDate: '2026-07-03' },
+          { ...existing.travelSegments[1]! },
+        ],
+      });
+
+      expect(vacationRepo.updateVacation).toHaveBeenCalledWith(
+        'vac-1',
+        expect.objectContaining({
+          startDate: '2026-07-01',
+          endDate: '2026-07-10',
+        })
+      );
+    });
+
+    it('accepts a manual startDate/endDate edit (can shrink the window)', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({
+        startDate: '2026-07-01',
+        endDate: '2026-07-10',
+      });
+      store.vacations.push(existing);
+
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      // Manual shrink from the summary page.
+      await store.updateVacation('vac-1', {
+        startDate: '2026-07-03',
+        endDate: '2026-07-08',
+      });
+
+      expect(vacationRepo.updateVacation).toHaveBeenCalledWith(
+        'vac-1',
+        expect.objectContaining({
+          startDate: '2026-07-03',
+          endDate: '2026-07-08',
+        })
+      );
+    });
+
+    it('seeds dates from segments when existing vacation has undefined dates', async () => {
+      const store = useVacationStore();
+      // Historical vacation with no trip dates (pre-ADR-023).
+      const existing = makeVacation({
+        startDate: undefined,
+        endDate: undefined,
+        travelSegments: [
+          {
+            id: 's-out',
+            type: 'flight_outbound',
+            title: 'Out',
+            status: 'booked',
+            departureDate: '2026-07-01',
+          },
+        ],
+      });
+      store.vacations.push(existing);
+
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+
+      // Any mutation triggers the seed-fallback since existing had no dates.
+      await store.updateVacation('vac-1', {
+        accommodations: [
+          {
+            id: 'a1',
+            type: 'hotel',
+            title: 'Hotel',
+            status: 'booked',
+            checkInDate: '2026-07-02',
+            checkOutDate: '2026-07-09',
+          },
+        ],
+      });
+
+      expect(vacationRepo.updateVacation).toHaveBeenCalledWith(
+        'vac-1',
+        expect.objectContaining({
+          startDate: '2026-07-01',
+          endDate: '2026-07-09',
+        })
+      );
+    });
+
+    it('surfaces a warning toast when activity sync fails after vacation save', async () => {
+      const store = useVacationStore();
+      const existing = makeVacation({ startDate: '2026-07-01', endDate: '2026-07-10' });
+      store.vacations.push(existing);
+
+      vi.mocked(vacationRepo.updateVacation).mockResolvedValue({
+        ...existing,
+        name: 'Renamed',
+      });
+      vi.mocked(activityRepo.updateActivity).mockRejectedValue(new Error('network fail'));
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const result = await store.updateVacation('vac-1', { name: 'Renamed' });
+
+      // Vacation save still succeeded.
+      expect(result).not.toBeNull();
+      expect(result?.name).toBe('Renamed');
+      // Toast warned the user.
+      expect(showToast).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('calendar may be out of date'),
+        expect.any(String)
+      );
+      // Console logged with the grep-able prefix.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[vacation] Vacation updated but linked activity'),
+        expect.any(Error)
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('returns null and logs when the vacation id is not found', async () => {
+      const store = useVacationStore();
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const result = await store.updateVacation('vac-missing', { name: 'does not matter' });
+
+      expect(result).toBeNull();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[vacation] updateVacation: no vacation with id "vac-missing"')
+      );
+      expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
+
+      errorSpy.mockRestore();
     });
   });
 

@@ -9,14 +9,23 @@ import type {
   VacationTravelSegment,
 } from '@/types/models';
 import { generateUUID } from '@/utils/id';
+import { prefillAccommodationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 
-const props = defineProps<{
-  accommodations: VacationAccommodation[];
-  travelSegments?: VacationTravelSegment[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    accommodations: VacationAccommodation[];
+    travelSegments?: VacationTravelSegment[];
+    tripStartDate?: string;
+    tripEndDate?: string;
+  }>(),
+  {
+    tripStartDate: '',
+    tripEndDate: '',
+  }
+);
 
 const emit = defineEmits<{
   'update:accommodations': [value: VacationAccommodation[]];
@@ -64,13 +73,37 @@ const flightDates = computed(() => {
 });
 
 function addItem(type: VacationAccommodationType) {
+  const isFirst = props.accommodations.length === 0;
+
+  // Seed check-in/out from trip dates on the first accommodation (covers
+  // the common "hotel for the whole trip" case). Subsequent adds leave
+  // dates blank — multi-stop trips rarely share the full trip window.
+  // Legacy fallback: if trip dates aren't set (edit mode on a pre-ADR-023
+  // vacation), derive from outbound arrival / return departure.
+  let checkInDate: string | undefined;
+  let checkOutDate: string | undefined;
+  if (isFirst) {
+    if (props.tripStartDate || props.tripEndDate) {
+      const seeded = prefillAccommodationDates(
+        { checkInDate: undefined, checkOutDate: undefined } as VacationAccommodation,
+        props.tripStartDate || undefined,
+        props.tripEndDate || undefined
+      );
+      checkInDate = seeded.checkInDate;
+      checkOutDate = seeded.checkOutDate;
+    } else {
+      checkInDate = flightDates.value.checkIn;
+      checkOutDate = flightDates.value.checkOut;
+    }
+  }
+
   const item: VacationAccommodation = {
     id: generateUUID(),
     type,
     title: t(`vacation.accommodation.${type}` as any),
     status: 'pending',
-    checkInDate: flightDates.value.checkIn,
-    checkOutDate: flightDates.value.checkOut,
+    checkInDate,
+    checkOutDate,
   };
   collapsedMap.value[item.id] = false;
   emit('update:accommodations', [...props.accommodations, item]);

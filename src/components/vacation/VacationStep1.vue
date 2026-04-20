@@ -3,6 +3,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import type { VacationTripType, VacationTripPurpose } from '@/types/models';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import TripDatesInput from '@/components/ui/TripDatesInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
   tripType: VacationTripType | '';
   tripPurpose: VacationTripPurpose;
   assigneeIds: string[];
+  tripStartDate: string;
+  tripEndDate: string;
   showErrors?: boolean;
 }
 
@@ -22,6 +25,9 @@ const emit = defineEmits<{
   'update:tripType': [value: VacationTripType];
   'update:tripPurpose': [value: VacationTripPurpose];
   'update:assigneeIds': [value: string[]];
+  'update:tripStartDate': [value: string];
+  'update:tripEndDate': [value: string];
+  'update:tripDatesValid': [value: boolean];
 }>();
 
 const { t } = useTranslation();
@@ -121,6 +127,15 @@ const tripTypes: { value: VacationTripType; emoji: string; key: string }[] = [
         </button>
       </div>
     </Transition>
+
+    <!-- Trip dates (required — wizard won't advance without them) -->
+    <TripDatesInput
+      :start-date="tripStartDate"
+      :end-date="tripEndDate"
+      @update:start-date="emit('update:tripStartDate', $event)"
+      @update:end-date="emit('update:tripEndDate', $event)"
+      @update:is-valid="emit('update:tripDatesValid', $event)"
+    />
 
     <!-- Who's going -->
     <FormFieldGroup

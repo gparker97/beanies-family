@@ -1,3 +1,10 @@
+/**
+ * Pure helpers for vacation date/segment logic. No reactivity, no store
+ * access, no side effects. Orchestration (auto-extend, activity sync,
+ * persistence) lives in `vacationStore`. See ADR-023 for the
+ * architectural model (user-owned trip dates, extend-never-shrink).
+ */
+
 import {
   parseLocalDate,
   extractDatePart,
@@ -38,6 +45,13 @@ export function tripTypeEmoji(tripType?: string, tripPurpose?: string): string {
  * Derive the overall start and end dates from all vacation segments.
  * Scans travel (departure/embarkation), accommodation (check-in/out),
  * and transportation (pickup/return) to find the earliest start and latest end.
+ *
+ * **Retained as a seed fallback only** (see ADR-023). Call from
+ * `createVacation` when the caller didn't provide explicit dates, or
+ * from `updateVacation` when the existing vacation has `undefined` for
+ * both dates (historical data before ADR-023 landed). Everyday segment
+ * mutation goes through `extendTripDates` instead — never recompute
+ * from scratch on edit, that's what caused the shrink bug.
  */
 export function computeVacationDates(v: {
   travelSegments: VacationTravelSegment[];
@@ -71,6 +85,212 @@ export function computeVacationDates(v: {
 
   dates.sort();
   return { startDate: dates[0], endDate: dates[dates.length - 1] };
+}
+
+// ── Trip-date helpers (ADR-023: user-owned, extend-never-shrink) ─────────────
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Narrow guard: true only for well-formed `YYYY-MM-DD` ISO date strings. */
+export function isValidISODate(s: unknown): s is string {
+  return typeof s === 'string' && ISO_DATE_RE.test(s);
+}
+
+/**
+ * Widen the current {start, end} window to include every candidate
+ * date. Never narrows — if a candidate falls inside the current window,
+ * it's a no-op. Missing current.start or current.end is treated as
+ * "infinitely wide open" on that side.
+ *
+ * Invalid or malformed ISO date strings are logged with the
+ * `[vacation]` prefix and skipped — fail-safe, never silent.
+ * `undefined` candidates are ignored without logging (common path).
+ *
+ * @example
+ *   extendTripDates({ start: '2026-06-01', end: '2026-06-10' }, '2026-06-15')
+ *   // → { start: '2026-06-01', end: '2026-06-15' }
+ *   extendTripDates({ start: '2026-06-01', end: '2026-06-10' }, '2026-06-05')
+ *   // → { start: '2026-06-01', end: '2026-06-10' }   (no-op — within range)
+ *   extendTripDates({}, '2026-06-05')
+ *   // → { start: '2026-06-05', end: '2026-06-05' }
+ */
+export function extendTripDates(
+  current: { start?: string; end?: string },
+  ...candidates: Array<string | undefined>
+): { start?: string; end?: string } {
+  let { start, end } = current;
+
+  for (const candidate of candidates) {
+    if (candidate === undefined) continue;
+    if (!isValidISODate(candidate)) {
+      console.warn(
+        `[vacation] Skipping invalid trip-date candidate "${candidate}" — expected ISO YYYY-MM-DD`
+      );
+      continue;
+    }
+    if (!start || candidate < start) start = candidate;
+    if (!end || candidate > end) end = candidate;
+  }
+
+  return { start, end };
+}
+
+/**
+ * Collect every segment/accommodation/transportation date that might
+ * contribute to the trip window. Used by the store to feed candidates
+ * into `extendTripDates` after a segment mutation.
+ *
+ * Accepts a partial input shape so callers can pass only the arrays
+ * they're actually mutating (the store does this to avoid re-scanning
+ * unchanged data).
+ */
+export function collectSegmentDates(v: {
+  travelSegments?: VacationTravelSegment[];
+  accommodations?: VacationAccommodation[];
+  transportation?: VacationTransportation[];
+}): string[] {
+  const dates: string[] = [];
+  for (const seg of v.travelSegments ?? []) {
+    if (seg.departureDate) dates.push(seg.departureDate);
+    if (seg.arrivalDate) dates.push(seg.arrivalDate);
+    if (seg.embarkationDate) dates.push(seg.embarkationDate);
+    if (seg.disembarkationDate) dates.push(seg.disembarkationDate);
+  }
+  for (const acc of v.accommodations ?? []) {
+    if (acc.checkInDate) dates.push(acc.checkInDate);
+    if (acc.checkOutDate) dates.push(acc.checkOutDate);
+  }
+  for (const trans of v.transportation ?? []) {
+    if (trans.pickupDate) dates.push(trans.pickupDate);
+    if (trans.returnDate) dates.push(trans.returnDate);
+    if (trans.departureDate) dates.push(trans.departureDate);
+  }
+  return dates;
+}
+
+// ── Segment prefill on add (seed from trip dates) ────────────────────────────
+
+/**
+ * Return a copy of the travel segment with its primary date(s) filled
+ * in from the trip window, per segment type. Used when adding a new
+ * segment to avoid forcing the user to retype dates they already set
+ * at wizard Step 1.
+ *
+ * Idempotent — existing dates on the segment are never overwritten.
+ * The `switch` is exhaustive over `VacationTravelType`; the `never`
+ * default guards against drift if a new subtype is added.
+ *
+ * @see ADR-023
+ */
+export function prefillSegmentDates<T extends VacationTravelSegment>(
+  segment: T,
+  tripStart: string | undefined,
+  tripEnd: string | undefined
+): T {
+  if (!tripStart && !tripEnd) {
+    console.warn('[vacation] prefillSegmentDates called without trip dates — returning unchanged');
+    return segment;
+  }
+  const type = segment.type;
+  if (!type) return segment;
+
+  switch (type) {
+    case 'flight_outbound':
+    case 'flight_other':
+    case 'train':
+    case 'ferry':
+    case 'car':
+      return segment.departureDate || !tripStart
+        ? segment
+        : { ...segment, departureDate: tripStart };
+
+    case 'flight_return':
+      return segment.departureDate || !tripEnd ? segment : { ...segment, departureDate: tripEnd };
+
+    case 'cruise':
+      return {
+        ...segment,
+        embarkationDate: segment.embarkationDate ?? tripStart,
+        disembarkationDate: segment.disembarkationDate ?? tripEnd,
+      };
+
+    case 'activity':
+      // Activities pick their own day — no auto-prefill.
+      return segment;
+
+    default: {
+      // Exhaustiveness guard: a new `VacationTravelType` member makes
+      // this unreachable and `type` becomes `never`. Adding a subtype
+      // without updating the switch will fail compilation.
+      const _exhaustive: never = type;
+      void _exhaustive;
+      return segment;
+    }
+  }
+}
+
+/**
+ * Fill in check-in/check-out from the trip window on a newly-added
+ * accommodation. Idempotent. The caller decides whether to apply
+ * (typically only for the first accommodation — see Req 3 in the
+ * refactor plan).
+ */
+export function prefillAccommodationDates<T extends VacationAccommodation>(
+  acc: T,
+  tripStart: string | undefined,
+  tripEnd: string | undefined
+): T {
+  if (!tripStart && !tripEnd) {
+    console.warn(
+      '[vacation] prefillAccommodationDates called without trip dates — returning unchanged'
+    );
+    return acc;
+  }
+  return {
+    ...acc,
+    checkInDate: acc.checkInDate ?? tripStart,
+    checkOutDate: acc.checkOutDate ?? tripEnd,
+  };
+}
+
+/**
+ * Fill in pickup/return or departure from the trip window on a newly-
+ * added transportation entry. Switch on `VacationTransportationType`
+ * is exhaustive.
+ */
+export function prefillTransportationDates<T extends VacationTransportation>(
+  trans: T,
+  tripStart: string | undefined,
+  tripEnd: string | undefined
+): T {
+  if (!tripStart && !tripEnd) {
+    console.warn(
+      '[vacation] prefillTransportationDates called without trip dates — returning unchanged'
+    );
+    return trans;
+  }
+  const type = trans.type;
+  if (!type) return trans;
+
+  switch (type) {
+    case 'rental_car':
+    case 'airport_shuttle':
+    case 'taxi_rideshare':
+      return {
+        ...trans,
+        pickupDate: trans.pickupDate ?? tripStart,
+        returnDate: trans.returnDate ?? tripEnd,
+      };
+
+    case 'bus':
+      return trans.departureDate || !tripStart ? trans : { ...trans, departureDate: tripStart };
+
+    default: {
+      const _exhaustive: never = type;
+      void _exhaustive;
+      return trans;
+    }
+  }
 }
 
 /**
@@ -282,77 +502,60 @@ function rangesOverlap(
   return a.start < b.end && b.start < a.end;
 }
 
-/**
- * Detect planning overlaps that may indicate booking errors.
- * Returns a map of item ID → hint message for items that have overlap issues.
- * Each affected item gets its own hint entry so the UI can tint individual cards.
- */
-export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHint> {
-  const hintMap = new Map<string, TimelineHint>();
+type AddHint = (id: string, message: string, affectedIds: string[]) => void;
+type DatedItem = { id: string; range: { start: string; end: string }; title: string };
 
-  function addHint(id: string, message: string, affectedIds: string[]) {
-    const existing = hintMap.get(id);
-    if (existing) {
-      // Append to existing hint
-      existing.message += '; ' + message;
-      for (const aid of affectedIds) {
-        if (!existing.affectedIds.includes(aid)) existing.affectedIds.push(aid);
-      }
-    } else {
-      hintMap.set(id, { message, affectedIds: [...affectedIds] });
-    }
-  }
-
-  // Build date ranges for accommodations
-  const accItems = v.accommodations
+function buildAccommodationItems(v: FamilyVacation): DatedItem[] {
+  return v.accommodations
     .map((acc) => ({
       id: acc.id,
       range: dateRange(acc.checkInDate, acc.checkOutDate),
       title: acc.title || acc.name || 'accommodation',
     }))
-    .filter(
-      (a): a is { id: string; range: { start: string; end: string }; title: string } => !!a.range
-    );
+    .filter((a): a is DatedItem => !!a.range);
+}
 
-  // Build date ranges for cruises
-  const cruiseItems = v.travelSegments
+function buildCruiseItems(v: FamilyVacation): DatedItem[] {
+  return v.travelSegments
     .filter((s) => s.type === 'cruise')
     .map((s) => ({
       id: s.id,
       range: dateRange(s.embarkationDate, s.disembarkationDate),
       title: s.title || 'cruise',
     }))
-    .filter(
-      (c): c is { id: string; range: { start: string; end: string }; title: string } => !!c.range
-    );
+    .filter((c): c is DatedItem => !!c.range);
+}
 
-  // Build date ranges for flights
-  const flightItems = v.travelSegments
+function buildFlightItems(v: FamilyVacation): DatedItem[] {
+  return v.travelSegments
     .filter((s) => s.type?.startsWith('flight'))
     .map((s) => ({
       id: s.id,
       range: dateRange(s.departureDate, s.arrivalDate ?? s.departureDate),
       title: s.title || 'flight',
     }))
-    .filter(
-      (f): f is { id: string; range: { start: string; end: string }; title: string } => !!f.range
-    );
+    .filter((f): f is DatedItem => !!f.range);
+}
 
-  // 1. Accommodation vs accommodation overlaps
+/** Two accommodations overlapping in date range → double-booked nights? */
+function detectAccommodationOverlaps(v: FamilyVacation, addHint: AddHint): void {
+  const accItems = buildAccommodationItems(v);
   for (let i = 0; i < accItems.length; i++) {
     for (let j = i + 1; j < accItems.length; j++) {
       const a = accItems[i]!;
       const b = accItems[j]!;
       if (rangesOverlap(a.range, b.range)) {
-        const msg = `Overlaps with "${b.title}" — double-booked nights?`;
-        const msgB = `Overlaps with "${a.title}" — double-booked nights?`;
-        addHint(a.id, msg, [a.id, b.id]);
-        addHint(b.id, msgB, [a.id, b.id]);
+        addHint(a.id, `Overlaps with "${b.title}" — double-booked nights?`, [a.id, b.id]);
+        addHint(b.id, `Overlaps with "${a.title}" — double-booked nights?`, [a.id, b.id]);
       }
     }
   }
+}
 
-  // 2. Accommodation vs cruise overlaps
+/** Accommodation booked during a cruise window — cruise already includes it. */
+function detectAccommodationDuringCruise(v: FamilyVacation, addHint: AddHint): void {
+  const accItems = buildAccommodationItems(v);
+  const cruiseItems = buildCruiseItems(v);
   for (const acc of accItems) {
     for (const cruise of cruiseItems) {
       if (rangesOverlap(acc.range, cruise.range)) {
@@ -367,8 +570,31 @@ export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHin
       }
     }
   }
+}
 
-  // 3. Late-night / early-morning travel warnings (all segment types)
+/** Flight scheduled during a cruise window — is this intentional? */
+function detectFlightDuringCruise(v: FamilyVacation, addHint: AddHint): void {
+  const flightItems = buildFlightItems(v);
+  const cruiseItems = buildCruiseItems(v);
+  for (const flight of flightItems) {
+    for (const cruise of cruiseItems) {
+      if (flight.range.start >= cruise.range.start && flight.range.start < cruise.range.end) {
+        addHint(flight.id, `Scheduled during "${cruise.title}" — is this intentional?`, [
+          flight.id,
+          cruise.id,
+        ]);
+        addHint(cruise.id, `"${flight.title}" scheduled during cruise`, [flight.id, cruise.id]);
+      }
+    }
+  }
+}
+
+/** Departures close to midnight are a frequent source of off-by-one date bugs. */
+function detectNightFlights(
+  v: FamilyVacation,
+  addHint: AddHint,
+  hintMap: Map<string, TimelineHint>
+): void {
   for (const seg of v.travelSegments) {
     const depTime = seg.departureTime || seg.embarkationTime || seg.leavingTime || seg.startTime;
     const night = detectNightFlight(depTime);
@@ -388,19 +614,78 @@ export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHin
       hintMap.get(seg.id)!.nightFlight = 'late-night';
     }
   }
+}
 
-  // 4. Flights during a cruise
-  for (const flight of flightItems) {
-    for (const cruise of cruiseItems) {
-      if (flight.range.start >= cruise.range.start && flight.range.start < cruise.range.end) {
-        addHint(flight.id, `Scheduled during "${cruise.title}" — is this intentional?`, [
-          flight.id,
-          cruise.id,
-        ]);
-        addHint(cruise.id, `"${flight.title}" scheduled during cruise`, [flight.id, cruise.id]);
-      }
+/**
+ * Segments whose primary date falls before `v.startDate` or after
+ * `v.endDate`. Amber hint surfaces the misalignment; the user can fix
+ * by editing the segment date or the trip window. Never blocks.
+ *
+ * Skips vacations with no trip window set (no anchor to compare to).
+ */
+function detectOutOfRange(v: FamilyVacation, addHint: AddHint): void {
+  if (!v.startDate && !v.endDate) return;
+
+  type Item = { id: string; date: string; title: string };
+  const items: Item[] = [];
+
+  for (const seg of v.travelSegments) {
+    const primary = seg.departureDate ?? seg.embarkationDate;
+    if (primary) items.push({ id: seg.id, date: primary, title: seg.title || 'item' });
+  }
+  for (const acc of v.accommodations) {
+    if (acc.checkInDate) {
+      items.push({
+        id: acc.id,
+        date: acc.checkInDate,
+        title: acc.title || acc.name || 'accommodation',
+      });
     }
   }
+  for (const trans of v.transportation) {
+    const primary = trans.departureDate ?? trans.pickupDate;
+    if (primary) items.push({ id: trans.id, date: primary, title: trans.title || 'transport' });
+  }
+
+  for (const item of items) {
+    const date = extractDatePart(item.date);
+    if (v.startDate && date < extractDatePart(v.startDate)) {
+      addHint(item.id, `Scheduled before trip start (${v.startDate})`, [item.id]);
+    } else if (v.endDate && date > extractDatePart(v.endDate)) {
+      addHint(item.id, `Scheduled after trip end (${v.endDate})`, [item.id]);
+    }
+  }
+}
+
+/**
+ * Detect planning issues worth surfacing on the timeline. Returns a
+ * map of item ID → hint message; each affected item gets its own entry
+ * so the UI can tint the matching card.
+ *
+ * Composed from single-concern detectors so each can be tested and
+ * evolved in isolation (see ADR-023 and the refactor plan). Adding a
+ * new detector is a one-line change here plus one new function.
+ */
+export function computeTimelineHints(v: FamilyVacation): Map<string, TimelineHint> {
+  const hintMap = new Map<string, TimelineHint>();
+
+  const addHint: AddHint = (id, message, affectedIds) => {
+    const existing = hintMap.get(id);
+    if (existing) {
+      existing.message += '; ' + message;
+      for (const aid of affectedIds) {
+        if (!existing.affectedIds.includes(aid)) existing.affectedIds.push(aid);
+      }
+    } else {
+      hintMap.set(id, { message, affectedIds: [...affectedIds] });
+    }
+  };
+
+  detectAccommodationOverlaps(v, addHint);
+  detectAccommodationDuringCruise(v, addHint);
+  detectFlightDuringCruise(v, addHint);
+  detectNightFlights(v, addHint, hintMap);
+  detectOutOfRange(v, addHint);
 
   return hintMap;
 }

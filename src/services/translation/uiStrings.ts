@@ -4470,6 +4470,24 @@ const STRING_DEFS = {
   'travel.editAccommodation': { en: 'Edit Accommodation', beanie: 'edit accommodation' },
   'travel.editTransportation': { en: 'Edit Transportation', beanie: 'edit transportation' },
 
+  // Trip dates input (wizard Step 1 + summary-page edit — ADR-023)
+  'travel.dates.startLabel': { en: 'Start Date', beanie: 'start date' },
+  'travel.dates.endLabel': { en: 'End Date', beanie: 'end date' },
+  'travel.dates.quickAdd': { en: 'Quick set:', beanie: 'quick set:' },
+  'travel.dates.chip3days': { en: '+3 days', beanie: '+3 days' },
+  'travel.dates.chip1week': { en: '+1 week', beanie: '+1 week' },
+  'travel.dates.chip2weeks': { en: '+2 weeks', beanie: '+2 weeks' },
+  'travel.dates.dayLabelSingular': { en: 'day', beanie: 'day' },
+  'travel.dates.dayLabelPlural': { en: 'days', beanie: 'days' },
+  'travel.dates.errorEndBeforeStart': {
+    en: 'End date must be on or after start date',
+    beanie: 'end date must be on or after start date',
+  },
+  'travel.dates.errorMissing': {
+    en: 'Please set both a start and end date',
+    beanie: 'please set both a start and end date',
+  },
+
   // PWA re-install notice (shown to users bounced in from the pre-cutover PWA shell)
   'pwaReinstall.title': { en: 'Quick Re-install Needed', beanie: 'quick re-install needed' },
   'pwaReinstall.reassuranceTitle': { en: 'Your beans are safe', beanie: 'your beans are safe' },
