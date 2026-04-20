@@ -487,29 +487,17 @@ async function handleSave() {
         {{ autoTitle }}
       </div>
 
-      <!-- ═══ Flight fields — compact layout ═══ -->
+      <!-- ═══ Flight fields — shape first, booking details second ═══ -->
       <template v-if="isFlight">
-        <div class="grid grid-cols-[1fr_auto] gap-3">
+        <!-- Row 1: trip shape — Date | From | To (always required) -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
           <FormFieldGroup
-            :label="t('vacation.field.airline')"
-            :required="validation.isRequired('airline')"
-            :error="validation.showError('airline')"
+            :label="t('form.date')"
+            :required="validation.isRequired('departureDate')"
+            :error="validation.showError('departureDate')"
           >
-            <BaseCombobox
-              v-model="airline"
-              :options="airlineOpts"
-              :placeholder="t('vacation.field.airline')"
-            />
+            <BaseInput v-model="departureDate" type="date" />
           </FormFieldGroup>
-          <FormFieldGroup
-            :label="t('vacation.field.flightNumber')"
-            :required="validation.isRequired('flightNumber')"
-            :error="validation.showError('flightNumber')"
-          >
-            <BaseInput v-model="flightNumber" placeholder="e.g. 1842" class="!w-24" />
-          </FormFieldGroup>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.departureAirport')"
             :required="validation.isRequired('departureAirport')"
@@ -533,14 +521,34 @@ async function handleSave() {
             />
           </FormFieldGroup>
         </div>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
+
+        <!-- Booking details: required only when status=booked -->
+        <div
+          class="font-outfit pt-2 text-xs font-semibold tracking-[0.1em] text-[var(--color-text-muted)] uppercase"
+        >
+          {{ t('vacation.bookingDetails') }}
+        </div>
+        <div class="grid grid-cols-[1fr_auto] gap-3">
           <FormFieldGroup
-            :label="t('form.date')"
-            :required="validation.isRequired('departureDate')"
-            :error="validation.showError('departureDate')"
+            :label="t('vacation.field.airline')"
+            :required="validation.isRequired('airline')"
+            :error="validation.showError('airline')"
           >
-            <BaseInput v-model="departureDate" type="date" />
+            <BaseCombobox
+              v-model="airline"
+              :options="airlineOpts"
+              :placeholder="t('vacation.field.airline')"
+            />
           </FormFieldGroup>
+          <FormFieldGroup
+            :label="t('vacation.field.flightNumber')"
+            :required="validation.isRequired('flightNumber')"
+            :error="validation.showError('flightNumber')"
+          >
+            <BaseInput v-model="flightNumber" placeholder="e.g. 1842" class="!w-24" />
+          </FormFieldGroup>
+        </div>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1.3fr_1fr]">
           <FormFieldGroup
             :label="t('vacation.field.departureTime')"
             :required="validation.isRequired('departureTime')"
@@ -571,17 +579,52 @@ async function handleSave() {
               </label>
             </div>
           </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.bookingReference')">
+            <BaseInput
+              v-model="bookingReference"
+              :placeholder="t('vacation.field.bookingReference')"
+            />
+          </FormFieldGroup>
         </div>
-        <FormFieldGroup :label="t('vacation.field.bookingReference')">
-          <BaseInput
-            v-model="bookingReference"
-            :placeholder="t('vacation.field.bookingReference')"
-          />
-        </FormFieldGroup>
       </template>
 
-      <!-- ═══ Cruise fields ═══ -->
+      <!-- ═══ Cruise fields — shape first (dates + port), booking details second ═══ -->
       <template v-if="isCruise">
+        <!-- Row 1: trip shape — embarkation + disembarkation dates + port -->
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-[1fr_1fr_1.3fr]">
+          <FormFieldGroup
+            :label="t('vacation.field.embarkationDate')"
+            :required="validation.isRequired('embarkationDate')"
+            :error="validation.showError('embarkationDate')"
+          >
+            <BaseInput v-model="embarkationDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup
+            :label="t('vacation.field.disembarkationDate')"
+            :required="validation.isRequired('disembarkationDate')"
+            :error="validation.showError('disembarkationDate')"
+          >
+            <BaseInput v-model="disembarkationDate" type="date" />
+          </FormFieldGroup>
+          <FormFieldGroup
+            :label="t('vacation.field.departurePort')"
+            :required="validation.isRequired('departurePort')"
+            :error="validation.showError('departurePort')"
+          >
+            <BaseCombobox
+              v-model="departurePort"
+              :options="cruisePortOpts"
+              :placeholder="t('vacation.field.departurePort')"
+            />
+          </FormFieldGroup>
+        </div>
+
+        <!-- Booking details -->
+        <div
+          class="font-outfit pt-2 text-xs font-semibold tracking-[0.1em] text-[var(--color-text-muted)] uppercase"
+        >
+          {{ t('vacation.bookingDetails') }}
+        </div>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup
             :label="t('vacation.field.cruiseLine')"
@@ -606,30 +649,7 @@ async function handleSave() {
             />
           </FormFieldGroup>
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <FormFieldGroup
-            :label="t('vacation.field.departurePort')"
-            :required="validation.isRequired('departurePort')"
-            :error="validation.showError('departurePort')"
-          >
-            <BaseCombobox
-              v-model="departurePort"
-              :options="cruisePortOpts"
-              :placeholder="t('vacation.field.departurePort')"
-            />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('vacation.field.cabinNumber')">
-            <BaseInput v-model="cabinNumber" :placeholder="t('vacation.field.cabinNumber')" />
-          </FormFieldGroup>
-        </div>
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <FormFieldGroup
-            :label="t('vacation.field.embarkationDate')"
-            :required="validation.isRequired('embarkationDate')"
-            :error="validation.showError('embarkationDate')"
-          >
-            <BaseInput v-model="embarkationDate" type="date" />
-          </FormFieldGroup>
           <FormFieldGroup
             :label="t('vacation.field.embarkationTime')"
             :required="validation.isRequired('embarkationTime')"
@@ -637,20 +657,16 @@ async function handleSave() {
           >
             <BaseInput v-model="embarkationTime" type="time" />
           </FormFieldGroup>
-          <FormFieldGroup
-            :label="t('vacation.field.disembarkationDate')"
-            :required="validation.isRequired('disembarkationDate')"
-            :error="validation.showError('disembarkationDate')"
-          >
-            <BaseInput v-model="disembarkationDate" type="date" />
+          <FormFieldGroup :label="t('vacation.field.cabinNumber')">
+            <BaseInput v-model="cabinNumber" :placeholder="t('vacation.field.cabinNumber')" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('vacation.field.bookingReference')">
+            <BaseInput
+              v-model="bookingReference"
+              :placeholder="t('vacation.field.bookingReference')"
+            />
           </FormFieldGroup>
         </div>
-        <FormFieldGroup :label="t('vacation.field.bookingReference')">
-          <BaseInput
-            v-model="bookingReference"
-            :placeholder="t('vacation.field.bookingReference')"
-          />
-        </FormFieldGroup>
       </template>
 
       <!-- ═══ Car fields ═══ -->

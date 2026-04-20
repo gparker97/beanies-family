@@ -87,6 +87,12 @@ function offsetEndFromStart(days: number): void {
   }
 }
 
+const QUICK_ADD_CHIPS = [
+  { days: 3, labelKey: 'travel.dates.chip3days' },
+  { days: 7, labelKey: 'travel.dates.chip1week' },
+  { days: 14, labelKey: 'travel.dates.chip2weeks' },
+] as const;
+
 const chipClass = computed(() => [
   'font-outfit rounded-full border px-3 py-1 text-xs font-medium transition-colors',
   'focus:outline-none focus:ring-2 focus:ring-[var(--vacation-teal)]/40',
@@ -127,6 +133,8 @@ const chipClass = computed(() => [
         {{ t('travel.dates.quickAdd') }}
       </span>
       <button
+        v-for="chip in QUICK_ADD_CHIPS"
+        :key="chip.days"
         type="button"
         :class="[
           ...chipClass,
@@ -136,37 +144,9 @@ const chipClass = computed(() => [
         ]"
         :disabled="chipsDisabled"
         :aria-disabled="chipsDisabled"
-        @click="offsetEndFromStart(3)"
+        @click="offsetEndFromStart(chip.days)"
       >
-        {{ t('travel.dates.chip3days') }}
-      </button>
-      <button
-        type="button"
-        :class="[
-          ...chipClass,
-          chipsDisabled
-            ? 'cursor-not-allowed border-gray-200 text-gray-300 dark:border-slate-700 dark:text-slate-600'
-            : 'border-[var(--vacation-teal)]/30 text-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-5)]',
-        ]"
-        :disabled="chipsDisabled"
-        :aria-disabled="chipsDisabled"
-        @click="offsetEndFromStart(7)"
-      >
-        {{ t('travel.dates.chip1week') }}
-      </button>
-      <button
-        type="button"
-        :class="[
-          ...chipClass,
-          chipsDisabled
-            ? 'cursor-not-allowed border-gray-200 text-gray-300 dark:border-slate-700 dark:text-slate-600'
-            : 'border-[var(--vacation-teal)]/30 text-[var(--vacation-teal)] hover:bg-[var(--vacation-teal-5)]',
-        ]"
-        :disabled="chipsDisabled"
-        :aria-disabled="chipsDisabled"
-        @click="offsetEndFromStart(14)"
-      >
-        {{ t('travel.dates.chip2weeks') }}
+        {{ t(chip.labelKey) }}
       </button>
     </div>
 
