@@ -68,7 +68,7 @@ function closeModal(): void {
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+  <div class="space-y-6">
     <header
       class="relative mb-6 overflow-hidden rounded-[var(--sq)] border border-[rgb(230_126_34_/_15%)] bg-[#fbf3e3] px-5 py-6 sm:px-9 sm:py-8"
     >
@@ -204,5 +204,5 @@ function closeModal(): void {
     </div>
 
     <RecipeFormModal :open="modalOpen" :recipe="editing" @close="closeModal" />
-  </main>
+  </div>
 </template>

@@ -98,7 +98,7 @@ function openMedication(m: Medication): void {
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+  <div class="space-y-6">
     <header
       class="mb-6 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-5 py-5 sm:px-8 sm:py-7"
     >
@@ -222,5 +222,5 @@ function openMedication(m: Medication): void {
       </ul>
       <EmptyState v-else emoji="🆘" :message="t('careSafety.empty.keyContacts')" />
     </section>
-  </main>
+  </div>
 </template>

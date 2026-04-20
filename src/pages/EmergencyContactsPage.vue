@@ -92,7 +92,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+  <div class="space-y-6">
     <!-- Hero -->
     <header
       class="relative mb-6 flex flex-wrap items-start gap-4 overflow-hidden rounded-[var(--sq)] border border-[rgb(241_93_34_/_15%)] bg-gradient-to-br from-[rgb(241_93_34_/_6%)] via-white to-[rgb(174_214_241_/_20%)] px-4 py-5 sm:gap-5 sm:px-6 sm:py-6 dark:bg-slate-800"
@@ -282,5 +282,5 @@ function emailFor(c: EmergencyContact, e: Event): void {
     </div>
 
     <EmergencyContactFormModal :open="modalOpen" :contact="editing" @close="closeModal" />
-  </main>
+  </div>
 </template>

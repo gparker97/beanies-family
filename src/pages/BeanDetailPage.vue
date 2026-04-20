@@ -98,7 +98,7 @@ function selectTab(tab: BeanTabId): void {
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+  <div class="space-y-6">
     <template v-if="member">
       <BeanHero :member="member" :can-manage="canManagePod" @edit="showEditModal = true" />
       <BeanTabs :active="activeTab" :counts="counts" @select="selectTab" />
@@ -136,5 +136,5 @@ function selectTab(tab: BeanTabId): void {
         {{ t('bean.backToPod') }}
       </button>
     </div>
-  </main>
+  </div>
 </template>

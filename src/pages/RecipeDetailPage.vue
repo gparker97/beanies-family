@@ -111,7 +111,7 @@ function onRecipeDeleted(): void {
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+  <div class="space-y-6">
     <template v-if="recipe">
       <button
         type="button"
@@ -321,5 +321,5 @@ function onRecipeDeleted(): void {
         {{ t('recipes.detail.backToCookbook') }}
       </button>
     </div>
-  </main>
+  </div>
 </template>
