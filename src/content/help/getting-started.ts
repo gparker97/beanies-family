@@ -241,7 +241,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4F1}',
     readTime: 3,
     popular: true,
-    updatedDate: '2026-04-20',
+    updatedDate: '2026-04-21',
     sections: [
       {
         type: 'heading',
@@ -290,7 +290,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in <strong>Safari</strong>',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in <strong>Safari</strong> \u2014 no need to sign in yet, you\u2019ll do that once the installed app opens',
           'Tap the <strong>Share</strong> button at the bottom of the screen (the square with an up-arrow)',
           'Scroll down in the share sheet and tap <strong>Add to Home Screen</strong>',
           'Edit the name if you want (or leave it as "beanies.family") and tap <strong>Add</strong> in the top-right',
@@ -382,7 +382,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in <strong>Chrome</strong>',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in <strong>Chrome</strong> \u2014 no need to sign in yet, you\u2019ll do that once the installed app opens',
           'Tap the <strong>three-dot menu</strong> (\u22EE) in the top-right corner',
           'Tap <strong>Install app</strong> or <strong>Add to Home screen</strong> (the exact label depends on your Android version)',
           'Tap <strong>Install</strong> in the pop-up to confirm',
@@ -434,7 +434,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in Chrome / Edge / Brave',
+          'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> in Chrome / Edge / Brave \u2014 no need to sign in yet, you\u2019ll do that once the installed app opens',
           'Click the <strong>install icon</strong> in the URL bar (right side, near the bookmark star)',
           'If you don\u2019t see the icon, open the browser menu (\u22EE or \u2026) and look for <strong>Install beanies.family</strong> or <strong>Apps \u2192 Install this site as an app</strong>',
           'Click <strong>Install</strong> in the confirmation pop-up',
