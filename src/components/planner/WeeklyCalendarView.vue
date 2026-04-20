@@ -30,7 +30,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
-const { isMobile } = useBreakpoint();
+const { isMobile, isTablet } = useBreakpoint();
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
@@ -524,7 +524,7 @@ defineExpose({ weekLabel, activityCount });
               <div
                 v-for="(activity, ai) in group"
                 :key="activity.id"
-                class="absolute z-10 flex cursor-pointer flex-wrap items-start gap-x-1.5 gap-y-0 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
+                class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
                 :style="{
                   ...getPosition(activity.startTime!, activity.endTime),
                   left: `${(ai / group.length) * 100}%`,
@@ -534,22 +534,35 @@ defineExpose({ weekLabel, activityCount });
                 }"
                 @click.stop="emit('view-activity', activity.id, day.dateStr)"
               >
-                <span
-                  class="font-outfit w-full truncate text-xs font-semibold"
+                <div
+                  class="font-outfit truncate text-xs font-semibold"
                   style="color: var(--color-text)"
                 >
                   {{ activity.title }}
-                </span>
-                <span class="text-primary-500 text-xs leading-tight opacity-70">
-                  {{ formatTime12(activity.startTime!)
-                  }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
-                </span>
-                <div v-if="normalizeAssignees(activity).length > 0" class="flex gap-0.5">
-                  <MemberChip
-                    v-for="mid in normalizeAssignees(activity).slice(0, 2)"
-                    :key="mid"
-                    :member-id="mid"
-                  />
+                </div>
+                <div class="flex min-w-0 items-center gap-1">
+                  <span class="text-primary-500 truncate text-[11px] leading-tight opacity-70">
+                    {{ formatTime12(activity.startTime!)
+                    }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
+                  </span>
+                  <span
+                    v-if="activity.location"
+                    class="text-secondary-500/60 min-w-0 flex-1 truncate text-[11px] leading-tight dark:text-gray-400"
+                  >
+                    · 📍 {{ activity.location }}
+                  </span>
+                  <div
+                    v-if="normalizeAssignees(activity).length > 0"
+                    class="ml-auto flex flex-shrink-0 -space-x-1"
+                    aria-label="Assigned to"
+                  >
+                    <MemberChip
+                      v-for="mid in normalizeAssignees(activity).slice(0, isTablet ? 3 : 2)"
+                      :key="mid"
+                      :member-id="mid"
+                      :size="isTablet ? 'dot' : 'sm'"
+                    />
+                  </div>
                 </div>
               </div>
             </template>
