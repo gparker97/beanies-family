@@ -982,7 +982,10 @@ function addQuickIdea() {
                             <span class="text-xs opacity-30">📋</span>
                           </button>
 
-                          <!-- Inline-editable date/time: show formatted text with hidden native picker -->
+                          <!-- Inline-editable date/time: show formatted text with hidden native picker.
+                               Ref key MUST include item.id — multiple segments share field names
+                               like `departureDate`, so a non-scoped ref collides across segments and
+                               `?.[0]?.showPicker()` ends up firing the wrong segment's picker. -->
                           <div
                             v-else-if="
                               row.field && (row.inputType === 'date' || row.inputType === 'time')
@@ -993,7 +996,7 @@ function addQuickIdea() {
                               class="font-outfit cursor-pointer border-b border-dashed border-transparent pr-6 text-sm font-medium text-gray-900 transition-colors hover:border-gray-300 dark:text-gray-100"
                               @click="
                                 (
-                                  $refs[`input-${row.field}`] as HTMLInputElement[]
+                                  $refs[`input-${item.id}-${row.field}`] as HTMLInputElement[]
                                 )?.[0]?.showPicker?.()
                               "
                             >
@@ -1009,7 +1012,7 @@ function addQuickIdea() {
                               }}
                             </span>
                             <input
-                              :ref="`input-${row.field}`"
+                              :ref="`input-${item.id}-${row.field}`"
                               :type="row.inputType"
                               :value="row.value"
                               class="pointer-events-none absolute inset-0 opacity-0"
