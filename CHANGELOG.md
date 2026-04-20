@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Moving a flight no longer silently shrinks your trip.** Trip start/end dates are now user-owned rather than derived from segment dates on every save (see ADR-023). Changing an outbound or return flight within your trip window leaves the trip unchanged; changing one _past_ the window extends the window. The only way to shrink is a manual date edit on the trip summary page. This fixes the "orphaned accommodation" error greg hit when moving a flight later — the hotel was never orphaned, the trip had silently contracted around it.
 
+### Changed
+
+- **Flight and cruise segment editors now surface trip-shape fields first.** The flight edit modal starts with a single prominent row of Date | Departure airport | Arrival airport — the three fields every flight needs regardless of booking status — then a "Booking details" caption groups airline, flight number, times, and booking reference. Cruise gets the same treatment (embarkation + disembarkation dates + departure port on top). Field order now matches the mental model: "what shape is this leg?" first, "who did I book it with?" second. Wizard inline carries through the same asterisks-when-booked behavior from the prior fix.
+
 ### Added
 
 - **Trip dates display + click-to-edit at the top of the trip summary.** The date range now sits in a chip at the top of every trip's detail view; tapping **Edit dates** reveals the same start/end pickers used in the wizard (with the quick-add chips), and committing hits the store directly. `aria-expanded` / `aria-controls` wiring keeps the interaction accessible. Cancelling restores the previous values.
