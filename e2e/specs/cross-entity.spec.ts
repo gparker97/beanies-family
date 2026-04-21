@@ -415,7 +415,12 @@ test.describe('Loan & Activity Linking', () => {
     await page.getByPlaceholder(ui('modal.whatsTheActivity')).fill('Guitar Lesson');
     await selectAssignee(page);
     await page.getByRole('button', { name: /one-time/i }).click();
-    await page.locator('input[type="date"]').fill('2026-04-20');
+    // Use tomorrow so the activity appears in the Upcoming list — the only
+    // surface on /activities that renders the title as searchable text.
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    await page.locator('input[type="date"]').fill(tomorrowStr);
 
     // Save without cost
     await page.getByRole('button', { name: /^add activity$/i }).click();
