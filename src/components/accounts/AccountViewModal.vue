@@ -190,7 +190,7 @@ watch(
   <BeanieFormModal
     :open="open && !!account"
     variant="drawer"
-    size="narrow"
+    size="wide"
     :title="account?.name ?? ''"
     icon="💰"
     :save-label="t('action.edit')"
@@ -310,6 +310,19 @@ watch(
           </button>
         </div>
       </div>
+    </template>
+
+    <!-- Close button paired with the primary Edit save button.
+         Mirrors the Cancel/Save pairing convention used by other view-edit
+         drawers (MedicationViewModal, ActivityViewEditModal). -->
+    <template #footer-start>
+      <button
+        type="button"
+        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        @click="emit('close')"
+      >
+        {{ t('action.close') }}
+      </button>
     </template>
   </BeanieFormModal>
 </template>
