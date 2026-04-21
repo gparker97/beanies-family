@@ -10,6 +10,9 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import GoalModal from '@/components/goals/GoalModal.vue';
+import GoalViewModal from '@/components/goals/GoalViewModal.vue';
+import GoalContributionModal from '@/components/goals/GoalContributionModal.vue';
+import { useContributeToGoal } from '@/composables/useContributeToGoal';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
@@ -23,6 +26,7 @@ import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useGoalsStore } from '@/stores/goalsStore';
+import { getPriorityConfig, PRIORITY_ORDER, PRIORITY_RANK } from '@/constants/goalDisplay';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { formatDate, formatMonthYearShort, parseLocalDate } from '@/utils/date';
@@ -116,35 +120,9 @@ const typeToEmoji: Record<GoalType, string> = {
   purchase: '🛍️',
 };
 
-// Priority order and configs
-const priorityOrder: GoalPriority[] = ['critical', 'high', 'medium', 'low'];
-const priorityRank: Record<GoalPriority, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-
-function getPriorityConfig(priority: GoalPriority) {
-  const configs: Record<GoalPriority, { icon: string; bgClass: string; textClass: string }> = {
-    critical: {
-      icon: '🔥',
-      bgClass: 'bg-[var(--tint-orange-15)]',
-      textClass: 'text-primary-500',
-    },
-    high: {
-      icon: '⬆️',
-      bgClass: 'bg-[rgba(230,126,34,0.1)]',
-      textClass: 'text-terracotta-500',
-    },
-    medium: {
-      icon: '➡️',
-      bgClass: 'bg-[var(--tint-silk-20)]',
-      textClass: 'text-[#5B9BD5]',
-    },
-    low: {
-      icon: '⬇️',
-      bgClass: 'bg-[var(--tint-slate-5)]',
-      textClass: 'text-secondary-400',
-    },
-  };
-  return configs[priority];
-}
+// Priority order and configs (shared — imported for both sort + chip styling)
+// PRIORITY_RANK is used locally for sorting; keep reference so the import isn't ambiguous.
+const priorityRank = PRIORITY_RANK;
 
 // Sections computed — follows AccountsPage pattern
 interface GoalSection {
@@ -198,15 +176,13 @@ const sections = computed<GoalSection[]>(() => {
   }
 
   // Group by priority
-  return priorityOrder
-    .filter((p) => activeGoals.some((g) => g.priority === p))
-    .map((p) => ({
-      key: p,
-      label: t(`goals.priority.${p}`),
-      goals: activeGoals.filter((g) => g.priority === p),
-      addDefaults: { priority: p },
-      header: { kind: 'priority' as const, priority: p },
-    }));
+  return PRIORITY_ORDER.filter((p) => activeGoals.some((g) => g.priority === p)).map((p) => ({
+    key: p,
+    label: t(`goals.priority.${p}`),
+    goals: activeGoals.filter((g) => g.priority === p),
+    addDefaults: { priority: p },
+    header: { kind: 'priority' as const, priority: p },
+  }));
 });
 
 // Get encouragement for a goal
@@ -257,11 +233,31 @@ function getMemberForGoal(memberId: string | undefined) {
   return familyStore.members.find((m) => m.id === memberId);
 }
 
-// Dual modal pattern
+// Modal state: Add / Edit / View / Contribute
+// View + contribution state store GOAL IDs rather than object references so
+// the modals stay reactive to store updates. Capturing the object at open
+// time would leave the modal reading a stale snapshot after an update
+// (e.g., the quick-contribute flow updates the goal in-place and we want
+// the open view modal to reflect the new `manualContributions` immediately).
 const showAddModal = ref(false);
 const showEditModal = ref(false);
+const showViewModal = ref(false);
+const showContributionModal = ref(false);
 const editingGoal = ref<Goal | null>(null);
+const viewingGoalId = ref<string | null>(null);
+const contributingToGoalId = ref<string | null>(null);
 const addModalDefaults = ref<{ memberId?: string; priority?: GoalPriority } | undefined>();
+
+const viewingGoal = computed<Goal | null>(() =>
+  viewingGoalId.value ? (goalsStore.goals.find((g) => g.id === viewingGoalId.value) ?? null) : null
+);
+const contributingToGoal = computed<Goal | null>(() =>
+  contributingToGoalId.value
+    ? (goalsStore.goals.find((g) => g.id === contributingToGoalId.value) ?? null)
+    : null
+);
+
+const { saveWithContribution } = useContributeToGoal();
 
 function openAddWithDefaults(defaults?: { memberId?: string; priority?: GoalPriority }) {
   addModalDefaults.value = defaults;
@@ -270,6 +266,9 @@ function openAddWithDefaults(defaults?: { memberId?: string; priority?: GoalPrio
 }
 
 function openEditModal(goal: Goal) {
+  // Close the view modal if it's open — keep one drawer on screen at a time.
+  showViewModal.value = false;
+  viewingGoalId.value = null;
   editingGoal.value = goal;
   showEditModal.value = true;
 }
@@ -279,9 +278,31 @@ function closeEditModal() {
   editingGoal.value = null;
 }
 
+function openViewModal(goal: Goal) {
+  viewingGoalId.value = goal.id;
+  showViewModal.value = true;
+}
+
+function closeViewModal() {
+  showViewModal.value = false;
+  viewingGoalId.value = null;
+}
+
+function openContributionModal(goal: Goal) {
+  contributingToGoalId.value = goal.id;
+  showContributionModal.value = true;
+}
+
+function closeContributionModal() {
+  showContributionModal.value = false;
+  contributingToGoalId.value = null;
+}
+
 async function handleGoalSave(data: CreateGoalInput | { id: string; data: UpdateGoalInput }) {
   if ('id' in data) {
-    await goalsStore.updateGoal(data.id, data.data);
+    // Route through useContributeToGoal so currentAmount edits emit a
+    // manual-contribution audit entry via the store-level invariant.
+    await saveWithContribution(data.id, data.data);
     closeEditModal();
   } else {
     await goalsStore.createGoal(data);
@@ -457,7 +478,7 @@ async function deleteCompletedGoal(id: string) {
               },
             ]"
             :style="{ animationDelay: `${goalIndex * 0.07}s` }"
-            @click="openEditModal(goal)"
+            @click="openViewModal(goal)"
           >
             <!-- Card Header -->
             <div class="mb-3 flex items-start justify-between">
@@ -746,6 +767,22 @@ async function deleteCompletedGoal(id: string) {
       @close="closeEditModal"
       @save="handleGoalSave"
       @delete="handleGoalDelete"
+    />
+
+    <!-- View Goal Modal (read-only drawer with activity log) -->
+    <GoalViewModal
+      :open="showViewModal"
+      :goal="viewingGoal"
+      @close="closeViewModal"
+      @open-edit="openEditModal"
+      @contribute="openContributionModal"
+    />
+
+    <!-- Quick-Contribute Modal (stacks on top of GoalViewModal) -->
+    <GoalContributionModal
+      :open="showContributionModal"
+      :goal="contributingToGoal"
+      @close="closeContributionModal"
     />
   </div>
 </template>

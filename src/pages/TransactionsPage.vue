@@ -77,6 +77,8 @@ const activeFilter = ref<'all' | 'recurring' | 'one-time'>('all');
 const directionFilter = ref<'all' | 'income' | 'expense'>('all');
 /** Account-scope filter (set from `?account=<id>` query param). `null` means "all accounts". */
 const accountFilter = ref<string | null>(null);
+/** Goal-scope filter (set from `?goal=<id>` query param). `null` means "all goals". */
+const goalFilter = ref<string | null>(null);
 const searchQuery = ref('');
 
 // Modal state
@@ -124,7 +126,17 @@ function handleTransactionQueryParam() {
       showToast('error', t('txn.filter.accountNotFound'));
     }
   }
-  if (viewId || riId || direction || accountId) {
+  const goalId = route.query.goal as string | undefined;
+  if (goalId) {
+    const g = goalsStore.goals.find((gg) => gg.id === goalId);
+    if (g) {
+      goalFilter.value = goalId;
+    } else {
+      console.warn('[TransactionsPage] unknown goal filter id:', goalId);
+      showToast('error', t('txn.filter.goalNotFound'));
+    }
+  }
+  if (viewId || riId || direction || accountId || goalId) {
     router.replace({ query: {} });
   }
 }
@@ -228,11 +240,24 @@ const accountFilterName = computed(() => {
   return accountsStore.accounts.find((a) => a.id === accountFilter.value)?.name ?? null;
 });
 
+// Apply goal filter (only transactions with goalId === filter)
+const filteredByGoal = computed(() => {
+  if (!goalFilter.value) return filteredByAccount.value;
+  const id = goalFilter.value;
+  return filteredByAccount.value.filter((tx) => tx.goalId === id);
+});
+
+/** Display name of the currently-filtered goal, or null when no filter is set. */
+const goalFilterName = computed(() => {
+  if (!goalFilter.value) return null;
+  return goalsStore.goals.find((g) => g.id === goalFilter.value)?.name ?? null;
+});
+
 // Apply search
 const displayTransactions = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
-  if (!q) return filteredByAccount.value;
-  return filteredByAccount.value.filter(
+  if (!q) return filteredByGoal.value;
+  return filteredByGoal.value.filter(
     (tx) =>
       tx.description.toLowerCase().includes(q) ||
       getCategoryName(tx.category).toLowerCase().includes(q) ||
@@ -899,6 +924,29 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
         @click="accountFilter = null"
       >
         {{ t('txn.filteredByAccount').replace('{name}', accountFilterName) }}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        >
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Goal filter chip -->
+    <div v-if="goalFilter && goalFilterName" class="flex items-center gap-2">
+      <button
+        type="button"
+        class="font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--tint-slate-8)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--tint-slate-12)] dark:bg-slate-700 dark:text-gray-200"
+        :aria-label="t('txn.clearFilter')"
+        @click="goalFilter = null"
+      >
+        {{ t('txn.filteredByGoal').replace('{name}', goalFilterName) }}
         <svg
           width="14"
           height="14"

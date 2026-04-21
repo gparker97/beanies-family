@@ -10,6 +10,7 @@ export type CelebrationTrigger =
   | 'first-account'
   | 'first-transaction'
   | 'goal-reached'
+  | 'goal-milestone'
   | 'first-save'
   | 'debt-free'
   | 'recipe-5star';
@@ -65,6 +66,11 @@ const configs: Record<
   'recipe-5star': {
     type: 'toast',
     messageKey: 'celebration.recipe5Star',
+    asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
+  },
+  'goal-milestone': {
+    type: 'toast',
+    messageKey: 'celebration.goalMilestone',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
 };
