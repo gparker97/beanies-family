@@ -42,8 +42,7 @@ import {
   fetchGoogleUserEmail,
 } from '@/services/google/googleAuth';
 import {
-  getOrCreateAppFolder,
-  listBeanpodFiles,
+  searchBeanpodFilesGlobal,
   clearFolderCache,
   getAppFolderId,
   DriveApiError,
@@ -1521,15 +1520,14 @@ export const useSyncStore = defineStore('sync', () => {
     const token = await requestAccessToken({
       forceConsent: options?.forceNewAccount,
     });
-    const folderId = await getOrCreateAppFolder(token);
-    const files = await listBeanpodFiles(token, folderId);
-
-    if (files.length > 0) return files;
-
-    console.warn('[syncStore] No files found, retrying with cleared folder cache...');
-    clearFolderCache();
-    const retryFolderId = await getOrCreateAppFolder(token);
-    return listBeanpodFiles(token, retryFolderId);
+    // Drive-wide search so we don't resolve (and potentially create) the
+    // `beanies.family` folder at listing time. For joiners who will load
+    // a shared `.beanpod` from someone else's Drive, this avoids eagerly
+    // creating an empty folder on their own Drive. When the user actually
+    // needs the folder — creating a new pod, uploading a photo —
+    // getOrCreateAppFolder is called on-demand at the write site
+    // (`GoogleDriveProvider.createNew` + photoStore upload paths).
+    return searchBeanpodFilesGlobal(token);
   }
 
   let tokenExpiryUnsub: (() => void) | null = null;
