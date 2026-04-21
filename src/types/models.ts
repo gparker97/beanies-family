@@ -154,7 +154,7 @@ export interface Account {
 }
 
 // Transaction - Income and expenses
-export type TransactionType = 'income' | 'expense' | 'transfer';
+export type TransactionType = 'income' | 'expense' | 'transfer' | 'balance_adjustment';
 
 export interface RecurringConfig {
   frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
@@ -162,6 +162,12 @@ export interface RecurringConfig {
   startDate: ISODateString;
   endDate?: ISODateString;
   lastProcessed?: ISODateString;
+}
+
+/** Metadata attached to `balance_adjustment` transactions. Never set for other types. */
+export interface BalanceAdjustmentMeta {
+  delta: number; // signed; positive = credit, negative = debit
+  updatedBy: UUID; // FamilyMember.id who initiated the adjustment
 }
 
 export interface Transaction {
@@ -184,6 +190,7 @@ export interface Transaction {
   description: string;
   recurring?: RecurringConfig;
   recurringItemId?: UUID; // Links to source RecurringItem if auto-generated
+  adjustment?: BalanceAdjustmentMeta; // only set when type === 'balance_adjustment'
   isReconciled: boolean;
   createdAt: ISODateString;
   updatedAt: ISODateString;
