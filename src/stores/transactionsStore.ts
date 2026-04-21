@@ -544,6 +544,21 @@ export const useTransactionsStore = defineStore('transactions', () => {
       });
   }
 
+  /**
+   * All transactions directed at a given goal (via `goalId`), sorted
+   * descending by (date, createdAt). Used by the goal activity log. Manual
+   * contributions (inline on Goal.manualContributions) are merged in at the
+   * component layer.
+   */
+  function transactionsForGoal(goalId: string): Transaction[] {
+    return transactions.value
+      .filter((t) => t.goalId === goalId)
+      .sort((a, b) => {
+        const d = b.date.localeCompare(a.date);
+        return d !== 0 ? d : b.createdAt.localeCompare(a.createdAt);
+      });
+  }
+
   function getTransactionsByDateRange(start: ISODateString, end: ISODateString): Transaction[] {
     return transactions.value.filter((t) => isDateBetween(t.date, start, end));
   }
@@ -592,6 +607,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
     getTransactionById,
     getTransactionsByAccountId,
     transactionsForAccount,
+    transactionsForGoal,
     getTransactionsByDateRange,
     resetState,
   };

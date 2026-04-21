@@ -6,6 +6,12 @@
  * logic lives here — row clicks navigate to `/transactions?view=<id>`
  * where the existing `TransactionViewEditModal` handles inspection.
  *
+ * The activity section is delegated to `<EntityActivityLog>` — a shared
+ * renderer also used by `GoalViewModal`. This component owns the filter
+ * bucket rule + signed-amount + transfer-perspective logic (all
+ * account-specific); the shared component handles grouping, chips, empty
+ * state, and rendering.
+ *
  * Primary save button is repurposed as "Edit" (emits `open-edit`) so the
  * parent can open the existing `AccountModal` in edit mode.
  */
@@ -13,17 +19,18 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import CurrencyAmount from '@/components/common/CurrencyAmount.vue';
+import EntityActivityLog, {
+  type ActivityEntry,
+  type ActivityFilterDef,
+} from '@/components/common/EntityActivityLog.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useTranslation } from '@/composables/useTranslation';
-import type { UIStringKey } from '@/services/translation/uiStrings';
 import { showToast } from '@/composables/useToast';
 import { getTransactionSubtitle } from '@/utils/transactionLabel';
-import { groupByDate } from '@/utils/groupByDate';
-import { toDateInputValue, formatNookDate } from '@/utils/date';
 import type { Account, Transaction } from '@/types/models';
 
 type ActivityFilter = 'all' | 'manual' | 'recurring' | 'loans' | 'goals' | 'transfers';
@@ -49,7 +56,7 @@ const { getMemberName } = useMemberInfo();
 const VISIBLE_CAP = 20;
 const activeFilter = ref<ActivityFilter>('all');
 
-const FILTERS: ReadonlyArray<{ id: ActivityFilter; labelKey: UIStringKey; emoji: string }> = [
+const FILTERS: ActivityFilterDef<ActivityFilter>[] = [
   { id: 'all', labelKey: 'accountView.filter.all', emoji: '📋' },
   { id: 'manual', labelKey: 'accountView.filter.manual', emoji: '✋' },
   { id: 'recurring', labelKey: 'accountView.filter.recurring', emoji: '🔁' },
@@ -60,8 +67,8 @@ const FILTERS: ReadonlyArray<{ id: ActivityFilter; labelKey: UIStringKey; emoji:
 
 /**
  * Classify a transaction into exactly one filter bucket using
- * most-specific-wins priority. Kept here (rather than in the subtitle
- * helper) because it drives filter visibility, not display text.
+ * most-specific-wins priority. Kept here (rather than in the shared
+ * component) because it drives filter visibility, not display.
  */
 function bucketFor(tx: Transaction): Exclude<ActivityFilter, 'all'> | 'other' {
   if (tx.type === 'balance_adjustment') return 'manual';
@@ -82,24 +89,6 @@ const filtered = computed<Transaction[]>(() => {
   if (activeFilter.value === 'all') return allTransactions.value;
   return allTransactions.value.filter((tx) => bucketFor(tx) === activeFilter.value);
 });
-
-const visible = computed<Transaction[]>(() => filtered.value.slice(0, VISIBLE_CAP));
-const hasMore = computed(() => filtered.value.length > VISIBLE_CAP);
-
-/** Friendly date label used in the activity log group headers. */
-function dateLabel(dateStr: string): string {
-  const today = toDateInputValue(new Date());
-  if (dateStr === today) return t('date.today');
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  if (dateStr === toDateInputValue(tomorrow)) return t('date.tomorrow');
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (dateStr === toDateInputValue(yesterday)) return t('date.yesterday');
-  return formatNookDate(dateStr);
-}
-
-const grouped = computed(() => groupByDate(visible.value, (tx) => tx.date, dateLabel));
 
 /** Resolve display names once per row so the pure subtitle helper stays store-free. */
 function resolvedFor(tx: Transaction) {
@@ -131,10 +120,8 @@ function subtitleFor(tx: Transaction): string {
 
 /**
  * For a row rendered in this account's log, compute the signed delta to
- * show. Balance adjustments carry an explicit signed delta. Income credits
- * the account. Expenses debit. Transfers: debit the source, credit the
- * destination (perspective flips based on which side of the transfer this
- * account is on).
+ * show. Balance adjustments carry an explicit signed delta. Income credits.
+ * Expenses debit. Transfers flip sign by vantage account.
  */
 function signedAmountFor(tx: Transaction): {
   amount: number;
@@ -153,6 +140,22 @@ function signedAmountFor(tx: Transaction): {
   const isSource = props.account ? tx.accountId === props.account.id : true;
   return { amount: tx.amount, type: isSource ? 'expense' : 'income' };
 }
+
+const entries = computed<ActivityEntry[]>(() =>
+  filtered.value.map((tx) => {
+    const { amount, type } = signedAmountFor(tx);
+    return {
+      id: tx.id,
+      date: tx.date,
+      title: tx.description,
+      subtitle: subtitleFor(tx),
+      amount,
+      currency: tx.currency,
+      direction: type,
+      onClick: () => onRowClick(tx),
+    };
+  })
+);
 
 function onRowClick(tx: Transaction) {
   router.push({ path: '/transactions', query: { view: tx.id } });
@@ -224,91 +227,24 @@ watch(
         </div>
       </div>
 
-      <!-- Activity section -->
+      <!-- Activity section (shared renderer) -->
       <div class="space-y-3">
         <h3
           class="font-outfit text-xs font-semibold tracking-[0.08em] text-[#2C3E50]/50 uppercase dark:text-gray-500"
         >
           {{ t('accountView.activity') }}
         </h3>
-
-        <!-- Filter chips -->
-        <div class="flex flex-wrap gap-1.5">
-          <button
-            v-for="filter in FILTERS"
-            :key="filter.id"
-            type="button"
-            class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors"
-            :class="
-              activeFilter === filter.id
-                ? 'from-secondary-500 bg-gradient-to-r to-[#3D5368] text-white'
-                : 'bg-[var(--tint-slate-5)] text-[var(--color-text)] hover:bg-[var(--tint-slate-8)] dark:bg-slate-700 dark:text-gray-300'
-            "
-            @click="activeFilter = filter.id"
-          >
-            <span>{{ filter.emoji }}</span>
-            <span>{{ t(filter.labelKey) }}</span>
-          </button>
-        </div>
-
-        <!-- Empty state -->
-        <div
-          v-if="filtered.length === 0"
-          class="rounded-2xl border border-dashed border-[var(--tint-slate-8)] bg-[var(--tint-slate-5)] px-4 py-6 text-center dark:border-slate-600 dark:bg-slate-700/40"
-        >
-          <p class="font-outfit text-sm text-[#2C3E50]/50 dark:text-gray-400">
-            {{ t('accountView.noActivity') }}
-          </p>
-        </div>
-
-        <!-- Grouped list -->
-        <div v-else class="space-y-3">
-          <div v-for="group in grouped" :key="group.date">
-            <p
-              class="font-outfit mb-1.5 text-xs font-semibold tracking-wide text-[#2C3E50]/50 uppercase dark:text-gray-500"
-            >
-              {{ group.label }}
-            </p>
-            <div class="space-y-1.5">
-              <button
-                v-for="tx in group.items"
-                :key="tx.id"
-                type="button"
-                class="flex w-full items-start gap-3 rounded-2xl bg-white px-3.5 py-2.5 text-left shadow-[var(--card-shadow)] transition-colors hover:bg-[var(--tint-slate-5)] dark:bg-slate-800 dark:hover:bg-slate-700/50"
-                @click="onRowClick(tx)"
-              >
-                <div class="min-w-0 flex-1">
-                  <p
-                    class="font-outfit truncate text-sm font-semibold text-[#2C3E50] dark:text-gray-100"
-                  >
-                    {{ tx.description || subtitleFor(tx) }}
-                  </p>
-                  <p class="truncate text-xs text-[#2C3E50]/60 dark:text-gray-400">
-                    {{ subtitleFor(tx) }}
-                  </p>
-                </div>
-                <div class="font-outfit shrink-0 text-right">
-                  <CurrencyAmount
-                    :amount="signedAmountFor(tx).amount"
-                    :currency="tx.currency"
-                    :type="signedAmountFor(tx).type"
-                    size="sm"
-                  />
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <!-- View all -->
-          <button
-            v-if="hasMore"
-            type="button"
-            class="text-primary-500 hover:bg-primary-500/5 mt-2 w-full cursor-pointer rounded-2xl py-2 text-center text-sm font-semibold transition-colors"
-            @click="onViewAll"
-          >
-            {{ t('accountView.viewAll') }}
-          </button>
-        </div>
+        <EntityActivityLog
+          :entries="entries"
+          :empty-state-text="t('accountView.noActivity')"
+          :filters="FILTERS"
+          :active-filter-id="activeFilter"
+          :visible-cap="VISIBLE_CAP"
+          :view-all-text="t('accountView.viewAll')"
+          show-view-all
+          @filter-select="activeFilter = $event"
+          @view-all="onViewAll"
+        />
       </div>
     </template>
 

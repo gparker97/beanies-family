@@ -1,6 +1,6 @@
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
-import { useFamilyStore } from '@/stores/familyStore';
+import { useAuthoringMember } from '@/composables/useAuthoringMember';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { toDateInputValue } from '@/utils/date';
@@ -31,7 +31,7 @@ export interface AdjustBalanceResult {
 export function useAdjustBalance() {
   const accountsStore = useAccountsStore();
   const transactionsStore = useTransactionsStore();
-  const familyStore = useFamilyStore();
+  const { resolveOrToast } = useAuthoringMember();
   const { t } = useTranslation();
 
   async function saveWithAdjustment(
@@ -57,17 +57,12 @@ export function useAdjustBalance() {
       return { success: true, account: updated };
     }
 
-    const author = familyStore.currentMember?.id ?? familyStore.owner?.id;
+    const author = resolveOrToast({
+      callerTag: 'useAdjustBalance',
+      toastTitleKey: 'accountView.adjustError.noAuthor',
+      toastHelpKey: 'accountView.adjustError.noAuthorHelp',
+    });
     if (!author) {
-      console.error(
-        '[useAdjustBalance] no authorable member; balance updated but audit row skipped:',
-        id
-      );
-      showToast(
-        'error',
-        t('accountView.adjustError.noAuthor'),
-        t('accountView.adjustError.noAuthorHelp')
-      );
       return { success: true, account: updated };
     }
 

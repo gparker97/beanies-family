@@ -167,6 +167,7 @@ const STRING_DEFS = {
   'modal.goalName': { en: 'Goal Name', beanie: 'goal name' },
   'modal.targetAmount': { en: 'Target Amount', beanie: 'target amount' },
   'modal.currentAmount': { en: 'Current Amount', beanie: 'current amount' },
+  'modal.remainingAmount': { en: 'Remaining Amount', beanie: 'remaining amount' },
   'modal.priority': { en: 'Priority', beanie: 'priority' },
   'modal.deadline': { en: 'Deadline', beanie: 'deadline' },
   'modal.memberName': { en: 'Name', beanie: 'name' },
@@ -1012,10 +1013,79 @@ const STRING_DEFS = {
   'txn.accountColumn': { en: 'Account', beanie: 'account' },
   'txn.whoColumn': { en: 'Who', beanie: 'who' },
   'txn.filteredByAccount': { en: 'Filtered: {name}', beanie: 'filtered: {name}' },
+  'txn.filteredByGoal': { en: 'Goal: {name}', beanie: 'goal: {name}' },
   'txn.clearFilter': { en: 'Clear filter', beanie: 'clear filter' },
   'txn.filter.accountNotFound': {
     en: "We couldn't find that account — the filter has been cleared.",
     beanie: "we couldn't find that account — the filter has been cleared.",
+  },
+  'txn.filter.goalNotFound': {
+    en: "We couldn't find that goal — the filter has been cleared.",
+    beanie: "we couldn't find that goal — the filter has been cleared.",
+  },
+
+  // Goal view modal (activity log)
+  'goalView.title': { en: 'Goal', beanie: 'goal' },
+  'goalView.activity': { en: 'Activity', beanie: 'activity' },
+  'goalView.noActivity': {
+    en: 'No contributions yet — automated transactions and manual contributions will show here.',
+    beanie: 'no beans added yet — contributions will show up here.',
+  },
+  'goalView.viewAll': { en: 'View all →', beanie: 'view all →' },
+  'goalView.notFound': {
+    en: "Hmm, we couldn't find that goal. It may have been deleted.",
+    beanie: "hmm, we couldn't find that goal — it may have been deleted.",
+  },
+  'goalView.progressLabel': { en: 'Progress', beanie: 'progress' },
+  'goalView.deadlineLabel': { en: 'Target date', beanie: 'target date' },
+  'goalView.priorityLabel': { en: 'Priority', beanie: 'priority' },
+  'goalView.adjustedBy': { en: 'Contribution by {name}', beanie: 'contribution by {name}' },
+  'goalView.adjustedByYou': { en: 'Your contribution', beanie: 'your contribution' },
+
+  // Goal quick-contribute modal
+  'goalContribute.title': { en: 'Contribute to goal', beanie: 'contribute to goal' },
+  'goalContribute.amountLabel': { en: 'Amount', beanie: 'amount' },
+  'goalContribute.amountPlaceholder': { en: 'e.g. 50', beanie: 'e.g. 50' },
+  'goalContribute.noteLabel': { en: 'Note (optional)', beanie: 'note (optional)' },
+  'goalContribute.notePlaceholder': {
+    en: "e.g. mom's birthday money, bonus, savings from groceries",
+    beanie: "e.g. mom's birthday money, bonus, savings from groceries",
+  },
+  'goalContribute.button': { en: 'Contribute', beanie: 'contribute' },
+  'goalContribute.successToast': {
+    en: '🎉 Contribution added!',
+    beanie: '🎉 contribution added!',
+  },
+  'goalContribute.undoLabel': { en: 'Undo', beanie: 'undo' },
+  'goalContribute.revertedToast': {
+    en: 'Contribution reverted.',
+    beanie: 'contribution reverted.',
+  },
+  'goalContribute.undoFailed': {
+    en: "We couldn't undo that contribution — the goal may have been deleted.",
+    beanie: "we couldn't undo that contribution — the goal may have been deleted.",
+  },
+  'goalContribute.error.noAuthor': {
+    en: "We couldn't record who's contributing.",
+    beanie: "we couldn't record who's contributing.",
+  },
+  'goalContribute.error.noAuthorHelp': {
+    en: 'No signed-in family member was found. Sign in and try again.',
+    beanie: 'no signed-in beanie was found. sign in and try again.',
+  },
+  'goalContribute.deleteConfirmTitle': {
+    en: 'Delete this contribution?',
+    beanie: 'delete this contribution?',
+  },
+  'goalContribute.deleteConfirmMessage': {
+    en: "This will subtract it from your goal's progress.",
+    beanie: "this will subtract it from your goal's progress.",
+  },
+
+  // Milestone celebration
+  'celebration.goalMilestone': {
+    en: 'Milestone reached — keep going!',
+    beanie: 'milestone reached — keep going!',
   },
 
   // Generic fallbacks used by transactionLabel
