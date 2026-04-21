@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - **Tapping an account card opens a view, not an edit.** Matches how medications, activities, and todos already behave — the card opens a read-only detail view first, with the pencil (✏️) icon still opening the edit form directly. The Edit button inside the view modal takes you straight into edit mode.
 - **Transactions page header: "Family" → "Who".** Short, clear label for the member column on the transactions table.
+- **Sidebar sub-navigation stays tight.** The Pod's sub-items (Meet the Beans, Scrapbook, Cookbook, Care & Safety, Emergency Contacts) now auto-collapse when you navigate away from `/pod/*` and auto-expand when you're inside it. You can still pin the sub-nav open on any page via the chevron — it just re-collapses the next time you move into a different top-level section. Paired with a small density tightening on the nav items themselves, the sidebar no longer overflows on typical laptop viewports.
 
 ### Changed
 
