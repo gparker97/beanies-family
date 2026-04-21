@@ -80,8 +80,24 @@ export function useSidebarAccordion() {
           saveState();
           if (activeItem.children && isPathUnderParent(path, activeItem.path)) {
             expandedItems[activeItem.path] = true;
-            saveExpandedItems();
           }
+        }
+
+        // Auto-collapse any parent whose sub-tree the user is NOT currently in.
+        // Keeps the sidebar tight: the Pod's five children only show up while
+        // the user is actually browsing /pod/*. Users can still pin a parent
+        // open via the chevron on any given page — that overrides on next nav.
+        let changed = false;
+        for (const item of NAV_ITEMS) {
+          if (!item.children) continue;
+          if (isPathUnderParent(path, item.path)) continue;
+          if (expandedItems[item.path]) {
+            expandedItems[item.path] = false;
+            changed = true;
+          }
+        }
+        if (changed || expandedItems[activeItem?.path ?? '']) {
+          saveExpandedItems();
         }
       },
       { immediate: true }

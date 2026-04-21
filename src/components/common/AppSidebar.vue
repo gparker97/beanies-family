@@ -148,7 +148,7 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
     </div>
 
     <!-- Accordion Navigation -->
-    <nav class="flex-1 space-y-1 overflow-y-auto">
+    <nav class="flex-1 space-y-0.5 overflow-y-auto">
       <div v-for="section in sections" :key="section.id">
         <!-- Section Header -->
         <button
@@ -170,7 +170,7 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
         <div v-show="isOpen(section.id as 'treehouse' | 'piggyBank')" class="space-y-0.5">
           <template v-for="item in section.items" :key="item.path">
             <button
-              class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-lg font-medium transition-all duration-150"
+              class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
               :class="[
                 isParentActive(item)
                   ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
@@ -232,7 +232,7 @@ function subItemsOf(item: MappedNavItem): NavSubItemDef[] {
       <button
         v-for="item in pinnedItems"
         :key="item.path"
-        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-lg font-medium transition-all duration-150"
+        class="font-outfit group relative flex w-full items-center gap-3 rounded-2xl px-3.5 py-2 text-left text-lg font-medium transition-all duration-150"
         :class="
           isActive(item.path)
             ? 'border-primary-500 border-l-4 bg-gradient-to-r from-[rgba(241,93,34,0.2)] to-[rgba(230,126,34,0.1)] pl-3 font-semibold text-white'
