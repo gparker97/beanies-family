@@ -6,137 +6,161 @@ disable-model-invocation: true
 
 # Deploy to Production (Auto-Approved)
 
-This skill commits all pending changes, pushes to `main`, monitors CI pipelines, fixes any failures, and deploys to production — all without pausing for user confirmation.
+Commits all pending changes, pushes to `main`, monitors CI pipelines, fixes any failures, and deploys to production — all without pausing for user confirmation.
 
 **All actions are pre-approved:** commit, push, and deploy will proceed automatically. The only reason to stop is an unrecoverable failure after 3 fix attempts.
 
 ---
 
-## Step 1: Commit & Push
+## Design principle: minimise permission prompts
 
-1. Run `git status` and `git diff` to review all pending changes.
-2. Draft a commit message based on the changes (follow the repo's commit style).
-3. Stage relevant files (never stage `.env`, credentials, or secrets).
-4. Commit immediately with the drafted message — no need to confirm with the user.
-5. Push to `main`. The pre-push hook (`npm run test:run`) will run automatically.
-6. If pre-push tests fail:
-   - Analyze the failure output.
-   - Fix the root cause (do not skip hooks with `--no-verify`).
-   - Re-commit the fix and push again.
-   - Repeat until push succeeds.
+Each Bash invocation below is a **single, simple command** — no inline `$(...)` subshells, no `&&` / `||` / `;` chains, no `$?` exit-code inspection, no heredoc commit messages. Complex classification work lives in `scripts/deploy/classify-changes.sh`. Commit bodies use multiple `-m` flags rather than heredocs.
 
-## Step 2: Classify what needs deploying
-
-Two deploy workflows exist:
-
-- `deploy.yml` — Vue PWA at `app.beanies.family` (gated on CI + security)
-- `deploy-web.yml` — Astro marketing site at `beanies.family` (no CI gate)
-
-Look at each workflow independently: diff HEAD against the SHA that workflow **last shipped successfully**. This catches the case where prior commits touched one side but that workflow wasn't triggered — the next skill invocation notices the gap and catches up.
-
-```bash
-LAST_VUE_SHA=$(gh run list --workflow=deploy.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
-LAST_WEB_SHA=$(gh run list --workflow=deploy-web.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
-
-VUE_CHANGES=$( { [ -n "$LAST_VUE_SHA" ] && git diff --name-only "$LAST_VUE_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
-WEB_CHANGES=$( { [ -n "$LAST_WEB_SHA" ] && git diff --name-only "$LAST_WEB_SHA" HEAD 2>/dev/null; } || git show HEAD --name-only --pretty=format: )
-
-NEEDS_WEB=$(echo "$WEB_CHANGES" | grep -E '^(web/|packages/|content/blog/|src/content/help/)' || true)
-NEEDS_VUE=$(echo "$VUE_CHANGES" | grep -Ev '^(web/|content/blog/|src/content/help/|\.claude/|\.github/|docs/|tasks/|scripts/|infrastructure/|README|CHANGELOG|LICENSE|SECURITY|TRADEMARK|POSTMORTEM)' || true)
-```
-
-Path rules (applied to each workflow's own change set):
-
-- `web/**` or `content/blog/**` → Astro deploy
-- `src/content/help/**` → Astro deploy **only** (per the 2026-04-16 consolidation, help articles are rendered exclusively by the Astro site; the Vue PWA's in-app help links open `beanies.family/help` in a new tab and never import the content modules)
-- `packages/**` → BOTH (shared brand tokens consumed by both apps)
-- `src/**`, `public/**`, build configs, root files → Vue deploy (except `src/content/help/**` — see above)
-- Only `.claude/**`, `docs/**`, `tasks/**`, `scripts/**`, `infrastructure/**`, or root READMEs touched → skip that workflow
-
-If both empty, report "no runtime changes since last deploy — nothing to ship" and stop.
-
-## Step 3: Deploy the Astro site (if NEEDS_WEB, fires immediately)
-
-Astro has its own build-and-test inside the deploy workflow — no external CI gate. Trigger it now in parallel with the Vue CI wait below:
-
-```bash
-if [ -n "$NEEDS_WEB" ]; then
-  gh workflow run deploy-web.yml --ref main -f target=production
-fi
-```
-
-Wait ~10s, then watch:
-
-```bash
-gh run list --workflow=deploy-web.yml --limit=1
-gh run watch <run-id>
-```
-
-If it fails, report logs and move on — it doesn't block the Vue deploy.
-
-## Step 4: Monitor CI (only if NEEDS_VUE; skip otherwise)
-
-After push, two CI workflows run automatically on `main`:
-
-| Workflow | File | What it checks |
-|----------|------|----------------|
-| **Main Branch CI** | `main-ci.yml` | Type-check, lint, format, unit tests, build, E2E (Chromium + Firefox) |
-| **Security Scanning** | `security.yml` | npm audit, SAST, secrets detection, CodeQL |
-
-Monitor both:
-
-1. Wait ~30 seconds after push, then check:
-   ```
-   gh run list --workflow=main-ci.yml --branch=main --limit=1
-   gh run list --workflow=security.yml --branch=main --limit=1
-   ```
-2. Poll every 30 seconds until both complete:
-   ```
-   gh run watch <run-id>
-   ```
-3. If a workflow **fails**:
-   - Fetch the failed job logs: `gh run view <run-id> --log-failed`
-   - Analyze the error and fix the root cause.
-   - Commit the fix, push, and restart monitoring from the beginning of Step 4.
-   - Maximum 3 fix attempts. If still failing after 3 rounds, stop and report.
-4. If both pass, proceed immediately to Step 5.
-
-## Step 5: Deploy the Vue app (only if NEEDS_VUE)
-
-Once CI and Security are green, deploy the Vue PWA — no user confirmation needed:
-
-```bash
-gh workflow run deploy.yml
-gh run list --workflow=deploy.yml --limit=1
-gh run watch <run-id>
-```
-
-The deploy workflow has its own gate that re-verifies CI/Security passed for the commit. If it fails, report logs. Do not retry automatically.
-
-## Step 6: Report
-
-Summarize: deployed commit SHA, which workflows ran, deploy durations, production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro).
+If a step genuinely needs a chained command, stop and add a dedicated script under `scripts/deploy/` instead of writing the chain inline. Skills should invoke scripts, not orchestrate shells.
 
 ---
 
-## GitHub Account
+## Step 1: Verify GitHub account
 
-This repo requires the **`gparker97`** GitHub account.
-
-Before pushing or triggering workflows, verify the active account:
+Run:
 ```
 gh auth status
 ```
 
-If a different account is authorized, switch first:
+The active account must be **`gparker97`**. If a different account is active, run `gh auth switch --user gparker97`. If `gparker97` isn't logged in at all, prompt the user to run `gh auth login`.
+
+## Step 2: Review & commit pending changes
+
+Check the working tree:
 ```
-gh auth switch --user gparker97
+git status --short
+```
+```
+git diff
 ```
 
-If `gparker97` is not logged in at all, prompt the user to authenticate:
+Draft a commit message. Follow the repo's conventional-commit style (e.g. `feat(area): summary`, `fix(...)`, `chore(...)`). **Never stage** `.env`, credentials, or secrets. Per `CLAUDE.md` guidance, stage files by explicit path — avoid `git add -A` / `git add .`.
+
+Stage files:
 ```
-gh auth login
+git add <path> <path>
 ```
+
+Commit using separate `-m` flags for subject + body paragraphs — NEVER a heredoc or `$(cat <<EOF ... EOF)`:
+```
+git commit -m "feat(area): subject line" -m "First paragraph of the body explaining why." -m "Second paragraph if needed." -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+## Step 3: Push
+
+```
+git push
+```
+
+The pre-push hook runs `npm run test:run` automatically. If it fails:
+1. Read the failure output.
+2. Fix the root cause — do NOT use `--no-verify`.
+3. Stage the fix, create a new commit (never amend), push again.
+4. Repeat up to 3 attempts. After 3 failures, stop and report.
+
+## Step 4: Classify what needs deploying
+
+Single command — all classification logic lives in the script:
+```
+bash scripts/deploy/classify-changes.sh
+```
+
+The final block of the output is machine-readable:
+```
+=== Deploy targets ===
+VUE: yes|no
+WEB: yes|no
+```
+
+Record `VUE` and `WEB` flags. If both are `no`, report "no runtime changes since last deploy — nothing to ship" and stop.
+
+## Step 5: Deploy the Astro site (fires immediately)
+
+Astro has no external CI gate — trigger in parallel with the Vue flow below.
+
+**Only if `WEB: yes`:**
+```
+gh workflow run deploy-web.yml --ref main -f target=production
+```
+
+Wait, then list + watch:
+```
+sleep 10
+```
+```
+gh run list --workflow=deploy-web.yml --limit=1
+```
+```
+gh run watch <web-run-id> --exit-status
+```
+
+`--exit-status` makes the process exit non-zero on failure, which the tool reports — no need to print `$?` yourself. If it fails, fetch logs (`gh run view <id> --log-failed`) and move on; it doesn't block the Vue deploy.
+
+## Step 6: Monitor CI (only if `VUE: yes`)
+
+Two workflows run automatically on every push to `main`:
+
+| Workflow | File | What it checks |
+|---|---|---|
+| **Main Branch CI** | `main-ci.yml` | Type-check, lint, format, unit tests, build, E2E (Chromium + Firefox) |
+| **Security Scanning** | `security.yml` | npm audit, SAST, secrets detection, CodeQL |
+
+Wait ~30 seconds, then locate the runs:
+```
+sleep 30
+```
+```
+gh run list --workflow=main-ci.yml --branch=main --limit=1
+```
+```
+gh run list --workflow=security.yml --branch=main --limit=1
+```
+
+Watch each in turn (they run in parallel, so watching sequentially is fine — you start watching after they've already begun):
+```
+gh run watch <ci-run-id> --exit-status
+```
+```
+gh run watch <security-run-id> --exit-status
+```
+
+If a workflow fails:
+1. Fetch logs: `gh run view <run-id> --log-failed`
+2. Fix the root cause.
+3. Commit the fix (new commit, not amend), push.
+4. Restart Step 6 from the top.
+5. Max 3 rounds; after that, stop and report.
+
+## Step 7: Deploy the Vue app (only if `VUE: yes`)
+
+Once CI + Security are green:
+```
+gh workflow run deploy.yml --ref main
+```
+```
+sleep 10
+```
+```
+gh run list --workflow=deploy.yml --limit=1
+```
+```
+gh run watch <deploy-run-id> --exit-status
+```
+
+The deploy workflow has its own gate that re-verifies CI/Security passed for the commit. If it fails, report logs — do not auto-retry.
+
+## Step 8: Report
+
+Summarise:
+- Deployed commit SHA
+- Which workflows ran (Main CI, Security, Vue Deploy, Astro Deploy)
+- Deploy durations (from `gh run view --json startedAt,updatedAt`)
+- Production URL(s) — `https://app.beanies.family` (Vue) and/or `https://beanies.family` (Astro)
 
 ---
 
@@ -145,5 +169,7 @@ gh auth login
 - **Never use `--no-verify` or `--force`** on any git command.
 - **Never skip or silence CI failures** — always fix the root cause.
 - **Never amend published commits** — always create new fix commits.
+- **Never inline `$(...)` / `$?` / `;` / `&&` / heredocs** in Bash commands run through the tool — they trigger permission prompts. If you need compound logic, add a script under `scripts/deploy/` and invoke it.
 - **Stop and ask the user only** if there is an unrecoverable failure after 3 fix attempts, or something truly unexpected (merge conflicts, unknown infrastructure failures).
-- The deploy workflow name is exactly `deploy.yml` (display name: "Deploy beanies PROD").
+- The Vue deploy workflow name is exactly `deploy.yml` (display name: "Deploy beanies PROD").
+- The Astro deploy workflow name is exactly `deploy-web.yml`.
