@@ -3,8 +3,52 @@ import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
+import { generateUUID } from '@/utils/id';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
-import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
+import type {
+  Goal,
+  GoalManualContribution,
+  CreateGoalInput,
+  UpdateGoalInput,
+  UUID,
+} from '@/types/models';
+
+/** Options passed to `updateGoal` for user-initiated edit paths. */
+export interface UpdateGoalOptions {
+  /**
+   * When set AND `input.currentAmount` differs from the stored value, the
+   * store atomically appends a GoalManualContribution. Automated callers
+   * (transactionsStore.applyGoalAllocation, recurringProcessor) omit this,
+   * so their writes never create audit entries.
+   */
+  contribution?: { author: UUID; note?: string };
+}
+
+/**
+ * Pure helper: return a new UpdateGoalInput with a GoalManualContribution
+ * appended when the contribution context + a non-zero delta are both present.
+ * No mutation; returns the input unchanged otherwise.
+ */
+function appendContributionIfChanged(
+  existing: Goal,
+  input: UpdateGoalInput,
+  contribution: { author: UUID; note?: string }
+): UpdateGoalInput {
+  if (input.currentAmount === undefined) return input;
+  const delta = input.currentAmount - existing.currentAmount;
+  if (delta === 0) return input;
+  const entry: GoalManualContribution = {
+    id: generateUUID(),
+    amount: delta,
+    at: new Date().toISOString(),
+    updatedBy: contribution.author,
+    ...(contribution.note ? { note: contribution.note } : {}),
+  };
+  return {
+    ...input,
+    manualContributions: [...(existing.manualContributions ?? []), entry],
+  };
+}
 
 export const useGoalsStore = defineStore('goals', () => {
   // State
@@ -70,7 +114,11 @@ export const useGoalsStore = defineStore('goals', () => {
     return result ?? null;
   }
 
-  async function updateGoal(id: string, input: UpdateGoalInput): Promise<Goal | null> {
+  async function updateGoal(
+    id: string,
+    input: UpdateGoalInput,
+    options?: UpdateGoalOptions
+  ): Promise<Goal | null> {
     const result = await wrapAsync(isLoading, error, async () => {
       const existing = goals.value.find((g) => g.id === id);
       const wasCompleted = existing?.isCompleted ?? false;
@@ -80,6 +128,12 @@ export const useGoalsStore = defineStore('goals', () => {
         if (input.currentAmount >= existing.targetAmount) {
           input = { ...input, isCompleted: true };
         }
+      }
+
+      // User-initiated contribution audit (only when the caller passed
+      // `options.contribution` — automated paths skip this branch).
+      if (options?.contribution && existing) {
+        input = appendContributionIfChanged(existing, input, options.contribution);
       }
 
       const updated = await goalRepo.updateGoal(id, input);

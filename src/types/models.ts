@@ -294,8 +294,23 @@ export interface Goal {
   priority: GoalPriority;
   isCompleted: boolean;
   notes?: string;
+  manualContributions?: GoalManualContribution[];
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+/**
+ * Append-only audit entries for user-initiated contributions to a goal
+ * (quick-contribute modal, or `currentAmount` edits through GoalModal).
+ * Automated contributions flow through Transaction rows with `goalId` set
+ * and are NOT written here.
+ */
+export interface GoalManualContribution {
+  id: UUID;
+  amount: number; // signed: positive = progress, negative = reversal
+  at: ISODateString; // full ISO timestamp
+  updatedBy: UUID; // FamilyMember.id
+  note?: string; // optional user-provided context
 }
 
 // Budget - Monthly spending plan

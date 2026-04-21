@@ -132,6 +132,41 @@ describe('transactionsStore — transactionsForAccount', () => {
   });
 });
 
+describe('transactionsStore — transactionsForGoal', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('returns only transactions with the given goalId', () => {
+    const store = useTransactionsStore();
+    store.transactions.push(
+      tx({ id: 't1', goalId: 'g-1' }),
+      tx({ id: 't2', goalId: 'g-2' }),
+      tx({ id: 't3', goalId: 'g-1' }),
+      tx({ id: 't4' }) // no goalId
+    );
+    const result = store.transactionsForGoal('g-1');
+    expect(result.map((t) => t.id).sort()).toEqual(['t1', 't3']);
+  });
+
+  it('sorts descending by date then createdAt', () => {
+    const store = useTransactionsStore();
+    store.transactions.push(
+      tx({ id: 'old', goalId: 'g-1', date: '2026-04-18', createdAt: '2026-04-18T10:00:00.000Z' }),
+      tx({ id: 'newA', goalId: 'g-1', date: '2026-04-21', createdAt: '2026-04-21T09:00:00.000Z' }),
+      tx({ id: 'newB', goalId: 'g-1', date: '2026-04-21', createdAt: '2026-04-21T11:00:00.000Z' })
+    );
+    expect(store.transactionsForGoal('g-1').map((t) => t.id)).toEqual(['newB', 'newA', 'old']);
+  });
+
+  it('returns empty when no transactions match', () => {
+    const store = useTransactionsStore();
+    store.transactions.push(tx({ goalId: 'g-other' }));
+    expect(store.transactionsForGoal('g-1')).toEqual([]);
+  });
+});
+
 describe('transactionsStore — createTransaction balance_adjustment invariants', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

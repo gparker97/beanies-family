@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-21",
-    "translationCount": 2347
+    "translationCount": 2401
   },
   "translations": {
     "app.name": {
@@ -11739,6 +11739,276 @@
     "photos.viewer.open": {
       "translation": "打开照片( O)",
       "hash": "eiq7zw",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.title": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.noActivity": {
+      "translation": "尚无活动—此处将显示手动余额更新和交易。",
+      "hash": "8sh5j9",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.viewAll": {
+      "translation": "查看全部",
+      "hash": "m9neiw",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.notFound": {
+      "translation": "哎呀，我们找不到该账号。它可能已被删除。",
+      "hash": "f5xb1g",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.filter.all": {
+      "translation": "所有食谱",
+      "hash": "1ev5",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.filter.manual": {
+      "translation": "说明书",
+      "hash": "x1aeca",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.filter.recurring": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.filter.loans": {
+      "translation": "贷款",
+      "hash": "17tbab",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.filter.goals": {
+      "translation": "目标",
+      "hash": "152c9s",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.filter.transfers": {
+      "translation": "调职",
+      "hash": "kh9yyg",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.adjustedBy": {
+      "translation": "由{name}调整",
+      "hash": "xmprpq",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.adjustedByYou": {
+      "translation": "由您调整",
+      "hash": "iq6rvs",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.adjustError.noAuthor": {
+      "translation": "余额已更新，但我们无法记录谁进行了更改。",
+      "hash": "z2hxiv",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.adjustError.noAuthorHelp": {
+      "translation": "未找到已登录的家庭成员。登录并重试。",
+      "hash": "x3fkny",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.recurringLabel": {
+      "translation": "定期： {name}",
+      "hash": "9a213u",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.loanLabel": {
+      "translation": "还贷",
+      "hash": "5zuney",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.goalLabel": {
+      "translation": "目标分配",
+      "hash": "pgwi6r",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.transferTo": {
+      "translation": "转账帐户",
+      "hash": "cnjbjs",
+      "lastUpdated": "2026-04-21"
+    },
+    "accountView.transferFrom": {
+      "translation": "转账帐户",
+      "hash": "o8xkfu",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.balanceAdjusted": {
+      "translation": "调整后的余额。",
+      "hash": "tp9t8y",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.accountColumn": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.whoColumn": {
+      "translation": "对象",
+      "hash": "1v32",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.filteredByAccount": {
+      "translation": "已筛选： {name}",
+      "hash": "xqw770",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.filteredByGoal": {
+      "translation": "目标名称",
+      "hash": "eex8xc",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.clearFilter": {
+      "translation": "清除过滤器",
+      "hash": "2s7sc5",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.filter.accountNotFound": {
+      "translation": "我们无法找到该账号—筛选条件已被清除。",
+      "hash": "xyb17o",
+      "lastUpdated": "2026-04-21"
+    },
+    "txn.filter.goalNotFound": {
+      "translation": "我们无法找到该目标—筛选器已被清除。",
+      "hash": "9p2oyy",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.title": {
+      "translation": "入球",
+      "hash": "1bos3",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.activity": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.noActivity": {
+      "translation": "还没有贡献—自动交易和手动贡献将显示在此处。",
+      "hash": "7eyohi",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.viewAll": {
+      "translation": "查看全部",
+      "hash": "m9neiw",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.notFound": {
+      "translation": "嗯，我们找不到那个目标。它可能已被删除。",
+      "hash": "murt2y",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.progressLabel": {
+      "translation": "进度",
+      "hash": "fhj16b",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.deadlineLabel": {
+      "translation": "目标日期",
+      "hash": "7v0uv7",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.priorityLabel": {
+      "translation": "优先级",
+      "hash": "i7ebss",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.adjustedBy": {
+      "translation": "{name}的贡献",
+      "hash": "gmo8r4",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalView.adjustedByYou": {
+      "translation": "您的贡献值：",
+      "hash": "q5josj",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.title": {
+      "translation": "为目标做出贡献",
+      "hash": "p9rhmt",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.amountLabel": {
+      "translation": "金额(元)",
+      "hash": "whwdbs",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.amountPlaceholder": {
+      "translation": "例如 50",
+      "hash": "e690q3",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.noteLabel": {
+      "translation": "备注（可选）",
+      "hash": "pxl7dd",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.notePlaceholder": {
+      "translation": "例如：妈妈的生日钱、奖金、生鲜杂货优惠",
+      "hash": "xxd61n",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.button": {
+      "translation": "帮助软件发展",
+      "hash": "rm7tyr",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.successToast": {
+      "translation": "🎉 贡献已添加！",
+      "hash": "ua1bya",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.undoLabel": {
+      "translation": "撤销",
+      "hash": "1klxg",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.revertedToast": {
+      "translation": "贡献已恢复。",
+      "hash": "wimcx1",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.undoFailed": {
+      "translation": "我们无法撤消该贡献—目标可能已被删除。",
+      "hash": "59vn41",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.error.noAuthor": {
+      "translation": "我们无法记录谁在捐款。",
+      "hash": "ot90qb",
+      "lastUpdated": "2026-04-21"
+    },
+    "goalContribute.error.noAuthorHelp": {
+      "translation": "未找到已登录的家庭成员。登录并重试。",
+      "hash": "x3fkny",
+      "lastUpdated": "2026-04-21"
+    },
+    "celebration.goalMilestone": {
+      "translation": "已达到里程碑—继续前进！",
+      "hash": "bwkg8o",
+      "lastUpdated": "2026-04-21"
+    },
+    "family.unknownMember": {
+      "translation": "不详",
+      "hash": "mti622",
+      "lastUpdated": "2026-04-21"
+    },
+    "family.unknownAccount": {
+      "translation": "未知账户",
+      "hash": "to2qt3",
+      "lastUpdated": "2026-04-21"
+    },
+    "transactions.type.balance_adjustment": {
+      "translation": "余额调整",
+      "hash": "as72y7",
       "lastUpdated": "2026-04-21"
     }
   }

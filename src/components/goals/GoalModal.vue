@@ -78,7 +78,13 @@ const priorityOptions = [
   { value: 'critical', label: t('goals.priority.critical') },
 ];
 
-// Form state
+// Form state — note: the user-facing field is "Remaining amount" (how
+// much is left to reach the target). Internally we still work with
+// `currentAmount` for storage + delta math, but the UI binds to a
+// `remainingAmount` computed so the user sees their goal in intuitive
+// "how much to go" terms. Reducing the remaining amount (e.g., after
+// contributing) becomes a positive delta on `currentAmount`, which the
+// store invariant records as a positive manual contribution.
 const goalEmoji = ref('');
 const name = ref('');
 const type = ref<GoalType>('savings');
@@ -88,6 +94,26 @@ const currency = ref('');
 const priority = ref<GoalPriority>('medium');
 const memberId = ref('');
 const deadline = ref('');
+
+/**
+ * Two-way bridge between the user-facing "Remaining amount" field and the
+ * stored `currentAmount`. Clamps remaining to [0, targetAmount] on write
+ * so the user can't enter a negative remaining (which would imply
+ * overshot progress via this field; overshooting is reserved for the
+ * Contribute flow where crossing the target auto-completes the goal).
+ */
+const remainingAmount = computed<number | undefined>({
+  get: () => {
+    const target = targetAmount.value ?? 0;
+    const current = currentAmount.value ?? 0;
+    return Math.max(0, target - current);
+  },
+  set: (value) => {
+    const target = targetAmount.value ?? 0;
+    const remaining = Math.max(0, Math.min(target, value ?? 0));
+    currentAmount.value = target - remaining;
+  },
+});
 
 // Reset form when modal opens
 const { isEditing, isSubmitting } = useFormModal(
@@ -202,10 +228,10 @@ function handleDelete() {
       <CurrencyAmountInput v-model:amount="targetAmount" v-model:currency="currency" />
     </FormFieldGroup>
 
-    <!-- 4. Current amount -->
-    <FormFieldGroup :label="t('modal.currentAmount')">
+    <!-- 4. Remaining amount (= targetAmount - currentAmount, clamped to [0, targetAmount]) -->
+    <FormFieldGroup :label="t('modal.remainingAmount')">
       <AmountInput
-        v-model="currentAmount"
+        v-model="remainingAmount"
         :currency-symbol="currency || settingsStore.displayCurrency"
         font-size="1.2rem"
       />
