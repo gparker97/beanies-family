@@ -442,9 +442,101 @@ const STRING_DEFS = {
     beanie: 'delete this medication?',
   },
   'medications.deleteConfirm.body': {
-    en: 'The bottle photo will be cleaned up after 24 hours.',
-    beanie: 'the bottle photo will be cleaned up after 24 hours',
+    en: 'All dose history for this medication will also be removed. The bottle photo will be cleaned up after 24 hours.',
+    beanie:
+      'all dose history for this medication will also be removed. the bottle photo will be cleaned up after 24 hours',
   },
+  // ── Medication administration log ────────────────────────────────────────
+  // Log-entry creation, undo, confirmation, and delete strings.
+  // Brand voice: friendly + factual. Heritage Orange for the confirm variant,
+  // never Alert Red.
+  'medicationLog.giveDose': {
+    en: 'Log a dose',
+    beanie: 'log a dose',
+  },
+  'medicationLog.doseLogged': {
+    en: 'Dose logged',
+    beanie: 'dose logged',
+  },
+  'medicationLog.undo': { en: 'Undo', beanie: 'undo' },
+  'medicationLog.modalTitlePrefix': {
+    en: 'Log a dose of',
+    beanie: 'log a dose of',
+  },
+  'medicationLog.confirmLogDose': {
+    en: 'Log dose',
+    beanie: 'log dose',
+  },
+  'medicationLog.givenTodayHeader': {
+    en: 'Given today',
+    beanie: 'given today',
+  },
+  'medicationLog.noneYetToday': {
+    en: 'No doses logged today yet.',
+    beanie: 'no doses logged today yet.',
+  },
+  'medicationLog.whenHeader': {
+    en: 'When was this dose given?',
+    beanie: 'when was this dose given?',
+  },
+  'medicationLog.dateFieldLabel': { en: 'Date', beanie: 'date' },
+  'medicationLog.timeFieldLabel': { en: 'Time', beanie: 'time' },
+  'medicationLog.now': { en: 'Now', beanie: 'now' },
+  'medicationLog.errors.futureNotAllowed': {
+    en: "You can't log a dose in the future.",
+    beanie: "you can't log a dose in the future.",
+  },
+  'medicationLog.recentHeader': {
+    en: 'Recent doses',
+    beanie: 'recent doses',
+  },
+  'medicationLog.empty': {
+    en: 'No doses logged yet.',
+    beanie: 'no doses logged yet.',
+  },
+  'medicationLog.lastDosePrefix': {
+    en: 'last dose:',
+    beanie: 'last dose:',
+  },
+  'medicationLog.lastDoseNever': {
+    en: 'no doses logged yet',
+    beanie: 'no doses logged yet',
+  },
+  'medicationLog.dose': { en: 'dose', beanie: 'dose' },
+  'medicationLog.doses': { en: 'doses', beanie: 'doses' },
+  'medicationLog.dosesTodaySuffix': {
+    en: 'today',
+    beanie: 'today',
+  },
+  'medicationLog.viewAll': {
+    en: 'View all →',
+    beanie: 'view all →',
+  },
+  'medicationLog.showLess': {
+    en: 'Show less',
+    beanie: 'show less',
+  },
+  'medicationLog.deleteConfirm.title': {
+    en: 'Remove this entry?',
+    beanie: 'remove this entry?',
+  },
+  'medicationLog.deleteConfirm.body': {
+    en: "This dose will be removed from the log. This can't be undone.",
+    beanie: "this dose will be removed from the log. this can't be undone.",
+  },
+  'medicationLog.medDeleted': {
+    en: 'This medication was removed.',
+    beanie: 'this medication was removed.',
+  },
+  'medicationLog.errors.noCurrentMember': {
+    en: 'Pick a bean to continue',
+    beanie: 'pick a bean to continue',
+  },
+  'medicationLog.errors.noCurrentMember.detail': {
+    en: 'Sign in as the family member giving the dose so we know who to credit.',
+    beanie: 'sign in as the bean giving the dose so we know who to credit.',
+  },
+  'medicationLog.someone': { en: 'someone', beanie: 'someone' },
   'family.discardChanges.title': {
     en: 'Discard your changes?',
     beanie: 'discard your changes?',
@@ -4660,6 +4752,7 @@ const STRING_DEFS = {
   'photos.previous': { en: 'Previous photo', beanie: 'previous photo' },
   'photos.close': { en: 'Close', beanie: 'close' },
   'photos.viewer.of': { en: 'of', beanie: 'of' },
+  'photos.viewer.open': { en: 'Open photo', beanie: 'open photo' },
 } satisfies Record<string, StringEntry>;
 
 /**

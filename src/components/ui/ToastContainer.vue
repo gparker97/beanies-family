@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useToast, type ToastType } from '@/composables/useToast';
 
-const { toasts, dismissToast } = useToast();
+const { toasts, dismissToast, invokeToastAction } = useToast();
 
 const typeConfig: Record<ToastType, { icon: string; bgClass: string; borderClass: string }> = {
   success: {
@@ -72,6 +72,13 @@ const titleColorClass: Record<ToastType, string> = {
           {{ toast.message }}
         </p>
       </div>
+      <button
+        v-if="toast.actionLabel"
+        class="font-outfit shrink-0 self-center rounded-lg px-2.5 py-1 text-xs font-bold text-[var(--heritage-orange)] underline-offset-2 transition-colors hover:bg-[var(--tint-orange-8)] hover:underline focus:bg-[var(--tint-orange-8)] focus:underline focus:outline-none"
+        @click="invokeToastAction(toast.id)"
+      >
+        {{ toast.actionLabel }}
+      </button>
       <button
         class="shrink-0 rounded-lg p-1 text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
         @click="dismissToast(toast.id)"

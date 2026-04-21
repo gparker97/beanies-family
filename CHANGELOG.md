@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-21
 
+### Added
+
+- **Medication view modal + one-tap dose log.** Tapping a medication card now opens a read-only detail view with the bottle photo up top, who it's for, and the dose/frequency meta. A big orange **"I gave this dose"** button records an administration entry with a single tap — date, time, and the signed-in family member are captured automatically. A recent-doses list sits below the button so everyone can see who gave the last dose and when. An **Undo** button appears in the success toast for a few seconds in case the tap was a mistake. If you'd already logged a dose for the same medication today, a friendly confirm asks "Already given today — do you want to log another dose?" before adding a duplicate, so multiple caregivers can't accidentally double up. A 💊 quick-action button on each medication card lets you log a dose without opening the modal for meds you give often. Ended medications hide the dose button and CTA entirely — no accidental logging on a med the family has stopped. Past entries can be removed via the trash icon on any row. Edit is still reachable via the ✏️ button inside the view modal, routing to the existing edit drawer.
+
+### Changed
+
+- **Deleting a medication now also removes its dose history.** Previously there was no dose history to cascade; now there is, and the delete confirmation explicitly tells you the history will go with it. Done in a single atomic CRDT change so the doc never holds orphan log entries.
+
 ### Fixed
 
 - **Editing one travel segment's date no longer overwrites a different segment.** Inline-editing a date on any travel-segment card (flight, train, activity, car) was corrupting another segment's date — typically the earliest travel segment in the trip. Root cause was a Vue template-ref collision: every travel-segment type uses `departureDate` as its date field name, so the hidden-picker refs all piled into the same array and the "open picker" helper always opened the first one. User's intended edit would then fire on the wrong input, saving the new date onto the wrong segment. Refs are now scoped per segment (`input-<segmentId>-<field>`) so each card owns its own picker. If you had a date go sideways on a recent inline edit, you'll want to check the affected segment and restore it.
