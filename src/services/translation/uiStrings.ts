@@ -437,6 +437,10 @@ const STRING_DEFS = {
   'medications.emptyCTA': { en: 'Add the first one', beanie: 'add the first one' },
   'medications.active': { en: 'Active', beanie: 'active' },
   'medications.ended': { en: 'Ended', beanie: 'ended' },
+  'medications.endedSection.title': {
+    en: 'Ended medications',
+    beanie: 'ended medications',
+  },
   'medications.deleteConfirm.title': {
     en: 'Delete this medication?',
     beanie: 'delete this medication?',

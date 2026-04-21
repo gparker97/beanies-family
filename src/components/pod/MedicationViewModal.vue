@@ -315,6 +315,19 @@ const scheduleMeta = computed(() => {
         </div>
       </div>
     </template>
+
+    <!-- Secondary close action alongside the primary "Log a dose" button.
+         Mirrors the Cancel/Save pairing convention used across the app's
+         view-edit modals (see ActivityViewEditModal footer-start slot). -->
+    <template #footer-start>
+      <button
+        type="button"
+        class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-300 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
+        @click="emit('close')"
+      >
+        {{ t('action.close') }}
+      </button>
+    </template>
   </BeanieFormModal>
 
   <!-- Photo lightbox — separate z-layer; modal (z-50) sits above drawer (z-40) -->

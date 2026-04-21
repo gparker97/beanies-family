@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
- * Medications tab — card per Medication. Active (ongoing OR today
- * within [start, end]) sort first. Inactive entries dim so the list
- * reads as "what they're on now" vs "history".
+ * Medications tab — active meds in the primary grid; ended meds tucked
+ * into a collapsible "Ended medications" section below (mirrors the
+ * completed-goals pattern on GoalsPage). Keeps the default view focused
+ * on "what they're on now" without losing the history surface.
  *
  * Modal coordination uses an explicit state machine rather than paired
  * booleans: `{ kind: 'none' | 'viewing' | 'editing', medication }`. This
@@ -30,16 +31,34 @@ const { t } = useTranslation();
 const medicationsStore = useMedicationsStore();
 const { giveDose } = useGiveDose();
 
-const medications = computed(() => {
-  const list = medicationsStore.byMember(props.memberId).value;
-  // Active first, then alphabetical by name for stable ordering.
-  return [...list].sort((a, b) => {
-    const aActive = isMedicationActive(a) ? 0 : 1;
-    const bActive = isMedicationActive(b) ? 0 : 1;
-    if (aActive !== bActive) return aActive - bActive;
-    return a.name.localeCompare(b.name);
-  });
-});
+const memberMedications = computed(() => medicationsStore.byMember(props.memberId).value);
+
+// Active meds: primary grid. Sorted alphabetically for stable ordering.
+const activeMedications = computed(() =>
+  memberMedications.value.filter(isMedicationActive).sort((a, b) => a.name.localeCompare(b.name))
+);
+
+// Ended meds: collapsible history section. Sorted by endDate desc
+// (most-recently-ended first) so fresh history tops the list;
+// undated ended meds fall through to an alphabetical tiebreak.
+const endedMedications = computed(() =>
+  memberMedications.value
+    .filter((m) => !isMedicationActive(m))
+    .sort((a, b) => {
+      const aEnd = a.endDate ?? '';
+      const bEnd = b.endDate ?? '';
+      if (aEnd !== bEnd) return bEnd.localeCompare(aEnd);
+      return a.name.localeCompare(b.name);
+    })
+);
+
+const hasAnyMedications = computed(
+  () => activeMedications.value.length > 0 || endedMedications.value.length > 0
+);
+
+// Ended section is collapsed by default — history doesn't compete for
+// attention with current meds.
+const showEndedMedications = ref(false);
 
 // ── Modal state machine ─────────────────────────────────────────────
 type ModalState =
@@ -94,10 +113,13 @@ function closeModals(): void {
 </script>
 
 <template>
-  <div>
-    <div v-if="medications.length" class="grid gap-3 md:grid-cols-2">
+  <div class="space-y-4">
+    <!-- Active medications grid (always includes AddTile as the last slot).
+         When there are ended meds but zero active, the grid is still
+         rendered so the AddTile stays discoverable. -->
+    <div v-if="hasAnyMedications" class="grid gap-3 md:grid-cols-2">
       <MedicationCard
-        v-for="m in medications"
+        v-for="m in activeMedications"
         :key="m.id"
         :medication="m"
         @view="openView(m)"
@@ -115,6 +137,44 @@ function closeModals(): void {
         :action-label="t('medications.emptyCTA')"
         @action="openAdd"
       />
+    </div>
+
+    <!-- Ended medications — collapsible history section. Mirrors the
+         GoalsPage completed-goals pattern (single toggle button with
+         emoji + label + count pill + rotating chevron). -->
+    <div v-if="endedMedications.length > 0">
+      <button
+        type="button"
+        class="flex w-full items-center gap-2.5 rounded-xl px-4 py-3 text-left transition-colors hover:bg-[var(--tint-slate-5)]"
+        :aria-expanded="showEndedMedications"
+        @click="showEndedMedications = !showEndedMedications"
+      >
+        <span class="text-lg">📋</span>
+        <span class="font-outfit text-secondary-400 text-base font-semibold dark:text-gray-400">
+          {{ t('medications.endedSection.title') }}
+        </span>
+        <span
+          class="font-outfit rounded-full bg-[var(--tint-slate-10)] px-2.5 py-0.5 text-xs font-semibold text-[#2C3E50] dark:bg-slate-700 dark:text-gray-300"
+        >
+          {{ endedMedications.length }}
+        </span>
+        <span
+          class="ml-auto text-xs text-gray-400 transition-transform"
+          :class="{ 'rotate-180': !showEndedMedications }"
+          aria-hidden="true"
+        >
+          ▲
+        </span>
+      </button>
+      <div v-if="showEndedMedications" class="mt-3 grid gap-3 md:grid-cols-2">
+        <MedicationCard
+          v-for="m in endedMedications"
+          :key="m.id"
+          :medication="m"
+          @view="openView(m)"
+          @give-dose="giveDose"
+        />
+      </div>
     </div>
 
     <!-- View modal — opens on card click; emits `edit` to pivot into edit mode. -->

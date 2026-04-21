@@ -39,7 +39,6 @@ type EditableField =
   | 'endDate'
   | 'startTime'
   | 'endTime'
-  | 'location'
   | 'dropoff'
   | 'pickup'
   | 'instructorName'
@@ -124,7 +123,6 @@ const draftDate = ref('');
 const draftEndDate = ref('');
 const draftStartTime = ref('');
 const draftEndTime = ref('');
-const draftLocation = ref('');
 const draftDropoffMemberId = ref('');
 const draftPickupMemberId = ref('');
 const draftInstructorName = ref('');
@@ -166,9 +164,6 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           break;
         case 'endTime':
           draftEndTime.value = activity.value.endTime ?? '';
-          break;
-        case 'location':
-          draftLocation.value = activity.value.location ?? '';
           break;
         case 'dropoff':
           draftDropoffMemberId.value = activity.value.dropoffMemberId ?? '';
@@ -260,14 +255,6 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
           }
           if (val !== (activity.value.endTime ?? null)) {
             update.endTime = val;
-            changed = true;
-          }
-          break;
-        }
-        case 'location': {
-          const val = draftLocation.value.trim() || null;
-          if (val !== (activity.value.location ?? null)) {
-            update.location = val;
             changed = true;
           }
           break;
@@ -999,67 +986,38 @@ async function confirmReschedule() {
           </FormFieldGroup>
         </div>
 
-        <!-- Location — only shown when populated -->
+        <!-- Location — whole field opens Google Maps. Editing lives on the
+             footer ✏️ Edit button (full form) to keep the common tap path
+             (viewing where the activity is) a single frictionless action. -->
         <FormFieldGroup v-if="activity.location" :label="t('planner.field.location')">
-          <InlineEditField
-            :editing="editingField === 'location'"
-            tint-color="orange"
-            @start-edit="startEdit('location')"
+          <a
+            :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="group/loc -mx-1.5 flex items-center gap-1.5 rounded-lg px-1.5 py-1 transition-colors hover:bg-orange-50 focus:bg-orange-50 focus:outline-none dark:hover:bg-orange-900/20 dark:focus:bg-orange-900/20"
+            :title="t('planner.openInMaps')"
           >
-            <template #view>
-              <div class="flex items-center gap-1.5">
-                <a
-                  :href="`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location)}`"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#F15D22] transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  :title="t('planner.openInMaps')"
-                  @click.stop
-                >
-                  <svg
-                    class="h-3.5 w-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
-                </a>
-                <span class="text-sm text-[var(--color-text)] dark:text-gray-300">
-                  {{ activity.location }}
-                </span>
-              </div>
-            </template>
-            <template #edit>
-              <div class="flex items-center gap-2">
-                <div class="flex-1">
-                  <BaseInput
-                    v-model="draftLocation"
-                    type="text"
-                    :placeholder="t('planner.field.location')"
-                    class="rounded-[14px] ring-2 ring-orange-500/30"
-                    @keydown="handleInputKeydown('location')($event)"
-                  />
-                </div>
-                <button
-                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                  @click.stop="saveField('location')"
-                >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                </button>
-              </div>
-            </template>
-          </InlineEditField>
+            <span
+              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[#F15D22] transition-colors group-hover/loc:bg-orange-100 dark:group-hover/loc:bg-orange-900/30"
+              aria-hidden="true"
+            >
+              <svg
+                class="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+            </span>
+            <span
+              class="text-sm text-[var(--color-text)] group-hover/loc:underline dark:text-gray-300"
+            >
+              {{ activity.location }}
+            </span>
+          </a>
         </FormFieldGroup>
 
         <!-- Drop-off / Pick-up — inline editable -->
