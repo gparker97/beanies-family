@@ -21,6 +21,7 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useProjectedTransactions } from '@/composables/useProjectedTransactions';
 import { useMemberInfo } from '@/composables/useMemberInfo';
+import { showToast } from '@/composables/useToast';
 import { getCategoryById } from '@/constants/categories';
 import { getCurrencyInfo } from '@/constants/currencies';
 import {
@@ -74,6 +75,8 @@ const selectedMonth = ref(new Date());
 const { isFutureMonth, projectedTransactions } = useProjectedTransactions(selectedMonth);
 const activeFilter = ref<'all' | 'recurring' | 'one-time'>('all');
 const directionFilter = ref<'all' | 'income' | 'expense'>('all');
+/** Account-scope filter (set from `?account=<id>` query param). `null` means "all accounts". */
+const accountFilter = ref<string | null>(null);
 const searchQuery = ref('');
 
 // Modal state
@@ -111,7 +114,17 @@ function handleTransactionQueryParam() {
   if (direction === 'income' || direction === 'expense') {
     directionFilter.value = direction;
   }
-  if (viewId || riId || direction) {
+  const accountId = route.query.account as string | undefined;
+  if (accountId) {
+    const account = accountsStore.accounts.find((a) => a.id === accountId);
+    if (account) {
+      accountFilter.value = accountId;
+    } else {
+      console.warn('[TransactionsPage] unknown account filter id:', accountId);
+      showToast('error', t('txn.filter.accountNotFound'));
+    }
+  }
+  if (viewId || riId || direction || accountId) {
     router.replace({ query: {} });
   }
 }
@@ -202,17 +215,48 @@ const filteredByDirection = computed(() => {
   return filteredByType.value.filter((tx) => tx.type === directionFilter.value);
 });
 
+// Apply account filter (matches source OR destination for transfers)
+const filteredByAccount = computed(() => {
+  if (!accountFilter.value) return filteredByDirection.value;
+  const id = accountFilter.value;
+  return filteredByDirection.value.filter((tx) => tx.accountId === id || tx.toAccountId === id);
+});
+
+/** Display name of the currently-filtered account, or null when no filter is set. */
+const accountFilterName = computed(() => {
+  if (!accountFilter.value) return null;
+  return accountsStore.accounts.find((a) => a.id === accountFilter.value)?.name ?? null;
+});
+
 // Apply search
 const displayTransactions = computed(() => {
   const q = searchQuery.value.toLowerCase().trim();
-  if (!q) return filteredByDirection.value;
-  return filteredByDirection.value.filter(
+  if (!q) return filteredByAccount.value;
+  return filteredByAccount.value.filter(
     (tx) =>
       tx.description.toLowerCase().includes(q) ||
       getCategoryName(tx.category).toLowerCase().includes(q) ||
       getMemberNameByAccountId(tx.accountId).toLowerCase().includes(q)
   );
 });
+
+/** Resolve the display name for an account id; used by the account column pill. */
+function getAccountName(accountId: string | undefined): string {
+  if (!accountId) return '';
+  return accountsStore.accounts.find((a) => a.id === accountId)?.name ?? '';
+}
+
+/** Format transfer source → destination for the account column. */
+function formatAccountColumn(tx: {
+  accountId: string;
+  toAccountId?: string;
+  type: string;
+}): string {
+  if (tx.type === 'transfer' && tx.toAccountId) {
+    return `${getAccountName(tx.accountId)} → ${getAccountName(tx.toAccountId)}`;
+  }
+  return getAccountName(tx.accountId);
+}
 
 // Group by date
 const groupedTransactions = computed(() => {
@@ -846,6 +890,29 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       </SummaryStatCard>
     </div>
 
+    <!-- Account filter chip -->
+    <div v-if="accountFilter && accountFilterName" class="flex items-center gap-2">
+      <button
+        type="button"
+        class="font-outfit inline-flex cursor-pointer items-center gap-1.5 rounded-full bg-[var(--tint-slate-8)] px-3.5 py-1.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--tint-slate-12)] dark:bg-slate-700 dark:text-gray-200"
+        :aria-label="t('txn.clearFilter')"
+        @click="accountFilter = null"
+      >
+        {{ t('txn.filteredByAccount').replace('{name}', accountFilterName) }}
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.5"
+          stroke-linecap="round"
+        >
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
     <!-- Direction filter chip -->
     <div v-if="directionFilter !== 'all'" class="flex items-center gap-2">
       <button
@@ -891,11 +958,12 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
       <template v-else>
         <!-- Grid header (desktop) -->
         <div
-          class="font-outfit hidden border-b-2 border-[var(--tint-slate-5)] bg-[rgba(44,62,80,0.015)] px-4 py-3 text-xs font-semibold tracking-[0.08em] uppercase opacity-30 md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700 dark:bg-slate-800/50"
+          class="font-outfit hidden border-b-2 border-[var(--tint-slate-5)] bg-[rgba(44,62,80,0.015)] px-4 py-3 text-xs font-semibold tracking-[0.08em] uppercase opacity-30 md:grid md:grid-cols-[36px_1.4fr_0.9fr_0.7fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700 dark:bg-slate-800/50"
         >
           <div></div>
           <div>{{ t('transactions.title') }}</div>
-          <div>{{ t('family.title') }}</div>
+          <div>{{ t('txn.accountColumn') }}</div>
+          <div>{{ t('txn.whoColumn') }}</div>
           <div>{{ t('form.amount') }}</div>
           <div>{{ t('form.type') }}</div>
           <div></div>
@@ -920,7 +988,7 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
             v-for="tx in txns"
             :key="tx.id"
             data-testid="transaction-item"
-            class="group cursor-pointer border-b px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.6fr_0.8fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
+            class="group cursor-pointer border-b px-4 py-3.5 transition-opacity md:grid md:grid-cols-[36px_1.4fr_0.9fr_0.7fr_0.7fr_0.8fr_0.6fr] md:items-center md:gap-2.5 dark:border-slate-700"
             :class="[
               syncHighlightClass(tx.id),
               tx.isProjected
@@ -962,7 +1030,8 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                 <p class="text-xs text-[var(--color-text)] opacity-35">
                   {{ getCategoryName(tx.category) }}
                   <span class="md:hidden">
-                    &middot; {{ getMemberNameByAccountId(tx.accountId) }}
+                    &middot; {{ formatAccountColumn(tx) }} &middot;
+                    {{ getMemberNameByAccountId(tx.accountId) }}
                   </span>
                 </p>
                 <!-- Mobile: amount + type -->
@@ -999,6 +1068,20 @@ function isRecurringItemInactive(tx: DisplayTransaction): boolean {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <!-- Account (desktop) — member-color pill; transfers render "from → to" -->
+            <div class="hidden min-w-0 md:flex md:items-center">
+              <span
+                class="font-outfit max-w-full truncate rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+                :style="{
+                  backgroundColor: `${getMemberColorByAccountId(tx.accountId)}22`,
+                  color: getMemberColorByAccountId(tx.accountId),
+                }"
+                :title="formatAccountColumn(tx)"
+              >
+                {{ formatAccountColumn(tx) }}
+              </span>
             </div>
 
             <!-- Member (desktop) -->

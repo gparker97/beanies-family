@@ -12,8 +12,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Account activity log + manual balance audit trail.** Tap an account card to open a new read-only drawer showing balance, institution, and a filterable, date-grouped log of every credit, debit, and balance correction on the account. Filter chips let you narrow to Manual / Recurring / Loans / Goals / Transfers. Tap any row to jump straight to the transaction's detail view. Transfers appear in both source and destination accounts' logs with a direction arrow. Linked-to-asset accounts still redirect to the Assets page.
+- **Manual balance edits now leave a paper trail.** When you change an account's balance by hand, a dedicated "balance adjustment" entry is recorded with the signed delta, the date, and which family member made the change. These entries show as `Adjusted by {name}` in the activity log (or "Adjusted by you" for your own edits). They're read-only — if a past correction needs tweaking, create a new adjustment instead. Balance adjustments are **excluded from all income/expense totals**, budgets, and dashboard summaries since they're corrections, not cash flow.
+- **Account column on the transactions page.** At tablet+ widths, each transaction row now shows which account it belongs to as a small member-colored pill. Transfers render as `Main Checking → Savings`. On mobile, the account name appears inline under the description. Clicking "View all →" from an account's activity log filters the transactions page to that account (with a dismissible pill to clear the filter).
 - **Close button on the medication view drawer.** The drawer now has a neutral **Close** button paired with the primary **Log a dose** button in the footer, matching the Cancel/Save convention used on other view-edit modals across the app.
 - **Ended medications now tuck into a collapsible history section.** On each bean's medication tab, active medications stay in the primary grid while ended ones collapse into a **📋 Ended medications** section with a count pill — matches the pattern used for completed goals on the Goals page. Collapsed by default so current meds don't compete for attention with history; tap the section to expand.
+
+### Changed
+
+- **Tapping an account card opens a view, not an edit.** Matches how medications, activities, and todos already behave — the card opens a read-only detail view first, with the pencil (✏️) icon still opening the edit form directly. The Edit button inside the view modal takes you straight into edit mode.
+- **Transactions page header: "Family" → "Who".** Short, clear label for the member column on the transactions table.
 
 ### Changed
 

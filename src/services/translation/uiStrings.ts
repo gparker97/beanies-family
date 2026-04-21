@@ -973,6 +973,55 @@ const STRING_DEFS = {
   'accounts.type.education_529': { en: 'college fund (529)', beanie: 'college fund (529)' },
   'accounts.type.education_savings': { en: 'education savings', beanie: 'education savings' },
 
+  // Account view modal (activity log, balance adjustments)
+  'accountView.title': { en: 'Account', beanie: 'account' },
+  'accountView.activity': { en: 'Activity', beanie: 'activity' },
+  'accountView.noActivity': {
+    en: 'No activity yet — manual balance updates and transactions will show here.',
+    beanie: 'no beans have moved yet — updates and transactions will show up here.',
+  },
+  'accountView.viewAll': { en: 'View all →', beanie: 'view all →' },
+  'accountView.notFound': {
+    en: "Hmm, we couldn't find that account. It may have been deleted.",
+    beanie: "hmm, we couldn't find that account — it may have been deleted.",
+  },
+  'accountView.filter.all': { en: 'All', beanie: 'all' },
+  'accountView.filter.manual': { en: 'Manual', beanie: 'manual' },
+  'accountView.filter.recurring': { en: 'Recurring', beanie: 'recurring' },
+  'accountView.filter.loans': { en: 'Loans', beanie: 'loans' },
+  'accountView.filter.goals': { en: 'Goals', beanie: 'goals' },
+  'accountView.filter.transfers': { en: 'Transfers', beanie: 'transfers' },
+  'accountView.adjustedBy': { en: 'Adjusted by {name}', beanie: 'adjusted by {name}' },
+  'accountView.adjustedByYou': { en: 'Adjusted by you', beanie: 'adjusted by you' },
+  'accountView.adjustError.noAuthor': {
+    en: "Balance updated, but we couldn't record who made the change.",
+    beanie: "balance updated — but we couldn't record who changed it.",
+  },
+  'accountView.adjustError.noAuthorHelp': {
+    en: 'No signed-in family member was found. Sign in and try again.',
+    beanie: 'no signed-in beanie was found. sign in and try again.',
+  },
+  'accountView.recurringLabel': { en: 'Recurring: {name}', beanie: 'recurring: {name}' },
+  'accountView.loanLabel': { en: 'Loan payment', beanie: 'loan payment' },
+  'accountView.goalLabel': { en: 'Goal allocation', beanie: 'goal allocation' },
+  'accountView.transferTo': { en: 'Transfer → {account}', beanie: 'transfer → {account}' },
+  'accountView.transferFrom': { en: 'Transfer ← {account}', beanie: 'transfer ← {account}' },
+
+  // Transaction metadata used outside the account view
+  'txn.balanceAdjusted': { en: 'Balance adjusted', beanie: 'balance adjusted' },
+  'txn.accountColumn': { en: 'Account', beanie: 'account' },
+  'txn.whoColumn': { en: 'Who', beanie: 'who' },
+  'txn.filteredByAccount': { en: 'Filtered: {name}', beanie: 'filtered: {name}' },
+  'txn.clearFilter': { en: 'Clear filter', beanie: 'clear filter' },
+  'txn.filter.accountNotFound': {
+    en: "We couldn't find that account — the filter has been cleared.",
+    beanie: "we couldn't find that account — the filter has been cleared.",
+  },
+
+  // Generic fallbacks used by transactionLabel
+  'family.unknownMember': { en: 'Unknown', beanie: 'unknown' },
+  'family.unknownAccount': { en: 'Unknown account', beanie: 'unknown account' },
+
   // Account categories & subtypes (used in AccountCategoryPicker)
   'accounts.cat.bank': { en: 'Bank', beanie: 'bank' },
   'accounts.cat.investment': { en: 'Investment', beanie: 'investment' },
@@ -1040,6 +1089,10 @@ const STRING_DEFS = {
   'transactions.type.income': { en: 'Income', beanie: 'income' },
   'transactions.type.expense': { en: 'Expense', beanie: 'expense' },
   'transactions.type.transfer': { en: 'Transfer', beanie: 'transfer' },
+  'transactions.type.balance_adjustment': {
+    en: 'Balance adjustment',
+    beanie: 'balance adjustment',
+  },
 
   // Assets
   'assets.title': { en: 'Assets', beanie: 'big beans' },
