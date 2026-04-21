@@ -274,6 +274,16 @@ export function toDateInputValue(date: Date): string {
 }
 
 /**
+ * Format a Date as `HH:mm` in LOCAL time — the value shape expected by
+ * `<input type="time">`. Mirrors `toDateInputValue` for time inputs.
+ */
+export function toTimeInputValue(date: Date): string {
+  const h = date.getHours();
+  const m = date.getMinutes();
+  return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}`;
+}
+
+/**
  * Detect if an HH:mm departure time is late-night (21:00–23:59) or early-morning (00:00–02:59).
  * Returns 'early-morning', 'late-night', or null.
  */
