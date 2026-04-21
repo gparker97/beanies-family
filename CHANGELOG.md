@@ -12,6 +12,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- **Close button on the medication view drawer.** The drawer now has a neutral **Close** button paired with the primary **Log a dose** button in the footer, matching the Cancel/Save convention used on other view-edit modals across the app.
+- **Ended medications now tuck into a collapsible history section.** On each bean's medication tab, active medications stay in the primary grid while ended ones collapse into a **📋 Ended medications** section with a count pill — matches the pattern used for completed goals on the Goals page. Collapsed by default so current meds don't compete for attention with history; tap the section to expand.
+
+### Changed
+
+- **The medication detail view is now a right-side drawer** (instead of a centered modal), matching the app's convention for view/edit surfaces. The primary action "Log a dose" lives as the drawer's save button; its confirm dialog stacks cleanly on top.
+- **"I gave this dose" → "Log a dose"** — shorter, clearer action label across the card quick-action and drawer CTA.
+- **Dose-log flow is always a confirmation.** Tapping 💊 now opens a dialog that shows today's doses for the medication (or "No doses logged today yet"), plus an editable date + time defaulting to now. Future values blocked. Supports retroactive logging for doses you forgot to mark, and prevents over-dosing by showing you the last-given time before you confirm.
+
+### Fixed
+
+- **Tapping anywhere on a calendar activity's location field now opens Google Maps.** Previously tapping the location text opened a quick-edit box while only the pin icon opened the map — inconsistent. The whole field is now the map tap target; editing the location moves to the main **✏️ Edit** button. Consistent with the travel-plans pattern.
+
+### Added
+
 - **Medication view modal + one-tap dose log.** Tapping a medication card now opens a read-only detail view with the bottle photo up top, who it's for, and the dose/frequency meta. A big orange **"I gave this dose"** button records an administration entry with a single tap — date, time, and the signed-in family member are captured automatically. A recent-doses list sits below the button so everyone can see who gave the last dose and when. An **Undo** button appears in the success toast for a few seconds in case the tap was a mistake. If you'd already logged a dose for the same medication today, a friendly confirm asks "Already given today — do you want to log another dose?" before adding a duplicate, so multiple caregivers can't accidentally double up. A 💊 quick-action button on each medication card lets you log a dose without opening the modal for meds you give often. Ended medications hide the dose button and CTA entirely — no accidental logging on a med the family has stopped. Past entries can be removed via the trash icon on any row. Edit is still reachable via the ✏️ button inside the view modal, routing to the existing edit drawer.
 
 ### Changed
