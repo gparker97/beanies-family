@@ -15,6 +15,7 @@ import type {
   MemberNote,
   Allergy,
   Medication,
+  MedicationLogEntry,
   Recipe,
   CookLogEntry,
   EmergencyContact,
@@ -44,6 +45,7 @@ export interface FamilyDocument {
   memberNotes: Record<string, MemberNote>;
   allergies: Record<string, Allergy>;
   medications: Record<string, Medication>;
+  medicationLogs: Record<string, MedicationLogEntry>;
   recipes: Record<string, Recipe>;
   cookLogs: Record<string, CookLogEntry>;
   emergencyContacts: Record<string, EmergencyContact>;

@@ -1,6 +1,12 @@
 // Type aliases for clarity
 export type UUID = string;
 export type ISODateString = string;
+/**
+ * Full ISO-8601 datetime string (e.g. `2026-04-21T14:32:11.000Z`).
+ * Distinct from ISODateString for self-documentation where hour/minute
+ * precision is load-bearing — medication log entries, for example.
+ */
+export type ISODateTimeString = string;
 export type CurrencyCode = string; // ISO 4217 codes (e.g., 'USD', 'EUR', 'GBP')
 export type LanguageCode = 'en' | 'zh'; // Supported UI languages
 
@@ -804,6 +810,32 @@ export interface Medication {
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
+
+/**
+ * Administration log entry for a medication — "I gave a dose."
+ *
+ * Stores FULL timestamps (not just dates) because "last dose: 3h ago"
+ * requires hour precision. A deleted medication cascade-removes all its
+ * log entries (see `deleteMedication` in medicationsStore).
+ *
+ * Log entries are photo-less by design (v1) — no `registerPhotoCollection`
+ * for this collection in App.vue. See plan 2026-04-21 §1.9.
+ */
+export interface MedicationLogEntry {
+  id: UUID;
+  medicationId: UUID;
+  administeredOn: ISODateTimeString;
+  administeredBy: UUID;
+  createdBy?: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export type CreateMedicationLogEntryInput = Omit<
+  MedicationLogEntry,
+  'id' | 'createdAt' | 'updatedAt'
+>;
+export type UpdateMedicationLogEntryInput = Partial<CreateMedicationLogEntryInput>;
 
 /**
  * A family recipe — "secret family recipe" in the Family Cookbook.
