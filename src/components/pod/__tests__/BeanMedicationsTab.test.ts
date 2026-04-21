@@ -54,13 +54,20 @@ describe('BeanMedicationsTab', () => {
     expect(wrapper.text()).toContain('medications.empty');
   });
 
-  it('sorts active medications before ended ones', () => {
+  it('shows active medications in the primary grid and keeps ended ones collapsed by default', async () => {
     const wrapper = mountTab([
       makeMed({ id: 'm1', name: 'Ended-med', endDate: '2020-01-01' }),
       makeMed({ id: 'm2', name: 'Ongoing-med', ongoing: true }),
     ]);
-    const text = wrapper.text();
-    expect(text.indexOf('Ongoing-med')).toBeLessThan(text.indexOf('Ended-med'));
+    // Active med is rendered immediately; ended med is hidden until the
+    // "Ended medications" section is expanded.
+    expect(wrapper.text()).toContain('Ongoing-med');
+    expect(wrapper.text()).not.toContain('Ended-med');
+    expect(wrapper.text()).toContain('medications.endedSection.title');
+
+    // Toggle the section — ended med now renders.
+    await wrapper.find('button[aria-expanded]').trigger('click');
+    expect(wrapper.text()).toContain('Ended-med');
   });
 
   it('filters out medications for other members', () => {

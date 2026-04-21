@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-21",
-    "translationCount": 2345
+    "translationCount": 2347
   },
   "translations": {
     "app.name": {
@@ -11729,6 +11729,16 @@
     "medicationLog.errors.futureNotAllowed": {
       "translation": "您将来无法记录剂量。",
       "hash": "sebp7p",
+      "lastUpdated": "2026-04-21"
+    },
+    "medications.endedSection.title": {
+      "translation": "结束用药",
+      "hash": "uz3vum",
+      "lastUpdated": "2026-04-21"
+    },
+    "photos.viewer.open": {
+      "translation": "打开照片( O)",
+      "hash": "eiq7zw",
       "lastUpdated": "2026-04-21"
     }
   }
