@@ -9,6 +9,7 @@ import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import AccountModal from '@/components/accounts/AccountModal.vue';
+import AccountViewModal from '@/components/accounts/AccountViewModal.vue';
 import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
@@ -24,6 +25,7 @@ import { confirm as showConfirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAdjustBalance } from '@/composables/useAdjustBalance';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -32,6 +34,7 @@ import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } fro
 const route = useRoute();
 const router = useRouter();
 const accountsStore = useAccountsStore();
+const { saveWithAdjustment } = useAdjustBalance();
 const assetsStore = useAssetsStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
@@ -44,7 +47,9 @@ const { formatInDisplayCurrency } = useCurrencyDisplay();
 
 const showAddModal = ref(false);
 const showEditModal = ref(false);
+const showViewModal = ref(false);
 const editingAccount = ref<Account | null>(null);
+const viewingAccount = ref<Account | null>(null);
 const groupBy = ref<'member' | 'category'>(
   route.query.groupBy === 'category' ? 'category' : 'member'
 );
@@ -323,6 +328,10 @@ function openEditModal(account: Account) {
     router.push('/assets');
     return;
   }
+  // Close the view modal first if it was the entry point — keeps only one
+  // drawer on screen and ensures the edit form takes focus cleanly.
+  showViewModal.value = false;
+  viewingAccount.value = null;
   editingAccount.value = account;
   showEditModal.value = true;
 }
@@ -332,11 +341,30 @@ function closeEditModal() {
   editingAccount.value = null;
 }
 
+function openViewModal(account: Account) {
+  // Linked-to-asset accounts redirect to the Assets page (same behaviour as
+  // opening edit) — the Assets page owns the full view for those.
+  if (account.linkedAssetId) {
+    showToast('info', t('accounts.editOnAssetsPage'));
+    router.push('/assets');
+    return;
+  }
+  viewingAccount.value = account;
+  showViewModal.value = true;
+}
+
+function closeViewModal() {
+  showViewModal.value = false;
+  viewingAccount.value = null;
+}
+
 async function handleAccountSave(
   data: CreateAccountInput | { id: string; data: UpdateAccountInput }
 ) {
   if ('id' in data) {
-    await accountsStore.updateAccount(data.id, data.data);
+    // Route through useAdjustBalance so manual balance edits leave an audit
+    // trail. Non-balance edits (name / institution / member) emit no adjustment row.
+    await saveWithAdjustment(data.id, data.data);
     closeEditModal();
   } else {
     await accountsStore.createAccount(data);
@@ -537,7 +565,7 @@ async function deleteAccount(id: string) {
               { 'border-l-primary-500 border-l-4': isLiability(account.type) },
               syncHighlightClass(account.id),
             ]"
-            @click="openEditModal(account)"
+            @click="openViewModal(account)"
           >
             <!-- Card Header -->
             <div class="mb-4 flex items-start justify-between">
@@ -683,6 +711,14 @@ async function deleteAccount(id: string) {
       @close="closeEditModal"
       @save="handleAccountSave"
       @delete="handleAccountDelete"
+    />
+
+    <!-- View Account Modal (read-only drawer with activity log) -->
+    <AccountViewModal
+      :open="showViewModal"
+      :account="viewingAccount"
+      @close="closeViewModal"
+      @open-edit="openEditModal"
     />
   </div>
 </template>

@@ -72,12 +72,16 @@ export function calculateMonthlyFee(opts: {
   return Math.round(monthly * 100) / 100;
 }
 
+import type { TransactionType } from '@/types/models';
+
 /**
  * Calculate how a transaction affects an account balance.
  * Income adds, expense subtracts, transfer debits source and credits destination.
+ * Balance adjustments return 0 — they are audit echoes of an already-applied
+ * balance change and must NEVER cascade a second time.
  */
 export function calculateBalanceAdjustment(
-  type: 'income' | 'expense' | 'transfer',
+  type: TransactionType,
   amount: number,
   isSourceAccount: boolean = true
 ): number {
@@ -88,6 +92,8 @@ export function calculateBalanceAdjustment(
       return -amount;
     case 'transfer':
       return isSourceAccount ? -amount : amount;
+    case 'balance_adjustment':
+      return 0;
     default:
       return 0;
   }

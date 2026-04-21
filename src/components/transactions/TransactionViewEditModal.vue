@@ -49,7 +49,7 @@ const assetsStore = useAssetsStore();
 const activityStore = useActivityStore();
 const goalsStore = useGoalsStore();
 const recurringStore = useRecurringStore();
-const { getMemberNameByAccountId } = useMemberInfo();
+const { getMemberNameByAccountId, getMemberName } = useMemberInfo();
 
 // Live-lookup from store so display stays reactive after inline edits
 const transaction = computed(() =>
@@ -58,6 +58,38 @@ const transaction = computed(() =>
       props.transaction)
     : null
 );
+
+/**
+ * Whether this transaction exposes the standard view-then-edit affordances
+ * (inline edits, Delete, Edit-drawer button). Balance-adjustment rows are an
+ * audit-only record: editing them retroactively would introduce inconsistencies
+ * with transactions layered on top of the adjusted balance, so all editing
+ * affordances are suppressed. Users who want to correct the balance create a
+ * new adjustment.
+ */
+const isEditable = computed(
+  () => !!transaction.value && transaction.value.type !== 'balance_adjustment'
+);
+
+/** For balance_adjustment rows: pre-resolved author name for the ribbon. */
+const adjustmentAuthorLabel = computed(() => {
+  const tx = transaction.value;
+  if (!tx || tx.type !== 'balance_adjustment' || !tx.adjustment?.updatedBy) return '';
+  const name = getMemberName(tx.adjustment.updatedBy);
+  return t('accountView.adjustedBy').replace('{name}', name);
+});
+
+/** For balance_adjustment rows: signed delta + coloring for CurrencyAmount. */
+const adjustmentAmountDisplay = computed<{
+  amount: number;
+  type: 'income' | 'expense' | 'neutral';
+}>(() => {
+  const delta = transaction.value?.adjustment?.delta ?? 0;
+  return {
+    amount: Math.abs(delta),
+    type: delta > 0 ? 'income' : delta < 0 ? 'expense' : 'neutral',
+  };
+});
 
 // Draft refs
 const draftDescription = ref('');
@@ -204,6 +236,10 @@ const typeBadge = computed(() => {
       label: t('transactions.type.transfer'),
       class: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
     },
+    balance_adjustment: {
+      label: t('transactions.type.balance_adjustment'),
+      class: 'bg-slate-50 text-slate-700 dark:bg-slate-900/20 dark:text-slate-300',
+    },
   };
   return map[transaction.value.type] ?? { label: transaction.value.type, class: '' };
 });
@@ -276,7 +312,7 @@ async function handleDelete() {
     size="narrow"
     :save-label="t('action.close')"
     save-gradient="orange"
-    :show-delete="true"
+    :show-delete="isEditable"
     @close="handleClose"
     @save="handleDone"
     @delete="handleDelete"
@@ -340,8 +376,28 @@ async function handleDelete() {
         </div>
       </div>
 
+      <!-- Balance-adjustment ribbon: signed delta + author line (read-only).
+           Shown in place of the inline editable fields below for audit rows. -->
+      <div
+        v-if="!isEditable"
+        class="space-y-1.5 rounded-[14px] bg-[var(--tint-slate-5)] px-4 py-3 dark:bg-slate-700"
+      >
+        <div class="font-outfit text-2xl font-extrabold">
+          <CurrencyAmount
+            :amount="adjustmentAmountDisplay.amount"
+            :currency="transaction.currency"
+            :type="adjustmentAmountDisplay.type"
+            size="xl"
+          />
+        </div>
+        <p class="font-outfit text-sm text-[var(--color-text-muted)]">
+          {{ adjustmentAuthorLabel }}
+        </p>
+      </div>
+
       <!-- Description — inline editable -->
       <InlineEditField
+        v-if="isEditable"
         :editing="editingField === 'description'"
         tint-color="orange"
         @start-edit="startEdit('description')"
@@ -379,7 +435,7 @@ async function handleDelete() {
       </InlineEditField>
 
       <!-- Amount — inline editable (locked for linked recurring transactions) -->
-      <FormFieldGroup :label="t('form.amount')">
+      <FormFieldGroup v-if="isEditable" :label="t('form.amount')">
         <InlineEditField
           :editing="editingField === 'amount'"
           :disabled="
@@ -431,7 +487,7 @@ async function handleDelete() {
       </FormFieldGroup>
 
       <!-- Category — inline editable -->
-      <FormFieldGroup :label="t('planner.field.category')">
+      <FormFieldGroup v-if="isEditable" :label="t('planner.field.category')">
         <InlineEditField
           :editing="editingField === 'category'"
           tint-color="orange"
@@ -452,8 +508,10 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
-      <!-- Date — inline editable (locked for recurring transactions) -->
-      <FormFieldGroup :label="t('form.date')">
+      <!-- Date — inline editable (locked for recurring transactions).
+           For balance_adjustment, the date is displayed read-only in the
+           Schedule summary box above; skip the inline editor. -->
+      <FormFieldGroup v-if="isEditable" :label="t('form.date')">
         <InlineEditField
           :editing="editingField === 'date'"
           :disabled="!!transaction.recurringItemId"
@@ -569,6 +627,7 @@ async function handleDelete() {
 
     <template #footer-start>
       <button
+        v-if="isEditable"
         type="button"
         class="font-outfit flex-1 rounded-[16px] border border-gray-200 py-3.5 text-sm font-bold text-[var(--color-text)] transition-all duration-200 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700"
         @click="handleOpenEdit"

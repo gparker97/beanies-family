@@ -349,6 +349,16 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   async function createTransaction(input: CreateTransactionInput): Promise<Transaction | null> {
     const result = await wrapAsync(isLoading, error, async () => {
+      // Balance adjustments are audit echoes of an already-applied balance change.
+      // Skip all cascading side effects (balance mutation, goal/loan application)
+      // and force isReconciled: true so the invariant lives in one place.
+      if (input.type === 'balance_adjustment') {
+        const normalized = { ...input, isReconciled: true };
+        const transaction = await transactionRepo.createTransaction(normalized);
+        transactions.value = [...transactions.value, transaction];
+        return transaction;
+      }
+
       const transaction = await transactionRepo.createTransaction(input);
       const isFirst = transactions.value.length === 0;
       // Immutable update: assign a new array so downstream computeds re-evaluate
@@ -391,6 +401,12 @@ export const useTransactionsStore = defineStore('transactions', () => {
       if (updated) {
         // Immutable update: assign a new array so downstream computeds re-evaluate
         transactions.value = transactions.value.map((t) => (t.id === id ? updated : t));
+
+        // Balance adjustments carry no side effects (see createTransaction for rationale).
+        // Skip the reverse-and-reapply dance for both the original and updated shape.
+        if (original?.type === 'balance_adjustment' || updated.type === 'balance_adjustment') {
+          return updated;
+        }
 
         // If amount, type, or account changed, adjust balances
         if (original) {
@@ -454,6 +470,11 @@ export const useTransactionsStore = defineStore('transactions', () => {
       if (success) {
         transactions.value = transactions.value.filter((t) => t.id !== id);
 
+        // Balance adjustments carry no side effects — skip reversal.
+        if (transaction?.type === 'balance_adjustment') {
+          return success;
+        }
+
         // Reverse the transaction's effect on account balance
         if (transaction) {
           const adjustment = calculateBalanceAdjustment(transaction.type, transaction.amount, true);
@@ -510,6 +531,19 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return transactions.value.filter((t) => t.accountId === accountId);
   }
 
+  /**
+   * All transactions where the given account is the source OR destination,
+   * sorted descending by (date, createdAt). Used by the account activity log.
+   */
+  function transactionsForAccount(accountId: string): Transaction[] {
+    return transactions.value
+      .filter((t) => t.accountId === accountId || t.toAccountId === accountId)
+      .sort((a, b) => {
+        const d = b.date.localeCompare(a.date);
+        return d !== 0 ? d : b.createdAt.localeCompare(a.createdAt);
+      });
+  }
+
   function getTransactionsByDateRange(start: ISODateString, end: ISODateString): Transaction[] {
     return transactions.value.filter((t) => isDateBetween(t.date, start, end));
   }
@@ -557,6 +591,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
     deleteTransactionsByRecurringItemId,
     getTransactionById,
     getTransactionsByAccountId,
+    transactionsForAccount,
     getTransactionsByDateRange,
     resetState,
   };
