@@ -8,6 +8,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-22
+
+### Fixed
+
+- **Net worth chart now reflects manual balance adjustments.** Previously, when you manually edited an account balance (or any other balance adjustment recorded against an account), the historical net worth chart on the dashboard silently dropped the adjustment from its replay — so a $500k bump made yesterday would render as a flat line at the new amount across the entire chart history. The chart now correctly shows the step where the adjustment happened, with the prior history reflecting the pre-adjustment balance. Adjustments on credit-card or loan accounts move the line in the opposite direction (since balance changes there mean debt changes).
+- **Net worth chart now respects when accounts and assets were created.** Adding a new account or asset today no longer makes it appear at its current value across the entire historical chart. Pre-creation chart points correctly omit the entity, so adding a $10k savings account today produces a step up at today rather than a flat line. Buying a $500k house with a $200k loan added the same day shows zero retroactive contribution (the asset and the linked loan account cancel each other out before that date).
+- **Net worth chart now accounts for principal vs interest on loan payments.** Loan payments split into a principal portion (which reduces debt) and an interest portion (which is real cost). Previously the chart only reversed the cash side of a loan-payment expense, so historical net worth was overstated by the cumulative principal you'd paid. Now reflects the principal payback against the loan balance correctly — the chart only "drops" by the interest portion at each payment.
+- **Reports "Income vs Expenses" chart no longer counts transfers and balance adjustments as expenses.** The bar chart's per-month aggregation was treating every non-income transaction as an expense via a binary classification — so a $500k positive balance adjustment would render as a $500k expense for that month, and every transfer between accounts would be double-counted. Income, expenses, and net cash flow stats on the Reports page also self-correct.
+- **Activity feeds now show a distinct icon for manual balance adjustments.** The Nook "Recent Activity" card and global search results were rendering balance-adjustment transactions with the credit-card / expense icon. Adjustments now use a scale (⚖️) icon, with the tint reflecting the direction (green for positive, orange for negative). Transfers also pick up a distinct arrows icon and blue tint.
+
+### Changed
+
+- **More informative chart errors.** When the dashboard net worth chart can't render due to an unexpected error (data corruption, missing exchange rates, etc.), it now shows a brief "Could not render net worth history. Check the console for details." message in place of the silent empty state, while logging the underlying error to the console.
+
+---
+
 ## 2026-04-21
 
 ### Added

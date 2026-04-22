@@ -4,6 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { formatNookDate } from '@/utils/date';
+import { getTransactionVisual, type TransactionVisual } from '@/utils/transactionLabel';
 import NookSectionCard from './NookSectionCard.vue';
 
 const emit = defineEmits<{
@@ -19,7 +20,7 @@ interface ActivityItem {
   id: string;
   type: 'todo' | 'transaction';
   icon: string;
-  iconTint: 'green' | 'orange';
+  iconTint: TransactionVisual['tint'];
   description: string;
   time: string;
   date: string;
@@ -50,11 +51,12 @@ const activityItems = computed<ActivityItem[]>(() => {
 
   // 2. Recent transactions (last 5)
   for (const tx of transactionsStore.filteredRecentTransactions.slice(0, 5)) {
+    const visual = getTransactionVisual(tx);
     items.push({
       id: tx.id,
       type: 'transaction',
-      icon: tx.type === 'income' ? '\u{1F4B0}' : '\u{1F4B3}',
-      iconTint: tx.type === 'income' ? 'green' : 'orange',
+      icon: visual.icon,
+      iconTint: visual.tint,
       description: tx.description,
       time: formatNookDate(tx.date) + ' \u00B7 ' + tx.category,
       date: tx.date,
@@ -95,6 +97,8 @@ const activityItems = computed<ActivityItem[]>(() => {
           :class="{
             'bg-[var(--tint-success-10)]': item.iconTint === 'green',
             'bg-[var(--tint-orange-8)]': item.iconTint === 'orange',
+            'bg-[var(--tint-slate-8)]': item.iconTint === 'slate',
+            'bg-[var(--tint-blue-8)]': item.iconTint === 'blue',
           }"
         >
           {{ item.icon }}

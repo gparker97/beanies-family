@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Transaction } from '@/types/models';
-import { getTransactionSubtitle } from '../transactionLabel';
+import { getTransactionSubtitle, getTransactionVisual } from '../transactionLabel';
 
 /** i18n stub that returns the key with any {placeholders} still embedded for inspection. */
 const tStub = (key: string) => {
@@ -157,5 +157,55 @@ describe('getTransactionSubtitle', () => {
       'expense'
     );
     warnSpy.mockRestore();
+  });
+});
+
+describe('getTransactionVisual', () => {
+  it('income → money-bag icon, green tint', () => {
+    expect(getTransactionVisual(tx({ type: 'income' }))).toEqual({
+      icon: '\u{1F4B0}',
+      tint: 'green',
+    });
+  });
+
+  it('expense → credit-card icon, orange tint', () => {
+    expect(getTransactionVisual(tx({ type: 'expense' }))).toEqual({
+      icon: '\u{1F4B3}',
+      tint: 'orange',
+    });
+  });
+
+  it('transfer → arrows icon, blue tint', () => {
+    expect(getTransactionVisual(tx({ type: 'transfer' }))).toEqual({
+      icon: '\u{1F504}',
+      tint: 'blue',
+    });
+  });
+
+  it('balance_adjustment with positive delta → scale icon, green tint', () => {
+    const t = tx({
+      type: 'balance_adjustment',
+      adjustment: { delta: 500, updatedBy: 'm-1' },
+    });
+    expect(getTransactionVisual(t)).toEqual({ icon: '⚖️', tint: 'green' });
+  });
+
+  it('balance_adjustment with negative delta → scale icon, orange tint', () => {
+    const t = tx({
+      type: 'balance_adjustment',
+      adjustment: { delta: -300, updatedBy: 'm-1' },
+    });
+    expect(getTransactionVisual(t)).toEqual({ icon: '⚖️', tint: 'orange' });
+  });
+
+  it('balance_adjustment with zero/missing delta → scale icon, slate tint', () => {
+    const tZero = tx({
+      type: 'balance_adjustment',
+      adjustment: { delta: 0, updatedBy: 'm-1' },
+    });
+    expect(getTransactionVisual(tZero)).toEqual({ icon: '⚖️', tint: 'slate' });
+
+    const tMissing = tx({ type: 'balance_adjustment' });
+    expect(getTransactionVisual(tMissing)).toEqual({ icon: '⚖️', tint: 'slate' });
   });
 });

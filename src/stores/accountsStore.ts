@@ -5,6 +5,7 @@ import { useAssetsStore } from './assetsStore';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
+import { accountNetWorthMultiplier, isLiabilityType } from '@/utils/finance';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import type { Account, CreateAccountInput, UpdateAccountInput, CurrencyCode } from '@/types/models';
@@ -34,26 +35,21 @@ export const useAccountsStore = defineStore('accounts', () => {
       .filter((a) => a.isActive && a.includeInNetWorth)
       .reduce((sum, account) => {
         const convertedBalance = convertToBaseCurrency(account.balance, account.currency);
-        const multiplier = account.type === 'credit_card' || account.type === 'loan' ? -1 : 1;
-        return sum + convertedBalance * multiplier;
+        return sum + convertedBalance * accountNetWorthMultiplier(account);
       }, 0);
   });
 
   // Total assets - converts each account to base currency first
   const totalAssets = computed(() => {
     return accounts.value
-      .filter(
-        (a) => a.isActive && a.includeInNetWorth && a.type !== 'credit_card' && a.type !== 'loan'
-      )
+      .filter((a) => a.isActive && a.includeInNetWorth && !isLiabilityType(a.type))
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 
   // Account-based liabilities only (credit cards, loans)
   const accountLiabilities = computed(() => {
     return accounts.value
-      .filter(
-        (a) => a.isActive && a.includeInNetWorth && (a.type === 'credit_card' || a.type === 'loan')
-      )
+      .filter((a) => a.isActive && a.includeInNetWorth && isLiabilityType(a.type))
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 
@@ -81,26 +77,21 @@ export const useAccountsStore = defineStore('accounts', () => {
       .filter((a) => a.isActive && a.includeInNetWorth)
       .reduce((sum, account) => {
         const convertedBalance = convertToBaseCurrency(account.balance, account.currency);
-        const multiplier = account.type === 'credit_card' || account.type === 'loan' ? -1 : 1;
-        return sum + convertedBalance * multiplier;
+        return sum + convertedBalance * accountNetWorthMultiplier(account);
       }, 0);
   });
 
   // Filtered total assets
   const filteredTotalAssets = computed(() => {
     return filteredAccounts.value
-      .filter(
-        (a) => a.isActive && a.includeInNetWorth && a.type !== 'credit_card' && a.type !== 'loan'
-      )
+      .filter((a) => a.isActive && a.includeInNetWorth && !isLiabilityType(a.type))
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 
   // Filtered account liabilities
   const filteredAccountLiabilities = computed(() => {
     return filteredAccounts.value
-      .filter(
-        (a) => a.isActive && a.includeInNetWorth && (a.type === 'credit_card' || a.type === 'loan')
-      )
+      .filter((a) => a.isActive && a.includeInNetWorth && isLiabilityType(a.type))
       .reduce((sum, a) => sum + convertToBaseCurrency(a.balance, a.currency), 0);
   });
 

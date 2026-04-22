@@ -1,5 +1,6 @@
 import type { Transaction } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { assertNever } from '@/utils/assertNever';
 
 export interface SubtitleContext {
   /** i18n lookup function (from useTranslation). */
@@ -78,4 +79,46 @@ export function getTransactionSubtitle(
     return '';
   }
   return tx.description;
+}
+
+/** Visual treatment used by activity rows that display transactions. */
+export interface TransactionVisual {
+  icon: string;
+  tint: 'green' | 'orange' | 'slate' | 'blue';
+}
+
+/**
+ * Stable icon + tint for any transaction. Single source of truth for
+ * transaction-row visuals across the app (activity feeds, search results,
+ * recent activity card). Mirrors the priority chain used by
+ * `getTransactionSubtitle`: balance_adjustment is checked first, then
+ * transfer, then income, then expense as the default.
+ *
+ * Balance adjustments use the scale emoji (⚖️) with the tint reflecting
+ * the direction of the adjustment (positive = green, negative = orange,
+ * zero = slate). Transfers use a directional arrow icon with a blue tint
+ * (distinct from cash flow). Income is the money-bag icon with green;
+ * expense is the credit-card icon with orange.
+ *
+ * @example
+ *   const { icon, tint } = getTransactionVisual(tx);
+ *
+ * @see getTransactionSubtitle — for the matching subtitle classification
+ */
+export function getTransactionVisual(tx: Transaction): TransactionVisual {
+  switch (tx.type) {
+    case 'balance_adjustment': {
+      const delta = tx.adjustment?.delta ?? 0;
+      const tint: TransactionVisual['tint'] = delta > 0 ? 'green' : delta < 0 ? 'orange' : 'slate';
+      return { icon: '⚖️', tint };
+    }
+    case 'transfer':
+      return { icon: '\u{1F504}', tint: 'blue' };
+    case 'income':
+      return { icon: '\u{1F4B0}', tint: 'green' };
+    case 'expense':
+      return { icon: '\u{1F4B3}', tint: 'orange' };
+    default:
+      assertNever(tx.type, 'getTransactionVisual');
+  }
 }
