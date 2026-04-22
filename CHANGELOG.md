@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-22
 
+### Changed
+
+- **Pillar guides redesign — tier 1 (prototype on pillar 1, not yet live in prod).** The first of four pillar guides (`/guides/overwhelmed-family-planning`) now renders with a family-zine editorial treatment: "TL;DR" answer cards on each section (the existing short-answer blocks promoted from inline bold to distinctive kraft-paper cards with a Heritage Orange rail), gradient drop-caps on the first paragraph after every heading, "CHAPTER 01/02/03…" eyebrows above each heading, a numbered-chapter table of contents, a sticky section rail on wide screens (≥1200px) that highlights the section you're currently reading, a thin reading-progress bar at the top, and a Deep Slate "what to take away" recap card at the end of the guide. Body prose switches to the Fraunces serif typeface for long-read warmth; display + metadata stay in the existing Outfit. All changes are in the shared template, so the other three pillars will inherit the treatment once their `keyTakeaways:` frontmatter is populated. Guides remain `draft: true` and are not live in prod — preview via `npm run dev:web`.
+
 ### Fixed
 
 - **Net worth chart now reflects manual balance adjustments.** Previously, when you manually edited an account balance (or any other balance adjustment recorded against an account), the historical net worth chart on the dashboard silently dropped the adjustment from its replay — so a $500k bump made yesterday would render as a flat line at the new amount across the entire chart history. The chart now correctly shows the step where the adjustment happened, with the prior history reflecting the pre-adjustment balance. Adjustments on credit-card or loan accounts move the line in the opposite direction (since balance changes there mean debt changes).
