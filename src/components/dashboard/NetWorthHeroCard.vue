@@ -39,6 +39,11 @@ interface Props {
   historyData?: NetWorthDataPoint[];
   /** Info hint text */
   hint?: string;
+  /**
+   * If chart construction failed, an explanatory message to render in
+   * place of the chart. When set, takes precedence over the empty state.
+   */
+  chartError?: string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -47,6 +52,7 @@ const props = withDefaults(defineProps<Props>(), {
   label: 'Family Net Worth',
   selectedPeriod: '1M',
   historyData: () => [],
+  chartError: null,
 });
 
 const emit = defineEmits<{
@@ -337,9 +343,14 @@ const periodLabel = computed(() => {
       </div>
     </div>
 
-    <!-- Chart area -->
+    <!-- Chart area: 3-way flat branch (error / empty / chart) -->
     <div class="relative mt-5 h-28">
-      <div v-if="historyData.length === 0" class="flex h-full items-center justify-center">
+      <div v-if="chartError" class="flex h-full items-center justify-center px-4 text-center">
+        <span class="font-outfit text-xs font-medium text-white/40">
+          {{ chartError }}
+        </span>
+      </div>
+      <div v-else-if="historyData.length === 0" class="flex h-full items-center justify-center">
         <span class="font-outfit text-xs font-medium text-white/20">
           {{ t('dashboard.noDataYet') }}
         </span>

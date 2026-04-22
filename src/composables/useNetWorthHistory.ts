@@ -1,17 +1,23 @@
+/**
+ * Reactive composable for the dashboard NetWorth chart.
+ *
+ * Thin orchestrator: reads filtered store snapshots, hands them to the
+ * pure helpers in `utils/netWorthHistory.ts`, and exposes the resulting
+ * data points + an error message if construction fails.
+ *
+ * Sign conventions, replay invariants, and per-event-type math live in
+ * the pure module. Adding a new transaction type or event source should
+ * happen there, not here.
+ */
 import { ref, computed } from 'vue';
 import { useAccountsStore } from '@/stores/accountsStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
-import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { convertAmount } from '@/utils/currency';
+import { buildNetWorthChanges, replayNetWorthHistory } from '@/utils/netWorthHistory';
 import {
   addDays,
-  addMonths,
-  getStartOfMonth,
-  getEndOfMonth,
   getStartOfDay,
-  toISODateString,
-  isDateBetween,
   formatDateShort,
   formatMonthYearShort,
   toDateInputValue,
@@ -42,125 +48,137 @@ function formatLabel(date: Date, period: PeriodKey): string {
   return formatMonthYearShort(date);
 }
 
+/**
+ * Build the descending list of chart-point dates for a given period.
+ * Newest-first to match the backward-walk replay direction.
+ */
+function buildChartPointsNewestFirst(period: PeriodKey, earliestTxnDate: Date | null): Date[] {
+  const now = getStartOfDay(new Date());
+  let startDate: Date;
+  let stepDays: number;
+
+  switch (period) {
+    case '1W':
+      startDate = addDays(now, -6);
+      stepDays = 1;
+      break;
+    case '1M':
+      startDate = addDays(now, -29);
+      stepDays = 1;
+      break;
+    case '3M':
+      startDate = addDays(now, -89);
+      stepDays = 3;
+      break;
+    case '1Y':
+      startDate = addDays(now, -364);
+      stepDays = 14;
+      break;
+    case 'all': {
+      if (earliestTxnDate) {
+        startDate = getStartOfDay(earliestTxnDate);
+        const minStart = addDays(now, -29);
+        if (startDate > minStart) startDate = minStart;
+      } else {
+        startDate = addDays(now, -89);
+      }
+      const totalDays = Math.max(
+        1,
+        Math.round((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      stepDays = Math.max(1, Math.round(totalDays / 30));
+      break;
+    }
+  }
+
+  const points: Date[] = [];
+  let cursor = new Date(now);
+  while (cursor >= startDate) {
+    points.push(new Date(cursor));
+    cursor = addDays(cursor, -stepDays);
+  }
+  if (points[points.length - 1]?.getTime() !== startDate.getTime()) {
+    points.push(new Date(startDate));
+  }
+  return points;
+}
+
 export function useNetWorthHistory() {
   const accountsStore = useAccountsStore();
+  const assetsStore = useAssetsStore();
   const transactionsStore = useTransactionsStore();
-  const recurringStore = useRecurringStore();
   const settingsStore = useSettingsStore();
 
   const selectedPeriod = ref<PeriodKey>('1M');
 
   /**
-   * Compute historical net worth data points by replaying transactions backwards.
+   * Single source of truth for chart state. Keeping data + error in one
+   * computed (rather than mutating an external ref from inside the
+   * computed) avoids the well-known anti-pattern of side effects in
+   * computeds, which can fire at surprising times under reactivity changes.
    *
-   * Starting from the current net worth, we walk backwards through time,
-   * reversing the effect of each transaction to reconstruct what the
-   * net worth was at each point in the past.
-   *
-   * Assets are treated as constant (no historical valuation data).
+   * `chartData` and `chartError` are thin destructure-computeds over this.
    */
-  const chartData = computed<NetWorthDataPoint[]>(() => {
-    const baseCurrency = settingsStore.baseCurrency;
-    const rates = settingsStore.exchangeRates;
-    const currentNetWorth = accountsStore.filteredCombinedNetWorth;
-    const period = selectedPeriod.value;
+  const chartResult = computed<{ data: NetWorthDataPoint[]; error: string | null }>(() => {
+    try {
+      const period = selectedPeriod.value;
+      const baseCurrency = settingsStore.baseCurrency;
+      const rates = settingsStore.exchangeRates;
 
-    const now = getStartOfDay(new Date());
-    let startDate: Date;
-    let stepDays: number;
+      const transactions = transactionsStore.filteredTransactions;
 
-    switch (period) {
-      case '1W':
-        startDate = addDays(now, -6);
-        stepDays = 1;
-        break;
-      case '1M':
-        startDate = addDays(now, -29);
-        stepDays = 1;
-        break;
-      case '3M':
-        startDate = addDays(now, -89);
-        stepDays = 3;
-        break;
-      case '1Y':
-        startDate = addDays(now, -364);
-        stepDays = 14;
-        break;
-      case 'all': {
-        const allTxns = transactionsStore.filteredTransactions;
-        if (allTxns.length > 0) {
-          const earliest = allTxns.reduce((min, t) => {
+      // Filter to net-worth-eligible entities ONCE here; downstream uses
+      // these snapshots and assumes they're already eligibility-filtered.
+      const eligibleAccounts = accountsStore.filteredAccounts.filter(
+        (a) => a.isActive && a.includeInNetWorth
+      );
+      const eligibleAssets = assetsStore.filteredAssets.filter((a) => a.includeInNetWorth);
+
+      const earliestTxnDate = transactions.length
+        ? transactions.reduce<Date>((min, t) => {
             const d = new Date(t.date);
             return d < min ? d : min;
-          }, new Date());
-          startDate = getStartOfDay(earliest);
-          const minStart = addDays(now, -29);
-          if (startDate > minStart) startDate = minStart;
-        } else {
-          startDate = addDays(now, -89);
-        }
-        const totalDays = Math.max(
-          1,
-          Math.round((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-        );
-        stepDays = Math.max(1, Math.round(totalDays / 30));
-        break;
-      }
-    }
+          }, new Date())
+        : null;
 
-    // Sorted newest-first for backward replay
-    const transactions = [...transactionsStore.filteredTransactions].sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+      const chartPointsNewestFirst = buildChartPointsNewestFirst(period, earliestTxnDate);
 
-    // Build date points from now backwards to startDate
-    const datePoints: Date[] = [];
-    let cursor = new Date(now);
-    while (cursor >= startDate) {
-      datePoints.push(new Date(cursor));
-      cursor = addDays(cursor, -stepDays);
-    }
-    if (datePoints[datePoints.length - 1]?.getTime() !== startDate.getTime()) {
-      datePoints.push(new Date(startDate));
-    }
-
-    // Process: walk date points newest→oldest, reversing transactions after each point
-    const result: NetWorthDataPoint[] = [];
-    let runningNetWorth = currentNetWorth;
-    let txnIdx = 0;
-
-    for (const pointDate of datePoints) {
-      // Reverse all transactions that happened after this date point
-      while (txnIdx < transactions.length) {
-        const txn = transactions[txnIdx]!;
-        const txnDate = getStartOfDay(new Date(txn.date));
-        if (txnDate <= pointDate) break;
-
-        const converted = convertAmount(txn.amount, txn.currency, baseCurrency, rates);
-
-        if (txn.type === 'income') {
-          runningNetWorth -= converted;
-        } else if (txn.type === 'expense') {
-          runningNetWorth += converted;
-        }
-        txnIdx++;
-      }
-
-      result.push({
-        date: pointDate,
-        label: formatLabel(pointDate, period),
-        value: runningNetWorth,
+      const changesNewestFirst = buildNetWorthChanges({
+        accounts: eligibleAccounts,
+        assets: eligibleAssets,
+        transactions,
+        baseCurrency,
+        rates,
       });
-    }
 
-    // datePoints were built newest→oldest, so reverse to get chronological order
-    result.reverse();
-    return result;
+      const values = replayNetWorthHistory({
+        currentNetWorth: accountsStore.filteredCombinedNetWorth,
+        chartPointsNewestFirst,
+        changesNewestFirst,
+      });
+
+      const data: NetWorthDataPoint[] = chartPointsNewestFirst.map((date, i) => ({
+        date,
+        label: formatLabel(date, period),
+        value: values[i] ?? 0,
+      }));
+      // Chart consumers expect chronological order (oldest → newest).
+      data.reverse();
+
+      return { data, error: null };
+    } catch (e) {
+      console.error('[useNetWorthHistory] chart construction failed:', e);
+      return {
+        data: [],
+        error: 'Could not render net worth history. Check the console for details.',
+      };
+    }
   });
 
-  /**
-   * Period-over-period comparison for net worth.
-   */
+  const chartData = computed(() => chartResult.value.data);
+  const chartError = computed(() => chartResult.value.error);
+
+  /** Period-over-period comparison: first vs last point in chronological order. */
   const periodComparison = computed<PeriodComparison>(() => {
     const data = chartData.value;
     if (data.length < 2) return { changeAmount: 0, changePercent: 0 };
@@ -176,75 +194,10 @@ export function useNetWorthHistory() {
     return { changeAmount, changePercent };
   });
 
-  // ── Last month comparison data for SummaryStatCards ────────────────────────
-
-  const lastMonthOneTimeIncome = computed(() => {
-    const baseCurrency = settingsStore.baseCurrency;
-    const rates = settingsStore.exchangeRates;
-    const lastMonth = addMonths(new Date(), -1);
-    const start = toISODateString(getStartOfMonth(lastMonth));
-    const end = toISODateString(getEndOfMonth(lastMonth));
-
-    return transactionsStore.filteredTransactions
-      .filter((t) => t.type === 'income' && !t.recurringItemId && isDateBetween(t.date, start, end))
-      .reduce((sum, t) => sum + convertAmount(t.amount, t.currency, baseCurrency, rates), 0);
-  });
-
-  const lastMonthOneTimeExpenses = computed(() => {
-    const baseCurrency = settingsStore.baseCurrency;
-    const rates = settingsStore.exchangeRates;
-    const lastMonth = addMonths(new Date(), -1);
-    const start = toISODateString(getStartOfMonth(lastMonth));
-    const end = toISODateString(getEndOfMonth(lastMonth));
-
-    return transactionsStore.filteredTransactions
-      .filter(
-        (t) => t.type === 'expense' && !t.recurringItemId && isDateBetween(t.date, start, end)
-      )
-      .reduce((sum, t) => sum + convertAmount(t.amount, t.currency, baseCurrency, rates), 0);
-  });
-
-  const lastMonthIncome = computed(
-    () => lastMonthOneTimeIncome.value + recurringStore.filteredTotalMonthlyRecurringIncome
-  );
-
-  const lastMonthExpenses = computed(
-    () => lastMonthOneTimeExpenses.value + recurringStore.filteredTotalMonthlyRecurringExpenses
-  );
-
-  const lastMonthCashFlow = computed(() => lastMonthIncome.value - lastMonthExpenses.value);
-
-  const incomeChange = computed(() => {
-    const thisMonth =
-      transactionsStore.filteredThisMonthOneTimeIncome +
-      recurringStore.filteredTotalMonthlyRecurringIncome;
-    return thisMonth - lastMonthIncome.value;
-  });
-
-  const expenseChange = computed(() => {
-    const thisMonth =
-      transactionsStore.filteredThisMonthOneTimeExpenses +
-      recurringStore.filteredTotalMonthlyRecurringExpenses;
-    return thisMonth - lastMonthExpenses.value;
-  });
-
-  const cashFlowChange = computed(() => {
-    const thisMonthIncome =
-      transactionsStore.filteredThisMonthOneTimeIncome +
-      recurringStore.filteredTotalMonthlyRecurringIncome;
-    const thisMonthExpenses =
-      transactionsStore.filteredThisMonthOneTimeExpenses +
-      recurringStore.filteredTotalMonthlyRecurringExpenses;
-    const thisMonthCashFlow = thisMonthIncome - thisMonthExpenses;
-    return thisMonthCashFlow - lastMonthCashFlow.value;
-  });
-
   return {
     selectedPeriod,
     chartData,
+    chartError,
     periodComparison,
-    incomeChange,
-    expenseChange,
-    cashFlowChange,
   };
 }

@@ -1,4 +1,5 @@
 import { createAutomergeRepository } from '../automergeRepository';
+import { accountNetWorthMultiplier } from '@/utils/finance';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
 const repo = createAutomergeRepository<'accounts', Account, CreateAccountInput, UpdateAccountInput>(
@@ -37,8 +38,5 @@ export async function getTotalBalance(memberId?: string): Promise<number> {
   const accounts = memberId ? await getAccountsByMemberId(memberId) : await getAllAccounts();
   return accounts
     .filter((a) => a.isActive && a.includeInNetWorth)
-    .reduce((sum, account) => {
-      const multiplier = account.type === 'credit_card' || account.type === 'loan' ? -1 : 1;
-      return sum + account.balance * multiplier;
-    }, 0);
+    .reduce((sum, account) => sum + account.balance * accountNetWorthMultiplier(account), 0);
 }

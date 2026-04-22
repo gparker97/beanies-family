@@ -13,6 +13,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { getActivityCategoryById } from '@/constants/activityCategories';
 import { tripTypeEmoji } from '@/utils/vacation';
 import { formatDateShort } from '@/utils/date';
+import { getTransactionVisual } from '@/utils/transactionLabel';
 
 type ResultType =
   | 'activity'
@@ -171,7 +172,7 @@ const results = computed<SearchResult[]>(() => {
         type: 'transaction',
         title: tx.description,
         subtitle: `${tx.type} · ${tx.currency} ${tx.amount}${tx.date ? ' · ' + formatDateShort(tx.date) : ''}`,
-        icon: tx.type === 'income' ? '💚' : tx.type === 'transfer' ? '🔄' : '🧡',
+        icon: getTransactionVisual(tx).icon,
       });
     }
   }
