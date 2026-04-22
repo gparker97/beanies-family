@@ -14,6 +14,12 @@ tags:
   - family-organization
   - overwhelm
   - parenting
+keyTakeaways:
+  - Family overwhelm is structural, not a personal failure — the cause is fragmented tools, invisible mental load, and a culture that undervalues rest.
+  - The biggest single win is consolidating family logistics into one shared place the whole family can see and contribute to.
+  - Name the mental load out loud — if it's not visible to everyone in the household, it stays the responsibility of whoever is tracking it in their head.
+  - Protect recovery time like you'd protect a meeting — unscheduled white space on the family calendar is not a bug, it's a feature.
+  - Start with one small reset (one calendar, one to-do surface, one weekly family huddle) before trying to overhaul everything at once.
 draft: true
 ---
 
