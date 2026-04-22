@@ -4,12 +4,16 @@ import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
 import tailwindcss from '@tailwindcss/vite';
+import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
 
 export default defineConfig({
   site: 'https://beanies.family',
   trailingSlash: 'never',
   build: {
     format: 'file',
+  },
+  markdown: {
+    rehypePlugins: [rehypeGuideAnnotations],
   },
   // Canonical homepage is the apex (beanies.family). Anyone hitting /home
   // gets sent there. /welcome is an app-surface URL — kick it to the PWA so
