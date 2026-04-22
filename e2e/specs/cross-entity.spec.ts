@@ -4,6 +4,7 @@ import { AssetsPage } from '../page-objects/AssetsPage';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { ui } from '../helpers/ui-strings';
+import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 
 // ---------------------------------------------------------------------------
 // Institution Combobox
@@ -325,9 +326,7 @@ test.describe('Loan & Activity Linking', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
     // Dismiss the "Activity Created" confirmation modal
-    const confirmOk = page.locator('[role="dialog"]').getByRole('button', { name: /^ok$/i });
-    await confirmOk.click({ timeout: 5000 });
-    await expect(confirmOk).not.toBeVisible({ timeout: 3000 });
+    await dismissActivityCreatedConfirm(page);
   }
 
   test('Activity with monthly fee creates recurring item', async ({ page }) => {
@@ -426,9 +425,7 @@ test.describe('Loan & Activity Linking', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
     // Dismiss the "Activity Created" confirmation modal
-    const confirmOk2 = page.locator('[role="dialog"]').getByRole('button', { name: /^ok$/i });
-    await confirmOk2.click({ timeout: 5000 });
-    await expect(confirmOk2).not.toBeVisible({ timeout: 3000 });
+    await dismissActivityCreatedConfirm(page);
 
     // Verify activity was created without recurring item
     let data = await dbHelper.exportData();
