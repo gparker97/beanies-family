@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-21",
-    "translationCount": 2401
+    "lastUpdated": "2026-04-22",
+    "translationCount": 2404
   },
   "translations": {
     "app.name": {
@@ -12010,6 +12010,21 @@
       "translation": "余额调整",
       "hash": "as72y7",
       "lastUpdated": "2026-04-21"
+    },
+    "modal.remainingAmount": {
+      "translation": "剩余金额",
+      "hash": "aottdu",
+      "lastUpdated": "2026-04-22"
+    },
+    "goalContribute.deleteConfirmTitle": {
+      "translation": "删除此贡献？",
+      "hash": "s8afz2",
+      "lastUpdated": "2026-04-22"
+    },
+    "goalContribute.deleteConfirmMessage": {
+      "translation": "这将从您的目标进度中扣除。",
+      "hash": "8n4swc",
+      "lastUpdated": "2026-04-22"
     }
   }
 }
