@@ -4,6 +4,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { AUTHOR } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
 import { isPublished } from '~/utils/content';
+// Fraunces: humanist serif used for guide body prose only. Scoped here so
+// it doesn't ship on every marketing page. Variable font = single file.
+import '@fontsource-variable/fraunces';
 
 export async function getStaticPaths() {
   const guides = await getCollection('guides', isPublished);
@@ -18,12 +21,16 @@ const { Content, headings } = await render(guide);
 
 const canonicalPath = `/guides/${guide.data.slug}`;
 
-// Build ToC from H2 headings. H3s are skipped — too granular for a pillar ToC
-// and clutters the sidebar. Each heading already gets an id from Astro's
-// default slugger (rehype-slug-style).
+// Build ToC from H2 headings. H3s skipped — too granular for a pillar ToC
+// and clutters the rail. Astro's default slugger gives each an id.
 const toc = headings.filter((h) => h.depth === 2);
 
-// Resolve related blog posts from frontmatter slugs (drafts stay excluded)
+// Rough reading time: 220 wpm against the rendered-content body. Pulled
+// from the raw markdown body (Astro doesn't expose word count directly).
+const wordCount = guide.body?.split(/\s+/).filter(Boolean).length ?? 0;
+const readingMinutes = Math.max(1, Math.round(wordCount / 220));
+
+// Resolve related blog posts from frontmatter slugs (drafts stay excluded).
 const allPosts = await getCollection('blog', isPublished);
 const related = guide.data.relatedPosts
   .map((slug) => allPosts.find((p) => p.data.slug === slug))
@@ -37,7 +44,7 @@ const related = guide.data.relatedPosts
 const fmt = (d: Date) =>
   d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-// Article JSON-LD — TechArticle subtype since guides are informational references
+// Article JSON-LD — TechArticle subtype since guides are informational reference.
 const articleSchema = {
   '@type': 'Article',
   headline: guide.data.title,
@@ -62,67 +69,131 @@ const articleSchema = {
   modifiedTime={guide.data.lastUpdated.toISOString()}
   jsonLd={[articleSchema, AUTHOR]}
 >
+  <!-- Reading progress bar: pure CSS via scroll-timeline where supported,
+       no-op elsewhere. Thin Heritage Orange strip across the top of the page. -->
+  <div class="guide-progress" aria-hidden="true"><span></span></div>
+
   <article class="guide-page">
-    <div class="guide-container">
-      <a href="/guides" class="guide-back">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <polyline points="15 18 9 12 15 6"></polyline>
-        </svg>
-        all guides
-      </a>
+    <div class="guide-shell">
+      <!-- Left column: article body. Right column on wide screens: sticky
+           section rail. Everything else collapses gracefully on narrow. -->
+      <div class="guide-main">
+        <a href="/guides" class="guide-back">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+          all guides
+        </a>
 
-      <header class="guide-header">
-        {guide.data.heroEmoji && <div class="guide-hero-emoji">{guide.data.heroEmoji}</div>}
-        <h1 class="guide-title">{guide.data.title}</h1>
-        <p class="guide-excerpt">{guide.data.excerpt}</p>
-        <p class="guide-updated">
-          <time datetime={guide.data.lastUpdated.toISOString()}>
-            updated {fmt(guide.data.lastUpdated)}
-          </time>
-          {
-            guide.data.lastUpdated.getTime() !== guide.data.publishedDate.getTime() && (
-              <span class="guide-published">
-                · first published <time datetime={guide.data.publishedDate.toISOString()}>{fmt(guide.data.publishedDate)}</time>
-              </span>
-            )
-          }
-        </p>
-      </header>
+        <header class="guide-header">
+          <p class="guide-kicker">
+            <span class="guide-kicker-dot" aria-hidden="true"></span>
+            the beanies guides · pillar
+          </p>
+          {guide.data.heroEmoji && <div class="guide-hero-emoji">{guide.data.heroEmoji}</div>}
+          <h1 class="guide-title">{guide.data.title}</h1>
+          <p class="guide-excerpt">{guide.data.excerpt}</p>
+          <p class="guide-meta">
+            <span class="guide-meta-dot">·</span>
+            <time datetime={guide.data.lastUpdated.toISOString()}>
+              updated {fmt(guide.data.lastUpdated)}
+            </time>
+            <span class="guide-meta-dot">·</span>
+            <span>{readingMinutes} min read</span>
+            {
+              guide.data.lastUpdated.getTime() !== guide.data.publishedDate.getTime() && (
+                <>
+                  <span class="guide-meta-dot">·</span>
+                  <span>first published <time datetime={guide.data.publishedDate.toISOString()}>{fmt(guide.data.publishedDate)}</time></span>
+                </>
+              )
+            }
+          </p>
+        </header>
 
-      {
-        toc.length > 2 && (
-          <nav class="guide-toc" aria-label="Table of contents">
-            <p class="guide-toc-label">what's in this guide</p>
-            <ol class="guide-toc-list">
-              {toc.map((h) => (
-                <li><a href={`#${h.slug}`}>{h.text}</a></li>
-              ))}
-            </ol>
-          </nav>
-        )
-      }
+        {
+          toc.length > 2 && (
+            <nav class="guide-toc" aria-label="what's in this guide">
+              <p class="guide-toc-label">what's in this guide</p>
+              <ol class="guide-toc-list">
+                {toc.map((h, i) => (
+                  <li>
+                    <a href={`#${h.slug}`}>
+                      <span class="guide-toc-num">{String(i + 1).padStart(2, '0')}</span>
+                      <span class="guide-toc-text">{h.text}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )
+        }
 
-      <div class="guide-divider"></div>
+        <div class="guide-divider guide-divider-top" aria-hidden="true">
+          <span class="guide-divider-glyph">🫘</span>
+        </div>
 
-      <div class="guide-prose" id="guide-content">
-        <Content />
+        <div class="guide-prose" id="guide-content">
+          <Content />
+        </div>
+
+        {
+          guide.data.keyTakeaways.length > 0 && (
+            <section class="guide-recap" aria-labelledby="guide-recap-title">
+              <div class="guide-recap-eyebrow">recap</div>
+              <h2 id="guide-recap-title" class="guide-recap-title">what to take away</h2>
+              <ol class="guide-recap-list">
+                {guide.data.keyTakeaways.map((point, i) => (
+                  <li>
+                    <span class="guide-recap-num" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                    <span class="guide-recap-text">{point}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )
+        }
+
+        {
+          related.length > 0 && (
+            <aside class="guide-related">
+              <p class="guide-related-eyebrow">further reading</p>
+              <h2 class="guide-related-title">from the beanstalk</h2>
+              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
+              <ul class="guide-related-list">
+                {related.map((post) => (
+                  <li>
+                    <a href={post.href}>
+                      <span class="guide-related-arrow" aria-hidden="true">→</span>
+                      <span>
+                        <span class="guide-related-post-title">{post.title}</span>
+                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )
+        }
       </div>
 
       {
-        related.length > 0 && (
-          <aside class="guide-related">
-            <h2 class="guide-related-title">further reading</h2>
-            <p class="guide-related-sub">personal stories + product updates from the beanstalk blog:</p>
-            <ul class="guide-related-list">
-              {related.map((post) => (
-                <li>
-                  <a href={post.href}>
-                    <span class="guide-related-post-title">{post.title}</span>
-                    <span class="guide-related-post-excerpt">{post.excerpt}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
+        toc.length > 2 && (
+          <aside class="guide-rail" aria-hidden="true">
+            <div class="guide-rail-inner">
+              <p class="guide-rail-label">sections</p>
+              <ol class="guide-rail-list">
+                {toc.map((h, i) => (
+                  <li>
+                    <a href={`#${h.slug}`} data-rail-target={h.slug}>
+                      <span class="guide-rail-num">{String(i + 1).padStart(2, '0')}</span>
+                      <span class="guide-rail-text">{h.text}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </aside>
         )
       }
@@ -130,207 +201,814 @@ const articleSchema = {
   </article>
 </BaseLayout>
 
+<script>
+  // Rail-section sync: highlight the current H2 in the sticky rail as the
+  // reader scrolls. Works with IntersectionObserver. Falls back to no-op if
+  // the rail isn't rendered (short guides) or the API is unavailable.
+  const railLinks = document.querySelectorAll<HTMLAnchorElement>('[data-rail-target]');
+  if (railLinks.length > 0 && 'IntersectionObserver' in window) {
+    const headings = Array.from(
+      document.querySelectorAll<HTMLHeadingElement>('.guide-prose h2[id]')
+    );
+    const byId = new Map<string, HTMLAnchorElement>();
+    railLinks.forEach((a) => {
+      const slug = a.dataset.railTarget;
+      if (slug) byId.set(slug, a);
+    });
+
+    let currentActive: HTMLAnchorElement | null = null;
+    const activate = (slug: string | undefined) => {
+      if (!slug) return;
+      const next = byId.get(slug);
+      if (!next || next === currentActive) return;
+      currentActive?.classList.remove('is-active');
+      next.classList.add('is-active');
+      currentActive = next;
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) activate(visible[0].target.id);
+      },
+      { rootMargin: '-10% 0px -70% 0px', threshold: 0 }
+    );
+
+    headings.forEach((h) => observer.observe(h));
+    if (headings[0]) activate(headings[0].id);
+  }
+
+  // Copy-link on H2 hover — lightweight zero-deps version.
+  for (const h of document.querySelectorAll<HTMLHeadingElement>('.guide-prose h2[id]')) {
+    const a = document.createElement('a');
+    a.href = `#${h.id}`;
+    a.className = 'guide-h2-anchor';
+    a.setAttribute('aria-label', 'copy link to this section');
+    a.textContent = '#';
+    h.appendChild(a);
+  }
+</script>
+
 <style is:global>
   .guide-page {
     --deep-slate: #2c3e50;
     --heritage-orange: #f15d22;
     --terracotta: #e67e22;
+    --sky-silk: #aed6f1;
     --cloud-white: #f8f9fa;
+    --kraft: #f3ecd8;
+    --ink: #1f2d3d;
+    --muted: rgb(44 62 80 / 60%);
+    --hairline: rgb(44 62 80 / 8%);
+    --font-display: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    --font-serif: 'Fraunces Variable', 'Fraunces', 'Source Serif 4', Georgia, serif;
+    --font-hand: 'Caveat', 'Caveat Variable', cursive;
     background: var(--cloud-white);
+    background-image:
+      radial-gradient(circle at 8% 12%, rgb(241 93 34 / 3%) 0%, transparent 40%),
+      radial-gradient(circle at 92% 88%, rgb(174 214 241 / 6%) 0%, transparent 45%);
     min-height: 100vh;
     overflow-x: hidden;
+    position: relative;
   }
-  .guide-container {
+
+  /* Reading progress bar — uses scroll-timeline where supported (modern
+     Chromium + Firefox Nightly). No JS needed. Other browsers: the bar
+     stays at 0% width, which is fine — it's decorative, not load-bearing. */
+  .guide-progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    z-index: 50;
+    pointer-events: none;
+    background: transparent;
+  }
+  .guide-progress span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--heritage-orange), var(--terracotta));
+    box-shadow: 0 0 8px rgb(241 93 34 / 40%);
+  }
+  @supports (animation-timeline: scroll()) {
+    .guide-progress span {
+      width: 100%;
+      transform-origin: 0 50%;
+      animation: guide-progress-grow linear both;
+      animation-timeline: scroll(root block);
+    }
+    @keyframes guide-progress-grow {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+  }
+
+  .guide-shell {
     box-sizing: border-box;
+    display: grid;
+    gap: 48px;
+    grid-template-columns: minmax(0, 1fr);
     margin: 0 auto;
-    max-width: 720px;
+    max-width: 780px;
     padding: 88px 24px 64px;
   }
+  @media (min-width: 1200px) {
+    .guide-shell {
+      grid-template-columns: minmax(0, 720px) 200px;
+      max-width: 1000px;
+    }
+  }
+  @media (min-width: 1440px) {
+    .guide-shell {
+      grid-template-columns: minmax(0, 760px) 220px;
+      max-width: 1080px;
+    }
+  }
+
+  .guide-main { min-width: 0; }
+
   .guide-back {
     align-items: center;
-    color: rgb(44 62 80 / 35%);
+    color: rgb(44 62 80 / 45%);
     display: inline-flex;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
+    font-family: var(--font-display);
     font-size: 0.75rem;
     font-weight: 600;
-    gap: 4px;
-    margin-bottom: 24px;
+    gap: 6px;
+    letter-spacing: 0.02em;
+    margin-bottom: 32px;
     text-decoration: none;
-    transition: color 200ms;
+    text-transform: lowercase;
+    transition: color 200ms, gap 200ms;
   }
-  .guide-back:hover { color: var(--heritage-orange); }
+  .guide-back:hover {
+    color: var(--heritage-orange);
+    gap: 10px;
+  }
 
-  .guide-header { margin-bottom: 32px; }
-  .guide-hero-emoji { font-size: 3rem; line-height: 1; margin-bottom: 16px; }
-  .guide-title {
-    color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 2rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-    margin: 0;
+  /* Hero — magazine-cover treatment. Kicker + oversized title + subtitle. */
+  .guide-header {
+    position: relative;
+    margin-bottom: 40px;
+    padding-bottom: 32px;
   }
-  .guide-excerpt {
-    color: rgb(44 62 80 / 70%);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.0625rem;
-    line-height: 1.55;
-    margin: 12px 0 0;
-  }
-  .guide-updated {
-    color: rgb(44 62 80 / 40%);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.75rem;
-    margin: 16px 0 0;
-  }
-  .guide-published { margin-left: 4px; }
-
-  .guide-toc {
-    background: white;
-    border: 1px solid rgb(44 62 80 / 8%);
-    border-radius: 20px;
-    margin: 32px 0;
-    padding: 24px;
-  }
-  .guide-toc-label {
-    color: rgb(44 62 80 / 50%);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
+  .guide-kicker {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: inline-flex;
+    font-family: var(--font-display);
     font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    margin: 0 0 12px;
+    gap: 8px;
+    letter-spacing: 0.16em;
+    margin: 0 0 20px;
     text-transform: uppercase;
   }
-  .guide-toc-list { list-style: decimal inside; margin: 0; padding: 0; }
-  .guide-toc-list li { color: rgb(44 62 80 / 40%); font-size: 0.875rem; padding: 4px 0; }
-  .guide-toc-list li a {
+  .guide-kicker-dot {
+    background: var(--heritage-orange);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgb(241 93 34 / 18%);
+    display: inline-block;
+    height: 6px;
+    width: 6px;
+  }
+  .guide-hero-emoji {
+    font-size: 3.5rem;
+    line-height: 1;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 8px 24px rgb(241 93 34 / 18%));
+    transform-origin: center;
+    animation: guide-emoji-breathe 6s ease-in-out infinite;
+  }
+  @keyframes guide-emoji-breathe {
+    0%, 100% { transform: scale(1) rotate(-2deg); }
+    50% { transform: scale(1.04) rotate(2deg); }
+  }
+  .guide-title {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+    margin: 0;
+    max-width: 18ch;
+  }
+  .guide-excerpt {
+    color: rgb(44 62 80 / 72%);
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: 1.25rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.55;
+    margin: 20px 0 0;
+    max-width: 34ch;
+  }
+  .guide-meta {
+    color: rgb(44 62 80 / 48%);
+    display: flex;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 500;
+    gap: 8px;
+    letter-spacing: 0.02em;
+    margin: 28px 0 0;
+  }
+  .guide-meta-dot { color: var(--heritage-orange); font-weight: 700; opacity: 0.55; }
+
+  /* Top ToC — kept for pillar-level overview + AIO crawlers. Redesigned
+     with numbered chapter list and hairline rule. Still semantic <ol>. */
+  .guide-toc {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(243, 236, 216, 0.55));
+    border: 1px solid var(--hairline);
+    border-radius: 24px;
+    box-shadow: 0 1px 0 rgb(44 62 80 / 3%), 0 12px 28px rgb(44 62 80 / 4%);
+    margin: 36px 0 40px;
+    padding: 28px 32px;
+    position: relative;
+  }
+  .guide-toc::before {
+    content: '🫘';
+    font-size: 1.25rem;
+    left: 24px;
+    opacity: 0.45;
+    position: absolute;
+    top: -14px;
+    background: var(--cloud-white);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .guide-toc-label {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    margin: 0 0 16px;
+    text-transform: uppercase;
+  }
+  .guide-toc-list { counter-reset: chapter; list-style: none; margin: 0; padding: 0; }
+  .guide-toc-list li {
+    border-top: 1px solid var(--hairline);
+    padding: 0;
+  }
+  .guide-toc-list li:first-child { border-top: none; }
+  .guide-toc-list li a {
+    align-items: baseline;
+    color: var(--deep-slate);
+    display: grid;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
     font-weight: 600;
+    gap: 16px;
+    grid-template-columns: 28px 1fr;
+    padding: 12px 0;
     text-decoration: none;
+    transition: color 180ms, padding 180ms;
   }
-  .guide-toc-list li a:hover { color: var(--heritage-orange); }
+  .guide-toc-list li a:hover {
+    color: var(--heritage-orange);
+    padding-left: 4px;
+  }
+  .guide-toc-num {
+    color: var(--heritage-orange);
+    font-family: var(--font-serif);
+    font-size: 0.85rem;
+    font-style: italic;
+    font-weight: 600;
+    opacity: 0.7;
+  }
 
+  /* Decorative divider — bean glyph centered between sections. */
   .guide-divider {
-    background: rgb(44 62 80 / 8%);
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    margin: 32px 0 40px;
+    position: relative;
+  }
+  .guide-divider::before,
+  .guide-divider::after {
+    background: linear-gradient(90deg, transparent, var(--hairline), var(--hairline), transparent);
+    content: '';
+    flex: 1;
     height: 1px;
-    margin: 24px 0;
+    max-width: 140px;
+  }
+  .guide-divider-glyph {
+    color: var(--heritage-orange);
+    font-size: 0.9rem;
+    letter-spacing: 0.3em;
+    margin: 0 16px;
+    opacity: 0.55;
   }
 
-  .guide-prose { overflow-wrap: anywhere; word-break: break-word; }
+  /* Prose body — Fraunces serif, relaxed rhythm, generous spacing. */
+  .guide-prose {
+    counter-reset: chapter;
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* H2 — chapter opener with eyebrow + ornamental glyph. */
   .guide-prose h2 {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.375rem;
-    font-weight: 700;
-    margin: 2.5rem 0 0.75rem;
+    counter-increment: chapter;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 1.875rem);
+    font-weight: 800;
+    letter-spacing: -0.018em;
+    line-height: 1.18;
+    margin: 4.5rem 0 1.25rem;
+    padding-top: 2.5rem;
+    position: relative;
     scroll-margin-top: 90px;
+    text-wrap: balance;
   }
+  .guide-prose h2::before {
+    color: var(--heritage-orange);
+    content: 'chapter ' counter(chapter, decimal-leading-zero);
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    margin-bottom: 10px;
+    opacity: 0.85;
+    text-transform: uppercase;
+  }
+  .guide-prose h2::after {
+    background: var(--heritage-orange);
+    border-radius: 999px;
+    content: '';
+    display: block;
+    height: 3px;
+    margin-top: 18px;
+    width: 48px;
+  }
+  /* Copy-link glyph appended by the script above. */
+  .guide-prose .guide-h2-anchor {
+    color: rgb(44 62 80 / 15%);
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-left: 12px;
+    opacity: 0;
+    text-decoration: none;
+    transition: opacity 160ms, color 160ms;
+    vertical-align: middle;
+  }
+  .guide-prose h2:hover .guide-h2-anchor {
+    color: var(--heritage-orange);
+    opacity: 1;
+  }
+
   .guide-prose h3 {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin: 1.75rem 0 0.5rem;
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.3;
+    margin: 2.25rem 0 0.75rem;
     scroll-margin-top: 90px;
   }
-  .guide-prose p {
-    color: rgb(44 62 80 / 75%);
-    font-size: 1rem;
-    line-height: 1.75;
-    margin-bottom: 1rem;
+  .guide-prose h3::before {
+    color: var(--heritage-orange);
+    content: '§';
+    font-family: var(--font-serif);
+    font-weight: 600;
+    margin-right: 10px;
+    opacity: 0.7;
   }
+
+  /* Paragraphs — relaxed serif body. */
+  .guide-prose p {
+    color: var(--ink);
+    margin-bottom: 1.25rem;
+  }
+  .guide-prose p:last-child { margin-bottom: 0; }
   .guide-prose strong { color: var(--deep-slate); font-weight: 600; }
-  .guide-prose em { font-style: italic; }
+  .guide-prose em { color: var(--deep-slate); font-style: italic; }
   .guide-prose a {
     color: var(--heritage-orange);
-    font-weight: 600;
-    text-decoration: none;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(241 93 34 / 35%);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: text-decoration-color 180ms, color 180ms;
   }
-  .guide-prose a:hover { color: var(--terracotta); text-decoration: underline; }
-  .guide-prose ul, .guide-prose ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+  .guide-prose a:hover {
+    color: var(--terracotta);
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+  }
+
+  /* Lead paragraph — first <p> after each H2 gets a drop-cap. Class is
+     added by rehype-guide-annotations.mjs. Never matches the short-answer
+     paragraph. */
+  .guide-prose .guide-lead {
+    font-size: 1.125rem;
+    font-weight: 400;
+  }
+  .guide-prose .guide-lead::first-letter {
+    background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    float: left;
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: 4.25rem;
+    font-weight: 700;
+    line-height: 0.88;
+    margin: 0.24rem 0.5rem -0.1rem -0.15rem;
+    padding-right: 4px;
+  }
+
+  /* Short-answer block — the AIO citation chunk. Kraft-paper card with
+     Heritage Orange accent, "TL;DR" eyebrow (via CSS), quote-mark glyph.
+     Semantically still a <p> with <strong> inside. */
+  .guide-prose .guide-short-answer {
+    background: linear-gradient(135deg, rgba(243, 236, 216, 0.7), rgba(255, 255, 255, 0.85));
+    border: 1px solid rgb(241 93 34 / 12%);
+    border-left: 4px solid var(--heritage-orange);
+    border-radius: 18px;
+    box-shadow: 0 1px 0 rgb(44 62 80 / 2%), 0 10px 24px rgb(44 62 80 / 4%);
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    font-size: 1.125rem;
+    font-weight: 500;
+    line-height: 1.6;
+    margin: 1.5rem 0 2rem;
+    padding: 22px 28px 22px 60px;
+    position: relative;
+  }
+  .guide-prose .guide-short-answer::before {
+    color: rgb(241 93 34 / 30%);
+    content: '“';
+    font-family: var(--font-serif);
+    font-size: 3.5rem;
+    font-weight: 700;
+    left: 18px;
+    line-height: 1;
+    position: absolute;
+    top: 12px;
+  }
+  .guide-prose .guide-short-answer::after {
+    background: var(--heritage-orange);
+    border-radius: 999px;
+    color: white;
+    content: 'TL;DR';
+    font-family: var(--font-display);
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    padding: 4px 10px;
+    position: absolute;
+    right: 16px;
+    text-transform: uppercase;
+    top: -10px;
+  }
+  .guide-prose .guide-short-answer-label {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-right: 6px;
+    text-transform: uppercase;
+    vertical-align: 0.1em;
+  }
+
+  /* Lists — break up dense paragraphs. */
+  .guide-prose ul, .guide-prose ol {
+    margin: 0 0 1.5rem;
+    padding-left: 1.5rem;
+  }
   .guide-prose li {
-    color: rgb(44 62 80 / 75%);
-    line-height: 1.7;
-    margin-bottom: 0.375rem;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+    padding-left: 4px;
   }
-  .guide-prose ul li { list-style-type: disc; }
-  .guide-prose ol li { list-style-type: decimal; }
+  .guide-prose ul li::marker { color: var(--heritage-orange); }
+  .guide-prose ol li::marker { color: var(--heritage-orange); font-weight: 600; }
+
+  /* Blockquote — pull-quote-style treatment. Hand-font accent mark. */
   .guide-prose blockquote {
-    border-left: 3px solid var(--heritage-orange);
-    color: rgb(44 62 80 / 70%);
+    border: none;
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
     font-style: italic;
-    margin: 1.5rem 0;
-    padding: 0.25rem 0 0.25rem 1.25rem;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    line-height: 1.45;
+    margin: 2rem 0;
+    padding: 0 0 0 2.5rem;
+    position: relative;
   }
+  .guide-prose blockquote::before {
+    color: var(--heritage-orange);
+    content: '—';
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    left: 0;
+    line-height: 1;
+    opacity: 0.7;
+    position: absolute;
+    top: 0.1em;
+  }
+  .guide-prose blockquote p { color: inherit; font-size: inherit; margin-bottom: 0.75rem; }
+  .guide-prose blockquote p:last-child { margin-bottom: 0; }
+
   .guide-prose code {
-    background: rgb(44 62 80 / 5%);
+    background: rgb(44 62 80 / 6%);
     border-radius: 4px;
+    color: var(--deep-slate);
     font-family: ui-monospace, monospace;
-    font-size: 0.9em;
-    padding: 0.15em 0.4em;
+    font-size: 0.88em;
+    font-weight: 500;
+    padding: 0.15em 0.42em;
   }
   .guide-prose hr {
-    background: rgb(44 62 80 / 8%);
+    background: var(--hairline);
     border: none;
     height: 1px;
-    margin: 2rem 0;
+    margin: 2.5rem auto;
+    width: 60%;
   }
   .guide-prose img {
-    border: 1px solid rgb(44 62 80 / 8%);
-    border-radius: 16px;
+    border: 1px solid var(--hairline);
+    border-radius: 20px;
+    box-shadow: 0 12px 36px rgb(44 62 80 / 6%);
     display: block;
-    margin: 1.5rem auto;
+    margin: 2rem auto;
     max-width: 100%;
     width: 100%;
   }
 
+  /* Recap card — structured takeaways at the article's close.
+     Kraft-paper treatment, numbered list, acts as a visual "landing pad". */
+  .guide-recap {
+    background: linear-gradient(135deg, var(--deep-slate), #34495e 70%, #2c3e50);
+    background-image:
+      linear-gradient(135deg, rgba(241, 93, 34, 0.12), transparent 60%),
+      linear-gradient(135deg, var(--deep-slate), #34495e);
+    border-radius: 28px;
+    box-shadow: 0 1px 0 rgb(44 62 80 / 4%), 0 24px 60px rgb(44 62 80 / 14%);
+    color: white;
+    margin: 64px 0 48px;
+    overflow: hidden;
+    padding: 36px 36px 40px;
+    position: relative;
+  }
+  .guide-recap::before {
+    background: radial-gradient(circle, rgba(241, 93, 34, 0.25) 0%, transparent 70%);
+    border-radius: 50%;
+    content: '';
+    height: 260px;
+    position: absolute;
+    right: -80px;
+    top: -80px;
+    width: 260px;
+  }
+  .guide-recap-eyebrow {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    margin-bottom: 8px;
+    position: relative;
+    text-transform: uppercase;
+  }
+  .guide-recap-title {
+    color: white;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 24px;
+    position: relative;
+  }
+  .guide-recap-list {
+    counter-reset: recap;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    position: relative;
+  }
+  .guide-recap-list li {
+    align-items: baseline;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 40px 1fr;
+    padding: 16px 0;
+  }
+  .guide-recap-list li:first-child { border-top: none; padding-top: 4px; }
+  .guide-recap-num {
+    color: var(--heritage-orange);
+    font-family: var(--font-serif);
+    font-size: 1.5rem;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .guide-recap-text {
+    color: rgba(255, 255, 255, 0.88);
+    font-family: var(--font-serif);
+    font-size: 1.025rem;
+    line-height: 1.55;
+  }
+
+  /* Related ("from the beanstalk") — paper-card, hand-font accent. */
   .guide-related {
     background: white;
-    border: 1px solid rgb(44 62 80 / 8%);
+    border: 1px solid var(--hairline);
     border-radius: 24px;
-    margin-top: 48px;
-    padding: 28px;
+    box-shadow: 0 1px 0 rgb(44 62 80 / 2%), 0 8px 24px rgb(44 62 80 / 3%);
+    margin-top: 32px;
+    padding: 32px;
+  }
+  .guide-related-eyebrow {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    margin: 0 0 6px;
+    text-transform: uppercase;
   }
   .guide-related-title {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.125rem;
-    font-weight: 700;
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
     margin: 0;
   }
   .guide-related-sub {
-    color: rgb(44 62 80 / 55%);
-    font-size: 0.875rem;
-    margin: 6px 0 16px;
+    color: var(--muted);
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    font-style: italic;
+    margin: 6px 0 18px;
   }
   .guide-related-list { list-style: none; margin: 0; padding: 0; }
-  .guide-related-list li { border-top: 1px solid rgb(44 62 80 / 6%); }
+  .guide-related-list li { border-top: 1px solid var(--hairline); }
   .guide-related-list li:first-child { border-top: none; }
   .guide-related-list a {
+    align-items: start;
     color: var(--deep-slate);
-    display: block;
-    padding: 14px 0;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 24px 1fr;
+    padding: 16px 0;
     text-decoration: none;
+    transition: color 180ms, gap 180ms;
   }
-  .guide-related-list a:hover { color: var(--heritage-orange); }
+  .guide-related-list a:hover {
+    color: var(--heritage-orange);
+    gap: 20px;
+  }
+  .guide-related-arrow {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    opacity: 0.5;
+    transition: opacity 180ms;
+  }
+  .guide-related-list a:hover .guide-related-arrow { opacity: 1; }
   .guide-related-post-title {
     display: block;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.9375rem;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
     font-weight: 600;
   }
   .guide-related-post-excerpt {
-    color: rgb(44 62 80 / 55%);
+    color: var(--muted);
     display: block;
-    font-size: 0.8125rem;
+    font-family: var(--font-serif);
+    font-size: 0.92rem;
+    font-style: italic;
+    line-height: 1.5;
     margin-top: 4px;
   }
 
+  /* Sticky section rail — only mounts on wide viewports via grid. */
+  .guide-rail {
+    display: none;
+  }
+  @media (min-width: 1200px) {
+    .guide-rail {
+      display: block;
+    }
+    .guide-rail-inner {
+      position: sticky;
+      top: 100px;
+      padding-top: 8px;
+    }
+    .guide-rail-label {
+      color: var(--heritage-orange);
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      margin: 0 0 14px;
+      padding-left: 16px;
+      text-transform: uppercase;
+    }
+    .guide-rail-list {
+      border-left: 1px solid var(--hairline);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .guide-rail-list li { padding: 0; }
+    .guide-rail-list a {
+      color: rgb(44 62 80 / 48%);
+      display: grid;
+      font-family: var(--font-display);
+      font-size: 0.78rem;
+      gap: 10px;
+      grid-template-columns: 24px 1fr;
+      padding: 6px 0 6px 16px;
+      position: relative;
+      text-decoration: none;
+      transition: color 180ms, transform 180ms;
+    }
+    .guide-rail-list a::before {
+      background: transparent;
+      border-radius: 999px;
+      content: '';
+      height: 6px;
+      left: -3.5px;
+      position: absolute;
+      top: 12px;
+      transition: background 180ms, box-shadow 180ms, transform 180ms;
+      width: 6px;
+    }
+    .guide-rail-list a:hover {
+      color: var(--deep-slate);
+      transform: translateX(2px);
+    }
+    .guide-rail-list a.is-active {
+      color: var(--heritage-orange);
+      font-weight: 600;
+    }
+    .guide-rail-list a.is-active::before {
+      background: var(--heritage-orange);
+      box-shadow: 0 0 0 3px rgb(241 93 34 / 18%);
+      transform: scale(1.15);
+    }
+    .guide-rail-num {
+      color: var(--heritage-orange);
+      font-family: var(--font-serif);
+      font-size: 0.78rem;
+      font-style: italic;
+      font-weight: 600;
+      opacity: 0.55;
+    }
+    .guide-rail-text {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.35;
+      overflow: hidden;
+    }
+  }
+
+  /* Reduced-motion users: no emoji breathing, no progress animation. */
+  @media (prefers-reduced-motion: reduce) {
+    .guide-hero-emoji { animation: none; transform: none; }
+    .guide-progress span { animation: none; }
+  }
+
+  /* Narrow screens — tighten padding + shrink hero. */
   @media (max-width: 520px) {
-    .guide-container { padding-top: 76px; }
-    .guide-title { font-size: 1.5rem; }
-    .guide-excerpt { font-size: 0.9375rem; }
+    .guide-shell { padding: 76px 20px 48px; }
+    .guide-header { margin-bottom: 28px; padding-bottom: 24px; }
+    .guide-title { font-size: clamp(1.75rem, 8vw, 2.25rem); }
+    .guide-excerpt { font-size: 1.05rem; }
+    .guide-toc { padding: 22px 20px; }
+    .guide-prose { font-size: 1.05rem; }
+    .guide-prose h2 { margin-top: 3.5rem; padding-top: 2rem; }
+    .guide-prose .guide-short-answer { font-size: 1.05rem; padding: 22px 20px 22px 46px; }
+    .guide-prose .guide-short-answer::before { font-size: 2.75rem; left: 12px; }
+    .guide-prose .guide-lead::first-letter { font-size: 3.5rem; }
+    .guide-recap { padding: 28px 24px; }
+    .guide-related { padding: 24px; }
   }
 </style>

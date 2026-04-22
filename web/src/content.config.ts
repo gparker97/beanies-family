@@ -52,6 +52,9 @@ const guides = defineCollection({
     /** Blog post slugs that act as spokes for this pillar — rendered in "further reading". */
     relatedPosts: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
+    /** Optional recap bullets rendered in the "what to take away" card at
+     *  the end of the guide. Structured plaintext for AIO skim + citation. */
+    keyTakeaways: z.array(z.string()).default([]),
     /** When true, the entry is hidden from production builds (list pages,
      *  sitemap, direct URL). Visible in `npm run dev:web` so drafts can
      *  be iterated locally. See `isPublished()` in utils/content.ts. */
