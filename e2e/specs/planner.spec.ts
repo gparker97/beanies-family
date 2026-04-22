@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { ui } from '../helpers/ui-strings';
+import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
 
 /**
  * E2E tests for the Family Planner page.
@@ -24,13 +25,6 @@ test.describe('Family Planner', () => {
     // Navigate to planner (defaults to month view)
     await page.goto('/activities');
     await page.waitForURL('/activities');
-  }
-
-  /** Dismiss the "Activity Created" confirmation modal that appears after saving a new activity. */
-  async function dismissCreatedConfirm(page: import('@playwright/test').Page) {
-    const okButton = page.locator('[role="dialog"]').getByRole('button', { name: /^ok$/i });
-    await okButton.click({ timeout: 5000 });
-    await expect(okButton).not.toBeVisible({ timeout: 3000 });
   }
 
   /** Select the first family member chip in the activity modal (required for multi-owner). */
@@ -58,7 +52,7 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
     await page.locator('input[type="date"]').first().fill(tomorrowStr);
     await page.getByRole('button', { name: /^add activity$/i }).click();
-    await dismissCreatedConfirm(page);
+    await dismissActivityCreatedConfirm(page);
   }
 
   /** Helper to open view modal then edit modal for the first occurrence of an activity. */
@@ -95,7 +89,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
     // Dismiss confirmation modal
-    await dismissCreatedConfirm(page);
+    await dismissActivityCreatedConfirm(page);
 
     // Verify one-time activity persisted in IndexedDB
     let exported = await dbHelper.exportData();
@@ -122,7 +116,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
     // Dismiss confirmation modal
-    await dismissCreatedConfirm(page);
+    await dismissActivityCreatedConfirm(page);
 
     // Verify recurring activity persisted
     exported = await dbHelper.exportData();
@@ -305,7 +299,7 @@ test.describe('Family Planner', () => {
     await page.getByRole('button', { name: /^add activity$/i }).click();
 
     // Dismiss confirmation modal
-    await dismissCreatedConfirm(page);
+    await dismissActivityCreatedConfirm(page);
 
     // Click the first occurrence in the upcoming list — opens view modal
     await page.getByText('Reschedule Test').first().click();

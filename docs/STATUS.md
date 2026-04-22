@@ -95,7 +95,6 @@ Plan: `docs/plans/2026-04-20-travel-plans-ux-refactor.md`. ADR: `docs/adr/023-us
 
 **Engineering follow-ups:**
 
-- **Terraform apply needed** — staging distribution removal plan validated (`staging-removal.plan`). Run: `cd ~/projects/beanies-family/infrastructure && terraform apply -var-file=environments/prod.tfvars staging-removal.plan`. Destroys 7 staging-only resources (CloudFront dist, ACM cert, DNS records, noindex policy). No production impact.
 - **Lighthouse CI first real run** — fires on next PR touching `web/`. May need perf tuning if assertions fail.
 - **Vue app fonts still on Google Fonts** (`index.html`). Out of scope for #167.
 - **Dependabot `tmp` vulnerability** — transitive dep in `@lhci/cli`. Not actionable; resolves when `@lhci/cli` updates.
