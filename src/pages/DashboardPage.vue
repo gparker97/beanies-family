@@ -12,6 +12,7 @@ import SummaryStatCard from '@/components/dashboard/SummaryStatCard.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyStateIllustration from '@/components/ui/EmptyStateIllustration.vue';
 import { useNetWorthHistory } from '@/composables/useNetWorthHistory';
+import { useMonthOverMonthCashFlow } from '@/composables/useMonthOverMonthCashFlow';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
@@ -24,7 +25,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { formatDateShort } from '@/utils/date';
-import type { AccountType } from '@/types/models';
+import { isLiabilityType } from '@/utils/finance';
 
 const router = useRouter();
 const accountsStore = useAccountsStore();
@@ -37,8 +38,8 @@ const { t } = useTranslation();
 const { syncHighlightClass } = useSyncHighlight();
 
 // ── Net worth history ───────────────────────────────────────────────────────
-const { selectedPeriod, chartData, periodComparison, incomeChange, expenseChange, cashFlowChange } =
-  useNetWorthHistory();
+const { selectedPeriod, chartData, chartError, periodComparison } = useNetWorthHistory();
+const { incomeChange, expenseChange, cashFlowChange } = useMonthOverMonthCashFlow();
 
 // ── Financial data ──────────────────────────────────────────────────────────
 const netWorth = computed(() => accountsStore.filteredCombinedNetWorth);
@@ -123,10 +124,6 @@ function getIconTint(type: string): 'orange' | 'silk' | 'green' | 'slate' {
   if (type === 'income') return 'green';
   return 'orange';
 }
-
-function isLiability(type: AccountType): boolean {
-  return type === 'credit_card' || type === 'loan';
-}
 </script>
 
 <template>
@@ -140,6 +137,7 @@ function isLiability(type: AccountType): boolean {
       :change-percent="periodComparison.changePercent"
       :selected-period="selectedPeriod"
       :history-data="chartData"
+      :chart-error="chartError"
       :hint="t('hints.dashboardNetWorth')"
       @update:selected-period="selectedPeriod = $event"
     />
@@ -403,7 +401,7 @@ function isLiability(type: AccountType): boolean {
             <CurrencyAmount
               :amount="account.balance"
               :currency="account.currency"
-              :type="isLiability(account.type) ? 'expense' : 'neutral'"
+              :type="isLiabilityType(account.type) ? 'expense' : 'neutral'"
               size="sm"
               class="flex-shrink-0"
             />

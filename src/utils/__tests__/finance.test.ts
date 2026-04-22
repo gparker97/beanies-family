@@ -1,5 +1,46 @@
-import { describe, it, expect } from 'vitest';
-import { calculateMonthlyFee, computeGoalAllocRaw, calculateBalanceAdjustment } from '../finance';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  calculateMonthlyFee,
+  computeGoalAllocRaw,
+  calculateBalanceAdjustment,
+  isLiabilityType,
+  accountNetWorthMultiplier,
+  accountBalanceDeltaFromTx,
+} from '../finance';
+import type { Account, AccountType, Transaction } from '@/types/models';
+
+function makeAccount(overrides: Partial<Account> = {}): Account {
+  return {
+    id: 'acc-1',
+    memberId: 'm-1',
+    name: 'Test',
+    type: 'checking',
+    currency: 'USD',
+    balance: 0,
+    isActive: true,
+    includeInNetWorth: true,
+    createdAt: '2026-01-01',
+    updatedAt: '2026-01-01',
+    ...overrides,
+  };
+}
+
+function makeTx(overrides: Partial<Transaction> = {}): Transaction {
+  return {
+    id: 'tx-1',
+    accountId: 'acc-1',
+    type: 'expense',
+    amount: 50,
+    currency: 'USD',
+    category: 'food',
+    date: '2026-04-21',
+    description: '',
+    isReconciled: false,
+    createdAt: '2026-04-21T00:00:00.000Z',
+    updatedAt: '2026-04-21T00:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('calculateMonthlyFee', () => {
   it('per_session: $30/session, 2 sessions/week → $260.00/mo', () => {
@@ -174,5 +215,116 @@ describe('calculateBalanceAdjustment', () => {
 
   it('transfer credits destination account', () => {
     expect(calculateBalanceAdjustment('transfer', 100, false)).toBe(100);
+  });
+
+  it('balance_adjustment returns 0 (cascade short-circuit)', () => {
+    expect(calculateBalanceAdjustment('balance_adjustment', 500)).toBe(0);
+  });
+});
+
+describe('isLiabilityType', () => {
+  const cases: Array<[AccountType, boolean]> = [
+    ['checking', false],
+    ['savings', false],
+    ['investment', false],
+    ['cash', false],
+    ['credit_card', true],
+    ['loan', true],
+    ['retirement_401k', false],
+    ['crypto', false],
+    ['other', false],
+  ];
+  for (const [type, expected] of cases) {
+    it(`${type} → ${expected}`, () => {
+      expect(isLiabilityType(type)).toBe(expected);
+    });
+  }
+});
+
+describe('accountNetWorthMultiplier', () => {
+  it('asset account → +1', () => {
+    expect(accountNetWorthMultiplier(makeAccount({ type: 'checking' }))).toBe(1);
+  });
+
+  it('credit_card → -1', () => {
+    expect(accountNetWorthMultiplier(makeAccount({ type: 'credit_card' }))).toBe(-1);
+  });
+
+  it('loan → -1', () => {
+    expect(accountNetWorthMultiplier(makeAccount({ type: 'loan' }))).toBe(-1);
+  });
+});
+
+describe('accountBalanceDeltaFromTx', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('income on this account → +amount', () => {
+    const tx = makeTx({ type: 'income', amount: 200, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(200);
+  });
+
+  it('expense on this account → -amount', () => {
+    const tx = makeTx({ type: 'expense', amount: 75, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(-75);
+  });
+
+  it('transfer with this account as source → -amount', () => {
+    const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(-100);
+  });
+
+  it('transfer with this account as destination → +amount', () => {
+    const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2')).toBe(100);
+  });
+
+  it('transfer with unrelated vantage → 0', () => {
+    const tx = makeTx({ type: 'transfer', amount: 100, accountId: 'acc-1', toAccountId: 'acc-2' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-3')).toBe(0);
+  });
+
+  it('income on a different account → 0', () => {
+    const tx = makeTx({ type: 'income', amount: 200, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2')).toBe(0);
+  });
+
+  it('balance_adjustment with positive delta → +delta', () => {
+    const tx = makeTx({
+      type: 'balance_adjustment',
+      amount: 500,
+      accountId: 'acc-1',
+      adjustment: { delta: 500, updatedBy: 'm-1' },
+    });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(500);
+  });
+
+  it('balance_adjustment with negative delta → -delta (signed)', () => {
+    const tx = makeTx({
+      type: 'balance_adjustment',
+      amount: 300,
+      accountId: 'acc-1',
+      adjustment: { delta: -300, updatedBy: 'm-1' },
+    });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(-300);
+  });
+
+  it('balance_adjustment on a different account → 0', () => {
+    const tx = makeTx({
+      type: 'balance_adjustment',
+      amount: 500,
+      accountId: 'acc-1',
+      adjustment: { delta: 500, updatedBy: 'm-1' },
+    });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-2')).toBe(0);
+  });
+
+  it('balance_adjustment missing adjustment metadata → 0 + console.warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const tx = makeTx({ type: 'balance_adjustment', amount: 500, accountId: 'acc-1' });
+    expect(accountBalanceDeltaFromTx(tx, 'acc-1')).toBe(0);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]?.[0]).toContain('balance_adjustment missing adjustment metadata');
   });
 });

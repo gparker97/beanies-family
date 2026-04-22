@@ -24,6 +24,7 @@ import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { convertToBaseCurrency } from '@/utils/currency';
+import { isLiabilityType } from '@/utils/finance';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAdjustBalance } from '@/composables/useAdjustBalance';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -300,17 +301,13 @@ function getAccountTypeConfig(type: AccountType): {
   return configs[type] || configs.other;
 }
 
-function isLiability(type: AccountType): boolean {
-  return type === 'credit_card' || type === 'loan';
-}
-
 function getMemberForAccount(memberId: string) {
   return familyStore.members.find((m) => m.id === memberId);
 }
 
 function sectionMemberTotal(section: AccountSection): number {
   return section.accounts.reduce(
-    (s, a) => s + convertToBaseCurrency(a.balance, a.currency) * (isLiability(a.type) ? -1 : 1),
+    (s, a) => s + convertToBaseCurrency(a.balance, a.currency) * (isLiabilityType(a.type) ? -1 : 1),
     0
   );
 }
@@ -562,7 +559,7 @@ async function deleteAccount(id: string) {
             class="cursor-pointer rounded-[var(--sq)] bg-white p-5 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[var(--card-hover-shadow)] dark:bg-slate-800"
             :class="[
               { 'opacity-60': !account.isActive },
-              { 'border-l-primary-500 border-l-4': isLiability(account.type) },
+              { 'border-l-primary-500 border-l-4': isLiabilityType(account.type) },
               syncHighlightClass(account.id),
             ]"
             @click="openViewModal(account)"
@@ -621,7 +618,7 @@ async function deleteAccount(id: string) {
                 <CurrencyAmount
                   :amount="account.balance"
                   :currency="account.currency"
-                  :type="isLiability(account.type) ? 'expense' : 'income'"
+                  :type="isLiabilityType(account.type) ? 'expense' : 'income'"
                   size="xl"
                 />
               </div>

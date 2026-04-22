@@ -35,6 +35,7 @@ import {
   formatMonthYearShort,
 } from '@/utils/date';
 import { useTranslation } from '@/composables/useTranslation';
+import { accountNetWorthMultiplier } from '@/utils/finance';
 import type {
   CurrencyCode,
   ExchangeRate,
@@ -166,8 +167,7 @@ function calculateCurrentNetWorth(): number {
   // Account balances (liabilities are negative)
   const accountBalance = accounts.reduce((sum, account) => {
     const converted = convertToBaseCurrency(account.balance, account.currency);
-    const multiplier = account.type === 'credit_card' || account.type === 'loan' ? -1 : 1;
-    return sum + converted * multiplier;
+    return sum + converted * accountNetWorthMultiplier(account);
   }, 0);
 
   // Asset values
@@ -445,8 +445,13 @@ const incomeExpenseChartData = computed(() => {
       isDateBetween(t.date, monthStart, monthEnd)
     );
 
-    // Process transactions by category
+    // Process transactions by category. Only income and expense contribute
+    // to the income-vs-expenses chart: transfers are net-zero between
+    // accounts and balance adjustments are audit echoes of an
+    // already-applied balance change, not cash flow.
     for (const t of monthTransactions) {
+      if (t.type !== 'income' && t.type !== 'expense') continue;
+
       const catId = normalizeCategoryId(t.category);
       // Apply category filter if selected
       if (selectedCategory.value !== 'all' && catId !== selectedCategory.value) continue;
