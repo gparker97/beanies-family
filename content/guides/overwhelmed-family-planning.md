@@ -4,7 +4,7 @@ slug: overwhelmed-family-planning
 excerpt: "a guide for parents drowning in activities, kids' schoolwork, chores, and the mental load. practical resets that helped me avoid a breakdown."
 heroEmoji: 🌀
 publishedDate: 2026-04-16
-lastUpdated: 2026-04-17
+lastUpdated: 2026-04-22
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
