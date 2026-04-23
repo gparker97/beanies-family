@@ -36,14 +36,14 @@ const terms: Term[] = [
     term: 'pod',
     short:
       "A family's private data unit in beanies.family. One pod holds everything one family tracks: members, finances, activities, goals, travel.",
-    long: 'Each pod is backed by a single `.beanpod` file that the family controls. Inviting family members grants them access to the same pod. Each family gets their own, totally independent pod file.',
+    long: 'Each pod is backed by a single <code>.beanpod</code> file that the family controls. Inviting family members grants them access to the same pod. Each family gets their own, totally independent pod file.',
   },
   {
     id: 'beanpod-file',
     term: '.beanpod file',
     short:
-      'The encrypted file format that holds an entire family pod. A single `.beanpod` is a portable, self-contained backup — you can email it, save it to a USB stick, or sync it to Google Drive.',
-    long: 'Internally it is an Automerge CRDT document wrapped in an AES-GCM-encrypted envelope (V4 format). Without the pod password, the contents are unreadable — not even the beanies team can decrypt it. Unencrypted, a `.beanpod` file is just a simple text file containing data in JSON format (despite the extension).',
+      'The encrypted file format that holds an entire family pod. A single <code>.beanpod</code> is a portable, self-contained backup — you can email it, save it to a USB stick, or sync it to Google Drive.',
+    long: 'Internally it is an Automerge CRDT document wrapped in an AES-GCM-encrypted envelope (V4 format). Without the pod password, the contents are unreadable — not even the beanies team can decrypt it. Unencrypted, a <code>.beanpod</code> file is just a simple text file containing data in JSON format (despite the extension).',
   },
   {
     id: 'bean-beanie',
@@ -78,27 +78,27 @@ const terms: Term[] = [
     term: 'Automerge',
     short:
       'The specific CRDT library beanies.family uses under the hood. An open-source project originally from the University of Cambridge and Ink & Switch that provides a JSON-like data structure with automatic conflict-free merging.',
-    long: 'Automerge is loaded into the browser as a WebAssembly module (~2.6 MB). The family pod is stored as an Automerge document in memory, cached to IndexedDB, and persisted as the `.beanpod` file.',
+    long: 'Automerge is loaded into the browser as a WebAssembly module (~2.6 MB). The family pod is stored as an Automerge document in memory, cached to IndexedDB, and persisted as the <code>.beanpod</code> file.',
   },
   {
     id: 'e2ee',
     term: 'end-to-end encryption (E2EE)',
     short:
       'Encryption where only the endpoints (you and your family) can read the data. Intermediate servers, including the service provider, see only ciphertext and cannot decrypt it. More info about E2EE is in the <a href="/guides/local-first-family-finance-planning-tools#end-to-end-encryption-explained-without-the-math">end-to-end encryption section</a> of the local-first guide.',
-    long: "beanies.family's optional Google Drive sync is E2EE: the `.beanpod` file is encrypted with your pod password before it leaves your browser. Google stores the ciphertext, cannot read the file. No beanies server ever touches your data.",
+    long: "beanies.family's optional Google Drive sync is E2EE: the <code>.beanpod</code> file is encrypted with your pod password before it leaves your browser. Google stores the ciphertext, cannot read the file. No beanies server ever touches your data.",
   },
   {
     id: 'aes-gcm',
     term: 'AES-GCM',
     short:
-      'The symmetric encryption algorithm used to encrypt the contents of the `.beanpod` file. Industry-standard authenticated encryption with a 256-bit key.',
+      'The symmetric encryption algorithm used to encrypt the contents of the <code>.beanpod</code> file. Industry-standard authenticated encryption with a 256-bit key.',
     long: 'AES-GCM provides both confidentiality (nobody can read the file without the key) and integrity (any tampering is detected on decryption). Implemented directly via the browser\'s native Web Crypto API. No third-party crypto libraries are used.',
   },
   {
     id: 'aes-kw',
     term: 'AES-KW',
     short:
-      "AES Key Wrap — a smaller companion algorithm used by beanies.family to encrypt per-member copies of the family's master encryption key. Each family member has their own key (passphrase), which both identifies the family member and unlocks your family's `.beanpod` file.",
+      "AES Key Wrap — a smaller companion algorithm used by beanies.family to encrypt per-member copies of the family's master encryption key. Each family member has their own key (passphrase), which both identifies the family member and unlocks your family's <code>.beanpod</code> file.",
     long: "When you invite a new family member, beanies.family wraps the family master key with a key derived from that family member's passphrase. They unwrap it on their device. The master key itself is never exposed in plaintext across the network.",
   },
   {
@@ -106,7 +106,7 @@ const terms: Term[] = [
     term: 'Web Crypto API',
     short:
       "The browser's built-in cryptography toolkit. All encryption, decryption, key derivation, and key wrapping in beanies.family uses the native Web Crypto API rather than a third-party library.",
-    long: 'Using the browser-native API means the cryptographic primitives are audited by browser vendors (Chromium, Firefox, Safari security teams). There is no beanies.family specific crypto code to review — the code just calls `crypto.subtle.encrypt()` and trusts the browser.',
+    long: 'Using the browser-native API means the cryptographic primitives are audited by browser vendors (Chromium, Firefox, Safari security teams). There is no beanies.family specific crypto code to review — the code just calls <code>crypto.subtle.encrypt()</code> and trusts the browser.',
   },
   {
     id: 'pwa',
@@ -119,8 +119,8 @@ const terms: Term[] = [
     id: 'google-drive-sync',
     term: 'Google Drive sync',
     short:
-      'Optional cross-device backup for your pod. beanies.family can save the encrypted `.beanpod` file to your personal Google Drive so you can load it on another device and share data with your family members.',
-    long: 'Sync is opt-in, and uses the `drive.file` OAuth scope. beanies.family can only see files it created in your Drive, and never any other files. The synced file is encrypted client-side before upload — Google sees ciphertext only. More detail in the <a href="/guides/local-first-family-finance-planning-tools#end-to-end-encryption-explained-without-the-math">encryption section</a> of the local-first guide.',
+      'Optional cross-device backup for your pod. beanies.family can save the encrypted <code>.beanpod</code> file to your personal Google Drive so you can load it on another device and share data with your family members.',
+    long: 'Sync is opt-in, and uses the <code>drive.file</code> OAuth scope. beanies.family can only see files it created in your Drive, and never any other files. The synced file is encrypted client-side before upload — Google sees ciphertext only. More detail in the <a href="/guides/local-first-family-finance-planning-tools#end-to-end-encryption-explained-without-the-math">encryption section</a> of the local-first guide.',
   },
   {
     id: 'mental-load',
@@ -141,14 +141,14 @@ const terms: Term[] = [
     term: 'IndexedDB',
     short:
       "The browser's built-in local database, used by beanies.family as a temporary cache for your family's decrypted pod data, and as PWA offline support.",
-    long: 'The cache can be deleted on sign-out, so leaving a device clears all decrypted data from that device. The authoritative copy of your pod lives in the `.beanpod` file; IndexedDB is just a performance cache.',
+    long: 'The cache can be deleted on sign-out, so leaving a device clears all decrypted data from that device. The authoritative copy of your pod lives in the <code>.beanpod</code> file; IndexedDB is just a performance cache.',
   },
   {
     id: 'pod-password',
     term: 'pod password',
     short:
-      "The password that encrypts your family's `.beanpod` file. Without it, the pod cannot be decrypted — not by you, not by beanies, not by anyone.",
-    long: 'Given the <a href="/guides/local-first-family-finance-planning-tools">local-first</a> nature of the app, password recovery for a `.beanpod` file is not possible. If you lose the pod password and don\'t have the file cached on any device, the pod is unrecoverable. beanies.family strongly recommends writing it down somewhere safe.',
+      "The password that encrypts your family's <code>.beanpod</code> file. Without it, the pod cannot be decrypted — not by you, not by beanies, not by anyone.",
+    long: 'Given the <a href="/guides/local-first-family-finance-planning-tools">local-first</a> nature of the app, password recovery for a <code>.beanpod</code> file is not possible. If you lose the pod password and don\'t have the file cached on any device, the pod is unrecoverable. beanies.family strongly recommends writing it down somewhere safe.',
   },
   {
     id: 'the-beanstalk',
@@ -210,8 +210,8 @@ const glossarySchema = {
           {terms.map((t) => (
             <article class="glossary-term" id={t.id}>
               <h2 class="glossary-term-name">{t.term}</h2>
-              <p class="glossary-term-short" set:html={t.short} />
-              {t.long && <p class="glossary-term-long" set:html={t.long} />}
+              <div class="glossary-term-short" set:html={t.short} />
+              {t.long && <div class="glossary-term-long" set:html={t.long} />}
               <a class="glossary-term-anchor" href={`#${t.id}`} aria-label={`copy link to ${t.term}`}>#</a>
             </article>
           ))}
@@ -296,20 +296,32 @@ const glossarySchema = {
     font-size: 0.95rem;
     font-weight: 500;
     line-height: 1.65;
-    margin: 0 0 8px;
+    margin-bottom: 8px;
   }
   .glossary-term-long {
     color: rgb(44 62 80 / 65%);
     font-size: 0.9rem;
     line-height: 1.7;
-    margin: 0;
   }
+  .glossary-term-short p, .glossary-term-long p { margin: 0; }
+  .glossary-term-short p + p, .glossary-term-long p + p { margin-top: 0.75em; }
   .glossary-term-long a, .glossary-term-short a {
     color: #f15d22;
     font-weight: 600;
     text-decoration: none;
   }
   .glossary-term-long a:hover, .glossary-term-short a:hover { text-decoration: underline; }
+  .glossary-term-long strong, .glossary-term-short strong {
+    color: #2c3e50;
+    font-weight: 700;
+  }
+  .glossary-term-long code, .glossary-term-short code {
+    background: rgb(44 62 80 / 5%);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.88em;
+    padding: 0.1em 0.35em;
+  }
   .glossary-term-anchor {
     color: rgb(44 62 80 / 20%);
     font-family: ui-monospace, monospace;
