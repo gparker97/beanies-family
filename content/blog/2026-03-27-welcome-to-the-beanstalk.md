@@ -31,7 +31,7 @@ Soccer practice, piano lessons, math tutor, gymnastics (2 types), Chinese classe
 
 When my youngest was about 6 months old, my wife started calling him 小豆豆 (_xiǎo dòu dou_). Which in Chinese sounds endearing, but just means **little bean**. Cuz he sort of looked like one. It sounds cute in English too, so I called him **beanie**, and it stuck.
 
-I built this app to track all that stuff I mentioned above: your family finances, what you spent and received, what you plan to spend and receive (roughly), and to know how much you'll have in the future — in short, your "wealth".
+I built this app to track all that stuff I mentioned above: your family finances, what you spent and received, what you plan to spend and receive (roughly), and to know how much you'll have in the future - in short, your "wealth".
 
 But also, I built this to track your _actual_ family life: piano lessons, schoolwork, sports practice, ballet class, family vacations (we may even give you advice), and, of course, who will pick up whom (yes, _whom_). In short, **anything we can help you with, even in a small way, as you navigate the joys and sorrows of a complicated, crowded, chaotic, stressful, but of course, rewarding?** (sorry, I meant, rewarding) **family life.**
 
@@ -45,13 +45,13 @@ If you want the cloud version so you can share it with your family (don't worry,
 
 Here's the fun stuff:
 
-- 🤖 **Claude Max / Opus 4.6** — Mostly. I may have pitched in a line or 2.
+- 🤖 **Claude Max / Opus 4.6** - Mostly. I may have pitched in a line or 2.
 - 💻 **Vue 3 / TypeScript** + Vite / Tailwind / Pinia
-- 💾 **IndexedDB** — to cache encrypted family data in your local browser, which you can clear at anytime
-- 🔒 **Web Crypto API** — Your data is fully encrypted in transit and at rest (AES-256-GCM), each family member gets their own password-derived key (PBKDF2) that wraps a shared family key (AES-KW), and data _never_ leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache
-- 🔀 **Automerge** — for CRDTs — adds a bit of heft to the package, but we tried rolling our own merge algorithms and trust me, it's not worth it — keeping your data safe is what matters
-- 🧪 **Vitest + Playwright + Dependabot** — unit tests, E2E tests, and automated dependency updates to keep things secure (seriously, how cool is Dependabot!?)
-- ☁️ **One single, stupid, plain vanilla DynamoDB** — in the cloud to map your family ID to your (encrypted) data file, so we can locate it in your personal location that only you can access. Nothing else. Anywhere. Ever.
+- 💾 **IndexedDB** - to cache encrypted family data in your local browser, which you can clear at anytime
+- 🔒 **Web Crypto API** - Your data is fully encrypted in transit and at rest (AES-256-GCM), each family member gets their own password-derived key (PBKDF2) that wraps a shared family key (AES-KW), and data _never_ leaves your personal storage location, except to travel directly to (and from) your browser's (encrypted) cache
+- 🔀 **Automerge** - for CRDTs - adds a bit of heft to the package, but we tried rolling our own merge algorithms and trust me, it's not worth it - keeping your data safe is what matters
+- 🧪 **Vitest + Playwright + Dependabot** - unit tests, E2E tests, and automated dependency updates to keep things secure (seriously, how cool is Dependabot!?)
+- ☁️ **One single, stupid, plain vanilla DynamoDB** - in the cloud to map your family ID to your (encrypted) data file, so we can locate it in your personal location that only you can access. Nothing else. Anywhere. Ever.
 
 So there it is. If you're a techie nerd like me, run it locally. If you don't want to deal with the bs, use [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=welcome-to-the-beanstalk).
 
