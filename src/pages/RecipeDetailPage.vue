@@ -21,6 +21,7 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -55,6 +56,12 @@ function openAddCookLog(): void {
   editingEntry.value = null;
   cookLogOpen.value = true;
 }
+
+// Quick-add FAB — `add-cooklog` on a recipe detail route pre-fills the
+// recipe (via route.params.recipeId) and opens the log modal directly.
+useQuickAddIntent((action) => {
+  if (action === 'add-cooklog') openAddCookLog();
+});
 
 function openEditCookLog(e: CookLogEntry): void {
   editingEntry.value = e;

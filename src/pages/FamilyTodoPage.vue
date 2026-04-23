@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useSounds } from '@/composables/useSounds';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { useTodoStore } from '@/stores/todoStore';
@@ -133,6 +134,14 @@ watch(
     if (val) handleTodoQueryParam();
   }
 );
+// Quick-add FAB → focus the QuickAddBar so the user can type a todo.
+// There is no separate "add" modal for todos — adds happen inline.
+useQuickAddIntent(async (action) => {
+  if (action !== 'add-todo') return;
+  await nextTick();
+  quickAddBar.value?.focus();
+});
+
 onMounted(async () => {
   handleTodoQueryParam();
 

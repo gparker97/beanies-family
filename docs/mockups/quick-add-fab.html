@@ -1615,6 +1615,254 @@
       .action-toast .emoji {
         margin-right: 8px;
       }
+
+      /* ---------- FAB asset comparison (top of page) ---------- */
+      .asset-compare {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) minmax(520px, 2fr);
+        gap: 28px;
+        padding: 24px 28px;
+        background:
+          linear-gradient(180deg, rgba(241, 93, 34, 0.04), rgba(241, 93, 34, 0.01)),
+          rgba(26, 37, 47, 0.6);
+        border: 1px solid rgba(241, 93, 34, 0.18);
+        border-radius: 20px;
+        backdrop-filter: blur(4px);
+      }
+      @media (max-width: 1100px) {
+        .asset-compare {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .asset-compare .copy-block .kicker {
+        margin-bottom: 8px;
+      }
+      .asset-compare h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        color: #f5f6f8;
+        margin: 0 0 10px;
+        letter-spacing: -0.01em;
+      }
+      .asset-compare h2 em {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 400;
+        color: var(--orange);
+      }
+      .asset-compare p {
+        font-size: 14px;
+        line-height: 1.55;
+        color: rgba(245, 246, 248, 0.75);
+        margin: 0 0 10px;
+      }
+      .asset-compare p strong {
+        color: rgba(245, 246, 248, 0.95);
+        font-weight: 600;
+      }
+      .asset-compare .diff-list {
+        list-style: none;
+        padding: 0;
+        margin: 12px 0 0;
+        font-size: 13px;
+        color: rgba(245, 246, 248, 0.72);
+      }
+      .asset-compare .diff-list li {
+        padding: 4px 0 4px 18px;
+        position: relative;
+        line-height: 1.5;
+      }
+      .asset-compare .diff-list li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 11px;
+        width: 6px;
+        height: 6px;
+        background: var(--orange);
+        border-radius: 50%;
+      }
+
+      .compare-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        align-items: end;
+      }
+      @media (max-width: 720px) {
+        .compare-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+
+      .compare-col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 10px 14px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        position: relative;
+      }
+      .compare-col.is-new {
+        border-color: rgba(241, 93, 34, 0.35);
+        background:
+          radial-gradient(
+            140px 80px at 50% 0%,
+            rgba(241, 93, 34, 0.12),
+            transparent
+          ),
+          rgba(241, 93, 34, 0.02);
+      }
+      .compare-col.is-new::before {
+        content: 'new';
+        position: absolute;
+        top: -9px;
+        right: 12px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #fff;
+        background: var(--orange);
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+
+      .compare-swatches {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+      }
+      .swatch-cell {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+      .swatch-cell .size-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(245, 246, 248, 0.4);
+      }
+
+      .fab-swatch {
+        border-radius: 50%;
+        box-shadow:
+          0 8px 22px -6px rgba(0, 0, 0, 0.35),
+          0 2px 4px rgba(0, 0, 0, 0.2);
+        background-repeat: no-repeat;
+        background-position: center;
+        flex-shrink: 0;
+      }
+      .fab-swatch.size-60 {
+        width: 60px;
+        height: 60px;
+      }
+      .fab-swatch.size-120 {
+        width: 120px;
+        height: 120px;
+      }
+      .fab-swatch.gemini-orange {
+        background-image: url('assets/beanie_plus_sign_orange.png');
+        background-size: auto 160%;
+        background-position: center 28%;
+      }
+      .fab-swatch.gemini-blue {
+        background-image: url('assets/beanie_plus_sign_blue.png');
+        background-size: auto 160%;
+        background-position: center 28%;
+      }
+      /* inlined-SVG swatches: the <svg> sits directly inside the div and we
+         override --fab-bg on a parent modifier to theme the circle fill. */
+      .fab-swatch.svg-host {
+        background: transparent;
+        box-shadow:
+          0 10px 24px -6px rgba(241, 93, 34, 0.35),
+          0 2px 4px rgba(0, 0, 0, 0.25);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .fab-swatch.svg-host.dark {
+        --fab-bg: radial-gradient(circle at 50% 38%, #3b506a, #1c2a3b);
+        box-shadow:
+          0 10px 24px -6px rgba(28, 42, 59, 0.55),
+          0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+      .fab-swatch.svg-host svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .compare-col .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        color: rgba(245, 246, 248, 0.88);
+        text-align: center;
+        line-height: 1.3;
+      }
+      .compare-col .sublabel {
+        font-size: 10px;
+        font-weight: 400;
+        color: rgba(245, 246, 248, 0.42);
+        letter-spacing: 0.04em;
+      }
+
+      /* tiny "on phone backdrop" preview — simulates the orange dashboard gradient behind the FAB */
+      .phone-preview-strip {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: center;
+        padding: 14px 16px;
+        background: rgba(0, 0, 0, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        margin-top: 8px;
+      }
+      .phone-preview-strip .strip-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: rgba(245, 246, 248, 0.55);
+      }
+      .phone-preview-strip .mini-bg {
+        width: 96px;
+        height: 56px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        position: relative;
+      }
+      .phone-preview-strip .mini-bg.light {
+        background: linear-gradient(135deg, #fff8f3, #fef2e9);
+      }
+      .phone-preview-strip .mini-bg.dark {
+        background: linear-gradient(135deg, #1b2635, #0d1420);
+      }
+      .phone-preview-strip .mini-bg .fab-swatch {
+        width: 40px;
+        height: 40px;
+        box-shadow:
+          0 6px 14px -2px rgba(241, 93, 34, 0.45),
+          0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
     </style>
   </head>
 
@@ -1642,6 +1890,291 @@
           </div>
         </div>
       </header>
+
+      <!-- hidden SVG symbol for the beanie-plus FAB (inlined once, reused below) -->
+      <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+        <symbol id="beanie-fab" viewBox="0 0 120 120">
+          <defs>
+            <radialGradient id="bfab-bg" cx="50%" cy="38%" r="68%">
+              <stop offset="0%" stop-color="#FF824A" />
+              <stop offset="100%" stop-color="#DD4D14" />
+            </radialGradient>
+            <radialGradient id="bfab-bg-dark" cx="50%" cy="38%" r="68%">
+              <stop offset="0%" stop-color="#3B506A" />
+              <stop offset="100%" stop-color="#1C2A3B" />
+            </radialGradient>
+            <linearGradient id="bfab-bean" x1="0.2" y1="0" x2="0.8" y2="1">
+              <stop offset="0%" stop-color="#F57A3A" />
+              <stop offset="100%" stop-color="#D44810" />
+            </linearGradient>
+            <linearGradient id="bfab-hat" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#CDE5F5" />
+              <stop offset="100%" stop-color="#8FBFDA" />
+            </linearGradient>
+            <linearGradient id="bfab-cuff" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#A4CCE1" />
+              <stop offset="100%" stop-color="#7DAEC8" />
+            </linearGradient>
+            <linearGradient id="bfab-plus" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FFFFFF" />
+              <stop offset="100%" stop-color="#EEF2F5" />
+            </linearGradient>
+          </defs>
+
+          <circle
+            cx="60"
+            cy="60"
+            r="58"
+            fill="var(--fab-bg, url(#bfab-bg))"
+          />
+          <circle
+            cx="60"
+            cy="60"
+            r="56.5"
+            fill="none"
+            stroke="#FFFFFF"
+            stroke-opacity="0.10"
+            stroke-width="0.7"
+          />
+          <ellipse cx="42" cy="26" rx="30" ry="14" fill="#FFFFFF" opacity="0.14" />
+
+          <!-- PLUS VERTICAL BAR — symmetric 18px arms (top hidden, bottom visible) -->
+          <g>
+            <rect x="50" y="44" width="20" height="56" rx="6" fill="#1A252F" opacity="0.22" transform="translate(0 2)" />
+            <rect x="50" y="44" width="20" height="56" rx="6" fill="url(#bfab-plus)" />
+          </g>
+
+          <!-- CHARACTER HEAD — upper half peeks above crossbar, lower half hidden -->
+          <g>
+            <path
+              d="M60 32 C75 32, 84 42, 84 54 C84 65, 76 75, 65 77 C49 79, 37 70, 36 56 C35 43, 46 32, 60 32 Z"
+              fill="url(#bfab-bean)"
+            />
+            <path
+              d="M40 60 C38 54, 38 46, 42 40 C41 47, 42 56, 47 64 C44 64, 41 62, 40 60 Z"
+              fill="#B8420F" opacity="0.22"
+            />
+            <ellipse
+              cx="74" cy="44" rx="3.3" ry="5"
+              fill="#FFFFFF" opacity="0.22"
+              transform="rotate(-22 74 44)"
+            />
+          </g>
+
+          <!-- BEANIE HAT — sits LOW on the forehead, just above the eyes; big pom-pom on top -->
+          <g>
+            <path
+              d="M40 32 C40 24, 48 18, 60 18 C72 18, 80 24, 80 32 L80 34 C80 34.8, 79.2 35.2, 78.4 35.2 L41.6 35.2 C40.8 35.2, 40 34.8, 40 34 Z"
+              fill="url(#bfab-hat)"
+            />
+            <path
+              d="M38 34 C38 33.3, 38.8 32.8, 39.7 32.8 L80.3 32.8 C81.2 32.8, 82 33.3, 82 34 L82 42.8 C82 43.6, 81.2 44, 80.3 44 L39.7 44 C38.8 44, 38 43.6, 38 42.8 Z"
+              fill="url(#bfab-cuff)"
+            />
+            <g stroke="#6895B0" stroke-width="1" stroke-linecap="round" opacity="0.75">
+              <line x1="44" y1="34" x2="44" y2="41.5" />
+              <line x1="49" y1="34" x2="49" y2="41.5" />
+              <line x1="55" y1="34" x2="55" y2="41.5" />
+              <line x1="60" y1="34" x2="60" y2="41.5" />
+              <line x1="65" y1="34" x2="65" y2="41.5" />
+              <line x1="71" y1="34" x2="71" y2="41.5" />
+              <line x1="76" y1="34" x2="76" y2="41.5" />
+            </g>
+            <path
+              d="M41 34 L79 34"
+              stroke="#FFFFFF" stroke-width="0.8"
+              stroke-linecap="round" opacity="0.4"
+            />
+            <circle cx="60" cy="13" r="6.5" fill="#C96519" />
+            <circle cx="60" cy="13" r="6" fill="#E67E22" />
+            <circle cx="57.6" cy="10.6" r="2.2" fill="#FFFFFF" opacity="0.6" />
+            <circle cx="59.5" cy="12.2" r="1" fill="#FFFFFF" opacity="0.4" />
+          </g>
+
+          <!-- FACE — bigger wide-open eyes -->
+          <g>
+            <ellipse cx="51" cy="50" rx="3.8" ry="4.9" fill="#1F2E3D" />
+            <ellipse cx="69" cy="50" rx="3.8" ry="4.9" fill="#1F2E3D" />
+            <circle cx="52.5" cy="48.2" r="1.7" fill="#FFFFFF" />
+            <circle cx="70.5" cy="48.2" r="1.7" fill="#FFFFFF" />
+            <circle cx="50" cy="51.7" r="0.9" fill="#FFFFFF" />
+            <circle cx="68" cy="51.7" r="0.9" fill="#FFFFFF" />
+            <ellipse cx="42" cy="58.5" rx="3" ry="1.8" fill="#EC9AAB" opacity="0.55" />
+            <ellipse cx="78" cy="58.5" rx="3" ry="1.8" fill="#EC9AAB" opacity="0.55" />
+          </g>
+
+          <!-- PLUS CROSSBAR — covers the lower half of the character -->
+          <g>
+            <rect x="32" y="62" width="56" height="20" rx="6" fill="#1A252F" opacity="0.22" transform="translate(0 2)" />
+            <rect x="32" y="62" width="56" height="20" rx="6" fill="url(#bfab-plus)" />
+            <rect x="34" y="63.4" width="52" height="1.6" rx="0.8" fill="#FFFFFF" opacity="0.65" />
+          </g>
+
+          <!-- HANDS gripping the crossbar -->
+          <g>
+            <g transform="rotate(-10 42 62)">
+              <ellipse cx="42" cy="62" rx="8" ry="5"
+                       fill="#C94510"
+                       stroke="#5A1D04" stroke-width="1.1" stroke-opacity="0.55" />
+              <ellipse cx="40" cy="58.8" rx="4" ry="1.6"
+                       fill="#FF9B5F" opacity="0.55" />
+              <path d="M36.5 63 Q42 60.8, 47.5 63"
+                    stroke="#5A1D04" stroke-width="0.9" fill="none"
+                    stroke-linecap="round" opacity="0.6" />
+              <circle cx="48.2" cy="61" r="1.8" fill="#C94510"
+                      stroke="#5A1D04" stroke-width="0.9" stroke-opacity="0.55" />
+            </g>
+            <g transform="rotate(10 78 62)">
+              <ellipse cx="78" cy="62" rx="8" ry="5"
+                       fill="#C94510"
+                       stroke="#5A1D04" stroke-width="1.1" stroke-opacity="0.55" />
+              <ellipse cx="80" cy="58.8" rx="4" ry="1.6"
+                       fill="#FF9B5F" opacity="0.55" />
+              <path d="M72.5 63 Q78 60.8, 83.5 63"
+                    stroke="#5A1D04" stroke-width="0.9" fill="none"
+                    stroke-linecap="round" opacity="0.6" />
+              <circle cx="71.8" cy="61" r="1.8" fill="#C94510"
+                      stroke="#5A1D04" stroke-width="0.9" stroke-opacity="0.55" />
+            </g>
+          </g>
+        </symbol>
+      </svg>
+
+      <!-- FAB asset comparison — Gemini PNG vs hand-authored SVG -->
+      <section class="asset-compare" aria-label="FAB asset comparison">
+        <div class="copy-block">
+          <div class="kicker">asset · FAB iconography</div>
+          <h2>Gemini concept <em>vs</em> hand-authored SVG</h2>
+          <p>
+            The Gemini PNG is illustrated and warm but its subtle shading collapses
+            into muddy pixels at <strong>60 px</strong> (the actual FAB size). A
+            clean geometric SVG — same peek-a-boo composition, simpler shape
+            language — reads sharper at small size, weighs
+            <strong>~2 KB</strong>, and themes via a single CSS variable.
+          </p>
+          <ul class="diff-list">
+            <li>
+              Matches the Gemini peek-a-boo composition — head pops above the
+              plus, two hands grip the crossbar top.
+            </li>
+            <li>
+              Circle background fills via <code>--fab-bg</code> — swap orange ↔
+              slate per theme without shipping two files.
+            </li>
+            <li>
+              Character stays warm across themes (orange bean + blue beanie);
+              only the outer frame changes.
+            </li>
+            <li>
+              Plus arms are all equal — top hidden by the character, but the
+              visible "T" shape still reads as a proper plus sign.
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <div class="compare-grid">
+            <!-- Gemini orange -->
+            <div class="compare-col">
+              <div class="compare-swatches">
+                <div class="swatch-cell">
+                  <div class="fab-swatch gemini-orange size-120"></div>
+                  <span class="size-label">120 · 2×</span>
+                </div>
+                <div class="swatch-cell">
+                  <div class="fab-swatch gemini-orange size-60"></div>
+                  <span class="size-label">60 · 1×</span>
+                </div>
+              </div>
+              <div class="label">
+                Gemini PNG <span class="sublabel">· orange · ~942 KB</span>
+              </div>
+            </div>
+
+            <!-- SVG orange -->
+            <div class="compare-col is-new">
+              <div class="compare-swatches">
+                <div class="swatch-cell">
+                  <div class="fab-swatch svg-host size-120">
+                    <svg viewBox="0 0 120 120"><use href="#beanie-fab" /></svg>
+                  </div>
+                  <span class="size-label">120 · 2×</span>
+                </div>
+                <div class="swatch-cell">
+                  <div class="fab-swatch svg-host size-60">
+                    <svg viewBox="0 0 120 120"><use href="#beanie-fab" /></svg>
+                  </div>
+                  <span class="size-label">60 · 1×</span>
+                </div>
+              </div>
+              <div class="label">
+                SVG <span class="sublabel">· orange · ~2.4 KB</span>
+              </div>
+            </div>
+
+            <!-- Gemini blue -->
+            <div class="compare-col">
+              <div class="compare-swatches">
+                <div class="swatch-cell">
+                  <div class="fab-swatch gemini-blue size-120"></div>
+                  <span class="size-label">120 · 2×</span>
+                </div>
+                <div class="swatch-cell">
+                  <div class="fab-swatch gemini-blue size-60"></div>
+                  <span class="size-label">60 · 1×</span>
+                </div>
+              </div>
+              <div class="label">
+                Gemini PNG <span class="sublabel">· slate · ~850 KB</span>
+              </div>
+            </div>
+
+            <!-- SVG slate (dark) -->
+            <div class="compare-col is-new">
+              <div class="compare-swatches">
+                <div class="swatch-cell">
+                  <div
+                    class="fab-swatch svg-host dark size-120"
+                    style="--fab-bg: url(#bfab-bg-dark)"
+                  >
+                    <svg viewBox="0 0 120 120"><use href="#beanie-fab" /></svg>
+                  </div>
+                  <span class="size-label">120 · 2×</span>
+                </div>
+                <div class="swatch-cell">
+                  <div
+                    class="fab-swatch svg-host dark size-60"
+                    style="--fab-bg: url(#bfab-bg-dark)"
+                  >
+                    <svg viewBox="0 0 120 120"><use href="#beanie-fab" /></svg>
+                  </div>
+                  <span class="size-label">60 · 1×</span>
+                </div>
+              </div>
+              <div class="label">
+                SVG <span class="sublabel">· same file, --fab-bg</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="phone-preview-strip">
+            <span class="strip-label">on-phone preview</span>
+            <div class="mini-bg light">
+              <div class="fab-swatch svg-host">
+                <svg viewBox="0 0 120 120"><use href="#beanie-fab" /></svg>
+              </div>
+            </div>
+            <div class="mini-bg dark">
+              <div
+                class="fab-swatch svg-host dark"
+                style="--fab-bg: url(#bfab-bg-dark)"
+              >
+                <svg viewBox="0 0 120 120"><use href="#beanie-fab" /></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- variant picker -->
       <aside class="variant-picker" id="picker">

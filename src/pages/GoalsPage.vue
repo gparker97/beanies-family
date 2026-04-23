@@ -25,6 +25,7 @@ import {
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { getPriorityConfig, PRIORITY_ORDER, PRIORITY_RANK } from '@/constants/goalDisplay';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -264,6 +265,11 @@ function openAddWithDefaults(defaults?: { memberId?: string; priority?: GoalPrio
   editingGoal.value = null;
   showAddModal.value = true;
 }
+
+// Quick-add FAB → open blank Add Goal modal.
+useQuickAddIntent((action) => {
+  if (action === 'add-goal') openAddWithDefaults();
+});
 
 function openEditModal(goal: Goal) {
   // Close the view modal if it's open — keep one drawer on screen at a time.

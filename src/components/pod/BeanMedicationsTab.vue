@@ -17,7 +17,7 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import MedicationCard from '@/components/pod/MedicationCard.vue';
 import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import MedicationViewModal from '@/components/pod/MedicationViewModal.vue';
-import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
 import { useGiveDose } from '@/composables/useGiveDose';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
@@ -68,16 +68,12 @@ type ModalState =
 
 const modalState = ref<ModalState>({ kind: 'none' });
 
-// Auto-open `?add=medications` / similar query deep links in ADD mode.
-const addModalOpen = computed({
-  get: () => modalState.value.kind === 'editing' && modalState.value.medication === null,
-  set: (value: boolean) => {
-    if (value) modalState.value = { kind: 'editing', medication: null };
-    else if (modalState.value.kind === 'editing' && modalState.value.medication === null)
-      modalState.value = { kind: 'none' };
-  },
+// Auto-open via `?action=add-medication` from the Quick-add FAB.
+useQuickAddIntent((action) => {
+  if (action === 'add-medication') {
+    modalState.value = { kind: 'editing', medication: null };
+  }
 });
-useAutoOpenOnQuery(addModalOpen);
 
 // Reactive resolution of the viewing medication — recomputes if the
 // store mutates (e.g. deleted on another device → becomes undefined,

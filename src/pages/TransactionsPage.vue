@@ -18,6 +18,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { chooseScope } from '@/composables/useRecurringEditScope';
 import { useProjectedTransactions } from '@/composables/useProjectedTransactions';
 import { useMemberInfo } from '@/composables/useMemberInfo';
@@ -404,6 +405,22 @@ function openAddModal() {
   editingTransaction.value = null;
   showAddModal.value = true;
 }
+
+// Quick-add FAB handlers. `add-recurring` flips the list filter before
+// opening so the user lands back in the recurring view after saving.
+useQuickAddIntent((action) => {
+  switch (action) {
+    case 'add-transaction':
+      openAddModal();
+      break;
+    case 'add-recurring':
+      activeFilter.value = 'recurring';
+      openAddModal();
+      break;
+    default:
+      break;
+  }
+});
 
 function openEditModal(transaction: Transaction) {
   editingTransaction.value = transaction;

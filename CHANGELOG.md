@@ -10,9 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-23
 
-### Internal
+### Added
 
-- **Quick-add FAB — design exploration + implementation plan (not shipped).** Interactive mockup at `docs/mockups/quick-add-fab.html` exploring six directions for the long-pending quick-add FAB (issue #37), plus a full implementation plan at `docs/plans/2026-04-23-quick-add-fab-and-sheet.md`. Recommended direction: a bottom sheet that opens from a peek-a-boo beanie FAB, with 6 "everyday" adds (Activity · To-do · Transaction · Trip · Cook log · Saying) jar-popping at the top and Family / Money / Care groups fading in below — 18 entities total, including Budget which had been missing from the FAB's original spec. Issue #37 acceptance criteria refreshed to match today's app surface area. No user-visible change yet; implementation queued for a future session.
+- **Quick-add FAB (#37).** A floating "+" button pinned to the bottom-right of every page opens a grouped sheet with 19 add actions spread across four sections — Everyday (Activity, To-do, Transaction, Trip, Cook log, Saying), Family, Money, and Care. Tap anything to land directly in its add form, no matter which page you were on. The button itself is a hand-authored peek-a-boo beanie SVG that themes for dark mode via a single CSS variable. Hidden on Settings / Login / Welcome / 404.
+- **Context-aware pre-fill.** When you're on a bean's detail page and tap Saying (or Favorite, Note, Medication, Allergy), the add form opens with that bean already selected. Same for Cook log when you're viewing a specific recipe. No picker step needed.
+- **Inline bean picker.** If you tap a bean-specific action from anywhere else (like the Dashboard), the sheet expands directly below the section you tapped with a tile grid of family beanies. Pick one and the add form opens with them pre-selected. Pets are filtered out. Re-tapping a different action updates the picker in place.
+- **Recipe + medication pickers.** Tapping Cook log without a recipe in context, or Dose log without a medication, swaps the sheet to a full picker view with a scrollable list — recipes show their polaroid thumbnail, medications show which beanie they belong to. Dose log picks + confirms a dose in one flow without any page navigation.
+- **Empty-state guidance.** Tapping Trip idea when you have no trips yet shows a warm "add a trip first" prompt with a one-tap jump into the trip wizard. Same pattern for empty bean / recipe / medication pickers.
+- **Stale-link guard.** If a deep-linked `?action=…` URL lands on a page that hides the FAB (e.g. Settings), the query is stripped and a friendly toast explains the menu isn't available there — no silent swallow.
+
+### Changed
+
+- **Unified the "add from deep link" flow.** The bean-tab-specific `?add=1` query shortcut is replaced by the FAB's richer `?action=<name>` intent system. User-facing behavior is unchanged; under the hood, all Bean tabs + the Pod index pages now consume intents through one composable with proper error handling (unknown actions surface a toast; handler exceptions are caught and reported).
 
 ---
 

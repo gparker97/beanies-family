@@ -11,6 +11,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { confirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { playWhoosh } from '@/composables/useSounds';
 import {
@@ -36,6 +37,13 @@ const { syncHighlightClass } = useSyncHighlight();
 // Modals
 const showSettingsModal = ref(false);
 const showQuickAddModal = ref(false);
+
+// Quick-add FAB → open Budget Settings in create mode. BudgetSettingsModal
+// accepts an absent `editing` prop as "create a new budget"; the existing
+// "No budget yet → Set up budget" CTA on this page already uses this path.
+useQuickAddIntent((action) => {
+  if (action === 'add-budget') showSettingsModal.value = true;
+});
 
 // Hero card values
 const budgetAmount = computed(() =>

@@ -22,6 +22,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useCurrencyDisplay } from '@/composables/useCurrencyDisplay';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { showToast } from '@/composables/useToast';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { isLiabilityType } from '@/utils/finance';
@@ -318,6 +319,11 @@ function openAddWithDefaults(defaults?: { memberId?: string; type?: AccountType 
   editingAccount.value = null;
   showAddModal.value = true;
 }
+
+// Quick-add FAB → open blank Add Account modal.
+useQuickAddIntent((action) => {
+  if (action === 'add-account') openAddWithDefaults();
+});
 
 function openEditModal(account: Account) {
   if (account.linkedAssetId) {

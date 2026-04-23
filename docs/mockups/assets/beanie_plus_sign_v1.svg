@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="beanies quick-add">
+  <defs>
+    <radialGradient id="bg-orange" cx="50%" cy="42%" r="62%">
+      <stop offset="0%" stop-color="#FF7B3E"/>
+      <stop offset="100%" stop-color="#E25116"/>
+    </radialGradient>
+    <linearGradient id="plus-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F2F4F6"/>
+    </linearGradient>
+    <linearGradient id="bean-shade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F57A3B"/>
+      <stop offset="100%" stop-color="#D74F18"/>
+    </linearGradient>
+    <linearGradient id="hat-shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#BEDFF3"/>
+      <stop offset="100%" stop-color="#8FC0DC"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background circle -->
+  <circle cx="60" cy="60" r="58" fill="var(--fab-bg, url(#bg-orange))"/>
+  <!-- soft inner highlight on the top-left to fake a light source -->
+  <ellipse cx="46" cy="32" rx="32" ry="18" fill="#FFFFFF" opacity="0.12"/>
+
+  <!-- BEAN HEAD (behind plus, peeking above crossbar) -->
+  <g>
+    <!-- bean silhouette, slight tilt -->
+    <path d="M58 16
+             C74 15, 82 26, 81 40
+             C80 52, 72 60, 62 61
+             C50 62, 41 55, 40 43
+             C39 29, 46 17, 58 16 Z"
+          fill="url(#bean-shade)"/>
+    <!-- subtle body shading on left side -->
+    <path d="M40 43
+             C39 33, 45 22, 54 18
+             C50 24, 46 32, 46 40
+             C46 48, 50 56, 58 60
+             C48 61, 41 55, 40 43 Z"
+          fill="#C4451A" opacity="0.28"/>
+    <!-- cheek highlight gleam -->
+    <ellipse cx="72" cy="35" rx="4" ry="6" fill="#FFFFFF" opacity="0.30" transform="rotate(-18 72 35)"/>
+  </g>
+
+  <!-- BEANIE HAT -->
+  <g>
+    <!-- dome -->
+    <path d="M44 22
+             C44 12, 50 6, 60 6
+             C70 6, 77 12, 77 22
+             C77 26, 75 28, 73 28
+             L47 28
+             C45 28, 44 26, 44 22 Z"
+          fill="url(#hat-shade)"/>
+    <!-- ribbed cuff -->
+    <rect x="42" y="26" width="36" height="8" rx="2.5" fill="#8FC0DC"/>
+    <!-- rib lines -->
+    <g stroke="#6FA7C6" stroke-width="0.9" stroke-linecap="round">
+      <line x1="48" y1="27.5" x2="48" y2="32.5"/>
+      <line x1="54" y1="27.5" x2="54" y2="32.5"/>
+      <line x1="60" y1="27.5" x2="60" y2="32.5"/>
+      <line x1="66" y1="27.5" x2="66" y2="32.5"/>
+      <line x1="72" y1="27.5" x2="72" y2="32.5"/>
+    </g>
+    <!-- pom-pom -->
+    <circle cx="60" cy="5" r="4" fill="#E67E22"/>
+    <circle cx="58.5" cy="4" r="1.1" fill="#FFFFFF" opacity="0.55"/>
+  </g>
+
+  <!-- FACE -->
+  <g>
+    <!-- pink cheeks -->
+    <ellipse cx="48" cy="46" rx="3.8" ry="2.6" fill="#F4A0B2" opacity="0.70"/>
+    <ellipse cx="70" cy="46" rx="3.8" ry="2.6" fill="#F4A0B2" opacity="0.70"/>
+    <!-- eyes -->
+    <ellipse cx="52" cy="41" rx="2.1" ry="2.6" fill="#2C3E50"/>
+    <ellipse cx="66" cy="41" rx="2.1" ry="2.6" fill="#2C3E50"/>
+    <!-- eye highlights -->
+    <circle cx="53" cy="40" r="0.8" fill="#FFFFFF"/>
+    <circle cx="67" cy="40" r="0.8" fill="#FFFFFF"/>
+    <!-- smile -->
+    <path d="M54 50 Q59 54, 64 50" stroke="#2C3E50" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- PLUS SIGN (foreground, white, covers chin) -->
+  <g>
+    <!-- soft shadow -->
+    <g opacity="0.18" transform="translate(0 1.5)">
+      <rect x="50" y="40" width="20" height="56" rx="6" fill="#1A252F"/>
+      <rect x="32" y="58" width="56" height="20" rx="6" fill="#1A252F"/>
+    </g>
+    <!-- bars -->
+    <rect x="50" y="40" width="20" height="56" rx="6" fill="url(#plus-sheen)"/>
+    <rect x="32" y="58" width="56" height="20" rx="6" fill="url(#plus-sheen)"/>
+    <!-- subtle inner highlight on top edge -->
+    <rect x="52" y="41.5" width="16" height="2" rx="1" fill="#FFFFFF" opacity="0.7"/>
+    <rect x="34" y="59.5" width="52" height="2" rx="1" fill="#FFFFFF" opacity="0.7"/>
+  </g>
+
+  <!-- HANDS on top of crossbar -->
+  <g>
+    <ellipse cx="38" cy="57" rx="4.6" ry="3.2" fill="url(#bean-shade)"/>
+    <ellipse cx="82" cy="57" rx="4.6" ry="3.2" fill="url(#bean-shade)"/>
+    <!-- tiny finger-indents -->
+    <path d="M35 58 Q38 56, 41 58" stroke="#C4451A" stroke-width="0.7" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M79 58 Q82 56, 85 58" stroke="#C4451A" stroke-width="0.7" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
+</svg>

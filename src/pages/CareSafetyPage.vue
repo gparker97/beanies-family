@@ -11,6 +11,8 @@ import { useRouter } from 'vue-router';
 import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { useGiveDose } from '@/composables/useGiveDose';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
@@ -24,6 +26,35 @@ const familyStore = useFamilyStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
 const contactsStore = useEmergencyContactsStore();
+const { giveDose } = useGiveDose();
+
+// Quick-add FAB handlers.
+//
+// - `add-medication` / `add-allergy` — forward to the selected bean's
+//   relevant tab so the existing per-tab add flow opens with member
+//   context. (The picker in QuickAddSheet guarantees memberId.)
+// - `add-dose-log` — look up the medication by id and call
+//   `useGiveDose.giveDose()` directly. The composable is the single
+//   source for dose logging; reusing it keeps undo + member-guard +
+//   toast surfaces consistent with the Bean tab's quick-give button.
+useQuickAddIntent(async (action, { memberId, medicationId }) => {
+  if (action === 'add-medication' && memberId) {
+    await router.push({ path: `/pod/${memberId}/medications`, query: { action } });
+    return;
+  }
+  if (action === 'add-allergy' && memberId) {
+    await router.push({ path: `/pod/${memberId}/allergies`, query: { action } });
+    return;
+  }
+  if (action === 'add-dose-log' && medicationId) {
+    const med = medicationsStore.medications.find((m) => m.id === medicationId);
+    if (!med) {
+      console.warn(`[CareSafetyPage] dose-log intent: medication ${medicationId} not found`);
+      return;
+    }
+    await giveDose(med);
+  }
+});
 
 // "Key contacts" preview on the Care & Safety surface — the first
 // three contacts, sorted to lead with Other/custom entries (poison
