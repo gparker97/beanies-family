@@ -4888,10 +4888,6 @@ const STRING_DEFS = {
     beanie: 'what would you like to add?',
   },
   'quickAdd.close': { en: 'Close', beanie: 'close' },
-  'quickAdd.closeHint': {
-    en: 'or swipe back · tap outside · Esc',
-    beanie: 'or swipe back · tap outside · esc',
-  },
 
   // Quick-add FAB — group labels
   'quickAdd.groups.everyday.kicker': {

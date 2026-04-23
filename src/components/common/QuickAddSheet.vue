@@ -110,9 +110,22 @@ function handleItemClick(item: QuickAddItem): void {
          item is pending). Tapping a different item while the picker is
          open just updates `pending` — the picker re-renders in place. -->
     <div v-else class="sheet-body" data-testid="quick-add-sheet">
-      <h2 id="quick-add-sheet-title" class="sheet-title">
-        {{ t('quickAdd.title') }}
-      </h2>
+      <header class="sheet-header">
+        <h2 id="quick-add-sheet-title" class="sheet-title">
+          {{ t('quickAdd.title') }}
+        </h2>
+        <!-- Corner × — primary close affordance, always in reach. The
+             bottom "close" pill is a secondary/thumb-friendly fallback. -->
+        <button
+          type="button"
+          class="sheet-close-x"
+          :aria-label="t('quickAdd.close')"
+          data-testid="quick-add-close-x"
+          @click="close"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </header>
 
       <!-- Everyday beans — kraft-paper card with 3x2 grid -->
       <section class="everyday-card" :aria-labelledby="'quick-add-everyday-kicker'">
@@ -183,18 +196,14 @@ function handleItemClick(item: QuickAddItem): void {
         <QuickAddMemberPicker v-if="pickerAfter(group.id)" />
       </template>
 
-      <!-- Footer: explicit close target. Backdrop tap, Esc, and the PWA
-           back gesture already close the sheet, but none of those are
-           discoverable on a cold open — especially on mobile where the
-           fat-finger "I opened this by accident" recovery path needs to
-           be visible. Styled as a tertiary pill so it doesn't compete
-           with action tiles above. -->
+      <!-- Footer: thumb-friendly close for mobile. The corner × is the
+           primary affordance; this wide pill is the reach-friendly
+           fallback. Styled as a filled slate "utility" pill so it reads
+           distinctly different from the orange-accented action tiles. -->
       <footer class="sheet-footer">
         <button type="button" class="sheet-close" data-testid="quick-add-close" @click="close">
-          <span class="sheet-close-glyph" aria-hidden="true">×</span>
-          <span class="sheet-close-label">{{ t('quickAdd.close') }}</span>
+          {{ t('quickAdd.close') }}
         </button>
-        <p class="sheet-close-hint">{{ t('quickAdd.closeHint') }}</p>
       </footer>
     </div>
   </BaseModal>
@@ -207,6 +216,13 @@ function handleItemClick(item: QuickAddItem): void {
   gap: 20px;
 }
 
+.sheet-header {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
 .sheet-title {
   color: rgb(var(--color-ink, 44 62 80));
   font-family: Outfit, sans-serif;
@@ -216,6 +232,55 @@ function handleItemClick(item: QuickAddItem): void {
 }
 
 :global(.dark) .sheet-title {
+  color: rgb(241 242 244);
+}
+
+/* Corner × — small, muted, always-there. Used chiefly by desktop /
+   keyboard users; mobile thumb-users have the wider bottom pill. */
+.sheet-close-x {
+  align-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: rgb(44 62 80 / 55%);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-family: Outfit, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 0.15s ease-out,
+    color 0.15s ease-out,
+    transform 0.15s ease-out;
+  width: 32px;
+}
+
+.sheet-close-x:hover {
+  background: rgb(44 62 80 / 8%);
+  color: rgb(44 62 80);
+}
+
+.sheet-close-x:active {
+  transform: scale(0.9);
+}
+
+.sheet-close-x:focus-visible {
+  outline: 2px solid rgb(241 93 34 / 90%);
+  outline-offset: 2px;
+}
+
+:global(.dark) .sheet-close-x {
+  color: rgb(241 242 244 / 55%);
+}
+
+:global(.dark) .sheet-close-x:hover {
+  background: rgb(241 242 244 / 10%);
   color: rgb(241 242 244);
 }
 
@@ -463,37 +528,34 @@ function handleItemClick(item: QuickAddItem): void {
 .sheet-footer {
   align-items: center;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 12px;
+  justify-content: center;
+  padding-top: 4px;
 }
 
+/* Bottom close — filled slate pill. Intentionally neutral (no orange,
+   no white) so it reads as a "utility / dismiss" target rather than
+   another action. Wider than the corner × so it's thumb-friendly. */
 .sheet-close {
-  align-items: center;
-  background: transparent;
-  border: 1px dashed rgb(44 62 80 / 25%);
+  background: rgb(44 62 80 / 6%);
+  border: 1px solid transparent;
   border-radius: 999px;
-  color: rgb(44 62 80 / 75%);
+  color: rgb(44 62 80 / 80%);
   cursor: pointer;
-  display: inline-flex;
   font-family: Outfit, sans-serif;
   font-size: 0.875rem;
   font-weight: 600;
-  gap: 8px;
-  padding: 10px 22px;
+  letter-spacing: 0.02em;
+  min-width: 140px;
+  padding: 11px 28px;
   -webkit-tap-highlight-color: transparent;
   transition:
     background-color 0.15s ease-out,
-    border-color 0.15s ease-out,
     color 0.15s ease-out,
     transform 0.15s ease-out;
 }
 
 .sheet-close:hover {
-  background: rgb(44 62 80 / 4%);
-  border-color: rgb(44 62 80 / 45%);
-  border-style: solid;
+  background: rgb(44 62 80 / 10%);
   color: rgb(44 62 80);
 }
 
@@ -507,39 +569,13 @@ function handleItemClick(item: QuickAddItem): void {
 }
 
 :global(.dark) .sheet-close {
-  border-color: rgb(241 242 244 / 25%);
-  color: rgb(241 242 244 / 75%);
+  background: rgb(241 242 244 / 8%);
+  color: rgb(241 242 244 / 80%);
 }
 
 :global(.dark) .sheet-close:hover {
-  background: rgb(241 242 244 / 6%);
-  border-color: rgb(241 242 244 / 45%);
+  background: rgb(241 242 244 / 14%);
   color: rgb(241 242 244);
-}
-
-.sheet-close-glyph {
-  font-size: 1.25rem;
-  font-weight: 400;
-  line-height: 1;
-  margin-top: -2px;
-}
-
-.sheet-close-label {
-  letter-spacing: 0.02em;
-}
-
-.sheet-close-hint {
-  color: rgb(44 62 80 / 45%);
-  font-family: Inter, sans-serif;
-  font-size: 0.6875rem;
-  font-style: italic;
-  font-weight: 400;
-  margin: 0;
-  text-align: center;
-}
-
-:global(.dark) .sheet-close-hint {
-  color: rgb(241 242 244 / 45%);
 }
 
 /* --- Animations (gated on reduced-motion) --- */
