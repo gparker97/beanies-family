@@ -1,0 +1,2774 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FAB design exploration · beanies.family · issue #37</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Caveat:wght@500;700&family=Fraunces:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ---------- brand tokens ---------- */
+      :root {
+        --slate: #2c3e50;
+        --slate-1a: #1a252f;
+        --slate-24: #243342;
+        --slate-34: #34495e;
+        --orange: #f15d22;
+        --orange-soft: #e0551f;
+        --terracotta: #e67e22;
+        --silk: #aed6f1;
+        --cloud: #f8f9fa;
+        --success: #27ae60;
+        --ink: #2c3e50;
+        --muted: rgba(44, 62, 80, 0.55);
+        --hairline: rgba(44, 62, 80, 0.08);
+        --hairline-strong: rgba(44, 62, 80, 0.14);
+        --tint-orange-8: rgba(241, 93, 34, 0.08);
+        --tint-orange-15: rgba(241, 93, 34, 0.15);
+        --tint-silk-20: rgba(174, 214, 241, 0.25);
+        --tint-slate-5: rgba(44, 62, 80, 0.05);
+        --shadow-soft: 0 4px 20px rgba(44, 62, 80, 0.08);
+        --shadow-fab: 0 10px 30px rgba(241, 93, 34, 0.3),
+          0 4px 10px rgba(241, 93, 34, 0.25);
+        --shadow-lift: 0 20px 50px rgba(44, 62, 80, 0.2);
+        --radius: 18px;
+        --radius-sm: 12px;
+        --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+        --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+
+      [data-theme='dark'] {
+        --ink: #ecf0f1;
+        --cloud: #1a252f;
+        --muted: rgba(236, 240, 241, 0.55);
+        --hairline: rgba(236, 240, 241, 0.08);
+        --hairline-strong: rgba(236, 240, 241, 0.14);
+        --tint-slate-5: rgba(236, 240, 241, 0.04);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        color: var(--ink);
+        background: radial-gradient(
+            1200px 800px at 100% 0%,
+            rgba(241, 93, 34, 0.08),
+            transparent 55%
+          ),
+          radial-gradient(
+            1000px 700px at 0% 100%,
+            rgba(174, 214, 241, 0.18),
+            transparent 55%
+          ),
+          #f1eadb;
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      [data-theme='dark'] body,
+      body[data-theme='dark'] {
+        background: radial-gradient(
+            1200px 800px at 100% 0%,
+            rgba(241, 93, 34, 0.15),
+            transparent 55%
+          ),
+          radial-gradient(
+            1000px 700px at 0% 100%,
+            rgba(52, 73, 94, 0.5),
+            transparent 55%
+          ),
+          #0f171f;
+      }
+
+      /* ---------- stage layout ---------- */
+      .stage {
+        display: grid;
+        grid-template-columns: 1fr minmax(380px, 440px) 1fr;
+        grid-template-rows: auto 1fr;
+        min-height: 100vh;
+        padding: 32px clamp(16px, 3vw, 48px);
+        gap: 32px;
+      }
+
+      @media (max-width: 1100px) {
+        .stage {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .title-block {
+        grid-column: 1 / -1;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .kicker {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+
+      .kicker::before {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        background: var(--orange);
+        border-radius: 2px;
+        margin-right: 10px;
+        transform: rotate(45deg);
+        vertical-align: 1px;
+      }
+
+      h1 {
+        font-family: 'Outfit', sans-serif;
+        font-size: clamp(28px, 4vw, 44px);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 8px 0 2px;
+        line-height: 1.05;
+      }
+
+      .subtitle {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 17px;
+        color: var(--muted);
+        max-width: 60ch;
+      }
+
+      .meta {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .meta a {
+        color: var(--orange);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .meta a:hover {
+        text-decoration: underline;
+      }
+
+      /* ---------- variant picker ---------- */
+      .variant-picker {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-self: start;
+        position: sticky;
+        top: 32px;
+      }
+
+      .variant-card {
+        text-align: left;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        transition:
+          background 0.18s,
+          border-color 0.18s,
+          transform 0.18s;
+        color: var(--ink);
+        display: grid;
+        grid-template-columns: 32px 1fr auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      [data-theme='dark'] .variant-card {
+        background: rgba(52, 73, 94, 0.5);
+      }
+
+      .variant-card:hover {
+        border-color: var(--orange);
+      }
+
+      .variant-card.active {
+        border-color: var(--orange);
+        background: var(--orange);
+        color: white;
+        box-shadow: var(--shadow-fab);
+      }
+
+      .variant-card.active .variant-num,
+      .variant-card.active .variant-pros {
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      .variant-card.recommended {
+        border-color: var(--orange);
+        box-shadow: 0 0 0 1px var(--orange);
+      }
+
+      .rec-pill {
+        display: inline-block;
+        background: var(--orange);
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: 999px;
+        margin-left: 6px;
+        vertical-align: 1px;
+      }
+
+      .variant-card.recommended.active .rec-pill {
+        background: white;
+        color: var(--orange);
+      }
+
+      .variant-card.recommended .variant-num {
+        color: var(--orange);
+        font-size: 18px;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 800;
+      }
+
+      .variant-num {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 22px;
+        font-weight: 600;
+        color: var(--orange);
+        text-align: center;
+        line-height: 1;
+      }
+
+      .variant-title {
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        line-height: 1.2;
+      }
+
+      .variant-pros {
+        font-family: 'Inter', sans-serif;
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .variant-card svg {
+        width: 16px;
+        height: 16px;
+        opacity: 0.5;
+      }
+
+      /* ---------- right rail: notes ---------- */
+      .notes-rail {
+        align-self: start;
+      }
+
+      .note-card {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--hairline);
+        border-radius: var(--radius);
+        padding: 20px 22px;
+        margin-bottom: 16px;
+      }
+
+      [data-theme='dark'] .note-card {
+        background: rgba(52, 73, 94, 0.5);
+      }
+
+      .note-card h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 13px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--orange);
+        margin: 0 0 12px;
+      }
+
+      .note-card p,
+      .note-card li {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--ink);
+        margin: 0 0 8px;
+      }
+
+      .note-card ul {
+        padding-left: 18px;
+        margin: 0;
+      }
+
+      .note-card .pill {
+        display: inline-block;
+        background: var(--tint-orange-8);
+        color: var(--orange);
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 3px 8px;
+        border-radius: 999px;
+        margin-right: 6px;
+      }
+
+      .note-card .pill.green {
+        background: rgba(39, 174, 96, 0.1);
+        color: var(--success);
+      }
+      .note-card .pill.slate {
+        background: var(--tint-slate-5);
+        color: var(--slate);
+      }
+      [data-theme='dark'] .note-card .pill.slate {
+        color: var(--ink);
+      }
+
+      .rec {
+        border-left: 3px solid var(--orange);
+        padding-left: 14px;
+        margin-top: 10px;
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--ink);
+      }
+
+      /* ---------- phone frame ---------- */
+      .phone-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
+
+      .phone {
+        width: 100%;
+        max-width: 400px;
+        aspect-ratio: 9 / 19;
+        background: var(--cloud);
+        border-radius: 44px;
+        box-shadow:
+          0 50px 100px -20px rgba(44, 62, 80, 0.35),
+          0 30px 60px -30px rgba(44, 62, 80, 0.4),
+          inset 0 0 0 10px #0d1117,
+          inset 0 0 0 11px rgba(255, 255, 255, 0.1);
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .phone::before {
+        content: '';
+        position: absolute;
+        top: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 28px;
+        background: #0d1117;
+        border-radius: 14px;
+        z-index: 50;
+      }
+
+      /* ---------- app chrome (inside phone) ---------- */
+      .app {
+        position: absolute;
+        inset: 10px;
+        border-radius: 34px;
+        overflow: hidden;
+        background: var(--cloud);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .status-bar {
+        height: 44px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 24px 0 28px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+
+      .status-bar .dots span {
+        display: inline-block;
+        width: 4px;
+        height: 4px;
+        background: var(--ink);
+        border-radius: 50%;
+        margin-left: 2px;
+        opacity: 0.7;
+      }
+
+      .app-head {
+        padding: 8px 20px 14px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .greet-kicker {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 700;
+        color: var(--muted);
+      }
+
+      .greet-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin-top: 2px;
+      }
+
+      .greet-accent {
+        font-family: 'Caveat', cursive;
+        color: var(--orange);
+        font-weight: 700;
+      }
+
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        display: grid;
+        place-items: center;
+      }
+
+      .app-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 20px 100px;
+        scrollbar-width: none;
+      }
+      .app-scroll::-webkit-scrollbar {
+        display: none;
+      }
+
+      .hero-card {
+        background: linear-gradient(
+          135deg,
+          var(--slate) 0%,
+          var(--slate-34) 100%
+        );
+        color: white;
+        border-radius: 22px;
+        padding: 18px 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-card::after {
+        content: '';
+        position: absolute;
+        right: -30px;
+        top: -30px;
+        width: 140px;
+        height: 140px;
+        background: radial-gradient(
+          circle,
+          var(--orange) 0%,
+          transparent 70%
+        );
+        opacity: 0.45;
+        filter: blur(2px);
+      }
+
+      .hero-label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-weight: 700;
+        opacity: 0.7;
+      }
+
+      .hero-amount {
+        font-family: 'Outfit', sans-serif;
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin-top: 4px;
+        line-height: 1.1;
+      }
+
+      .hero-meta {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+        font-size: 11px;
+      }
+
+      .hero-meta .up {
+        color: var(--silk);
+        font-weight: 600;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin: 22px 0 10px;
+      }
+
+      .section-head h2 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+
+      .section-head a {
+        font-size: 11px;
+        color: var(--muted);
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .activity-row {
+        display: grid;
+        grid-template-columns: 36px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--hairline);
+      }
+
+      .activity-row:last-child {
+        border-bottom: 0;
+      }
+
+      .activity-row .icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+      }
+
+      .icon.orange {
+        background: var(--tint-orange-15);
+      }
+      .icon.silk {
+        background: var(--tint-silk-20);
+      }
+      .icon.slate {
+        background: var(--tint-slate-5);
+      }
+
+      .activity-row .label {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .activity-row .sub {
+        font-size: 11px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .activity-row .amt {
+        font-family: 'Outfit', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .amt.pos {
+        color: var(--success);
+      }
+      .amt.neg {
+        color: var(--orange);
+      }
+
+      .goal-card {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: var(--tint-slate-5);
+        display: grid;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      [data-theme='dark'] .goal-card {
+        background: rgba(236, 240, 241, 0.04);
+      }
+
+      .goal-card .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+      }
+      .goal-card .name {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .goal-card .pct {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--orange);
+      }
+      .goal-card .bar {
+        height: 6px;
+        background: var(--hairline);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .goal-card .bar > span {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, var(--orange), var(--terracotta));
+        border-radius: inherit;
+      }
+
+      /* ---------- bottom nav ---------- */
+      .bottom-nav {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        height: 72px;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(16px);
+        border-top: 1px solid var(--hairline);
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        z-index: 5;
+        border-radius: 0 0 34px 34px;
+        padding-bottom: 12px;
+      }
+
+      [data-theme='dark'] .bottom-nav {
+        background: rgba(26, 37, 47, 0.9);
+      }
+
+      .nav-tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--muted);
+        cursor: pointer;
+        background: none;
+        border: 0;
+        padding-top: 8px;
+      }
+
+      .nav-tab.active {
+        color: var(--orange);
+      }
+
+      .nav-tab .ico {
+        font-size: 20px;
+      }
+
+      /* ---------- FAB base ---------- */
+      .fab,
+      .fab-mini {
+        position: absolute;
+        z-index: 15;
+        cursor: pointer;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .fab {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-image: url('assets/beanie_plus_sign_orange.png');
+        background-repeat: no-repeat;
+        background-size: auto 160%;
+        background-position: center 28%;
+        box-shadow: var(--shadow-fab);
+        display: grid;
+        place-items: center;
+        border: 0;
+        color: white;
+        transition:
+          transform 0.45s var(--ease-spring),
+          box-shadow 0.25s;
+        animation: fab-peek 2.6s ease-in-out infinite;
+      }
+
+      [data-theme='dark'] .fab {
+        background-image: url('assets/beanie_plus_sign_blue.png');
+      }
+
+      @keyframes fab-peek {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-3px);
+        }
+      }
+
+      .fab:hover {
+        box-shadow: var(--shadow-fab),
+          0 0 0 4px rgba(241, 93, 34, 0.15);
+      }
+
+      .fab:active {
+        transform: scale(0.94);
+        animation: none;
+      }
+
+      /* hide the text + since the PNG already shows a plus */
+      .fab-plus,
+      .fab svg {
+        display: none;
+      }
+
+      .fab.open {
+        transform: rotate(45deg) scale(0.96);
+        animation: none;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .fab {
+          animation: none;
+        }
+      }
+
+      /* ---------- backdrop ---------- */
+      .backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(26, 37, 47, 0.45);
+        backdrop-filter: blur(6px);
+        opacity: 0;
+        pointer-events: none;
+        z-index: 12;
+        transition: opacity 0.25s var(--ease-out);
+        border-radius: 34px;
+      }
+
+      .backdrop.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      /* ---------- variant 1: arc fan ---------- */
+      .arc-item {
+        position: absolute;
+        bottom: 100px;
+        right: 30px;
+        z-index: 14;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-direction: row-reverse;
+        opacity: 0;
+        transform: translate(0, 20px) scale(0.4);
+        pointer-events: none;
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.45s var(--ease-spring);
+      }
+
+      .variant-1.open .arc-item {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .variant-1.open .arc-item[data-i='0'] {
+        transform: translate(-94px, -24px) scale(1);
+        transition-delay: 0.05s;
+      }
+      .variant-1.open .arc-item[data-i='1'] {
+        transform: translate(-80px, -72px) scale(1);
+        transition-delay: 0.09s;
+      }
+      .variant-1.open .arc-item[data-i='2'] {
+        transform: translate(-48px, -108px) scale(1);
+        transition-delay: 0.13s;
+      }
+      .variant-1.open .arc-item[data-i='3'] {
+        transform: translate(-6px, -128px) scale(1);
+        transition-delay: 0.17s;
+      }
+      .variant-1.open .arc-item[data-i='4'] {
+        transform: translate(40px, -128px) scale(1);
+        transition-delay: 0.21s;
+      }
+
+      .arc-bean {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: white;
+        box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+      }
+      [data-theme='dark'] .arc-bean {
+        background: var(--slate-34);
+        box-shadow:
+          var(--shadow-soft),
+          inset 0 0 0 1px var(--hairline-strong);
+      }
+
+      .arc-label {
+        background: var(--slate);
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 6px 10px;
+        border-radius: 8px;
+        white-space: nowrap;
+      }
+
+      /* ---------- variant 2: bean jar stack ---------- */
+      .jar-item {
+        position: absolute;
+        bottom: 100px;
+        right: 30px;
+        z-index: 14;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-direction: row-reverse;
+        opacity: 0;
+        transform: translateY(8px) scale(0.2);
+        pointer-events: none;
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.55s var(--ease-spring);
+      }
+
+      .variant-2.open .jar-item[data-i='0'] {
+        transform: translateY(-64px) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+        transition-delay: 0.04s;
+      }
+      .variant-2.open .jar-item[data-i='1'] {
+        transform: translateY(-120px) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+        transition-delay: 0.1s;
+      }
+      .variant-2.open .jar-item[data-i='2'] {
+        transform: translateY(-176px) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+        transition-delay: 0.16s;
+      }
+      .variant-2.open .jar-item[data-i='3'] {
+        transform: translateY(-232px) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+        transition-delay: 0.22s;
+      }
+      .variant-2.open .jar-item[data-i='4'] {
+        transform: translateY(-288px) scale(1);
+        opacity: 1;
+        pointer-events: auto;
+        transition-delay: 0.28s;
+      }
+
+      .jar-bean {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: white;
+        box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        position: relative;
+      }
+      [data-theme='dark'] .jar-bean {
+        background: var(--slate-34);
+      }
+
+      .jar-bean::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.9),
+          transparent 50%
+        );
+        pointer-events: none;
+      }
+      [data-theme='dark'] .jar-bean::before {
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.2),
+          transparent 50%
+        );
+      }
+
+      .jar-label {
+        background: white;
+        color: var(--ink);
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 12px;
+        border-radius: 10px;
+        white-space: nowrap;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid var(--hairline);
+        opacity: 0;
+        transform: translateX(6px);
+        transition:
+          opacity 0.25s var(--ease-out),
+          transform 0.3s var(--ease-out);
+      }
+      [data-theme='dark'] .jar-label {
+        background: var(--slate-34);
+        color: var(--ink);
+      }
+
+      .variant-2.open .jar-item .jar-label {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      .variant-2.open .jar-item[data-i='0'] .jar-label {
+        transition-delay: 0.14s;
+      }
+      .variant-2.open .jar-item[data-i='1'] .jar-label {
+        transition-delay: 0.2s;
+      }
+      .variant-2.open .jar-item[data-i='2'] .jar-label {
+        transition-delay: 0.26s;
+      }
+      .variant-2.open .jar-item[data-i='3'] .jar-label {
+        transition-delay: 0.32s;
+      }
+      .variant-2.open .jar-item[data-i='4'] .jar-label {
+        transition-delay: 0.38s;
+      }
+
+      /* ---------- variant 3: bottom sheet ---------- */
+      .sheet {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        background: white;
+        border-radius: 28px 28px 34px 34px;
+        z-index: 13;
+        transform: translateY(105%);
+        transition: transform 0.45s var(--ease-out);
+        padding: 16px 20px 28px;
+        box-shadow: 0 -20px 40px rgba(44, 62, 80, 0.15);
+        max-height: 72%;
+        overflow-y: auto;
+        scrollbar-width: none;
+      }
+      .sheet::-webkit-scrollbar {
+        display: none;
+      }
+      [data-theme='dark'] .sheet {
+        background: var(--slate-24);
+      }
+
+      .variant-3.open .sheet {
+        transform: translateY(0);
+      }
+
+      .sheet-handle {
+        width: 36px;
+        height: 4px;
+        background: var(--hairline-strong);
+        border-radius: 999px;
+        margin: 0 auto 14px;
+      }
+
+      .sheet-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 2px;
+        letter-spacing: -0.01em;
+      }
+
+      .sheet-sub {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 16px;
+      }
+
+      .sheet-section-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 14px 0 10px;
+      }
+
+      .sheet-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .sheet-item {
+        padding: 14px 14px 12px;
+        border-radius: 16px;
+        background: var(--cloud);
+        border: 1px solid var(--hairline);
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transition:
+          transform 0.2s,
+          border-color 0.2s;
+      }
+
+      [data-theme='dark'] .sheet-item {
+        background: var(--slate-34);
+      }
+
+      .sheet-item:active {
+        transform: scale(0.97);
+      }
+
+      .sheet-item:hover {
+        border-color: var(--orange);
+      }
+
+      .sheet-item .emoji {
+        font-size: 22px;
+      }
+      .sheet-item .title {
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+        font-size: 13px;
+      }
+      .sheet-item .hint {
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      /* ---------- variant 4: center tab nav ---------- */
+      .center-tab {
+        position: relative;
+      }
+
+      .center-tab::before {
+        content: '';
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 56px;
+        height: 56px;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        border-radius: 50%;
+        box-shadow: var(--shadow-fab);
+        z-index: 1;
+      }
+
+      .center-tab .plus-mark {
+        position: absolute;
+        top: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 56px;
+        height: 56px;
+        display: grid;
+        place-items: center;
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 32px;
+        line-height: 0;
+        font-weight: 300;
+        z-index: 2;
+        transition: transform 0.35s var(--ease-spring);
+      }
+
+      .variant-4.open .center-tab .plus-mark {
+        transform: translateX(-50%) rotate(135deg);
+      }
+
+      .center-tab span.label {
+        visibility: hidden;
+      }
+
+      /* variant 4 uses sheet */
+
+      /* ---------- variant 5: draggable assistive ---------- */
+      .drag-fab {
+        position: absolute;
+        top: calc(50% - 28px);
+        right: 10px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--orange), var(--terracotta));
+        box-shadow: var(--shadow-fab);
+        display: grid;
+        place-items: center;
+        color: white;
+        z-index: 16;
+        opacity: 0.55;
+        transition:
+          opacity 0.25s,
+          transform 0.3s var(--ease-spring);
+        cursor: grab;
+      }
+
+      .drag-fab:hover {
+        opacity: 1;
+      }
+
+      .drag-fab.dragging {
+        cursor: grabbing;
+        transition: none;
+        opacity: 1;
+        transform: scale(1.06);
+      }
+
+      .drag-fab .plus {
+        font-family: 'Outfit', sans-serif;
+        font-size: 32px;
+        font-weight: 300;
+        line-height: 0;
+        transition: transform 0.35s var(--ease-spring);
+      }
+
+      .drag-fab.open {
+        opacity: 1;
+      }
+      .drag-fab.open .plus {
+        transform: rotate(135deg);
+      }
+
+      .radial-ring {
+        position: absolute;
+        width: 240px;
+        height: 240px;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 15;
+        opacity: 0;
+        transition: opacity 0.25s var(--ease-out);
+      }
+
+      .radial-ring.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .radial-ring .ring-halo {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle,
+          rgba(241, 93, 34, 0.16),
+          transparent 60%
+        );
+      }
+
+      .radial-item {
+        position: absolute;
+        width: 52px;
+        height: 52px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(0.2);
+        background: white;
+        border-radius: 50%;
+        box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--hairline);
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        transition: transform 0.55s var(--ease-spring);
+        cursor: pointer;
+      }
+      [data-theme='dark'] .radial-item {
+        background: var(--slate-34);
+      }
+
+      .radial-ring.open .radial-item {
+        transform: translate(var(--rx), var(--ry)) scale(1);
+      }
+
+      .radial-ring.open .radial-item[data-i='0'] {
+        transition-delay: 0.05s;
+      }
+      .radial-ring.open .radial-item[data-i='1'] {
+        transition-delay: 0.1s;
+      }
+      .radial-ring.open .radial-item[data-i='2'] {
+        transition-delay: 0.15s;
+      }
+      .radial-ring.open .radial-item[data-i='3'] {
+        transition-delay: 0.2s;
+      }
+      .radial-ring.open .radial-item[data-i='4'] {
+        transition-delay: 0.25s;
+      }
+
+      /* ---------- variant 6: recommended (sheet + jar pop on Money) ---------- */
+      .sheet-v6 {
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        background: white;
+        border-radius: 28px 28px 34px 34px;
+        z-index: 13;
+        transform: translateY(105%);
+        transition: transform 0.45s var(--ease-out);
+        padding: 16px 20px 28px;
+        box-shadow: 0 -20px 40px rgba(44, 62, 80, 0.15);
+        max-height: 78%;
+        overflow-y: auto;
+        scrollbar-width: none;
+      }
+      .sheet-v6::-webkit-scrollbar {
+        display: none;
+      }
+      [data-theme='dark'] .sheet-v6 {
+        background: var(--slate-24);
+      }
+
+      .variant-6.open .sheet-v6 {
+        transform: translateY(0);
+      }
+
+      /* Money group — warm kraft-paper card treatment */
+      .money-section {
+        margin: 10px -6px 6px;
+        padding: 14px 16px 16px;
+        border-radius: 20px;
+        background: linear-gradient(
+          135deg,
+          rgba(241, 93, 34, 0.08) 0%,
+          rgba(230, 126, 34, 0.12) 100%
+        );
+        border: 1px solid var(--tint-orange-15);
+        position: relative;
+        overflow: hidden;
+      }
+
+      [data-theme='dark'] .money-section {
+        background: linear-gradient(
+          135deg,
+          rgba(241, 93, 34, 0.18) 0%,
+          rgba(230, 126, 34, 0.22) 100%
+        );
+      }
+
+      .money-section::before {
+        content: '';
+        position: absolute;
+        right: -28px;
+        bottom: -28px;
+        width: 120px;
+        height: 120px;
+        background: radial-gradient(
+          circle,
+          rgba(241, 93, 34, 0.18),
+          transparent 70%
+        );
+        filter: blur(4px);
+        pointer-events: none;
+      }
+
+      .money-kicker {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .money-kicker .lead {
+        font-family: 'Outfit', sans-serif;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+
+      .money-kicker .subhint {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .money-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .money-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        padding: 12px 6px 10px;
+        background: white;
+        border-radius: 16px;
+        cursor: pointer;
+        border: 1px solid var(--hairline);
+        opacity: 0;
+        transform: translateY(28px) scale(0.35);
+        transition:
+          transform 0.55s var(--ease-spring),
+          opacity 0.3s var(--ease-out),
+          border-color 0.18s;
+      }
+
+      [data-theme='dark'] .money-item {
+        background: var(--slate-34);
+      }
+
+      .money-item:hover {
+        border-color: var(--orange);
+      }
+
+      .money-item:active {
+        transform: scale(0.96) !important;
+      }
+
+      .money-bean {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: linear-gradient(
+          135deg,
+          rgba(241, 93, 34, 0.12),
+          rgba(230, 126, 34, 0.16)
+        );
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        position: relative;
+      }
+
+      .money-bean::before {
+        content: '';
+        position: absolute;
+        inset: 4px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 30% 30%,
+          rgba(255, 255, 255, 0.7),
+          transparent 50%
+        );
+        pointer-events: none;
+      }
+
+      .money-item .mlabel {
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.1;
+        text-align: center;
+      }
+
+      /* pop stagger — triggered by .open */
+      .variant-6.open .money-item {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .variant-6.open .money-item[data-i='0'] {
+        transition-delay: 0.12s;
+      }
+      .variant-6.open .money-item[data-i='1'] {
+        transition-delay: 0.18s;
+      }
+      .variant-6.open .money-item[data-i='2'] {
+        transition-delay: 0.24s;
+      }
+      .variant-6.open .money-item[data-i='3'] {
+        transition-delay: 0.3s;
+      }
+      .variant-6.open .money-item[data-i='4'] {
+        transition-delay: 0.36s;
+      }
+      .variant-6.open .money-item[data-i='5'] {
+        transition-delay: 0.42s;
+      }
+
+      /* other groups — gentler fade */
+      .other-group .sheet-item {
+        opacity: 0;
+        transform: translateY(10px);
+        transition:
+          transform 0.35s var(--ease-out),
+          opacity 0.3s var(--ease-out),
+          border-color 0.18s;
+      }
+
+      .variant-6.open .other-group .sheet-item {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .variant-6.open .other-group[data-group='family'] .sheet-item {
+        transition-delay: calc(0.42s + var(--d, 0s));
+      }
+      .variant-6.open .other-group[data-group='money'] .sheet-item {
+        transition-delay: calc(0.52s + var(--d, 0s));
+      }
+      .variant-6.open .other-group[data-group='care'] .sheet-item {
+        transition-delay: calc(0.6s + var(--d, 0s));
+      }
+
+      /* faded "setup" label next to section titles */
+      .sheet-section-title .subtle {
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-size: 10px;
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--muted);
+        margin-left: 6px;
+      }
+
+      .sheet-v6-handle {
+        width: 36px;
+        height: 4px;
+        background: var(--hairline-strong);
+        border-radius: 999px;
+        margin: 0 auto 10px;
+      }
+
+      .sheet-v6-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+
+      /* reduced motion override */
+      @media (prefers-reduced-motion: reduce) {
+        .money-item,
+        .other-group .sheet-item,
+        .jar-item,
+        .arc-item,
+        .radial-item {
+          transition-duration: 0.01s !important;
+          transition-delay: 0s !important;
+        }
+      }
+
+      /* ---------- variant helpers ---------- */
+      .is-hidden {
+        display: none !important;
+      }
+
+      /* ---------- top bar (desktop controls) ---------- */
+      .top-bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .chip-btn {
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--hairline-strong);
+        background: rgba(255, 255, 255, 0.7);
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      [data-theme='dark'] .chip-btn {
+        background: rgba(52, 73, 94, 0.5);
+      }
+
+      .chip-btn.active {
+        background: var(--slate);
+        color: white;
+        border-color: var(--slate);
+      }
+
+      /* ---------- overlay hint chip for fresh tap ---------- */
+      .tap-hint {
+        position: absolute;
+        bottom: 96px;
+        right: 106px;
+        background: var(--slate);
+        color: white;
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        opacity: 0;
+        transform: translateX(6px);
+        pointer-events: none;
+        z-index: 18;
+        transition:
+          opacity 0.3s,
+          transform 0.3s;
+      }
+
+      .phone:hover .tap-hint:not(.dismiss) {
+        opacity: 0.85;
+        transform: translateX(0);
+      }
+
+      .tap-hint::after {
+        content: '';
+        position: absolute;
+        right: -4px;
+        top: 50%;
+        transform: translateY(-50%) rotate(45deg);
+        width: 8px;
+        height: 8px;
+        background: var(--slate);
+      }
+
+      /* scrim for modal-like confirm after tap */
+      .action-toast {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        top: 64px;
+        background: var(--slate);
+        color: white;
+        padding: 10px 14px;
+        border-radius: 14px;
+        font-family: 'Outfit', sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        z-index: 20;
+        box-shadow: var(--shadow-lift);
+        opacity: 0;
+        transform: translateY(-10px);
+        pointer-events: none;
+        transition:
+          opacity 0.3s,
+          transform 0.3s;
+      }
+
+      .action-toast.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .action-toast .emoji {
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="stage">
+      <!-- title -->
+      <header class="title-block">
+        <div>
+          <div class="kicker">FAB design exploration · issue #37</div>
+          <h1>A quick-add button that doesn't<br />get in the way.</h1>
+          <div class="subtitle">
+            Five directions for the beanies.family FAB — from the classic arc
+            fan to a draggable AssistiveTouch-style puck. Tap each option on the
+            left to compare in context.
+          </div>
+        </div>
+        <div class="top-bar">
+          <button class="chip-btn" id="theme-toggle">dark mode</button>
+          <div class="meta">
+            <span>2026-04-23</span>
+            <span>·</span>
+            <a href="https://github.com/gparker97/beanies-family/issues/37"
+              >github/#37</a
+            >
+          </div>
+        </div>
+      </header>
+
+      <!-- variant picker -->
+      <aside class="variant-picker" id="picker">
+        <button class="variant-card recommended active" data-variant="6">
+          <div class="variant-num">★</div>
+          <div>
+            <div class="variant-title">
+              Everyday beans
+              <span class="rec-pill">recommended</span>
+            </div>
+            <div class="variant-pros">
+              daily adds get the jar-pop · setup grouped below
+            </div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="variant-card" data-variant="1">
+          <div class="variant-num">01</div>
+          <div>
+            <div class="variant-title">Arc fan (classic)</div>
+            <div class="variant-pros">familiar · compact · 5-item ceiling</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="variant-card" data-variant="2">
+          <div class="variant-num">02</div>
+          <div>
+            <div class="variant-title">Bean-jar stack</div>
+            <div class="variant-pros">most on-brand · playful · vertical</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="variant-card" data-variant="3">
+          <div class="variant-num">03</div>
+          <div>
+            <div class="variant-title">Bottom sheet (grid)</div>
+            <div class="variant-pros">scales to 15+ items · grouped</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="variant-card" data-variant="4">
+          <div class="variant-num">04</div>
+          <div>
+            <div class="variant-title">Center-tab + (mobile)</div>
+            <div class="variant-pros">
+              zero float intrusion · bottom-nav native
+            </div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <button class="variant-card" data-variant="5">
+          <div class="variant-num">05</div>
+          <div>
+            <div class="variant-title">Draggable AssistiveTouch</div>
+            <div class="variant-pros">
+              user-positioned · edge-snap · novel
+            </div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M9 18l6-6-6-6" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </button>
+      </aside>
+
+      <!-- phone preview -->
+      <div class="phone-wrap">
+        <div class="phone" id="phone">
+          <div class="app" id="app">
+            <!-- status bar -->
+            <div class="status-bar">
+              <span>9:41</span>
+              <span class="dots"><span></span><span></span><span></span></span>
+            </div>
+
+            <!-- greeting -->
+            <div class="app-head">
+              <div>
+                <div class="greet-kicker">Thu · Apr 23</div>
+                <div class="greet-title">
+                  Morning, <span class="greet-accent">greg</span>
+                </div>
+              </div>
+              <div class="avatar">G</div>
+            </div>
+
+            <!-- scrolling content -->
+            <div class="app-scroll">
+              <div class="hero-card">
+                <div class="hero-label">net worth</div>
+                <div class="hero-amount">$ 842,310</div>
+                <div class="hero-meta">
+                  <span class="up">▲ $4,120</span>
+                  <span style="opacity: 0.6">this month</span>
+                </div>
+              </div>
+
+              <div class="section-head">
+                <h2>Today's beans</h2>
+                <a>See all →</a>
+              </div>
+
+              <div class="activity-row">
+                <div class="icon orange">🛒</div>
+                <div>
+                  <div class="label">Whole Foods</div>
+                  <div class="sub">Groceries · Checking</div>
+                </div>
+                <div class="amt neg">-$72.40</div>
+              </div>
+              <div class="activity-row">
+                <div class="icon silk">🍲</div>
+                <div>
+                  <div class="label">Ben's birthday dinner</div>
+                  <div class="sub">Dining · Credit card</div>
+                </div>
+                <div class="amt neg">-$148.10</div>
+              </div>
+              <div class="activity-row">
+                <div class="icon slate">🔄</div>
+                <div>
+                  <div class="label">Transfer → Emergency fund</div>
+                  <div class="sub">Checking → Savings</div>
+                </div>
+                <div class="amt">$500.00</div>
+              </div>
+
+              <div class="section-head">
+                <h2>Goals</h2>
+                <a>See all →</a>
+              </div>
+
+              <div class="goal-card">
+                <div class="row">
+                  <span class="name">✈️ Japan 2026</span>
+                  <span class="pct">62%</span>
+                </div>
+                <div class="bar"><span style="width: 62%"></span></div>
+              </div>
+              <div class="goal-card">
+                <div class="row">
+                  <span class="name">🏠 Emergency fund</span>
+                  <span class="pct">84%</span>
+                </div>
+                <div class="bar"><span style="width: 84%"></span></div>
+              </div>
+              <div class="goal-card">
+                <div class="row">
+                  <span class="name">🎓 College — Oliver</span>
+                  <span class="pct">28%</span>
+                </div>
+                <div class="bar"><span style="width: 28%"></span></div>
+              </div>
+              <div style="height: 40px"></div>
+            </div>
+
+            <!-- bottom nav: always visible except in variant-4 override -->
+            <nav class="bottom-nav" id="bottom-nav">
+              <button class="nav-tab active">
+                <span class="ico">🏡</span><span>Nook</span>
+              </button>
+              <button class="nav-tab">
+                <span class="ico">📅</span><span>Planner</span>
+              </button>
+              <button class="nav-tab center-tab" id="center-tab">
+                <span class="ico">🫘</span><span class="label">Pod</span>
+                <span class="plus-mark" id="plus-mark">+</span>
+              </button>
+              <button class="nav-tab">
+                <span class="ico">✅</span><span>Todos</span>
+              </button>
+              <button class="nav-tab">
+                <span class="ico">⋯</span><span>More</span>
+              </button>
+            </nav>
+
+            <!-- backdrop -->
+            <div class="backdrop" id="backdrop"></div>
+
+            <!-- toast -->
+            <div class="action-toast" id="toast">
+              <span class="emoji"></span><span class="text"></span>
+            </div>
+
+            <!-- variant 1: arc fan -->
+            <div class="variant-layer variant-1 is-hidden" id="v1">
+              <div class="arc-item" data-i="0">
+                <div class="arc-bean">💰</div>
+                <div class="arc-label">Account</div>
+              </div>
+              <div class="arc-item" data-i="1">
+                <div class="arc-bean">💳</div>
+                <div class="arc-label">Transaction</div>
+              </div>
+              <div class="arc-item" data-i="2">
+                <div class="arc-bean">🔁</div>
+                <div class="arc-label">Recurring</div>
+              </div>
+              <div class="arc-item" data-i="3">
+                <div class="arc-bean">🏢</div>
+                <div class="arc-label">Asset</div>
+              </div>
+              <div class="arc-item" data-i="4">
+                <div class="arc-bean">🎯</div>
+                <div class="arc-label">Goal</div>
+              </div>
+              <button
+                class="fab"
+                id="fab-1"
+                style="bottom: 92px; right: 24px"
+                aria-label="Quick add"
+              >
+                <span class="fab-plus">+</span>
+              </button>
+            </div>
+
+            <!-- variant 2: bean jar stack -->
+            <div class="variant-layer variant-2 is-hidden" id="v2">
+              <div class="jar-item" data-i="0">
+                <div class="jar-bean" style="color: var(--orange)">💰</div>
+                <div class="jar-label">Add account</div>
+              </div>
+              <div class="jar-item" data-i="1">
+                <div class="jar-bean" style="color: var(--terracotta)">💳</div>
+                <div class="jar-label">Log a transaction</div>
+              </div>
+              <div class="jar-item" data-i="2">
+                <div class="jar-bean" style="color: var(--slate)">🔁</div>
+                <div class="jar-label">Recurring series</div>
+              </div>
+              <div class="jar-item" data-i="3">
+                <div class="jar-bean" style="color: var(--success)">🎯</div>
+                <div class="jar-label">New goal</div>
+              </div>
+              <div class="jar-item" data-i="4">
+                <div class="jar-bean" style="color: var(--slate)">📅</div>
+                <div class="jar-label">Schedule activity</div>
+              </div>
+              <button
+                class="fab"
+                id="fab-2"
+                style="bottom: 92px; right: 24px"
+                aria-label="Quick add"
+              >
+                <span class="fab-plus">+</span>
+              </button>
+            </div>
+
+            <!-- variant 3: bottom sheet grid -->
+            <div class="variant-layer variant-3 is-hidden" id="v3">
+              <button
+                class="fab"
+                id="fab-3"
+                style="bottom: 92px; right: 24px"
+                aria-label="Quick add"
+              >
+                <span class="fab-plus">+</span>
+              </button>
+              <div class="sheet" id="sheet-3">
+                <div class="sheet-handle"></div>
+                <h3 class="sheet-title">What would you like to add?</h3>
+                <p class="sheet-sub">
+                  Tap any bean to jump straight to the form.
+                </p>
+
+                <div class="sheet-section-title">Money</div>
+                <div class="sheet-grid">
+                  <div class="sheet-item" data-label="Transaction">
+                    <span class="emoji">💳</span>
+                    <span class="title">Transaction</span>
+                    <span class="hint">income · expense · transfer</span>
+                  </div>
+                  <div class="sheet-item" data-label="Recurring">
+                    <span class="emoji">🔁</span>
+                    <span class="title">Recurring</span>
+                    <span class="hint">weekly · monthly · yearly</span>
+                  </div>
+                  <div class="sheet-item" data-label="Account">
+                    <span class="emoji">💰</span>
+                    <span class="title">Account</span>
+                    <span class="hint">checking · credit · loan</span>
+                  </div>
+                  <div class="sheet-item" data-label="Asset">
+                    <span class="emoji">🏢</span>
+                    <span class="title">Asset</span>
+                    <span class="hint">home · vehicle · investment</span>
+                  </div>
+                  <div class="sheet-item" data-label="Goal">
+                    <span class="emoji">🎯</span>
+                    <span class="title">Goal</span>
+                    <span class="hint">save · payoff · invest</span>
+                  </div>
+                </div>
+
+                <div class="sheet-section-title">Family</div>
+                <div class="sheet-grid">
+                  <div class="sheet-item" data-label="Activity">
+                    <span class="emoji">📅</span>
+                    <span class="title">Activity</span>
+                    <span class="hint">piano · soccer · playdate</span>
+                  </div>
+                  <div class="sheet-item" data-label="To-do">
+                    <span class="emoji">✅</span>
+                    <span class="title">To-do</span>
+                    <span class="hint">assign · due · subtask</span>
+                  </div>
+                  <div class="sheet-item" data-label="Saying">
+                    <span class="emoji">💬</span>
+                    <span class="title">Saying</span>
+                    <span class="hint">quote a beanie</span>
+                  </div>
+                  <div class="sheet-item" data-label="Favorite">
+                    <span class="emoji">💝</span>
+                    <span class="title">Favorite</span>
+                    <span class="hint">food · game · song</span>
+                  </div>
+                </div>
+
+                <div class="sheet-section-title">Care</div>
+                <div class="sheet-grid">
+                  <div class="sheet-item" data-label="Medication">
+                    <span class="emoji">💊</span>
+                    <span class="title">Medication</span>
+                    <span class="hint">dose · schedule</span>
+                  </div>
+                  <div class="sheet-item" data-label="Allergy">
+                    <span class="emoji">⚠️</span>
+                    <span class="title">Allergy</span>
+                    <span class="hint">severity · response</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- variant 4: center-tab + bottom sheet -->
+            <div class="variant-layer variant-4 is-hidden" id="v4">
+              <!-- plus mark is in the nav via #center-tab + #plus-mark; script wires it -->
+              <div class="sheet" id="sheet-4">
+                <div class="sheet-handle"></div>
+                <h3 class="sheet-title">Quick add</h3>
+                <p class="sheet-sub">Tap any bean to open its form.</p>
+
+                <div class="sheet-section-title">Money</div>
+                <div class="sheet-grid">
+                  <div class="sheet-item" data-label="Transaction">
+                    <span class="emoji">💳</span>
+                    <span class="title">Transaction</span>
+                    <span class="hint">one-tap logging</span>
+                  </div>
+                  <div class="sheet-item" data-label="Recurring">
+                    <span class="emoji">🔁</span>
+                    <span class="title">Recurring</span>
+                    <span class="hint">auto-repeat</span>
+                  </div>
+                  <div class="sheet-item" data-label="Account">
+                    <span class="emoji">💰</span>
+                    <span class="title">Account</span>
+                    <span class="hint">bank · loan · crypto</span>
+                  </div>
+                  <div class="sheet-item" data-label="Goal">
+                    <span class="emoji">🎯</span>
+                    <span class="title">Goal</span>
+                    <span class="hint">targets · deadlines</span>
+                  </div>
+                </div>
+
+                <div class="sheet-section-title">Family</div>
+                <div class="sheet-grid">
+                  <div class="sheet-item" data-label="Activity">
+                    <span class="emoji">📅</span>
+                    <span class="title">Activity</span>
+                    <span class="hint">calendar event</span>
+                  </div>
+                  <div class="sheet-item" data-label="To-do">
+                    <span class="emoji">✅</span>
+                    <span class="title">To-do</span>
+                    <span class="hint">task · who · when</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- variant 5: draggable -->
+            <div class="variant-layer variant-5 is-hidden" id="v5">
+              <button
+                class="drag-fab"
+                id="drag-fab"
+                aria-label="Draggable quick add"
+              >
+                <span class="plus">+</span>
+              </button>
+              <div class="radial-ring" id="radial-ring">
+                <div class="ring-halo"></div>
+                <div
+                  class="radial-item"
+                  data-i="0"
+                  style="--rx: 0px; --ry: -96px"
+                >
+                  💰
+                </div>
+                <div
+                  class="radial-item"
+                  data-i="1"
+                  style="--rx: -92px; --ry: -28px"
+                >
+                  💳
+                </div>
+                <div
+                  class="radial-item"
+                  data-i="2"
+                  style="--rx: -56px; --ry: 80px"
+                >
+                  🔁
+                </div>
+                <div
+                  class="radial-item"
+                  data-i="3"
+                  style="--rx: 56px; --ry: 80px"
+                >
+                  🎯
+                </div>
+                <div
+                  class="radial-item"
+                  data-i="4"
+                  style="--rx: 92px; --ry: -28px"
+                >
+                  🏢
+                </div>
+              </div>
+            </div>
+
+            <!-- variant 6: RECOMMENDED — sheet + jar-pop Money -->
+            <div class="variant-layer variant-6" id="v6">
+              <button
+                class="fab"
+                id="fab-6"
+                style="bottom: 92px; right: 24px"
+                aria-label="Quick add"
+              >
+                <span class="fab-plus">+</span>
+              </button>
+              <div class="sheet-v6" id="sheet-6">
+                <div class="sheet-v6-handle"></div>
+                <h3 class="sheet-v6-title">What would you like to add?</h3>
+
+                <!-- Everyday group: kraft-paper card + jar-pop -->
+                <div class="money-section">
+                  <div class="money-kicker">
+                    <span class="lead">🫘 everyday beans</span>
+                    <span class="subhint">what you add most</span>
+                  </div>
+                  <div class="money-grid everyday-grid">
+                    <div class="money-item" data-i="0" data-label="Activity">
+                      <div class="money-bean">📅</div>
+                      <div class="mlabel">Activity</div>
+                    </div>
+                    <div class="money-item" data-i="1" data-label="To-do">
+                      <div class="money-bean">✅</div>
+                      <div class="mlabel">To-do</div>
+                    </div>
+                    <div class="money-item" data-i="2" data-label="Transaction">
+                      <div class="money-bean">💳</div>
+                      <div class="mlabel">Transaction</div>
+                    </div>
+                    <div class="money-item" data-i="3" data-label="Trip">
+                      <div class="money-bean">✈️</div>
+                      <div class="mlabel">Trip</div>
+                    </div>
+                    <div class="money-item" data-i="4" data-label="Cook log">
+                      <div class="money-bean">👨‍🍳</div>
+                      <div class="mlabel">Cook log</div>
+                    </div>
+                    <div class="money-item" data-i="5" data-label="Saying">
+                      <div class="money-bean">💬</div>
+                      <div class="mlabel">Saying</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Family group -->
+                <div class="sheet-section-title">Family</div>
+                <div class="other-group" data-group="family">
+                  <div class="sheet-grid">
+                    <div
+                      class="sheet-item"
+                      data-label="Favorite"
+                      style="--d: 0s"
+                    >
+                      <span class="emoji">💝</span>
+                      <span class="title">Favorite</span>
+                      <span class="hint">food · game · song</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Note"
+                      style="--d: 0.04s"
+                    >
+                      <span class="emoji">📝</span>
+                      <span class="title">Note</span>
+                      <span class="hint">per-bean journal</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Recipe"
+                      style="--d: 0.08s"
+                    >
+                      <span class="emoji">🍜</span>
+                      <span class="title">Recipe</span>
+                      <span class="hint">ingredients · steps</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Trip idea"
+                      style="--d: 0.12s"
+                    >
+                      <span class="emoji">💡</span>
+                      <span class="title">Trip idea</span>
+                      <span class="hint">wishlist a destination</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Money group (setup) -->
+                <div class="sheet-section-title">Money <span class="subtle">setup</span></div>
+                <div class="other-group" data-group="money">
+                  <div class="sheet-grid">
+                    <div
+                      class="sheet-item"
+                      data-label="Account"
+                      style="--d: 0s"
+                    >
+                      <span class="emoji">💰</span>
+                      <span class="title">Account</span>
+                      <span class="hint">checking · credit · loan</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Budget"
+                      style="--d: 0.04s"
+                    >
+                      <span class="emoji">📊</span>
+                      <span class="title">Budget</span>
+                      <span class="hint">category caps · period</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Recurring"
+                      style="--d: 0.08s"
+                    >
+                      <span class="emoji">🔁</span>
+                      <span class="title">Recurring</span>
+                      <span class="hint">weekly · monthly · yearly</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Asset"
+                      style="--d: 0.12s"
+                    >
+                      <span class="emoji">🏢</span>
+                      <span class="title">Asset</span>
+                      <span class="hint">home · vehicle · investment</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Goal"
+                      style="--d: 0.16s"
+                    >
+                      <span class="emoji">🎯</span>
+                      <span class="title">Goal</span>
+                      <span class="hint">save · payoff · invest</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Care group -->
+                <div class="sheet-section-title">Care</div>
+                <div class="other-group" data-group="care">
+                  <div class="sheet-grid">
+                    <div
+                      class="sheet-item"
+                      data-label="Medication"
+                      style="--d: 0s"
+                    >
+                      <span class="emoji">💊</span>
+                      <span class="title">Medication</span>
+                      <span class="hint">dose · schedule</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Dose log"
+                      style="--d: 0.04s"
+                    >
+                      <span class="emoji">⏱</span>
+                      <span class="title">Dose log</span>
+                      <span class="hint">record a given dose</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Allergy"
+                      style="--d: 0.08s"
+                    >
+                      <span class="emoji">⚠️</span>
+                      <span class="title">Allergy</span>
+                      <span class="hint">severity · response</span>
+                    </div>
+                    <div
+                      class="sheet-item"
+                      data-label="Emergency contact"
+                      style="--d: 0.12s"
+                    >
+                      <span class="emoji">🆘</span>
+                      <span class="title">Emergency contact</span>
+                      <span class="hint">sitter · doctor · school</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- hover hint -->
+            <div class="tap-hint" id="tap-hint">tap to open</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right rail notes -->
+      <aside class="notes-rail">
+        <div class="note-card" id="note-analysis">
+          <h3>my take</h3>
+          <p id="note-text">
+            Select a variant on the left to see the breakdown here.
+          </p>
+          <div id="note-pros-cons"></div>
+        </div>
+
+        <div class="note-card">
+          <h3>the context that's changed</h3>
+          <p>
+            Issue #37 was filed when the app had 5 addable entities (account,
+            tx, recurring, asset, goal). Today the app has 15+: add activities,
+            todos, trips, sayings, favorites, notes, recipes, cook-logs,
+            medications, allergies, emergency contacts.
+          </p>
+          <p>
+            A 5-slot arc fan no longer captures reality. That changes the shape
+            of the answer more than the animation does.
+          </p>
+        </div>
+
+        <div class="note-card">
+          <h3>my recommendation — built as variant 06</h3>
+          <div class="rec">
+            Selected by default. Tap the <strong>peek-a-boo beanie</strong>
+            on the phone to see it: six everyday beans (Activity, To-do,
+            Transaction, Trip, Cook log, Saying) jar-pop into a 3×2 grid at
+            the top, then Family / Money / Care fade in below. FAB swaps to
+            the slate version in dark mode. Icons pulled from the app's
+            canonical conventions — <code>navigation.ts</code>,
+            <code>BeanTabs.vue</code>, <code>VacationWizard.vue</code>.
+          </div>
+          <p style="margin-top: 14px">
+            The top tier is ordered by <strong>how often real families hit
+            add</strong>, not by domain. "Accountant-brain" wanted Money up
+            top; "parent-brain" wants the one-tap capture for the soccer
+            schedule change or the thing the 5-year-old just said.
+          </p>
+          <p>
+            The draggable variant (05) is fun — drag the orange puck to feel
+            it — but I'd ship it as a Settings toggle, not a default.
+          </p>
+        </div>
+
+        <div class="note-card">
+          <h3>the FAB itself — peek-a-boo beanie</h3>
+          <p>
+            The button swaps a generic gradient-<code>+</code> for a beanie
+            peeking over a plus sign (your Gemini concepts). Orange by default,
+            slate-blue in dark mode. Idle bob sells the "peeking" — 2.6s gentle
+            rise-and-settle, killed by <code>prefers-reduced-motion</code>.
+            Tap rotates it 45° with a spring so the beanie tilts into a close
+            affordance.
+          </p>
+          <p style="margin-top: 10px">
+            <span class="pill">prod follow-up</span> The source PNGs are 5 MB
+            each — fine for the mockup, too heavy for the app. Before shipping
+            we'll want either <strong>SVG</strong> (~15 KB, stays sharp at any
+            size, can be restyled via CSS vars) or a 2x/3x optimised PNG set
+            (~40 KB). At 60 px the face may lose detail; the SVG pass would be
+            the place to simplify the micro-features.
+          </p>
+        </div>
+
+        <div class="note-card">
+          <h3>hard constraints</h3>
+          <ul>
+            <li>
+              <span class="pill slate">mobile</span> FAB must sit above the
+              <code>MobileBottomNav</code> with
+              <code>bottom: calc(env(safe-area-inset-bottom) + 92px)</code>.
+            </li>
+            <li>
+              <span class="pill slate">z-index</span> FAB and menu above page
+              content, below modals, below toasts.
+            </li>
+            <li>
+              <span class="pill green">a11y</span> menu closes on
+              <code>Esc</code>, focus traps while open, FAB itself is a
+              <code>&lt;button&gt;</code>.
+            </li>
+            <li>
+              <span class="pill">motion</span> all animations gated on
+              <code>prefers-reduced-motion</code>.
+            </li>
+          </ul>
+        </div>
+
+        <div class="note-card">
+          <h3>drag-to-move, honestly</h3>
+          <p>
+            Apple's AssistiveTouch works because it has to overlay the entire
+            OS. In a single app the payoff is smaller — users want it somewhere
+            predictable. If we ship it, treat it as a power-user toggle in
+            Settings, not a default. I built a working draggable variant so you
+            can feel it.
+          </p>
+        </div>
+      </aside>
+    </div>
+
+    <script>
+      // ---------- state ----------
+      const state = {
+        variant: 1,
+        open: false,
+      };
+
+      const phone = document.getElementById('phone');
+      const app = document.getElementById('app');
+      const backdrop = document.getElementById('backdrop');
+      const toast = document.getElementById('toast');
+      const tapHint = document.getElementById('tap-hint');
+      const bottomNav = document.getElementById('bottom-nav');
+      const centerTab = document.getElementById('center-tab');
+      const plusMark = document.getElementById('plus-mark');
+
+      const layers = {
+        1: document.getElementById('v1'),
+        2: document.getElementById('v2'),
+        3: document.getElementById('v3'),
+        4: document.getElementById('v4'),
+        5: document.getElementById('v5'),
+        6: document.getElementById('v6'),
+      };
+
+      const fabs = {
+        1: document.getElementById('fab-1'),
+        2: document.getElementById('fab-2'),
+        3: document.getElementById('fab-3'),
+        5: document.getElementById('drag-fab'),
+        6: document.getElementById('fab-6'),
+      };
+
+      const notes = {
+        6: {
+          text: 'The recommended direction. Top tier is the 6 adds that happen most — Activity, To-do, Transaction, Trip, Cook log, Saying — jar-popping into the warm kraft-paper card. Family (4), Money (5), Care (4) sit below with gentler fades. 18 addable entities total, audited against every store + repository in the codebase. All icons match site-wide conventions.',
+          pros: [
+            'top 6 reflects real family usage, not domain hierarchy',
+            'icons match site conventions (navigation, BeanTabs, VacationWizard)',
+            'complete coverage — every addable entity in the app is reachable',
+            'sub-entities (Cook log, Trip idea, Dose log) live next to their parents',
+          ],
+          cons: [
+            'composition of top-6 is a judgment call — future Settings override',
+            'sub-entities need a parent picker (which bean / trip / medication)',
+          ],
+        },
+        1: {
+          text: 'The familiar one. 5 chips fan out along a quarter-circle, staggered 40ms each with spring bounce. Works, but the arc breaks down past 5 items — you quickly run out of real-estate above the bottom nav.',
+          pros: ['familiar from material apps', 'compact', 'readable labels'],
+          cons: [
+            'ceiling ≈ 5 items',
+            'arc math gets awkward at the edges',
+            'labels eat horizontal space',
+          ],
+        },
+        2: {
+          text: 'The most on-brand option. Beans pop out of the FAB one-by-one, each with its own color, then labels slide in after. Feels like shaking beans out of a jar — genuinely fun, but still a vertical column so it caps at ~5-6 items before it hits the status bar.',
+          pros: [
+            'strongest brand voice',
+            'labels stay readable',
+            'predictable column shape',
+          ],
+          cons: ['same item-count ceiling as #1', 'more motion to QA'],
+        },
+        3: {
+          text: 'Sheet-first instead of fan-first. The FAB taps to open a grouped 2-column sheet covering the lower 60% of the screen — Money / Family / Care sections. Scales to every addable entity the app has today, and to whatever we add next year.',
+          pros: [
+            'scales to 15+ items',
+            'semantic grouping',
+            'native pattern on iOS/Android',
+            'familiar drag-to-dismiss',
+          ],
+          cons: [
+            'one extra tap vs. radial',
+            'less visually novel on its own',
+          ],
+        },
+        4: {
+          text: 'Fold the FAB into the MobileBottomNav as the center tab — no floating element, no edge-case overlap. Tap the center + to raise the same sheet as variant #3. Zero new z-index battles on mobile. Desktop still needs its own treatment (bottom-right FAB or a header shortcut).',
+          pros: [
+            'zero mobile real-estate cost',
+            'Instagram/Twitter-familiar',
+            'no bottom-nav collision',
+          ],
+          cons: [
+            'loses the +tap destination "Pod"',
+            'asymmetric with desktop',
+            'requires nav redesign',
+          ],
+        },
+        5: {
+          text: 'Apple AssistiveTouch-style. FAB starts at 55% opacity so it disappears when you\'re not looking at it. Drag anywhere — on release it snaps to the nearest edge and remembers its vertical position. Tap to open a radial ring of beans around it. Fun, but feels like a toy: the hit-rate on "did greg want it there on purpose" is low.',
+          pros: [
+            'user-positioned = never in the way',
+            'novel, genuinely delightful on first use',
+            'handles any screen size',
+          ],
+          cons: [
+            'most users won\'t discover the drag',
+            'position state is one more thing to sync',
+            'radial menu still caps at ~5 items',
+          ],
+        },
+      };
+
+      // ---------- variant switching ----------
+      function setVariant(v) {
+        state.variant = v;
+        state.open = false;
+
+        Object.entries(layers).forEach(([k, el]) => {
+          el.classList.toggle('is-hidden', Number(k) !== v);
+          el.classList.remove('open');
+        });
+
+        // clear open state on fabs
+        Object.values(fabs).forEach((f) => f && f.classList.remove('open'));
+
+        // hide backdrop
+        backdrop.classList.remove('show');
+
+        // center-tab plus mark only in variant 4
+        if (v === 4) {
+          plusMark.style.display = 'grid';
+          centerTab.classList.add('is-center');
+        } else {
+          plusMark.style.display = 'none';
+          centerTab.classList.remove('is-center');
+        }
+
+        // variant picker
+        document
+          .querySelectorAll('.variant-card')
+          .forEach((c) =>
+            c.classList.toggle(
+              'active',
+              Number(c.dataset.variant) === v,
+            ),
+          );
+
+        // notes
+        const n = notes[v];
+        document.getElementById('note-text').textContent = n.text;
+        const pcEl = document.getElementById('note-pros-cons');
+        pcEl.innerHTML = `
+          <p style="margin-top:12px"><span class="pill green">pros</span>${n.pros.join(' · ')}</p>
+          <p><span class="pill">cons</span>${n.cons.join(' · ')}</p>
+        `;
+
+        tapHint.classList.remove('dismiss');
+      }
+
+      document.getElementById('picker').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-variant]');
+        if (!btn) return;
+        setVariant(Number(btn.dataset.variant));
+      });
+
+      // ---------- open/close shared ----------
+      function openMenu() {
+        state.open = true;
+        layers[state.variant].classList.add('open');
+        backdrop.classList.add('show');
+        const f = fabs[state.variant];
+        if (f) f.classList.add('open');
+        tapHint.classList.add('dismiss');
+        tapHint.style.opacity = 0;
+      }
+
+      function closeMenu() {
+        state.open = false;
+        layers[state.variant].classList.remove('open');
+        backdrop.classList.remove('show');
+        const f = fabs[state.variant];
+        if (f) f.classList.remove('open');
+      }
+
+      function toggle() {
+        state.open ? closeMenu() : openMenu();
+      }
+
+      [fabs[1], fabs[2], fabs[3], fabs[6]].forEach((f) =>
+        f.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggle();
+        }),
+      );
+
+      backdrop.addEventListener('click', closeMenu);
+
+      // ---------- action toast ----------
+      function showToast(emoji, text) {
+        toast.querySelector('.emoji').textContent = emoji;
+        toast.querySelector('.text').textContent = text;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 1800);
+      }
+
+      // arc/jar/radial items
+      document
+        .querySelectorAll(
+          '.arc-item, .jar-item, .sheet-item, .radial-item, .money-item',
+        )
+        .forEach((item) => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const label =
+              item.dataset.label ||
+              item.querySelector('.arc-label, .jar-label, .mlabel')
+                ?.textContent ||
+              item.querySelector('.title')?.textContent ||
+              '✨';
+            const emoji =
+              item.querySelector(
+                '.arc-bean, .jar-bean, .money-bean, .emoji',
+              )?.textContent ||
+              item.textContent?.trim() ||
+              '✨';
+            closeMenu();
+            closeSheet4();
+            closeRadial();
+            showToast(emoji, `Opening “${label}” form…`);
+          });
+        });
+
+      // ---------- variant 4: center-tab ----------
+      let sheet4Open = false;
+
+      function openSheet4() {
+        sheet4Open = true;
+        state.open = true;
+        layers[4].classList.add('open');
+        backdrop.classList.add('show');
+        plusMark.style.transform = 'translateX(-50%) rotate(135deg)';
+      }
+
+      function closeSheet4() {
+        sheet4Open = false;
+        state.open = false;
+        if (layers[4]) layers[4].classList.remove('open');
+        backdrop.classList.remove('show');
+        plusMark.style.transform = '';
+      }
+
+      centerTab.addEventListener('click', (e) => {
+        if (state.variant !== 4) return;
+        e.stopPropagation();
+        sheet4Open ? closeSheet4() : openSheet4();
+      });
+
+      // ---------- variant 5: draggable ----------
+      const dragFab = document.getElementById('drag-fab');
+      const radial = document.getElementById('radial-ring');
+      let dragState = null;
+
+      function pointAppPos(clientX, clientY) {
+        const r = app.getBoundingClientRect();
+        return { x: clientX - r.left, y: clientY - r.top };
+      }
+
+      function placeFab(x, y) {
+        const r = app.getBoundingClientRect();
+        const sz = 56;
+        const cx = Math.max(8, Math.min(r.width - sz - 8, x - sz / 2));
+        const cy = Math.max(8, Math.min(r.height - sz - 8, y - sz / 2));
+        dragFab.style.left = cx + 'px';
+        dragFab.style.top = cy + 'px';
+        dragFab.style.right = 'auto';
+        if (radial) {
+          radial.style.left = cx + 'px';
+          radial.style.top = cy + 'px';
+          radial.style.transform = 'translate(-92px, -92px)';
+          radial.style.width = '240px';
+          radial.style.height = '240px';
+        }
+      }
+
+      // initialize placement once
+      function initDragFab() {
+        const r = app.getBoundingClientRect();
+        placeFab(r.width - 36, r.height / 2);
+      }
+
+      dragFab.addEventListener('pointerdown', (e) => {
+        if (state.variant !== 5) return;
+        dragFab.setPointerCapture(e.pointerId);
+        const start = pointAppPos(e.clientX, e.clientY);
+        dragState = {
+          id: e.pointerId,
+          startX: start.x,
+          startY: start.y,
+          moved: false,
+          startTime: performance.now(),
+        };
+        dragFab.classList.add('dragging');
+      });
+
+      dragFab.addEventListener('pointermove', (e) => {
+        if (!dragState || dragState.id !== e.pointerId) return;
+        const p = pointAppPos(e.clientX, e.clientY);
+        const dx = Math.abs(p.x - dragState.startX);
+        const dy = Math.abs(p.y - dragState.startY);
+        if (dx + dy > 6) {
+          dragState.moved = true;
+          placeFab(p.x, p.y);
+          if (radial.classList.contains('open')) closeRadial();
+        }
+      });
+
+      dragFab.addEventListener('pointerup', (e) => {
+        if (!dragState || dragState.id !== e.pointerId) return;
+        dragFab.classList.remove('dragging');
+
+        const r = app.getBoundingClientRect();
+        const fabRect = dragFab.getBoundingClientRect();
+        const fabX = fabRect.left - r.left;
+        const fabCenter = fabX + 28;
+
+        if (dragState.moved) {
+          // snap to nearest edge horizontally
+          const snapLeft = fabCenter < r.width / 2;
+          const targetX = snapLeft ? 10 : r.width - 56 - 10;
+          dragFab.style.transition =
+            'left 0.35s cubic-bezier(0.34,1.56,0.64,1), top 0.25s ease';
+          dragFab.style.left = targetX + 'px';
+          setTimeout(() => {
+            dragFab.style.transition = '';
+            placeFab(
+              targetX + 28,
+              fabRect.top - r.top + 28,
+            );
+          }, 360);
+        } else {
+          toggleRadial();
+        }
+
+        dragState = null;
+      });
+
+      function toggleRadial() {
+        radial.classList.contains('open') ? closeRadial() : openRadial();
+      }
+
+      function openRadial() {
+        radial.classList.add('open');
+        dragFab.classList.add('open');
+        backdrop.classList.add('show');
+      }
+
+      function closeRadial() {
+        radial.classList.remove('open');
+        dragFab.classList.remove('open');
+        backdrop.classList.remove('show');
+      }
+
+      // backdrop click closes radial too
+      backdrop.addEventListener('click', () => {
+        closeRadial();
+        closeSheet4();
+      });
+
+      // ---------- keyboard ----------
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeMenu();
+          closeSheet4();
+          closeRadial();
+        }
+      });
+
+      // ---------- dark mode toggle ----------
+      const themeToggle = document.getElementById('theme-toggle');
+      themeToggle.addEventListener('click', () => {
+        const cur = document.documentElement.getAttribute('data-theme');
+        const next = cur === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        themeToggle.textContent = next === 'dark' ? 'light mode' : 'dark mode';
+      });
+
+      // ---------- boot ----------
+      setVariant(6);
+      // init drag fab after layout settles
+      requestAnimationFrame(() => {
+        requestAnimationFrame(initDragFab);
+      });
+      window.addEventListener('resize', () => {
+        if (state.variant === 5) initDragFab();
+      });
+    </script>
+  </body>
+</html>

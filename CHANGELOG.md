@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-04-23
+
+### Internal
+
+- **Quick-add FAB — design exploration + implementation plan (not shipped).** Interactive mockup at `docs/mockups/quick-add-fab.html` exploring six directions for the long-pending quick-add FAB (issue #37), plus a full implementation plan at `docs/plans/2026-04-23-quick-add-fab-and-sheet.md`. Recommended direction: a bottom sheet that opens from a peek-a-boo beanie FAB, with 6 "everyday" adds (Activity · To-do · Transaction · Trip · Cook log · Saying) jar-popping at the top and Family / Money / Care groups fading in below — 18 entities total, including Budget which had been missing from the FAB's original spec. Issue #37 acceptance criteria refreshed to match today's app surface area. No user-visible change yet; implementation queued for a future session.
+
+---
+
 ## 2026-04-22
 
 ### Changed
