@@ -1,195 +1,881 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import { getCollection } from 'astro:content';
+import { getCollection, render } from 'astro:content';
 import { isPublished, comparePillarOrder } from '~/utils/content';
+import { SITE_URL } from '@beanies/brand/nav';
+// Fraunces serif is used in the page title + pitch lines to carry the
+// e-zine / library aesthetic into the landing page. Scoped import so
+// the font only ships on this route.
+import '@fontsource-variable/fraunces';
 
-// Canonical pillar reading order — matches Notion and the prev/next walk
-// on each guide page. Not date-sorted; these are a curriculum, not a
-// stream.
+/**
+ * Per-pillar visual treatment. The grid is four chapter-covers, each
+ * with its own palette + background texture. The `slug` key matches
+ * the guide frontmatter slug — adding a new pillar guide requires an
+ * entry here OR it falls back to the neutral 'default' theme.
+ *
+ * `tint` maps to the heavy accent (chapter number, hover, title
+ * gradient anchor). `wash` is the card's base fill. `accentOn` drives
+ * the texture colour against that wash.
+ */
+type PillarTheme = {
+  tint: string;
+  wash: string;
+  accentOn: string;
+  glyph: string;
+  texture: 'swirl' | 'grid' | 'ledger' | 'circuit';
+};
+
+const PILLAR_THEMES: Record<string, PillarTheme> = {
+  'overwhelmed-family-planning': {
+    tint: '#f15d22',
+    wash: 'linear-gradient(140deg, #fff6ef 0%, #ffe9d6 100%)',
+    accentOn: 'rgb(241 93 34 / 22%)',
+    glyph: '🌀',
+    texture: 'swirl',
+  },
+  'family-organization': {
+    tint: '#3a82b3',
+    wash: 'linear-gradient(140deg, #f1f8fd 0%, #dceaf6 100%)',
+    accentOn: 'rgb(58 130 179 / 28%)',
+    glyph: '🏠',
+    texture: 'grid',
+  },
+  'family-finance-basics': {
+    tint: '#c76a21',
+    wash: 'linear-gradient(140deg, #fff5e8 0%, #f5e1c2 100%)',
+    accentOn: 'rgb(199 106 33 / 32%)',
+    glyph: '💰',
+    texture: 'ledger',
+  },
+  'local-first-family-finance-planning-tools': {
+    tint: '#2c3e50',
+    wash: 'linear-gradient(140deg, #f2f4f7 0%, #dde3ec 100%)',
+    accentOn: 'rgb(44 62 80 / 30%)',
+    glyph: '🔒',
+    texture: 'circuit',
+  },
+};
+
+const DEFAULT_THEME: PillarTheme = {
+  tint: '#2c3e50',
+  wash: 'linear-gradient(140deg, #ffffff 0%, #eef1f5 100%)',
+  accentOn: 'rgb(44 62 80 / 20%)',
+  glyph: '📖',
+  texture: 'grid',
+};
+
 const guides = [...(await getCollection('guides', isPublished))].sort(comparePillarOrder);
 
-const fmt = (d: Date) =>
-  d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+// Call render() per guide so we can surface each pillar's H2s as a
+// "what's inside" bullet list on the card. Build-time only; no runtime
+// cost. Word count comes from the raw markdown body — Astro doesn't
+// expose that directly on the rendered Content.
+const pillars = await Promise.all(
+  guides.map(async (guide, i) => {
+    const { headings } = await render(guide);
+    const h2s = headings.filter((h) => h.depth === 2).map((h) => h.text);
+    const wordCount = guide.body?.split(/\s+/).filter(Boolean).length ?? 0;
+    const readingMinutes = Math.max(1, Math.round(wordCount / 220));
+    const theme = PILLAR_THEMES[guide.data.slug] ?? DEFAULT_THEME;
+    return {
+      number: String(i + 1).padStart(2, '0'),
+      slug: guide.data.slug,
+      title: guide.data.title,
+      excerpt: guide.data.excerpt,
+      heroEmoji: guide.data.heroEmoji,
+      tags: guide.data.tags,
+      lastUpdated: guide.data.lastUpdated,
+      publishedDate: guide.data.publishedDate,
+      h2s,
+      readingMinutes,
+      theme,
+      href: `/guides/${guide.data.slug}`,
+    };
+  })
+);
+
+const totalReadingMinutes = pillars.reduce((sum, p) => sum + p.readingMinutes, 0);
+
+const canonicalPath = '/guides';
+
+/**
+ * Library-level structured data. CollectionPage tells crawlers this is a
+ * curated index; ItemList enumerates the pillars in reading order with
+ * an explicit `position` (1..N) so AI retrieval can reconstruct the
+ * intended sequence. Each entry is a LearningResource pointing at the
+ * guide's canonical URL — the guide's own Article JSON-LD on the
+ * detail page then fills in authorship, dates, keywords.
+ */
+const collectionSchema = {
+  '@type': 'CollectionPage',
+  '@id': `${SITE_URL}${canonicalPath}#library`,
+  name: 'the family library',
+  description:
+    'four pillar guides on the building blocks of a calmer family life: overwhelm, organization, finance, and privacy-first tooling.',
+  url: `${SITE_URL}${canonicalPath}`,
+  inLanguage: 'en',
+  isPartOf: { '@id': `${SITE_URL}#site` },
+  hasPart: pillars.map((p) => ({
+    '@type': 'LearningResource',
+    '@id': `${SITE_URL}${p.href}#guide`,
+    name: p.title,
+    description: p.excerpt,
+    url: `${SITE_URL}${p.href}`,
+    learningResourceType: 'Guide',
+    timeRequired: `PT${p.readingMinutes}M`,
+    keywords: p.tags.join(', '),
+    inLanguage: 'en',
+  })),
+};
+
+const itemListSchema = {
+  '@type': 'ItemList',
+  '@id': `${SITE_URL}${canonicalPath}#itemlist`,
+  name: 'the family library — reading order',
+  numberOfItems: pillars.length,
+  itemListOrder: 'ItemListOrderAscending',
+  itemListElement: pillars.map((p, i) => ({
+    '@type': 'ListItem',
+    position: i + 1,
+    url: `${SITE_URL}${p.href}`,
+    name: p.title,
+  })),
+};
 ---
 
 <BaseLayout
-  title="guides — beanies.family"
-  description="comprehensive, evergreen guides on family organization, finances, privacy, and keeping everyone on the same page. updated as things change."
-  canonicalPath="/guides"
+  title="the family library — beanies.family"
+  description="four evergreen pillar guides on family life, in a deliberate reading order: overwhelm, organization, finance basics, and local-first tooling. honest, lived experience — not listicles."
+  canonicalPath={canonicalPath}
+  jsonLd={[collectionSchema, itemListSchema]}
 >
-  <div class="guides-page">
-    <header class="guides-hero">
-      <div class="guides-hero-pattern"></div>
-      <div class="guides-hero-content">
-        <img
-          src="/brand/beanies_open_eyes_transparent_512x512.png"
-          alt="a bean with wide open eyes"
-          class="guides-hero-mascot"
-          width="150"
-          height="150"
-        />
-        <h1 class="guides-hero-title">guides</h1>
-        <p class="guides-hero-tagline">
-          long-form, evergreen reference for the things that make family planning less overwhelming.
-          updated in place as the world (and beanies) change.
+  <main class="library">
+    <!-- ============== HERO ============== -->
+    <header class="library-hero">
+      <div class="library-hero-wash" aria-hidden="true"></div>
+      <img
+        src="/brand/beanies_family_hugging_transparent_512x512.png"
+        alt=""
+        class="library-hero-mascot"
+        width="220"
+        height="220"
+        aria-hidden="true"
+      />
+      <div class="library-hero-content">
+        <p class="library-kicker">
+          <span class="library-kicker-dot" aria-hidden="true"></span>
+          the beanies guides · pillar set · volume 01
         </p>
+        <h1 class="library-title">
+          <span class="library-title-over">the family</span>
+          <span class="library-title-under">library</span>
+        </h1>
+        <p class="library-pitch">
+          four evergreen guides on the building blocks of a calmer family life &mdash;
+          written as a <em>curriculum</em>, not a content dump. start with the overwhelm,
+          end with the tools.
+        </p>
+        <div class="library-stats">
+          <span class="library-stat">
+            <strong>{pillars.length}</strong> pillars
+          </span>
+          <span class="library-stat-dot" aria-hidden="true">·</span>
+          <span class="library-stat">
+            <strong>~{totalReadingMinutes}</strong> min total
+          </span>
+          <span class="library-stat-dot" aria-hidden="true">·</span>
+          <span class="library-stat library-stat-italic">a lifetime to practice</span>
+        </div>
       </div>
     </header>
 
-    <div class="guides-content">
-      {
-        guides.length === 0 ? (
-          <div class="guides-empty">
-            <p class="guides-empty-text">guides are on the way. in the meantime, read <a href="/blog">the beanstalk</a> for personal stories and product updates.</p>
+    <!-- ============== CURRICULUM ARC ============== -->
+    <nav class="library-arc" aria-label="the curriculum path">
+      <p class="library-arc-label">the path</p>
+      <ol class="library-arc-list">
+        {pillars.map((p, i) => (
+          <li class="library-arc-item" style={`--tint: ${p.theme.tint}`}>
+            <a href={`#pillar-${p.slug}`} class="library-arc-link">
+              <span class="library-arc-num">{p.number}</span>
+              <span class="library-arc-text">{p.title}</span>
+            </a>
+            {i < pillars.length - 1 && (
+              <span class="library-arc-connector" aria-hidden="true"></span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+
+    <!-- ============== PILLAR COVERS ============== -->
+    <section class="library-pillars" aria-label="the pillar guides">
+      {pillars.map((p, i) => (
+        <article
+          class={`pillar pillar--${p.theme.texture}`}
+          id={`pillar-${p.slug}`}
+          style={`--tint: ${p.theme.tint}; --wash: ${p.theme.wash}; --accent-on: ${p.theme.accentOn};`}
+        >
+          <div class="pillar-texture" aria-hidden="true">
+            {p.theme.texture === 'swirl' && (
+              <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+                <g fill="none" stroke="currentColor" stroke-width="1.2">
+                  <circle cx="200" cy="200" r="40" />
+                  <circle cx="200" cy="200" r="80" />
+                  <circle cx="200" cy="200" r="125" />
+                  <circle cx="200" cy="200" r="175" />
+                  <circle cx="200" cy="200" r="230" />
+                  <path d="M 70 200 Q 140 90, 200 200 T 330 200" />
+                  <path d="M 70 240 Q 140 130, 200 240 T 330 240" />
+                </g>
+              </svg>
+            )}
+            {p.theme.texture === 'grid' && (
+              <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                  <pattern id={`grid-${p.slug}`} width="28" height="28" patternUnits="userSpaceOnUse">
+                    <path d="M 28 0 L 0 0 0 28" fill="none" stroke="currentColor" stroke-width="1" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill={`url(#grid-${p.slug})`} />
+                <rect x="60" y="60" width="120" height="90" fill="none" stroke="currentColor" stroke-width="1.5" />
+                <rect x="200" y="160" width="140" height="110" fill="none" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            )}
+            {p.theme.texture === 'ledger' && (
+              <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+                <g stroke="currentColor" stroke-width="0.9" fill="none">
+                  {Array.from({ length: 22 }).map((_, j) => (
+                    <line x1="0" y1={18 + j * 18} x2="400" y2={18 + j * 18} />
+                  ))}
+                  <line x1="70" y1="0" x2="70" y2="400" stroke-width="1.4" />
+                  <line x1="330" y1="0" x2="330" y2="400" stroke-width="1.4" />
+                </g>
+              </svg>
+            )}
+            {p.theme.texture === 'circuit' && (
+              <svg viewBox="0 0 400 400" preserveAspectRatio="xMidYMid slice">
+                <g fill="none" stroke="currentColor" stroke-width="1.3">
+                  <path d="M 40 80 H 160 V 160 H 280 V 60 H 360" />
+                  <path d="M 20 220 H 120 V 320 H 260 V 260 H 380" />
+                  <path d="M 80 360 V 260 H 200" />
+                  <circle cx="160" cy="80" r="4" fill="currentColor" />
+                  <circle cx="280" cy="160" r="4" fill="currentColor" />
+                  <circle cx="120" cy="220" r="4" fill="currentColor" />
+                  <circle cx="260" cy="320" r="4" fill="currentColor" />
+                  <circle cx="200" cy="260" r="4" fill="currentColor" />
+                </g>
+              </svg>
+            )}
           </div>
-        ) : (
-          <ul class="guides-list">
-            {guides.map((guide) => (
-              <li>
-                <a href={`/guides/${guide.data.slug}`} class="guide-card">
-                  {guide.data.heroEmoji && <span class="guide-card-emoji" aria-hidden="true">{guide.data.heroEmoji}</span>}
-                  <div class="guide-card-body">
-                    <h2 class="guide-card-title">{guide.data.title}</h2>
-                    <p class="guide-card-excerpt">{guide.data.excerpt}</p>
-                    <p class="guide-card-meta">updated {fmt(guide.data.lastUpdated)}</p>
-                  </div>
-                  <svg class="guide-card-arrow" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-    </div>
-  </div>
+
+          <header class="pillar-head">
+            <span class="pillar-chapter">chapter {p.number}</span>
+            <span class="pillar-time">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              {p.readingMinutes} min
+            </span>
+            {i === 0 && <span class="pillar-badge">start here</span>}
+          </header>
+
+          <div class="pillar-glyph" aria-hidden="true">{p.heroEmoji ?? p.theme.glyph}</div>
+
+          <h2 class="pillar-title">
+            <a href={p.href}>{p.title}</a>
+          </h2>
+
+          <p class="pillar-pitch">{p.excerpt}</p>
+
+          {p.h2s.length > 0 && (
+            <div class="pillar-inside">
+              <p class="pillar-inside-label">what's inside</p>
+              <ul class="pillar-inside-list">
+                {p.h2s.slice(0, 4).map((h) => (
+                  <li>{h}</li>
+                ))}
+              </ul>
+              {p.h2s.length > 4 && (
+                <p class="pillar-inside-more">+ {p.h2s.length - 4} more chapters</p>
+              )}
+            </div>
+          )}
+
+          {p.tags.length > 0 && (
+            <ul class="pillar-tags" aria-label="tags">
+              {p.tags.slice(0, 3).map((t) => (
+                <li class="pillar-tag">{t}</li>
+              ))}
+            </ul>
+          )}
+
+          <a href={p.href} class="pillar-read">
+            read chapter {p.number}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </a>
+        </article>
+      ))}
+    </section>
+
+    <!-- ============== FOOTER STRIP ============== -->
+    <footer class="library-foot">
+      <p class="library-foot-copy">
+        the guides are written by <a href="/about/greg">greg</a> &mdash; a dad of three beanies, in the
+        trenches of family logistics. for weekly notes on the beans and product,
+        subscribe to <a href="/blog">the beanstalk</a>.
+      </p>
+    </footer>
+  </main>
 </BaseLayout>
 
 <style>
-  .guides-page {
+  .library {
     --deep-slate: #2c3e50;
     --heritage-orange: #f15d22;
     --terracotta: #e67e22;
+    --sky-silk: #aed6f1;
     --cloud-white: #f8f9fa;
+    --kraft: #f3ecd8;
+    --ink: #1f2d3d;
+    --muted: rgb(44 62 80 / 60%);
+    --hairline: rgb(44 62 80 / 8%);
+    --font-display: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    --font-serif: 'Fraunces Variable', 'Fraunces', 'Source Serif 4', Georgia, serif;
     background: var(--cloud-white);
+    background-image:
+      radial-gradient(circle at 6% 14%, rgb(241 93 34 / 4%) 0%, transparent 42%),
+      radial-gradient(circle at 94% 86%, rgb(174 214 241 / 7%) 0%, transparent 48%);
     min-height: 100vh;
     overflow-x: hidden;
+    position: relative;
   }
 
-  .guides-hero {
-    overflow: hidden;
-    padding: 100px 24px 48px;
+  /* ===== HERO ===== */
+  .library-hero {
+    box-sizing: border-box;
+    margin: 0 auto;
+    max-width: 1120px;
+    padding: 120px 32px 60px;
     position: relative;
-    text-align: center;
   }
-  .guides-hero-pattern {
-    background-image:
-      radial-gradient(circle at 25% 25%, var(--heritage-orange) 1px, transparent 1px),
-      radial-gradient(circle at 75% 75%, var(--terracotta) 1px, transparent 1px);
-    background-size: 32px 32px;
+  .library-hero-wash {
+    background:
+      radial-gradient(circle at 15% 20%, rgb(241 93 34 / 10%) 0%, transparent 40%),
+      radial-gradient(circle at 85% 70%, rgb(230 126 34 / 8%) 0%, transparent 42%);
     inset: 0;
-    opacity: 0.03;
+    pointer-events: none;
     position: absolute;
   }
-  .guides-hero-content { position: relative; z-index: 1; }
-  .guides-hero-mascot {
-    filter: drop-shadow(0 12px 32px rgb(44 62 80 / 10%));
-    height: 150px;
-    margin: 0 auto 20px;
-    width: 150px;
+  .library-hero-mascot {
+    bottom: -20px;
+    filter: drop-shadow(0 18px 36px rgb(44 62 80 / 14%));
+    pointer-events: none;
+    position: absolute;
+    right: -30px;
+    transform: rotate(7deg);
+    width: 220px;
+    z-index: 0;
   }
-  .guides-hero-title {
+  .library-hero-content {
+    max-width: 640px;
+    position: relative;
+    z-index: 1;
+  }
+  .library-kicker {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    gap: 10px;
+    letter-spacing: 0.22em;
+    margin: 0 0 24px;
+    text-transform: uppercase;
+  }
+  .library-kicker-dot {
+    background: var(--heritage-orange);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgb(241 93 34 / 15%);
+    display: inline-block;
+    height: 8px;
+    width: 8px;
+  }
+  .library-title {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 2.25rem;
+    display: block;
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    line-height: 0.92;
+    margin: 0 0 24px;
+  }
+  .library-title-over {
+    display: block;
+    font-size: clamp(2rem, 4.2vw, 3rem);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    opacity: 0.78;
+  }
+  .library-title-under {
+    color: var(--deep-slate);
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(4rem, 10vw, 7.5rem);
     font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
+    letter-spacing: -0.045em;
+    margin-top: 2px;
+    text-transform: lowercase;
   }
-  .guides-hero-tagline {
+  .library-pitch {
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: clamp(1.05rem, 1.6vw, 1.2rem);
+    font-weight: 400;
+    line-height: 1.55;
+    margin: 0 0 28px;
+    max-width: 560px;
+  }
+  .library-pitch em {
+    color: var(--heritage-orange);
+    font-style: italic;
+    font-weight: 500;
+  }
+  .library-stats {
+    align-items: center;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 0.88rem;
+    gap: 10px;
+  }
+  .library-stat strong {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    margin: 8px auto 0;
-    max-width: 520px;
-    opacity: 0.5;
+    font-weight: 700;
+  }
+  .library-stat-italic {
+    font-family: var(--font-serif);
+    font-style: italic;
+  }
+  .library-stat-dot {
+    color: var(--heritage-orange);
+    font-weight: 700;
+    opacity: 0.55;
   }
 
-  .guides-content {
-    margin: 0 auto;
-    max-width: 800px;
-    padding: 16px 24px 48px;
+  /* ===== CURRICULUM ARC ===== */
+  .library-arc {
+    border-top: 1px solid var(--hairline);
+    box-sizing: border-box;
+    margin: 16px auto 0;
+    max-width: 1120px;
+    padding: 32px;
   }
-
-  .guides-empty {
-    background: white;
-    border: 1px dashed rgb(44 62 80 / 15%);
-    border-radius: 20px;
-    padding: 48px 24px;
+  .library-arc-label {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    margin: 0 0 22px;
     text-align: center;
+    text-transform: uppercase;
   }
-  .guides-empty-text {
-    color: rgb(44 62 80 / 55%);
-    font-size: 0.95rem;
-    line-height: 1.6;
+  .library-arc-list {
+    align-items: center;
+    display: flex;
+    gap: 0;
+    justify-content: space-between;
+    list-style: none;
+    margin: 0;
+    padding: 0;
   }
-  .guides-empty-text a { color: var(--heritage-orange); text-decoration: none; }
-  .guides-empty-text a:hover { text-decoration: underline; }
-
-  .guides-list { display: flex; flex-direction: column; gap: 16px; list-style: none; padding: 0; }
-  .guide-card {
+  .library-arc-item {
+    align-items: center;
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    min-width: 0;
+  }
+  .library-arc-link {
+    align-items: center;
+    color: var(--deep-slate);
+    display: flex;
+    flex-shrink: 0;
+    gap: 12px;
+    text-decoration: none;
+    transition: transform 180ms;
+  }
+  .library-arc-link:hover { transform: translateY(-2px); }
+  .library-arc-num {
     align-items: center;
     background: white;
-    border: 1px solid rgb(44 62 80 / 6%);
-    border-radius: 24px;
-    display: flex;
-    gap: 20px;
-    padding: 24px;
-    text-decoration: none;
-    transition: border-color 200ms, box-shadow 200ms, transform 200ms;
+    border: 2px solid var(--tint, var(--heritage-orange));
+    border-radius: 50%;
+    color: var(--tint, var(--heritage-orange));
+    display: inline-flex;
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 800;
+    height: 36px;
+    justify-content: center;
+    transition: background-color 180ms, color 180ms, box-shadow 180ms;
+    width: 36px;
   }
-  .guide-card:hover {
-    border-color: rgb(241 93 34 / 25%);
-    box-shadow: 0 12px 32px rgb(241 93 34 / 10%);
-    transform: translateY(-2px);
+  .library-arc-link:hover .library-arc-num {
+    background: var(--tint, var(--heritage-orange));
+    box-shadow: 0 0 0 6px rgb(241 93 34 / 12%);
+    color: white;
   }
-  .guide-card-emoji { flex-shrink: 0; font-size: 2.25rem; }
-  .guide-card-body { flex: 1; min-width: 0; }
-  .guide-card-title {
+  .library-arc-text {
     color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.125rem;
+    font-family: var(--font-serif);
+    font-size: 0.92rem;
+    font-weight: 500;
+    line-height: 1.25;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .library-arc-connector {
+    background: linear-gradient(
+      to right,
+      rgb(241 93 34 / 20%),
+      rgb(44 62 80 / 15%)
+    );
+    border-radius: 999px;
+    flex: 1;
+    height: 2px;
+    margin: 0 8px;
+    min-width: 20px;
+  }
+
+  /* ===== PILLAR GRID ===== */
+  .library-pillars {
+    box-sizing: border-box;
+    display: grid;
+    gap: 28px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 32px auto 0;
+    max-width: 1120px;
+    padding: 0 32px;
+  }
+
+  /* ===== PILLAR COVER ===== */
+  .pillar {
+    background: var(--wash);
+    border: 1px solid color-mix(in srgb, var(--tint) 18%, transparent);
+    border-radius: 28px;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    isolation: isolate;
+    overflow: hidden;
+    padding: 36px 34px 34px;
+    position: relative;
+    scroll-margin-top: 96px;
+    transition:
+      border-color 220ms,
+      box-shadow 220ms,
+      transform 220ms;
+  }
+  .pillar::after {
+    background: linear-gradient(
+      160deg,
+      transparent 20%,
+      rgb(255 255 255 / 40%) 60%,
+      transparent 100%
+    );
+    content: '';
+    inset: 0;
+    mix-blend-mode: overlay;
+    opacity: 0.6;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+  .pillar:hover {
+    border-color: color-mix(in srgb, var(--tint) 50%, transparent);
+    box-shadow: 0 24px 44px -16px color-mix(in srgb, var(--tint) 35%, transparent);
+    transform: translateY(-4px);
+  }
+
+  .pillar-texture {
+    color: var(--accent-on);
+    inset: 0;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
+    pointer-events: none;
+    position: absolute;
+    z-index: 0;
+  }
+  .pillar-texture svg {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+
+  /* All direct children above the texture via z-index. */
+  .pillar > *:not(.pillar-texture):not(::after) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .pillar-head {
+    align-items: center;
+    color: var(--tint);
+    display: flex;
+    flex-wrap: wrap;
+    font-family: var(--font-display);
+    font-size: 0.72rem;
     font-weight: 700;
+    gap: 14px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .pillar-chapter { color: var(--tint); }
+  .pillar-time {
+    align-items: center;
+    color: rgb(44 62 80 / 55%);
+    display: inline-flex;
+    gap: 5px;
+    letter-spacing: 0.06em;
+    text-transform: none;
+  }
+  .pillar-time svg { color: rgb(44 62 80 / 45%); }
+  .pillar-badge {
+    background: var(--tint);
+    border-radius: 999px;
+    color: white;
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    padding: 4px 10px;
+  }
+
+  .pillar-glyph {
+    color: var(--tint);
+    filter: drop-shadow(0 6px 16px color-mix(in srgb, var(--tint) 35%, transparent));
+    font-size: 3.5rem;
+    line-height: 1;
+    margin: 12px 0 4px;
+    transition: transform 220ms;
+  }
+  .pillar:hover .pillar-glyph {
+    transform: translateY(-2px) rotate(-4deg) scale(1.05);
+  }
+
+  .pillar-title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: clamp(1.35rem, 2vw, 1.6rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.14;
     margin: 0;
   }
-  .guide-card:hover .guide-card-title { color: var(--heritage-orange); }
-  .guide-card-excerpt {
-    color: rgb(44 62 80 / 65%);
-    font-size: 0.875rem;
-    line-height: 1.5;
-    margin: 6px 0 0;
+  .pillar-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 180ms;
   }
-  .guide-card-meta {
-    color: rgb(44 62 80 / 35%);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.75rem;
-    margin: 10px 0 0;
+  .pillar:hover .pillar-title a {
+    color: var(--tint);
   }
-  .guide-card-arrow {
-    color: rgb(44 62 80 / 25%);
-    flex-shrink: 0;
-    transition: color 200ms, transform 200ms;
+
+  .pillar-pitch {
+    color: rgb(44 62 80 / 78%);
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.55;
+    margin: 0;
   }
-  .guide-card:hover .guide-card-arrow {
-    color: var(--heritage-orange);
+
+  .pillar-inside {
+    background: rgb(255 255 255 / 55%);
+    border: 1px solid color-mix(in srgb, var(--tint) 14%, transparent);
+    border-radius: 16px;
+    padding: 14px 16px 14px 18px;
+  }
+  .pillar-inside-label {
+    color: var(--tint);
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+  }
+  .pillar-inside-list {
+    color: rgb(44 62 80 / 78%);
+    font-family: var(--font-serif);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .pillar-inside-list li {
+    padding: 3px 0 3px 14px;
+    position: relative;
+  }
+  .pillar-inside-list li::before {
+    background: var(--tint);
+    border-radius: 50%;
+    content: '';
+    height: 5px;
+    left: 0;
+    position: absolute;
+    top: 12px;
+    width: 5px;
+  }
+  .pillar-inside-more {
+    color: rgb(44 62 80 / 45%);
+    font-family: var(--font-serif);
+    font-size: 0.8rem;
+    font-style: italic;
+    margin: 8px 0 0;
+  }
+
+  .pillar-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .pillar-tag {
+    background: color-mix(in srgb, var(--tint) 10%, white);
+    border: 1px solid color-mix(in srgb, var(--tint) 20%, transparent);
+    border-radius: 999px;
+    color: rgb(44 62 80 / 70%);
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 3px 10px;
+  }
+
+  .pillar-read {
+    align-items: center;
+    align-self: flex-start;
+    background: var(--deep-slate);
+    border-radius: 999px;
+    color: white;
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 600;
+    gap: 8px;
+    letter-spacing: 0.02em;
+    margin-top: 8px;
+    padding: 10px 20px;
+    text-decoration: none;
+    transition:
+      background-color 200ms,
+      transform 200ms;
+  }
+  .pillar-read:hover {
+    background: var(--tint);
+    transform: translateX(2px);
+  }
+  .pillar-read svg {
+    transition: transform 180ms;
+  }
+  .pillar-read:hover svg {
     transform: translateX(3px);
   }
 
+  /* ===== FOOTER STRIP ===== */
+  .library-foot {
+    border-top: 1px solid var(--hairline);
+    margin: 72px auto 0;
+    max-width: 1120px;
+    padding: 32px 32px 72px;
+    text-align: center;
+  }
+  .library-foot-copy {
+    color: rgb(44 62 80 / 60%);
+    font-family: var(--font-serif);
+    font-size: 0.98rem;
+    font-style: italic;
+    line-height: 1.6;
+    margin: 0 auto;
+    max-width: 620px;
+  }
+  .library-foot-copy a {
+    color: var(--heritage-orange);
+    font-style: normal;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .library-foot-copy a:hover {
+    text-decoration: underline;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 900px) {
+    .library-hero { padding: 100px 24px 40px; }
+    .library-hero-mascot {
+      bottom: auto;
+      opacity: 0.45;
+      right: -40px;
+      top: 72px;
+      width: 160px;
+    }
+    .library-pillars {
+      gap: 20px;
+      grid-template-columns: 1fr;
+      padding: 0 24px;
+    }
+    .library-arc { padding: 24px; }
+    .library-arc-list {
+      flex-direction: column;
+      gap: 14px;
+    }
+    .library-arc-item { flex: none; width: 100%; }
+    .library-arc-link { width: 100%; }
+    .library-arc-text { white-space: normal; }
+    .library-arc-connector {
+      background: linear-gradient(
+        to bottom,
+        rgb(241 93 34 / 20%),
+        rgb(44 62 80 / 15%)
+      );
+      height: 18px;
+      margin: 4px 0 4px 17px;
+      width: 2px;
+    }
+    .library-foot { padding: 28px 24px 64px; }
+  }
+
   @media (max-width: 520px) {
-    .guides-hero-title { font-size: 1.75rem; }
-    .guide-card { padding: 20px; }
-    .guide-card-emoji { font-size: 1.75rem; }
+    .library-hero { padding: 92px 20px 32px; }
+    .library-hero-mascot {
+      opacity: 0.3;
+      top: 56px;
+      width: 130px;
+    }
+    .library-title-under { font-size: clamp(3rem, 14vw, 5rem); }
+    .library-pitch { font-size: 1rem; }
+    .pillar { padding: 28px 24px 26px; }
+    .pillar-glyph { font-size: 2.75rem; }
+  }
+
+  /* Reduce motion — drop the hover-glyph wobble. */
+  @media (prefers-reduced-motion: reduce) {
+    .pillar:hover .pillar-glyph { transform: none; }
+    .pillar:hover { transform: none; }
+    .library-arc-link:hover { transform: none; }
   }
 </style>
