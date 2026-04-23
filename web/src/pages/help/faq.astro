@@ -347,7 +347,7 @@ const faqSchema = {
                   <header class="faq-group-head">
                     <span class="faq-group-stripe" aria-hidden="true"></span>
                     <h2 class="faq-group-heading">{s.heading}</h2>
-                    <span class="faq-group-count">{s.count} {s.count === 1 ? 'question' : 'questions'}</span>
+                    <span class="faq-group-count">{`${s.count} ${s.count === 1 ? 'question' : 'questions'}`}</span>
                   </header>
                   <div class="faq-list">
                     {s.faqs.map((f, i) => (
