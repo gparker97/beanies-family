@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-23",
-    "translationCount": 2470
+    "translationCount": 2469
   },
   "translations": {
     "app.name": {
@@ -12349,11 +12349,6 @@
     "quickAdd.close": {
       "translation": "关闭",
       "hash": "12tjh4",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.closeHint": {
-      "translation": "或向后滑动·轻触外面· Esc",
-      "hash": "4sp4et",
       "lastUpdated": "2026-04-23"
     }
   }
