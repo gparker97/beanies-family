@@ -334,7 +334,7 @@ const glossarySchema = {
                 <header class="glossary-section-head">
                   <span class="glossary-section-letter" aria-hidden="true">{section.letter}</span>
                   <span class="glossary-section-meta">
-                    {section.terms.length} {section.terms.length === 1 ? 'term' : 'terms'}
+                    {`${section.terms.length} ${section.terms.length === 1 ? 'term' : 'terms'}`}
                   </span>
                   <span class="glossary-section-rule" aria-hidden="true"></span>
                 </header>
