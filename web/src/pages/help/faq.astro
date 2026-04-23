@@ -32,19 +32,24 @@ const groups: FAQGroup[] = [
     heading: 'getting started',
     faqs: [
       {
+        id: 'how-to-use',
+        q: 'How do I use beanies.family?',
+        a: 'You can access the beanies.family app directly from the website — just create a family at <a href="https://app.beanies.family/welcome">app.beanies.family/welcome</a>. If you\'re a tech guru, you can also use beanies.family locally by cloning it from <a href="https://github.com/gparker97/beanies-family">github</a> and installing it on your local machine.',
+      },
+      {
         id: 'is-it-free',
         q: 'Is beanies.family free?',
-        a: 'Yes — beanies.family is free to use. It is open-source (MIT licensed) and there are no paid tiers today. Because your data lives on your own device and optional Google Drive, there are no per-user cloud costs for us to pass on.',
+        a: 'beanies.family is 100% free to use locally. It is open-source (MIT licensed) and there are no paid tiers today. Your data lives on your own device, or optionally on a cloud storage provider, such as Google Drive. Regarding beanies.family on the cloud, it is free today. However, if by some miracle this thing becomes real, it will no longer be free. I know that sounds ominous, but we don\'t sell your data or do anything else to make money, so at some point the costs of running a cloud app will catch up with me. If we charge, I assure you the pricing will not break the bank.',
       },
       {
         id: 'what-devices',
         q: 'What devices can I use beanies.family on?',
-        a: 'Any modern device with a browser — desktop (Chrome, Edge, Safari, Firefox, Brave) or mobile (iOS Safari, Android Chrome). Install it as an app via your browser\'s "Add to Home Screen" or "Install app" option. See the <a href="/help/getting-started/install-as-app">install guide</a> for per-platform instructions.',
+        a: 'Any modern device with a browser, including desktop (Chrome, Edge, Safari, Firefox, Brave) or mobile (iOS Safari, Android Chrome). You can install beanies.family as an app via your browser\'s "Add to Home Screen" or "Install app" option — see the <a href="/help/getting-started/install-as-app">install guide</a> for per-platform instructions.',
       },
       {
         id: 'need-google-account',
         q: 'Do I need a Google account?',
-        a: 'You don\'t *need* one to try it — you can create and use a pod entirely offline. But signing in with Google unlocks optional Google Drive sync across devices, which most families want after they decide beanies.family is for them.',
+        a: 'You don\'t need any account to try beanies.family — you can create and use a pod entirely offline. Adding your Google Drive account, however, unlocks synchronization of your family data across devices, which most families want after they decide beanies.family is for them. Don\'t worry — your data always stays with you, and cannot be read by anybody outside of your family members.',
       },
       {
         id: 'how-to-install',
@@ -54,7 +59,7 @@ const groups: FAQGroup[] = [
       {
         id: 'add-family-members',
         q: 'How do I add my partner / kids to my pod?',
-        a: 'From Settings → Family members, create an invite link and send it to them (text, email, whatever). They open the link on their device, set their own password, and they are in the same pod. All your data is shared live from that point.',
+        a: 'From "the pod" → "meet the beans" menu, create an invite link and send it to your family member (text, email, whatever). They open the link on their device, set their own password, and they are in the same pod. Email is optional. All your data (or the data you choose) is shared live with your family members from that point.',
       },
     ],
   },
@@ -64,32 +69,32 @@ const groups: FAQGroup[] = [
       {
         id: 'where-is-my-data',
         q: 'Where is my data stored?',
-        a: 'On your device, in an encrypted file called a `.beanpod`. If you opt in to sync, a copy is also stored in your own Google Drive — encrypted before it leaves your browser. **beanies.family does not have servers that store your family data.** There is nothing on our side to breach or subpoena.',
+        a: 'Your data is stored either on your device or in your selected cloud storage provider that you own. Data is saved to an encrypted file called a <code>.beanpod</code>, which is just a normal text file with data in JSON format when decrypted. If you opt in to sync, your data is stored in your own Google Drive. It is encrypted before it leaves your browser. beanies.family does not store your family data.',
       },
       {
         id: 'how-is-data-encrypted',
         q: 'How is my data encrypted?',
-        a: 'AES-GCM with a 256-bit key, using the browser\'s native Web Crypto API (no third-party crypto libraries). Per-member keys are wrapped with AES-KW. The key is derived from your pod password via a strong password-derivation function. Full details in <a href="/help/security/how-your-data-is-encrypted">how your data is encrypted</a>.',
+        a: 'AES-GCM with a 256-bit key, using the browser\'s native Web Crypto API (no third-party crypto libraries). Per-member keys are wrapped with AES-KW. The key is derived from your pod password via a strong password-derivation function.',
       },
       {
         id: 'lose-password',
         q: 'What happens if I lose my pod password?',
-        a: 'We cannot recover it. By design — the whole point of local-first encryption is that nobody except you can decrypt the pod. If you lose the password AND don\'t have the unlocked pod cached on any device, the pod is unrecoverable. Please write the password down somewhere safe. See <a href="/help/security/password-recovery">password recovery</a> for more.',
+        a: 'If you lose your password, unfortunately we cannot recover it. This is a technical limitation of local-first end-to-end encryption (E2EE) — nobody except you holds the key and can decrypt your pod. If you lose the password, the pod is unrecoverable. Please do store your password somewhere safe to prevent data loss.',
       },
       {
         id: 'can-beanies-see-my-data',
         q: 'Can the beanies.family team see my family data?',
-        a: 'No. We never receive it. The pod data is encrypted on your device with a key derived from your password, and we never see the password. Even the optional Google Drive sync stores ciphertext only — Google also cannot read it. We have zero ability to access, inspect, or share your family data.',
+        a: 'No. We cannot see your data. The pod data is encrypted on your device with a key derived from your password, and we never see the password. Even the optional Google Drive sync stores ciphertext only — Google also cannot read it.',
       },
       {
         id: 'is-this-really-secure',
         q: 'Is beanies.family really secure, or is this just marketing?',
-        a: 'The code is open source and auditable at <a href="https://github.com/gparker97/beanies-family">github.com/gparker97/beanies-family</a>. You can verify the encryption approach yourself. The crypto primitives are the browser\'s native Web Crypto API — no custom "roll-your-own" crypto. No servers means no server-side breach surface.',
+        a: 'The code is open source and auditable on <a href="https://github.com/gparker97/beanies-family">GitHub</a>. You can audit or verify the encryption approach, and let us know if you notice any issues. The crypto primitives are the browser\'s native Web Crypto API. We do not store your data on our own servers, meaning there is no server-side breach surface.',
       },
       {
         id: 'google-drive-permissions',
         q: 'What does beanies.family access in my Google Drive?',
-        a: 'Only files it creates itself — the `drive.file` OAuth scope. beanies.family cannot see or read any of your other Google Drive files, emails, calendar, or account data. You can revoke access at any time from your Google account settings.',
+        a: 'We only access the files we create. We use the <code>drive.file</code> OAuth scope, meaning beanies.family cannot see or read any of your other Google Drive files, emails, calendar, or account data. You can revoke access at any time from your Google account settings.',
       },
     ],
   },
@@ -99,27 +104,27 @@ const groups: FAQGroup[] = [
       {
         id: 'offline',
         q: 'Can I use beanies.family offline?',
-        a: 'Yes. After the first load, the app works fully offline — you can view and edit your pod without an internet connection. Changes sync to Google Drive (if enabled) next time you come online. This is the "local-first" architecture at work.',
+        a: 'Yes. After the first load, the app works fully offline — you can view and edit your pod without an internet connection. Changes sync to Google Drive (if enabled) the next time you come online. This is the local-first architecture at work.',
       },
       {
         id: 'multiple-currencies',
         q: 'Does beanies.family support multiple currencies?',
-        a: 'Yes. You can record accounts, transactions, assets, and goals in any currency, and beanies.family converts everything into your chosen base currency for totals and dashboards. Exchange rates update automatically from a public rates API.',
+        a: 'Yes! You can record accounts, transactions, assets, and goals in any currency, and beanies.family converts everything into your chosen base currency for totals and dashboards. Exchange rates update automatically from a public rates API.',
       },
       {
         id: 'kids-privacy',
         q: 'Can my kids use beanies.family?',
-        a: "Yes, with parental setup. The recommended flow is for a parent to own the pod and invite kids as family members once they're old enough to want their own view. Because all data is local (not on a server), there is no data-processing of children's information — the parent controls everything.",
+        a: 'Absolutely, with parental setup. The recommended flow is for a parent to own the pod and invite kids as family members once they\'re old enough to want their own view. All data is stored locally or on a cloud storage provider that you own (not on our servers), so there is no data-processing of children\'s information — the parent controls everything.',
       },
       {
         id: 'export',
         q: 'Can I export my data?',
-        a: 'Yes. Your entire pod is already a single file (`.beanpod`) that you can download anytime from Settings. You can also export structured data as JSON for use in other tools. No lock-in: your data is yours, exportable, and portable.',
+        a: 'Yes, at any time. Your entire pod is stored in a single <code>.beanpod</code> family data file that you can download anytime from Settings. You can also export structured data as JSON for use in other tools. No lock-in: your data is yours, exportable, and portable.',
       },
       {
         id: 'what-can-i-track',
         q: 'What can I track in beanies.family?',
-        a: 'Accounts (checking, savings, investments, crypto), transactions, assets (real estate, vehicles), financial goals, family activities, to-dos, travel plans, and family members with their own avatars and settings. It is designed to be the single place for your family\'s planning.',
+        a: 'Accounts (checking, savings, investments, retirement, crypto), transactions, assets (real estate, vehicles, and more), financial goals, family budget, family activities, to-dos, travel plans, secret family recipes, and even details about your family members, such as their favorite foods, allergies, medications, and funny sayings.',
       },
     ],
   },
@@ -129,22 +134,22 @@ const groups: FAQGroup[] = [
       {
         id: 'open-source',
         q: 'Is beanies.family open source?',
-        a: 'Yes — MIT licensed. The full source code is at <a href="https://github.com/gparker97/beanies-family">github.com/gparker97/beanies-family</a>. You can audit the encryption, self-host, fork it, or just read the code to confirm it does what we say it does.',
+        a: 'Yes — we are MIT licensed open source. The source code is on <a href="https://github.com/gparker97/beanies-family">Github</a>.',
       },
       {
         id: 'how-is-it-built',
         q: 'What is beanies.family built with?',
-        a: 'Vue 3 + TypeScript + Vite for the app, with Automerge (a CRDT library) as the data layer for conflict-free multi-device merging. Styling is Tailwind CSS 4. It runs entirely in the browser — no backend server for application logic. Full stack details in <a href="/help/how-it-works">how it works</a>.',
+        a: 'Vue 3 + TypeScript + Vite for the app, with Automerge (a CRDT library) as the data layer for conflict-free multi-device merging. Styling is Tailwind CSS 4. beanies.family is a <a href="https://www.inkandswitch.com/local-first/">local-first application</a>.',
       },
       {
         id: 'service-goes-down',
         q: 'What happens if beanies.family goes out of business or the website goes down?',
-        a: 'Your data survives. You already have the `.beanpod` file on your device and (if you enabled sync) in your Google Drive — we never had it. You can still open the pod file in any beanies.family build (the code is open source, so someone could run it indefinitely). This is the local-first architecture\'s best feature.',
+        a: 'We will be sad, but on the bright side, your data will be fine. You already have the <code>.beanpod</code> file on your device or your cloud storage provider. You can download a copy of your decrypted <code>.beanpod</code> file at any time from the app, or open the <code>.beanpod</code> file in any beanies.family build (the code is open source, so it can be run locally even if the website is done).',
       },
       {
         id: 'self-host',
         q: 'Can I self-host beanies.family?',
-        a: "Yes — the repository is a standard Vue 3 + Vite project. Clone it, `npm install && npm run build`, and serve the `dist/` directory from any static host. The only external service is Google Drive (for optional sync), and that's the user's own Drive, not ours.",
+        a: 'Yes, if you want. The repository is a standard Vue 3 + Vite project. Clone it, <code>npm install &amp;&amp; npm run build</code>, and serve the <code>dist/</code> directory from any static host. The only external service is the cloud provider (i.e. Google Drive). That\'s the user\'s own cloud storage, not ours.',
       },
     ],
   },
@@ -153,23 +158,23 @@ const groups: FAQGroup[] = [
     faqs: [
       {
         id: 'why-beanies',
-        q: 'Why is it called "beanies"?',
-        a: 'The founder\'s son, when he was little, started calling family members "beanies" — tiny, precious, countable. The name stuck. The tagline "every bean counts" came from the same place.',
+        q: 'Why is it called "beanies.family"?',
+        a: 'Because when my youngest son was just a baby, my wife and I started calling him "beanie". That\'s all. If you want to learn more, read about <a href="/blog/welcome-to-the-beanstalk">how it all started here</a>. The name stuck, and the tagline "every bean counts" came from the same place.',
       },
       {
         id: 'who-built-it',
         q: 'Who built beanies.family?',
-        a: 'greg, a software engineer and father, built it for his own family after years of frustration with existing family apps that either harvested data or became cluttered add-feature-mills. Read the full origin story: <a href="/blog/why-i-built-beanies-family">why I built beanies.family</a>.',
+        a: 'Me. Well, me and my glorious claude-bot. My name\'s greg — I\'m a software engineer and dad of 3 boys. I built beanies.family because we needed a way to stay organized, and now I\'m sharing it with all of you.',
       },
       {
         id: 'comparison-with-others',
-        q: 'How does beanies.family compare to Cozi, YNAB, Copilot, etc.?',
-        a: 'Different positioning. Cozi is cloud-native family planning; YNAB and Copilot are finance-focused. beanies.family is the intersection of family logistics + family finances, with privacy-first local-first architecture as a differentiator. Dedicated comparison posts coming to <a href="/blog">the beanstalk</a>.',
+        q: 'How does beanies.family compare to other family or finance planning apps, such as Cozi, Maple, YNAB, Copilot, etc.?',
+        a: 'beanies.family sits at the intersection of family, finance and data security. The <a href="/guides/local-first-family-finance-planning-tools">local-first</a> approach, the family-first positioning, and the integration of your finances with your family makes it a different type of app from those that are purely family or finance-focused. Cozi and Maple are cloud-native family planning focused apps, while YNAB and Copilot are finance-focused. Those apps absolutely have their place, and beanies.family has its place as well.',
       },
       {
         id: 'feedback',
-        q: 'How can I give feedback or suggest features?',
-        a: 'Open an issue on <a href="https://github.com/gparker97/beanies-family/issues">GitHub</a>, or use the contact form on the <a href="/">homepage</a>. Every message is read by a real human (the founder). Feedback from early users has a disproportionate impact on what gets built next.',
+        q: 'Can I give feedback or suggest features?',
+        a: 'Absolutely! Open an issue on <a href="https://github.com/gparker97/beanies-family/issues">GitHub</a>, or use the contact form on the <a href="/">homepage</a>. Every message is read by a real human (me). Feedback from early users has a huge impact on what gets built next.',
       },
     ],
   },
