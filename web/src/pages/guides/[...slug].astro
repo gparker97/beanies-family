@@ -681,8 +681,12 @@ const articleSchema = {
 
   /* Lead paragraph — first <p> after each H2 gets a drop-cap. Class is
      added by rehype-guide-annotations.mjs. Never matches the short-answer
-     paragraph. */
+     paragraph. `display: flow-root` establishes a block-formatting context
+     so the floated ::first-letter stays contained to this paragraph —
+     otherwise a short lead + a following list lets the float extend below
+     and pushes the first bullet (and only the first bullet) to the right. */
   .guide-prose .guide-lead {
+    display: flow-root;
     font-size: 1.125rem;
     font-weight: 400;
   }
