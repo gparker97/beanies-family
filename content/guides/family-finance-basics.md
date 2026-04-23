@@ -13,7 +13,7 @@ tags:
   - budgeting
   - financial-planning
   - money
-draft: true
+draft: false
 ---
 
 > **Note:** This guide reflects my personal experience as a parent, not financial advice. I am not a licensed financial advisor. For major decisions - mortgages, investment strategy, tax planning, retirement - consult a professional.

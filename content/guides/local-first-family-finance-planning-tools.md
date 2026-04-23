@@ -13,7 +13,7 @@ tags:
   - privacy
   - family-apps
   - e2ee
-draft: true
+draft: false
 ---
 
 ## what does "local-first software" actually mean?

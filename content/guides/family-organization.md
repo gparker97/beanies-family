@@ -13,7 +13,7 @@ tags:
   - routines
   - household-systems
   - mental-load
-draft: true
+draft: false
 ---
 
 ## what is a "family OS"? what does family organization actually mean?
