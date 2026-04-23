@@ -767,13 +767,22 @@ const glossarySchema = {
     margin: 0 auto;
     max-width: 560px;
   }
+  .glossary-intro a,
   .glossary-foot-copy a {
     color: var(--heritage-orange);
     font-style: normal;
-    font-weight: 600;
-    text-decoration: none;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(241 93 34 / 40%);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: text-decoration-color 180ms, text-decoration-thickness 180ms;
   }
-  .glossary-foot-copy a:hover { text-decoration: underline; }
+  .glossary-intro a:hover,
+  .glossary-foot-copy a:hover {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+  }
 
   /* ===== RESPONSIVE ===== */
   @media (max-width: 720px) {
