@@ -648,8 +648,8 @@ const STRING_DEFS = {
   'recipes.cookLogs.entry': { en: 'entry', beanie: 'entry' },
   // Recipe detail
   'recipes.detail.backToCookbook': {
-    en: '← Back to the Cookbook',
-    beanie: '← back to the cookbook',
+    en: 'Back to the Cookbook',
+    beanie: 'back to the cookbook',
   },
   'recipes.detail.ingredients': { en: 'Ingredients', beanie: 'ingredients' },
   'recipes.detail.steps': { en: 'How to make it', beanie: 'how to make it' },
@@ -4948,11 +4948,6 @@ const STRING_DEFS = {
   'quickAdd.budget.hint': {
     en: 'category caps · period',
     beanie: 'category caps · period',
-  },
-  'quickAdd.recurring.label': { en: 'Recurring', beanie: 'recurring' },
-  'quickAdd.recurring.hint': {
-    en: 'weekly · monthly · yearly',
-    beanie: 'weekly · monthly · yearly',
   },
   'quickAdd.asset.label': { en: 'Asset', beanie: 'asset' },
   'quickAdd.asset.hint': {

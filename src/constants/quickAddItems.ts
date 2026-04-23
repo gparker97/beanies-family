@@ -176,20 +176,9 @@ export const QUICK_ADD_ITEMS = [
     action: 'add-budget',
   },
   {
-    id: 'recurring',
-    group: 'money',
-    order: 3,
-    emoji: '\u{1F501}', // 🔁
-    labelKey: 'quickAdd.recurring.label',
-    hintKey: 'quickAdd.recurring.hint',
-    route: '/transactions',
-    action: 'add-recurring',
-    tab: 'recurring',
-  },
-  {
     id: 'asset',
     group: 'money',
-    order: 4,
+    order: 3,
     emoji: '\u{1F3E2}', // 🏢
     labelKey: 'quickAdd.asset.label',
     hintKey: 'quickAdd.asset.hint',
@@ -199,7 +188,7 @@ export const QUICK_ADD_ITEMS = [
   {
     id: 'goal',
     group: 'money',
-    order: 5,
+    order: 4,
     emoji: '\u{1F3AF}', // 🎯
     labelKey: 'quickAdd.goal.label',
     hintKey: 'quickAdd.goal.hint',

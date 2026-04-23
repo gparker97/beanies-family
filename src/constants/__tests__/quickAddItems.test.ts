@@ -31,11 +31,11 @@ const ALLOWED_CONTEXT_KEYS: readonly QuickAddContextKey[] = [
 ];
 
 describe('QUICK_ADD_ITEMS — invariants', () => {
-  it('has exactly 19 items (4 groups: 6 everyday + 4 family + 5 money + 4 care)', () => {
-    expect(QUICK_ADD_ITEMS).toHaveLength(19);
+  it('has exactly 18 items (4 groups: 6 everyday + 4 family + 4 money + 4 care)', () => {
+    expect(QUICK_ADD_ITEMS).toHaveLength(18);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'everyday')).toHaveLength(6);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'family')).toHaveLength(4);
-    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'money')).toHaveLength(5);
+    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'money')).toHaveLength(4);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'care')).toHaveLength(4);
   });
 
@@ -144,7 +144,6 @@ describe('derived QuickAddAction type', () => {
       'add-trip-idea',
       'add-account',
       'add-budget',
-      'add-recurring',
       'add-asset',
       'add-goal',
       'add-medication',

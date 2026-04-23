@@ -406,15 +406,13 @@ function openAddModal() {
   showAddModal.value = true;
 }
 
-// Quick-add FAB handlers. `add-recurring` flips the list filter before
-// opening so the user lands back in the recurring view after saving.
+// Quick-add FAB handler — one entry-point per page. The previous
+// `add-recurring` action was removed from the FAB (transaction opens
+// the same drawer, and the recurrence toggle inside it is one click
+// away), so only `add-transaction` reaches here now.
 useQuickAddIntent((action) => {
   switch (action) {
     case 'add-transaction':
-      openAddModal();
-      break;
-    case 'add-recurring':
-      activeFilter.value = 'recurring';
       openAddModal();
       break;
     default:
