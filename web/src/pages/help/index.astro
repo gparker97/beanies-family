@@ -110,6 +110,87 @@ const popular = getPopularArticles().slice(0, 3);
     </div>
   </section>
 
+  <!-- ══════ SECTION 2B: QUICK REFERENCE (FAQ + GLOSSARY) ══════ -->
+  <!--
+    The two canonical "quick lookup" surfaces in the help center. Given
+    bolder visual weight than the category grid so readers spot them
+    immediately. Counts are hand-written against the current content in
+    /help/faq.astro and /help/glossary.astro — update if you add or
+    remove a question / term.
+  -->
+  <section class="border-t border-[var(--color-border)] py-16 md:py-20">
+    <div class="mx-auto max-w-[1200px] px-6 md:px-8">
+      <div class="mb-8">
+        <p class="font-outfit text-xs font-bold tracking-[0.18em] text-primary-500 uppercase">
+          quick reference
+        </p>
+        <h2 class="font-outfit mt-2 text-2xl font-bold text-secondary-500 md:text-[28px]">
+          need a quick answer or a definition?
+        </h2>
+      </div>
+
+      <div class="grid gap-6 md:grid-cols-2">
+        <!-- FAQ card -->
+        <a
+          href="/help/faq"
+          class="group relative flex flex-col overflow-hidden rounded-3xl border border-[var(--tint-orange-15)] bg-gradient-to-br from-white to-[var(--tint-orange-8)] p-8 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)]"
+        >
+          <div class="absolute -top-6 -right-6 flex h-32 w-32 items-center justify-center rounded-full bg-[var(--tint-orange-15)] text-6xl opacity-60 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6">
+            💬
+          </div>
+          <div class="relative">
+            <p class="font-outfit text-[11px] font-bold tracking-[0.2em] text-primary-500 uppercase">
+              frequently asked
+            </p>
+            <h3 class="font-outfit mt-3 text-2xl font-extrabold leading-tight text-secondary-500 md:text-[28px]">
+              questions, answered
+            </h3>
+            <p class="mt-3 max-w-[340px] text-[15px] leading-snug text-[var(--color-text-muted)]">
+              the most common questions about pricing, privacy, supported devices, and how things work under the hood.
+            </p>
+            <div class="mt-6 flex items-center justify-between">
+              <span class="font-outfit inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-primary-500 shadow-[var(--card-shadow)]">
+                24 answers in full
+              </span>
+              <span class="font-outfit flex items-center gap-1 text-sm font-semibold text-primary-500 transition-[gap] group-hover:gap-2">
+                browse faq →
+              </span>
+            </div>
+          </div>
+        </a>
+
+        <!-- Glossary card -->
+        <a
+          href="/help/glossary"
+          class="group relative flex flex-col overflow-hidden rounded-3xl border border-[var(--color-border)] bg-gradient-to-br from-white to-[var(--tint-silk-20)] p-8 shadow-[var(--card-shadow)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[var(--card-hover-shadow)]"
+        >
+          <div class="absolute -top-6 -right-6 flex h-32 w-32 items-center justify-center rounded-full bg-[var(--tint-silk-20)] text-6xl opacity-60 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
+            📖
+          </div>
+          <div class="relative">
+            <p class="font-outfit text-[11px] font-bold tracking-[0.2em] text-primary-500 uppercase">
+              the lexicon
+            </p>
+            <h3 class="font-outfit mt-3 text-2xl font-extrabold leading-tight text-secondary-500 md:text-[28px]">
+              the glossary
+            </h3>
+            <p class="mt-3 max-w-[340px] text-[15px] leading-snug text-[var(--color-text-muted)]">
+              definitions of product terms, family-planning concepts, and technology you'll see across beanies.family.
+            </p>
+            <div class="mt-6 flex items-center justify-between">
+              <span class="font-outfit inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-primary-500 shadow-[var(--card-shadow)]">
+                19 defined terms
+              </span>
+              <span class="font-outfit flex items-center gap-1 text-sm font-semibold text-primary-500 transition-[gap] group-hover:gap-2">
+                open glossary →
+              </span>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- ══════ SECTION 3: POPULAR ARTICLES ══════ -->
   {popular.length > 0 && (
     <section class="border-t border-[var(--color-border)] py-16 md:py-20">
