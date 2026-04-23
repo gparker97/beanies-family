@@ -640,8 +640,12 @@ const itemListSchema = {
     width: 100%;
   }
 
-  /* All direct children above the texture via z-index. */
-  .pillar > *:not(.pillar-texture):not(::after) {
+  /* All direct children sit above the absolutely-positioned texture
+     overlay (z-index:0). `::after` is a pseudo-element so it can't be
+     selected via `> *` anyway — previous `:not(::after)` syntax was
+     invalid CSS and killed the whole rule, leaving every child stacked
+     beneath the overlay and visually wiped. */
+  .pillar > *:not(.pillar-texture) {
     position: relative;
     z-index: 1;
   }
@@ -842,7 +846,7 @@ const itemListSchema = {
 
   /* ===== RESPONSIVE ===== */
   @media (max-width: 900px) {
-    .library-hero { padding: 100px 24px 40px; }
+    .library-hero { padding: 130px 24px 40px; }
     .library-hero-mascot {
       bottom: auto;
       opacity: 0.45;
@@ -891,7 +895,7 @@ const itemListSchema = {
   }
 
   @media (max-width: 520px) {
-    .library-hero { padding: 92px 20px 32px; }
+    .library-hero { padding: 140px 20px 32px; }
     .library-hero-mascot {
       opacity: 0.3;
       top: 56px;

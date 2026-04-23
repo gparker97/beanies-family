@@ -8,7 +8,7 @@ import { SITE_URL } from '@beanies/brand/nav';
 // to this route via the plain import.
 import '@fontsource-variable/fraunces';
 
-const DRAFT = true;
+const DRAFT = false;
 const hidden = isDraftHidden(DRAFT);
 
 /**
@@ -794,8 +794,8 @@ const glossarySchema = {
 
   /* ===== RESPONSIVE ===== */
   @media (max-width: 720px) {
-    .glossary-mascot { top: 72px; right: -30px; width: 130px; opacity: 0.45; }
-    .glossary-shell { padding: 92px 22px 56px; }
+    .glossary-mascot { top: 110px; right: -30px; width: 130px; opacity: 0.45; }
+    .glossary-shell { padding: 130px 22px 56px; }
     .glossary-sections { gap: 44px; }
     .glossary-section-head { gap: 12px; }
     .glossary-term { padding: 22px 22px; }
@@ -808,8 +808,8 @@ const glossarySchema = {
   }
 
   @media (max-width: 520px) {
-    .glossary-mascot { top: 60px; right: -40px; width: 110px; opacity: 0.35; }
-    .glossary-shell { padding: 84px 20px 48px; }
+    .glossary-mascot { top: 100px; right: -40px; width: 110px; opacity: 0.35; }
+    .glossary-shell { padding: 140px 20px 48px; }
     .glossary-alphabet { padding: 8px 10px; }
     .glossary-alpha a, .glossary-alpha span {
       font-size: 0.72rem;

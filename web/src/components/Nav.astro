@@ -150,17 +150,34 @@ const securityHref = isHome ? '#security' : '/#security';
   }
 
   @media (max-width: 900px) {
-    .fnav { flex-wrap: wrap; justify-content: center; max-width: 95vw; padding: 6px 12px 6px 14px; }
+    .fnav {
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: calc(100vw - 16px);
+      padding: 6px 12px 6px 14px;
+    }
     .fnav__logo { flex-basis: 100%; justify-content: center; }
-    .fnav__right { flex-shrink: 0; }
+    .fnav__right {
+      flex-shrink: 1;
+      flex-wrap: wrap;
+      justify-content: center;
+      min-width: 0;
+      row-gap: 4px;
+    }
   }
 
   @media (max-width: 640px) {
     .fnav { gap: 6px; padding: 5px 10px 5px 12px; }
     .fnav__logo { font-size: 0.85rem; }
     .fnav__logo img { height: 22px; margin-right: 5px; width: 22px; }
-    .fnav__links { gap: 0; }
-    .fnav__links a { font-size: 0.75rem; padding: 4px 6px; }
-    .fnav__cta { font-size: 0.75rem; padding: 5px 12px; }
+    .fnav__links {
+      flex-wrap: wrap;
+      gap: 0;
+      justify-content: center;
+      min-width: 0;
+      row-gap: 2px;
+    }
+    .fnav__links a { font-size: 0.72rem; padding: 4px 6px; }
+    .fnav__cta { font-size: 0.72rem; padding: 5px 12px; }
   }
 </style>
