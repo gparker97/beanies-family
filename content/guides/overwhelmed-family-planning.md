@@ -53,7 +53,7 @@ I'm here to tell you that you're not alone — and there are ways that have work
 
 Each kid multiplies logistics — activities, appointments, friendships, doctor's appointments, and everything else. When you're getting bombarded with updates, field trips, and new activities from 7 different places, context-switching alone becomes a full-time job. This is the **data-scatter problem**. My data lies in a million different places, and I don't know where to find it.
 
-According to Eve Rodsky in her book [_Fair Play_](https://www.fairplaylife.com), this is what's known as **kin-keeping**, and it can cause severe repercussions to one or both parents, particularly to the parent carrying the mental load. It includes things like:
+According to Eve Rodsky in her book [_Fair Play_](https://www.fairplaylife.com), this is what's known as [**kin-keeping**](/help/glossary#kin-keeping), and it can cause severe repercussions to one or both parents, particularly to the parent carrying the mental load. It includes things like:
 
 - Remembering birthdays, anniversaries, school events (Joey's birthday is coming up!)
 - Planning holidays, gifts, and gatherings (What are we going to do for Christmas?)
@@ -140,6 +140,8 @@ For example:
 > **Mom:** There's also Neil's school play on the 5th — I have an important work meeting that day. And we also have to reschedule his soccer practice the week after, because we'll be visiting my parents.
 >
 > **Dad:** I'd suggest we break it up like this — I'll handle the school play and Neil's birthday and activities. You handle Mary's school holiday and her other activities. I'll spend some time after work today, let's catch up tomorrow on the details.
+
+At least for me, simply by approaching the problem as a couple and talking it through together, in a collaborative way, I can already feel relief from some of the stress of carrying what felt like my own burden. Now the responsibilities are shared, the labor is visible, and we have a clear plan. Or at least, a plan. And any plan is better than nothing.
 
 ## the 15-minute weekly family meeting
 
