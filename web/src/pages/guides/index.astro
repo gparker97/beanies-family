@@ -1,11 +1,12 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getCollection } from 'astro:content';
-import { isPublished } from '~/utils/content';
+import { isPublished, comparePillarOrder } from '~/utils/content';
 
-const guides = (await getCollection('guides', isPublished)).sort(
-  (a, b) => b.data.lastUpdated.getTime() - a.data.lastUpdated.getTime(),
-);
+// Canonical pillar reading order — matches Notion and the prev/next walk
+// on each guide page. Not date-sorted; these are a curriculum, not a
+// stream.
+const guides = [...(await getCollection('guides', isPublished))].sort(comparePillarOrder);
 
 const fmt = (d: Date) =>
   d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
