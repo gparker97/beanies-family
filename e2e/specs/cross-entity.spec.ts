@@ -173,29 +173,32 @@ test.describe('Onboarding Wizard', () => {
     await expect(page.getByTestId('onboarding-start')).toBeVisible();
 
     // --- Step 1 → Step 2 (from onboarding test #4) ---
+    // Timeouts bumped from 5s→15s / 3s→8s for webkit — modal transitions
+    // in the wizard can exceed 5s under CI contention (see E2E_HEALTH.md
+    // entries from 2026-04-13 / 2026-04-19 for the same pattern).
     await page.getByTestId('onboarding-start').click();
-    await page.getByTestId('onboarding-add-account').waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByTestId('onboarding-add-account').waitFor({ state: 'visible', timeout: 15000 });
 
     // Add an account via the bank combobox
     await page.getByTestId('onboarding-bank-select').getByTestId('combobox-trigger').click();
-    await page.getByTestId('combobox-dropdown').waitFor({ state: 'visible', timeout: 3000 });
+    await page.getByTestId('combobox-dropdown').waitFor({ state: 'visible', timeout: 8000 });
     await page.getByTestId('combobox-dropdown').locator('button').first().click();
     await page.getByTestId('onboarding-add-account').click();
 
     // Should show the added account list with "Add Another" button
-    await expect(page.getByText(/add another/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/add another/i)).toBeVisible({ timeout: 15000 });
 
     // --- Step 2 → Step 3: Activity presets (from onboarding test #6) ---
     await page.getByTestId('onboarding-next').click();
-    await expect(page.getByText(/family life/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/family life/i)).toBeVisible({ timeout: 15000 });
 
     // --- Step 3 → Completion screen (from onboarding test #8) ---
     await page.getByTestId('onboarding-next').click();
-    await page.getByTestId('onboarding-finish').waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByTestId('onboarding-finish').waitFor({ state: 'visible', timeout: 15000 });
 
     // Click "Enter The Nook" to close wizard
     await page.getByTestId('onboarding-finish').click();
-    await expect(page.getByTestId('onboarding-wizard')).not.toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('onboarding-wizard')).not.toBeVisible({ timeout: 15000 });
 
     // --- Verify data persistence: account was created ---
     const dbHelper = new IndexedDBHelper(page);
