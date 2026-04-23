@@ -31,7 +31,7 @@ I'm not a child psychologist or some kind of family planning expert — I'm just
 
 With multiple kids, running your family feels like being a manager for a job you never applied for. The staff are literal toddlers (instead of just figurative ones) and the KPIs change on a daily basis. You wake up tired and your phone never leaves your hand, except when your kid grabs it and throws it in the river. Your family WhatsApp group is permanently pinned to the top of your chats.
 
-In [Brigid Schulte](https://brigidschulte.com/overwhelmed)'s book _Overwhelmed_, she talks about how feeling overwhelmed is _not_ a personal failure — it's structural. We all have unrealistic work expectations, we deal with (sometimes outdated) family roles, and we often live in a culture that undervalues rest and leisure.
+In **Brigid Schulte**'s book [_Overwhelmed_](https://brigidschulte.com/overwhelmed), she talks about how feeling overwhelmed is _not_ a personal failure — it's structural. We all have unrealistic work expectations, we deal with (sometimes outdated) family roles, and we often live in a culture that undervalues rest and leisure.
 
 A key concept of her book is **time confetti** — the reason you never feel caught up. Always feeling _busy_ but never feeling _done_, not being able to get real rest, and walking around with a constant feeling of anxiety or stress. Does any of this sound familiar?
 
@@ -53,7 +53,7 @@ I'm here to tell you that you're not alone — and there are ways that have work
 
 Each kid multiplies logistics — activities, appointments, friendships, doctor's appointments, and everything else. When you're getting bombarded with updates, field trips, and new activities from 7 different places, context-switching alone becomes a full-time job. This is the **data-scatter problem**. My data lies in a million different places, and I don't know where to find it.
 
-According to Eve Rodsky in her book [_Fair Play_](https://www.fairplaylife.com), this is what's known as [**kin-keeping**](/help/glossary#kin-keeping), and it can cause severe repercussions to one or both parents, particularly to the parent carrying the mental load. It includes things like:
+According to **Eve Rodsky** in her book [_Fair Play_](https://www.fairplaylife.com), this is what's known as [**kin-keeping**](/help/glossary#kin-keeping), and it can cause severe repercussions to one or both parents, particularly to the parent carrying the mental load. It includes things like:
 
 - Remembering birthdays, anniversaries, school events (Joey's birthday is coming up!)
 - Planning holidays, gifts, and gatherings (What are we going to do for Christmas?)
@@ -61,7 +61,7 @@ According to Eve Rodsky in her book [_Fair Play_](https://www.fairplaylife.com),
 - Tracking logistics (when are their appointments, did you pick up the kids, etc)
 - Managing emotional dynamics (Did you write a thank-you note to your grandmother for your birthday gift?)
 
-I highly recommend her book, which lays out a clear and easy-to-follow system for helping share the load between parents and make invisible labor more visible, so it does not go unnoticed by the other partner.
+I highly recommend her book, which lays out a clear and easy-to-follow system for helping share the load between parents and _make invisible labor more visible_, so it does not go unnoticed by the other partner.
 
 In my case, with 3 little ones all going to school, participating in various activities, playing with friends, and doing homework, even the slightest hiccup in your schedule can feel like the end of the world. I have WhatsApp, Google Calendar, a different app for each of my kids' schools, emails or chats from their various sports coaches, and lots more. When mental load reaches capacity, it can feel like you have lost control of your schedule, and even your sanity.
 
