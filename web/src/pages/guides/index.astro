@@ -172,9 +172,9 @@ const itemListSchema = {
           <span class="library-title-under">library</span>
         </h1>
         <p class="library-pitch">
-          four evergreen guides on the building blocks of a calmer family life &mdash;
-          written as a <em>curriculum</em>, not a content dump. start with the overwhelm,
-          end with the tools.
+          informative, lesson-based guides to help you build a calmer family life
+          and get organized. arranged as a <em>curriculum</em>, so you can read and
+          learn as you go.
         </p>
         <div class="library-stats">
           <span class="library-stat">
@@ -324,7 +324,7 @@ const itemListSchema = {
     <!-- ============== FOOTER STRIP ============== -->
     <footer class="library-foot">
       <p class="library-foot-copy">
-        the guides are written by <a href="/about/greg">greg</a> &mdash; a dad of three beanies, in the
+        the guides are written by <a href="/about/greg">greg</a> - a dad of three beanies, in the
         trenches of family logistics. for weekly notes on the beans and product,
         subscribe to <a href="/blog">the beanstalk</a>.
       </p>
@@ -487,29 +487,40 @@ const itemListSchema = {
     text-transform: uppercase;
   }
   .library-arc-list {
-    align-items: center;
+    align-items: flex-start;
     display: flex;
     gap: 0;
-    justify-content: space-between;
     list-style: none;
     margin: 0;
     padding: 0;
   }
+  /* Each item is a horizontal strip: the chapter link column (circle
+     stacked over title) on the left, then a connector hairline that
+     fills the rest of the item's allotted space. On desktop the
+     connector reaches across to the next item's circle. */
   .library-arc-item {
-    align-items: center;
+    align-items: flex-start;
     display: flex;
-    flex: 1;
+    flex: 1 1 0;
     gap: 12px;
     min-width: 0;
+  }
+  .library-arc-item:last-child {
+    flex: 0 0 auto;
   }
   .library-arc-link {
     align-items: center;
     color: var(--deep-slate);
     display: flex;
+    flex-direction: column;
     flex-shrink: 0;
     gap: 12px;
+    max-width: 170px;
+    min-width: 0;
+    text-align: center;
     text-decoration: none;
     transition: transform 180ms;
+    width: 170px;
   }
   .library-arc-link:hover { transform: translateY(-2px); }
   .library-arc-num {
@@ -534,15 +545,21 @@ const itemListSchema = {
     color: white;
   }
   .library-arc-text {
+    -webkit-box-orient: vertical;
     color: var(--deep-slate);
+    display: -webkit-box;
     font-family: var(--font-serif);
-    font-size: 0.92rem;
+    font-size: 0.88rem;
     font-weight: 500;
-    line-height: 1.25;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.3;
     min-width: 0;
     overflow: hidden;
+    padding: 0 6px;
+    text-align: center;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: break-word;
   }
   .library-arc-connector {
     background: linear-gradient(
@@ -553,8 +570,8 @@ const itemListSchema = {
     border-radius: 999px;
     flex: 1;
     height: 2px;
-    margin: 0 8px;
-    min-width: 20px;
+    margin-top: 17px;
+    min-width: 16px;
   }
 
   /* ===== PILLAR GRID ===== */
@@ -843,9 +860,23 @@ const itemListSchema = {
       flex-direction: column;
       gap: 14px;
     }
-    .library-arc-item { flex: none; width: 100%; }
-    .library-arc-link { width: 100%; }
-    .library-arc-text { white-space: normal; }
+    .library-arc-item {
+      flex: none;
+      flex-direction: column;
+      gap: 0;
+      width: 100%;
+    }
+    .library-arc-link {
+      flex-direction: row;
+      gap: 14px;
+      max-width: none;
+      text-align: left;
+      width: 100%;
+    }
+    .library-arc-text {
+      padding: 0;
+      text-align: left;
+    }
     .library-arc-connector {
       background: linear-gradient(
         to bottom,
