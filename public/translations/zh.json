@@ -3,7 +3,7 @@
     "language": "zh",
     "languageName": "中文 (简体)",
     "lastUpdated": "2026-04-23",
-    "translationCount": 2469
+    "translationCount": 2467
   },
   "translations": {
     "app.name": {
@@ -10747,9 +10747,9 @@
       "lastUpdated": "2026-04-19"
     },
     "recipes.detail.backToCookbook": {
-      "translation": "← 返回烹饪手册",
-      "hash": "kxvx24",
-      "lastUpdated": "2026-04-19"
+      "translation": "返回烹饪手册",
+      "hash": "dapmyc",
+      "lastUpdated": "2026-04-23"
     },
     "recipes.detail.ingredients": {
       "translation": "食材",
@@ -12199,16 +12199,6 @@
     "quickAdd.budget.hint": {
       "translation": "类别上限·期间",
       "hash": "miuuiv",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.recurring.label": {
-      "translation": "周期",
-      "hash": "ilxzyb",
-      "lastUpdated": "2026-04-23"
-    },
-    "quickAdd.recurring.hint": {
-      "translation": "每周·每月·每年",
-      "hash": "h8wmq6",
       "lastUpdated": "2026-04-23"
     },
     "quickAdd.asset.label": {

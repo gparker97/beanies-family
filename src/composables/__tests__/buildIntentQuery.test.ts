@@ -45,11 +45,14 @@ describe('buildIntentQuery', () => {
   });
 
   it('includes `tab` when the item sets one', () => {
+    // `tab` is a generic passthrough — any item that sets one carries
+    // it into the query. No production item currently uses it, so this
+    // synthesises one to keep the mechanism regression-tested.
     const out = buildIntentQuery(
-      makeItem({ action: 'add-recurring', tab: 'recurring' }),
+      makeItem({ action: 'add-activity', tab: 'archived' }),
       makeRoute()
     );
-    expect(out).toEqual({ action: 'add-recurring', tab: 'recurring' });
+    expect(out).toEqual({ action: 'add-activity', tab: 'archived' });
   });
 
   it('includes contextKey from route.params when present', () => {
