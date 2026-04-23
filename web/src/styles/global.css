@@ -9,6 +9,15 @@ html {
   color: #2c3e50;
   font-family: var(--font-inter);
   -webkit-font-smoothing: antialiased;
+  scroll-behavior: smooth;
+}
+
+/* Respect the user's motion preference — no animated scrolling for those
+   who've asked the OS to tone things down. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 h1,
