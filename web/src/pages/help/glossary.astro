@@ -4,6 +4,9 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import DraftPlaceholder from '../../components/DraftPlaceholder.astro';
 import { isDraftHidden } from '~/utils/draftPage';
 import { SITE_URL } from '@beanies/brand/nav';
+// Fraunces for the serif flourishes in the title + term names. Scoped
+// to this route via the plain import.
+import '@fontsource-variable/fraunces';
 
 const DRAFT = true;
 const hidden = isDraftHidden(DRAFT);
@@ -160,6 +163,95 @@ const terms: Term[] = [
 
 const canonicalPath = '/help/glossary';
 
+/**
+ * "Core vocabulary" — the terms someone has to understand to read the
+ * rest of the glossary + the product docs. Marked with a ribbon on the
+ * card so a first-time reader can see where to start. Keep this list
+ * small (4-6 entries); if everything is "core", nothing is.
+ */
+const CORE_TERMS = new Set<string>([
+  'beanies-family',
+  'pod',
+  'beanpod-file',
+  'local-first',
+  'e2ee',
+]);
+
+/**
+ * Normalize a term for sorting: strip a leading `.` or `the ` so
+ * `.beanpod file` buckets under B and `the beanstalk` buckets under B.
+ * Lowercased so case doesn't scramble the order.
+ */
+function sortKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/^\./, '')
+    .replace(/^the\s+/, '')
+    .trim();
+}
+
+function firstLetter(name: string): string {
+  const key = sortKey(name);
+  const first = key[0]?.toUpperCase() ?? '#';
+  return /[A-Z]/.test(first) ? first : '#';
+}
+
+/** Alphabet strip: 26 letters, each active if any term buckets under it. */
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+// Sort + bucket.
+const sortedTerms = [...terms].sort((a, b) => sortKey(a.term).localeCompare(sortKey(b.term)));
+const bucketMap = new Map<string, Term[]>();
+for (const t of sortedTerms) {
+  const letter = firstLetter(t.term);
+  if (!bucketMap.has(letter)) bucketMap.set(letter, []);
+  bucketMap.get(letter)!.push(t);
+}
+
+const sections = ALPHABET
+  .filter((letter) => bucketMap.has(letter))
+  .map((letter) => ({
+    letter,
+    id: `letter-${letter.toLowerCase()}`,
+    terms: bucketMap.get(letter) ?? [],
+  }));
+
+const activeLetters = new Set(sections.map((s) => s.letter));
+
+/**
+ * Compute cross-links ("see also") for each term. Heuristic: for term T,
+ * find other terms whose name appears as a substring in T's short or
+ * long text (case-insensitive, strip HTML tags + parentheticals from the
+ * haystack). Skip self-matches and stop at three entries so the chip
+ * row stays tidy.
+ */
+function stripHtml(s: string): string {
+  return s.replace(/<[^>]+>/g, ' ').toLowerCase();
+}
+function normalizeTermName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s*\([^)]*\)\s*/g, ' ') // drop parentheticals like "(E2EE)"
+    .replace(/\s*\/\s*/g, ' ') // "bean / beanie" -> "bean beanie"
+    .replace(/\./g, '')
+    .trim();
+}
+const relatedFor = new Map<string, Term[]>();
+for (const t of terms) {
+  const hay = stripHtml(`${t.short} ${t.long ?? ''}`);
+  const hits: Term[] = [];
+  for (const other of terms) {
+    if (other.id === t.id) continue;
+    const needle = normalizeTermName(other.term);
+    if (needle.length < 3) continue;
+    // Word-boundary check so "e2ee" doesn't match "tree" etc.
+    const re = new RegExp(`(^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}([^a-z0-9]|$)`);
+    if (re.test(hay)) hits.push(other);
+    if (hits.length >= 3) break;
+  }
+  relatedFor.set(t.id, hits);
+}
+
 // DefinedTermSet JSON-LD — each term becomes a DefinedTerm the AI can cite.
 const glossarySchema = {
   '@type': 'DefinedTermSet',
@@ -188,33 +280,103 @@ const glossarySchema = {
       jsonLd={glossarySchema}
     >
       <article class="glossary-page">
-        <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'help', href: '/help' }, { label: 'glossary', href: canonicalPath }]} />
+        <div class="glossary-atmo" aria-hidden="true"></div>
+        <img
+          src="/brand/beanies_neutral_icon_transparent_350x350.png"
+          alt=""
+          class="glossary-mascot"
+          width="180"
+          height="180"
+          aria-hidden="true"
+        />
 
-        <header class="glossary-header">
-          <h1 class="glossary-title">glossary</h1>
-          <p class="glossary-intro">
-            definitions of the product terms, family-planning concepts, and technology you'll see across beanies.family. each term is linkable (use the # anchor in the URL) so you can share specific definitions.
-          </p>
-        </header>
+        <div class="glossary-shell">
+          <header class="glossary-hero">
+            <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'help', href: '/help' }, { label: 'glossary', href: canonicalPath }]} />
+            <p class="glossary-kicker">
+              <span class="glossary-kicker-dot" aria-hidden="true"></span>
+              the lexicon · {terms.length} defined
+            </p>
+            <h1 class="glossary-title">
+              <span class="glossary-title-over">the</span>
+              <span class="glossary-title-under">glossary</span>
+            </h1>
+            <p class="glossary-intro">
+              definitions of the product terms, family-planning concepts, and technology
+              you&rsquo;ll see across beanies.family. each entry is linkable &mdash; use
+              the <code>#anchor</code> in the URL to share a specific definition.
+            </p>
+          </header>
 
-        <nav class="glossary-toc" aria-label="jump to term">
-          <p class="glossary-toc-label">jump to</p>
-          <ul class="glossary-toc-list">
-            {terms.map((t) => (
-              <li><a href={`#${t.id}`}>{t.term}</a></li>
+          <!-- Alphabet strip. Letters without terms are rendered as spans
+               (not links) and dimmed so the scanner sees the whole alphabet
+               but can't click into empty sections. Sticky on desktop so
+               it rides with the reader. -->
+          <nav class="glossary-alphabet" aria-label="jump to letter">
+            <ol class="glossary-alphabet-strip">
+              {ALPHABET.map((letter) => (
+                activeLetters.has(letter) ? (
+                  <li class="glossary-alpha glossary-alpha-on">
+                    <a href={`#letter-${letter.toLowerCase()}`}>{letter}</a>
+                  </li>
+                ) : (
+                  <li class="glossary-alpha glossary-alpha-off">
+                    <span>{letter}</span>
+                  </li>
+                )
+              ))}
+            </ol>
+          </nav>
+
+          <div class="glossary-sections">
+            {sections.map((section) => (
+              <section class="glossary-section" id={section.id}>
+                <header class="glossary-section-head">
+                  <span class="glossary-section-letter" aria-hidden="true">{section.letter}</span>
+                  <span class="glossary-section-meta">
+                    {section.terms.length} {section.terms.length === 1 ? 'term' : 'terms'}
+                  </span>
+                  <span class="glossary-section-rule" aria-hidden="true"></span>
+                </header>
+                <div class="glossary-section-terms">
+                  {section.terms.map((t) => {
+                    const related = relatedFor.get(t.id) ?? [];
+                    const isCore = CORE_TERMS.has(t.id);
+                    return (
+                      <article
+                        class={`glossary-term${isCore ? ' is-core' : ''}`}
+                        id={t.id}
+                      >
+                        {isCore && <span class="glossary-core-ribbon" aria-label="core vocabulary">core</span>}
+                        <h2 class="glossary-term-name">{t.term}</h2>
+                        <div class="glossary-term-short" set:html={t.short} />
+                        {t.long && <div class="glossary-term-long" set:html={t.long} />}
+                        {related.length > 0 && (
+                          <div class="glossary-related">
+                            <span class="glossary-related-label">see also</span>
+                            <ul class="glossary-related-list">
+                              {related.map((r) => (
+                                <li><a href={`#${r.id}`}>{r.term}</a></li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <a class="glossary-term-anchor" href={`#${t.id}`} aria-label={`copy link to ${t.term}`}>#</a>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
             ))}
-          </ul>
-        </nav>
+          </div>
 
-        <div class="glossary-terms">
-          {terms.map((t) => (
-            <article class="glossary-term" id={t.id}>
-              <h2 class="glossary-term-name">{t.term}</h2>
-              <div class="glossary-term-short" set:html={t.short} />
-              {t.long && <div class="glossary-term-long" set:html={t.long} />}
-              <a class="glossary-term-anchor" href={`#${t.id}`} aria-label={`copy link to ${t.term}`}>#</a>
-            </article>
-          ))}
+          <footer class="glossary-foot">
+            <p class="glossary-foot-copy">
+              spotted a missing term or a definition that could be clearer?
+              <a href="https://github.com/gparker97/beanies-family/issues">open an issue</a>
+              and we&rsquo;ll add or refine it.
+            </p>
+          </footer>
         </div>
       </article>
     </BaseLayout>
@@ -223,96 +385,302 @@ const glossarySchema = {
 
 <style>
   .glossary-page {
+    --deep-slate: #2c3e50;
+    --heritage-orange: #f15d22;
+    --terracotta: #e67e22;
+    --cloud-white: #f8f9fa;
+    --ink: #1f2d3d;
+    --muted: rgb(44 62 80 / 60%);
+    --hairline: rgb(44 62 80 / 8%);
+    --font-display: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    --font-serif: 'Fraunces Variable', 'Fraunces', 'Source Serif 4', Georgia, serif;
+    background: var(--cloud-white);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  .glossary-atmo {
+    background:
+      radial-gradient(circle at 88% 12%, rgb(241 93 34 / 6%) 0%, transparent 42%),
+      radial-gradient(circle at 12% 82%, rgb(174 214 241 / 8%) 0%, transparent 46%);
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .glossary-mascot {
+    filter: drop-shadow(0 14px 30px rgb(44 62 80 / 12%));
+    pointer-events: none;
+    position: absolute;
+    right: -20px;
+    top: 88px;
+    transform: rotate(6deg);
+    width: 160px;
+    z-index: 0;
+  }
+
+  .glossary-shell {
     box-sizing: border-box;
     margin: 0 auto;
-    max-width: 760px;
-    padding: 88px 24px 64px;
-  }
-  .glossary-header { margin: 24px 0 32px; }
-  .glossary-title {
-    color: #2c3e50;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 2.25rem;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    margin: 0;
-  }
-  .glossary-intro {
-    color: rgb(44 62 80 / 65%);
-    font-size: 1rem;
-    line-height: 1.65;
-    margin: 12px 0 0;
-    max-width: 600px;
+    max-width: 960px;
+    padding: 104px 32px 72px;
+    position: relative;
+    z-index: 1;
   }
 
-  .glossary-toc {
-    background: white;
-    border: 1px solid rgb(44 62 80 / 8%);
-    border-radius: 20px;
-    margin-bottom: 32px;
-    padding: 20px 24px;
-  }
-  .glossary-toc-label {
-    color: rgb(44 62 80 / 50%);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
+  /* ===== HERO ===== */
+  .glossary-hero { margin-bottom: 36px; }
+  .glossary-kicker {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: inline-flex;
+    font-family: var(--font-display);
     font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.1em;
-    margin: 0 0 10px;
+    gap: 10px;
+    letter-spacing: 0.22em;
+    margin: 20px 0 18px;
     text-transform: uppercase;
   }
-  .glossary-toc-list { display: flex; flex-wrap: wrap; gap: 6px 12px; list-style: none; margin: 0; padding: 0; }
-  .glossary-toc-list a {
-    color: #2c3e50;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-decoration: none;
+  .glossary-kicker-dot {
+    background: var(--heritage-orange);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgb(241 93 34 / 15%);
+    display: inline-block;
+    height: 8px;
+    width: 8px;
   }
-  .glossary-toc-list a:hover { color: #f15d22; }
+  .glossary-title {
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    line-height: 0.92;
+    margin: 0 0 20px;
+  }
+  .glossary-title-over {
+    display: block;
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    opacity: 0.78;
+  }
+  .glossary-title-under {
+    color: var(--deep-slate);
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 5.5rem);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    margin-top: 2px;
+    text-transform: lowercase;
+  }
+  .glossary-intro {
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin: 0;
+    max-width: 620px;
+  }
+  .glossary-intro code {
+    background: rgb(44 62 80 / 5%);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85em;
+    padding: 0.1em 0.35em;
+  }
 
-  .glossary-terms { display: flex; flex-direction: column; gap: 28px; }
+  /* ===== ALPHABET STRIP ===== */
+  .glossary-alphabet {
+    background: white;
+    border: 1px solid var(--hairline);
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgb(44 62 80 / 4%);
+    margin-bottom: 48px;
+    padding: 10px 14px;
+  }
+  @media (min-width: 960px) {
+    .glossary-alphabet {
+      position: sticky;
+      top: 84px;
+      z-index: 5;
+    }
+  }
+  .glossary-alphabet-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    justify-content: center;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .glossary-alpha {
+    line-height: 1;
+  }
+  .glossary-alpha a,
+  .glossary-alpha span {
+    align-items: center;
+    border-radius: 8px;
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    height: 32px;
+    justify-content: center;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    transition: background-color 150ms, color 150ms, transform 150ms;
+    width: 30px;
+  }
+  .glossary-alpha-on a {
+    color: var(--deep-slate);
+  }
+  .glossary-alpha-on a:hover {
+    background: color-mix(in srgb, var(--heritage-orange) 14%, white);
+    color: var(--heritage-orange);
+    transform: translateY(-1px);
+  }
+  .glossary-alpha-off span {
+    color: rgb(44 62 80 / 20%);
+    cursor: default;
+  }
+
+  /* ===== SECTIONS ===== */
+  .glossary-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+  }
+  .glossary-section { scroll-margin-top: 132px; }
+  .glossary-section-head {
+    align-items: flex-end;
+    display: flex;
+    gap: 18px;
+    margin-bottom: 20px;
+  }
+  .glossary-section-letter {
+    color: var(--heritage-orange);
+    font-family: var(--font-serif);
+    font-size: clamp(3rem, 8vw, 5rem);
+    font-style: italic;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 0.85;
+  }
+  .glossary-section-meta {
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    padding-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .glossary-section-rule {
+    background: linear-gradient(
+      to right,
+      rgb(241 93 34 / 35%),
+      rgb(44 62 80 / 10%)
+    );
+    border-radius: 999px;
+    flex: 1;
+    height: 2px;
+    margin-bottom: 16px;
+  }
+  .glossary-section-terms {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  /* ===== TERM CARD ===== */
   .glossary-term {
     background: white;
-    border: 1px solid rgb(44 62 80 / 6%);
+    border: 1px solid var(--hairline);
     border-radius: 20px;
+    box-shadow: 0 2px 12px rgb(44 62 80 / 3%);
     padding: 24px 28px;
     position: relative;
-    scroll-margin-top: 90px;
+    scroll-margin-top: 132px;
+    transition:
+      border-color 180ms,
+      box-shadow 180ms,
+      transform 180ms;
+  }
+  .glossary-term:hover {
+    border-color: rgb(241 93 34 / 28%);
+    box-shadow: 0 10px 26px rgb(241 93 34 / 10%);
+    transform: translateY(-1px);
   }
   .glossary-term:target {
-    border-color: rgb(241 93 34 / 30%);
-    box-shadow: 0 4px 16px rgb(241 93 34 / 10%);
+    border-color: rgb(241 93 34 / 45%);
+    box-shadow: 0 10px 26px rgb(241 93 34 / 15%);
   }
+
+  /* Core-vocab terms get a bookmark ribbon pinned to the top-right
+     corner. Flagged via .is-core, positioned absolutely so it overhangs
+     the card's rounded edge like a real bookmark. */
+  .glossary-term.is-core {
+    border-color: rgb(241 93 34 / 20%);
+  }
+  .glossary-core-ribbon {
+    background: linear-gradient(135deg, #f15d22 0%, #d14d1a 100%);
+    border-radius: 6px;
+    box-shadow: 0 4px 10px rgb(241 93 34 / 25%);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    font-weight: 800;
+    left: 20px;
+    letter-spacing: 0.2em;
+    padding: 3px 10px;
+    position: absolute;
+    text-transform: uppercase;
+    top: -10px;
+  }
+
   .glossary-term-name {
-    color: #2c3e50;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.25rem;
-    font-weight: 700;
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    font-size: 1.35rem;
+    font-style: italic;
+    font-weight: 600;
+    letter-spacing: -0.01em;
     margin: 0 0 10px;
   }
   .glossary-term-short {
-    color: #2c3e50;
-    font-size: 0.95rem;
-    font-weight: 500;
-    line-height: 1.65;
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.6;
     margin-bottom: 8px;
   }
   .glossary-term-long {
-    color: rgb(44 62 80 / 65%);
-    font-size: 0.9rem;
-    line-height: 1.7;
+    color: rgb(44 62 80 / 70%);
+    font-family: var(--font-serif);
+    font-size: 0.93rem;
+    font-weight: 400;
+    line-height: 1.65;
   }
   .glossary-term-short p, .glossary-term-long p { margin: 0; }
   .glossary-term-short p + p, .glossary-term-long p + p { margin-top: 0.75em; }
   .glossary-term-long a, .glossary-term-short a {
-    color: #f15d22;
-    font-weight: 600;
-    text-decoration: none;
+    color: var(--heritage-orange);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(241 93 34 / 40%);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
-  .glossary-term-long a:hover, .glossary-term-short a:hover { text-decoration: underline; }
+  .glossary-term-long a:hover, .glossary-term-short a:hover {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+  }
   .glossary-term-long strong, .glossary-term-short strong {
-    color: #2c3e50;
+    color: var(--deep-slate);
     font-weight: 700;
   }
   .glossary-term-long code, .glossary-term-short code {
@@ -322,8 +690,54 @@ const glossarySchema = {
     font-size: 0.88em;
     padding: 0.1em 0.35em;
   }
+
+  /* See-also chip row */
+  .glossary-related {
+    align-items: center;
+    border-top: 1px dashed var(--hairline);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+  }
+  .glossary-related-label {
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    margin-right: 4px;
+    text-transform: uppercase;
+  }
+  .glossary-related-list {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .glossary-related-list a {
+    background: rgb(44 62 80 / 5%);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    text-decoration: none;
+    transition: all 160ms;
+  }
+  .glossary-related-list a:hover {
+    background: rgb(241 93 34 / 10%);
+    border-color: rgb(241 93 34 / 25%);
+    color: var(--heritage-orange);
+  }
+
   .glossary-term-anchor {
-    color: rgb(44 62 80 / 20%);
+    color: rgb(44 62 80 / 22%);
     font-family: ui-monospace, monospace;
     font-size: 0.875rem;
     font-weight: 600;
@@ -332,14 +746,60 @@ const glossarySchema = {
     right: 20px;
     text-decoration: none;
     top: 20px;
-    transition: opacity 150ms, color 150ms;
+    transition: opacity 160ms, color 160ms;
   }
   .glossary-term:hover .glossary-term-anchor { opacity: 1; }
-  .glossary-term-anchor:hover { color: #f15d22; }
+  .glossary-term-anchor:hover { color: var(--heritage-orange); }
+
+  /* ===== FOOTER ===== */
+  .glossary-foot {
+    border-top: 1px solid var(--hairline);
+    margin-top: 56px;
+    padding-top: 24px;
+    text-align: center;
+  }
+  .glossary-foot-copy {
+    color: var(--muted);
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    font-style: italic;
+    line-height: 1.6;
+    margin: 0 auto;
+    max-width: 560px;
+  }
+  .glossary-foot-copy a {
+    color: var(--heritage-orange);
+    font-style: normal;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .glossary-foot-copy a:hover { text-decoration: underline; }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 720px) {
+    .glossary-mascot { top: 72px; right: -30px; width: 130px; opacity: 0.45; }
+    .glossary-shell { padding: 92px 22px 56px; }
+    .glossary-sections { gap: 44px; }
+    .glossary-section-head { gap: 12px; }
+    .glossary-term { padding: 22px 22px; }
+    .glossary-alphabet { margin-bottom: 36px; }
+    .glossary-alpha a, .glossary-alpha span {
+      font-size: 0.78rem;
+      height: 28px;
+      width: 26px;
+    }
+  }
 
   @media (max-width: 520px) {
-    .glossary-page { padding-top: 76px; }
-    .glossary-title { font-size: 1.75rem; }
-    .glossary-term { padding: 20px; }
+    .glossary-mascot { top: 60px; right: -40px; width: 110px; opacity: 0.35; }
+    .glossary-shell { padding: 84px 20px 48px; }
+    .glossary-alphabet { padding: 8px 10px; }
+    .glossary-alpha a, .glossary-alpha span {
+      font-size: 0.72rem;
+      height: 26px;
+      width: 22px;
+    }
+    .glossary-term { padding: 20px 18px; }
+    .glossary-core-ribbon { font-size: 0.58rem; left: 16px; padding: 3px 8px; }
   }
 </style>
