@@ -57,10 +57,13 @@ test.describe('Family Planner', () => {
 
   /** Helper to open view modal then edit modal for the first occurrence of an activity. */
   async function openEditModal(page: import('@playwright/test').Page, title: string) {
+    // Modal-to-modal transitions can exceed 5s on webkit under CI load;
+    // bump to 15s to match the hardening pattern used elsewhere
+    // (activity-modal.ts, onboarding wizard test).
     await page.getByText(title).first().click();
-    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/activity details/i)).toBeVisible({ timeout: 15000 });
     await page.getByRole('button', { name: /edit/i }).click();
-    await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/edit activity/i)).toBeVisible({ timeout: 15000 });
   }
 
   test('Activity CRUD lifecycle', async ({ page }) => {
