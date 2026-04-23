@@ -383,7 +383,15 @@ const glossarySchema = {
   )
 }
 
-<style>
+<style is:global>
+  /* is:global is required here because several selectors (glossary-term
+     -short a, glossary-term-long a, strong, code, etc.) target HTML
+     injected via set:html from each term's definition. Astro's default
+     scoping rewrites those descendant selectors to require the scope
+     attribute on BOTH the parent AND the descendant, but set:html
+     content never carries the scope attribute. Every selector below is
+     namespaced under `.glossary-page` / glossary-* class prefixes so
+     these rules don't leak to other pages. */
   .glossary-page {
     --deep-slate: #2c3e50;
     --heritage-orange: #f15d22;
