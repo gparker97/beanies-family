@@ -20,7 +20,7 @@ keyTakeaways:
   - Name the mental load out loud - if it's not visible to everyone in the household, it stays the responsibility of whoever is tracking it in their head.
   - Protect recovery time like you'd protect a meeting - unscheduled white space on the family calendar is not a bug, it's a feature.
   - Start with one small reset (one calendar, one to-do surface, one weekly family huddle) before trying to overhaul everything at once.
-draft: true
+draft: false
 ---
 
 ## what does being overwhelmed with family planning and activities actually feel like?
