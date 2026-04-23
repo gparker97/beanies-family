@@ -560,12 +560,21 @@ const faqSchema = {
     margin: 0;
     max-width: 620px;
   }
-  .faq-intro a {
+  .faq-intro a,
+  .faq-empty-hint a {
     color: var(--heritage-orange);
-    font-weight: 600;
-    text-decoration: none;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(241 93 34 / 40%);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: text-decoration-color 180ms, text-decoration-thickness 180ms;
   }
-  .faq-intro a:hover { text-decoration: underline; }
+  .faq-intro a:hover,
+  .faq-empty-hint a:hover {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+  }
 
   /* ===== LAYOUT ===== */
   .faq-layout {
@@ -875,12 +884,6 @@ const faqSchema = {
     line-height: 1.55;
     margin: 0;
   }
-  .faq-empty-hint a {
-    color: var(--heritage-orange);
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .faq-empty-hint a:hover { text-decoration: underline; }
 
   /* Footer CTA */
   .faq-foot {
