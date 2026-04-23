@@ -2,8 +2,8 @@
   "meta": {
     "language": "zh",
     "languageName": "中文 (简体)",
-    "lastUpdated": "2026-04-22",
-    "translationCount": 2404
+    "lastUpdated": "2026-04-23",
+    "translationCount": 2468
   },
   "translations": {
     "app.name": {
@@ -12025,6 +12025,326 @@
       "translation": "这将从您的目标进度中扣除。",
       "hash": "8n4swc",
       "lastUpdated": "2026-04-22"
+    },
+    "quickAdd.fab.label": {
+      "translation": "快速添加",
+      "hash": "gehf02",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.title": {
+      "translation": "请问您想看什么呢？",
+      "hash": "yrr03i",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.groups.everyday.kicker": {
+      "translation": "🫘 日常豆类",
+      "hash": "3e7cx6",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.groups.everyday.subhint": {
+      "translation": "您添加最多的内容",
+      "hash": "ti73a7",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.groups.family.title": {
+      "translation": "科",
+      "hash": "yohf9g",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.groups.money.title": {
+      "translation": "金钱",
+      "hash": "18ddb4",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.groups.money.setup": {
+      "translation": "设置",
+      "hash": "1t3at9",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.groups.care.title": {
+      "translation": "照顾家庭成员",
+      "hash": "18uup",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.activity.label": {
+      "translation": "活跃度",
+      "hash": "qbfkk1",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.activity.hint": {
+      "translation": "日程",
+      "hash": "i088g8",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.todo.label": {
+      "translation": "任务",
+      "hash": "1c6l8d",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.todo.hint": {
+      "translation": "任务·谁·何时",
+      "hash": "rhl4yx",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.transaction.label": {
+      "translation": "交易",
+      "hash": "819i6a",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.transaction.hint": {
+      "translation": "收入·费用·转账",
+      "hash": "1llkws",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.trip.label": {
+      "translation": "行程",
+      "hash": "1k211",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.trip.hint": {
+      "translation": "旅行计划",
+      "hash": "gjs350",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.cookLog.label": {
+      "translation": "烹饪日志",
+      "hash": "80er90",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.cookLog.hint": {
+      "translation": "5星·备注·照片",
+      "hash": "rzq5ne",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.saying.label": {
+      "translation": "金句",
+      "hash": "u6tvpl",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.saying.hint": {
+      "translation": "quote a beanie",
+      "hash": "504osv",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.favorite.label": {
+      "translation": "我的最愛",
+      "hash": "ig3mpo",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.favorite.hint": {
+      "translation": "食物·游戏·歌曲",
+      "hash": "mitllt",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.note.label": {
+      "translation": "附註",
+      "hash": "1g64y",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.note.hint": {
+      "translation": "per-Bean journal",
+      "hash": "id429j",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.recipe.label": {
+      "translation": "配方",
+      "hash": "um2dea",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.recipe.hint": {
+      "translation": "成分·步骤",
+      "hash": "ty5zvk",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.tripIdea.label": {
+      "translation": "行程创意",
+      "hash": "plagaa",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.tripIdea.hint": {
+      "translation": "收藏目的地",
+      "hash": "shibm4",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.tripIdea.noTripsTitle": {
+      "translation": "请先添加行程",
+      "hash": "ozwp7x",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.tripIdea.noTripsMessage": {
+      "translation": "行程创意体现在行程中--创建一个创意，然后再回来。",
+      "hash": "1tizfk",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.tripIdea.addTripAction": {
+      "translation": "新增行程",
+      "hash": "kbxbj0",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.account.label": {
+      "translation": "账户",
+      "hash": "8259n1",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.account.hint": {
+      "translation": "支票·信贷·贷款",
+      "hash": "av7dpr",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.budget.label": {
+      "translation": "预算",
+      "hash": "x3510l",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.budget.hint": {
+      "translation": "类别上限·期间",
+      "hash": "miuuiv",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.recurring.label": {
+      "translation": "周期",
+      "hash": "ilxzyb",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.recurring.hint": {
+      "translation": "每周·每月·每年",
+      "hash": "h8wmq6",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.asset.label": {
+      "translation": "资产",
+      "hash": "11uhu8",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.asset.hint": {
+      "translation": "房屋·车辆·投资",
+      "hash": "k3evlm",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.goal.label": {
+      "translation": "入球",
+      "hash": "1bos3",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.goal.hint": {
+      "translation": "储蓄·回报·投资",
+      "hash": "krrhwr",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.medication.label": {
+      "translation": "藥品",
+      "hash": "504f0x",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.medication.hint": {
+      "translation": "剂量·时间表",
+      "hash": "civ8sd",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.doseLog.label": {
+      "translation": "剂量日志",
+      "hash": "mm3ftt",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.doseLog.hint": {
+      "translation": "记录给定剂量",
+      "hash": "mfwwha",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.allergy.label": {
+      "translation": "过敏",
+      "hash": "cgbk9s",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.allergy.hint": {
+      "translation": "严重程度·反应",
+      "hash": "ckl30t",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.emergency.label": {
+      "translation": "紧急联系人",
+      "hash": "vxniq7",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.emergency.hint": {
+      "translation": "保姆·医生·学校",
+      "hash": "dfqi0",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.error.unknown.title": {
+      "translation": "从这里做不到",
+      "hash": "uw355t",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.error.unknown.message": {
+      "translation": "此添加操作不再可用—应用可能需要重新加载。",
+      "hash": "8ce3jr",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.error.handler.title": {
+      "translation": "那没有工作。",
+      "hash": "m1edrc",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.error.handler.message": {
+      "translation": "打开该表单时出错。有关详细信息，请查看控制台。",
+      "hash": "tqyjxb",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.error.notHere.title": {
+      "translation": "从另一个页面打开",
+      "hash": "r9i8ga",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.error.notHere.message": {
+      "translation": "此页面上隐藏了快速添加菜单以获得焦点。返回主应用后，轻触小便帽。",
+      "hash": "qommyj",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.back": {
+      "translation": "回到",
+      "hash": "187if",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.bean.title": {
+      "translation": "挑选便帽",
+      "hash": "vh1biu",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.bean.empty": {
+      "translation": "您还没有添加任何beanies —从Pod中添加一个。",
+      "hash": "tiqzca",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.recipe.title": {
+      "translation": "选择一个食谱",
+      "hash": "nwa6s4",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.recipe.empty": {
+      "translation": "尚未保存食谱—请先从食谱中添加食谱。",
+      "hash": "6mxcig",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.medication.title": {
+      "translation": "选择一种药物",
+      "hash": "m87rf7",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.medication.empty": {
+      "translation": "无有效药物—从Beanie的“护理”选项卡中添加。",
+      "hash": "ydmo1k",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.vacation.title": {
+      "translation": "选择一趟行程",
+      "hash": "hwsbst",
+      "lastUpdated": "2026-04-23"
+    },
+    "quickAdd.picker.vacation.empty": {
+      "translation": "您尚未添加任何行程，请从旅行计划开始。",
+      "hash": "3debvo",
+      "lastUpdated": "2026-04-23"
     }
   }
 }

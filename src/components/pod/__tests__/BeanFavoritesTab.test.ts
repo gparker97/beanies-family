@@ -17,11 +17,11 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-// Stub the query-driven auto-open so the tab tests don't need a router
-// — the composable's contract (flip the ref when ?add=1) is covered
-// separately once we have integration coverage for the hero menu.
-vi.mock('@/composables/useAutoOpenOnQuery', () => ({
-  useAutoOpenOnQuery: () => undefined,
+// Stub the Quick-add intent consumer so the tab tests don't need a router.
+// The composable's contract (dispatch `?action=add-favorite` → open modal)
+// is covered by useQuickAddIntent's own unit tests.
+vi.mock('@/composables/useQuickAddIntent', () => ({
+  useQuickAddIntent: () => undefined,
 }));
 
 const MEMBER_ID = 'bean-neil';

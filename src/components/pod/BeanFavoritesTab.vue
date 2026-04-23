@@ -9,7 +9,7 @@ import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import FavoriteFormModal from '@/components/pod/FavoriteFormModal.vue';
 import { useRouter } from 'vue-router';
-import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useRecipesStore } from '@/stores/recipesStore';
@@ -39,7 +39,12 @@ function openRecipe(id: string, e: Event): void {
 
 const modalOpen = ref(false);
 const editing = ref<FavoriteItem | null>(null);
-useAutoOpenOnQuery(modalOpen);
+useQuickAddIntent((action) => {
+  if (action === 'add-favorite') {
+    editing.value = null;
+    modalOpen.value = true;
+  }
+});
 
 const CATEGORY_EMOJI: Record<FavoriteCategory, string> = {
   food: '\u{1F35C}',

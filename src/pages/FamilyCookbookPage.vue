@@ -16,6 +16,7 @@ import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { usePhotoStore } from '@/stores/photoStore';
@@ -56,6 +57,23 @@ function openAdd(): void {
   editing.value = null;
   modalOpen.value = true;
 }
+
+// Quick-add FAB handlers.
+//
+// - `add-recipe` opens the RecipeFormModal directly.
+// - `add-cooklog` with a `recipeId` forwards to the recipe detail page
+//   where RecipeDetailPage's existing handler opens the CookLogFormModal.
+//   The sheet's picker guarantees recipeId is always present when this
+//   action routes through the cookbook index.
+useQuickAddIntent(async (action, { recipeId }) => {
+  if (action === 'add-recipe') {
+    openAdd();
+    return;
+  }
+  if (action === 'add-cooklog' && recipeId) {
+    await router.push({ path: `/pod/cookbook/${recipeId}`, query: { action } });
+  }
+});
 
 function openRecipe(r: Recipe): void {
   router.push(`/pod/cookbook/${r.id}`);

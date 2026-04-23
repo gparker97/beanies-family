@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageHeader from '@/components/common/PageHeader.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -17,6 +17,8 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
 import { confirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { showToast } from '@/composables/useToast';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import { formatDateShort, formatNookDate, toDateInputValue, extractDatePart } from '@/utils/date';
@@ -64,6 +66,7 @@ const collapsedCards = ref<Record<string, boolean>>({});
 const quickIdeaText = ref('');
 const editingIdeaId = ref<string | null>(null);
 const ideasPanelRef = ref<HTMLElement | null>(null);
+const quickIdeaInput = ref<HTMLInputElement | null>(null);
 
 function scrollToIdeas() {
   ideasPanelRef.value?.scrollIntoView({ behavior: 'smooth' });
@@ -255,6 +258,51 @@ function startWizard() {
   editVacationStep.value = undefined;
   showVacationWizard.value = true;
 }
+
+// Quick-add FAB handlers.
+//
+// - `add-trip` opens the vacation wizard fresh.
+// - `add-trip-idea` requires a parent trip. If the user arrived with a
+//   `vacationId` (on a trip detail route) we select that one and focus
+//   the inline quick-idea input. Without context, we pick the first
+//   trip if any exist, or fire an info toast with a "Create trip"
+//   action so the user isn't left guessing why nothing happened.
+function handleAddTripIdea(vacationId: string | undefined): void {
+  const vacations = vacationStore.vacations;
+  if (vacations.length === 0) {
+    showToast('info', t('quickAdd.tripIdea.noTripsTitle'), t('quickAdd.tripIdea.noTripsMessage'), {
+      actionLabel: t('quickAdd.tripIdea.addTripAction'),
+      actionFn: () => {
+        startWizard();
+      },
+    });
+    return;
+  }
+
+  const targetId =
+    vacationId && vacations.some((v) => v.id === vacationId) ? vacationId : vacations[0].id;
+  selectedVacationId.value = targetId;
+
+  // Wait for the ideas panel to render (route/state change may re-mount
+  // it), then focus the quick-add input so the user can type immediately.
+  void nextTick().then(() => {
+    scrollToIdeas();
+    quickIdeaInput.value?.focus();
+  });
+}
+
+useQuickAddIntent((action, { vacationId }) => {
+  switch (action) {
+    case 'add-trip':
+      startWizard();
+      break;
+    case 'add-trip-idea':
+      handleAddTripIdea(vacationId);
+      break;
+    default:
+      break;
+  }
+});
 
 function editInWizard(step: number) {
   if (selectedVacation.value) {
@@ -1227,6 +1275,7 @@ function addQuickIdea() {
           <!-- Quick-add input -->
           <div class="mt-3 flex gap-1.5">
             <input
+              ref="quickIdeaInput"
               v-model="quickIdeaText"
               type="text"
               :placeholder="t('travel.quickAddIdea')"

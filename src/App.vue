@@ -12,6 +12,8 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
 import ConfirmModal from '@/components/ui/ConfirmModal.vue';
 import DoseLogConfirmModal from '@/components/pod/DoseLogConfirmModal.vue';
+import QuickAddFab from '@/components/common/QuickAddFab.vue';
+import QuickAddSheet from '@/components/common/QuickAddSheet.vue';
 import RecurringEditScopeModal from '@/components/ui/RecurringEditScopeModal.vue';
 import TrustDeviceModal from '@/components/common/TrustDeviceModal.vue';
 import PasskeyPromptModal from '@/components/common/PasskeyPromptModal.vue';
@@ -933,6 +935,226 @@ watch(
     <ConfirmModal />
     <DoseLogConfirmModal />
     <RecurringEditScopeModal />
+
+    <!--
+      Quick-add FAB — global floating button + bottom sheet.
+      Visibility is driven by route.meta.hideQuickAdd; see
+      docs/plans/2026-04-23-quick-add-fab-and-sheet.md.
+
+      The inline <symbol> below is the single SVG source for every
+      <use href="#beanie-plus-fab"> reference. Gradient IDs are
+      prefixed with `bfab-` to avoid document-level collisions with
+      other SVGs that might use short IDs like "bg". The background
+      circle's fill pulls from --fab-bg (default: url(#bfab-bg)), so
+      dark mode swaps only the gradient reference — the character
+      colors stay warm across themes.
+    -->
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute">
+      <symbol id="beanie-plus-fab" viewBox="0 0 120 120">
+        <defs>
+          <radialGradient id="bfab-bg" cx="50%" cy="38%" r="68%">
+            <stop offset="0%" stop-color="#FF824A" />
+            <stop offset="100%" stop-color="#DD4D14" />
+          </radialGradient>
+          <radialGradient id="bfab-bg-dark" cx="50%" cy="38%" r="68%">
+            <stop offset="0%" stop-color="#3B506A" />
+            <stop offset="100%" stop-color="#1C2A3B" />
+          </radialGradient>
+          <linearGradient id="bfab-bean" x1="0.2" y1="0" x2="0.8" y2="1">
+            <stop offset="0%" stop-color="#F57A3A" />
+            <stop offset="100%" stop-color="#D44810" />
+          </linearGradient>
+          <linearGradient id="bfab-hat" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#CDE5F5" />
+            <stop offset="100%" stop-color="#8FBFDA" />
+          </linearGradient>
+          <linearGradient id="bfab-cuff" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#A4CCE1" />
+            <stop offset="100%" stop-color="#7DAEC8" />
+          </linearGradient>
+          <linearGradient id="bfab-plus" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#FFFFFF" />
+            <stop offset="100%" stop-color="#EEF2F5" />
+          </linearGradient>
+        </defs>
+
+        <circle cx="60" cy="60" r="58" fill="var(--fab-bg, url(#bfab-bg))" />
+        <circle
+          cx="60"
+          cy="60"
+          r="56.5"
+          fill="none"
+          stroke="#FFFFFF"
+          stroke-opacity="0.10"
+          stroke-width="0.7"
+        />
+        <ellipse cx="42" cy="26" rx="30" ry="14" fill="#FFFFFF" opacity="0.14" />
+
+        <!-- PLUS VERTICAL BAR — drawn first; upper portion hidden by character -->
+        <g>
+          <rect
+            x="50"
+            y="44"
+            width="20"
+            height="56"
+            rx="6"
+            fill="#1A252F"
+            opacity="0.22"
+            transform="translate(0 2)"
+          />
+          <rect x="50" y="44" width="20" height="56" rx="6" fill="url(#bfab-plus)" />
+        </g>
+
+        <!-- CHARACTER HEAD — upper half peeks above crossbar, lower half hidden -->
+        <g>
+          <path
+            d="M60 32 C75 32, 84 42, 84 54 C84 65, 76 75, 65 77 C49 79, 37 70, 36 56 C35 43, 46 32, 60 32 Z"
+            fill="url(#bfab-bean)"
+          />
+          <path
+            d="M40 60 C38 54, 38 46, 42 40 C41 47, 42 56, 47 64 C44 64, 41 62, 40 60 Z"
+            fill="#B8420F"
+            opacity="0.22"
+          />
+          <ellipse
+            cx="74"
+            cy="44"
+            rx="3.3"
+            ry="5"
+            fill="#FFFFFF"
+            opacity="0.22"
+            transform="rotate(-22 74 44)"
+          />
+        </g>
+
+        <!-- BEANIE HAT — sits low on forehead; big pom-pom -->
+        <g>
+          <path
+            d="M40 32 C40 24, 48 18, 60 18 C72 18, 80 24, 80 32 L80 34 C80 34.8, 79.2 35.2, 78.4 35.2 L41.6 35.2 C40.8 35.2, 40 34.8, 40 34 Z"
+            fill="url(#bfab-hat)"
+          />
+          <path
+            d="M38 34 C38 33.3, 38.8 32.8, 39.7 32.8 L80.3 32.8 C81.2 32.8, 82 33.3, 82 34 L82 42.8 C82 43.6, 81.2 44, 80.3 44 L39.7 44 C38.8 44, 38 43.6, 38 42.8 Z"
+            fill="url(#bfab-cuff)"
+          />
+          <g stroke="#6895B0" stroke-width="1" stroke-linecap="round" opacity="0.75">
+            <line x1="44" y1="34" x2="44" y2="41.5" />
+            <line x1="49" y1="34" x2="49" y2="41.5" />
+            <line x1="55" y1="34" x2="55" y2="41.5" />
+            <line x1="60" y1="34" x2="60" y2="41.5" />
+            <line x1="65" y1="34" x2="65" y2="41.5" />
+            <line x1="71" y1="34" x2="71" y2="41.5" />
+            <line x1="76" y1="34" x2="76" y2="41.5" />
+          </g>
+          <path
+            d="M41 34 L79 34"
+            stroke="#FFFFFF"
+            stroke-width="0.8"
+            stroke-linecap="round"
+            opacity="0.4"
+          />
+          <circle cx="60" cy="13" r="6.5" fill="#C96519" />
+          <circle cx="60" cy="13" r="6" fill="#E67E22" />
+          <circle cx="57.6" cy="10.6" r="2.2" fill="#FFFFFF" opacity="0.6" />
+          <circle cx="59.5" cy="12.2" r="1" fill="#FFFFFF" opacity="0.4" />
+        </g>
+
+        <!-- FACE — wide-open eyes; lower face hidden -->
+        <g>
+          <ellipse cx="51" cy="50" rx="3.8" ry="4.9" fill="#1F2E3D" />
+          <ellipse cx="69" cy="50" rx="3.8" ry="4.9" fill="#1F2E3D" />
+          <circle cx="52.5" cy="48.2" r="1.7" fill="#FFFFFF" />
+          <circle cx="70.5" cy="48.2" r="1.7" fill="#FFFFFF" />
+          <circle cx="50" cy="51.7" r="0.9" fill="#FFFFFF" />
+          <circle cx="68" cy="51.7" r="0.9" fill="#FFFFFF" />
+          <ellipse cx="42" cy="58.5" rx="3" ry="1.8" fill="#EC9AAB" opacity="0.55" />
+          <ellipse cx="78" cy="58.5" rx="3" ry="1.8" fill="#EC9AAB" opacity="0.55" />
+        </g>
+
+        <!-- PLUS CROSSBAR — covers lower half of character -->
+        <g>
+          <rect
+            x="32"
+            y="62"
+            width="56"
+            height="20"
+            rx="6"
+            fill="#1A252F"
+            opacity="0.22"
+            transform="translate(0 2)"
+          />
+          <rect x="32" y="62" width="56" height="20" rx="6" fill="url(#bfab-plus)" />
+          <rect x="34" y="63.4" width="52" height="1.6" rx="0.8" fill="#FFFFFF" opacity="0.65" />
+        </g>
+
+        <!-- HANDS gripping the crossbar -->
+        <g>
+          <g transform="rotate(-8 44 63)">
+            <ellipse
+              cx="44"
+              cy="63"
+              rx="7.5"
+              ry="4.8"
+              fill="#C94510"
+              stroke="#5A1D04"
+              stroke-width="1.1"
+              stroke-opacity="0.55"
+            />
+            <ellipse cx="42" cy="59.8" rx="3.6" ry="1.5" fill="#FF9B5F" opacity="0.55" />
+            <path
+              d="M39 64 Q44 62, 49 64"
+              stroke="#5A1D04"
+              stroke-width="0.9"
+              fill="none"
+              stroke-linecap="round"
+              opacity="0.6"
+            />
+            <circle
+              cx="49.5"
+              cy="62.4"
+              r="1.5"
+              fill="#C94510"
+              stroke="#5A1D04"
+              stroke-width="0.9"
+              stroke-opacity="0.55"
+            />
+          </g>
+          <g transform="rotate(8 76 63)">
+            <ellipse
+              cx="76"
+              cy="63"
+              rx="7.5"
+              ry="4.8"
+              fill="#C94510"
+              stroke="#5A1D04"
+              stroke-width="1.1"
+              stroke-opacity="0.55"
+            />
+            <ellipse cx="78" cy="59.8" rx="3.6" ry="1.5" fill="#FF9B5F" opacity="0.55" />
+            <path
+              d="M71 64 Q76 62, 81 64"
+              stroke="#5A1D04"
+              stroke-width="0.9"
+              fill="none"
+              stroke-linecap="round"
+              opacity="0.6"
+            />
+            <circle
+              cx="70.5"
+              cy="62.4"
+              r="1.5"
+              fill="#C94510"
+              stroke="#5A1D04"
+              stroke-width="0.9"
+              stroke-opacity="0.55"
+            />
+          </g>
+        </g>
+      </symbol>
+    </svg>
+
+    <QuickAddFab />
+    <QuickAddSheet />
     <TrustDeviceModal
       :open="showTrustPrompt"
       @trust="handleTrustDevice"
