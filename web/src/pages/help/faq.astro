@@ -4,6 +4,9 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import DraftPlaceholder from '../../components/DraftPlaceholder.astro';
 import { isDraftHidden } from '~/utils/draftPage';
 import { SITE_URL } from '@beanies/brand/nav';
+// Fraunces carries the italic display flourish in the title + kicker. Scoped
+// import so the font only ships on this route.
+import '@fontsource-variable/fraunces';
 
 const DRAFT = true;
 const hidden = isDraftHidden(DRAFT);
@@ -190,6 +193,37 @@ function stripHtml(html: string): string {
 // Flatten all FAQs for JSON-LD
 const allFaqs = groups.flatMap((g) => g.faqs);
 
+/**
+ * Per-group visual treatment. Each category gets its own tint for the
+ * side-stripe + category header in the sidebar/section. Derived in
+ * insertion order so new categories appear with a neutral tint until
+ * added here.
+ */
+const GROUP_TINTS: Record<string, string> = {
+  'getting started': '#f15d22',
+  'privacy & security': '#2c3e50',
+  'features & usage': '#3a82b3',
+  'technical': '#c76a21',
+  'about the project': '#8e6fb8',
+};
+const DEFAULT_TINT = '#2c3e50';
+
+// Build the sidebar + section data. Each group gets a slug so the URL
+// can deep-link to it (#getting-started), and we pre-compute the count
+// so the sidebar chip can show "6 questions" without recomputing.
+const sections = groups.map((g) => {
+  const slug = g.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return {
+    slug,
+    heading: g.heading,
+    count: g.faqs.length,
+    tint: GROUP_TINTS[g.heading] ?? DEFAULT_TINT,
+    faqs: g.faqs,
+  };
+});
+
+const totalCount = allFaqs.length;
+
 const faqSchema = {
   '@type': 'FAQPage',
   '@id': `${SITE_URL}${canonicalPath}#faq`,
@@ -216,111 +250,590 @@ const faqSchema = {
       jsonLd={faqSchema}
     >
       <article class="faq-page">
-        <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'help', href: '/help' }, { label: 'faq', href: canonicalPath }]} />
+        <div class="faq-atmo" aria-hidden="true"></div>
+        <img
+          src="/brand/beanies_open_eyes_transparent_512x512.png"
+          alt=""
+          class="faq-mascot"
+          width="200"
+          height="200"
+          aria-hidden="true"
+        />
 
-        <header class="faq-header">
-          <h1 class="faq-title">frequently asked questions</h1>
-          <p class="faq-intro">
-            the questions we get asked most, answered in full. if your question isn't here, open an issue on <a href="https://github.com/gparker97/beanies-family/issues">GitHub</a> or reach out via the <a href="/#contact">contact form</a>.
-          </p>
-        </header>
+        <div class="faq-shell">
+          <header class="faq-hero">
+            <Breadcrumbs items={[{ label: 'home', href: '/' }, { label: 'help', href: '/help' }, { label: 'faq', href: canonicalPath }]} />
 
-        {groups.map((group) => (
-          <section class="faq-group">
-            <h2 class="faq-group-heading">{group.heading}</h2>
-            <div class="faq-list">
-              {group.faqs.map((f) => (
-                <article class="faq-item" id={f.id}>
-                  <h3 class="faq-q">{f.q}</h3>
-                  <div class="faq-a" set:html={f.a} />
-                  <a class="faq-anchor" href={`#${f.id}`} aria-label={`copy link to this question`}>#</a>
-                </article>
+            <p class="faq-kicker">
+              <span class="faq-kicker-dot" aria-hidden="true"></span>
+              frequently asked · {totalCount} answers
+            </p>
+            <h1 class="faq-title">
+              <span class="faq-title-over">questions,</span>
+              <span class="faq-title-under">answered</span>
+            </h1>
+            <p class="faq-intro">
+              the questions we get asked most, answered in full. filter, jump by
+              category, or scroll it all. if your question isn&rsquo;t here, open an
+              issue on <a href="https://github.com/gparker97/beanies-family/issues">GitHub</a>
+              or reach out via the <a href="/#contact">contact form</a>.
+            </p>
+          </header>
+
+          <div class="faq-layout">
+            <!-- Sticky category sidebar on desktop; collapses to a horizontal
+                 chip strip on mobile. Scroll-spy highlights the current
+                 section as the reader passes through it. -->
+            <aside class="faq-sidebar" aria-label="categories">
+              <p class="faq-sidebar-label">categories</p>
+              <ol class="faq-sidebar-list">
+                {sections.map((s) => (
+                  <li class="faq-sidebar-item" style={`--tint: ${s.tint}`}>
+                    <a href={`#${s.slug}`} data-category-link={s.slug}>
+                      <span class="faq-sidebar-name">{s.heading}</span>
+                      <span class="faq-sidebar-count">{s.count}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </aside>
+
+            <div class="faq-main">
+              <!-- Client-side filter. DOM stays fully crawlable; the filter
+                   just sets [hidden] on non-matching <article>s and category
+                   sections that end up with zero matches. Empty-state panel
+                   fills in if every question is filtered out. -->
+              <div class="faq-filter">
+                <svg
+                  class="faq-filter-icon"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="17" y1="17" x2="21" y2="21" />
+                </svg>
+                <input
+                  type="search"
+                  class="faq-filter-input"
+                  id="faq-filter"
+                  placeholder="filter questions…"
+                  autocomplete="off"
+                  aria-label="filter questions"
+                />
+                <button
+                  type="button"
+                  class="faq-filter-clear"
+                  id="faq-filter-clear"
+                  aria-label="clear filter"
+                  hidden
+                >×</button>
+                <span class="faq-filter-count" id="faq-filter-count" aria-live="polite">
+                  {totalCount} of {totalCount}
+                </span>
+              </div>
+
+              {sections.map((s) => (
+                <section
+                  class="faq-group"
+                  id={s.slug}
+                  data-category-section={s.slug}
+                  style={`--tint: ${s.tint}`}
+                >
+                  <header class="faq-group-head">
+                    <span class="faq-group-stripe" aria-hidden="true"></span>
+                    <h2 class="faq-group-heading">{s.heading}</h2>
+                    <span class="faq-group-count">{s.count} {s.count === 1 ? 'question' : 'questions'}</span>
+                  </header>
+                  <div class="faq-list">
+                    {s.faqs.map((f, i) => (
+                      <article class="faq-item" id={f.id} data-faq-item>
+                        <span class="faq-number" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+                        <h3 class="faq-q">{f.q}</h3>
+                        <div class="faq-a" set:html={f.a} />
+                        <a class="faq-anchor" href={`#${f.id}`} aria-label={`copy link to this question`}>#</a>
+                      </article>
+                    ))}
+                  </div>
+                </section>
               ))}
+
+              <div class="faq-empty" id="faq-empty" hidden>
+                <p class="faq-empty-title">no questions match that filter.</p>
+                <p class="faq-empty-hint">
+                  try a shorter word, or clear the filter. if it&rsquo;s a real gap,
+                  <a href="https://github.com/gparker97/beanies-family/issues">open an issue</a>
+                  and we&rsquo;ll add it.
+                </p>
+              </div>
+
+              <footer class="faq-foot">
+                <p class="faq-foot-title">didn&rsquo;t find what you needed?</p>
+                <div class="faq-foot-actions">
+                  <a class="faq-foot-btn" href="https://github.com/gparker97/beanies-family/issues">
+                    <span aria-hidden="true">🐙</span> open an issue
+                  </a>
+                  <a class="faq-foot-btn faq-foot-btn-alt" href="/#contact">
+                    <span aria-hidden="true">✉</span> contact greg
+                  </a>
+                </div>
+              </footer>
             </div>
-          </section>
-        ))}
+          </div>
+        </div>
       </article>
+
+      <script is:inline>
+        // Filter + scroll-spy, zero-deps. Runs once on initial load and on
+        // input; the DOM is fully server-rendered and remains crawlable.
+        (function () {
+          var input = document.getElementById('faq-filter');
+          var clear = document.getElementById('faq-filter-clear');
+          var count = document.getElementById('faq-filter-count');
+          var empty = document.getElementById('faq-empty');
+          var items = Array.prototype.slice.call(document.querySelectorAll('[data-faq-item]'));
+          var sections = Array.prototype.slice.call(document.querySelectorAll('[data-category-section]'));
+          var links = Array.prototype.slice.call(document.querySelectorAll('[data-category-link]'));
+          if (!input || !count || !empty) return;
+          var total = items.length;
+
+          // Pre-compute searchable text per item so we don't crawl the DOM on
+          // every keystroke.
+          var itemText = items.map(function (el) {
+            return (el.textContent || '').toLowerCase();
+          });
+
+          function apply(q) {
+            var needle = (q || '').trim().toLowerCase();
+            var shown = 0;
+            items.forEach(function (el, i) {
+              var match = needle === '' || itemText[i].indexOf(needle) !== -1;
+              el.hidden = !match;
+              if (match) shown += 1;
+            });
+            // Hide a section whose items are all filtered out.
+            sections.forEach(function (sec) {
+              var any = sec.querySelectorAll('[data-faq-item]:not([hidden])').length > 0;
+              sec.hidden = !any;
+            });
+            count.textContent = needle === ''
+              ? total + ' of ' + total
+              : shown + ' of ' + total + ' match';
+            empty.hidden = shown !== 0;
+            if (clear) clear.hidden = needle === '';
+          }
+
+          input.addEventListener('input', function () { apply(input.value); });
+          if (clear) clear.addEventListener('click', function () {
+            input.value = '';
+            input.focus();
+            apply('');
+          });
+
+          // Scroll-spy: highlight the sidebar link whose section is currently
+          // at the top of the viewport. IntersectionObserver keeps this cheap.
+          if ('IntersectionObserver' in window && links.length > 0) {
+            var byId = {};
+            links.forEach(function (a) {
+              var k = a.getAttribute('data-category-link');
+              if (k) byId[k] = a;
+            });
+            var active = null;
+            var io = new IntersectionObserver(function (entries) {
+              var visible = entries
+                .filter(function (e) { return e.isIntersecting; })
+                .sort(function (a, b) { return a.boundingClientRect.top - b.boundingClientRect.top; });
+              if (!visible[0]) return;
+              var slug = visible[0].target.getAttribute('data-category-section');
+              if (!slug) return;
+              var next = byId[slug];
+              if (!next || next === active) return;
+              if (active) active.classList.remove('is-active');
+              next.classList.add('is-active');
+              active = next;
+            }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+            sections.forEach(function (s) { io.observe(s); });
+          }
+        })();
+      </script>
     </BaseLayout>
   )
 }
 
 <style>
   .faq-page {
+    --deep-slate: #2c3e50;
+    --heritage-orange: #f15d22;
+    --terracotta: #e67e22;
+    --cloud-white: #f8f9fa;
+    --kraft: #f3ecd8;
+    --ink: #1f2d3d;
+    --muted: rgb(44 62 80 / 60%);
+    --hairline: rgb(44 62 80 / 8%);
+    --font-display: 'Outfit Variable', Outfit, system-ui, sans-serif;
+    --font-serif: 'Fraunces Variable', 'Fraunces', 'Source Serif 4', Georgia, serif;
+    background: var(--cloud-white);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  .faq-atmo {
+    background:
+      radial-gradient(circle at 8% 18%, rgb(241 93 34 / 6%) 0%, transparent 42%),
+      radial-gradient(circle at 92% 8%, rgb(174 214 241 / 9%) 0%, transparent 46%);
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .faq-mascot {
+    filter: drop-shadow(0 14px 30px rgb(44 62 80 / 12%));
+    pointer-events: none;
+    position: absolute;
+    right: -28px;
+    top: 82px;
+    transform: rotate(-8deg);
+    width: 180px;
+    z-index: 0;
+  }
+
+  .faq-shell {
     box-sizing: border-box;
     margin: 0 auto;
-    max-width: 760px;
-    padding: 88px 24px 64px;
+    max-width: 1180px;
+    padding: 104px 32px 72px;
+    position: relative;
+    z-index: 1;
   }
 
-  .faq-header { margin: 24px 0 40px; }
+  /* ===== HERO ===== */
+  .faq-hero { margin-bottom: 44px; }
+  .faq-kicker {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    gap: 10px;
+    letter-spacing: 0.22em;
+    margin: 20px 0 18px;
+    text-transform: uppercase;
+  }
+  .faq-kicker-dot {
+    background: var(--heritage-orange);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgb(241 93 34 / 15%);
+    display: inline-block;
+    height: 8px;
+    width: 8px;
+  }
   .faq-title {
-    color: #2c3e50;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 2.25rem;
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    line-height: 0.92;
+    margin: 0 0 20px;
+  }
+  .faq-title-over {
+    display: block;
+    font-size: clamp(1.75rem, 3.6vw, 2.6rem);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    opacity: 0.78;
+  }
+  .faq-title-under {
+    color: var(--deep-slate);
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 5.5rem);
     font-weight: 800;
-    letter-spacing: -0.02em;
-    margin: 0;
+    letter-spacing: -0.04em;
+    margin-top: 2px;
+    text-transform: lowercase;
   }
   .faq-intro {
-    color: rgb(44 62 80 / 65%);
-    font-size: 1rem;
-    line-height: 1.65;
-    margin: 12px 0 0;
-    max-width: 600px;
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    line-height: 1.6;
+    margin: 0;
+    max-width: 620px;
   }
-  .faq-intro a { color: #f15d22; font-weight: 600; text-decoration: none; }
+  .faq-intro a {
+    color: var(--heritage-orange);
+    font-weight: 600;
+    text-decoration: none;
+  }
   .faq-intro a:hover { text-decoration: underline; }
 
-  .faq-group { margin-bottom: 40px; }
-  .faq-group-heading {
-    color: rgb(44 62 80 / 45%);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.75rem;
+  /* ===== LAYOUT ===== */
+  .faq-layout {
+    display: grid;
+    gap: 40px;
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 960px) {
+    .faq-layout {
+      grid-template-columns: 220px minmax(0, 1fr);
+    }
+  }
+
+  /* ===== SIDEBAR ===== */
+  .faq-sidebar {
+    order: 1;
+  }
+  @media (min-width: 960px) {
+    .faq-sidebar {
+      position: sticky;
+      top: 96px;
+      align-self: flex-start;
+    }
+  }
+  .faq-sidebar-label {
+    color: var(--heritage-orange);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.12em;
-    margin: 0 0 16px;
+    letter-spacing: 0.2em;
+    margin: 0 0 12px;
+    text-transform: uppercase;
+  }
+  .faq-sidebar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .faq-sidebar-item a {
+    align-items: center;
+    border-left: 3px solid transparent;
+    color: var(--deep-slate);
+    display: flex;
+    font-family: var(--font-display);
+    font-size: 0.92rem;
+    font-weight: 500;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 9px 14px 9px 13px;
+    text-decoration: none;
+    transition:
+      background-color 180ms,
+      border-color 180ms,
+      color 180ms;
+  }
+  .faq-sidebar-item a:hover {
+    background: rgb(44 62 80 / 3%);
+    color: var(--tint);
+  }
+  .faq-sidebar-item a.is-active {
+    background: color-mix(in srgb, var(--tint) 8%, transparent);
+    border-left-color: var(--tint);
+    color: var(--tint);
+    font-weight: 600;
+  }
+  .faq-sidebar-count {
+    background: rgb(44 62 80 / 6%);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+  }
+  .faq-sidebar-item a.is-active .faq-sidebar-count {
+    background: color-mix(in srgb, var(--tint) 15%, transparent);
+    color: var(--tint);
+  }
+  /* Horizontal chip strip on narrow viewports. */
+  @media (max-width: 959px) {
+    .faq-sidebar-list {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .faq-sidebar-item a {
+      background: white;
+      border: 1px solid var(--hairline);
+      border-left: 1px solid var(--hairline);
+      border-radius: 999px;
+      padding: 6px 12px;
+    }
+    .faq-sidebar-item a.is-active {
+      background: color-mix(in srgb, var(--tint) 10%, white);
+      border-color: color-mix(in srgb, var(--tint) 40%, transparent);
+    }
+    .faq-sidebar-count {
+      padding: 1px 6px;
+    }
+  }
+
+  /* ===== MAIN ===== */
+  .faq-main { order: 2; min-width: 0; }
+
+  /* Filter row */
+  .faq-filter {
+    align-items: center;
+    background: white;
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    box-shadow: 0 2px 10px rgb(44 62 80 / 4%);
+    display: flex;
+    gap: 10px;
+    margin: 0 0 32px;
+    padding: 4px 14px 4px 16px;
+  }
+  .faq-filter:focus-within {
+    border-color: color-mix(in srgb, var(--heritage-orange) 40%, transparent);
+    box-shadow: 0 4px 14px rgb(241 93 34 / 10%);
+  }
+  .faq-filter-icon { color: rgb(44 62 80 / 45%); flex-shrink: 0; }
+  .faq-filter-input {
+    background: transparent;
+    border: none;
+    color: var(--deep-slate);
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    min-width: 0;
+    outline: none;
+    padding: 12px 0;
+  }
+  .faq-filter-input::placeholder { color: rgb(44 62 80 / 40%); }
+  .faq-filter-clear {
+    background: transparent;
+    border: none;
+    border-radius: 999px;
+    color: rgb(44 62 80 / 45%);
+    cursor: pointer;
+    font-size: 1.25rem;
+    height: 26px;
+    line-height: 1;
+    width: 26px;
+  }
+  .faq-filter-clear:hover { background: rgb(44 62 80 / 6%); color: var(--deep-slate); }
+  .faq-filter-count {
+    color: var(--muted);
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+
+  /* Group sections */
+  .faq-group {
+    margin-bottom: 44px;
+    scroll-margin-top: 92px;
+  }
+  .faq-group:last-of-type { margin-bottom: 0; }
+  .faq-group-head {
+    align-items: center;
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    gap: 14px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+  }
+  .faq-group-stripe {
+    background: var(--tint);
+    border-radius: 999px;
+    flex-shrink: 0;
+    height: 20px;
+    width: 4px;
+  }
+  .faq-group-heading {
+    color: var(--deep-slate);
+    flex: 1;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+    margin: 0;
+  }
+  .faq-group-count {
+    color: var(--tint);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
-  .faq-list { display: flex; flex-direction: column; gap: 16px; }
+  /* Q cards */
+  .faq-list { display: flex; flex-direction: column; gap: 14px; }
   .faq-item {
     background: white;
-    border: 1px solid rgb(44 62 80 / 6%);
-    border-radius: 20px;
-    padding: 22px 28px;
+    border: 1px solid var(--hairline);
+    border-radius: 18px;
+    box-shadow: 0 2px 10px rgb(44 62 80 / 3%);
+    padding: 22px 28px 22px 72px;
     position: relative;
-    scroll-margin-top: 90px;
+    scroll-margin-top: 100px;
+    transition:
+      border-color 180ms,
+      box-shadow 180ms,
+      transform 180ms;
+  }
+  .faq-item:hover {
+    border-color: color-mix(in srgb, var(--tint) 30%, transparent);
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--tint) 12%, transparent);
+    transform: translateY(-1px);
   }
   .faq-item:target {
-    border-color: rgb(241 93 34 / 30%);
-    box-shadow: 0 4px 16px rgb(241 93 34 / 10%);
+    border-color: color-mix(in srgb, var(--tint) 50%, transparent);
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--tint) 18%, transparent);
+  }
+  .faq-number {
+    background: color-mix(in srgb, var(--tint) 10%, white);
+    border: 1px solid color-mix(in srgb, var(--tint) 22%, transparent);
+    border-radius: 10px;
+    color: var(--tint);
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 800;
+    left: 22px;
+    letter-spacing: 0.06em;
+    padding: 5px 8px;
+    position: absolute;
+    top: 22px;
   }
   .faq-q {
-    color: #2c3e50;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
+    color: var(--deep-slate);
+    font-family: var(--font-display);
     font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: -0.005em;
     margin: 0 0 10px;
   }
   .faq-a {
     color: rgb(44 62 80 / 80%);
-    font-size: 0.95rem;
-    line-height: 1.7;
+    font-family: var(--font-serif);
+    font-size: 1rem;
+    line-height: 1.65;
   }
-  .faq-a p {
-    margin: 0;
-  }
-  .faq-a p + p {
-    margin-top: 0.85em;
-  }
+  .faq-a p { margin: 0; }
+  .faq-a p + p { margin-top: 0.85em; }
   .faq-a a {
-    color: #f15d22;
-    font-weight: 600;
-    text-decoration: none;
+    color: var(--heritage-orange);
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(241 93 34 / 40%);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
-  .faq-a a:hover { text-decoration: underline; }
+  .faq-a a:hover {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+  }
   .faq-a strong {
-    color: #2c3e50;
+    color: var(--deep-slate);
     font-weight: 700;
   }
   .faq-a code {
@@ -332,7 +845,7 @@ const faqSchema = {
   }
 
   .faq-anchor {
-    color: rgb(44 62 80 / 20%);
+    color: rgb(44 62 80 / 22%);
     font-family: ui-monospace, monospace;
     font-size: 0.875rem;
     font-weight: 600;
@@ -340,15 +853,113 @@ const faqSchema = {
     position: absolute;
     right: 20px;
     text-decoration: none;
-    top: 20px;
-    transition: opacity 150ms, color 150ms;
+    top: 22px;
+    transition: opacity 160ms, color 160ms;
   }
   .faq-item:hover .faq-anchor { opacity: 1; }
-  .faq-anchor:hover { color: #f15d22; }
+  .faq-anchor:hover { color: var(--tint); }
+
+  /* Empty state */
+  .faq-empty {
+    border: 2px dashed rgb(44 62 80 / 12%);
+    border-radius: 18px;
+    padding: 32px 28px;
+    text-align: center;
+  }
+  .faq-empty-title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 6px;
+  }
+  .faq-empty-hint {
+    color: var(--muted);
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .faq-empty-hint a {
+    color: var(--heritage-orange);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .faq-empty-hint a:hover { text-decoration: underline; }
+
+  /* Footer CTA */
+  .faq-foot {
+    background: linear-gradient(
+      135deg,
+      rgb(241 93 34 / 6%) 0%,
+      rgb(230 126 34 / 5%) 100%
+    );
+    border: 1px solid rgb(241 93 34 / 18%);
+    border-radius: 22px;
+    margin-top: 56px;
+    padding: 28px 28px 30px;
+    text-align: center;
+  }
+  .faq-foot-title {
+    color: var(--deep-slate);
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    font-style: italic;
+    font-weight: 400;
+    margin: 0 0 14px;
+  }
+  .faq-foot-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+  }
+  .faq-foot-btn {
+    align-items: center;
+    background: var(--deep-slate);
+    border-radius: 999px;
+    color: white;
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.85rem;
+    font-weight: 600;
+    gap: 8px;
+    padding: 10px 20px;
+    text-decoration: none;
+    transition:
+      background-color 180ms,
+      transform 180ms;
+  }
+  .faq-foot-btn:hover {
+    background: var(--heritage-orange);
+    transform: translateY(-1px);
+  }
+  .faq-foot-btn-alt {
+    background: white;
+    border: 1px solid rgb(44 62 80 / 15%);
+    color: var(--deep-slate);
+  }
+  .faq-foot-btn-alt:hover {
+    background: var(--heritage-orange);
+    border-color: var(--heritage-orange);
+    color: white;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 720px) {
+    .faq-mascot { top: 72px; right: -36px; width: 140px; opacity: 0.45; }
+    .faq-shell { padding: 92px 22px 56px; }
+    .faq-item { padding: 22px 22px 22px 64px; }
+    .faq-number { left: 16px; top: 18px; }
+    .faq-anchor { top: 18px; right: 16px; }
+  }
 
   @media (max-width: 520px) {
-    .faq-page { padding-top: 76px; }
-    .faq-title { font-size: 1.75rem; }
-    .faq-item { padding: 20px; }
+    .faq-mascot { top: 60px; right: -48px; width: 118px; opacity: 0.35; }
+    .faq-shell { padding: 84px 20px 48px; }
+    .faq-item { padding: 20px 18px 20px 18px; }
+    .faq-number { position: static; margin-bottom: 10px; }
+    .faq-anchor { top: 14px; right: 14px; }
+    .faq-filter-count { display: none; }
   }
 </style>
