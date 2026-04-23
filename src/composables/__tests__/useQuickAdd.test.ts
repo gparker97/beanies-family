@@ -78,7 +78,12 @@ describe('useQuickAdd — open/close singleton state', () => {
     replace.mockClear();
     mockRoute.path = '/dashboard';
     mockRoute.params = {};
+    // Reset jsdom history so the sheet-marker from a previous test doesn't
+    // leak into this one. replaceState wipes any state without triggering
+    // popstate or changing the URL.
+    window.history.replaceState(null, '');
     closeQuickAdd();
+    window.history.replaceState(null, '');
   });
 
   it('isOpen starts closed', () => {
@@ -142,6 +147,62 @@ describe('useQuickAdd — open/close singleton state', () => {
   });
 });
 
+describe('useQuickAdd — history integration (back gesture)', () => {
+  beforeEach(() => {
+    mockedHasOpenOverlays.mockReturnValue(false);
+    push.mockClear();
+    replace.mockClear();
+    mockRoute.path = '/dashboard';
+    mockRoute.params = {};
+    window.history.replaceState(null, '');
+    closeQuickAdd();
+    window.history.replaceState(null, '');
+  });
+
+  it('open() pushes a marker onto window.history', () => {
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+    openQuickAdd();
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    const [state] = pushSpy.mock.calls[0] ?? [];
+    expect(state).toMatchObject({ __beanieQuickAddOpen: true });
+    pushSpy.mockRestore();
+  });
+
+  it('close() pops the marker via history.back when the marker is on the stack', () => {
+    openQuickAdd();
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    closeQuickAdd();
+    expect(backSpy).toHaveBeenCalledTimes(1);
+    backSpy.mockRestore();
+  });
+
+  it('close() does not call history.back when there is no marker', () => {
+    // Sheet was never opened, or marker was wiped externally.
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    closeQuickAdd();
+    expect(backSpy).not.toHaveBeenCalled();
+    backSpy.mockRestore();
+  });
+
+  it('popstate closes the sheet without re-popping history', () => {
+    const { isOpen } = useQuickAdd();
+    openQuickAdd();
+    expect(isOpen.value).toBe(true);
+
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    // Simulate the back gesture — jsdom fires popstate when navigating but
+    // we also need to clear the marker so the popstate handler's "were we
+    // our own entry?" check is consistent. jsdom dispatches popstate; we
+    // wipe the state first so the handler sees a non-marker state.
+    window.history.replaceState(null, '');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(isOpen.value).toBe(false);
+    expect(backSpy).not.toHaveBeenCalled();
+    backSpy.mockRestore();
+  });
+});
+
 describe('triggerQuickAddAction — main ↔ picker branching', () => {
   beforeEach(() => {
     mockedHasOpenOverlays.mockReturnValue(false);
@@ -149,7 +210,9 @@ describe('triggerQuickAddAction — main ↔ picker branching', () => {
     replace.mockClear();
     mockRoute.path = '/dashboard';
     mockRoute.params = {};
+    window.history.replaceState(null, '');
     closeQuickAdd();
+    window.history.replaceState(null, '');
     openQuickAdd();
   });
 
@@ -160,10 +223,13 @@ describe('triggerQuickAddAction — main ↔ picker branching', () => {
     );
     expect(isOpen.value).toBe(false);
     expect(stage.value.mode).toBe('main');
-    expect(push).toHaveBeenCalledWith({
+    // Sheet pushed a history marker on open, so navigation replaces the
+    // marker entry with the target — back from target goes to pre-sheet.
+    expect(replace).toHaveBeenCalledWith({
       path: '/transactions',
       query: { action: 'add-transaction' },
     });
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('item with contextKey PRESENT in route params navigates with context', () => {
@@ -174,7 +240,7 @@ describe('triggerQuickAddAction — main ↔ picker branching', () => {
     triggerQuickAddAction(item({ contextKey: 'memberId' }));
 
     expect(isOpen.value).toBe(false);
-    expect(push).toHaveBeenCalledWith({
+    expect(replace).toHaveBeenCalledWith({
       path: '/pod/scrapbook',
       query: { action: 'add-saying', memberId: 'bean-alice' },
     });
@@ -193,16 +259,22 @@ describe('triggerQuickAddAction — main ↔ picker branching', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('same-route tap uses replace, cross-route tap uses push', () => {
-    mockRoute.path = '/transactions';
+  it('replaces when marker is on the history stack, regardless of same/cross-route', () => {
+    // Marker present (opened via FAB). Cross-route goes replace — not push —
+    // so the marker entry gets overwritten by the target.
+    mockRoute.path = '/dashboard';
     triggerQuickAddAction(
       item({ route: '/transactions', action: 'add-transaction', contextKey: undefined })
     );
     expect(replace).toHaveBeenCalledTimes(1);
     expect(push).not.toHaveBeenCalled();
+  });
 
+  it('pushes when no marker is present and route differs (defensive fallback)', () => {
+    // Reset history so the open marker is gone before we navigate.
     push.mockClear();
     replace.mockClear();
+    window.history.replaceState(null, '');
 
     mockRoute.path = '/dashboard';
     triggerQuickAddAction(
@@ -220,7 +292,9 @@ describe('picker commit + cancel', () => {
     replace.mockClear();
     mockRoute.path = '/dashboard';
     mockRoute.params = {};
+    window.history.replaceState(null, '');
     closeQuickAdd();
+    window.history.replaceState(null, '');
     openQuickAdd();
     triggerQuickAddAction(item({ contextKey: 'memberId' }));
   });
@@ -231,7 +305,9 @@ describe('picker commit + cancel', () => {
 
     expect(isOpen.value).toBe(false);
     expect(stage.value.mode).toBe('main');
-    expect(push).toHaveBeenCalledWith({
+    // Marker is on the stack (openQuickAdd ran in beforeEach), so the
+    // target route replaces the marker entry rather than stacking on top.
+    expect(replace).toHaveBeenCalledWith({
       path: '/pod/scrapbook',
       query: { action: 'add-saying', memberId: 'bean-bob' },
     });

@@ -182,6 +182,20 @@ function handleItemClick(item: QuickAddItem): void {
         </section>
         <QuickAddMemberPicker v-if="pickerAfter(group.id)" />
       </template>
+
+      <!-- Footer: explicit close target. Backdrop tap, Esc, and the PWA
+           back gesture already close the sheet, but none of those are
+           discoverable on a cold open — especially on mobile where the
+           fat-finger "I opened this by accident" recovery path needs to
+           be visible. Styled as a tertiary pill so it doesn't compete
+           with action tiles above. -->
+      <footer class="sheet-footer">
+        <button type="button" class="sheet-close" data-testid="quick-add-close" @click="close">
+          <span class="sheet-close-glyph" aria-hidden="true">×</span>
+          <span class="sheet-close-label">{{ t('quickAdd.close') }}</span>
+        </button>
+        <p class="sheet-close-hint">{{ t('quickAdd.closeHint') }}</p>
+      </footer>
     </div>
   </BaseModal>
 </template>
@@ -443,6 +457,89 @@ function handleItemClick(item: QuickAddItem): void {
 
 :global(.dark) .secondary-hint {
   color: rgb(241 242 244 / 60%);
+}
+
+/* --- Footer close --- */
+.sheet-footer {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+
+.sheet-close {
+  align-items: center;
+  background: transparent;
+  border: 1px dashed rgb(44 62 80 / 25%);
+  border-radius: 999px;
+  color: rgb(44 62 80 / 75%);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: Outfit, sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  gap: 8px;
+  padding: 10px 22px;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out,
+    color 0.15s ease-out,
+    transform 0.15s ease-out;
+}
+
+.sheet-close:hover {
+  background: rgb(44 62 80 / 4%);
+  border-color: rgb(44 62 80 / 45%);
+  border-style: solid;
+  color: rgb(44 62 80);
+}
+
+.sheet-close:active {
+  transform: scale(0.97);
+}
+
+.sheet-close:focus-visible {
+  outline: 2px solid rgb(241 93 34 / 90%);
+  outline-offset: 2px;
+}
+
+:global(.dark) .sheet-close {
+  border-color: rgb(241 242 244 / 25%);
+  color: rgb(241 242 244 / 75%);
+}
+
+:global(.dark) .sheet-close:hover {
+  background: rgb(241 242 244 / 6%);
+  border-color: rgb(241 242 244 / 45%);
+  color: rgb(241 242 244);
+}
+
+.sheet-close-glyph {
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1;
+  margin-top: -2px;
+}
+
+.sheet-close-label {
+  letter-spacing: 0.02em;
+}
+
+.sheet-close-hint {
+  color: rgb(44 62 80 / 45%);
+  font-family: Inter, sans-serif;
+  font-size: 0.6875rem;
+  font-style: italic;
+  font-weight: 400;
+  margin: 0;
+  text-align: center;
+}
+
+:global(.dark) .sheet-close-hint {
+  color: rgb(241 242 244 / 45%);
 }
 
 /* --- Animations (gated on reduced-motion) --- */

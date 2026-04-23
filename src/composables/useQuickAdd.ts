@@ -35,20 +35,83 @@ export type QuickAddStage = { mode: 'main' } | { mode: 'picker'; pending: QuickA
 
 const stage = ref<QuickAddStage>({ mode: 'main' });
 
+// --- History integration --------------------------------------------------
+
+/**
+ * Marker we stamp onto `history.state` when opening the sheet. Lets us
+ * tell our own pushed entry apart from arbitrary navigations in the
+ * `popstate` handler, and tells navigation flows whether to replace
+ * vs push so the back stack doesn't accumulate dead sheet-open entries.
+ */
+const HISTORY_MARKER_KEY = '__beanieQuickAddOpen';
+
+function hasSheetHistoryMarker(): boolean {
+  if (typeof window === 'undefined') return false;
+  const state = window.history.state as Record<string, unknown> | null;
+  return Boolean(state && state[HISTORY_MARKER_KEY]);
+}
+
+function pushSheetHistoryMarker(): void {
+  if (typeof window === 'undefined') return;
+  const base = (window.history.state as Record<string, unknown> | null) ?? {};
+  window.history.pushState({ ...base, [HISTORY_MARKER_KEY]: true }, '');
+}
+
+/**
+ * Global popstate listener — closes the sheet when the back gesture
+ * (or browser back button) pops our history entry. We set
+ * `isOpen=false` directly instead of calling `closeQuickAdd`, because
+ * `closeQuickAdd` itself calls `history.back()` and would loop.
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    if (isOpen.value) {
+      isOpen.value = false;
+      stage.value = { mode: 'main' };
+    }
+  });
+}
+
 // --- Open / close / toggle ------------------------------------------------
 
 /**
  * Open the sheet in `main` mode. No-ops when another overlay already
  * has focus — stacking the sheet on top of a modal would produce
  * confusing focus ordering and double-backdrop stacking.
+ *
+ * Also pushes a synthetic history entry so a device back gesture (PWA
+ * swipe, browser back button) dismisses the sheet instead of leaving
+ * the app.
  */
 export function openQuickAdd(): void {
   if (hasOpenOverlays()) return;
   stage.value = { mode: 'main' };
   isOpen.value = true;
+  pushSheetHistoryMarker();
 }
 
+/**
+ * Close the sheet. If we pushed a history marker on open, pop it via
+ * `history.back()` so the stack doesn't leak dead entries. The popstate
+ * handler fires async but no-ops because `isOpen` is already false.
+ */
 export function closeQuickAdd(): void {
+  const shouldPop = isOpen.value && hasSheetHistoryMarker();
+  isOpen.value = false;
+  stage.value = { mode: 'main' };
+  if (shouldPop) {
+    window.history.back();
+  }
+}
+
+/**
+ * Reset visual state without touching history. Used by the navigate-
+ * from-sheet paths (tap an item; tap picker commit) where the route
+ * transition itself will `replace` the marker entry — double-popping
+ * via `history.back()` plus `router.replace` would race and leave the
+ * stack in a bad state.
+ */
+function closeSheetForNavigation(): void {
   isOpen.value = false;
   stage.value = { mode: 'main' };
 }
@@ -100,9 +163,17 @@ export function buildIntentQuery(
 // --- Navigation (internal) -------------------------------------------------
 
 /**
- * Run the actual vue-router navigation for a resolved intent. Same-
- * route taps replace (no history churn — no stack of identical routes
- * behind you as you add things from one page). Cross-route taps push.
+ * Run the actual vue-router navigation for a resolved intent.
+ *
+ * Replace semantics apply in two cases:
+ *   1. Same-route taps — no history churn from repeated quick-adds on
+ *      the page you're already on.
+ *   2. Sheet-marker on the history stack — the sheet pushed an entry
+ *      on open, and we want the target to REPLACE that entry so back
+ *      from the target goes to the pre-sheet page (not a dead
+ *      sheet-open marker pointing at the same URL).
+ *
+ * Cross-route taps with no marker push (normal router behavior).
  *
  * Runs OUTSIDE `setup()` (click handler / picker-commit context), so
  * we use the imported router singleton rather than `useRouter()`.
@@ -112,7 +183,8 @@ export function buildIntentQuery(
 function navigateToIntent(item: QuickAddItem, query: Record<string, string>): void {
   const route = router.currentRoute.value;
   const sameRoute = route.path === item.route;
-  const go = sameRoute ? router.replace : router.push;
+  const shouldReplace = sameRoute || hasSheetHistoryMarker();
+  const go = shouldReplace ? router.replace : router.push;
   go.call(router, { path: item.route, query }).catch((err: unknown) => {
     console.warn('[useQuickAdd] navigation swallowed:', err);
   });
@@ -142,7 +214,7 @@ export function triggerQuickAddAction(item: QuickAddItem): void {
     stage.value = { mode: 'picker', pending: item };
     return;
   }
-  closeQuickAdd();
+  closeSheetForNavigation();
   const query = buildIntentQuery(item, router.currentRoute.value);
   navigateToIntent(item, query);
 }
@@ -172,7 +244,7 @@ export function commitPickerSelection(contextId: string): void {
   const query = buildIntentQuery(item, router.currentRoute.value, {
     [contextKey]: contextId,
   });
-  closeQuickAdd();
+  closeSheetForNavigation();
   navigateToIntent(item, query);
 }
 
