@@ -433,7 +433,10 @@ const fmt = (d: Date) =>
 }
 
 @media (max-width: 520px) {
-  .blog-hero { padding-top: 60px; }
+  /* Mobile nav wraps to a tall pill (logo row + links/CTA row); 60px was
+     way too tight — the mascot's head landed under the nav. Bump to 140px
+     to clear the wrapped nav comfortably. */
+  .blog-hero { padding-top: 140px; }
   .blog-hero-mascot { height: 120px; width: 120px; }
   .blog-hero-title { font-size: 1.75rem; }
   .featured-card-inner { flex-direction: column; text-align: center; }
