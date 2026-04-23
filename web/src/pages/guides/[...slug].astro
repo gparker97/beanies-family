@@ -199,6 +199,9 @@ const articleSchema = {
       }
     </div>
   </article>
+
+  <!-- Back-to-top: matches the homepage control. Shown after 400px of scroll. -->
+  <button id="back-to-top" class="back-to-top" aria-label="back to top" hidden>↑</button>
 </BaseLayout>
 
 <script>
@@ -248,6 +251,20 @@ const articleSchema = {
     a.setAttribute('aria-label', 'copy link to this section');
     a.textContent = '#';
     h.appendChild(a);
+  }
+
+  // Back-to-top: show after a screen's worth of scroll, smooth-scroll on click.
+  const backToTop = document.getElementById('back-to-top');
+  if (backToTop) {
+    const toggleBackToTop = () => {
+      if (window.scrollY > 400) backToTop.removeAttribute('hidden');
+      else backToTop.setAttribute('hidden', '');
+    };
+    window.addEventListener('scroll', toggleBackToTop, { passive: true });
+    toggleBackToTop();
+    backToTop.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   }
 </script>
 
@@ -394,7 +411,8 @@ const articleSchema = {
     letter-spacing: -0.025em;
     line-height: 1.05;
     margin: 0;
-    max-width: 18ch;
+    max-width: 28ch;
+    text-wrap: balance;
   }
   .guide-excerpt {
     color: rgb(44 62 80 / 72%);
@@ -405,7 +423,8 @@ const articleSchema = {
     font-weight: 400;
     line-height: 1.55;
     margin: 20px 0 0;
-    max-width: 34ch;
+    max-width: 52ch;
+    text-wrap: pretty;
   }
   .guide-meta {
     color: rgb(44 62 80 / 48%);
@@ -513,8 +532,15 @@ const articleSchema = {
     font-family: var(--font-serif);
     font-size: 1.1rem;
     line-height: 1.75;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  /* Headings break on word boundaries only — aggressive wrapping is
+     confined to paragraphs below, where long URLs may otherwise overflow. */
+  .guide-prose h2,
+  .guide-prose h3,
+  .guide-prose h4 {
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   /* H2 — chapter opener with eyebrow + ornamental glyph. */
@@ -589,10 +615,13 @@ const articleSchema = {
     opacity: 0.7;
   }
 
-  /* Paragraphs — relaxed serif body. */
+  /* Paragraphs — relaxed serif body. Allow aggressive breaking so the
+     occasional pasted URL doesn't escape the column. */
   .guide-prose p {
     color: var(--ink);
     margin-bottom: 1.25rem;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .guide-prose p:last-child { margin-bottom: 0; }
   .guide-prose strong { color: var(--deep-slate); font-weight: 600; }
@@ -689,15 +718,19 @@ const articleSchema = {
     vertical-align: 0.1em;
   }
 
-  /* Lists — break up dense paragraphs. */
+  /* Lists — break up dense paragraphs. Explicit list-style is needed
+     because a global reset (Tailwind preflight / Astro BaseLayout) strips
+     markers across the site. */
   .guide-prose ul, .guide-prose ol {
     margin: 0 0 1.5rem;
-    padding-left: 1.5rem;
+    padding-left: 1.75rem;
   }
+  .guide-prose ul { list-style: disc; }
+  .guide-prose ol { list-style: decimal; }
   .guide-prose li {
     color: var(--ink);
     margin-bottom: 0.5rem;
-    padding-left: 4px;
+    padding-left: 6px;
   }
   .guide-prose ul li::marker { color: var(--heritage-orange); }
   .guide-prose ol li::marker { color: var(--heritage-orange); font-weight: 600; }
@@ -994,6 +1027,36 @@ const articleSchema = {
   @media (prefers-reduced-motion: reduce) {
     .guide-hero-emoji { animation: none; transform: none; }
     .guide-progress span { animation: none; }
+  }
+
+  /* Back-to-top — glassy disc pinned to the bottom-right. Appears after the
+     reader has scrolled past the hero. Matches the homepage control so the
+     marketing surface has one language for "scroll to top". */
+  .back-to-top {
+    align-items: center;
+    backdrop-filter: blur(12px);
+    background: rgb(255 255 255 / 85%);
+    border: 1px solid rgb(44 62 80 / 10%);
+    border-radius: 50%;
+    bottom: 28px;
+    box-shadow: 0 2px 12px rgb(44 62 80 / 8%);
+    color: var(--deep-slate);
+    cursor: pointer;
+    display: flex;
+    font-size: 1rem;
+    height: 40px;
+    justify-content: center;
+    position: fixed;
+    right: 28px;
+    transition: background 200ms, transform 200ms, box-shadow 200ms;
+    width: 40px;
+    z-index: 150;
+  }
+  .back-to-top[hidden] { display: none; }
+  .back-to-top:hover {
+    background: white;
+    box-shadow: 0 4px 16px rgb(44 62 80 / 12%);
+    transform: translateY(-2px);
   }
 
   /* Narrow screens — tighten padding + shrink hero. */
