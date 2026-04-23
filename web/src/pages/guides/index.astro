@@ -79,7 +79,7 @@ const pillars = await Promise.all(
     const readingMinutes = Math.max(1, Math.round(wordCount / 220));
     const theme = PILLAR_THEMES[guide.data.slug] ?? DEFAULT_THEME;
     return {
-      number: String(i + 1).padStart(2, '0'),
+      number: String(i + 1),
       slug: guide.data.slug,
       title: guide.data.title,
       excerpt: guide.data.excerpt,
