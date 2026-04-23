@@ -12,7 +12,7 @@ import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import StickyNote from '@/components/pod/shared/StickyNote.vue';
 import SayingFormModal from '@/components/pod/SayingFormModal.vue';
-import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import type { SayingItem, UUID } from '@/types/models';
@@ -28,7 +28,12 @@ const sayings = computed(() => sayingsStore.byMember(props.memberId).value);
 
 const modalOpen = ref(false);
 const editing = ref<SayingItem | null>(null);
-useAutoOpenOnQuery(modalOpen);
+useQuickAddIntent((action) => {
+  if (action === 'add-saying') {
+    editing.value = null;
+    modalOpen.value = true;
+  }
+});
 
 function openAdd(): void {
   editing.value = null;

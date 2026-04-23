@@ -19,6 +19,7 @@ import { useVacationStore } from '@/stores/vacationStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { usePermissions } from '@/composables/usePermissions';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { confirm } from '@/composables/useConfirm';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -165,6 +166,11 @@ function openAddModal(date?: string, time?: string, memberId?: string) {
   defaultAssigneeId.value = memberId;
   showModal.value = true;
 }
+
+// Quick-add FAB → open the Add Activity modal with default state.
+useQuickAddIntent((action) => {
+  if (action === 'add-activity') openAddModal();
+});
 
 function handleCalendarDateClick(date: string) {
   // Clicking a day in the monthly/weekly grid drills into that day's

@@ -11,6 +11,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import EmergencyContactFormModal from '@/components/pod/EmergencyContactFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { usePermissions } from '@/composables/usePermissions';
 import { CATEGORY_EMOJI, CATEGORY_ORDER } from '@/constants/emergencyContacts';
@@ -26,6 +27,14 @@ const filter = ref<EmergencyContactCategory | 'all'>('all');
 
 const modalOpen = ref(false);
 const editing = ref<EmergencyContact | null>(null);
+
+// Quick-add FAB → open blank Add Emergency Contact modal.
+useQuickAddIntent((action) => {
+  if (action === 'add-emergency') {
+    editing.value = null;
+    modalOpen.value = true;
+  }
+});
 
 // Search + filter pipeline — search is case-insensitive across name /
 // role / phone / email (matches the store's `search()` getter); filter

@@ -1,0 +1,103 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="beanies quick-add">
+  <defs>
+    <radialGradient id="bg-orange2" cx="50%" cy="40%" r="62%">
+      <stop offset="0%" stop-color="#FF824A"/>
+      <stop offset="100%" stop-color="#DE4D14"/>
+    </radialGradient>
+    <linearGradient id="bean-shade2" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#F67A38"/>
+      <stop offset="100%" stop-color="#D64A13"/>
+    </linearGradient>
+    <linearGradient id="hat-shade2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C9E3F4"/>
+      <stop offset="100%" stop-color="#8FBFDA"/>
+    </linearGradient>
+    <linearGradient id="plus-sheen2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EEF2F5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background circle -->
+  <circle cx="60" cy="60" r="58" fill="var(--fab-bg, url(#bg-orange2))"/>
+  <!-- soft top-left light -->
+  <ellipse cx="44" cy="28" rx="30" ry="16" fill="#FFFFFF" opacity="0.14"/>
+
+  <!-- BEAN HEAD — taller, narrower, slight tilt, kidney asymmetry -->
+  <g>
+    <!-- main bean silhouette: taller than wide, tilts right, left side flatter -->
+    <path d="M60 14
+             C73 14, 80 24, 80 36
+             C80 48, 73 58, 63 60
+             C52 62, 43 55, 42 44
+             C41 30, 48 14, 60 14 Z"
+          fill="url(#bean-shade2)"/>
+    <!-- left-side shadow for dimension -->
+    <path d="M42 44
+             C41 32, 46 20, 54 15
+             C49 22, 47 32, 48 42
+             C48 50, 52 57, 58 60
+             C50 61, 43 55, 42 44 Z"
+          fill="#B8420F" opacity="0.24"/>
+    <!-- highlight gleam right cheek -->
+    <ellipse cx="72" cy="32" rx="3.2" ry="6" fill="#FFFFFF" opacity="0.32" transform="rotate(-18 72 32)"/>
+  </g>
+
+  <!-- BEANIE HAT — wider, cuter proportions, pom-pom fully on canvas -->
+  <g>
+    <!-- dome -->
+    <path d="M43 24
+             C43 14, 50 8, 60 8
+             C70 8, 78 14, 78 24
+             C78 28, 76 30, 74 30
+             L46 30
+             C44 30, 43 28, 43 24 Z"
+          fill="url(#hat-shade2)"/>
+    <!-- ribbed cuff -->
+    <rect x="41" y="28" width="38" height="8" rx="2.5" fill="#8FBFDA"/>
+    <!-- rib lines -->
+    <g stroke="#6A9FBD" stroke-width="1" stroke-linecap="round" opacity="0.8">
+      <line x1="47" y1="29.5" x2="47" y2="34.5"/>
+      <line x1="53" y1="29.5" x2="53" y2="34.5"/>
+      <line x1="60" y1="29.5" x2="60" y2="34.5"/>
+      <line x1="67" y1="29.5" x2="67" y2="34.5"/>
+      <line x1="73" y1="29.5" x2="73" y2="34.5"/>
+    </g>
+    <!-- pom-pom, fully on canvas -->
+    <circle cx="60" cy="8" r="4.5" fill="#E67E22"/>
+    <circle cx="58" cy="6.5" r="1.4" fill="#FFFFFF" opacity="0.5"/>
+    <!-- tiny stem to hat -->
+    <rect x="59.2" y="9" width="1.6" height="3" fill="#D6691B" opacity="0.6"/>
+  </g>
+
+  <!-- FACE — simpler, larger features for legibility -->
+  <g>
+    <!-- pink cheeks — tighter to face -->
+    <ellipse cx="49" cy="48" rx="3.4" ry="2.4" fill="#F0A2B0" opacity="0.70"/>
+    <ellipse cx="68" cy="48" rx="3.4" ry="2.4" fill="#F0A2B0" opacity="0.70"/>
+    <!-- eyes -->
+    <ellipse cx="53" cy="42" rx="2.3" ry="2.9" fill="#2C3E50"/>
+    <ellipse cx="66" cy="42" rx="2.3" ry="2.9" fill="#2C3E50"/>
+    <!-- eye highlights -->
+    <circle cx="54" cy="41" r="0.95" fill="#FFFFFF"/>
+    <circle cx="67" cy="41" r="0.95" fill="#FFFFFF"/>
+    <!-- smile -->
+    <path d="M54.5 52 Q59.5 56.2, 64.5 52"
+          stroke="#2C3E50" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- PLUS SIGN (foreground, covers chin) -->
+  <g>
+    <!-- soft drop shadow -->
+    <g opacity="0.20" transform="translate(0 2)" filter="url(#blur)">
+      <rect x="50" y="44" width="20" height="54" rx="6" fill="#1A252F"/>
+      <rect x="32" y="62" width="56" height="20" rx="6" fill="#1A252F"/>
+    </g>
+    <!-- bars -->
+    <rect x="50" y="44" width="20" height="54" rx="6" fill="url(#plus-sheen2)"/>
+    <rect x="32" y="62" width="56" height="20" rx="6" fill="url(#plus-sheen2)"/>
+    <!-- subtle top-edge highlight -->
+    <rect x="52" y="45.5" width="16" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.7"/>
+    <rect x="34" y="63.5" width="52" height="1.8" rx="0.9" fill="#FFFFFF" opacity="0.7"/>
+  </g>
+</svg>

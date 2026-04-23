@@ -13,8 +13,8 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-vi.mock('@/composables/useAutoOpenOnQuery', () => ({
-  useAutoOpenOnQuery: () => undefined,
+vi.mock('@/composables/useQuickAddIntent', () => ({
+  useQuickAddIntent: () => undefined,
 }));
 
 const MEMBER_ID = 'bean-neil';

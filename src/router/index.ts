@@ -1,9 +1,16 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import {
+  createRouter,
+  createWebHistory,
+  type LocationQuery,
+  type RouteRecordRaw,
+} from 'vue-router';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { MARKETING_URL } from '@/utils/marketing';
+import { showToast } from '@/composables/useToast';
+import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 
 /** Route that cross-origin-redirects to the Astro marketing site, preserving the full path. */
 function externalRedirect(path: string, name: string): RouteRecordRaw {
@@ -40,19 +47,19 @@ const routes: RouteRecordRaw[] = [
     path: '/welcome',
     name: 'Welcome',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'login.welcome', requiresAuth: false },
+    meta: { titleKey: 'login.welcome', requiresAuth: false, hideQuickAdd: true },
   },
   {
     path: '/login',
     name: 'Login',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'login.title', requiresAuth: false },
+    meta: { titleKey: 'login.title', requiresAuth: false, hideQuickAdd: true },
   },
   {
     path: '/join',
     name: 'JoinFamily',
     component: () => import('@/pages/LoginPage.vue'),
-    meta: { titleKey: 'join.title', requiresAuth: false },
+    meta: { titleKey: 'join.title', requiresAuth: false, hideQuickAdd: true },
     props: { initialView: 'join' },
   },
   {
@@ -186,7 +193,7 @@ const routes: RouteRecordRaw[] = [
     path: '/settings',
     name: 'Settings',
     component: () => import('@/pages/SettingsPage.vue'),
-    meta: { titleKey: 'nav.settings', requiresAuth: true },
+    meta: { titleKey: 'nav.settings', requiresAuth: true, hideQuickAdd: true },
   },
   {
     path: '/oauth/callback',
@@ -221,7 +228,7 @@ const routes: RouteRecordRaw[] = [
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
     component: () => import('@/pages/NotFoundPage.vue'),
-    meta: { titleKey: 'notFound.title' },
+    meta: { titleKey: 'notFound.title', hideQuickAdd: true },
   },
 ];
 
@@ -270,6 +277,31 @@ router.beforeEach((to) => {
       return { name: 'NoAccess' };
     }
   }
+});
+
+// Orphan quick-add intent guard: if a `?action=...` query arrives on a
+// route that hides the FAB (stale bookmark, cross-device share of a
+// deep link), strip the intent keys and surface a warning toast so the
+// user understands nothing opened silently. Other query params are
+// preserved.
+router.beforeEach((to) => {
+  if (!to.meta.hideQuickAdd) return;
+  if (typeof to.query.action !== 'string' || !to.query.action) return;
+
+  const translationStore = useTranslationStore();
+  const next: LocationQuery = { ...to.query };
+  delete next.action;
+  for (const key of QUICK_ADD_CONTEXT_KEYS) {
+    delete next[key];
+  }
+
+  showToast(
+    'warning',
+    translationStore.t('quickAdd.error.notHere.title'),
+    translationStore.t('quickAdd.error.notHere.message')
+  );
+
+  return { path: to.path, query: next, replace: true };
 });
 
 // Update document title on route change

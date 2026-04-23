@@ -15,6 +15,7 @@ import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useFamilyStore } from '@/stores/familyStore';
 import {
   useScrapbookFeed,
@@ -44,6 +45,31 @@ const selectedTypes = ref<Set<ScrapType>>(new Set());
 const effectiveMemberIds = computed(() =>
   selectedMemberIds.value.length === 0 ? allMemberIds.value : selectedMemberIds.value
 );
+
+// Quick-add FAB handlers.
+//
+// When `memberId` context is present (the user tapped a scrapbook
+// entity from a bean detail route), forward to that bean's matching
+// tab with `?action=` preserved — BeanSayingsTab/BeanFavoritesTab/
+// BeanNotesTab consume the intent and open their add modal.
+//
+// Without memberId, no-op on Phase 1. Phase 2 ships a bean-picker-
+// first flow; landing on the scrapbook IS a reasonable place for the
+// user to pick a bean manually in the meantime.
+const ACTION_TO_BEAN_TAB: Record<string, 'sayings' | 'favorites' | 'notes'> = {
+  'add-saying': 'sayings',
+  'add-favorite': 'favorites',
+  'add-note': 'notes',
+};
+
+useQuickAddIntent(async (action, { memberId }) => {
+  const tab = ACTION_TO_BEAN_TAB[action];
+  if (!tab || !memberId) return;
+  await router.push({
+    path: `/pod/${memberId}/${tab}`,
+    query: { action },
+  });
+});
 
 const { entries } = useScrapbookFeed({
   memberIds: effectiveMemberIds,

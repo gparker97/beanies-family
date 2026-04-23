@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="beanies quick-add">
+  <defs>
+    <radialGradient id="bg-orange3" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#FF824A"/>
+      <stop offset="100%" stop-color="#DD4D14"/>
+    </radialGradient>
+    <linearGradient id="bean-shade3" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#F57A3A"/>
+      <stop offset="100%" stop-color="#D44810"/>
+    </linearGradient>
+    <linearGradient id="hat-shade3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#CDE5F5"/>
+      <stop offset="100%" stop-color="#8FBFDA"/>
+    </linearGradient>
+    <linearGradient id="cuff-shade3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#A4CCE1"/>
+      <stop offset="100%" stop-color="#7DAEC8"/>
+    </linearGradient>
+    <linearGradient id="plus-sheen3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EEF2F5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background circle -->
+  <circle cx="60" cy="60" r="58" fill="var(--fab-bg, url(#bg-orange3))"/>
+  <!-- inner rim hint -->
+  <circle cx="60" cy="60" r="56" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="0.8"/>
+  <!-- top-left light -->
+  <ellipse cx="46" cy="28" rx="28" ry="14" fill="#FFFFFF" opacity="0.13"/>
+
+  <!-- BEAN HEAD — full face visible in top half -->
+  <g>
+    <!-- main bean silhouette: asymmetric, heavier bottom-right -->
+    <path d="M60 18
+             C73 18, 81 28, 80 40
+             C79 50, 72 58, 62 58
+             C50 58, 41 50, 41 40
+             C41 28, 48 18, 60 18 Z"
+          fill="url(#bean-shade3)"/>
+    <!-- subtle curved highlight along top-right (inside head) -->
+    <path d="M58 21
+             C68 21, 76 28, 77 37"
+          stroke="#FFFFFF" stroke-width="2" stroke-linecap="round"
+          fill="none" opacity="0.22"/>
+  </g>
+
+  <!-- BEANIE HAT — worn low over the head -->
+  <g>
+    <!-- dome -->
+    <path d="M43 26
+             C43 16, 50 10, 60 10
+             C70 10, 78 16, 78 26
+             L78 30
+             C78 31.5, 76.5 32, 75 32
+             L45 32
+             C43.5 32, 43 31.5, 43 30 Z"
+          fill="url(#hat-shade3)"/>
+    <!-- ribbed cuff -->
+    <path d="M41 29
+             C41 28, 42 27.5, 43 27.5
+             L77 27.5
+             C78 27.5, 79 28, 79 29
+             L79 36
+             C79 37, 78 37.5, 77 37.5
+             L43 37.5
+             C42 37.5, 41 37, 41 36 Z"
+          fill="url(#cuff-shade3)"/>
+    <!-- rib lines -->
+    <g stroke="#6A9FBD" stroke-width="1.1" stroke-linecap="round" opacity="0.75">
+      <line x1="47" y1="30" x2="47" y2="35"/>
+      <line x1="53" y1="30" x2="53" y2="35"/>
+      <line x1="60" y1="30" x2="60" y2="35"/>
+      <line x1="67" y1="30" x2="67" y2="35"/>
+      <line x1="73" y1="30" x2="73" y2="35"/>
+    </g>
+    <!-- pom-pom -->
+    <circle cx="60" cy="9" r="4.8" fill="#E67E22"/>
+    <circle cx="58" cy="7" r="1.5" fill="#FFFFFF" opacity="0.5"/>
+  </g>
+
+  <!-- FACE -->
+  <g>
+    <!-- pink cheeks -->
+    <ellipse cx="50" cy="48" rx="3.6" ry="2.4" fill="#EC9AAB" opacity="0.72"/>
+    <ellipse cx="70" cy="48" rx="3.6" ry="2.4" fill="#EC9AAB" opacity="0.72"/>
+    <!-- eyes -->
+    <ellipse cx="54" cy="44" rx="2.2" ry="2.8" fill="#1F2E3D"/>
+    <ellipse cx="66" cy="44" rx="2.2" ry="2.8" fill="#1F2E3D"/>
+    <!-- eye highlights -->
+    <circle cx="55" cy="43" r="0.9" fill="#FFFFFF"/>
+    <circle cx="67" cy="43" r="0.9" fill="#FFFFFF"/>
+    <!-- smile -->
+    <path d="M55 52 Q60 56, 65 52"
+          stroke="#1F2E3D" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- PLUS SIGN (foreground) — covers a sliver of the chin for peek-a-boo overlap -->
+  <g>
+    <!-- shadow -->
+    <g opacity="0.22" transform="translate(0 2)">
+      <rect x="50" y="56" width="20" height="46" rx="6" fill="#1A252F"/>
+      <rect x="32" y="70" width="56" height="20" rx="6" fill="#1A252F"/>
+    </g>
+    <!-- bars -->
+    <rect x="50" y="56" width="20" height="46" rx="6" fill="url(#plus-sheen3)"/>
+    <rect x="32" y="70" width="56" height="20" rx="6" fill="url(#plus-sheen3)"/>
+    <!-- top-edge highlight -->
+    <rect x="52" y="57.5" width="16" height="1.6" rx="0.8" fill="#FFFFFF" opacity="0.7"/>
+    <rect x="34" y="71.5" width="52" height="1.6" rx="0.8" fill="#FFFFFF" opacity="0.7"/>
+  </g>
+</svg>

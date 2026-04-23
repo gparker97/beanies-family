@@ -12,6 +12,7 @@ import { useSounds } from '@/composables/useSounds';
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getAssetTypeIcon } from '@/constants/icons';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -174,6 +175,11 @@ function openAddWithDefaults(defaults?: { memberId?: string; type?: AssetType })
   editingAsset.value = null;
   showAddModal.value = true;
 }
+
+// Quick-add FAB → open blank Add Asset modal.
+useQuickAddIntent((action) => {
+  if (action === 'add-asset') openAddWithDefaults();
+});
 
 function openEditModal(asset: Asset) {
   editingAsset.value = asset;

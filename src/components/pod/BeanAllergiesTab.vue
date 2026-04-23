@@ -7,7 +7,7 @@ import { computed, ref } from 'vue';
 import AddTile from '@/components/pod/shared/AddTile.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import AllergyFormModal from '@/components/pod/AllergyFormModal.vue';
-import { useAutoOpenOnQuery } from '@/composables/useAutoOpenOnQuery';
+import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import type { Allergy, AllergySeverity, AllergyType, UUID } from '@/types/models';
@@ -29,7 +29,12 @@ const allergies = computed(() =>
 
 const modalOpen = ref(false);
 const editing = ref<Allergy | null>(null);
-useAutoOpenOnQuery(modalOpen);
+useQuickAddIntent((action) => {
+  if (action === 'add-allergy') {
+    editing.value = null;
+    modalOpen.value = true;
+  }
+});
 
 const TYPE_EMOJI: Record<AllergyType, string> = {
   food: '\u{1F35C}',

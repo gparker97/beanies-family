@@ -4880,6 +4880,153 @@ const STRING_DEFS = {
   'photos.close': { en: 'Close', beanie: 'close' },
   'photos.viewer.of': { en: 'of', beanie: 'of' },
   'photos.viewer.open': { en: 'Open photo', beanie: 'open photo' },
+
+  // Quick-add FAB — chrome
+  'quickAdd.fab.label': { en: 'Quick add', beanie: 'quick add' },
+  'quickAdd.title': {
+    en: 'What would you like to add?',
+    beanie: 'what would you like to add?',
+  },
+
+  // Quick-add FAB — group labels
+  'quickAdd.groups.everyday.kicker': {
+    en: '🫘 Everyday beans',
+    beanie: '🫘 everyday beans',
+  },
+  'quickAdd.groups.everyday.subhint': {
+    en: 'what you add most',
+    beanie: 'what you add most',
+  },
+  'quickAdd.groups.family.title': { en: 'Family', beanie: 'family' },
+  'quickAdd.groups.money.title': { en: 'Money', beanie: 'money' },
+  'quickAdd.groups.money.setup': { en: 'setup', beanie: 'setup' },
+  'quickAdd.groups.care.title': { en: 'Care', beanie: 'care' },
+
+  // Quick-add FAB — entities (18 × label + hint)
+  'quickAdd.activity.label': { en: 'Activity', beanie: 'activity' },
+  'quickAdd.activity.hint': { en: 'calendar event', beanie: 'calendar event' },
+  'quickAdd.todo.label': { en: 'To-do', beanie: 'to-do' },
+  'quickAdd.todo.hint': { en: 'task · who · when', beanie: 'task · who · when' },
+  'quickAdd.transaction.label': { en: 'Transaction', beanie: 'transaction' },
+  'quickAdd.transaction.hint': {
+    en: 'income · expense · transfer',
+    beanie: 'income · expense · transfer',
+  },
+  'quickAdd.trip.label': { en: 'Trip', beanie: 'trip' },
+  'quickAdd.trip.hint': { en: 'travel plans', beanie: 'travel plans' },
+  'quickAdd.cookLog.label': { en: 'Cook log', beanie: 'cook log' },
+  'quickAdd.cookLog.hint': { en: '5-star · note · photo', beanie: '5-star · note · photo' },
+  'quickAdd.saying.label': { en: 'Saying', beanie: 'saying' },
+  'quickAdd.saying.hint': { en: 'quote a beanie', beanie: 'quote a beanie' },
+  'quickAdd.favorite.label': { en: 'Favorite', beanie: 'favorite' },
+  'quickAdd.favorite.hint': { en: 'food · game · song', beanie: 'food · game · song' },
+  'quickAdd.note.label': { en: 'Note', beanie: 'note' },
+  'quickAdd.note.hint': { en: 'per-bean journal', beanie: 'per-bean journal' },
+  'quickAdd.recipe.label': { en: 'Recipe', beanie: 'recipe' },
+  'quickAdd.recipe.hint': { en: 'ingredients · steps', beanie: 'ingredients · steps' },
+  'quickAdd.tripIdea.label': { en: 'Trip idea', beanie: 'trip idea' },
+  'quickAdd.tripIdea.hint': {
+    en: 'wishlist a destination',
+    beanie: 'wishlist a destination',
+  },
+  'quickAdd.tripIdea.noTripsTitle': {
+    en: 'Add a trip first',
+    beanie: 'add a trip first',
+  },
+  'quickAdd.tripIdea.noTripsMessage': {
+    en: 'Trip ideas live inside a trip — create one and then come back.',
+    beanie: 'trip ideas live inside a trip — create one and then come back.',
+  },
+  'quickAdd.tripIdea.addTripAction': { en: 'Add trip', beanie: 'add trip' },
+  'quickAdd.account.label': { en: 'Account', beanie: 'account' },
+  'quickAdd.account.hint': {
+    en: 'checking · credit · loan',
+    beanie: 'checking · credit · loan',
+  },
+  'quickAdd.budget.label': { en: 'Budget', beanie: 'budget' },
+  'quickAdd.budget.hint': {
+    en: 'category caps · period',
+    beanie: 'category caps · period',
+  },
+  'quickAdd.recurring.label': { en: 'Recurring', beanie: 'recurring' },
+  'quickAdd.recurring.hint': {
+    en: 'weekly · monthly · yearly',
+    beanie: 'weekly · monthly · yearly',
+  },
+  'quickAdd.asset.label': { en: 'Asset', beanie: 'asset' },
+  'quickAdd.asset.hint': {
+    en: 'home · vehicle · investment',
+    beanie: 'home · vehicle · investment',
+  },
+  'quickAdd.goal.label': { en: 'Goal', beanie: 'goal' },
+  'quickAdd.goal.hint': { en: 'save · payoff · invest', beanie: 'save · payoff · invest' },
+  'quickAdd.medication.label': { en: 'Medication', beanie: 'medication' },
+  'quickAdd.medication.hint': { en: 'dose · schedule', beanie: 'dose · schedule' },
+  'quickAdd.doseLog.label': { en: 'Dose log', beanie: 'dose log' },
+  'quickAdd.doseLog.hint': {
+    en: 'record a given dose',
+    beanie: 'record a given dose',
+  },
+  'quickAdd.allergy.label': { en: 'Allergy', beanie: 'allergy' },
+  'quickAdd.allergy.hint': { en: 'severity · response', beanie: 'severity · response' },
+  'quickAdd.emergency.label': { en: 'Emergency contact', beanie: 'emergency contact' },
+  'quickAdd.emergency.hint': {
+    en: 'sitter · doctor · school',
+    beanie: 'sitter · doctor · school',
+  },
+
+  // Quick-add FAB — error surfaces
+  'quickAdd.error.unknown.title': {
+    en: "Can't do that from here",
+    beanie: "can't do that from here",
+  },
+  'quickAdd.error.unknown.message': {
+    en: "This add action isn't available any more — the app may need a reload.",
+    beanie: "this add action isn't available any more — the app may need a reload.",
+  },
+  'quickAdd.error.handler.title': {
+    en: "Hmm, that didn't work",
+    beanie: "hmm, that didn't work",
+  },
+  'quickAdd.error.handler.message': {
+    en: 'Something went wrong opening that form. Check the console for details.',
+    beanie: 'something went wrong opening that form. check the console for details.',
+  },
+  'quickAdd.error.notHere.title': {
+    en: 'Open this from another page',
+    beanie: 'open this from another page',
+  },
+  'quickAdd.error.notHere.message': {
+    en: "The Quick-add menu is hidden on this page for focus. Tap the beanie once you're back on the main app.",
+    beanie:
+      "the quick-add menu is hidden on this page for focus. tap the beanie once you're back on the main app.",
+  },
+
+  // Quick-add FAB — parent picker (bean / recipe / medication)
+  'quickAdd.picker.back': { en: 'Back', beanie: 'back' },
+  'quickAdd.picker.bean.title': { en: 'Pick a beanie', beanie: 'pick a beanie' },
+  'quickAdd.picker.bean.empty': {
+    en: "You haven't added any beanies yet — add one from the Pod.",
+    beanie: "you haven't added any beanies yet — add one from the pod.",
+  },
+  'quickAdd.picker.recipe.title': { en: 'Pick a recipe', beanie: 'pick a recipe' },
+  'quickAdd.picker.recipe.empty': {
+    en: 'No recipes saved yet — add one from the Cookbook first.',
+    beanie: 'no recipes saved yet — add one from the cookbook first.',
+  },
+  'quickAdd.picker.medication.title': {
+    en: 'Pick a medication',
+    beanie: 'pick a medication',
+  },
+  'quickAdd.picker.medication.empty': {
+    en: 'No active medications — add one from a beanie‘s Care tab.',
+    beanie: 'no active medications — add one from a beanie‘s care tab.',
+  },
+  'quickAdd.picker.vacation.title': { en: 'Pick a trip', beanie: 'pick a trip' },
+  'quickAdd.picker.vacation.empty': {
+    en: "You haven't added any trips yet — start one from Travel Plans.",
+    beanie: "you haven't added any trips yet — start one from travel plans.",
+  },
 } satisfies Record<string, StringEntry>;
 
 /**
