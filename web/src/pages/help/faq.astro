@@ -459,7 +459,15 @@ const faqSchema = {
   )
 }
 
-<style>
+<style is:global>
+  /* is:global is required here because several selectors (faq-a a,
+     faq-a code, faq-a strong, etc.) target HTML injected via set:html
+     from the answer data. Astro's default scoping rewrites those
+     descendant selectors to require the scope attribute on BOTH the
+     parent AND the descendant, but set:html content never carries the
+     scope attribute — so scoped versions of those rules silently miss.
+     Every selector below is namespaced under `.faq-page` to keep this
+     file's styles from leaking elsewhere. */
   .faq-page {
     --deep-slate: #2c3e50;
     --heritage-orange: #f15d22;
