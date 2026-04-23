@@ -321,21 +321,23 @@ const securityHref = isHome ? '#security' : '/#security';
 
   .fnav-drawer {
     background: white;
-    bottom: 0;
-    box-shadow: -16px 0 40px rgb(44 62 80 / 16%);
+    border-radius: 0 0 24px 24px;
+    box-shadow: 0 18px 42px rgb(44 62 80 / 18%);
     display: flex;
     flex-direction: column;
-    max-width: min(340px, 88vw);
+    left: 0;
+    max-height: min(calc(100vh - 48px), 560px);
+    overflow: hidden;
     position: fixed;
     right: 0;
     top: 0;
-    transform: translateX(100%);
-    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    transform: translateY(-100%);
+    transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
     width: 100%;
     z-index: 220;
   }
   .fnav-drawer[data-open] {
-    transform: translateX(0);
+    transform: translateY(0);
   }
 
   .fnav-drawer__head {
