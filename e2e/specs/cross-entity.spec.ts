@@ -5,6 +5,7 @@ import { IndexedDBHelper } from '../helpers/indexeddb';
 import { bypassLoginIfNeeded } from '../helpers/auth';
 import { ui } from '../helpers/ui-strings';
 import { dismissActivityCreatedConfirm } from '../helpers/activity-modal';
+import { selectBeanieDate } from '../helpers/date-picker';
 
 // ---------------------------------------------------------------------------
 // Institution Combobox
@@ -287,9 +288,7 @@ test.describe('Loan & Activity Linking', () => {
     // Stay in recurring mode (default) — fee schedule chips are only visible in recurring mode.
     // Fill start date
     const dialog = page.locator('div[role="dialog"]');
-    const dateInput = dialog.locator('input[type="date"]');
-    await dateInput.first().waitFor({ state: 'visible', timeout: 5000 });
-    await dateInput.first().fill('2026-04-15');
+    await selectBeanieDate(dialog, '2026-04-15');
 
     // Set cost amount
     const costInput = page.locator('div[role="dialog"]').locator('input[type="number"]').first();
@@ -422,7 +421,7 @@ test.describe('Loan & Activity Linking', () => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-    await page.locator('input[type="date"]').fill(tomorrowStr);
+    await selectBeanieDate(page.locator('div[role="dialog"]'), tomorrowStr);
 
     // Save without cost
     await page.getByRole('button', { name: /^add activity$/i }).click();
