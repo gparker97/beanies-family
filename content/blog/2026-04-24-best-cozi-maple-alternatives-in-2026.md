@@ -9,7 +9,7 @@ excerpt: 'a human + AI co-written tour of cozi, maple, ynab, greenlight, timetre
 subtitle: 'this post was written by AI. sort of.'
 featured: false
 author: greg
-draft: true
+draft: false
 ---
 
 Ok, time for full disclosure: This post was written by AI. Well, not specifically _this_ part. This is still me. But all that family software comparison stuff you're gonna read down below? Pure AI. For the most part.
