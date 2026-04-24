@@ -175,33 +175,27 @@ const articleSchema = {
           )
         }
 
-        {
-          related.length > 0 && (
-            <aside class="guide-related">
-              <p class="guide-related-eyebrow">further reading</p>
-              <h2 class="guide-related-title">from the beanstalk</h2>
-              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
-              <ul class="guide-related-list">
-                {related.map((post) => (
-                  <li>
-                    <a href={post.href}>
-                      <span class="guide-related-arrow" aria-hidden="true">→</span>
-                      <span>
-                        <span class="guide-related-post-title">{post.title}</span>
-                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          )
-        }
+        {/* Final-pillar warm-goodbye mascot — renders in the template
+            (not the markdown body) so it lands in the right position
+            between the recap and the payoff CTA. Hidden on non-final
+            pillars to keep the mascot as the curriculum's signature
+            closing beat. */}
+        {guide.data.isFinalPillar && (
+          <p class="guide-beanies-hug" aria-hidden="true">
+            <img
+              src="/brand/beanies_family_hugging_transparent_512x512.png"
+              alt=""
+              width="200"
+              height="200"
+              loading="lazy"
+            />
+          </p>
+        )}
 
-        {/* Final-pillar payoff card — renders LAST among content blocks
-            (after the further-reading aside) so the primary CTAs are
-            the final emphatic beat before navigation. Only renders on
-            the guide flagged `isFinalPillar` in frontmatter. */}
+        {/* Final-pillar payoff card — the emphatic closing CTA. Lands
+            immediately after the warm-goodbye mascot so the reader
+            finishes the piece and is invited straight into action.
+            Only renders on the guide flagged `isFinalPillar`. */}
         {guide.data.isFinalPillar && firstGuide && (
           <section class="guide-payoff" aria-labelledby="guide-payoff-title">
             <div class="guide-payoff-eyebrow">
@@ -248,6 +242,58 @@ const articleSchema = {
             )}
           </section>
         )}
+
+        {/* "Learn more" aside — external references and tools pulled
+            from the `learnMore` frontmatter array. Positioned AFTER
+            the payoff CTA so it reads as a deeper-dive off-ramp for
+            readers who want to keep exploring, and BEFORE the
+            beanstalk block since "learn more" sits upstream of our
+            own story posts. */}
+        {guide.data.learnMore.length > 0 && (
+          <aside class="guide-learn-more" aria-labelledby="guide-learn-more-title">
+            <p class="guide-learn-more-eyebrow">deep dives</p>
+            <h2 id="guide-learn-more-title" class="guide-learn-more-title">learn more</h2>
+            <p class="guide-learn-more-sub">primary references and tools worth knowing.</p>
+            <ul class="guide-learn-more-list">
+              {guide.data.learnMore.map((item) => (
+                <li>
+                  <a href={item.url} target="_blank" rel="noopener noreferrer">
+                    <span class="guide-learn-more-arrow" aria-hidden="true">→</span>
+                    <span>
+                      <span class="guide-learn-more-item-title">{item.title}</span>
+                      {item.description && (
+                        <span class="guide-learn-more-item-desc">{item.description}</span>
+                      )}
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
+
+        {
+          related.length > 0 && (
+            <aside class="guide-related">
+              <p class="guide-related-eyebrow">further reading</p>
+              <h2 class="guide-related-title">from the beanstalk</h2>
+              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
+              <ul class="guide-related-list">
+                {related.map((post) => (
+                  <li>
+                    <a href={post.href}>
+                      <span class="guide-related-arrow" aria-hidden="true">→</span>
+                      <span>
+                        <span class="guide-related-post-title">{post.title}</span>
+                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )
+        }
 
         {/* Prev/next chapter nav — a two-card walk-through rhythm. Each
             card shows the chapter label + title as the header and the
@@ -646,19 +692,19 @@ const articleSchema = {
     opacity: 0.55;
   }
 
-  /* Hugging-beanies mascot at the warm ending of a guide. Centres the
-     PNG, applies a soft idle breath so it feels alive, lifts it with a
-     subtle drop-shadow in Heritage Orange so it reads as a happy-end
-     punctuation mark rather than a random image drop. `prefers-reduced-
-     motion` drops the animation. */
-  .guide-prose .guide-beanies-hug {
+  /* Hugging-beanies mascot at the warm ending of a guide. Rendered in
+     the template (not the markdown body) so it lands in the final-
+     pillar flow after the recap and before the payoff CTA. Soft idle
+     breath + Heritage-Orange drop-shadow so it reads as a happy-end
+     punctuation mark. `prefers-reduced-motion` drops the animation. */
+  .guide-beanies-hug {
     animation: beanies-hug-breath 5.2s ease-in-out infinite;
     filter: drop-shadow(0 18px 32px rgb(241 93 34 / 20%));
-    margin: 32px auto 40px;
+    margin: 32px auto 12px;
     max-width: 220px;
     text-align: center;
   }
-  .guide-prose .guide-beanies-hug img {
+  .guide-beanies-hug img {
     display: block;
     height: auto;
     margin: 0 auto;
@@ -670,11 +716,11 @@ const articleSchema = {
     50% { transform: translateY(-3px) scale(1.015); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .guide-prose .guide-beanies-hug { animation: none; }
+    .guide-beanies-hug { animation: none; }
   }
   @media (max-width: 520px) {
-    .guide-prose .guide-beanies-hug { margin: 24px auto 32px; max-width: 160px; }
-    .guide-prose .guide-beanies-hug img { max-width: 160px; }
+    .guide-beanies-hug { margin: 24px auto 8px; max-width: 160px; }
+    .guide-beanies-hug img { max-width: 160px; }
   }
 
   /* Prose body — Fraunces serif, relaxed rhythm, generous spacing. */
@@ -1018,6 +1064,89 @@ const articleSchema = {
     font-family: var(--font-serif);
     font-size: 1.025rem;
     line-height: 1.55;
+  }
+
+  /* "Learn more" aside — external references + tools pulled from
+     frontmatter. Differentiated from `.guide-related` (blog spokes)
+     by a sky-silk accent vs Heritage Orange: these are outbound
+     references into the local-first canon, while related points at
+     our own story posts. Same card silhouette for visual rhythm. */
+  .guide-learn-more {
+    background:
+      linear-gradient(160deg, rgb(174 214 241 / 6%) 0%, transparent 60%),
+      white;
+    border: 1px solid color-mix(in srgb, var(--sky-silk, #aed6f1) 22%, var(--hairline));
+    border-radius: 24px;
+    box-shadow: 0 1px 0 rgb(44 62 80 / 2%), 0 8px 24px rgb(44 62 80 / 3%);
+    margin-top: 32px;
+    padding: 32px;
+  }
+  .guide-learn-more-eyebrow {
+    color: #3a82b3;
+    font-family: var(--font-display);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    margin: 0 0 6px;
+    text-transform: uppercase;
+  }
+  .guide-learn-more-title {
+    color: var(--deep-slate);
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    margin: 0;
+  }
+  .guide-learn-more-sub {
+    color: var(--muted);
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    font-style: italic;
+    margin: 6px 0 18px;
+  }
+  .guide-learn-more-list { list-style: none; margin: 0; padding: 0; }
+  .guide-learn-more-list li { border-top: 1px solid var(--hairline); }
+  .guide-learn-more-list li:first-child { border-top: none; }
+  .guide-learn-more-list a {
+    align-items: start;
+    color: var(--deep-slate);
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 24px 1fr;
+    padding: 14px 0;
+    text-decoration: none;
+    transition: color 180ms, gap 180ms;
+  }
+  .guide-learn-more-list a:hover {
+    color: #3a82b3;
+    gap: 20px;
+  }
+  .guide-learn-more-arrow {
+    color: #3a82b3;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    font-weight: 700;
+    opacity: 0.55;
+    transition: opacity 180ms;
+  }
+  .guide-learn-more-list a:hover .guide-learn-more-arrow { opacity: 1; }
+  .guide-learn-more-item-title {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .guide-learn-more-item-desc {
+    color: var(--muted);
+    display: block;
+    font-family: var(--font-serif);
+    font-size: 0.92rem;
+    font-style: italic;
+    margin-top: 2px;
+  }
+  @media (max-width: 520px) {
+    .guide-learn-more { padding: 24px; }
   }
 
   /* Related ("from the beanstalk") — paper-card, hand-font accent. */

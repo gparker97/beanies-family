@@ -77,6 +77,22 @@ const guides = defineCollection({
     nextTeaser: z.string().optional(),
     isFinalPillar: z.boolean().default(false),
     loopbackTeaser: z.string().optional(),
+    /** External references + tools the guide points readers toward.
+     *  Renders as a "learn more" aside after the payoff CTA on final
+     *  pillars (and could render on non-final pillars too if set).
+     *  Kept as structured data so it can be positioned in the
+     *  template flow rather than trapped at the end of the markdown
+     *  body, where it otherwise collides with the after-content
+     *  CTA + related-posts cards. */
+    learnMore: z
+      .array(
+        z.object({
+          title: z.string(),
+          url: z.string().url(),
+          description: z.string().optional(),
+        })
+      )
+      .default([]),
     /** When true, the entry is hidden from production builds (list pages,
      *  sitemap, direct URL). Visible in `npm run dev:web` so drafts can
      *  be iterated locally. See `isPublished()` in utils/content.ts. */
