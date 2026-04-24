@@ -4,6 +4,7 @@ slug: welcome-to-the-beanstalk
 date: 2026-03-27
 category: updates
 coverEmoji: 🫘
+coverImage: /blog/greg-family-disney.webp
 excerpt: "The story of how a janky spreadsheet, my son's nickname, and three crazy boys naturally led to vibe coding a family planning app at 3am."
 subtitle: 'why the janky spreadsheet finally got tossed'
 featured: false
@@ -65,3 +66,5 @@ _simplify your family life. every bean counts._
 Peace out, my beans.
 
 greg 🫘
+
+![my family (the one I built beanies.family for)](/blog/greg-family-disney.webp)

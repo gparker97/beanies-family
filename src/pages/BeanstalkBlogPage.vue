@@ -132,11 +132,10 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
         </span>
       </h1>
       <p class="masthead-pitch">
-        a newsletter about beanies.family, vibe coding, or just
-        <em>life in general</em>.<br />
-        published every friday, or roughly whenever
-        <span class="masthead-pitch-name">greg</span> feels like it.
-        <span class="masthead-pitch-em">not written by AI. usually.</span>
+        a newsletter about
+        <span class="masthead-pitch-brand">beanies.family</span>, vibe coding, or just life in
+        general. published every friday, or roughly whenever greg feels like it. not written by AI.
+        usually.
       </p>
       <p class="masthead-issue">
         <span class="masthead-issue-chip">VOL. 01</span>
@@ -192,7 +191,7 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
         <div class="issue-body">
           <p class="issue-kicker">
             <span class="issue-kicker-dot" aria-hidden="true" />
-            <span class="issue-kicker-label">FEATURED ISSUE</span>
+            <span class="issue-kicker-label">LATEST ISSUE</span>
             <span class="issue-kicker-divider">·</span>
             <span class="issue-kicker-issue"
               >ISSUE {{ String(featuredPost.issueNumber).padStart(2, '0') }}</span
@@ -337,35 +336,18 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   position: absolute;
 }
 
+/* Mascot kept as background decoration, not a foreground character. */
 .masthead-mascot {
-  animation: beanstalk-sway 6s ease-in-out infinite;
-  bottom: -18px;
-  filter: drop-shadow(0 14px 28px rgb(44 62 80 / 16%));
+  bottom: -24px;
   height: auto;
+  opacity: 0.22;
   pointer-events: none;
   position: absolute;
-  right: 4px;
+  right: -20px;
+  transform: rotate(6deg);
   transform-origin: bottom center;
-  width: 180px;
+  width: 210px;
   z-index: 0;
-}
-
-@keyframes beanstalk-sway {
-  0%,
-  100% {
-    transform: rotate(-2deg);
-  }
-
-  50% {
-    transform: rotate(2deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .masthead-mascot {
-    animation: none;
-    transform: rotate(0);
-  }
 }
 
 .masthead-rule-top {
@@ -469,21 +451,8 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   z-index: 1;
 }
 
-.masthead-pitch em {
+.masthead-pitch-brand {
   color: var(--heritage-orange);
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 500;
-}
-
-.masthead-pitch-name {
-  color: var(--deep-slate);
-  font-weight: 700;
-}
-
-.masthead-pitch-em {
-  color: var(--deep-slate);
-  font-weight: 600;
 }
 
 .masthead-issue {
@@ -520,39 +489,23 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   opacity: 0.45;
 }
 
-/* Beanstalk cartoon banner — between masthead and featured card. */
+/* Beanstalk banner as subtle ambient decoration — low opacity, no
+   drop-shadow, no animation. Wallpaper flair, not a visual beat. */
 .masthead-banner {
   display: flex;
   justify-content: center;
-  margin: 0 auto 44px;
+  margin: -20px auto 28px;
   max-width: 560px;
   padding: 0 32px;
+  pointer-events: none;
 }
 
 .masthead-banner img {
-  animation: beanstalk-float 4.2s ease-in-out infinite;
   display: block;
-  filter: drop-shadow(0 8px 18px rgb(44 62 80 / 12%));
   height: auto;
-  max-width: 520px;
+  max-width: 360px;
+  opacity: 0.18;
   width: 100%;
-}
-
-@keyframes beanstalk-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-4px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .masthead-banner img {
-    animation: none;
-  }
 }
 
 .beanstalk-content {
@@ -949,17 +902,17 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   }
 
   .masthead-mascot {
-    bottom: -10px;
-    right: 0;
-    width: 130px;
+    bottom: -12px;
+    right: -10px;
+    width: 160px;
   }
 
   .masthead-banner {
-    margin-bottom: 36px;
+    margin: -12px auto 24px;
   }
 
   .masthead-banner img {
-    max-width: 420px;
+    max-width: 300px;
   }
 
   .beanstalk-content {
@@ -997,14 +950,14 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
 
   .masthead-mascot {
     bottom: auto;
-    opacity: 0.35;
-    right: -6px;
+    opacity: 0.18;
+    right: -12px;
     top: 70px;
-    width: 100px;
+    width: 120px;
   }
 
   .masthead-banner img {
-    max-width: 320px;
+    max-width: 240px;
   }
 
   .masthead-rule-top {
