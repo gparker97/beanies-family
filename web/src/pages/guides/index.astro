@@ -87,6 +87,7 @@ const pillars = await Promise.all(
       tags: guide.data.tags,
       lastUpdated: guide.data.lastUpdated,
       publishedDate: guide.data.publishedDate,
+      stationSubtitle: guide.data.stationSubtitle,
       h2s,
       readingMinutes,
       theme,
@@ -165,20 +166,19 @@ const itemListSchema = {
       <div class="library-hero-content">
         <p class="library-kicker">
           <span class="library-kicker-dot" aria-hidden="true"></span>
-          the beanies guides · pillar set · volume 01
+          a reading curriculum · in order
         </p>
         <h1 class="library-title">
           <span class="library-title-over">the family</span>
           <span class="library-title-under">library</span>
         </h1>
         <p class="library-pitch">
-          informative, lesson-based guides to help you build a calmer family life
-          and get organized. arranged as a <em>curriculum</em>, so you can read and
-          learn as you go.
+          four chapters, one thread: name the overwhelm, build the system, layer
+          the money, own where it all lives. <em>designed to be read in order.</em>
         </p>
         <div class="library-stats">
           <span class="library-stat">
-            <strong>{pillars.length}</strong> pillars
+            <strong>{pillars.length}</strong> chapters
           </span>
           <span class="library-stat-dot" aria-hidden="true">·</span>
           <span class="library-stat">
@@ -190,22 +190,49 @@ const itemListSchema = {
       </div>
     </header>
 
-    <!-- ============== CURRICULUM ARC ============== -->
-    <nav class="library-arc" aria-label="the curriculum path">
-      <p class="library-arc-label">the path</p>
-      <ol class="library-arc-list">
-        {pillars.map((p, i) => (
-          <li class="library-arc-item" style={`--tint: ${p.theme.tint}`}>
-            <a href={`#pillar-${p.slug}`} class="library-arc-link">
-              <span class="library-arc-num">{p.number}</span>
-              <span class="library-arc-text">{p.title}</span>
-            </a>
-            {i < pillars.length - 1 && (
-              <span class="library-arc-connector" aria-hidden="true"></span>
-            )}
-          </li>
-        ))}
-      </ol>
+    {/* ============== CURRICULUM ARC ==============
+        Promoted from a secondary nav strip to the primary hero element.
+        Each station shows number + title + station subtitle (the "what
+        this chapter does for you" hook). Connector gradients flow from
+        one pillar's tint to the next so the arc literally walks the
+        reader through the palette. Previously this was a squished
+        1-line-title strip; now it's a proper curriculum map. */}
+    <nav class="library-arc" aria-label="the curriculum path" id="the-path">
+      <div class="library-arc-frame">
+        <p class="library-arc-label">
+          <span class="library-arc-label-rule" aria-hidden="true"></span>
+          <span>the path, chapter by chapter</span>
+          <span class="library-arc-label-rule" aria-hidden="true"></span>
+        </p>
+        <ol class="library-arc-list">
+          {pillars.map((p, i) => {
+            const next = pillars[i + 1];
+            const connectorStyle = next
+              ? `background: linear-gradient(to right, ${p.theme.tint}, ${next.theme.tint});`
+              : '';
+            return (
+              <li class="library-arc-item" style={`--tint: ${p.theme.tint}`}>
+                <a href={`#pillar-${p.slug}`} class="library-arc-link">
+                  <span class="library-arc-num" aria-hidden="true">{p.number}</span>
+                  <span class="library-arc-body">
+                    <span class="library-arc-text">{p.title}</span>
+                    {p.stationSubtitle && (
+                      <span class="library-arc-sub">{p.stationSubtitle}</span>
+                    )}
+                  </span>
+                </a>
+                {next && (
+                  <span
+                    class="library-arc-connector"
+                    style={connectorStyle}
+                    aria-hidden="true"
+                  ></span>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </nav>
 
     <!-- ============== PILLAR COVERS ============== -->
@@ -468,23 +495,74 @@ const itemListSchema = {
     opacity: 0.55;
   }
 
-  /* ===== CURRICULUM ARC ===== */
+  /* ===== CURRICULUM ARC =====
+     Lifted from a thin secondary-nav strip into the primary "this is a
+     journey" element. The arc now lives inside a framed container with
+     a gently-warmed kraft wash so it reads as a front-of-book table of
+     contents instead of a nav bar. Each station:
+       - filled tint-colored number bubble (not just outlined)
+       - chapter title in Outfit
+       - Fraunces-italic subtitle that names the station's payoff
+       - tint-to-tint gradient connector walking between pillars
+     On mobile the row flips to a vertical timeline with the connector
+     becoming a short vertical rule. */
   .library-arc {
-    border-top: 1px solid var(--hairline);
     box-sizing: border-box;
-    margin: 16px auto 0;
+    margin: 8px auto 0;
     max-width: 1120px;
-    padding: 32px;
+    padding: 0 32px;
+    position: relative;
+  }
+  .library-arc-frame {
+    background:
+      linear-gradient(180deg, rgb(248 249 250 / 0%) 0%, rgb(243 236 216 / 45%) 40%, rgb(243 236 216 / 60%) 100%),
+      white;
+    border: 1px solid var(--hairline);
+    border-radius: 28px;
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 80%) inset,
+      0 24px 48px -28px rgb(44 62 80 / 18%);
+    box-sizing: border-box;
+    padding: 40px 40px 44px;
+    position: relative;
+  }
+  /* Tiny kraft-paper grain behind the frame contents, subtle enough to
+     not compete with the station elements. */
+  .library-arc-frame::before {
+    background-image:
+      radial-gradient(circle at 18% 22%, rgb(44 62 80 / 3%) 0%, transparent 28%),
+      radial-gradient(circle at 82% 78%, rgb(241 93 34 / 3%) 0%, transparent 32%);
+    border-radius: inherit;
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
   }
   .library-arc-label {
+    align-items: center;
     color: var(--heritage-orange);
+    display: flex;
     font-family: var(--font-display);
     font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.2em;
-    margin: 0 0 22px;
-    text-align: center;
+    gap: 14px;
+    justify-content: center;
+    letter-spacing: 0.22em;
+    margin: 0 0 32px;
+    position: relative;
     text-transform: uppercase;
+    z-index: 1;
+  }
+  .library-arc-label-rule {
+    background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--heritage-orange) 35%, transparent),
+      transparent
+    );
+    flex: 1;
+    height: 1px;
+    max-width: 120px;
   }
   .library-arc-list {
     align-items: flex-start;
@@ -493,16 +571,17 @@ const itemListSchema = {
     list-style: none;
     margin: 0;
     padding: 0;
+    position: relative;
+    z-index: 1;
   }
-  /* Each item is a horizontal strip: the chapter link column (circle
-     stacked over title) on the left, then a connector hairline that
-     fills the rest of the item's allotted space. On desktop the
-     connector reaches across to the next item's circle. */
+  /* Each item: the station link block on the left (number over body),
+     then a gradient connector that fills the remaining space of the
+     item's flex allotment and reaches toward the next item's bubble. */
   .library-arc-item {
     align-items: flex-start;
     display: flex;
     flex: 1 1 0;
-    gap: 12px;
+    gap: 16px;
     min-width: 0;
   }
   .library-arc-item:last-child {
@@ -514,64 +593,112 @@ const itemListSchema = {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    gap: 12px;
-    max-width: 170px;
+    gap: 14px;
     min-width: 0;
     text-align: center;
     text-decoration: none;
-    transition: transform 180ms;
-    width: 170px;
+    transition: transform 200ms ease;
+    width: 180px;
   }
-  .library-arc-link:hover { transform: translateY(-2px); }
+  .library-arc-link:hover { transform: translateY(-3px); }
   .library-arc-num {
     align-items: center;
-    background: white;
-    border: 2px solid var(--tint, var(--heritage-orange));
+    background: var(--tint, var(--heritage-orange));
     border-radius: 50%;
-    color: var(--tint, var(--heritage-orange));
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--tint, var(--heritage-orange)) 14%, transparent),
+      0 8px 18px -8px color-mix(in srgb, var(--tint, var(--heritage-orange)) 55%, transparent);
+    color: white;
     display: inline-flex;
     flex-shrink: 0;
     font-family: var(--font-display);
-    font-size: 0.8rem;
+    font-size: 1.05rem;
     font-weight: 800;
-    height: 36px;
+    height: 48px;
     justify-content: center;
-    transition: background-color 180ms, color 180ms, box-shadow 180ms;
-    width: 36px;
+    letter-spacing: -0.01em;
+    position: relative;
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 220ms;
+    width: 48px;
+  }
+  /* Subtle inner highlight so the number bubble reads as a button,
+     not a flat disc. Kept inside the padding so it doesn't bleed. */
+  .library-arc-num::after {
+    background: linear-gradient(
+      160deg,
+      rgb(255 255 255 / 28%) 0%,
+      transparent 50%
+    );
+    border-radius: inherit;
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
   }
   .library-arc-link:hover .library-arc-num {
-    background: var(--tint, var(--heritage-orange));
-    box-shadow: 0 0 0 6px rgb(241 93 34 / 12%);
-    color: white;
+    box-shadow:
+      0 0 0 6px color-mix(in srgb, var(--tint, var(--heritage-orange)) 22%, transparent),
+      0 12px 24px -8px color-mix(in srgb, var(--tint, var(--heritage-orange)) 65%, transparent);
+    transform: scale(1.05);
+  }
+  .library-arc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: 0 4px;
   }
   .library-arc-text {
     -webkit-box-orient: vertical;
     color: var(--deep-slate);
     display: -webkit-box;
-    font-family: var(--font-serif);
-    font-size: 0.88rem;
-    font-weight: 500;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
     -webkit-line-clamp: 2;
     line-clamp: 2;
-    line-height: 1.3;
-    min-width: 0;
+    line-height: 1.25;
     overflow: hidden;
-    padding: 0 6px;
-    text-align: center;
     text-overflow: ellipsis;
+    transition: color 180ms;
     word-break: break-word;
   }
+  .library-arc-link:hover .library-arc-text { color: var(--tint, var(--heritage-orange)); }
+  .library-arc-sub {
+    color: rgb(44 62 80 / 70%);
+    display: block;
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: 0.85rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-top: 2px;
+  }
   .library-arc-connector {
-    background: linear-gradient(
-      to right,
-      rgb(241 93 34 / 20%),
-      rgb(44 62 80 / 15%)
-    );
     border-radius: 999px;
     flex: 1;
-    height: 2px;
-    margin-top: 17px;
-    min-width: 16px;
+    height: 3px;
+    margin-top: 22px;
+    min-width: 20px;
+    opacity: 0.72;
+    position: relative;
+  }
+  /* Tiny arrowhead at the end of each connector so the flow direction
+     reads at a glance instead of feeling like a passive divider. */
+  .library-arc-connector::after {
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid currentColor;
+    border-top: 4px solid transparent;
+    color: var(--tint, var(--heritage-orange));
+    content: '';
+    opacity: 0.55;
+    position: absolute;
+    right: -2px;
+    top: -3px;
   }
 
   /* ===== PILLAR GRID ===== */
@@ -859,10 +986,13 @@ const itemListSchema = {
       grid-template-columns: 1fr;
       padding: 0 24px;
     }
-    .library-arc { padding: 24px; }
+    .library-arc { padding: 0 24px; }
+    .library-arc-frame { padding: 28px 24px 32px; }
+    .library-arc-label { margin-bottom: 22px; }
+    .library-arc-label-rule { max-width: 60px; }
     .library-arc-list {
       flex-direction: column;
-      gap: 14px;
+      gap: 0;
     }
     .library-arc-item {
       flex: none;
@@ -871,25 +1001,51 @@ const itemListSchema = {
       width: 100%;
     }
     .library-arc-link {
+      align-items: flex-start;
       flex-direction: row;
-      gap: 14px;
+      gap: 18px;
       max-width: none;
       text-align: left;
       width: 100%;
     }
-    .library-arc-text {
+    .library-arc-num {
+      font-size: 1rem;
+      height: 44px;
+      margin-top: 2px;
+      width: 44px;
+    }
+    .library-arc-body {
+      flex: 1;
       padding: 0;
+    }
+    .library-arc-text {
+      font-size: 1rem;
       text-align: left;
     }
+    .library-arc-sub { text-align: left; }
+    /* Mobile connector becomes a short vertical rule aligned to the
+       centre of the number bubble (22px = 44px/2). Gradient still
+       flows from this station's tint to the next, but rotated. */
     .library-arc-connector {
       background: linear-gradient(
         to bottom,
-        rgb(241 93 34 / 20%),
-        rgb(44 62 80 / 15%)
-      );
-      height: 18px;
-      margin: 4px 0 4px 17px;
+        var(--tint),
+        color-mix(in srgb, var(--tint) 35%, transparent)
+      ) !important;
+      height: 26px;
+      margin: 8px 0 8px 22px;
+      min-width: 0;
       width: 2px;
+    }
+    .library-arc-connector::after {
+      border-bottom: none;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 6px solid currentColor;
+      bottom: -2px;
+      right: auto;
+      top: auto;
+      transform: translateX(-3px);
     }
     .library-foot { padding: 28px 24px 64px; }
   }

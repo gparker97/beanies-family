@@ -55,6 +55,28 @@ const guides = defineCollection({
     /** Optional recap bullets rendered in the "what to take away" card at
      *  the end of the guide. Structured plaintext for AIO skim + citation. */
     keyTakeaways: z.array(z.string()).default([]),
+    /** Curriculum scaffolding — these fields make the 4 pillars feel like
+     *  one connected walk instead of 4 parallel articles.
+     *
+     *  `stationSubtitle` renders under the numbered node in the /guides
+     *  hero arc. One short sentence describing what THIS chapter does
+     *  for the reader.
+     *
+     *  `prevTeaser` / `nextTeaser` render inside the prev/next cards at
+     *  the bottom of each article — a one-sentence tease of the adjacent
+     *  chapter so "what's next" is motivated, not just labelled.
+     *
+     *  `isFinalPillar` swaps the next card for a "payoff" closing card
+     *  on the last guide in the sequence.
+     *
+     *  `loopbackTeaser` renders inside that payoff card as the tease
+     *  for re-reading the whole curriculum from chapter 1.
+     */
+    stationSubtitle: z.string().optional(),
+    prevTeaser: z.string().optional(),
+    nextTeaser: z.string().optional(),
+    isFinalPillar: z.boolean().default(false),
+    loopbackTeaser: z.string().optional(),
     /** When true, the entry is hidden from production builds (list pages,
      *  sitemap, direct URL). Visible in `npm run dev:web` so drafts can
      *  be iterated locally. See `isPublished()` in utils/content.ts. */
