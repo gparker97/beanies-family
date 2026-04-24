@@ -17,6 +17,25 @@ stationSubtitle: 'your privacy, the tools you choose, and why they can make all 
 prevTeaser: 'the money layer sits on top of the system. this is what sits under all of it.'
 isFinalPillar: true
 loopbackTeaser: "remember that I'm always here to help - if you have a feature idea for beanies.family, a bug report, or just a random comment you'd like to share,"
+learnMore:
+  - title: 'Ink & Switch: local-first software'
+    url: 'https://www.inkandswitch.com/local-first/'
+    description: 'the foundational paper.'
+  - title: 'Automerge'
+    url: 'https://automerge.org/'
+    description: 'the CRDT library powering many local-first apps (including beanies.family).'
+  - title: 'Yjs'
+    url: 'https://yjs.dev/'
+    description: 'another widely-used CRDT library.'
+  - title: 'Obsidian'
+    url: 'https://obsidian.md/'
+    description: 'a polished local-first notes app.'
+  - title: 'Logseq'
+    url: 'https://logseq.com/'
+    description: 'another local-first knowledge-management tool.'
+  - title: 'Standard Notes'
+    url: 'https://standardnotes.com/'
+    description: 'encrypted local-first notes, open source.'
 draft: false
 ---
 
@@ -179,14 +198,3 @@ This is the model on which [I built beanies.family](/blog/accidentally-built-gre
 **Families are an obvious win for local-first software.** The data is sensitive, the use cases are inherently multi-device, and the cost of getting it wrong is high. Nobody should be staring over your shoulder at your family's precious personal and financial data except you.
 
 And your beanies.
-
-<p class="guide-beanies-hug" aria-hidden="true">
-  <img src="/brand/beanies_family_hugging_transparent_512x512.png" alt="" width="200" height="200" loading="lazy" />
-</p>
-
-## further reading
-
-- [Ink & Switch: local-first software](https://www.inkandswitch.com/local-first/) - the foundational paper.
-- [Automerge](https://automerge.org/) - the CRDT library powering many local-first apps (including beanies.family).
-- [Yjs](https://yjs.dev/) - another widely-used CRDT library.
-- [Obsidian](https://obsidian.md/), [Logseq](https://logseq.com/), [Standard Notes](https://standardnotes.com/) - three of the most polished local-first apps you can use today.
