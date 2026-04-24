@@ -83,13 +83,6 @@ function tintFor(issueNumber: number): IssueTint {
   return TINTS[(issueNumber - 1) % TINTS.length]!;
 }
 
-/** First character of the title, for typographic-plate fallbacks. */
-function firstLetter(title: string): string {
-  // Strip punctuation/leading quote marks to land on a real letter.
-  const m = title.match(/[A-Za-z]/);
-  return (m?.[0] ?? title[0] ?? '•').toLowerCase();
-}
-
 const fmtLong = (d: Date) =>
   d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -110,27 +103,47 @@ const latestDate = byDateDesc[0]?.data.date;
     <header class="masthead">
       <div class="masthead-wash" aria-hidden="true"></div>
       <img
-        src="/brand/beanies_family_hugging_transparent_512x512.png"
+        src="/brand/beanies-beanstalk-mascot.webp"
         alt=""
         class="masthead-mascot"
         aria-hidden="true"
-        width="180"
-        height="180"
+        width="220"
+        height="380"
       />
       <div class="masthead-rule-top" aria-hidden="true">
         <span>THE BEANSTALK</span>
         <span class="masthead-rule-divider">·</span>
         <span>EST. 2026</span>
         <span class="masthead-rule-divider">·</span>
-        <span>A BEANIES FAMILY PUBLICATION</span>
+        <span>A BEANIES.FAMILY PUBLICATION</span>
       </div>
       <h1 class="masthead-title">
-        <span class="masthead-title-over">the</span>
-        <span class="masthead-title-under">beanstalk.</span>
+        <span class="masthead-title-lede">the</span>
+        <span class="masthead-title-brand">beanies.family</span>
+        <span class="masthead-title-main">
+          beanstalk
+          <svg
+            class="masthead-title-squiggle"
+            viewBox="0 0 300 20"
+            aria-hidden="true"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M 4 14 Q 30 2, 60 11 T 120 10 T 180 11 T 240 10 T 296 11"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
       </h1>
       <p class="masthead-pitch">
-        a weekly dispatch from the bean patch <span class="masthead-pitch-em">— friday mornings</span>,
-        greg writing, not a newsletter.
+        a newsletter about beanies.family, vibe coding, or just
+        <em>life in general</em>.<br />
+        published every friday, or roughly whenever
+        <span class="masthead-pitch-name">greg</span> feels like it.
+        <span class="masthead-pitch-em">not written by AI. usually.</span>
       </p>
       <p class="masthead-issue">
         <span class="masthead-issue-chip">VOL. 01</span>
@@ -145,8 +158,8 @@ const latestDate = byDateDesc[0]?.data.date;
       </p>
     </header>
 
-    <div class="masthead-divider" aria-hidden="true">
-      <span class="masthead-divider-glyph">🫘</span>
+    <div class="masthead-banner" aria-hidden="true">
+      <img src="/brand/beanies-beanstalk-banner.webp" alt="" width="520" height="275" />
     </div>
 
     <!-- ══════════════ FEATURED: THIS WEEK'S ISSUE ══════════════ -->
@@ -154,7 +167,6 @@ const latestDate = byDateDesc[0]?.data.date;
       const issueNo = issueMap.get(featuredPost.data.slug) ?? 1;
       const tint = tintFor(issueNo);
       const hasImage = !!featuredPost.data.coverImage;
-      const plateLetter = firstLetter(featuredPost.data.title);
       return (
         <a
           class={`issue issue-featured ${hasImage ? 'issue-has-image' : 'issue-plate-variant'}`}
@@ -171,18 +183,26 @@ const latestDate = byDateDesc[0]?.data.date;
               </div>
             ) : (
               <div class="issue-plate">
-                <span class="issue-plate-letter">{plateLetter}</span>
-                {featuredPost.data.coverEmoji && (
-                  <span class="issue-plate-stamp">{featuredPost.data.coverEmoji}</span>
-                )}
                 <span class="issue-plate-grid" aria-hidden="true"></span>
+                {featuredPost.data.coverEmoji && (
+                  <span class="issue-plate-emoji">{featuredPost.data.coverEmoji}</span>
+                )}
+                <span class="issue-plate-stamp">ISSUE {String(issueNo).padStart(2, '0')}</span>
+                <img
+                  class="issue-plate-sprout"
+                  src="/brand/beanies-beanstalk-mascot.webp"
+                  alt=""
+                  aria-hidden="true"
+                  width="96"
+                  height="166"
+                />
               </div>
             )}
           </div>
           <div class="issue-body">
             <p class="issue-kicker">
               <span class="issue-kicker-dot" aria-hidden="true"></span>
-              <span class="issue-kicker-label">THIS WEEK'S ISSUE</span>
+              <span class="issue-kicker-label">FEATURED ISSUE</span>
               <span class="issue-kicker-divider">·</span>
               <span class="issue-kicker-issue">ISSUE {String(issueNo).padStart(2, '0')}</span>
             </p>
@@ -223,7 +243,6 @@ const latestDate = byDateDesc[0]?.data.date;
             const issueNo = issueMap.get(post.data.slug) ?? 1;
             const tint = tintFor(issueNo);
             const hasImage = !!post.data.coverImage;
-            const plateLetter = firstLetter(post.data.title);
             return (
               <a
                 class={`issue ${hasImage ? 'issue-has-image' : 'issue-plate-variant'}`}
@@ -239,11 +258,19 @@ const latestDate = byDateDesc[0]?.data.date;
                     </div>
                   ) : (
                     <div class="issue-plate">
-                      <span class="issue-plate-letter">{plateLetter}</span>
-                      {post.data.coverEmoji && (
-                        <span class="issue-plate-stamp">{post.data.coverEmoji}</span>
-                      )}
                       <span class="issue-plate-grid" aria-hidden="true"></span>
+                      {post.data.coverEmoji && (
+                        <span class="issue-plate-emoji">{post.data.coverEmoji}</span>
+                      )}
+                      <span class="issue-plate-stamp">ISSUE {String(issueNo).padStart(2, '0')}</span>
+                      <img
+                        class="issue-plate-sprout"
+                        src="/brand/beanies-beanstalk-mascot.webp"
+                        alt=""
+                        aria-hidden="true"
+                        width="80"
+                        height="138"
+                      />
                     </div>
                   )}
                 </div>
@@ -321,16 +348,23 @@ const latestDate = byDateDesc[0]?.data.date;
     position: absolute;
   }
   .masthead-mascot {
-    bottom: 0;
-    filter: drop-shadow(0 12px 28px rgb(44 62 80 / 12%));
-    height: 160px;
-    opacity: 0.9;
+    animation: beanstalk-sway 6s ease-in-out infinite;
+    bottom: -18px;
+    filter: drop-shadow(0 14px 28px rgb(44 62 80 / 16%));
+    height: auto;
     pointer-events: none;
     position: absolute;
-    right: -20px;
-    transform: rotate(8deg);
-    width: 160px;
+    right: 4px;
+    transform-origin: bottom center;
+    width: 180px;
     z-index: 0;
+  }
+  @keyframes beanstalk-sway {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(2deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .masthead-mascot { animation: none; transform: rotate(0); }
   }
   .masthead-rule-top {
     align-items: center;
@@ -358,49 +392,84 @@ const latestDate = byDateDesc[0]?.data.date;
     max-width: 80px;
   }
   .masthead-rule-divider { opacity: 0.55; }
+  /* Playful, less literary title — Outfit-driven, with an italic
+     Fraunces "the" sitting on top of the brand and title words.
+     Sized modestly so it doesn't dominate the page like a broadsheet
+     masthead; meant to read "happy little zine," not "The Paris
+     Review." */
   .masthead-title {
     color: var(--deep-slate);
-    font-family: var(--font-serif);
-    font-feature-settings: 'ss01';
-    line-height: 0.9;
-    margin: 0 0 22px;
+    font-family: var(--font-display);
+    line-height: 1;
+    margin: 0 0 18px;
     position: relative;
     z-index: 1;
   }
-  .masthead-title-over {
-    display: block;
-    font-size: clamp(1.8rem, 3.6vw, 2.6rem);
-    font-style: italic;
-    font-weight: 400;
-    letter-spacing: -0.005em;
-    opacity: 0.75;
-  }
-  .masthead-title-under {
-    color: var(--deep-slate);
+  .masthead-title-lede {
+    color: rgb(44 62 80 / 55%);
     display: block;
     font-family: var(--font-serif);
-    font-size: clamp(4rem, 11vw, 8rem);
+    font-feature-settings: 'ss01';
+    font-size: clamp(1.2rem, 2.2vw, 1.6rem);
     font-style: italic;
-    font-weight: 500;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    margin-bottom: 2px;
+  }
+  .masthead-title-brand {
+    color: var(--heritage-orange);
+    display: block;
+    font-family: var(--font-display);
+    font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .masthead-title-main {
+    color: var(--deep-slate);
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: clamp(3.2rem, 8vw, 5.5rem);
+    font-weight: 800;
     letter-spacing: -0.035em;
-    margin-top: 2px;
+    line-height: 0.95;
+    position: relative;
+  }
+  /* Hand-drawn squiggle underline, stroked in Heritage Orange. SVG
+     uses currentColor so the stroke inherits the color rule below. */
+  .masthead-title-squiggle {
+    bottom: -0.2em;
+    color: var(--heritage-orange);
+    height: 0.28em;
+    left: -2%;
+    opacity: 0.9;
+    position: absolute;
+    width: 104%;
   }
   .masthead-pitch {
     color: rgb(44 62 80 / 78%);
-    font-family: var(--font-serif);
-    font-size: clamp(1.05rem, 1.6vw, 1.2rem);
-    font-style: italic;
+    font-family: var(--font-display);
+    font-size: clamp(1rem, 1.55vw, 1.15rem);
     font-weight: 400;
-    line-height: 1.55;
+    line-height: 1.6;
     margin: 0 auto 26px;
-    max-width: 620px;
+    max-width: 580px;
     position: relative;
     z-index: 1;
   }
-  .masthead-pitch-em {
+  .masthead-pitch em {
     color: var(--heritage-orange);
+    font-family: var(--font-serif);
     font-style: italic;
     font-weight: 500;
+  }
+  .masthead-pitch-name {
+    color: var(--deep-slate);
+    font-weight: 700;
+  }
+  .masthead-pitch-em {
+    color: var(--deep-slate);
+    font-weight: 600;
   }
   .masthead-issue {
     align-items: center;
@@ -431,6 +500,35 @@ const latestDate = byDateDesc[0]?.data.date;
   }
   .masthead-issue-dot { opacity: 0.45; }
 
+  /* Beanstalk cartoon banner — between masthead and featured card.
+     Three whimsical vine shapes + a smiling cloud, silhouetted as a
+     row. Sized modestly; treated as decoration, not a hero graphic. */
+  .masthead-banner {
+    display: flex;
+    justify-content: center;
+    margin: 0 auto 44px;
+    max-width: 560px;
+    padding: 0 32px;
+    position: relative;
+  }
+  .masthead-banner img {
+    animation: beanstalk-float 4.2s ease-in-out infinite;
+    display: block;
+    filter: drop-shadow(0 8px 18px rgb(44 62 80 / 12%));
+    height: auto;
+    max-width: 520px;
+    width: 100%;
+  }
+  @keyframes beanstalk-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .masthead-banner img { animation: none; }
+  }
+
+  /* Legacy divider (kept for the old-style glyph-divider pattern in
+     case any other surface reuses it). Unused on this page. */
   .masthead-divider {
     align-items: center;
     color: var(--heritage-orange);
@@ -538,14 +636,16 @@ const latestDate = byDateDesc[0]?.data.date;
     filter: saturate(1.08) contrast(1.04);
     transform: scale(1.02);
   }
-  /* Scrapbook tape corners */
+  /* Scrapbook tape corners — tinted to the post's edition color so
+     each card has matching washi tape. Feels warmer and more
+     hand-glued than the earlier translucent-white version. */
   .issue-media-tape {
-    background: rgb(255 255 255 / 55%);
-    border: 1px solid rgb(255 255 255 / 35%);
-    box-shadow: 0 2px 4px rgb(44 62 80 / 12%);
-    height: 14px;
+    background: color-mix(in srgb, var(--tint) 32%, white);
+    border: 1px solid color-mix(in srgb, var(--tint) 25%, rgb(255 255 255 / 50%));
+    box-shadow: 0 2px 5px rgb(44 62 80 / 15%);
+    height: 16px;
     position: absolute;
-    width: 44px;
+    width: 50px;
     z-index: 2;
   }
   .issue-media-tape-tl {
@@ -559,7 +659,11 @@ const latestDate = byDateDesc[0]?.data.date;
     transform: rotate(-18deg);
   }
 
-  /* ── Typographic plate (when no coverImage) ── */
+  /* ── Playful plate (when no coverImage) ──
+     Big cover emoji as the dominant element, small beanstalk mascot
+     peeking in from the bottom-left, ISSUE-stamp pill in the top-right.
+     Designed to feel like a hand-glued sticker rather than a stark
+     editorial plate. */
   .issue-plate {
     align-items: center;
     color: var(--tint-ink);
@@ -567,36 +671,52 @@ const latestDate = byDateDesc[0]?.data.date;
     height: 100%;
     justify-content: center;
     min-height: 240px;
+    overflow: hidden;
     position: relative;
   }
-  .issue-plate-letter {
-    font-family: var(--font-serif);
-    font-feature-settings: 'ss01';
-    font-size: clamp(9rem, 22vw, 16rem);
-    font-style: italic;
-    font-weight: 500;
-    letter-spacing: -0.06em;
-    line-height: 0.82;
-    margin-bottom: -0.08em;
-    opacity: 0.82;
+  .issue-plate-emoji {
+    animation: plate-emoji-wobble 4.8s ease-in-out infinite;
+    font-size: clamp(4.5rem, 11vw, 7rem);
+    line-height: 1;
     position: relative;
+    transform-origin: center;
     z-index: 1;
   }
-  .issue-plate-stamp {
-    align-items: center;
-    background: white;
-    border: 1px solid color-mix(in srgb, var(--tint) 26%, transparent);
-    border-radius: 50%;
-    box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--tint) 30%, transparent);
-    display: inline-flex;
-    font-size: 1.25rem;
-    height: 42px;
-    justify-content: center;
+  @keyframes plate-emoji-wobble {
+    0%, 100% { transform: rotate(-3deg) scale(1); }
+    50% { transform: rotate(3deg) scale(1.04); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .issue-plate-emoji { animation: none; transform: none; }
+  }
+  .issue-plate-sprout {
+    bottom: -6px;
+    filter: drop-shadow(0 4px 8px rgb(44 62 80 / 18%));
+    height: auto;
+    left: 8px;
+    opacity: 0.92;
+    pointer-events: none;
     position: absolute;
-    right: 20px;
-    top: 20px;
-    transform: rotate(6deg);
-    width: 42px;
+    transform: rotate(-4deg);
+    width: 80px;
+    z-index: 0;
+  }
+  .issue-plate-stamp {
+    background: white;
+    border: 1px solid color-mix(in srgb, var(--tint) 30%, transparent);
+    border-radius: 999px;
+    box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--tint) 35%, transparent);
+    color: var(--tint-ink);
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    padding: 5px 11px;
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    transform: rotate(4deg);
+    z-index: 2;
     z-index: 2;
   }
   /* Subtle paper grid — echoes the guide textures. */
@@ -752,10 +872,12 @@ const latestDate = byDateDesc[0]?.data.date;
   @media (max-width: 900px) {
     .masthead { padding: 100px 24px 40px; }
     .masthead-mascot {
-      height: 120px;
-      right: -10px;
-      width: 120px;
+      bottom: -10px;
+      right: 0;
+      width: 130px;
     }
+    .masthead-banner { margin-bottom: 36px; }
+    .masthead-banner img { max-width: 420px; }
     .issue-featured {
       grid-template-columns: 1fr;
       margin-bottom: 44px;
@@ -770,20 +892,24 @@ const latestDate = byDateDesc[0]?.data.date;
   @media (max-width: 520px) {
     .masthead { padding: 92px 20px 32px; }
     .masthead-mascot {
-      height: 92px;
-      opacity: 0.75;
-      right: 0;
-      width: 92px;
+      bottom: auto;
+      opacity: 0.35;
+      right: -6px;
+      top: 70px;
+      width: 100px;
     }
+    .masthead-banner img { max-width: 320px; }
     .masthead-rule-top { font-size: 0.6rem; letter-spacing: 0.22em; }
     .masthead-rule-top::before,
     .masthead-rule-top::after { max-width: 40px; }
-    .masthead-title-over { font-size: clamp(1.4rem, 5vw, 2rem); }
-    .masthead-title-under { font-size: clamp(3.2rem, 15vw, 5.2rem); }
+    .masthead-title-lede { font-size: clamp(1rem, 4vw, 1.3rem); }
+    .masthead-title-brand { font-size: clamp(1.15rem, 4.5vw, 1.5rem); }
+    .masthead-title-main { font-size: clamp(2.6rem, 12vw, 4.4rem); }
     .masthead-pitch { font-size: 1rem; }
     .issue-body { padding: 22px 20px 24px; }
     .issue-title-featured { font-size: 1.45rem; }
-    .issue-plate-letter { font-size: clamp(7rem, 38vw, 11rem); }
+    .issue-plate-emoji { font-size: clamp(3.5rem, 18vw, 5.5rem); }
+    .issue-plate-sprout { width: 60px; }
     .issue-media-frame { padding: 10px; }
   }
 
