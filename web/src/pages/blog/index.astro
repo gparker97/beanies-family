@@ -102,156 +102,6 @@ const latestDate = byDateDesc[0]?.data.date;
     <!-- ══════════════ MASTHEAD ══════════════ -->
     <header class="masthead">
       <div class="masthead-wash" aria-hidden="true"></div>
-      {/* Inline SVG backdrop — cartoon beanstalk scene inspired by the
-          original .webp banner. Three stylized bean-vines with twists
-          + curls + leaves, rooted in little soil mounds, a smiling
-          orange cloud top-right, plus a few flying leaves for
-          ambiance. Gradient-baked opacity keeps it atmospheric so
-          the title copy stays the focal point. viewBox 1200x340 +
-          preserveAspectRatio="xMidYMax slice" pins the horizon to
-          the bottom on any viewport — mobile responsiveness is free. */}
-      <svg
-        class="masthead-backdrop"
-        viewBox="0 0 1200 340"
-        preserveAspectRatio="xMidYMax slice"
-        aria-hidden="true"
-      >
-        <defs>
-          <radialGradient id="bsGlow" cx="50%" cy="95%" r="70%">
-            <stop offset="0%" stop-color="#f15d22" stop-opacity="0.2" />
-            <stop offset="45%" stop-color="#e67e22" stop-opacity="0.09" />
-            <stop offset="100%" stop-color="#f15d22" stop-opacity="0" />
-          </radialGradient>
-          <linearGradient id="bsVine" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0%" stop-color="#8b4513" stop-opacity="0.42" />
-            <stop offset="50%" stop-color="#c76a21" stop-opacity="0.48" />
-            <stop offset="100%" stop-color="#e67e22" stop-opacity="0.3" />
-          </linearGradient>
-          <linearGradient id="bsLeaf" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#f15d22" stop-opacity="0.36" />
-            <stop offset="100%" stop-color="#e67e22" stop-opacity="0.2" />
-          </linearGradient>
-          <linearGradient id="bsSoil" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#8b5a2b" stop-opacity="0.38" />
-            <stop offset="100%" stop-color="#5d3a1a" stop-opacity="0.26" />
-          </linearGradient>
-        </defs>
-
-        <rect width="1200" height="340" fill="url(#bsGlow)" />
-
-        {/* ── BEANSTALK 1 (left) — S-curve with top curl ── */}
-        <g>
-          <ellipse cx="200" cy="332" rx="82" ry="14" fill="url(#bsSoil)" />
-          <circle cx="170" cy="330" r="2" fill="#5d3a1a" fill-opacity="0.32" />
-          <circle cx="215" cy="335" r="1.6" fill="#5d3a1a" fill-opacity="0.32" />
-          <circle cx="245" cy="328" r="2" fill="#5d3a1a" fill-opacity="0.32" />
-          <path
-            d="M 200 320 C 170 282, 222 256, 198 222 C 176 190, 230 175, 206 142 C 184 108, 236 90, 214 58 C 204 38, 224 18, 204 6"
-            stroke="url(#bsVine)"
-            stroke-width="10"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <path
-            d="M 204 6 Q 236 4, 236 32 Q 222 44, 212 28"
-            stroke="url(#bsVine)"
-            stroke-width="7"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <ellipse cx="185" cy="270" rx="25" ry="10" transform="rotate(-28 185 270)" fill="url(#bsLeaf)" />
-          <ellipse cx="225" cy="205" rx="25" ry="10" transform="rotate(28 225 205)" fill="url(#bsLeaf)" />
-          <ellipse cx="185" cy="135" rx="22" ry="9" transform="rotate(-22 185 135)" fill="url(#bsLeaf)" />
-          <ellipse cx="225" cy="72" rx="20" ry="8" transform="rotate(30 225 72)" fill="url(#bsLeaf)" />
-          <circle cx="175" cy="295" r="4" fill="#f15d22" fill-opacity="0.3" />
-        </g>
-
-        {/* ── BEANSTALK 2 (middle) — twisty with top spiral ── */}
-        <g>
-          <ellipse cx="600" cy="332" rx="90" ry="15" fill="url(#bsSoil)" />
-          <circle cx="570" cy="330" r="2" fill="#5d3a1a" fill-opacity="0.32" />
-          <circle cx="618" cy="336" r="1.6" fill="#5d3a1a" fill-opacity="0.32" />
-          <circle cx="648" cy="328" r="2" fill="#5d3a1a" fill-opacity="0.32" />
-          <path
-            d="M 600 320 C 578 284, 642 264, 610 228 C 578 192, 642 172, 600 132 C 564 92, 642 72, 616 42 C 606 24, 642 4, 626 30"
-            stroke="url(#bsVine)"
-            stroke-width="11"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <path
-            d="M 626 30 Q 642 18, 648 34 Q 640 46, 628 40"
-            stroke="url(#bsVine)"
-            stroke-width="8"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <ellipse cx="620" cy="270" rx="26" ry="11" transform="rotate(22 620 270)" fill="url(#bsLeaf)" />
-          <ellipse cx="585" cy="215" rx="26" ry="11" transform="rotate(-30 585 215)" fill="url(#bsLeaf)" />
-          <ellipse cx="625" cy="155" rx="25" ry="10" transform="rotate(25 625 155)" fill="url(#bsLeaf)" />
-          <ellipse cx="580" cy="95" rx="22" ry="9" transform="rotate(-25 580 95)" fill="url(#bsLeaf)" />
-          <ellipse cx="625" cy="55" rx="18" ry="7" transform="rotate(30 625 55)" fill="url(#bsLeaf)" />
-          <circle cx="572" cy="248" r="4" fill="#f15d22" fill-opacity="0.3" />
-        </g>
-
-        {/* ── BEANSTALK 3 (right) — upward twist with double curl ── */}
-        <g>
-          <ellipse cx="1000" cy="332" rx="82" ry="14" fill="url(#bsSoil)" />
-          <circle cx="970" cy="330" r="2" fill="#5d3a1a" fill-opacity="0.32" />
-          <circle cx="1018" cy="335" r="1.6" fill="#5d3a1a" fill-opacity="0.32" />
-          <circle cx="1044" cy="328" r="2" fill="#5d3a1a" fill-opacity="0.32" />
-          <path
-            d="M 1000 320 C 1030 284, 975 258, 1020 224 C 1062 192, 984 170, 1036 132 C 1076 100, 1000 72, 1050 42"
-            stroke="url(#bsVine)"
-            stroke-width="10"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <path
-            d="M 1050 42 Q 1076 28, 1086 54 Q 1076 70, 1060 60"
-            stroke="url(#bsVine)"
-            stroke-width="8"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <path
-            d="M 1060 60 Q 1068 70, 1054 74"
-            stroke="url(#bsVine)"
-            stroke-width="6"
-            fill="none"
-            stroke-linecap="round"
-          />
-          <ellipse cx="1002" cy="275" rx="24" ry="10" transform="rotate(28 1002 275)" fill="url(#bsLeaf)" />
-          <ellipse cx="1040" cy="210" rx="24" ry="10" transform="rotate(-30 1040 210)" fill="url(#bsLeaf)" />
-          <ellipse cx="1004" cy="150" rx="22" ry="9" transform="rotate(22 1004 150)" fill="url(#bsLeaf)" />
-          <ellipse cx="1046" cy="92" rx="20" ry="8" transform="rotate(-28 1046 92)" fill="url(#bsLeaf)" />
-        </g>
-
-        {/* ── Smiling cloud top-right ── */}
-        <g transform="translate(1108, 60)">
-          <g fill="#f15d22" fill-opacity="0.15">
-            <ellipse cx="0" cy="0" rx="56" ry="20" />
-            <ellipse cx="-28" cy="-10" rx="22" ry="15" />
-            <ellipse cx="22" cy="-13" rx="20" ry="14" />
-            <ellipse cx="0" cy="-18" rx="17" ry="10" />
-          </g>
-          <circle cx="-13" cy="-3" r="2.2" fill="#f15d22" fill-opacity="0.55" />
-          <circle cx="13" cy="-3" r="2.2" fill="#f15d22" fill-opacity="0.55" />
-          <path
-            d="M -11 5 Q 0 14 11 5"
-            stroke="#f15d22"
-            stroke-opacity="0.55"
-            stroke-width="2"
-            fill="none"
-            stroke-linecap="round"
-          />
-        </g>
-
-        {/* ── Flying leaves for ambiance ── */}
-        <ellipse cx="380" cy="102" rx="10" ry="4" transform="rotate(40 380 102)" fill="url(#bsLeaf)" />
-        <ellipse cx="820" cy="74" rx="10" ry="4" transform="rotate(-30 820 74)" fill="url(#bsLeaf)" />
-        <ellipse cx="460" cy="62" rx="8" ry="3" transform="rotate(20 460 62)" fill="url(#bsLeaf)" />
-      </svg>
 
       {/* Mascot as a left-side hero illustration — full opacity,
           anchored bottom of the masthead so it reads as "standing
@@ -501,11 +351,35 @@ const latestDate = byDateDesc[0]?.data.date;
     position: relative;
     z-index: 1;
   }
+  /* Polished beanies-theme gradient backdrop. Layered radial gradients
+     in the brand palette (Heritage Orange at top-left, Terracotta
+     middle-right, Sky Silk lower-right, Kraft warmth center-bottom).
+     Plus a subtle horizontal wash along the bottom for "horizon"
+     warmth without resorting to cartoon illustration. Scales fluidly
+     at any viewport, no SVG needed. */
   .masthead-wash {
     background:
-      radial-gradient(circle at 22% 35%, rgb(241 93 34 / 10%) 0%, transparent 42%),
-      radial-gradient(circle at 78% 70%, rgb(230 126 34 / 7%) 0%, transparent 45%);
+      radial-gradient(circle at 15% 25%, rgb(241 93 34 / 18%) 0%, transparent 45%),
+      radial-gradient(circle at 82% 20%, rgb(174 214 241 / 22%) 0%, transparent 50%),
+      radial-gradient(circle at 78% 78%, rgb(230 126 34 / 16%) 0%, transparent 48%),
+      radial-gradient(circle at 30% 95%, rgb(243 236 216 / 55%) 0%, transparent 55%),
+      linear-gradient(180deg, rgb(248 249 250 / 0%) 0%, rgb(241 93 34 / 6%) 100%);
     inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+  /* Subtle grain overlay — tiny orange + slate dots to add paper-ish
+     texture that the gradient alone can't supply. Very low contrast. */
+  .masthead-wash::after {
+    background-image:
+      radial-gradient(circle at 18% 42%, rgb(241 93 34 / 8%) 0.8px, transparent 1.1px),
+      radial-gradient(circle at 62% 28%, rgb(44 62 80 / 5%) 0.8px, transparent 1.1px),
+      radial-gradient(circle at 88% 66%, rgb(241 93 34 / 7%) 0.8px, transparent 1.1px);
+    background-size: 120px 120px, 96px 96px, 156px 156px;
+    content: '';
+    inset: 0;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
     pointer-events: none;
     position: absolute;
   }
@@ -634,73 +508,20 @@ const latestDate = byDateDesc[0]?.data.date;
   }
   .masthead-issue-dot { opacity: 0.45; }
 
-  /* Inline-SVG backdrop — scales fluidly across any viewport, so
-     mobile responsiveness is free. `preserveAspectRatio="xMidYMax
-     slice"` keeps the horizon pinned to the bottom of the masthead
-     while cropping the top when the SVG aspect ratio exceeds the
-     container's. Opacity is baked into the gradient stops + fills,
-     so we don't need a CSS opacity rule fighting against stacking
-     contexts. */
-  .masthead-backdrop {
-    bottom: 0;
-    display: block;
-    height: 62%;
-    left: 0;
-    pointer-events: none;
-    position: absolute;
-    right: 0;
-    width: 100%;
-    z-index: 0;
-  }
-
-  /* Legacy divider (kept for the old-style glyph-divider pattern in
-     case any other surface reuses it). Unused on this page. */
-  .masthead-divider {
-    align-items: center;
-    color: var(--heritage-orange);
-    display: flex;
-    gap: 18px;
-    justify-content: center;
-    margin: 0 auto 48px;
-    max-width: 540px;
-    padding: 0 32px;
-  }
-  .masthead-divider::before,
-  .masthead-divider::after {
-    background: linear-gradient(to right, transparent, rgb(241 93 34 / 30%), transparent);
-    content: '';
-    flex: 1;
-    height: 1px;
-  }
-  .masthead-divider-glyph {
-    font-size: 0.9rem;
-    letter-spacing: 0.3em;
-    opacity: 0.6;
-  }
-
   /* ══════════════ HERO MASCOT ══════════════
-     Beanie-character illustration as the masthead's left-column
-     hero feature. Flex item (not absolute) so the text block flows
+     Beanie-character illustration as the masthead's left-column hero
+     feature. Flex item (not absolute) so the text block flows
      naturally to its right. `align-items: flex-end` on the parent
-     pins the mascot's soil mound to the masthead baseline. Subtle
-     sway animation for a hand-drawn, alive feel. */
+     pins the mascot's soil mound to the masthead baseline. Static
+     placement — no sway — so it sits flush against the gradient. */
   .masthead-mascot {
-    animation: masthead-mascot-sway 7s ease-in-out infinite;
     filter: drop-shadow(0 12px 24px rgb(44 62 80 / 18%));
     flex-shrink: 0;
     height: auto;
     pointer-events: none;
     position: relative;
-    transform-origin: bottom center;
     width: 220px;
     z-index: 1;
-  }
-  @keyframes masthead-mascot-sway {
-    0%, 100% { transform: rotate(-1.5deg); }
-    50% { transform: rotate(1.5deg); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .masthead-mascot { animation: none; transform: rotate(0); }
   }
 
   /* ══════════════ ISSUE CARDS (featured + back issues) ══════════════ */
@@ -780,6 +601,9 @@ const latestDate = byDateDesc[0]?.data.date;
     filter: saturate(1.02) contrast(1.02);
     height: 100%;
     object-fit: cover;
+    /* Bias crop toward the upper third — keeps faces visible on
+       portrait family photos when the 16:10 frame crops vertically. */
+    object-position: center 28%;
     transition: transform 500ms ease, filter 500ms ease;
     width: 100%;
   }
@@ -1027,7 +851,6 @@ const latestDate = byDateDesc[0]?.data.date;
       gap: 8px;
       padding: 100px 24px 40px;
     }
-    .masthead-backdrop { height: 58%; }
     .masthead-mascot {
       margin-bottom: -6px;
       width: 170px;
@@ -1045,7 +868,6 @@ const latestDate = byDateDesc[0]?.data.date;
 
   @media (max-width: 520px) {
     .masthead { padding: 92px 20px 32px; }
-    .masthead-backdrop { height: 52%; }
     .masthead-mascot { width: 130px; }
     .masthead-rule-top { font-size: 0.6rem; letter-spacing: 0.22em; }
     .masthead-rule-top::before,
