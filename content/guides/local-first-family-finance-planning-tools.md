@@ -176,9 +176,13 @@ Local-first for families means a different architecture and experience:
 
 This is the model on which [I built beanies.family](/blog/accidentally-built-greatest-family-app). Partly because it was the model I wanted for my own family, but also because, once it was clear what the new tooling that we discussed above could do - it felt almost negligent not to.
 
-**Families are an obvious win for local-first software.** The data is sensitive, the use cases are inherently multi-device, and the cost of getting it wrong is high. Nobody should be staring over your shoulder at your family's precious personal and financial data except you. And your beanies.
+**Families are an obvious win for local-first software.** The data is sensitive, the use cases are inherently multi-device, and the cost of getting it wrong is high. Nobody should be staring over your shoulder at your family's precious personal and financial data except you.
 
-Thanks for reading. If you want the personal story of how I ended up here, start with [why I built beanies.family](/blog/welcome-to-the-beanstalk).
+And your beanies.
+
+<p class="guide-beanies-hug" aria-hidden="true">
+  <img src="/brand/beanies_family_hugging_transparent_512x512.png" alt="" width="200" height="200" loading="lazy" />
+</p>
 
 ## further reading
 
