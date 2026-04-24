@@ -12,6 +12,8 @@ import { prefillTransportationDates } from '@/utils/vacation';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 
 const props = withDefaults(
@@ -193,19 +195,15 @@ function isBus(type: VacationTransportationType): boolean {
           </div>
           <div class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('vacation.field.departureDate')">
-              <BaseInput
-                type="date"
+              <BeanieDatePicker
                 :model-value="item.departureDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'departureDate', String($event))"
+                @update:model-value="updateItem(index, 'departureDate', $event)"
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.departureTime')">
-              <BaseInput
-                type="time"
+              <BeanieTimeInput
                 :model-value="item.departureTime ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'departureTime', String($event))"
+                @update:model-value="updateItem(index, 'departureTime', $event)"
               />
             </FormFieldGroup>
           </div>
@@ -261,37 +259,29 @@ function isBus(type: VacationTransportationType): boolean {
           </FormFieldGroup>
           <div class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('vacation.field.pickupDate')">
-              <BaseInput
-                type="date"
+              <BeanieDatePicker
                 :model-value="item.pickupDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'pickupDate', String($event))"
+                @update:model-value="updateItem(index, 'pickupDate', $event)"
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.pickupTime')">
-              <BaseInput
-                type="time"
+              <BeanieTimeInput
                 :model-value="item.pickupTime ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'pickupTime', String($event))"
+                @update:model-value="updateItem(index, 'pickupTime', $event)"
               />
             </FormFieldGroup>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('vacation.field.returnDate')">
-              <BaseInput
-                type="date"
+              <BeanieDatePicker
                 :model-value="item.returnDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'returnDate', String($event))"
+                @update:model-value="updateItem(index, 'returnDate', $event)"
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.returnTime')">
-              <BaseInput
-                type="time"
+              <BeanieTimeInput
                 :model-value="item.returnTime ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'returnTime', String($event))"
+                @update:model-value="updateItem(index, 'returnTime', $event)"
               />
             </FormFieldGroup>
           </div>
@@ -308,28 +298,22 @@ function isBus(type: VacationTransportationType): boolean {
           </FormFieldGroup>
           <div class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('vacation.field.pickupDate')">
-              <BaseInput
-                type="date"
+              <BeanieDatePicker
                 :model-value="item.pickupDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'pickupDate', String($event))"
+                @update:model-value="updateItem(index, 'pickupDate', $event)"
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.pickupTime')">
-              <BaseInput
-                type="time"
+              <BeanieTimeInput
                 :model-value="item.pickupTime ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'pickupTime', String($event))"
+                @update:model-value="updateItem(index, 'pickupTime', $event)"
               />
             </FormFieldGroup>
           </div>
           <FormFieldGroup :label="t('vacation.field.returnDate')">
-            <BaseInput
-              type="date"
+            <BeanieDatePicker
               :model-value="item.returnDate ?? ''"
-              class="vacation-teal-input"
-              @update:model-value="updateItem(index, 'returnDate', String($event))"
+              @update:model-value="updateItem(index, 'returnDate', $event)"
             />
           </FormFieldGroup>
         </template>
@@ -338,19 +322,15 @@ function isBus(type: VacationTransportationType): boolean {
         <template v-else-if="item.type === 'taxi_rideshare'">
           <div class="grid grid-cols-2 gap-3">
             <FormFieldGroup :label="t('vacation.field.pickupDate')">
-              <BaseInput
-                type="date"
+              <BeanieDatePicker
                 :model-value="item.pickupDate ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'pickupDate', String($event))"
+                @update:model-value="updateItem(index, 'pickupDate', $event)"
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.pickupTime')">
-              <BaseInput
-                type="time"
+              <BeanieTimeInput
                 :model-value="item.pickupTime ?? ''"
-                class="vacation-teal-input"
-                @update:model-value="updateItem(index, 'pickupTime', String($event))"
+                @update:model-value="updateItem(index, 'pickupTime', $event)"
               />
             </FormFieldGroup>
           </div>

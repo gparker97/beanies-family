@@ -12,7 +12,7 @@
  * wiring so screen readers announce the failure alongside the inputs.
  */
 import { computed, watch } from 'vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { parseLocalDate, addDays, toDateInputValue } from '@/utils/date';
@@ -69,11 +69,11 @@ const summary = computed(() => {
 
 const chipsDisabled = computed(() => !props.startDate || !isValidISODate(props.startDate));
 
-function onStartChange(v: string | number): void {
-  emit('update:startDate', String(v));
+function onStartChange(v: string): void {
+  emit('update:startDate', v);
 }
-function onEndChange(v: string | number): void {
-  emit('update:endDate', String(v));
+function onEndChange(v: string): void {
+  emit('update:endDate', v);
 }
 
 function offsetEndFromStart(days: number): void {
@@ -103,24 +103,16 @@ const chipClass = computed(() => [
   <div class="space-y-3">
     <div class="grid grid-cols-2 gap-3">
       <FormFieldGroup :label="t('travel.dates.startLabel')" required>
-        <BaseInput
-          type="date"
-          :model-value="startDate"
-          :aria-invalid="!!errorMessage"
-          :aria-describedby="errorMessage ? errorId : undefined"
-          @update:model-value="onStartChange"
-        />
+        <BeanieDatePicker :model-value="startDate" @update:model-value="onStartChange" />
       </FormFieldGroup>
       <FormFieldGroup
         :label="t('travel.dates.endLabel')"
         required
         :error="!!errorMessage && (endBeforeStart || !!endDate)"
       >
-        <BaseInput
-          type="date"
+        <BeanieDatePicker
           :model-value="endDate"
-          :aria-invalid="!!errorMessage"
-          :aria-describedby="errorMessage ? errorId : undefined"
+          :min="startDate"
           @update:model-value="onEndChange"
         />
       </FormFieldGroup>

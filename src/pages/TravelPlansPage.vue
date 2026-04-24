@@ -8,6 +8,8 @@ import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
 import AccommodationEditModal from '@/components/travel/AccommodationEditModal.vue';
 import TransportationEditModal from '@/components/travel/TransportationEditModal.vue';
@@ -1030,54 +1032,41 @@ function addQuickIdea() {
                             <span class="text-xs opacity-30">📋</span>
                           </button>
 
-                          <!-- Inline-editable date/time: show formatted text with hidden native picker.
-                               Ref key MUST include item.id — multiple segments share field names
-                               like `departureDate`, so a non-scoped ref collides across segments and
-                               `?.[0]?.showPicker()` ends up firing the wrong segment's picker. -->
+                          <!-- Inline-editable date/time — themed beanie pills. Night-flight
+                               hint renders alongside when a date field is a late-night or
+                               early-morning departure. -->
                           <div
-                            v-else-if="
-                              row.field && (row.inputType === 'date' || row.inputType === 'time')
-                            "
-                            class="group/field relative min-w-0 shrink"
+                            v-else-if="row.field && row.inputType === 'date'"
+                            class="flex min-w-0 flex-wrap items-center gap-2"
                           >
+                            <div class="max-w-[180px] min-w-0">
+                              <BeanieDatePicker
+                                :model-value="String(row.value ?? '')"
+                                @update:model-value="saveInlineField(item, row.field!, $event)"
+                              />
+                            </div>
                             <span
-                              class="font-outfit cursor-pointer border-b border-dashed border-transparent pr-6 text-sm font-medium text-gray-900 transition-colors hover:border-gray-300 dark:text-gray-100"
-                              @click="
-                                (
-                                  $refs[`input-${item.id}-${row.field}`] as HTMLInputElement[]
-                                )?.[0]?.showPicker?.()
-                              "
+                              v-if="hintMap.get(item.id)?.nightFlight === 'early-morning'"
+                              class="font-outfit shrink-0 text-xs text-[var(--color-text-muted)]"
                             >
-                              {{ row.displayValue || row.value
-                              }}{{
-                                row.inputType === 'date' &&
-                                hintMap.get(item.id)?.nightFlight === 'early-morning'
-                                  ? ' 🌙 early morning'
-                                  : row.inputType === 'date' &&
-                                      hintMap.get(item.id)?.nightFlight === 'late-night'
-                                    ? ' 🌙 late night'
-                                    : ''
-                              }}
+                              🌙 early morning
                             </span>
-                            <input
-                              :ref="`input-${item.id}-${row.field}`"
-                              :type="row.inputType"
-                              :value="row.value"
-                              class="pointer-events-none absolute inset-0 opacity-0"
-                              tabindex="-1"
-                              @change="
-                                saveInlineField(
-                                  item,
-                                  row.field!,
-                                  ($event.target as HTMLInputElement).value
-                                )
-                              "
+                            <span
+                              v-else-if="hintMap.get(item.id)?.nightFlight === 'late-night'"
+                              class="font-outfit shrink-0 text-xs text-[var(--color-text-muted)]"
+                            >
+                              🌙 late night
+                            </span>
+                          </div>
+
+                          <div
+                            v-else-if="row.field && row.inputType === 'time'"
+                            class="max-w-[140px] min-w-0 shrink"
+                          >
+                            <BeanieTimeInput
+                              :model-value="String(row.value ?? '')"
+                              @update:model-value="saveInlineField(item, row.field!, $event)"
                             />
-                            <span
-                              class="pointer-events-none absolute top-1/2 right-0 -translate-y-1/2 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover/field:opacity-100 dark:text-slate-500"
-                            >
-                              ✏️
-                            </span>
                           </div>
 
                           <!-- Text / prose field — display-only with expand-to-read-more;

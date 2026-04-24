@@ -6,7 +6,7 @@ import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -249,7 +249,7 @@ function handleDelete() {
 
     <!-- 7. Deadline -->
     <FormFieldGroup :label="t('modal.deadline')" optional>
-      <BaseInput v-model="deadline" type="date" />
+      <BeanieDatePicker v-model="deadline" />
     </FormFieldGroup>
   </BeanieFormModal>
 </template>

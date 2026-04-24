@@ -16,6 +16,7 @@ import AmortizationBreakdown from '@/components/ui/AmortizationBreakdown.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useActivityStore } from '@/stores/activityStore';
@@ -856,7 +857,7 @@ function dismissLinkPrompt() {
           </FormFieldGroup>
         </div>
         <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr]">
-          <BaseInput v-model="startDate" :label="t('form.startDate')" type="date" required />
+          <BeanieDatePicker v-model="startDate" :label="t('form.startDate')" required />
           <div v-if="recurrenceFrequency === 'monthly'" class="flex items-end">
             <FormFieldGroup :label="t('transactions.dayOfMonth')">
               <div class="relative">
@@ -889,7 +890,7 @@ function dismissLinkPrompt() {
               </div>
             </FormFieldGroup>
           </div>
-          <BaseInput v-model="endDate" :label="`${t('form.endDate')} (optional)`" type="date" />
+          <BeanieDatePicker v-model="endDate" :label="`${t('form.endDate')} (optional)`" />
         </div>
       </div>
     </ConditionalSection>
@@ -898,7 +899,7 @@ function dismissLinkPrompt() {
     <ConditionalSection :show="recurrenceMode === 'one-time' && !isEditingRecurring">
       <div class="space-y-4">
         <FormFieldGroup :label="t('form.date')">
-          <BaseInput v-model="date" type="date" required />
+          <BeanieDatePicker v-model="date" required />
         </FormFieldGroup>
       </div>
     </ConditionalSection>

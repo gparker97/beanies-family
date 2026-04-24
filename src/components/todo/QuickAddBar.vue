@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 
 const { t } = useTranslation();
 
@@ -13,7 +14,6 @@ const title = ref('');
 const dueDate = ref('');
 const assigneeIds = ref<string[]>([]);
 const titleInput = ref<HTMLInputElement>();
-const dateInputFocused = ref(false);
 
 function focus() {
   titleInput.value?.focus();
@@ -73,30 +73,8 @@ function handleKeydown(e: KeyboardEvent) {
       </div>
 
       <!-- Date picker (desktop) -->
-      <div
-        class="hidden shrink-0 items-center gap-1.5 rounded-2xl px-3 transition-colors sm:flex"
-        :class="dueDate ? 'bg-[var(--tint-orange-8)]' : ''"
-        :style="!dueDate ? 'background: var(--tint-slate-5)' : undefined"
-      >
-        <span class="text-base">📅</span>
-        <div class="relative">
-          <input
-            v-model="dueDate"
-            type="date"
-            class="beanies-input font-outfit cursor-pointer border-none bg-transparent py-3 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-            :style="{
-              color: dueDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
-            }"
-            @focus="dateInputFocused = true"
-            @blur="dateInputFocused = false"
-          />
-          <span
-            v-if="!dueDate && !dateInputFocused"
-            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-2 text-sm font-semibold text-[var(--color-text)]"
-          >
-            {{ t('todo.selectDueDate') }}
-          </span>
-        </div>
+      <div class="hidden shrink-0 sm:block">
+        <BeanieDatePicker v-model="dueDate" :placeholder="t('todo.selectDueDate')" />
       </div>
 
       <!-- Assignee (desktop) -->
@@ -107,31 +85,7 @@ function handleKeydown(e: KeyboardEvent) {
 
     <!-- Row 2: Date + Assignee on same line (mobile only) -->
     <div class="grid grid-cols-2 gap-2 sm:hidden">
-      <div
-        class="flex items-center gap-1.5 rounded-2xl px-3 transition-colors"
-        :class="dueDate ? 'bg-[var(--tint-orange-8)]' : ''"
-        :style="!dueDate ? 'background: var(--tint-slate-5)' : undefined"
-      >
-        <span class="text-sm">📅</span>
-        <div class="relative min-w-0 flex-1">
-          <input
-            v-model="dueDate"
-            type="date"
-            class="beanies-input font-outfit w-full min-w-0 cursor-pointer border-none bg-transparent py-2 text-xs font-semibold shadow-none focus:shadow-none focus:ring-0"
-            :style="{
-              color: dueDate || dateInputFocused ? 'var(--color-primary)' : 'transparent',
-            }"
-            @focus="dateInputFocused = true"
-            @blur="dateInputFocused = false"
-          />
-          <span
-            v-if="!dueDate && !dateInputFocused"
-            class="font-outfit pointer-events-none absolute inset-0 flex items-center pl-2 text-xs font-semibold text-[var(--color-text)]"
-          >
-            {{ t('todo.selectDueDate') }}
-          </span>
-        </div>
-      </div>
+      <BeanieDatePicker v-model="dueDate" :placeholder="t('todo.selectDueDate')" />
       <div class="flex items-center gap-1.5">
         <span class="font-outfit text-xs font-semibold text-[var(--color-text)] opacity-35">
           {{ t('todo.who') }}

@@ -6,6 +6,8 @@ import { addHourToTime } from '@/utils/date';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
+import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import {
@@ -342,11 +344,9 @@ function removeSegment(index: number) {
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup :label="t('form.date')" required>
-                <BaseInput
-                  type="date"
+                <BeanieDatePicker
                   :model-value="seg.departureDate ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'departureDate', String($event))"
+                  @update:model-value="updateSegment(idx, 'departureDate', $event)"
                 />
               </FormFieldGroup>
               <BaseCombobox
@@ -409,48 +409,40 @@ function removeSegment(index: number) {
                 />
               </FormFieldGroup>
             </div>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1.3fr_1fr]">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
               <FormFieldGroup
                 :label="t('vacation.field.departureTime')"
                 :required="seg.status === 'booked'"
               >
-                <BaseInput
-                  type="time"
+                <BeanieTimeInput
                   :model-value="seg.departureTime ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'departureTime', String($event))"
+                  @update:model-value="updateSegment(idx, 'departureTime', $event)"
                 />
               </FormFieldGroup>
               <FormFieldGroup
                 :label="t('vacation.field.arrivalTime')"
                 :required="seg.status === 'booked'"
               >
-                <div class="flex items-center gap-2">
-                  <BaseInput
-                    type="time"
+                <div class="flex items-center gap-1.5">
+                  <BeanieTimeInput
                     :model-value="seg.arrivalTime ?? ''"
-                    class="vacation-teal-input flex-1"
-                    @update:model-value="updateSegment(idx, 'arrivalTime', String($event))"
+                    class="min-w-0 flex-1"
+                    @update:model-value="updateSegment(idx, 'arrivalTime', $event)"
                   />
-                  <label class="flex shrink-0 items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      :checked="seg.arrivesNextDay ?? false"
-                      class="h-3.5 w-3.5 rounded border-gray-300 text-[var(--vacation-teal)] focus:ring-[var(--vacation-teal)]"
-                      @change="
-                        updateSegment(
-                          idx,
-                          'arrivesNextDay',
-                          ($event.target as HTMLInputElement).checked
-                        )
-                      "
-                    />
-                    <span
-                      class="font-outfit text-[10px] font-medium text-gray-500 dark:text-gray-400"
-                    >
-                      +1 day
-                    </span>
-                  </label>
+                  <button
+                    type="button"
+                    :aria-pressed="seg.arrivesNextDay ?? false"
+                    :title="t('vacation.field.arrivesNextDay')"
+                    class="font-outfit shrink-0 rounded-full border-2 px-2 py-1 text-xs font-bold transition-all"
+                    :class="
+                      seg.arrivesNextDay
+                        ? 'border-primary-500 text-primary-500 dark:bg-primary-500/15 bg-[var(--tint-orange-8)]'
+                        : 'border-transparent bg-[var(--tint-slate-5)] text-[var(--color-text-muted)] hover:bg-[var(--tint-slate-10)] dark:bg-slate-700 dark:text-gray-400'
+                    "
+                    @click="updateSegment(idx, 'arrivesNextDay', !(seg.arrivesNextDay ?? false))"
+                  >
+                    +1
+                  </button>
                 </div>
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.bookingReference')">
@@ -478,19 +470,16 @@ function removeSegment(index: number) {
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup :label="t('vacation.field.embarkationDate')" required>
-                <BaseInput
-                  type="date"
+                <BeanieDatePicker
                   :model-value="seg.embarkationDate ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'embarkationDate', String($event))"
+                  @update:model-value="updateSegment(idx, 'embarkationDate', $event)"
                 />
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.disembarkationDate')" required>
-                <BaseInput
-                  type="date"
+                <BeanieDatePicker
                   :model-value="seg.disembarkationDate ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'disembarkationDate', String($event))"
+                  :min="seg.embarkationDate ?? ''"
+                  @update:model-value="updateSegment(idx, 'disembarkationDate', $event)"
                 />
               </FormFieldGroup>
               <BaseCombobox
@@ -547,11 +536,9 @@ function removeSegment(index: number) {
                 :label="t('vacation.field.embarkationTime')"
                 :required="seg.status === 'booked'"
               >
-                <BaseInput
-                  type="time"
+                <BeanieTimeInput
                   :model-value="seg.embarkationTime ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'embarkationTime', String($event))"
+                  @update:model-value="updateSegment(idx, 'embarkationTime', $event)"
                 />
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.cabinNumber')">
@@ -578,11 +565,9 @@ function removeSegment(index: number) {
       <!-- ═══ Car fields — date first, then booking details ═══ -->
       <template v-else-if="seg.type === 'car'">
         <FormFieldGroup :label="t('vacation.field.departureDate')" required>
-          <BaseInput
-            type="date"
+          <BeanieDatePicker
             :model-value="seg.departureDate ?? ''"
-            class="vacation-teal-input"
-            @update:model-value="updateSegment(idx, 'departureDate', String($event))"
+            @update:model-value="updateSegment(idx, 'departureDate', $event)"
           />
         </FormFieldGroup>
         <FormFieldGroup :label="t('vacation.field.carType')" :required="seg.status === 'booked'">
@@ -595,11 +580,9 @@ function removeSegment(index: number) {
         </FormFieldGroup>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup :label="t('vacation.field.leavingTime')">
-            <BaseInput
-              type="time"
+            <BeanieTimeInput
               :model-value="seg.leavingTime ?? ''"
-              class="vacation-teal-input"
-              @update:model-value="updateSegment(idx, 'leavingTime', String($event))"
+              @update:model-value="updateSegment(idx, 'leavingTime', $event)"
             />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.carLabel')">
@@ -625,11 +608,9 @@ function removeSegment(index: number) {
           <div class="rounded-xl border border-[var(--vacation-teal)]/25 p-3">
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3 [&>*]:min-w-0">
               <FormFieldGroup :label="t('vacation.field.departureDate')" required>
-                <BaseInput
-                  type="date"
+                <BeanieDatePicker
                   :model-value="seg.departureDate ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'departureDate', String($event))"
+                  @update:model-value="updateSegment(idx, 'departureDate', $event)"
                 />
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.departureStation')" required>
@@ -702,19 +683,15 @@ function removeSegment(index: number) {
                 :label="t('vacation.field.departureTime')"
                 :required="seg.status === 'booked'"
               >
-                <BaseInput
-                  type="time"
+                <BeanieTimeInput
                   :model-value="seg.departureTime ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'departureTime', String($event))"
+                  @update:model-value="updateSegment(idx, 'departureTime', $event)"
                 />
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.arrivalTime')">
-                <BaseInput
-                  type="time"
+                <BeanieTimeInput
                   :model-value="seg.arrivalTime ?? ''"
-                  class="vacation-teal-input"
-                  @update:model-value="updateSegment(idx, 'arrivalTime', String($event))"
+                  @update:model-value="updateSegment(idx, 'arrivalTime', $event)"
                 />
               </FormFieldGroup>
             </div>

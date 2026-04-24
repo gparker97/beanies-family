@@ -11,6 +11,7 @@ import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
@@ -214,10 +215,10 @@ const currentMemberId = computed(() => familyStore.currentMember?.id);
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <FormFieldGroup :label="t('medications.field.startDate')" optional>
-        <BaseInput v-model="startDate" type="date" />
+        <BeanieDatePicker v-model="startDate" />
       </FormFieldGroup>
       <FormFieldGroup :label="t('medications.field.endDate')" optional>
-        <BaseInput v-model="endDate" type="date" :disabled="ongoing" />
+        <BeanieDatePicker v-model="endDate" :disabled="ongoing" />
       </FormFieldGroup>
     </div>
 

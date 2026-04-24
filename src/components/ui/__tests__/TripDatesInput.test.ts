@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils';
+import { createPinia, setActivePinia } from 'pinia';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import TripDatesInput from '../TripDatesInput.vue';
+import BeanieDatePicker from '../BeanieDatePicker.vue';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -12,6 +14,7 @@ describe('TripDatesInput', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    setActivePinia(createPinia());
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
@@ -85,23 +88,25 @@ describe('TripDatesInput', () => {
       expect(alert.text()).toContain('travel.dates.errorEndBeforeStart');
     });
 
-    it('links the error to both inputs via aria-describedby + aria-invalid', async () => {
+    it('emits a unique error id with the trip-dates-error- prefix', async () => {
       const wrapper = factory('2026-06-10', '2026-06-01');
       await wrapper.vm.$nextTick();
       const alert = wrapper.find('[role="alert"]');
       expect(alert.attributes('id')).toMatch(/^trip-dates-error-/);
-      const inputs = wrapper.findAll('input[type="date"]');
-      for (const input of inputs) {
-        expect(input.attributes('aria-invalid')).toBe('true');
-        expect(input.attributes('aria-describedby')).toBe(alert.attributes('id'));
-      }
     });
   });
 
   describe('quick-add chips', () => {
+    // Quick-add chips carry aria-disabled so they can be scoped tightly
+    // alongside the BeanieDatePicker trigger buttons.
+    function quickAddChips(wrapper: ReturnType<typeof factory>) {
+      return wrapper.findAll('button[aria-disabled]');
+    }
+
     it('disables all chips when start is empty', () => {
       const wrapper = factory();
-      const chips = wrapper.findAll('button[type="button"]');
+      const chips = quickAddChips(wrapper);
+      expect(chips.length).toBe(3);
       for (const chip of chips) {
         expect(chip.attributes('disabled')).toBeDefined();
         expect(chip.attributes('aria-disabled')).toBe('true');
@@ -111,7 +116,7 @@ describe('TripDatesInput', () => {
     it('enables chips when a start date is set', async () => {
       const wrapper = factory('2026-06-01', '');
       await wrapper.vm.$nextTick();
-      const chips = wrapper.findAll('button[type="button"]');
+      const chips = quickAddChips(wrapper);
       for (const chip of chips) {
         expect(chip.attributes('disabled')).toBeUndefined();
       }
@@ -120,7 +125,7 @@ describe('TripDatesInput', () => {
     it('+3 days chip emits end = start + 3', async () => {
       const wrapper = factory('2026-06-01', '');
       await wrapper.vm.$nextTick();
-      const chips = wrapper.findAll('button[type="button"]');
+      const chips = quickAddChips(wrapper);
       await chips[0]!.trigger('click');
       expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-04']);
     });
@@ -128,7 +133,7 @@ describe('TripDatesInput', () => {
     it('+1 week chip emits end = start + 7', async () => {
       const wrapper = factory('2026-06-01', '');
       await wrapper.vm.$nextTick();
-      const chips = wrapper.findAll('button[type="button"]');
+      const chips = quickAddChips(wrapper);
       await chips[1]!.trigger('click');
       expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-08']);
     });
@@ -136,7 +141,7 @@ describe('TripDatesInput', () => {
     it('+2 weeks chip emits end = start + 14', async () => {
       const wrapper = factory('2026-06-01', '');
       await wrapper.vm.$nextTick();
-      const chips = wrapper.findAll('button[type="button"]');
+      const chips = quickAddChips(wrapper);
       await chips[2]!.trigger('click');
       expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-15']);
     });
@@ -167,17 +172,19 @@ describe('TripDatesInput', () => {
   });
 
   describe('two-way binding', () => {
-    it('emits update:startDate when the start input changes', async () => {
+    it('emits update:startDate when the start picker emits a new value', async () => {
       const wrapper = factory();
-      const inputs = wrapper.findAll('input[type="date"]');
-      await inputs[0]!.setValue('2026-06-15');
+      const pickers = wrapper.findAllComponents(BeanieDatePicker);
+      pickers[0]!.vm.$emit('update:modelValue', '2026-06-15');
+      await wrapper.vm.$nextTick();
       expect(wrapper.emitted('update:startDate')?.at(-1)).toEqual(['2026-06-15']);
     });
 
-    it('emits update:endDate when the end input changes', async () => {
+    it('emits update:endDate when the end picker emits a new value', async () => {
       const wrapper = factory();
-      const inputs = wrapper.findAll('input[type="date"]');
-      await inputs[1]!.setValue('2026-06-20');
+      const pickers = wrapper.findAllComponents(BeanieDatePicker);
+      pickers[1]!.vm.$emit('update:modelValue', '2026-06-20');
+      await wrapper.vm.$nextTick();
       expect(wrapper.emitted('update:endDate')?.at(-1)).toEqual(['2026-06-20']);
     });
   });

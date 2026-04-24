@@ -11,7 +11,7 @@ import InlineEditField from '@/components/ui/InlineEditField.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import { extractUrls, getUrlDomain, getUrlLabel, getFaviconUrl } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
@@ -209,12 +209,6 @@ function handleDescriptionKeydown(e: KeyboardEvent) {
   }
 }
 
-function handleDateKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') {
-    cancelEdit();
-  }
-}
-
 // Auto-save handlers for picker components
 function handleTimeChange(value: string) {
   draftDueTime.value = value;
@@ -378,12 +372,7 @@ async function handleDelete() {
           <template #edit>
             <div class="flex items-center gap-2">
               <div class="flex-1">
-                <BaseInput
-                  v-model="draftDueDate"
-                  type="date"
-                  class="rounded-[14px] ring-2 ring-purple-500/30"
-                  @keydown="handleDateKeydown"
-                />
+                <BeanieDatePicker v-model="draftDueDate" />
               </div>
               <button
                 class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
