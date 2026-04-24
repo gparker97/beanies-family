@@ -175,36 +175,11 @@ const articleSchema = {
           )
         }
 
-        {
-          related.length > 0 && (
-            <aside class="guide-related">
-              <p class="guide-related-eyebrow">further reading</p>
-              <h2 class="guide-related-title">from the beanstalk</h2>
-              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
-              <ul class="guide-related-list">
-                {related.map((post) => (
-                  <li>
-                    <a href={post.href}>
-                      <span class="guide-related-arrow" aria-hidden="true">→</span>
-                      <span>
-                        <span class="guide-related-post-title">{post.title}</span>
-                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          )
-        }
-
-        {/* Final-pillar payoff card — only renders on the guide flagged
-            `isFinalPillar` in frontmatter. Replaces the "next chapter"
-            slot (which doesn't exist on the final pillar) with an
-            explicit closing: what the reader just walked through, and
-            the two things they can do next (re-read the curriculum, or
-            open the app). The card is designed to feel like the
-            protagonist-of-the-story payoff, not a traditional nav CTA. */}
+        {/* Final-pillar payoff card — renders BEFORE "further reading"
+            so the primary end-of-curriculum CTAs land before we offer
+            off-ramp links to the blog. The payoff is the closing beat
+            we want the reader to arrive at. Only renders on the guide
+            flagged `isFinalPillar` in frontmatter. */}
         {guide.data.isFinalPillar && firstGuide && (
           <section class="guide-payoff" aria-labelledby="guide-payoff-title">
             <div class="guide-payoff-eyebrow">
@@ -251,6 +226,29 @@ const articleSchema = {
             )}
           </section>
         )}
+
+        {
+          related.length > 0 && (
+            <aside class="guide-related">
+              <p class="guide-related-eyebrow">further reading</p>
+              <h2 class="guide-related-title">from the beanstalk</h2>
+              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
+              <ul class="guide-related-list">
+                {related.map((post) => (
+                  <li>
+                    <a href={post.href}>
+                      <span class="guide-related-arrow" aria-hidden="true">→</span>
+                      <span>
+                        <span class="guide-related-post-title">{post.title}</span>
+                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )
+        }
 
         {/* Prev/next chapter nav — a two-card walk-through rhythm. Each
             card shows the chapter label + title as the header and the
@@ -647,6 +645,37 @@ const articleSchema = {
     letter-spacing: 0.3em;
     margin: 0 16px;
     opacity: 0.55;
+  }
+
+  /* Hugging-beanies mascot at the warm ending of a guide. Centres the
+     PNG, applies a soft idle breath so it feels alive, lifts it with a
+     subtle drop-shadow in Heritage Orange so it reads as a happy-end
+     punctuation mark rather than a random image drop. `prefers-reduced-
+     motion` drops the animation. */
+  .guide-prose .guide-beanies-hug {
+    animation: beanies-hug-breath 5.2s ease-in-out infinite;
+    filter: drop-shadow(0 18px 32px rgb(241 93 34 / 20%));
+    margin: 32px auto 40px;
+    max-width: 220px;
+    text-align: center;
+  }
+  .guide-prose .guide-beanies-hug img {
+    display: block;
+    height: auto;
+    margin: 0 auto;
+    max-width: 200px;
+    width: 100%;
+  }
+  @keyframes beanies-hug-breath {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-3px) scale(1.015); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .guide-prose .guide-beanies-hug { animation: none; }
+  }
+  @media (max-width: 520px) {
+    .guide-prose .guide-beanies-hug { margin: 24px auto 32px; max-width: 160px; }
+    .guide-prose .guide-beanies-hug img { max-width: 160px; }
   }
 
   /* Prose body — Fraunces serif, relaxed rhythm, generous spacing. */
