@@ -7,7 +7,12 @@ export interface BlogPost {
   date: string;
   category: string;
   coverEmoji: string;
+  coverImage?: string;
   excerpt: string;
+  subtitle?: string;
+  /** 1-based index in chronological order (oldest = 1). Drives per-post
+   *  tint cycling + "issue N" labelling on the beanstalk index. */
+  issueNumber: number;
   featured: boolean;
   author: string;
   content: string; // raw markdown body
@@ -44,16 +49,34 @@ const modules = import.meta.glob('/content/blog/*.md', {
   eager: true,
 });
 
+// Map each slug to an issue number (1-based by chronological order:
+// oldest = Issue 01). Computed once across ALL posts before filtering/
+// sorting, so numbers stay stable regardless of display order.
+const chronological = Object.entries(modules)
+  .map(([path, raw]) => {
+    const { meta } = parseFrontmatter(raw as string);
+    return {
+      slug: meta.slug || path.replace(/.*\//, '').replace('.md', ''),
+      date: meta.date || '',
+    };
+  })
+  .sort((a, b) => a.date.localeCompare(b.date));
+const issueNumberBySlug = new Map<string, number>(chronological.map((p, i) => [p.slug, i + 1]));
+
 const allPosts: BlogPost[] = Object.entries(modules)
   .map(([path, raw]) => {
     const { meta, body } = parseFrontmatter(raw as string);
+    const slug = meta.slug || path.replace(/.*\//, '').replace('.md', '');
     return {
-      slug: meta.slug || path.replace(/.*\//, '').replace('.md', ''),
+      slug,
       title: meta.title || 'Untitled',
       date: meta.date || '',
       category: meta.category || 'general',
       coverEmoji: meta.coverEmoji || '📝',
+      coverImage: meta.coverImage || undefined,
       excerpt: meta.excerpt || '',
+      subtitle: meta.subtitle || undefined,
+      issueNumber: issueNumberBySlug.get(slug) ?? 1,
       featured: meta.featured === 'true',
       author: meta.author || 'The Beanies Team',
       content: body,
