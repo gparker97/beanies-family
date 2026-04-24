@@ -20,6 +20,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
 import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { usePermissions } from '@/composables/usePermissions';
 import { showToast } from '@/composables/useToast';
 import { useVacationTimeline } from '@/composables/useVacationTimeline';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
@@ -40,6 +41,7 @@ import ExpandableText from '@/components/ui/ExpandableText.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const route = useRoute();
 const router = useRouter();
 const vacationStore = useVacationStore();
@@ -294,6 +296,7 @@ function handleAddTripIdea(vacationId: string | undefined): void {
 }
 
 useQuickAddIntent((action, { vacationId }) => {
+  if (!canEditActivities.value) return;
   switch (action) {
     case 'add-trip':
       startWizard();
@@ -493,6 +496,7 @@ function addQuickIdea() {
     <template v-if="!selectedVacationId">
       <PageHeader icon="airplane" :title="t('travel.title')" :subtitle="t('travel.subtitle')">
         <button
+          v-if="canEditActivities"
           type="button"
           class="font-outfit inline-flex cursor-pointer items-center gap-2 rounded-2xl bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-5 py-2.5 text-sm font-semibold whitespace-nowrap text-white shadow-[0_4px_12px_rgba(0,180,216,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(0,180,216,0.3)]"
           @click="startWizard"

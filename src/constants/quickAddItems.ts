@@ -20,6 +20,15 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export type QuickAddGroup = 'everyday' | 'family' | 'money' | 'care';
 
+/**
+ * Permission bucket a quick-add item belongs to. Consumed by
+ * `QuickAddSheet` to filter items the current member isn't allowed
+ * to act on, so e.g. a member without `canViewFinances` never sees
+ * "Transaction" in the sheet. `activities` maps to `canEditActivities`
+ * and covers every non-finance add (recipes, todos, medications, etc).
+ */
+export type QuickAddPermission = 'finance' | 'activities';
+
 /** Parent id key pre-filled into the target modal when the user is on the parent's detail route. */
 export type QuickAddContextKey = 'memberId' | 'recipeId' | 'vacationId' | 'medicationId';
 
@@ -42,6 +51,7 @@ interface QuickAddItemShape {
   readonly action: string;
   readonly tab?: string;
   readonly contextKey?: QuickAddContextKey;
+  readonly requiredPermission: QuickAddPermission;
 }
 
 export const QUICK_ADD_ITEMS = [
@@ -55,6 +65,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.activity.hint',
     route: '/activities',
     action: 'add-activity',
+    requiredPermission: 'activities',
   },
   {
     id: 'todo',
@@ -65,6 +76,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.todo.hint',
     route: '/todo',
     action: 'add-todo',
+    requiredPermission: 'activities',
   },
   {
     id: 'transaction',
@@ -75,6 +87,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.transaction.hint',
     route: '/transactions',
     action: 'add-transaction',
+    requiredPermission: 'finance',
   },
   {
     id: 'trip',
@@ -85,6 +98,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.trip.hint',
     route: '/travel',
     action: 'add-trip',
+    requiredPermission: 'activities',
   },
   {
     id: 'cook-log',
@@ -96,6 +110,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/cookbook',
     action: 'add-cooklog',
     contextKey: 'recipeId',
+    requiredPermission: 'activities',
   },
   {
     id: 'saying',
@@ -107,6 +122,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/scrapbook',
     action: 'add-saying',
     contextKey: 'memberId',
+    requiredPermission: 'activities',
   },
 
   // — Family —
@@ -120,6 +136,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/scrapbook',
     action: 'add-favorite',
     contextKey: 'memberId',
+    requiredPermission: 'activities',
   },
   {
     id: 'note',
@@ -131,6 +148,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/scrapbook',
     action: 'add-note',
     contextKey: 'memberId',
+    requiredPermission: 'activities',
   },
   {
     id: 'recipe',
@@ -141,6 +159,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.recipe.hint',
     route: '/pod/cookbook',
     action: 'add-recipe',
+    requiredPermission: 'activities',
   },
   {
     id: 'trip-idea',
@@ -152,6 +171,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/travel',
     action: 'add-trip-idea',
     contextKey: 'vacationId',
+    requiredPermission: 'activities',
   },
 
   // — Money (setup) —
@@ -164,6 +184,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.account.hint',
     route: '/accounts',
     action: 'add-account',
+    requiredPermission: 'finance',
   },
   {
     id: 'budget',
@@ -174,6 +195,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.budget.hint',
     route: '/budgets',
     action: 'add-budget',
+    requiredPermission: 'finance',
   },
   {
     id: 'asset',
@@ -184,6 +206,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.asset.hint',
     route: '/assets',
     action: 'add-asset',
+    requiredPermission: 'finance',
   },
   {
     id: 'goal',
@@ -194,6 +217,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.goal.hint',
     route: '/goals',
     action: 'add-goal',
+    requiredPermission: 'finance',
   },
 
   // — Care —
@@ -207,6 +231,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/safety',
     action: 'add-medication',
     contextKey: 'memberId',
+    requiredPermission: 'activities',
   },
   {
     id: 'dose-log',
@@ -218,6 +243,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/safety',
     action: 'add-dose-log',
     contextKey: 'medicationId',
+    requiredPermission: 'activities',
   },
   {
     id: 'allergy',
@@ -229,6 +255,7 @@ export const QUICK_ADD_ITEMS = [
     route: '/pod/safety',
     action: 'add-allergy',
     contextKey: 'memberId',
+    requiredPermission: 'activities',
   },
   {
     id: 'emergency',
@@ -239,6 +266,7 @@ export const QUICK_ADD_ITEMS = [
     hintKey: 'quickAdd.emergency.hint',
     route: '/pod/contacts',
     action: 'add-emergency',
+    requiredPermission: 'activities',
   },
 ] as const satisfies readonly QuickAddItemShape[];
 
@@ -268,6 +296,7 @@ export interface QuickAddItem {
   readonly action: QuickAddAction;
   readonly tab?: string;
   readonly contextKey?: QuickAddContextKey;
+  readonly requiredPermission: QuickAddPermission;
 }
 
 /**

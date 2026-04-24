@@ -9,6 +9,7 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import AllergyFormModal from '@/components/pod/AllergyFormModal.vue';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useAllergiesStore } from '@/stores/allergiesStore';
 import type { Allergy, AllergySeverity, AllergyType, UUID } from '@/types/models';
 
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const allergiesStore = useAllergiesStore();
 
 const SEVERITY_ORDER: Record<AllergySeverity, number> = { severe: 0, moderate: 1, mild: 2 };
@@ -30,7 +32,7 @@ const allergies = computed(() =>
 const modalOpen = ref(false);
 const editing = ref<Allergy | null>(null);
 useQuickAddIntent((action) => {
-  if (action === 'add-allergy') {
+  if (action === 'add-allergy' && canEditActivities.value) {
     editing.value = null;
     modalOpen.value = true;
   }
@@ -124,7 +126,7 @@ function closeModal(): void {
           🚨 {{ a.emergencyResponse }}
         </p>
       </button>
-      <AddTile :label="t('allergies.addTile')" @click="openAdd" />
+      <AddTile v-if="canEditActivities" :label="t('allergies.addTile')" @click="openAdd" />
     </div>
     <div
       v-else
@@ -133,7 +135,7 @@ function closeModal(): void {
       <EmptyState
         emoji="⚠️"
         :message="t('allergies.empty')"
-        :action-label="t('allergies.emptyCTA')"
+        :action-label="canEditActivities ? t('allergies.emptyCTA') : ''"
         @action="openAdd"
       />
     </div>

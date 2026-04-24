@@ -34,7 +34,7 @@ const { t } = useTranslation();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
 const photoStore = usePhotoStore();
-const { canManagePod } = usePermissions();
+const { canEditActivities } = usePermissions();
 
 const recipeId = computed(() => (route.params.recipeId as string) ?? '');
 const recipe = computed(() => recipesStore.recipes.find((r) => r.id === recipeId.value));
@@ -168,7 +168,7 @@ function onRecipeDeleted(): void {
             </span>
           </div>
 
-          <div v-if="canManagePod" class="mt-auto flex flex-wrap gap-2 pt-4">
+          <div v-if="canEditActivities" class="mt-auto flex flex-wrap gap-2 pt-4">
             <button
               type="button"
               class="font-outfit text-secondary-500 inline-flex items-center gap-1.5 rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-white dark:bg-slate-800/80 dark:text-gray-100"
@@ -289,7 +289,7 @@ function onRecipeDeleted(): void {
           <EmptyState
             emoji="🍳"
             :message="t('cookLog.empty')"
-            :action-label="canManagePod ? t('cookLog.emptyCTA') : ''"
+            :action-label="canEditActivities ? t('cookLog.emptyCTA') : ''"
             @action="openAddCookLog"
           />
         </div>

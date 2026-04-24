@@ -10,6 +10,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-04-24
 
+### Fixed
+
+- **Permission semantics across the pod.** The three member toggles now have clean, non-overlapping scopes: **Can view finances** (piggy bank), **Can edit family content** (recipes, cookbook, cook logs, medications, allergies, emergency contacts, scrapbook, sayings, favorites, notes, todos, travel plans — everything except the family roster), and **Can manage family members** (add/edit/delete members, family name, pod-level settings). Before this, the cookbook, recipes, and emergency contacts were incorrectly gated on "manage pod", so a member with edit-family-content but no manage-members permission could open the "add recipe" modal but not save it, and couldn't see the edit / log-cook buttons on a recipe. Scrapbook, medications, allergies, todos, and travel plans weren't gated at all. All add-affordances (buttons, add-tiles, empty-state CTAs, quick-add intents) now follow the same rules. The toggle labels in the family member modal have been renamed to match.
+- **Quick-add sheet hides actions you can't do.** The + button sheet used to show every action to everyone — a member without finance permission would see "Transaction" / "Account" / "Budget" / "Asset" / "Goal", tap one, and get bounced to the no-access page. Those items now disappear from the sheet entirely when the member can't view finances; likewise content items (recipes, cook-log, medications, allergies, etc) disappear when the member can't edit family content. Empty sections don't render.
+
 ### Added
 
 - **"Fresh off the press" divider on the beanstalk.** A small zine-style ornament now sits between the masthead and the latest-issue card on `/blog` — thin Heritage Orange rules fading in from each side, bracketing a Fraunces-italic label flanked by two accent dots. Replaces the previous "card butts up against the hero" layout.

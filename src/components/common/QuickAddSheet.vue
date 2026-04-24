@@ -23,9 +23,29 @@ import {
 } from '@/constants/quickAddItems';
 import { useQuickAdd } from '@/composables/useQuickAdd';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 
 const { t } = useTranslation();
+const { canViewFinances, canEditActivities } = usePermissions();
 const { isOpen, stage, close, triggerAction } = useQuickAdd();
+
+/**
+ * Per-member filter applied to every group. Items declare a
+ * `requiredPermission` ('finance' | 'activities'); the sheet hides
+ * any item the current member can't act on — and hides a whole
+ * section when it ends up empty.
+ */
+function itemAllowed(item: QuickAddItem): boolean {
+  if (item.requiredPermission === 'finance') return canViewFinances.value;
+  return canEditActivities.value;
+}
+
+const allowedByGroup = computed<Record<QuickAddGroup, readonly QuickAddItem[]>>(() => ({
+  everyday: QUICK_ADD_BY_GROUP.everyday.filter(itemAllowed),
+  family: QUICK_ADD_BY_GROUP.family.filter(itemAllowed),
+  money: QUICK_ADD_BY_GROUP.money.filter(itemAllowed),
+  care: QUICK_ADD_BY_GROUP.care.filter(itemAllowed),
+}));
 
 /** Narrowed picker-stage payload — `null` when sheet is in main mode. */
 const pickerItem = computed<QuickAddItem | null>(() =>
@@ -128,7 +148,11 @@ function handleItemClick(item: QuickAddItem): void {
       </header>
 
       <!-- Everyday beans — kraft-paper card with 3x2 grid -->
-      <section class="everyday-card" :aria-labelledby="'quick-add-everyday-kicker'">
+      <section
+        v-if="allowedByGroup.everyday.length > 0"
+        class="everyday-card"
+        :aria-labelledby="'quick-add-everyday-kicker'"
+      >
         <div class="everyday-header">
           <span id="quick-add-everyday-kicker" class="everyday-kicker">
             {{ t('quickAdd.groups.everyday.kicker') }}
@@ -139,7 +163,7 @@ function handleItemClick(item: QuickAddItem): void {
         </div>
         <div class="everyday-grid">
           <button
-            v-for="(item, idx) in QUICK_ADD_BY_GROUP.everyday"
+            v-for="(item, idx) in allowedByGroup.everyday"
             :key="item.id"
             type="button"
             class="everyday-item"
@@ -165,7 +189,7 @@ function handleItemClick(item: QuickAddItem): void {
            visible bottom of the sheet. -->
       <template v-for="(group, gIdx) in SECONDARY_GROUPS" :key="group.id">
         <section
-          v-if="showSection(group.id)"
+          v-if="showSection(group.id) && allowedByGroup[group.id].length > 0"
           class="secondary-group"
           :style="{ '--stagger-delay': `${400 + gIdx * 100}ms` }"
         >
@@ -175,7 +199,7 @@ function handleItemClick(item: QuickAddItem): void {
           </h3>
           <div class="secondary-grid">
             <button
-              v-for="(item, idx) in QUICK_ADD_BY_GROUP[group.id]"
+              v-for="(item, idx) in allowedByGroup[group.id]"
               :key="item.id"
               type="button"
               class="secondary-item"

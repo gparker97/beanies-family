@@ -9,6 +9,7 @@ import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import MemberNoteFormModal from '@/components/pod/MemberNoteFormModal.vue';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
 import type { MemberNote, UUID } from '@/types/models';
 
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const notesStore = useMemberNotesStore();
 
 const notes = computed(() => notesStore.byMember(props.memberId).value);
@@ -24,7 +26,7 @@ const notes = computed(() => notesStore.byMember(props.memberId).value);
 const modalOpen = ref(false);
 const editing = ref<MemberNote | null>(null);
 useQuickAddIntent((action) => {
-  if (action === 'add-note') {
+  if (action === 'add-note' && canEditActivities.value) {
     editing.value = null;
     modalOpen.value = true;
   }
@@ -63,7 +65,7 @@ function closeModal(): void {
           {{ n.body }}
         </p>
       </button>
-      <AddTile :label="t('memberNotes.addTile')" @click="openAdd" />
+      <AddTile v-if="canEditActivities" :label="t('memberNotes.addTile')" @click="openAdd" />
     </div>
     <div
       v-else
@@ -72,7 +74,7 @@ function closeModal(): void {
       <EmptyState
         emoji="📝"
         :message="t('memberNotes.empty')"
-        :action-label="t('memberNotes.emptyCTA')"
+        :action-label="canEditActivities ? t('memberNotes.emptyCTA') : ''"
         @action="openAdd"
       />
     </div>

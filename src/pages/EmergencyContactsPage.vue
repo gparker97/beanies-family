@@ -20,7 +20,7 @@ import type { EmergencyContact, EmergencyContactCategory } from '@/types/models'
 const router = useRouter();
 const { t } = useTranslation();
 const store = useEmergencyContactsStore();
-const { canManagePod } = usePermissions();
+const { canEditActivities } = usePermissions();
 
 const search = ref('');
 const filter = ref<EmergencyContactCategory | 'all'>('all');
@@ -132,7 +132,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
           {{ t('contacts.subtitle') }}
         </p>
       </div>
-      <div v-if="canManagePod" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
+      <div v-if="canEditActivities" class="flex w-full flex-shrink-0 items-center gap-2 sm:w-auto">
         <button
           type="button"
           class="font-outfit from-primary-500 to-terracotta-400 inline-flex w-full items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-r px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)] transition-all hover:shadow-[0_6px_16px_rgba(241,93,34,0.3)] sm:w-auto"
@@ -285,7 +285,9 @@ function emailFor(c: EmergencyContact, e: Event): void {
       <EmptyState
         emoji="🆘"
         :message="store.contacts.length ? t('contacts.noResults') : t('contacts.empty')"
-        :action-label="canManagePod && store.contacts.length === 0 ? t('contacts.emptyCTA') : ''"
+        :action-label="
+          canEditActivities && store.contacts.length === 0 ? t('contacts.emptyCTA') : ''
+        "
         @action="openAdd"
       />
     </div>

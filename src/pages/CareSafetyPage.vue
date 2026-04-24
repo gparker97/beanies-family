@@ -12,6 +12,7 @@ import StatStrip from '@/components/pod/shared/StatStrip.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { usePermissions } from '@/composables/usePermissions';
 import { useGiveDose } from '@/composables/useGiveDose';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAllergiesStore } from '@/stores/allergiesStore';
@@ -22,6 +23,7 @@ import type { Allergy, AllergySeverity, FamilyMember, Medication } from '@/types
 
 const router = useRouter();
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const familyStore = useFamilyStore();
 const allergiesStore = useAllergiesStore();
 const medicationsStore = useMedicationsStore();
@@ -38,6 +40,7 @@ const { giveDose } = useGiveDose();
 //   source for dose logging; reusing it keeps undo + member-guard +
 //   toast surfaces consistent with the Bean tab's quick-give button.
 useQuickAddIntent(async (action, { memberId, medicationId }) => {
+  if (!canEditActivities.value) return;
   if (action === 'add-medication' && memberId) {
     await router.push({ path: `/pod/${memberId}/medications`, query: { action } });
     return;

@@ -19,6 +19,7 @@ import MedicationFormModal from '@/components/pod/MedicationFormModal.vue';
 import MedicationViewModal from '@/components/pod/MedicationViewModal.vue';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useGiveDose } from '@/composables/useGiveDose';
 import { isMedicationActive, useMedicationsStore } from '@/stores/medicationsStore';
 import type { Medication, UUID } from '@/types/models';
@@ -28,6 +29,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const medicationsStore = useMedicationsStore();
 const { giveDose } = useGiveDose();
 
@@ -70,7 +72,7 @@ const modalState = ref<ModalState>({ kind: 'none' });
 
 // Auto-open via `?action=add-medication` from the Quick-add FAB.
 useQuickAddIntent((action) => {
-  if (action === 'add-medication') {
+  if (action === 'add-medication' && canEditActivities.value) {
     modalState.value = { kind: 'editing', medication: null };
   }
 });
@@ -121,7 +123,7 @@ function closeModals(): void {
         @view="openView(m)"
         @give-dose="giveDose"
       />
-      <AddTile :label="t('medications.addTile')" @click="openAdd" />
+      <AddTile v-if="canEditActivities" :label="t('medications.addTile')" @click="openAdd" />
     </div>
     <div
       v-else
@@ -130,7 +132,7 @@ function closeModals(): void {
       <EmptyState
         emoji="💊"
         :message="t('medications.empty')"
-        :action-label="t('medications.emptyCTA')"
+        :action-label="canEditActivities ? t('medications.emptyCTA') : ''"
         @action="openAdd"
       />
     </div>

@@ -14,6 +14,7 @@ import StickyNote from '@/components/pod/shared/StickyNote.vue';
 import SayingFormModal from '@/components/pod/SayingFormModal.vue';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useTranslation } from '@/composables/useTranslation';
+import { usePermissions } from '@/composables/usePermissions';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import type { SayingItem, UUID } from '@/types/models';
 
@@ -22,6 +23,7 @@ const props = defineProps<{
 }>();
 
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const sayingsStore = useSayingsStore();
 
 const sayings = computed(() => sayingsStore.byMember(props.memberId).value);
@@ -29,7 +31,7 @@ const sayings = computed(() => sayingsStore.byMember(props.memberId).value);
 const modalOpen = ref(false);
 const editing = ref<SayingItem | null>(null);
 useQuickAddIntent((action) => {
-  if (action === 'add-saying') {
+  if (action === 'add-saying' && canEditActivities.value) {
     editing.value = null;
     modalOpen.value = true;
   }
@@ -70,7 +72,12 @@ function footerText(s: SayingItem): string {
       >
         <StickyNote :text="s.words" :index="i" :footer-text="footerText(s)" />
       </button>
-      <AddTile :label="t('sayings.addTile')" min-height="8rem" @click="openAdd" />
+      <AddTile
+        v-if="canEditActivities"
+        :label="t('sayings.addTile')"
+        min-height="8rem"
+        @click="openAdd"
+      />
     </div>
     <div
       v-else
@@ -79,7 +86,7 @@ function footerText(s: SayingItem): string {
       <EmptyState
         emoji="💬"
         :message="t('sayings.empty')"
-        :action-label="t('sayings.emptyCTA')"
+        :action-label="canEditActivities ? t('sayings.emptyCTA') : ''"
         @action="openAdd"
       />
     </div>

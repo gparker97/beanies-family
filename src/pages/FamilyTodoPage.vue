@@ -5,6 +5,7 @@ import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
+import { usePermissions } from '@/composables/usePermissions';
 import { useSounds } from '@/composables/useSounds';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { useTodoStore } from '@/stores/todoStore';
@@ -21,6 +22,7 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
+const { canEditActivities } = usePermissions();
 const { syncHighlightClass } = useSyncHighlight();
 const { playWhoosh } = useSounds();
 const todoStore = useTodoStore();
@@ -138,6 +140,7 @@ watch(
 // There is no separate "add" modal for todos — adds happen inline.
 useQuickAddIntent(async (action) => {
   if (action !== 'add-todo') return;
+  if (!canEditActivities.value) return;
   await nextTick();
   quickAddBar.value?.focus();
 });
@@ -146,7 +149,7 @@ onMounted(async () => {
   handleTodoQueryParam();
 
   // Auto-focus the quick add bar (skip on mobile/tablet to avoid keyboard popup)
-  if (isDesktop.value) {
+  if (isDesktop.value && canEditActivities.value) {
     await nextTick();
     quickAddBar.value?.focus();
   }
@@ -189,7 +192,7 @@ async function handleDelete(id: string) {
     </div>
 
     <!-- Quick add bar -->
-    <QuickAddBar ref="quickAddBar" @add="handleQuickAdd" />
+    <QuickAddBar v-if="canEditActivities" ref="quickAddBar" @add="handleQuickAdd" />
 
     <!-- Empty state -->
     <div v-if="!hasAnyTodos" class="py-12 text-center">

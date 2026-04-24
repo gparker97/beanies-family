@@ -176,8 +176,8 @@ const STRING_DEFS = {
   'modal.profileColor': { en: 'Profile Color', beanie: 'profile color' },
   'modal.permissions': { en: 'Permissions', beanie: 'permissions' },
   'modal.canViewFinances': { en: 'Can view finances', beanie: 'can view finances' },
-  'modal.canEditActivities': { en: 'Can edit activities', beanie: 'can edit activities' },
-  'modal.canManagePod': { en: 'Can manage pod', beanie: 'can manage pod' },
+  'modal.canEditActivities': { en: 'Can edit family content', beanie: 'can edit family content' },
+  'modal.canManagePod': { en: 'Can manage family members', beanie: 'can manage family members' },
 
   // Status labels
   'status.active': { en: 'Active', beanie: 'active' },
