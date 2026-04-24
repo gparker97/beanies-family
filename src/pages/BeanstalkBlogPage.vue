@@ -98,6 +98,12 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     <header class="masthead">
       <div class="masthead-wash" aria-hidden="true" />
       <img
+        src="/brand/beanies-beanstalk-banner.webp"
+        alt=""
+        class="masthead-backdrop"
+        aria-hidden="true"
+      />
+      <img
         src="/brand/beanies-beanstalk-mascot.webp"
         alt=""
         class="masthead-mascot"
@@ -134,7 +140,7 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
       <p class="masthead-pitch">
         a newsletter about
         <span class="masthead-pitch-brand">beanies.family</span>, vibe coding, or just life in
-        general. published every friday, or roughly whenever greg feels like it. not written by AI.
+        general. published every friday, or roughly whenever I feel like it. not written by AI.
         usually.
       </p>
       <p class="masthead-issue">
@@ -147,10 +153,6 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
         </template>
       </p>
     </header>
-
-    <div class="masthead-banner" aria-hidden="true">
-      <img src="/brand/beanies-beanstalk-banner.webp" alt="" />
-    </div>
 
     <!-- ══════════════ FEATURED ══════════════ -->
     <div v-if="featuredPost" class="beanstalk-content">
@@ -489,23 +491,21 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   opacity: 0.45;
 }
 
-/* Beanstalk banner as subtle ambient decoration — low opacity, no
-   drop-shadow, no animation. Wallpaper flair, not a visual beat. */
-.masthead-banner {
-  display: flex;
-  justify-content: center;
-  margin: -20px auto 28px;
-  max-width: 560px;
-  padding: 0 32px;
-  pointer-events: none;
-}
-
-.masthead-banner img {
-  display: block;
+/* Beanstalk banner moved INSIDE the masthead as a decorative backdrop,
+   bottom-aligned, full-width-ish, very low opacity. No longer a
+   standalone block between masthead and first card — closes the gap
+   so the latest issue lands above the fold. */
+.masthead-backdrop {
+  bottom: -40px;
   height: auto;
-  max-width: 360px;
-  opacity: 0.18;
-  width: 100%;
+  left: 50%;
+  max-width: none;
+  opacity: 0.13;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 960px;
+  z-index: 0;
 }
 
 .beanstalk-content {
@@ -907,12 +907,9 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     width: 160px;
   }
 
-  .masthead-banner {
-    margin: -12px auto 24px;
-  }
-
-  .masthead-banner img {
-    max-width: 300px;
+  .masthead-backdrop {
+    bottom: -30px;
+    width: 740px;
   }
 
   .beanstalk-content {
@@ -956,8 +953,10 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     width: 120px;
   }
 
-  .masthead-banner img {
-    max-width: 240px;
+  .masthead-backdrop {
+    bottom: -20px;
+    opacity: 0.1;
+    width: 520px;
   }
 
   .masthead-rule-top {

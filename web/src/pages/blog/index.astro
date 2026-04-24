@@ -103,6 +103,12 @@ const latestDate = byDateDesc[0]?.data.date;
     <header class="masthead">
       <div class="masthead-wash" aria-hidden="true"></div>
       <img
+        src="/brand/beanies-beanstalk-banner.webp"
+        alt=""
+        class="masthead-backdrop"
+        aria-hidden="true"
+      />
+      <img
         src="/brand/beanies-beanstalk-mascot.webp"
         alt=""
         class="masthead-mascot"
@@ -141,7 +147,7 @@ const latestDate = byDateDesc[0]?.data.date;
       <p class="masthead-pitch">
         a newsletter about <span class="masthead-pitch-brand">beanies.family</span>,
         vibe coding, or just life in general. published every friday, or roughly whenever
-        greg feels like it. not written by AI. usually.
+        I feel like it. not written by AI. usually.
       </p>
       <p class="masthead-issue">
         <span class="masthead-issue-chip">VOL. 01</span>
@@ -156,9 +162,6 @@ const latestDate = byDateDesc[0]?.data.date;
       </p>
     </header>
 
-    <div class="masthead-banner" aria-hidden="true">
-      <img src="/brand/beanies-beanstalk-banner.webp" alt="" width="520" height="275" />
-    </div>
 
     <!-- ══════════════ FEATURED: THIS WEEK'S ISSUE ══════════════ -->
     {featuredPost && (() => {
@@ -485,23 +488,22 @@ const latestDate = byDateDesc[0]?.data.date;
   }
   .masthead-issue-dot { opacity: 0.45; }
 
-  /* Beanstalk banner kept as subtle ambient decoration — low opacity,
-     no drop-shadow, no animation. It's wallpaper flair between the
-     masthead and the first card, not a visual beat of its own. */
-  .masthead-banner {
-    display: flex;
-    justify-content: center;
-    margin: -20px auto 28px;
-    max-width: 560px;
-    padding: 0 32px;
-    pointer-events: none;
-  }
-  .masthead-banner img {
-    display: block;
+  /* Beanstalk banner moved INSIDE the masthead as a decorative
+     backdrop — bottom-aligned, full-width, very low opacity so it
+     reads as atmospheric flair behind the title copy. Removes the
+     previous gap between masthead and featured card so the latest
+     issue lands above the fold on most viewports. */
+  .masthead-backdrop {
+    bottom: -40px;
     height: auto;
-    max-width: 360px;
-    opacity: 0.18;
-    width: 100%;
+    left: 50%;
+    max-width: none;
+    opacity: 0.13;
+    pointer-events: none;
+    position: absolute;
+    transform: translateX(-50%);
+    width: 960px;
+    z-index: 0;
   }
 
   /* Legacy divider (kept for the old-style glyph-divider pattern in
@@ -853,8 +855,7 @@ const latestDate = byDateDesc[0]?.data.date;
       right: -10px;
       width: 160px;
     }
-    .masthead-banner { margin: -12px auto 24px; }
-    .masthead-banner img { max-width: 300px; }
+    .masthead-backdrop { bottom: -30px; width: 740px; }
     .issue-featured {
       grid-template-columns: 1fr;
       margin-bottom: 44px;
@@ -875,7 +876,7 @@ const latestDate = byDateDesc[0]?.data.date;
       top: 70px;
       width: 120px;
     }
-    .masthead-banner img { max-width: 240px; }
+    .masthead-backdrop { bottom: -20px; opacity: 0.1; width: 520px; }
     .masthead-rule-top { font-size: 0.6rem; letter-spacing: 0.22em; }
     .masthead-rule-top::before,
     .masthead-rule-top::after { max-width: 40px; }
