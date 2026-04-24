@@ -13,10 +13,10 @@ tags:
   - privacy
   - family-apps
   - e2ee
-stationSubtitle: 'why the tool you use for all of this matters'
+stationSubtitle: 'your privacy, the tools you choose, and why they can make all the difference'
 prevTeaser: 'the money layer sits on top of the system. this is what sits under all of it.'
 isFinalPillar: true
-loopbackTeaser: "you've walked the whole curriculum. re-read chapter 1 with the system in mind - it lands differently."
+loopbackTeaser: "remember that I'm always here to help - if you have a feature idea for beanies.family, a bug report, or just a random comment you'd like to share,"
 draft: false
 ---
 

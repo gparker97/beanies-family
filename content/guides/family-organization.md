@@ -13,9 +13,9 @@ tags:
   - routines
   - household-systems
   - mental-load
-stationSubtitle: 'the system that pulls it all out of your head'
+stationSubtitle: 'a system that takes things out of your head and shares responsibilities'
 prevTeaser: "chapter 1 is the emotional grounding. start there if you're feeling buried."
-nextTeaser: 'once the logistics are running, the money layer is next.'
+nextTeaser: "now we've discussed organization, let's get to the topic we've all been waiting for - money."
 draft: false
 ---
 

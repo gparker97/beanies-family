@@ -209,16 +209,24 @@ const articleSchema = {
           <section class="guide-payoff" aria-labelledby="guide-payoff-title">
             <div class="guide-payoff-eyebrow">
               <span class="guide-payoff-eyebrow-dot" aria-hidden="true"></span>
-              the end of the curriculum
+              you made it!
             </div>
-            <h2 id="guide-payoff-title" class="guide-payoff-title">what you can do now</h2>
+            <h2 id="guide-payoff-title" class="guide-payoff-title">what should i do now?</h2>
             <p class="guide-payoff-body">
-              you walked the whole thing. chapter by chapter: naming the overwhelm,
-              building the system, layering the money on top, and understanding why
-              the tool you use matters. what comes next is practice - every week,
-              with your family, inside whatever system works for you.
-              <strong>beanies.family</strong> is the tool i built from the four
-              chapters above. it's free, local-first, and designed for exactly this.
+              well, we did it. we've talked about the feeling of being overwhelmed,
+              how we can feel more organized and in control, understanding our family
+              finances, and why the systems and tools we use are critically important
+              in accomplishing our goal of regaining control, while at the same time
+              preserving our privacy (and sanity).
+            </p>
+            <p class="guide-payoff-body">
+              what comes next is practice - put these ideas to work in the world, in
+              your real life, using whatever systems work best for you.
+            </p>
+            <p class="guide-payoff-body">
+              <strong>beanies.family</strong> is the tool I built based on the
+              lessons I've described in the four chapters above. It's local-first,
+              family-friendly, and designed for exactly this.
             </p>
             <div class="guide-payoff-actions">
               <a class="guide-payoff-cta guide-payoff-cta-primary" href="https://app.beanies.family/welcome">
@@ -237,7 +245,9 @@ const articleSchema = {
               </a>
             </div>
             {guide.data.loopbackTeaser && (
-              <p class="guide-payoff-loopback">{guide.data.loopbackTeaser}</p>
+              <p class="guide-payoff-loopback">
+                {guide.data.loopbackTeaser} <a class="guide-payoff-loopback-link" href="/#contact">let me know</a>.
+              </p>
             )}
           </section>
         )}
@@ -1135,8 +1145,14 @@ const articleSchema = {
     font-size: 1.08rem;
     font-weight: 400;
     line-height: 1.6;
-    margin: 0 0 30px;
+    margin: 0 0 18px;
     max-width: 640px;
+  }
+  /* Last body paragraph pushes a bit more against the actions block
+     so the CTAs have room to breathe; intra-paragraph rhythm stays
+     tight. */
+  .guide-payoff-body:last-of-type {
+    margin-bottom: 30px;
   }
   .guide-payoff-body strong {
     color: var(--heritage-orange);
@@ -1200,6 +1216,23 @@ const articleSchema = {
     margin: 22px 0 0;
     max-width: 620px;
     padding-top: 18px;
+  }
+  /* "let me know" link inside the loopback — kept subtle (underline,
+     same italic serif) so it reads as a sentence continuation, not a
+     second CTA competing with the two buttons above. Hover lights it
+     to Heritage Orange. */
+  .guide-payoff-loopback-link {
+    color: white;
+    font-style: italic;
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: rgb(255 255 255 / 40%);
+    text-underline-offset: 3px;
+    transition: color 180ms, text-decoration-color 180ms;
+  }
+  .guide-payoff-loopback-link:hover {
+    color: var(--heritage-orange);
+    text-decoration-color: var(--heritage-orange);
   }
 
   /* ==========================================================

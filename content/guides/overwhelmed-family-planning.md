@@ -20,8 +20,8 @@ keyTakeaways:
   - Name the mental load out loud - if it's not visible to everyone in the household, it stays the responsibility of whoever is tracking it in their head.
   - Protect recovery time like you'd protect a meeting - unscheduled white space on the family calendar is not a bug, it's a feature.
   - Start with one small reset (one calendar, one to-do surface, one weekly family huddle) before trying to overhaul everything at once.
-stationSubtitle: "name what you're feeling, and why it's not your fault"
-nextTeaser: "now that we've named the feeling, chapter 2 is about the system that fixes it."
+stationSubtitle: "feeling overwhelmed? you're not alone. start here."
+nextTeaser: "we've talked about the feeling of being overwhelmed - now let's talk about ways to fix it."
 draft: false
 ---
 
