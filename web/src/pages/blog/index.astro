@@ -161,6 +161,23 @@ const latestDate = byDateDesc[0]?.data.date;
       </div>
     </header>
 
+    <!-- ══════════════ DIVIDER: MASTHEAD → LATEST ISSUE ══════════════
+         An ornamental zine-style flourish that separates the masthead
+         from the featured issue card. Thin orange rules fade in from
+         each side, meeting a Fraunces-italic "fresh off the press"
+         label bracketed by two small heritage-orange dots. Echoes the
+         hand-drawn squiggle motif under the beanstalk title without
+         repeating it. -->
+    <div class="fresh-divider" aria-hidden="true">
+      <span class="fresh-divider-rule"></span>
+      <span class="fresh-divider-ornament">
+        <span class="fresh-divider-dot"></span>
+        <span class="fresh-divider-text">fresh off the press</span>
+        <span class="fresh-divider-dot"></span>
+      </span>
+      <span class="fresh-divider-rule"></span>
+    </div>
+
     <!-- ══════════════ FEATURED: THIS WEEK'S ISSUE ══════════════ -->
     {featuredPost && (() => {
       const issueNo = issueMap.get(featuredPost.data.slug) ?? 1;
@@ -524,6 +541,57 @@ const latestDate = byDateDesc[0]?.data.date;
     z-index: 1;
   }
 
+  /* ══════════════ FRESH-OFF-THE-PRESS DIVIDER ══════════════
+     Ornamental break between the masthead and the featured issue.
+     Thin tapered rules flank a Fraunces-italic label with a small
+     heritage-orange dot on each side. Sized to match the featured
+     card width (980px) and padded against the card top. */
+  .fresh-divider {
+    align-items: center;
+    color: var(--heritage-orange);
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    margin: 4px auto 36px;
+    max-width: 760px;
+    padding: 0 32px;
+  }
+  .fresh-divider-rule {
+    background: linear-gradient(
+      to right,
+      transparent,
+      color-mix(in srgb, var(--heritage-orange) 32%, transparent),
+      transparent
+    );
+    flex: 1;
+    height: 1px;
+    max-width: 160px;
+  }
+  .fresh-divider-ornament {
+    align-items: center;
+    display: inline-flex;
+    gap: 14px;
+  }
+  .fresh-divider-dot {
+    background: var(--heritage-orange);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgb(241 93 34 / 14%);
+    display: inline-block;
+    flex-shrink: 0;
+    height: 6px;
+    width: 6px;
+  }
+  .fresh-divider-text {
+    color: var(--heritage-orange);
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: 1rem;
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
   /* ══════════════ ISSUE CARDS (featured + back issues) ══════════════ */
   .issue {
     background: var(--wash);
@@ -855,6 +923,13 @@ const latestDate = byDateDesc[0]?.data.date;
       margin-bottom: -6px;
       width: 170px;
     }
+    .fresh-divider {
+      gap: 14px;
+      margin: 0 auto 28px;
+      padding: 0 24px;
+    }
+    .fresh-divider-rule { max-width: 64px; }
+    .fresh-divider-text { font-size: 0.92rem; }
     .issue-featured {
       grid-template-columns: 1fr;
       margin-bottom: 44px;
