@@ -13,9 +13,9 @@ tags:
   - budgeting
   - financial-planning
   - money
-stationSubtitle: 'the money layer, once the logistics are running'
+stationSubtitle: 'the money layer, organized and running smoothly'
 prevTeaser: 'chapter 2 is the system. this chapter builds on it.'
-nextTeaser: "the system only works if you can trust where your family's data lives."
+nextTeaser: "let's discuss more about the system, where your family's data lives, and why that's critically important."
 draft: false
 ---
 
