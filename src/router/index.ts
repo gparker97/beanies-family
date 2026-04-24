@@ -210,20 +210,14 @@ const routes: RouteRecordRaw[] = [
   externalRedirect('/help/:pathMatch(.*)*', 'HelpRedirect'),
   externalRedirect('/privacy', 'PrivacyRedirect'),
   externalRedirect('/terms', 'TermsRedirect'),
-  {
-    path: '/blog',
-    name: 'BeanstalkBlog',
-    component: () => import('@/pages/BeanstalkBlogPage.vue'),
-    meta: { titleKey: 'nav.beanstalk', requiresAuth: false },
-  },
-  {
-    path: '/blog/:slug',
-    name: 'BeanstalkPost',
-    component: () => import('@/pages/BeanstalkPostPage.vue'),
-    meta: { titleKey: 'nav.beanstalk', requiresAuth: false },
-  },
-  { path: '/beanstalk', redirect: '/blog' },
-  { path: '/beanstalk/:slug', redirect: (to) => `/blog/${to.params.slug}` },
+  // Blog + beanstalk routes live on the Astro marketing site now
+  // (beanies.family/blog). These stubs exist so any stray bookmarks
+  // from the pre-Phase-C cutover era redirect to the real thing
+  // instead of 404-ing. Same pattern as /help above.
+  externalRedirect('/blog', 'BeanstalkBlogRedirect'),
+  externalRedirect('/blog/:slug', 'BeanstalkPostRedirect'),
+  externalRedirect('/beanstalk', 'BeanstalkBlogLegacyRedirect'),
+  externalRedirect('/beanstalk/:slug', 'BeanstalkPostLegacyRedirect'),
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
