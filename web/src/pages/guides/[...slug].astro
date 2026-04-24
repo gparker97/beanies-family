@@ -175,11 +175,33 @@ const articleSchema = {
           )
         }
 
-        {/* Final-pillar payoff card — renders BEFORE "further reading"
-            so the primary end-of-curriculum CTAs land before we offer
-            off-ramp links to the blog. The payoff is the closing beat
-            we want the reader to arrive at. Only renders on the guide
-            flagged `isFinalPillar` in frontmatter. */}
+        {
+          related.length > 0 && (
+            <aside class="guide-related">
+              <p class="guide-related-eyebrow">further reading</p>
+              <h2 class="guide-related-title">from the beanstalk</h2>
+              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
+              <ul class="guide-related-list">
+                {related.map((post) => (
+                  <li>
+                    <a href={post.href}>
+                      <span class="guide-related-arrow" aria-hidden="true">→</span>
+                      <span>
+                        <span class="guide-related-post-title">{post.title}</span>
+                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          )
+        }
+
+        {/* Final-pillar payoff card — renders LAST among content blocks
+            (after the further-reading aside) so the primary CTAs are
+            the final emphatic beat before navigation. Only renders on
+            the guide flagged `isFinalPillar` in frontmatter. */}
         {guide.data.isFinalPillar && firstGuide && (
           <section class="guide-payoff" aria-labelledby="guide-payoff-title">
             <div class="guide-payoff-eyebrow">
@@ -226,29 +248,6 @@ const articleSchema = {
             )}
           </section>
         )}
-
-        {
-          related.length > 0 && (
-            <aside class="guide-related">
-              <p class="guide-related-eyebrow">further reading</p>
-              <h2 class="guide-related-title">from the beanstalk</h2>
-              <p class="guide-related-sub">personal stories + product updates that expand on ideas in this guide.</p>
-              <ul class="guide-related-list">
-                {related.map((post) => (
-                  <li>
-                    <a href={post.href}>
-                      <span class="guide-related-arrow" aria-hidden="true">→</span>
-                      <span>
-                        <span class="guide-related-post-title">{post.title}</span>
-                        <span class="guide-related-post-excerpt">{post.excerpt}</span>
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          )
-        }
 
         {/* Prev/next chapter nav — a two-card walk-through rhythm. Each
             card shows the chapter label + title as the header and the
