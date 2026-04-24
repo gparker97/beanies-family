@@ -78,11 +78,6 @@ function tintStyle(post: BlogPost): Record<string, string> {
   };
 }
 
-function firstLetter(title: string): string {
-  const m = title.match(/[A-Za-z]/);
-  return (m?.[0] ?? title[0] ?? '•').toLowerCase();
-}
-
 function formatStamp(dateStr: string): string {
   if (!dateStr) return '';
   const d = new Date(`${dateStr}T00:00:00`);
@@ -103,7 +98,7 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     <header class="masthead">
       <div class="masthead-wash" aria-hidden="true" />
       <img
-        src="/brand/beanies_family_hugging_transparent_512x512.png"
+        src="/brand/beanies-beanstalk-mascot.webp"
         alt=""
         class="masthead-mascot"
         aria-hidden="true"
@@ -113,15 +108,35 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
         <span class="masthead-rule-divider">·</span>
         <span>EST. 2026</span>
         <span class="masthead-rule-divider">·</span>
-        <span>A BEANIES FAMILY PUBLICATION</span>
+        <span>A BEANIES.FAMILY PUBLICATION</span>
       </div>
       <h1 class="masthead-title">
-        <span class="masthead-title-over">the</span>
-        <span class="masthead-title-under">beanstalk.</span>
+        <span class="masthead-title-lede">the</span>
+        <span class="masthead-title-brand">beanies.family</span>
+        <span class="masthead-title-main">
+          beanstalk
+          <svg
+            class="masthead-title-squiggle"
+            viewBox="0 0 300 20"
+            aria-hidden="true"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M 4 14 Q 30 2, 60 11 T 120 10 T 180 11 T 240 10 T 296 11"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="round"
+            />
+          </svg>
+        </span>
       </h1>
       <p class="masthead-pitch">
-        a weekly dispatch from the bean patch
-        <span class="masthead-pitch-em">- friday mornings</span>, greg writing, not a newsletter.
+        a newsletter about beanies.family, vibe coding, or just
+        <em>life in general</em>.<br />
+        published every friday, or roughly whenever
+        <span class="masthead-pitch-name">greg</span> feels like it.
+        <span class="masthead-pitch-em">not written by AI. usually.</span>
       </p>
       <p class="masthead-issue">
         <span class="masthead-issue-chip">VOL. 01</span>
@@ -134,8 +149,8 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
       </p>
     </header>
 
-    <div class="masthead-divider" aria-hidden="true">
-      <span class="masthead-divider-glyph">🫘</span>
+    <div class="masthead-banner" aria-hidden="true">
+      <img src="/brand/beanies-beanstalk-banner.webp" alt="" />
     </div>
 
     <!-- ══════════════ FEATURED ══════════════ -->
@@ -158,18 +173,26 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
           </template>
           <template v-else>
             <div class="issue-plate">
-              <span class="issue-plate-letter">{{ firstLetter(featuredPost.title) }}</span>
-              <span v-if="featuredPost.coverEmoji" class="issue-plate-stamp">{{
+              <span class="issue-plate-grid" aria-hidden="true" />
+              <span v-if="featuredPost.coverEmoji" class="issue-plate-emoji">{{
                 featuredPost.coverEmoji
               }}</span>
-              <span class="issue-plate-grid" aria-hidden="true" />
+              <span class="issue-plate-stamp"
+                >ISSUE {{ String(featuredPost.issueNumber).padStart(2, '0') }}</span
+              >
+              <img
+                class="issue-plate-sprout"
+                src="/brand/beanies-beanstalk-mascot.webp"
+                alt=""
+                aria-hidden="true"
+              />
             </div>
           </template>
         </div>
         <div class="issue-body">
           <p class="issue-kicker">
             <span class="issue-kicker-dot" aria-hidden="true" />
-            <span class="issue-kicker-label">THIS WEEK'S ISSUE</span>
+            <span class="issue-kicker-label">FEATURED ISSUE</span>
             <span class="issue-kicker-divider">·</span>
             <span class="issue-kicker-issue"
               >ISSUE {{ String(featuredPost.issueNumber).padStart(2, '0') }}</span
@@ -228,11 +251,19 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
               </template>
               <template v-else>
                 <div class="issue-plate">
-                  <span class="issue-plate-letter">{{ firstLetter(post.title) }}</span>
-                  <span v-if="post.coverEmoji" class="issue-plate-stamp">{{
+                  <span class="issue-plate-grid" aria-hidden="true" />
+                  <span v-if="post.coverEmoji" class="issue-plate-emoji">{{
                     post.coverEmoji
                   }}</span>
-                  <span class="issue-plate-grid" aria-hidden="true" />
+                  <span class="issue-plate-stamp"
+                    >ISSUE {{ String(post.issueNumber).padStart(2, '0') }}</span
+                  >
+                  <img
+                    class="issue-plate-sprout"
+                    src="/brand/beanies-beanstalk-mascot.webp"
+                    alt=""
+                    aria-hidden="true"
+                  />
                 </div>
               </template>
             </div>
@@ -307,16 +338,34 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
 }
 
 .masthead-mascot {
-  bottom: 0;
-  filter: drop-shadow(0 12px 28px rgb(44 62 80 / 12%));
-  height: 160px;
-  opacity: 0.9;
+  animation: beanstalk-sway 6s ease-in-out infinite;
+  bottom: -18px;
+  filter: drop-shadow(0 14px 28px rgb(44 62 80 / 16%));
+  height: auto;
   pointer-events: none;
   position: absolute;
-  right: -20px;
-  transform: rotate(8deg);
-  width: 160px;
+  right: 4px;
+  transform-origin: bottom center;
+  width: 180px;
   z-index: 0;
+}
+
+@keyframes beanstalk-sway {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .masthead-mascot {
+    animation: none;
+    transform: rotate(0);
+  }
 }
 
 .masthead-rule-top {
@@ -355,52 +404,86 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   opacity: 0.55;
 }
 
+/* Playful title — Outfit-driven with italic serif lede + Heritage
+   Orange brand line + big main word with a hand-drawn squiggle. */
 .masthead-title {
   color: var(--deep-slate);
-  font-family: var(--font-serif);
-  line-height: 0.9;
-  margin: 0 0 22px;
+  font-family: var(--font-display);
+  line-height: 1;
+  margin: 0 0 18px;
   position: relative;
   z-index: 1;
 }
 
-.masthead-title-over {
-  display: block;
-  font-size: clamp(1.8rem, 3.6vw, 2.6rem);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.005em;
-  opacity: 0.75;
-}
-
-.masthead-title-under {
-  color: var(--deep-slate);
+.masthead-title-lede {
+  color: rgb(44 62 80 / 55%);
   display: block;
   font-family: var(--font-serif);
-  font-size: clamp(4rem, 11vw, 8rem);
+  font-size: clamp(1.2rem, 2.2vw, 1.6rem);
   font-style: italic;
-  font-weight: 500;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin-bottom: 2px;
+}
+
+.masthead-title-brand {
+  color: var(--heritage-orange);
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.masthead-title-main {
+  color: var(--deep-slate);
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: clamp(3.2rem, 8vw, 5.5rem);
+  font-weight: 800;
   letter-spacing: -0.035em;
-  margin-top: 2px;
+  line-height: 0.95;
+  position: relative;
+}
+
+.masthead-title-squiggle {
+  bottom: -0.2em;
+  color: var(--heritage-orange);
+  height: 0.28em;
+  left: -2%;
+  opacity: 0.9;
+  position: absolute;
+  width: 104%;
 }
 
 .masthead-pitch {
   color: rgb(44 62 80 / 78%);
-  font-family: var(--font-serif);
-  font-size: clamp(1.05rem, 1.6vw, 1.2rem);
-  font-style: italic;
+  font-family: var(--font-display);
+  font-size: clamp(1rem, 1.55vw, 1.15rem);
   font-weight: 400;
-  line-height: 1.55;
+  line-height: 1.6;
   margin: 0 auto 26px;
-  max-width: 620px;
+  max-width: 580px;
   position: relative;
   z-index: 1;
 }
 
-.masthead-pitch-em {
+.masthead-pitch em {
   color: var(--heritage-orange);
+  font-family: var(--font-serif);
   font-style: italic;
   font-weight: 500;
+}
+
+.masthead-pitch-name {
+  color: var(--deep-slate);
+  font-weight: 700;
+}
+
+.masthead-pitch-em {
+  color: var(--deep-slate);
+  font-weight: 600;
 }
 
 .masthead-issue {
@@ -437,29 +520,39 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   opacity: 0.45;
 }
 
-.masthead-divider {
-  align-items: center;
-  color: var(--heritage-orange);
+/* Beanstalk cartoon banner — between masthead and featured card. */
+.masthead-banner {
   display: flex;
-  gap: 18px;
   justify-content: center;
-  margin: 0 auto 48px;
-  max-width: 540px;
+  margin: 0 auto 44px;
+  max-width: 560px;
   padding: 0 32px;
 }
 
-.masthead-divider::before,
-.masthead-divider::after {
-  background: linear-gradient(to right, transparent, rgb(241 93 34 / 30%), transparent);
-  content: '';
-  flex: 1;
-  height: 1px;
+.masthead-banner img {
+  animation: beanstalk-float 4.2s ease-in-out infinite;
+  display: block;
+  filter: drop-shadow(0 8px 18px rgb(44 62 80 / 12%));
+  height: auto;
+  max-width: 520px;
+  width: 100%;
 }
 
-.masthead-divider-glyph {
-  font-size: 0.9rem;
-  letter-spacing: 0.3em;
-  opacity: 0.6;
+@keyframes beanstalk-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .masthead-banner img {
+    animation: none;
+  }
 }
 
 .beanstalk-content {
@@ -559,13 +652,14 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   transform: scale(1.02);
 }
 
+/* Tinted washi-tape corners — one color per edition. */
 .issue-media-tape {
-  background: rgb(255 255 255 / 55%);
-  border: 1px solid rgb(255 255 255 / 35%);
-  box-shadow: 0 2px 4px rgb(44 62 80 / 12%);
-  height: 14px;
+  background: color-mix(in srgb, var(--tint) 32%, white);
+  border: 1px solid color-mix(in srgb, var(--tint) 25%, rgb(255 255 255 / 50%));
+  box-shadow: 0 2px 5px rgb(44 62 80 / 15%);
+  height: 16px;
   position: absolute;
-  width: 44px;
+  width: 50px;
   z-index: 2;
 }
 
@@ -581,6 +675,9 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   transform: rotate(-18deg);
 }
 
+/* Playful plate fallback — big cover emoji + ISSUE stamp + beanstalk
+   mascot sprout in the corner. Replaces the earlier oversized italic
+   letter (too literary for the beanies tone). */
 .issue-plate {
   align-items: center;
   color: var(--tint-ink);
@@ -588,37 +685,65 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   height: 100%;
   justify-content: center;
   min-height: 240px;
+  overflow: hidden;
   position: relative;
 }
 
-.issue-plate-letter {
-  font-family: var(--font-serif);
-  font-size: clamp(9rem, 22vw, 16rem);
-  font-style: italic;
-  font-weight: 500;
-  letter-spacing: -0.06em;
-  line-height: 0.82;
-  margin-bottom: -0.08em;
-  opacity: 0.82;
+.issue-plate-emoji {
+  animation: plate-emoji-wobble 4.8s ease-in-out infinite;
+  font-size: clamp(4.5rem, 11vw, 7rem);
+  line-height: 1;
   position: relative;
+  transform-origin: center;
   z-index: 1;
 }
 
-.issue-plate-stamp {
-  align-items: center;
-  background: white;
-  border: 1px solid color-mix(in srgb, var(--tint) 26%, transparent);
-  border-radius: 50%;
-  box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--tint) 30%, transparent);
-  display: inline-flex;
-  font-size: 1.25rem;
-  height: 42px;
-  justify-content: center;
+@keyframes plate-emoji-wobble {
+  0%,
+  100% {
+    transform: rotate(-3deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(3deg) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .issue-plate-emoji {
+    animation: none;
+    transform: none;
+  }
+}
+
+.issue-plate-sprout {
+  bottom: -6px;
+  filter: drop-shadow(0 4px 8px rgb(44 62 80 / 18%));
+  height: auto;
+  left: 8px;
+  opacity: 0.92;
+  pointer-events: none;
   position: absolute;
-  right: 20px;
-  top: 20px;
-  transform: rotate(6deg);
-  width: 42px;
+  transform: rotate(-4deg);
+  width: 80px;
+  z-index: 0;
+}
+
+.issue-plate-stamp {
+  background: white;
+  border: 1px solid color-mix(in srgb, var(--tint) 30%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--tint) 35%, transparent);
+  color: var(--tint-ink);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  padding: 5px 11px;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  transform: rotate(4deg);
   z-index: 2;
 }
 
@@ -824,9 +949,17 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   }
 
   .masthead-mascot {
-    height: 120px;
-    right: -10px;
-    width: 120px;
+    bottom: -10px;
+    right: 0;
+    width: 130px;
+  }
+
+  .masthead-banner {
+    margin-bottom: 36px;
+  }
+
+  .masthead-banner img {
+    max-width: 420px;
   }
 
   .beanstalk-content {
@@ -863,10 +996,15 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
   }
 
   .masthead-mascot {
-    height: 92px;
-    opacity: 0.75;
-    right: 0;
-    width: 92px;
+    bottom: auto;
+    opacity: 0.35;
+    right: -6px;
+    top: 70px;
+    width: 100px;
+  }
+
+  .masthead-banner img {
+    max-width: 320px;
   }
 
   .masthead-rule-top {
@@ -879,12 +1017,16 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     max-width: 40px;
   }
 
-  .masthead-title-over {
-    font-size: clamp(1.4rem, 5vw, 2rem);
+  .masthead-title-lede {
+    font-size: clamp(1rem, 4vw, 1.3rem);
   }
 
-  .masthead-title-under {
-    font-size: clamp(3.2rem, 15vw, 5.2rem);
+  .masthead-title-brand {
+    font-size: clamp(1.15rem, 4.5vw, 1.5rem);
+  }
+
+  .masthead-title-main {
+    font-size: clamp(2.6rem, 12vw, 4.4rem);
   }
 
   .masthead-pitch {
@@ -899,8 +1041,12 @@ const latestStamp = computed(() => (posts.value[0] ? formatStamp(posts.value[0].
     font-size: 1.45rem;
   }
 
-  .issue-plate-letter {
-    font-size: clamp(7rem, 38vw, 11rem);
+  .issue-plate-emoji {
+    font-size: clamp(3.5rem, 18vw, 5.5rem);
+  }
+
+  .issue-plate-sprout {
+    width: 60px;
   }
 
   .issue-media-frame {

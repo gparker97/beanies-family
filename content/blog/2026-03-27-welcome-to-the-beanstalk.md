@@ -6,7 +6,7 @@ category: updates
 coverEmoji: 🫘
 excerpt: "The story of how a janky spreadsheet, my son's nickname, and three crazy boys naturally led to vibe coding a family planning app at 3am."
 subtitle: 'why the janky spreadsheet finally got tossed'
-featured: true
+featured: false
 author: greg
 ---
 
