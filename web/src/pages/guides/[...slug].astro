@@ -18,14 +18,26 @@ export async function getStaticPaths() {
     const i = sorted.findIndex((g) => g.data.slug === guide.data.slug);
     const prevGuide = i > 0 ? sorted[i - 1] : undefined;
     const nextGuide = i < sorted.length - 1 ? sorted[i + 1] : undefined;
+    // `firstGuide` powers the loopback CTA on the final pillar's payoff
+    // card ("re-read chapter 1 with the system in mind"). Also supplies
+    // chapter-1 title/slug so the card doesn't have to hard-code either.
+    const firstGuide = sorted[0];
     return {
       params: { slug: guide.data.slug },
-      props: { guide, prevGuide, nextGuide },
+      props: {
+        guide,
+        prevGuide,
+        nextGuide,
+        firstGuide,
+        chapterNumber: i + 1,
+        prevChapterNumber: i > 0 ? i : undefined,
+        nextChapterNumber: i < sorted.length - 1 ? i + 2 : undefined,
+      },
     };
   });
 }
 
-const { guide, prevGuide, nextGuide } = Astro.props;
+const { guide, prevGuide, nextGuide, firstGuide, chapterNumber, prevChapterNumber, nextChapterNumber } = Astro.props;
 const { Content, headings } = await render(guide);
 
 const canonicalPath = `/guides/${guide.data.slug}`;
@@ -186,33 +198,96 @@ const articleSchema = {
           )
         }
 
-        {/* Prev/next guide — chronological walk through the pillar set.
-            Falls back to the index when you're at either end. Labelled
-            with "chapter" language (vs blog's "previous/next") to lean
-            into the book-ish framing of the guides. */}
-        <nav class="guide-nav" aria-label="guide navigation">
+        {/* Final-pillar payoff card — only renders on the guide flagged
+            `isFinalPillar` in frontmatter. Replaces the "next chapter"
+            slot (which doesn't exist on the final pillar) with an
+            explicit closing: what the reader just walked through, and
+            the two things they can do next (re-read the curriculum, or
+            open the app). The card is designed to feel like the
+            protagonist-of-the-story payoff, not a traditional nav CTA. */}
+        {guide.data.isFinalPillar && firstGuide && (
+          <section class="guide-payoff" aria-labelledby="guide-payoff-title">
+            <div class="guide-payoff-eyebrow">
+              <span class="guide-payoff-eyebrow-dot" aria-hidden="true"></span>
+              the end of the curriculum
+            </div>
+            <h2 id="guide-payoff-title" class="guide-payoff-title">what you can do now</h2>
+            <p class="guide-payoff-body">
+              you walked the whole thing. chapter by chapter: naming the overwhelm,
+              building the system, layering the money on top, and understanding why
+              the tool you use matters. what comes next is practice - every week,
+              with your family, inside whatever system works for you.
+              <strong>beanies.family</strong> is the tool i built from the four
+              chapters above. it's free, local-first, and designed for exactly this.
+            </p>
+            <div class="guide-payoff-actions">
+              <a class="guide-payoff-cta guide-payoff-cta-primary" href="https://app.beanies.family/welcome">
+                <span class="guide-payoff-cta-label">try beanies.family</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </a>
+              <a class="guide-payoff-cta guide-payoff-cta-secondary" href={`/guides/${firstGuide.data.slug}`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true">
+                  <polyline points="12 19 5 12 12 5" />
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                </svg>
+                <span class="guide-payoff-cta-label">re-read chapter 1</span>
+              </a>
+            </div>
+            {guide.data.loopbackTeaser && (
+              <p class="guide-payoff-loopback">{guide.data.loopbackTeaser}</p>
+            )}
+          </section>
+        )}
+
+        {/* Prev/next chapter nav — a two-card walk-through rhythm. Each
+            card shows the chapter label + title as the header and the
+            forward/backward teaser (pulled from adjacent pillar's
+            frontmatter via `nextGuide.data.nextTeaser` for forward and
+            `guide.data.prevTeaser` for backward) as the earn-the-click
+            body copy. On the final pillar, the "next" slot drops since
+            the payoff card above already replaces it. */}
+        <nav class="guide-nav" aria-label="guide navigation" data-final={guide.data.isFinalPillar ? 'true' : undefined}>
           <a class="guide-nav-btn" href={prevGuide ? `/guides/${prevGuide.data.slug}` : '/guides'}>
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <svg class="guide-nav-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
               <polyline points="15 18 9 12 15 6" />
             </svg>
             <span class="guide-nav-text">
-              <span class="guide-nav-label">{prevGuide ? 'previous guide' : 'library'}</span>
-              <span class="guide-nav-title">{prevGuide ? prevGuide.data.title : 'all guides'}</span>
+              <span class="guide-nav-label">
+                {prevGuide ? `chapter ${prevChapterNumber} ·  previous` : 'back to'}
+              </span>
+              <span class="guide-nav-title">
+                {prevGuide ? prevGuide.data.title : 'the curriculum'}
+              </span>
+              {prevGuide && guide.data.prevTeaser && (
+                <span class="guide-nav-teaser">{guide.data.prevTeaser}</span>
+              )}
             </span>
           </a>
 
-          <a
-            class="guide-nav-btn guide-nav-btn-right"
-            href={nextGuide ? `/guides/${nextGuide.data.slug}` : '/guides'}
-          >
-            <span class="guide-nav-text">
-              <span class="guide-nav-label">{nextGuide ? 'next guide' : 'library'}</span>
-              <span class="guide-nav-title">{nextGuide ? nextGuide.data.title : 'all guides'}</span>
-            </span>
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </a>
+          {!guide.data.isFinalPillar && (
+            <a
+              class="guide-nav-btn guide-nav-btn-right"
+              href={nextGuide ? `/guides/${nextGuide.data.slug}` : '/guides'}
+            >
+              <span class="guide-nav-text">
+                <span class="guide-nav-label">
+                  {nextGuide ? `chapter ${nextChapterNumber} ·  next` : 'back to'}
+                </span>
+                <span class="guide-nav-title">
+                  {nextGuide ? nextGuide.data.title : 'the curriculum'}
+                </span>
+                {nextGuide && guide.data.nextTeaser && (
+                  <span class="guide-nav-teaser">{guide.data.nextTeaser}</span>
+                )}
+              </span>
+              <svg class="guide-nav-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </a>
+          )}
         </nav>
       </div>
 
@@ -598,7 +673,7 @@ const articleSchema = {
   }
   .guide-prose h2::before {
     color: var(--heritage-orange);
-    content: 'chapter ' counter(chapter, decimal-leading-zero);
+    content: 'chapter ' counter(chapter);
     display: block;
     font-family: var(--font-display);
     font-size: 0.7rem;
@@ -988,6 +1063,157 @@ const articleSchema = {
      on mobile instead of blowing the flex row past the viewport
      (same trick the blog's post-nav uses). Styling leans e-zine:
      cream cards, hairline rule on top, serif italic labels. */
+  /* ==========================================================
+     Final-pillar payoff card — the closing moment of the curriculum.
+
+     Visually distinct from every other block on the page: filled
+     slate-to-orange wash, kraft-paper grain, enough negative space
+     that the two CTAs are the centre of attention. This is the reader's
+     arrival, not a nav row. Only renders when `isFinalPillar: true`
+     in the guide frontmatter.
+  ========================================================== */
+  .guide-payoff {
+    background:
+      radial-gradient(circle at 18% 20%, rgb(241 93 34 / 12%) 0%, transparent 50%),
+      radial-gradient(circle at 82% 80%, rgb(230 126 34 / 10%) 0%, transparent 55%),
+      linear-gradient(145deg, #1d2a3a 0%, #2c3e50 60%, #35516c 100%);
+    border: 1px solid rgb(255 255 255 / 8%);
+    border-radius: 28px;
+    box-shadow:
+      0 1px 0 rgb(255 255 255 / 10%) inset,
+      0 28px 60px -28px rgb(44 62 80 / 40%);
+    color: white;
+    margin-top: 56px;
+    overflow: hidden;
+    padding: 44px 40px 40px;
+    position: relative;
+  }
+  /* Subtle grain so the filled slate doesn't read as flat digital fill. */
+  .guide-payoff::before {
+    background-image:
+      radial-gradient(circle at 10% 10%, rgb(255 255 255 / 4%) 0%, transparent 20%),
+      radial-gradient(circle at 90% 90%, rgb(255 255 255 / 3%) 0%, transparent 22%);
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+  .guide-payoff > * { position: relative; z-index: 1; }
+  .guide-payoff-eyebrow {
+    align-items: center;
+    color: rgb(255 255 255 / 75%);
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.68rem;
+    font-weight: 700;
+    gap: 10px;
+    letter-spacing: 0.22em;
+    margin-bottom: 18px;
+    text-transform: uppercase;
+  }
+  .guide-payoff-eyebrow-dot {
+    background: var(--heritage-orange);
+    border-radius: 50%;
+    box-shadow: 0 0 0 4px rgb(241 93 34 / 24%);
+    display: inline-block;
+    height: 8px;
+    width: 8px;
+  }
+  .guide-payoff-title {
+    color: white;
+    font-family: var(--font-display);
+    font-size: clamp(1.85rem, 3.5vw, 2.4rem);
+    font-weight: 800;
+    letter-spacing: -0.022em;
+    line-height: 1.1;
+    margin: 0 0 20px;
+    max-width: 640px;
+  }
+  .guide-payoff-body {
+    color: rgb(255 255 255 / 88%);
+    font-family: var(--font-serif);
+    font-size: 1.08rem;
+    font-weight: 400;
+    line-height: 1.6;
+    margin: 0 0 30px;
+    max-width: 640px;
+  }
+  .guide-payoff-body strong {
+    color: var(--heritage-orange);
+    font-weight: 600;
+  }
+  .guide-payoff-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .guide-payoff-cta {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    gap: 10px;
+    letter-spacing: -0.006em;
+    padding: 14px 24px;
+    text-decoration: none;
+    transition: transform 200ms, box-shadow 200ms, background-color 200ms;
+  }
+  .guide-payoff-cta-primary {
+    background: var(--heritage-orange);
+    box-shadow: 0 12px 28px -14px rgb(241 93 34 / 80%);
+    color: white;
+  }
+  .guide-payoff-cta-primary:hover {
+    background: #e05517;
+    box-shadow: 0 16px 32px -12px rgb(241 93 34 / 90%);
+    transform: translateY(-2px);
+  }
+  .guide-payoff-cta-primary svg {
+    transition: transform 200ms;
+  }
+  .guide-payoff-cta-primary:hover svg { transform: translateX(3px); }
+  .guide-payoff-cta-secondary {
+    background: rgb(255 255 255 / 10%);
+    border: 1px solid rgb(255 255 255 / 18%);
+    color: white;
+  }
+  .guide-payoff-cta-secondary:hover {
+    background: rgb(255 255 255 / 16%);
+    border-color: rgb(255 255 255 / 30%);
+    transform: translateY(-2px);
+  }
+  .guide-payoff-cta-secondary svg {
+    transition: transform 200ms;
+  }
+  .guide-payoff-cta-secondary:hover svg { transform: translateX(-3px); }
+  .guide-payoff-loopback {
+    border-top: 1px solid rgb(255 255 255 / 14%);
+    color: rgb(255 255 255 / 70%);
+    font-family: var(--font-serif);
+    font-size: 0.95rem;
+    font-style: italic;
+    line-height: 1.55;
+    margin: 22px 0 0;
+    max-width: 620px;
+    padding-top: 18px;
+  }
+
+  /* ==========================================================
+     Prev/next chapter nav (enhanced from the label-only variant).
+
+     Each card now earns the click by previewing the adjacent chapter:
+       - eyebrow = "chapter N · previous/next"
+       - title = chapter title
+       - teaser = one-sentence pull from adjacent pillar's frontmatter
+     Teaser sentence is the difference between "there's a next chapter"
+     and "here's why you want it." On the final pillar the right card
+     is suppressed since the payoff card above replaces it and the prev
+     card becomes full-width.
+  ========================================================== */
   .guide-nav {
     border-top: 1px solid var(--hairline);
     display: flex;
@@ -995,76 +1221,99 @@ const articleSchema = {
     margin-top: 48px;
     padding-top: 32px;
   }
+  .guide-nav[data-final='true'] { border-top: none; padding-top: 24px; }
+  .guide-nav[data-final='true'] .guide-nav-btn { flex: 1; }
   .guide-nav-btn {
-    align-items: center;
+    align-items: flex-start;
     background: white;
-    border: 1px solid rgb(44 62 80 / 6%);
-    border-radius: 18px;
+    border: 1px solid rgb(44 62 80 / 8%);
+    border-radius: 20px;
     display: flex;
     flex: 1;
-    gap: 12px;
+    gap: 14px;
     min-width: 0;
-    padding: 18px 20px;
+    padding: 20px 22px;
     text-decoration: none;
     transition:
-      border-color 200ms,
-      box-shadow 200ms,
-      transform 200ms;
+      border-color 220ms,
+      box-shadow 220ms,
+      transform 220ms;
   }
   .guide-nav-btn > .guide-nav-text {
+    flex: 1;
     min-width: 0;
   }
   .guide-nav-btn:hover {
-    border-color: rgb(241 93 34 / 20%);
-    box-shadow: 0 6px 20px rgb(241 93 34 / 8%);
-    transform: translateY(-1px);
+    border-color: rgb(241 93 34 / 28%);
+    box-shadow: 0 12px 28px -16px rgb(241 93 34 / 20%);
+    transform: translateY(-2px);
   }
   .guide-nav-btn-right {
     justify-content: flex-end;
     text-align: right;
   }
-  .guide-nav-btn svg {
-    color: rgb(44 62 80 / 25%);
+  .guide-nav-icon {
+    color: rgb(44 62 80 / 30%);
     flex-shrink: 0;
-    transition: color 200ms, transform 200ms;
+    margin-top: 4px;
+    transition: color 220ms, transform 220ms;
   }
-  .guide-nav-btn:hover svg {
+  .guide-nav-btn:hover .guide-nav-icon {
     color: var(--heritage-orange);
-    transform: translateX(-2px);
+    transform: translateX(-3px);
   }
-  .guide-nav-btn-right:hover svg {
-    transform: translateX(2px);
+  .guide-nav-btn-right:hover .guide-nav-icon {
+    transform: translateX(3px);
   }
   .guide-nav-text {
     display: flex;
     flex-direction: column;
+    gap: 6px;
     min-width: 0;
   }
   .guide-nav-label {
     color: var(--heritage-orange);
     font-family: var(--font-display);
-    font-size: 0.65rem;
+    font-size: 0.64rem;
     font-weight: 700;
-    letter-spacing: 0.14em;
-    opacity: 0.85;
+    letter-spacing: 0.18em;
+    opacity: 0.9;
     text-transform: uppercase;
   }
   .guide-nav-title {
+    -webkit-box-orient: vertical;
     color: var(--deep-slate);
-    font-family: var(--font-serif);
-    font-size: 1rem;
-    font-weight: 500;
-    letter-spacing: -0.005em;
-    line-height: 1.3;
-    margin-top: 6px;
+    display: -webkit-box;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.25;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    transition: color 200ms;
   }
   .guide-nav-btn:hover .guide-nav-title {
     color: var(--heritage-orange);
   }
+  /* Teaser: the one-sentence reason to click, pulled from the adjacent
+     pillar's frontmatter. Intentionally italic + serif so it reads like
+     a book-margin annotation, not a nav label. */
+  .guide-nav-teaser {
+    color: rgb(44 62 80 / 65%);
+    display: block;
+    font-family: var(--font-serif);
+    font-feature-settings: 'ss01';
+    font-size: 0.9rem;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.45;
+    margin-top: 2px;
+  }
+  .guide-nav-btn-right .guide-nav-teaser { text-align: right; }
 
   /* Sticky section rail — only mounts on wide viewports via grid. */
   .guide-rail {
@@ -1185,6 +1434,24 @@ const articleSchema = {
     transform: translateY(-2px);
   }
 
+  /* Mid-width — stack the prev/next cards vertically so the teaser
+     sentence gets full width instead of being squeezed into half a
+     column. Kept above the narrow breakpoint so it triggers on tablets. */
+  @media (max-width: 700px) {
+    .guide-nav { flex-direction: column; gap: 12px; }
+    .guide-nav-btn { flex: none; padding: 18px 20px; }
+    .guide-nav-btn-right { justify-content: flex-start; text-align: left; }
+    .guide-nav-btn-right .guide-nav-text { text-align: left; }
+    .guide-nav-btn-right .guide-nav-teaser { text-align: left; }
+    /* On stacked layout put the back-arrow card first visually and the
+       forward card second — keep the natural reading order. */
+    .guide-nav-btn-right { order: 2; }
+    .guide-payoff { margin-top: 44px; padding: 36px 28px 32px; }
+    .guide-payoff-title { font-size: clamp(1.6rem, 5.5vw, 2rem); }
+    .guide-payoff-body { font-size: 1rem; }
+    .guide-payoff-cta { padding: 12px 20px; }
+  }
+
   /* Narrow screens — tighten padding + shrink hero. */
   @media (max-width: 520px) {
     .guide-shell { padding: 76px 20px 48px; }
@@ -1200,7 +1467,10 @@ const articleSchema = {
     .guide-recap { padding: 28px 24px; }
     .guide-related { padding: 24px; }
     .guide-nav { gap: 10px; margin-top: 36px; padding-top: 24px; }
-    .guide-nav-btn { padding: 14px 16px; }
-    .guide-nav-title { font-size: 0.9rem; }
+    .guide-nav-btn { padding: 16px 18px; }
+    .guide-nav-title { font-size: 0.95rem; }
+    .guide-payoff { border-radius: 20px; padding: 30px 22px 26px; }
+    .guide-payoff-actions { gap: 10px; }
+    .guide-payoff-cta { width: 100%; justify-content: center; }
   }
 </style>

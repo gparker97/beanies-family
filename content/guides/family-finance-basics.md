@@ -4,7 +4,7 @@ slug: family-finance-basics
 excerpt: 'the minimally useful family finance setup for responsible parents - what to track and how to track it. written by a parent, not a financial advisor.'
 heroEmoji: 💰
 publishedDate: 2026-04-22
-lastUpdated: 2026-04-22
+lastUpdated: 2026-04-24
 relatedPosts:
   - welcome-to-the-beanstalk
   - accidentally-built-greatest-family-app
@@ -13,6 +13,9 @@ tags:
   - budgeting
   - financial-planning
   - money
+stationSubtitle: 'the money layer, once the logistics are running'
+prevTeaser: 'chapter 2 is the system. this chapter builds on it.'
+nextTeaser: "the system only works if you can trust where your family's data lives."
 draft: false
 ---
 
@@ -57,7 +60,7 @@ This got even more fun when we had kids. 3, to be exact.
 
 Rather than 2 incomes and a few more expenses, our balance sheet exploded. Kids' gear, school fees, tutors, sports, lessons, doctor's visits, and more. Family vacations went from a fun holiday to a full scale project and a major expense.
 
-I wrote [a blog about the fact that at one point, I completely lost track of my net worth](https://beanies.family/blog/accidentally-built-greatest-family-app). I had been keeping data in a spreadsheet, but I stopped updating it, and all the cool formulas I had written were broken.
+[I wrote a blog about the fact that at one point, I completely lost track of my net worth](/blog/accidentally-built-greatest-family-app). I had been keeping data in a spreadsheet, but I stopped updating it, and all the cool formulas I had written were broken.
 
 This is a common problem - family finance is harder for several fundamental reasons:
 
@@ -133,6 +136,8 @@ The two most popular budgeting frameworks for families are:
 - **50/30/20** - 50% on needs, 30% on wants, 20% on savings. Simple, easy to remember, generous on the "wants" side.
 - **Zero-based budgeting** - Every dollar is assigned to a category before the month starts. More discipline and more granularity, but also more chance of falling apart before it even gets started.
 
+The 50/30/20 rule was popularized by Elizabeth Warren and Amelia Warren Tyagi in their 2005 book [All Your Worth: The Ultimate Lifetime Money Plan](https://www.investopedia.com/ask/answers/022916/what-502030-budget-rule.asp). It's popular not only because the math is memorable, but because it works well as a high level rule.
+
 A reasonable middle ground for most families: use 50/30/20 as your high-level framework, then track a few critical categories (kids, food, big-discretionary) more carefully.
 
 ## kids and money: how much do kids really cost, and what changes as they grow?
@@ -160,6 +165,8 @@ More than anything else, the actionable insight is to budget for the next stage,
 
 Classic personal finance advice says to keep 3-6 months of expenses in an emergency fund. For families, lean toward the higher end of that range - 6 months at least, and more if your income is variable, or you are a single-income family.
 
+The Federal Reserve's 2024 [Economic Well-Being of U.S. Households report (SHED)](https://www.federalreserve.gov/publications/2024-economic-well-being-of-us-households-in-2023-expenses.htm) found that in 2023, 37% of adults would not be able to cover a $400 emergency expense without borrowing money. That's a serious issue, with potentially huge implications. A small buffer could be the difference between a bad week and a downward spiral.
+
 Families have more potential failure modes than individuals - car issues, roofs leaking, medical bills, job loss, a kid that needs braces, and the list goes on. Any one of these, on its own, is a single bad month. A few of them clumped together is what can tip a family over the financial edge - which is something that we want to avoid at all costs.
 
 A few practical notes:
@@ -186,7 +193,7 @@ A monthly money meeting changes the pattern. Here's a workable format:
 - **Talk about what surprised you** - Discuss anything in the last month that was bigger or smaller than expected, and why. Try to catch slow-moving problems before they become big.
 - **End with one decision** - What's the one thing you'll do differently next month?
 
-Two big rules:
+**Two big rules:**
 
 - **No blame** - whoever overspent, whoever forgot something, it doesn't matter. The only useful question is, "What do we do next?"
 - **No surprises** - If you make a big purchase between meetings, mention it before the meeting. Avoid having the meeting be the place where the other person finds out about something.
@@ -216,7 +223,7 @@ When I first started working in Japan I was paid in JPY, which was convenient. I
 
 The JPY was having a historically strong bull run against the dollar, and that one decision cost me anywhere from 10-30% of my take-home income every month, versus being paid in yen. While the decision to be paid in USD may have been beneficial for somebody who spent more time overseas, for me, it was the wrong decision and an expensive lesson to always do your homework before making a major financial decision.
 
-I built [beanies.family](https://beanies.family) specifically to help with families dealing with multiple currencies. Using beanies.family helps me immensely to view my finances, held in USD, SGD, and other currencies (hi there, crypto traders!). It's useful being able to see my net worth in any currency, and to capture my expenses in the currency that I pay, rather than having to convert it myself.
+I built [beanies.family](https://beanies.family) specifically to help with families dealing with multiple currencies. Using [beanies.family](https://beanies.family) helps me immensely to view my finances, held in USD, SGD, and other currencies (hi there, crypto traders!). It's useful being able to see my net worth in any currency, and to capture my expenses in the currency that I pay, rather than having to convert it myself.
 
 ## how and when to teach your kids about money
 
@@ -232,6 +239,8 @@ That said, here's a rough age-by-age framework for explicit money lessons:
 - **Ages 15-18** - Bring your kids into real family financial conversations, within reason. Show them the rough shape of how the household budget works. Talk about the trade-offs related to actual decisions they may need to make in college.
 - **Ages 18+** - Help them open a bank account. I'd recommend a debit card rather than a credit card, even if they clearly understand the disastrous financial consequences of being saddled with high-interest credit card debt. It's better to be safe than sorry. This is the age where lifelong habits get set.
 
+If you want to run the numbers yourself or together with your kids, the SEC's [compound interest calculator at investor.gov](https://www.investor.gov/financial-tools-calculators/calculators/compound-interest-calculator) is free, authoritative, and easy to use. Just plug in your contribution, rate, and timeline, and see how the curve steepens.
+
 My 10-year-old picked up the concepts early on, and even used his own money to buy his favorite Dog Man books at the local book store. Using his money to buy something he wanted was a great way to get him engaged, and to have a discussion about money and savings.
 
 ## tools that help, and tools that lock you in
@@ -241,7 +250,7 @@ My 10-year-old picked up the concepts early on, and even used his own money to b
 A few common tool categories, with honest pros and cons:
 
 - **Spreadsheets (Excel, Google Sheets)** - Maximum flexibility, minimal lock-in, free. But also, minimal guidance and direction - everything is up to you. They require manual updates, and only the spreadsheet owner maintains them. Spreadsheets degrade fast once kids enter the picture.
-- **Mainstream personal finance apps (Mint, YNAB, Copilot Money)** - Polished app / user interface, automatic bank transaction sync, useful budgeting features. They're often designed for one user, and store your data in their cloud (with the privacy implications I covered in the [local-first guide](/guides/local-first-family-finance-planning-tools) ←<link to local first guide here> <!-- link added: greg confirm -->). While it's unlikely, your data disappears if the company shuts down. Mint is the cautionary tale here - millions of users and data, then suddenly it was gone.
+- **Mainstream personal finance apps (Mint, YNAB, Copilot Money)** - Polished app / user interface, automatic bank transaction sync, useful budgeting features. They're often designed for one user, and store your data in their cloud (with the privacy implications I covered in the [local-first guide](/guides/local-first-family-finance-planning-tools)). While it's unlikely, your data disappears if the company shuts down. Mint is the cautionary tale here - millions of users and data, then suddenly it was gone.
 - **Online banking / bank-specific tools** - These are typically free and well-integrated with your bank. The issue is that they only see the accounts you have at that bank, and typically have weak family / multi-user support.
 - **Local-first family and finance planning tools** - This is where [beanies.family](https://beanies.family) comes into the picture. Your data stays on your device, fully encrypted, and family-aware from the ground up. The trade-off is that there is a smaller ecosystem with banks, meaning manual entry instead of bank sync. For some (like me), this is a plus.
 
@@ -255,13 +264,13 @@ For more on why data ownership matters, see the companion guide: [what is local-
 
 We've covered a lot here. If you take nothing else away:
 
-- **Know your four numbers** - net worth, monthly cashflow, runway, debt-to-income. Update them once a month and you'll know more than 80% of families.
+- **Know your four numbers** - Net worth, monthly cashflow, runway, debt-to-income. Update them once a month and you'll know more than 80% of families.
 - **Hold a monthly money meeting with your partner** - 30 minutes, structured, and calm. The single highest-leverage thing you can do for your family's financial health.
 - **Use a tool you trust** - Wherever you track your family finances, whether it's a spreadsheet, app, or ledger, make sure your data is yours and exportable. The tool you love today may not exist in five years.
 
 Family finance is hard, and the systems that work aren't necessarily the most sophisticated ones - they are the ones that both partners actually use. Build for that, and you will come out ahead.
 
-If you want to learn more, or just want to read more of my dumb writing, join [the beanstalk on substack](https://gpbeanies.substack.com) for a weekly-ish letter from me.
+If you want to learn more, or just want to read more of my dumb writing, [join the beanstalk on substack](https://gpbeanies.substack.com) for a weekly-ish letter from me.
 
 And if you want to try a family-aware tool I built precisely because none of the existing ones worked for me, that's [beanies.family](https://beanies.family).
 
